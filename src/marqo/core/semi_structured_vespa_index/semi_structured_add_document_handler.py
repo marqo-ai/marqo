@@ -6,6 +6,7 @@ from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import TooManyFieldsError
+from marqo.core.inference.api import Inference
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField, \
@@ -31,11 +32,12 @@ class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
     max_string_array_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED))
 
+
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
-                 vespa_client: VespaClient, index_management: IndexManagement,
+                 vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
                  field_count_config=SemiStructuredFieldCountConfig()):
-        super().__init__(marqo_index, add_docs_params, vespa_client)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.index_management = index_management
         self.marqo_index = marqo_index
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)

@@ -1,21 +1,19 @@
 import uuid
 from abc import ABC, abstractmethod
-from contextlib import ExitStack
 from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set
 
 from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
-    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
-from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
-    UnsupportedFeatureError, VespaDocumentParsingError
+from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError
+from marqo.core.inference.api import Modality, InferenceError, InferenceRequest, TextPreprocessingConfig, \
+    TextChunkConfig, ImagePreprocessingConfig, AudioVideoPreprocessingConfig, ChunkConfig, Inference, ModelConfig
 from marqo.core.models import MarqoIndex
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
-from marqo.core.models.marqo_index import FieldType
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.logging import get_logger
-from marqo.tensor_search import validation, add_docs
+from marqo.tensor_search import validation
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
@@ -110,10 +108,12 @@ class AddDocumentsHandler(ABC):
     docs to Vespa docs, etc.
     """
 
-    def __init__(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
+    def __init__(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams,
+                 vespa_client: VespaClient, inference: Inference):
         self.marqo_index = marqo_index
         self.add_docs_params = add_docs_params
         self.vespa_client = vespa_client
+        self.inference = inference
         # only normalise custom vector in new indexes to keep the backward compatibility
         self.should_normalise_custom_vector = (marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version()
                                                >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION)
@@ -158,8 +158,8 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
-                result = self.vespa_client.get_batch(ids = list(self.add_docs_response_collector.valid_original_ids()),
-                                                         schema = self.marqo_index.schema_name)
+                result = self.vespa_client.get_batch(ids=list(self.add_docs_response_collector.valid_original_ids()),
+                                                     schema=self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self._populate_existing_tensors(existing_vespa_docs)
 
@@ -167,7 +167,7 @@ class AddDocumentsHandler(ABC):
             self._vectorise_tensor_fields()
 
         # FIXME this step is not timed in the original implementation
-        vespa_docs = self._convert_to_vespa_docs() # Responsible for converting the marqo docs (i.e the dictionary that we collected all documents to earlier) to vespa docs
+        vespa_docs = self._convert_to_vespa_docs()
 
         self._pre_persist_to_vespa()
 
@@ -194,9 +194,12 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def _infer_field_type(self, field_name: str, field_content: Any) -> FieldType:
+    def _infer_modality(self, tensor_field: TensorField) -> Modality:
         """
-        This method infers the field type of a field based on the field name and content.
+        This method infers the modality of a tensor field.
+
+        Raises:
+            AddDocumentsError: If the modality of the media content cannot be inferred.
         """
         pass
 
@@ -266,162 +269,119 @@ class AddDocumentsHandler(ABC):
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def _vectorise_tensor_fields(self) -> None:
-        """
-        Download, preprocess, chunk and vectorise collected tensor fields.
-        Three different batching strategies can be chosen to do tradeoff between resource usage and performance.
-        - Batching by field: Chunk and vectorise field by field (Default?)
-        - Batching by doc: Chunk and vectorise fields of a doc by field type (text, image, audio, video, etc.)
-        - Batching by add-doc batch: Chunk and vectorise all fields of a batch of docs by type
-        """
-        model_config = ModelConfig(
-            model_name=self.marqo_index.model.name,
-            model_properties=self.marqo_index.model.get_properties(),
-            model_auth=self.add_docs_params.model_auth,
-            device=self.add_docs_params.device,
-            normalize_embeddings=self.marqo_index.normalize_embeddings
-        )
-        batch_mode = self.add_docs_params.batch_vectorisation_mode
+        modalities = self._infer_modalities()
 
-        if batch_mode == BatchVectorisationMode.PER_FIELD:
-            self._vectorise_tensor_fields_per_field(model_config)
-        elif batch_mode == BatchVectorisationMode.PER_DOCUMENT:
-            self._vectorise_tensor_fields_in_batch_per_doc(model_config)
-        elif batch_mode == BatchVectorisationMode.PER_BATCH:
-            self._vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
-        else:
-            raise UnsupportedFeatureError(
-                message=f'Unsupported batch vectorisation mode: {str(batch_mode)}'
-            )
+        for modality in modalities:
+            self._vectorise_fields(modality, for_top_level_field=True)
+            self._vectorise_fields(modality, for_top_level_field=False)
 
-    def _vectorise_tensor_fields_per_field(self, model_config: ModelConfig) -> None:
-        with ExitStack() as exit_stack:
-            media_repo = self._download_media_contents(exit_stack)
-            chunkers = self._field_type_chunker_map(media_repo)
-            vectorisers = Vectoriser.single_vectorisers_by_modality(model_config)
-
-            for doc_id, field_name, tensor_field_content in (
-                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
-                try:
-                    tensor_field_content.chunk(chunkers)
-                    tensor_field_content.vectorise(vectorisers)
-                except AddDocumentsError as err:
-                    self.add_docs_response_collector.collect_error_response(doc_id, err)
-                    self.tensor_fields_container.remove_doc(doc_id)
-
-    def _vectorise_tensor_fields_in_batch_per_doc(self, model_config: ModelConfig) -> None:
-        with ExitStack() as exit_stack:
-            media_repo = self._download_media_contents(exit_stack)
-            chunkers = self._field_type_chunker_map(media_repo)
-            # sample doc_chunks_map: {'doc_id1': {'image_pointer': [('field_a_0': content_chunk)]}}
-            doc_chunks_map: Dict[str, Dict[FieldType, List[Tuple[str, ContentChunkType]]]] = dict()
-            # sample doc_field_map: {'doc_id1': {'field_name_1': tensor_field_content}}
-            doc_field_map: Dict[str, Dict[str, TensorFieldContent]] = dict()
-
-            for doc_id, field_name, tensor_field_content in (
-                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
-                try:
-                    tensor_field_content.chunk(chunkers)
-                    content_chunks_with_key = [(f'{field_name}_{index}', chunk) for index, chunk in
-                                               enumerate(tensor_field_content.content_chunks)]
-                    doc_chunks_map.setdefault(doc_id, {}).setdefault(
-                        tensor_field_content.field_type, []).extend(content_chunks_with_key)
-                    doc_field_map.setdefault(doc_id, {})[field_name] = tensor_field_content
-
-                except AddDocumentsError as err:
-                    self.add_docs_response_collector.collect_error_response(doc_id, err)
-                    self.tensor_fields_container.remove_doc(doc_id)
-                    if doc_id in doc_chunks_map:
-                        del doc_chunks_map[doc_id]
-
-            # TODO check if we should capture total vectorise time
-            for doc_id, chunks_to_vectorise in doc_chunks_map.items():
-                try:
-                    vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_to_vectorise)
-
-                    for field_name, tensor_field_content in doc_field_map[doc_id].items():
-                        tensor_field_content.vectorise(vectorisers, key_prefix=field_name)
-
-                except AddDocumentsError as err:
-                    self.add_docs_response_collector.collect_error_response(doc_id, err)
-                    self.tensor_fields_container.remove_doc(doc_id)
-
-    def _vectorise_tensor_fields_in_batch_per_add_doc_batch(self, model_config: ModelConfig) -> None:
-        with ExitStack() as exit_stack:
-            media_repo = self._download_media_contents(exit_stack)
-            chunkers = self._field_type_chunker_map(media_repo)
-            # sample chunks_map: {'image_pointer': [('doc_id_1_field_a_0': content_chunk)]}
-            chunks_map: Dict[FieldType, List[Tuple[str, ContentChunkType]]] = dict()
-
-            for doc_id, field_name, tensor_field_content in (
-                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
-                try:
-                    tensor_field_content.chunk(chunkers)
-                    field_type = tensor_field_content.field_type
-                    content_chunks_with_key = [(f'{doc_id}_{field_name}_{index}', chunk) for index, chunk in
-                                               enumerate(tensor_field_content.content_chunks)]
-                    chunks_map.setdefault(field_type, []).extend(content_chunks_with_key)
-                except AddDocumentsError as err:
-                    self.add_docs_response_collector.collect_error_response(doc_id, err)
-                    self.tensor_fields_container.remove_doc(doc_id)
-
+    def _infer_modalities(self) -> Set[Modality]:
+        all_modalities = set()
+        for field in self.tensor_fields_container.select_unresolved_tensor_fields():
             try:
-                vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_map)
-            except AddDocumentsError as err:
-                logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err)
-                raise InternalError(
-                    message=f'Encountered problem when vectorising batch of documents. Reason: {err.error_message}'
+                modality = self._infer_modality(field)
+                field.modality = modality
+                all_modalities.add(modality)
+            except AddDocumentsError as e:
+                self.add_docs_response_collector.collect_error_response(field.doc_id, e)
+        return all_modalities
+
+    def _vectorise_fields(self, modality: Modality, for_top_level_field: bool = True):
+        logger.debug(f'Vectorise tensor fields for modality `{modality}`, top_level_field: {for_top_level_field}')
+
+        def top_level_field_predicate(f: TensorField) -> bool:
+            return f.modality == modality and f.is_unresolved_top_level_field()
+
+        def subfield_predicate(f: TensorField) -> bool:
+            return (f.modality == modality and f.is_unresolved_multimodal_subfield()
+                    and self.tensor_fields_container.has_unresolved_parent_field(f))
+
+        tensor_fields = self.tensor_fields_container.select_unresolved_tensor_fields(
+            predicate=top_level_field_predicate if for_top_level_field else subfield_predicate)
+
+        if not tensor_fields:
+            logger.debug(f'No tensor fields found for modality `{modality}`, top_level_field: {for_top_level_field}')
+            return
+
+        request = InferenceRequest(
+            modality=modality,
+            contents=[field.field_content for field in tensor_fields],
+            model_config=ModelConfig(
+                model_name=self.marqo_index.model.name,
+                model_properties=self.marqo_index.model.get_properties(),
+                model_auth=self.add_docs_params.model_auth,
+                normalize_embeddings=self.marqo_index.normalize_embeddings
+            ),
+            device=self.add_docs_params.device,
+            preprocessing_config=self._get_preprocessing_config(modality, for_top_level_field)
+        )
+
+        # TODO handle error for the batch
+        inference_result = self.inference.vectorise(request)
+
+        if len(tensor_fields) != len(inference_result.result):
+            # TODO find a better error
+            raise InternalError()
+
+        erroneous_doc_ids = set()
+        for index, r in enumerate(inference_result.result):
+            field = tensor_fields[index]
+            doc_id = field.doc_id
+            field_name = field.field_name
+
+            if doc_id in erroneous_doc_ids:
+                continue
+
+            if isinstance(r, InferenceError):
+                logger.warning(f'Encountered error when vectorising field {field_name} in document {doc_id}', r)
+                erroneous_doc_ids.add(doc_id)
+                self.tensor_fields_container.remove_doc(doc_id)
+                self.add_docs_response_collector.collect_error_response(
+                    doc_id, AddDocumentsError(f'Encountered error when vectorising field {field_name}: {r.message}'))
+            else:
+                field.populate_chunks_and_embeddings(
+                    chunks=[chunk for chunk, _ in r],
+                    embeddings=[embedding.tolist() for _, embedding in r],
+                    for_top_level_field=for_top_level_field
                 )
 
-            for doc_id, field_name, tensor_field_content in (
-                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
-                tensor_field_content.vectorise(vectorisers, key_prefix=f'{doc_id}_{field_name}')
-
-    def _download_media_contents(self, exit_stack):
-        url_doc_id_map = dict()
-        doc_media_fields = dict()
-        media_field_types_mapping = dict()
-
-        media_field_types = [FieldType.ImagePointer, FieldType.AudioPointer, FieldType.VideoPointer]
-
-        for doc_id, field_name, tensor_field_content in (
-                self.tensor_fields_container.tensor_fields_to_vectorise(*media_field_types)):
-            url = tensor_field_content.field_content
-            url_doc_id_map.setdefault(url, set()).add(doc_id)
-            doc_media_fields.setdefault(doc_id, dict())[field_name] = url
-            media_field_types_mapping[field_name] = tensor_field_content.field_type
-
-        if not doc_media_fields:
-            return dict()
-
-        with RequestMetricsStore.for_request().time("image_download.full_time"):
-            media_repo = exit_stack.enter_context(
-                add_docs.download_and_preprocess_multimedia_content(
-                    docs=list(doc_media_fields.values()),
-                    media_field_types_mapping=media_field_types_mapping,
-                    marqo_index=self.marqo_index,
-                    add_docs_params=self.add_docs_params,
+    def _get_preprocessing_config(self, modality: Modality, for_top_level_field: bool):
+        if modality == Modality.TEXT:
+            return TextPreprocessingConfig(
+                should_chunk=for_top_level_field,
+                text_prefix=self.add_docs_params.text_chunk_prefix,
+                chunk_config=None if not for_top_level_field else TextChunkConfig(
+                    split_length=self.marqo_index.text_preprocessing.split_length,
+                    split_overlap=self.marqo_index.text_preprocessing.split_overlap,
+                    split_method=self.marqo_index.text_preprocessing.split_method.value
                 )
             )
-
-        for url, data in media_repo.items():
-            if isinstance(data, Exception):
-                for doc_id in url_doc_id_map[url]:
-                    self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
-                        error_message=f"Could not process the media file found at `{url}`. Reason: {str(data)}"
-                    ))
-                    self.tensor_fields_container.remove_doc(doc_id)
-
-        return media_repo
-
-    def _field_type_chunker_map(self, media_repo):
-        chunkers: Dict[FieldType, Chunker] = {
-            FieldType.Text: TextChunker(text_preprocessing=self.marqo_index.text_preprocessing,
-                                        text_chunk_prefix=self.marqo_index.model.get_text_chunk_prefix(
-                                            self.add_docs_params.text_chunk_prefix)),
-            FieldType.ImagePointer: ImageChunker(media_repo=media_repo,
-                                                 image_preprocessing=self.marqo_index.image_preprocessing,
-                                                 device=self.add_docs_params.device),
-            FieldType.AudioPointer: AudioVideoChunker(media_repo=media_repo),
-            FieldType.VideoPointer: AudioVideoChunker(media_repo=media_repo),
-        }
-        return chunkers
+        elif modality == Modality.IMAGE:
+            return ImagePreprocessingConfig(
+                should_chunk=for_top_level_field and self.marqo_index.image_preprocessing.patch_method,
+                download_thread_count=self.add_docs_params.image_download_thread_count,
+                download_header=self.add_docs_params.media_download_headers,
+                patch_method=None if not for_top_level_field else self.marqo_index.image_preprocessing.patch_method.value
+            )
+        elif modality == Modality.AUDIO:
+            return AudioVideoPreprocessingConfig(
+                should_chunk=True,
+                download_thread_count=self.add_docs_params.media_download_thread_count,
+                download_header=self.add_docs_params.media_download_headers,
+                chunk_config=ChunkConfig(
+                    split_length=self.marqo_index.audio_preprocessing.split_length,
+                    split_overlap=self.marqo_index.audio_preprocessing.split_overlap,
+                )
+            )
+        elif modality == Modality.VIDEO:
+            return AudioVideoPreprocessingConfig(
+                should_chunk=True,
+                download_thread_count=self.add_docs_params.media_download_thread_count,
+                download_header=self.add_docs_params.media_download_headers,
+                chunk_config=ChunkConfig(
+                    split_length=self.marqo_index.video_preprocessing.split_length,
+                    split_overlap=self.marqo_index.video_preprocessing.split_overlap,
+                )
+            )
+        else:
+            raise InternalError(f'The modality {modality} is not supported.')

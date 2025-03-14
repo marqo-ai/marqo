@@ -2,66 +2,66 @@ import unittest
 from typing import Dict, Any, List
 from unittest.mock import patch
 
-import pytest
+import numpy as np
 
+from integ_tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, \
-    InternalError
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
-from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, InternalError
+from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError
+from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
-from marqo.core.models.marqo_index import FieldType
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import \
     UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import S2InferenceError
-from marqo.s2_inference.types import Modality
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
 
 
-@pytest.mark.unittest
+class DummyInference(Inference):
+    def vectorise(self, request: InferenceRequest) -> InferenceResult:
+        return InferenceResult(result=[[('chunk', np.array([1.0, 2.0]))] for _ in request.contents])
+
+
+class DummyAddDocumentsHandler(AddDocumentsHandler):
+    """
+    We create a dummy implementation of the AddDocumentsHandler to verify the main workflow
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(inference=DummyInference(), **kwargs)
+        self.handled_fields = []
+        self.handled_multimodal_fields = []
+        self.existing_vespa_docs = []
+        self.to_vespa_doc_call_count = 0
+
+    def _create_tensor_fields_container(self) -> TensorFieldsContainer:
+        return TensorFieldsContainer(self.add_docs_params.tensor_fields, [], {}, True)
+
+    def _handle_field(self, marqo_doc, field_name, field_content) -> None:
+        doc_id = marqo_doc[MARQO_DOC_ID]
+        marqo_doc[field_name] = field_content
+        self.tensor_fields_container.collect(doc_id, field_name, field_content)
+        self.handled_fields.append((doc_id, field_name))
+
+    def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
+        doc_id = marqo_doc[MARQO_DOC_ID]
+        self.handled_multimodal_fields.append(doc_id)
+
+    def _populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+        self.existing_vespa_docs = existing_vespa_docs
+
+    def _to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+        self.to_vespa_doc_call_count += 1
+        return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
+
+    def _infer_modality(self, tensor_field: TensorField) -> Modality:
+        return Modality.TEXT
+
+
 class TestAddDocumentHandler(MarqoTestCase):
-    class DummyAddDocumentsHandler(AddDocumentsHandler):
-        """
-        We create a dummy implementation of the AddDocumentsHandler to verify the main workflow
-        """
-
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.handled_fields = []
-            self.handled_multimodal_fields = []
-            self.existing_vespa_docs = []
-            self.to_vespa_doc_call_count = 0
-
-        def _create_tensor_fields_container(self) -> TensorFieldsContainer:
-            return TensorFieldsContainer(self.add_docs_params.tensor_fields, [], {}, True)
-
-        def _handle_field(self, marqo_doc, field_name, field_content) -> None:
-            doc_id = marqo_doc[MARQO_DOC_ID]
-            marqo_doc[field_name] = field_content
-            self.tensor_fields_container.collect(doc_id, field_name, field_content, self._infer_field_type)
-            self.handled_fields.append((doc_id, field_name))
-
-        def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
-            doc_id = marqo_doc[MARQO_DOC_ID]
-            self.handled_multimodal_fields.append(doc_id)
-
-        def _populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
-            self.existing_vespa_docs = existing_vespa_docs
-
-        def _to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
-            self.to_vespa_doc_call_count += 1
-            return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
-
-        def _infer_field_type(self, field_name: str, field_content: Any) -> FieldType:
-            return FieldType.Text
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.vespa.vespa_client.VespaClient.get_batch')
@@ -78,7 +78,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             FeedBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=200),
         ])]
 
-        handler = self.DummyAddDocumentsHandler(
+        handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
@@ -120,7 +120,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
             FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
         ])]
-        handler = self.DummyAddDocumentsHandler(
+        handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
@@ -139,7 +139,7 @@ class TestAddDocumentHandler(MarqoTestCase):
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self, mock_feed_batch):
-        handler = self.DummyAddDocumentsHandler(
+        handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
@@ -172,13 +172,12 @@ class TestAddDocumentHandler(MarqoTestCase):
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_handle_various_errors(self, mock_feed_batch):
         mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
-            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=400, message=
-            'Could not parse field field1'),
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=400, message='Could not parse field field1'),
             FeedBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=429, message='vespa error2'),
             FeedBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=507, message='vespa error3'),
         ])]
 
-        handler = self.DummyAddDocumentsHandler(
+        handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
@@ -233,113 +232,12 @@ class TestAddDocumentHandler(MarqoTestCase):
                                   code='invalid_argument')
         ], response.items)
 
-    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
-    @patch('marqo.s2_inference.s2_inference.vectorise', wraps=s2_inference.vectorise)
-    def test_add_documents_should_vectorise_tensor_fields_using_different_strategies(self, mock_vectorise, _):
-        for batch_mode, expected_vectorise_call_count, expected_call_args in [
-            (BatchVectorisationMode.PER_FIELD, 3, [['hello'], ['hello world'], ['ok']]),
-            (BatchVectorisationMode.PER_DOCUMENT, 2, [['hello'], ['hello world', 'ok']]),
-            (BatchVectorisationMode.PER_BATCH, 1, [['hello world', 'ok', 'hello']]),
-        ]:
-            with self.subTest(batch_mode=batch_mode):
-                handler = self.DummyAddDocumentsHandler(
-                    vespa_client=self.vespa_client,
-                    marqo_index=self.unstructured_marqo_index('index1', 'index1'),
-                    add_docs_params=AddDocsParams(
-                        index_name='index1', tensor_fields=['field1', 'field4'],
-                        batch_vectorisation_mode=batch_mode,
-                        docs=[
-                            {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
-                            {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
-                        ])
-                )
-
-                mock_vectorise.reset_mock()
-
-                handler.add_documents()
-                self.assertEqual(expected_vectorise_call_count, mock_vectorise.call_count)
-                # please note that assertCountEqual compares two list ignoring order
-                self.assertCountEqual(expected_call_args,
-                                      [args.kwargs['content'] for args in mock_vectorise.call_args_list])
-
-    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
-    @patch('marqo.s2_inference.s2_inference.vectorise')
-    def test_add_documents_should_fail_a_doc_using_vectorise_per_field_strategy(self, mock_vectorise, mock_feed_batch):
-        mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
-        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
-            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
-        ])]
-        handler = self.DummyAddDocumentsHandler(
-            vespa_client=self.vespa_client,
-            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
-            add_docs_params=AddDocsParams(
-                index_name='index1', tensor_fields=['field1', 'field4'],
-                batch_vectorisation_mode=BatchVectorisationMode.PER_FIELD,
-                docs=[
-                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
-                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
-                ])
-        )
-
-        response = handler.add_documents()
-        self.assertEqual(2, mock_vectorise.call_count)
-        self.assertTrue(response.errors)
-        self.assertEqual(200, response.items[0].status)
-        self.assertEqual(400, response.items[1].status)
-        self.assertEqual('vectorise error', response.items[1].message)
-
-    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
-    @patch('marqo.s2_inference.s2_inference.vectorise')
-    def test_add_documents_should_fail_a_doc_using_vectorise_per_doc_strategy(self, mock_vectorise, mock_feed_batch):
-        mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
-        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
-            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
-        ])]
-        handler = self.DummyAddDocumentsHandler(
-            vespa_client=self.vespa_client,
-            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
-            add_docs_params=AddDocsParams(
-                index_name='index1', tensor_fields=['field1', 'field4'],
-                batch_vectorisation_mode=BatchVectorisationMode.PER_DOCUMENT,
-                docs=[
-                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
-                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
-                ])
-        )
-
-        response = handler.add_documents()
-        self.assertEqual(2, mock_vectorise.call_count)
-        self.assertTrue(response.errors)
-        self.assertEqual(200, response.items[0].status)
-        self.assertEqual(400, response.items[1].status)
-        self.assertEqual('vectorise error', response.items[1].message)
-
-    @patch('marqo.s2_inference.s2_inference.vectorise')
-    def test_add_documents_should_fail_a_batch_using_vectorise_per_doc_strategy(self, mock_vectorise):
-        mock_vectorise.side_effect = [S2InferenceError('vectorise error')]
-
-        handler = self.DummyAddDocumentsHandler(
-            vespa_client=self.vespa_client,
-            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
-            add_docs_params=AddDocsParams(
-                index_name='index1', tensor_fields=['field1', 'field4'],
-                batch_vectorisation_mode=BatchVectorisationMode.PER_BATCH,
-                docs=[
-                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
-                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
-                ])
-        )
-
-        with self.assertRaisesStrict(InternalError) as context:
-            handler.add_documents()
-
-        self.assertEqual('Encountered problem when vectorising batch of documents. Reason: vectorise error',
-                         str(context.exception))
-
+    # TODO move following tests to test_unstructured_add_document_handler.py
     def test_unstructured_add_documents_handler_infer_modality_logic_image_false_and_media_false(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         both treat_urls_and_pointers_as_images and treat_urls_and_pointers_as_media are False."""
         unstructured_add_documents_handler = UnstructuredAddDocumentsHandler(
+            inference=DummyInference(),
             marqo_index=self.unstructured_marqo_index(
                 'index1', 'index1',
                 treat_urls_and_pointers_as_images=False,
@@ -357,17 +255,18 @@ class TestAddDocumentHandler(MarqoTestCase):
         ]
         for url, test_case in test_cases:
             with self.subTest(msg=test_case):
-                with patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality") as mock_infer_modality:
-                    self.assertEqual(
-                        FieldType.Text, unstructured_add_documents_handler.
-                        _infer_field_type(field_name="dummy_field_name", field_content=url)
-                    )
+                with patch("marqo.core.inference.modality_utils.infer_modality") as mock_infer_modality:
+                    modality = unstructured_add_documents_handler._infer_modality(
+                        TensorField(doc_id='id', field_name='dummy_field_name', field_content=url,
+                                    is_top_level_tensor_field=True))
+                    self.assertEqual(Modality.TEXT, modality)
                 mock_infer_modality.assert_not_called()
 
     def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_false(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         treat_urls_and_pointers_as_images=True and treat_urls_and_pointers_as_media=False."""
         unstructured_add_documents_handler = UnstructuredAddDocumentsHandler(
+            inference=DummyInference(),
             marqo_index=self.unstructured_marqo_index(
                 'index1', 'index1',
                 treat_urls_and_pointers_as_images=True,
@@ -379,25 +278,23 @@ class TestAddDocumentHandler(MarqoTestCase):
             vespa_client=self.vespa_client
         )
         test_cases = [
-            (TestAudioUrls.AUDIO1.value, "audio url should be treated as text", FieldType.Text),
-            (TestVideoUrls.VIDEO1.value, "video url should be treated as text", FieldType.Text),
-            (TestImageUrls.IMAGE1.value, "image url should be treated as image", FieldType.ImagePointer),
+            (TestAudioUrls.AUDIO1.value, "audio url should be treated as text", Modality.TEXT),
+            (TestVideoUrls.VIDEO1.value, "video url should be treated as text", Modality.TEXT),
+            (TestImageUrls.IMAGE1.value, "image url should be treated as image", Modality.IMAGE),
         ]
 
-        for url, test_case, expected_field_type in test_cases:
+        for url, test_case, expected_modality in test_cases:
             with self.subTest(msg=test_case):
-                self.assertEqual(
-                    expected_field_type,
-                    unstructured_add_documents_handler._infer_field_type(
-                        field_name="dummy_field_name",
-                        field_content=url
-                    )
-                )
+                modality = unstructured_add_documents_handler._infer_modality(
+                    TensorField(doc_id='id', field_name='dummy_field_name', field_content=url,
+                                is_top_level_tensor_field=True))
+                self.assertEqual(expected_modality,modality)
 
     def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_true(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         treat_urls_and_pointers_as_images=True and treat_urls_and_pointers_as_media=True."""
         unstructured_add_documents_handler = UnstructuredAddDocumentsHandler(
+            inference=DummyInference(),
             marqo_index=self.unstructured_marqo_index(
                 'index1', 'index1',
                 treat_urls_and_pointers_as_images=True,
@@ -409,77 +306,19 @@ class TestAddDocumentHandler(MarqoTestCase):
             vespa_client=self.vespa_client
         )
         test_cases = [
-            (TestAudioUrls.AUDIO1.value, "audio url should be treated as audio", FieldType.AudioPointer),
-            (TestVideoUrls.VIDEO1.value, "video url should be treated as video", FieldType.VideoPointer),
-            (TestImageUrls.IMAGE1.value, "image url should be treated as image", FieldType.ImagePointer),
+            (TestAudioUrls.AUDIO1.value, "audio url should be treated as audio", Modality.AUDIO),
+            (TestVideoUrls.VIDEO1.value, "video url should be treated as video", Modality.VIDEO),
+            (TestImageUrls.IMAGE1.value, "image url should be treated as image", Modality.IMAGE),
         ]
 
-        for url, test_case, expected_field_type in test_cases:
+        for url, test_case, expected_modality in test_cases:
             with self.subTest(msg=test_case):
-                self.assertEqual(
-                    expected_field_type,
-                    unstructured_add_documents_handler._infer_field_type(
-                        field_name="dummy_field_name",
-                        field_content=url
-                    )
-                )
-
-    def test_collect_tensor_field_content_infer_modality_logic(self):
-        """A test to ensure collect_tensor_field_content method in UnstructuredAddDocumentsHandler infer modality
-        for tensor fields and multimodal sub-fields, but not for non-tensor fields."""
-        unstructured_add_documents_handler = UnstructuredAddDocumentsHandler(
-            marqo_index=self.unstructured_marqo_index(
-                'index1', 'index1',
-                treat_urls_and_pointers_as_images=True,
-                treat_urls_and_pointers_as_media=True
-            ),
-            add_docs_params=AddDocsParams(
-                index_name='index1', tensor_fields=["tensor_field", "my_multimodal_field"], docs=[{'_id': '1'}],
-                mappings={
-                    "my_multimodal_field":
-                        {
-                            "type": "multimodal_combination",
-                            "weights": {
-                                "text_field": 0.5, "image_field": 0.8
-                            }
-                        }
-                }
-            ),
-            vespa_client=self.vespa_client
-        )
-        test_doc = {
-            "non_tensor_field": TestAudioUrls.AUDIO1.value,
-            "tensor_field": "This is a tensor field so its modality should be inferred",
-            "text_field": "This is a sub field of my_multimodal_field so its modality should be inferred",
-            "image_field": TestImageUrls.IMAGE1.value,
-            "another_non_tensor_field": TestImageUrls.IMAGE1.value,
-            "_id": "test"
-        }
-
-        test_cases = (
-            ("non_tensor_field", "A non-tensor field should not be inferred for modality", False),
-            ("tensor_field", "A tensor field should be inferred for modality", True),
-            ("text_field", "A sub field of a multimodal field should be inferred for modality", True),
-            ("image_field", "A sub field of a multimodal field should be inferred for modality", True),
-            ("another_non_tensor_field", "A non-tensor field should not be inferred for modality", False),
-
-        )
-
-        for field_name, msg, called in test_cases:
-            with self.subTest(f"{field_name} - {msg}"):
-                with patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality",
-                           return_value=Modality.TEXT) as mock_infer_modality:
-                    _ = unstructured_add_documents_handler._handle_field(
-                        test_doc, field_name=field_name,
-                        field_content=test_doc[field_name]
-                    )
-                if called:
-                    mock_infer_modality.assert_called_once_with(test_doc[field_name], None)
-                else:
-                    mock_infer_modality.assert_not_called()
+                modality = unstructured_add_documents_handler._infer_modality(
+                    TensorField(doc_id='id', field_name='dummy_field_name', field_content=url,
+                                is_top_level_tensor_field=True))
+                self.assertEqual(expected_modality, modality)
 
 
-@pytest.mark.unittest
 class TestAddDocumentsResponseCollector(unittest.TestCase):
 
     def test_should_collect_marqo_docs(self):
