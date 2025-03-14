@@ -7,10 +7,13 @@ import numpy as np
 from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import AddDocumentsError, MarqoDocumentParsingError
-from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality
+from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality, TextChunkConfig, \
+    ChunkConfig
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
+from marqo.core.models.marqo_index import TextPreProcessing, TextSplitMethod, ImagePreProcessing, PatchMethod, \
+    AudioPreProcessing, VideoPreProcessing
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
@@ -238,3 +241,139 @@ class TestAddDocumentHandler(unittest.TestCase):
                                   error='Docs must be dicts',
                                   code='invalid_argument')
         ], response.items)
+
+    def test_preprocessing_config_for_text_modality(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index(
+                'index1', 'index1',
+                text_preprocessing=TextPreProcessing(
+                    split_length=100,
+                    split_overlap=10,
+                    split_method=TextSplitMethod.Word
+                )),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+                text_chunk_prefix='prefix1:'
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.TEXT, for_top_level_field=True)
+        self.assertEqual(for_top_level_field.text_prefix, 'prefix1:')
+        self.assertTrue(for_top_level_field.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, TextChunkConfig(split_length=100, split_overlap=10, split_method='word'))
+
+        for_subfield = handler._get_preprocessing_config(Modality.TEXT, for_top_level_field=False)
+        self.assertEqual(for_subfield.text_prefix, 'prefix1:')
+        self.assertFalse(for_subfield.should_chunk)
+        self.assertIsNone(for_subfield.chunk_config)
+
+    def test_preprocessing_config_for_image_modality_without_patch_method(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+                media_download_headers={'a': 'b'},
+                image_download_thread_count=3
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=True)
+        self.assertFalse(for_top_level_field.should_chunk)
+        self.assertIsNone(for_top_level_field.patch_method)
+        self.assertEqual(for_top_level_field.download_header, {'a': 'b'})
+        self.assertEqual(for_top_level_field.download_thread_count, 3)
+
+        for_subfield = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=False)
+        self.assertFalse(for_subfield.should_chunk)
+        self.assertIsNone(for_subfield.patch_method)
+        self.assertEqual(for_subfield.download_header, {'a': 'b'})
+        self.assertEqual(for_subfield.download_thread_count, 3)
+
+    def test_preprocessing_config_for_image_modality_with_patch_method(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index(
+                'index1', 'index1',
+                image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Simple)
+            ),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+                image_download_thread_count=5
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=True)
+        self.assertTrue(for_top_level_field.should_chunk)
+        self.assertEqual(for_top_level_field.patch_method, 'simple')
+        self.assertIsNone(for_top_level_field.download_header)
+        self.assertEqual(for_top_level_field.download_thread_count, 5)
+
+        for_subfield = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=False)
+        self.assertFalse(for_subfield.should_chunk)
+        self.assertIsNone(for_subfield.patch_method)
+        self.assertIsNone(for_subfield.download_header)
+        self.assertEqual(for_subfield.download_thread_count, 5)
+
+    def test_preprocessing_config_for_audio_modality(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index(
+                'index1', 'index1',
+                audio_preprocessing=AudioPreProcessing(split_length=25, split_overlap=5)
+            ),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+                media_download_thread_count=4,
+                media_download_headers={'a': 'b'},
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.AUDIO, for_top_level_field=True)
+        self.assertTrue(for_top_level_field.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, ChunkConfig(split_length=25, split_overlap=5))
+        self.assertEqual(for_top_level_field.download_header, {'a': 'b'})
+        self.assertEqual(for_top_level_field.download_thread_count, 4)
+
+        for_subfield = handler._get_preprocessing_config(Modality.AUDIO, for_top_level_field=False)
+        self.assertTrue(for_subfield.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, ChunkConfig(split_length=25, split_overlap=5))
+        self.assertEqual(for_subfield.download_header, {'a': 'b'})
+        self.assertEqual(for_subfield.download_thread_count, 4)
+
+    def test_preprocessing_config_for_video_modality(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index(
+                'index1', 'index1',
+                video_preprocessing=VideoPreProcessing(split_length=25, split_overlap=5)
+            ),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+                media_download_thread_count=6,
+                media_download_headers={'a': 'b'},
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.VIDEO, for_top_level_field=True)
+        self.assertTrue(for_top_level_field.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, ChunkConfig(split_length=25, split_overlap=5))
+        self.assertEqual(for_top_level_field.download_header, {'a': 'b'})
+        self.assertEqual(for_top_level_field.download_thread_count, 6)
+
+        for_subfield = handler._get_preprocessing_config(Modality.VIDEO, for_top_level_field=False)
+        self.assertTrue(for_subfield.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, ChunkConfig(split_length=25, split_overlap=5))
+        self.assertEqual(for_subfield.download_header, {'a': 'b'})
+        self.assertEqual(for_subfield.download_thread_count, 6)

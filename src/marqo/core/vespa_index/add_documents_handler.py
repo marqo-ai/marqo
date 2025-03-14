@@ -357,11 +357,12 @@ class AddDocumentsHandler(ABC):
                 )
             )
         elif modality == Modality.IMAGE:
+            patch_method = self.marqo_index.image_preprocessing.patch_method
             return ImagePreprocessingConfig(
-                should_chunk=for_top_level_field and self.marqo_index.image_preprocessing.patch_method,
+                should_chunk=for_top_level_field and patch_method is not None,
                 download_thread_count=self.add_docs_params.image_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
-                patch_method=None if not for_top_level_field else self.marqo_index.image_preprocessing.patch_method.value
+                patch_method=None if not for_top_level_field or not patch_method else patch_method.value
             )
         elif modality == Modality.AUDIO:
             return AudioVideoPreprocessingConfig(
