@@ -75,6 +75,9 @@ jobs:
       push_to: "ECR"
       image_repo: "marqo-compatibility-tests"
       image_tag: "${{ github.sha }}"
+    permissions:
+      id-token: write
+      contents: read
 
 
   orchestrate:
