@@ -120,7 +120,7 @@ class AddDocumentsHandler(ABC):
         self.add_docs_response_collector = AddDocumentsResponseCollector()
         self.tensor_fields_container = self._create_tensor_fields_container()
 
-    def add_documents(self):
+    def add_documents(self) -> MarqoAddDocumentsResponse:
         """
         Template method for adding documents to a Marqo index. This method define a generic workflow to add documents
         in batches:
@@ -284,6 +284,7 @@ class AddDocumentsHandler(ABC):
                 all_modalities.add(modality)
             except AddDocumentsError as e:
                 self.add_docs_response_collector.collect_error_response(field.doc_id, e)
+                self.tensor_fields_container.remove_doc(field.doc_id)
         return all_modalities
 
     def _vectorise_fields(self, modality: Modality, for_top_level_field: bool = True):
@@ -316,12 +317,13 @@ class AddDocumentsHandler(ABC):
             preprocessing_config=self._get_preprocessing_config(modality, for_top_level_field)
         )
 
-        # TODO handle error for the batch
+        # This method could raise InferenceError, we'll allow it propagate to the API layer and convert to proper
+        # error response to return to users
         inference_result = self.inference.vectorise(request)
 
         if len(tensor_fields) != len(inference_result.result):
-            # TODO find a better error
-            raise InternalError()
+            raise InferenceError(f'Inference result contains chunks and embeddings for {len(inference_result.result)} '
+                                 f'fields, but {len(tensor_fields)} are expected')
 
         erroneous_doc_ids = set()
         for index, r in enumerate(inference_result.result):
@@ -333,7 +335,7 @@ class AddDocumentsHandler(ABC):
                 continue
 
             if isinstance(r, InferenceError):
-                logger.warning(f'Encountered error when vectorising field {field_name} in document {doc_id}', r)
+                logger.warning(f'Encountered error when vectorising field {field_name} in document {doc_id}: {str(r)}')
                 erroneous_doc_ids.add(doc_id)
                 self.tensor_fields_container.remove_doc(doc_id)
                 self.add_docs_response_collector.collect_error_response(

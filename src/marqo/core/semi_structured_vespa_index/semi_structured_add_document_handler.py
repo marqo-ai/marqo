@@ -64,10 +64,10 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             isinstance(field_content, list) and 
             all(isinstance(elem, str) for elem in field_content)
         )
-        if (is_string_array and 
-            self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION): #This is required so that we can update schema on the fly
+        if (is_string_array and
+                # This is required so that we can update schema on the fly
+                self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION):
             self._add_string_array_field_to_index(field_name)
-
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
@@ -130,7 +130,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 
         self.marqo_index.string_array_fields.append(
-            StringArrayField(name = field_name, type = FieldType.ArrayText, string_array_field_name = f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}', features=[FieldFeature.Filter])
+            StringArrayField(
+                name=field_name, type=FieldType.ArrayText, features=[FieldFeature.Filter],
+                string_array_field_name=f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}')
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

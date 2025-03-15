@@ -20,11 +20,6 @@ from marqo.vespa.models.get_document_response import Document, GetBatchResponse,
 from marqo.vespa.vespa_client import VespaClient
 
 
-class DummyInference(Inference):
-    def vectorise(self, request: InferenceRequest) -> InferenceResult:
-        return InferenceResult(result=[[('chunk', np.array([1.0, 2.0]))] for _ in request.contents])
-
-
 class DummyAddDocumentsHandler(AddDocumentsHandler):
     """
     We create a dummy stub of the AddDocumentsHandler to verify the main workflow
@@ -70,7 +65,12 @@ class TestAddDocumentHandler(unittest.TestCase):
     def setUp(self):
         self.vespa_client = MagicMock(spec=VespaClient)
         self.vespa_client.translate_vespa_document_response.side_effect = VespaClient.translate_vespa_document_response
-        self.inference = DummyInference()
+        self.inference = MagicMock(spec=Inference)
+
+        def vectorise_side_effect(request: InferenceRequest) -> InferenceResult:
+            return InferenceResult(result=[[('chunk', np.array([1.0, 2.0]))] for _ in request.contents])
+
+        self.inference.vectorise.side_effect = vectorise_side_effect
 
     def test_add_documents_main_workflow_happy_path(self):
         self.vespa_client.get_batch.side_effect = [GetBatchResponse(errors=True, responses=[
@@ -193,9 +193,9 @@ class TestAddDocumentHandler(unittest.TestCase):
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[
-                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
-                    {'_id': '2', 'field1': 'hello again'},
-                    {'_id': '3', 'field1': 'hello world'},
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},  # vespa 400
+                    {'_id': '2', 'field1': 'hello again'},  # vespa 429
+                    {'_id': '3', 'field1': 'hello world'},  # vespa 507
                     {'bad_field': 'bad_content'},  # error out when converting to vespa doc
                     {'_id': [5], 'field4': ['de']},  # doc with invalid id
                     {'field4': ['de'], 'field5': 'a very large string object' * 10000},  # doc too large
