@@ -23,7 +23,6 @@ class StructuredUpdateUser(MarqoLocustHttpUser):
         doc_id = f"doc_{random.randint(0, 99)}"  # Random doc from 100 docs
         update_doc = {
             '_id': doc_id,
-            'rating': random.randint(1, 5),
             'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3)),
             'in_stock': random.choice([True, False]),
             'price': round(random.uniform(10.0, 1000.0), 2),
