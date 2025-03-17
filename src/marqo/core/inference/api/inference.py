@@ -3,10 +3,10 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 
 import pydantic
 from numpy import ndarray
-from pydantic import StrictStr, root_validator, ValidationError
+from pydantic import StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.inference.api import PreprocessingConfig, InferenceError, Modality
+from marqo.core.inference.api import InferenceError, Modality, PreprocessingConfigType
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -23,17 +23,16 @@ class InferenceRequest(ImmutableBaseModel):
     contents: List[str] = pydantic.Field(min_items=1)
     device: Optional[str] = pydantic.Field(default=None)
     model_config: ModelConfig = pydantic.Field(alias='modelConfig')
-    preprocessing_config: PreprocessingConfig = pydantic.Field(alias='preprocessingConfig')
+    preprocessing_config: PreprocessingConfigType = pydantic.Field(alias='preprocessingConfig')
     use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
 
     @root_validator(pre=False)
     def check_preprocessing_config_matches_modality(cls, values):
         modality: Modality = values.get('modality')
-        preprocessing_config: PreprocessingConfig = values.get('preprocessing_config')
-        supported_modalities = preprocessing_config.supported_modalities
+        preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
 
-        if modality not in supported_modalities:
-            raise ValueError(f"{type(preprocessing_config)} only supports modality: {supported_modalities}, "
+        if not modality or modality.value != preprocessing_config.modality:
+            raise ValueError(f"{type(preprocessing_config)} only supports modality: {preprocessing_config.modality}, "
                              f"but modality: {modality} is specified in the request")
 
         return values

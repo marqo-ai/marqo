@@ -4,7 +4,7 @@ import numpy as np
 from pydantic import ValidationError
 
 from marqo.core.inference.api import ModelConfig, InferenceRequest, Modality, TextPreprocessingConfig, \
-    AudioVideoPreprocessingConfig, ImagePreprocessingConfig, InferenceError, InferenceResult
+    AudioPreprocessingConfig, VideoPreprocessingConfig, ImagePreprocessingConfig, InferenceError, InferenceResult
 from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -132,8 +132,8 @@ class TestInferenceRequest(unittest.TestCase):
         """Test creating a valid InferenceRequest with all required fields."""
         for modality, preprocessing_config in [
             (Modality.TEXT, TextPreprocessingConfig()),
-            (Modality.AUDIO, AudioVideoPreprocessingConfig()),
-            (Modality.VIDEO, AudioVideoPreprocessingConfig()),
+            (Modality.AUDIO, AudioPreprocessingConfig()),
+            (Modality.VIDEO, VideoPreprocessingConfig()),
             (Modality.IMAGE, ImagePreprocessingConfig()),
         ]:
             with self.subTest(modality=modality, preprocessing_config=preprocessing_config):
@@ -149,13 +149,20 @@ class TestInferenceRequest(unittest.TestCase):
     def test_invalid_inference_request_for_non_matching_modality(self):
         for modality, preprocessing_config in [
             (Modality.TEXT, ImagePreprocessingConfig()),
-            (Modality.TEXT, AudioVideoPreprocessingConfig()),
+            (Modality.TEXT, AudioPreprocessingConfig()),
+            (Modality.TEXT, VideoPreprocessingConfig()),
+
             (Modality.IMAGE, TextPreprocessingConfig()),
-            (Modality.IMAGE, AudioVideoPreprocessingConfig()),
+            (Modality.IMAGE, AudioPreprocessingConfig()),
+            (Modality.IMAGE, VideoPreprocessingConfig()),
+
             (Modality.AUDIO, TextPreprocessingConfig()),
             (Modality.AUDIO, ImagePreprocessingConfig()),
+            (Modality.AUDIO, VideoPreprocessingConfig()),
+
             (Modality.VIDEO, TextPreprocessingConfig()),
             (Modality.VIDEO, ImagePreprocessingConfig()),
+            (Modality.VIDEO, AudioPreprocessingConfig()),
         ]:
 
             with self.subTest(modality=modality, preprocessing_config=preprocessing_config):
@@ -187,7 +194,7 @@ class TestInferenceRequest(unittest.TestCase):
             device="cuda",
             use_inference_cache=True,
             model_config=self.model_config,
-            preprocessing_config=AudioVideoPreprocessingConfig()
+            preprocessing_config=AudioPreprocessingConfig()
         )
         self.assertEqual(request.device, "cuda")
         self.assertTrue(request.use_inference_cache)
