@@ -19,18 +19,6 @@ from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.types import Union, FloatTensor, List
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from marqo.core.inference.api.modality import Modality
-
-class HuggingFacePreprocessor(AbstractPreprocessor):
-    """The abstract base class for all Hugging Face preprocessors."""
-
-    def __init__(self, tokenizer):
-        super().__init__()
-        self.tokenizer = tokenizer
-
-    def preprocess(self, inputs, modality: Modality):
-        pass
 
 
 class HuggingFaceModel(AbstractEmbeddingModel):

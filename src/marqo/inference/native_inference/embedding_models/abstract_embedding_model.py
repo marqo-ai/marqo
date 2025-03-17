@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from marqo.core.inference.api.inference import ModelAuth
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
-    def __init__(self, model_properties: dict, device: str, model_auth: Optional[ModelAuth] = None):
+    def __init__(self, model_properties: Optional[dict] = None, device: Optional[str] = None,
+                 model_auth: Optional[ModelAuth] = None):
         """Load the model with the given properties.
 
         Args:
@@ -16,8 +16,12 @@ class AbstractEmbeddingModel(ABC):
             device (str): The device to load the model on.
             model_auth (dict): The authentication information for the model.
         """
+        if device is None:
+            raise ValueError("`device` is required for loading CLIP models!")
 
-        self.model_properties = model_properties
+        if model_properties is None:
+            model_properties = dict()
+
         self.device = device
         self.model_auth = model_auth
 
@@ -45,12 +49,6 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def encode(self, inputs, modality, normalize):
+    def encode(self):
         """Encode the input data."""
-        # downloading and preprocess inside the encode method
-        pass
-
-    @abstractmethod
-    def get_preprocessor(self)-> AbstractPreprocessor:
-        """Get the preprocessor for the model."""
         pass
