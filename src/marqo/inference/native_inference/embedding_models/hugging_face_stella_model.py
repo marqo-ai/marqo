@@ -1,7 +1,7 @@
 from typing import Optional
 
-from marqo.inference.native_inference.embedding_models import HuggingFaceModel
-from marqo.inference.native_inference.embedding_models import HuggingFaceModelFlags, \
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
+from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelFlags, \
     HuggingFaceTokenizerFlags
 from marqo.tensor_search.models.private_models import ModelAuth
 

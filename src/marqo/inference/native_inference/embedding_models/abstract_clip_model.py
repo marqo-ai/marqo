@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 
-from marqo.inference.native_inference.embedding_models import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.inference.media_download_and_preprocess.image_download import (_is_image, format_and_load_CLIP_images,
                                                                           format_and_load_CLIP_image)
 from marqo.s2_inference.logger import get_logger
