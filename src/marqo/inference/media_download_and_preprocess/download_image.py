@@ -152,8 +152,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
         media_download_headers (dict): header for the image download
         timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
-        ValueError: If the local path is invalid, and is not a url
-        UnidentifiedImageError: If the image is irretrievable or unprocessable.
+        UnidentifiedImageError: If the image is irretrievable or can't be opened.
 
     Returns:
         ImageType: In-memory PIL image.
@@ -168,6 +167,10 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
+        except OSError as e:
+            if "could not create decoder object" in str(e):
+                raise UnidentifiedImageError(f"Marqo encountered an error when loading the media url {image_path}. "
+                                             f"The image could not be decoded properly. Original error: {e}") from e
         finally:
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")

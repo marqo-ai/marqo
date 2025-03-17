@@ -18,7 +18,7 @@ class CLIPPreprocessor(AbstractPreprocessor):
         return [torch.rand(size=(1, 12)) for _ in range(len(inputs))]
 
 
-def preprocess_side_effect(inputs, modality="language"):
+def preprocess_side_effect(inputs, *args, **kwargs):
     """
     A side effect function for preprocess mock.
     Returns a list of tensors where each tensor depends on the length of the text.
@@ -26,7 +26,7 @@ def preprocess_side_effect(inputs, modality="language"):
     return [torch.ones(size=(1, 12)), ] * len(inputs)
 
 
-def faulty_preprocess_side_effect(inputs, modality="language"):
+def faulty_preprocess_side_effect(inputs, *args, **kwargs):
     """Return fewer tensors than the number of inputs to trigger the ValueError."""
     return [torch.ones(size=(1, 12))] * (len(inputs) - 1)  # One less output
 

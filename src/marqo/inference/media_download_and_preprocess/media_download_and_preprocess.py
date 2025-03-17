@@ -63,8 +63,15 @@ def threaded_download_and_preprocess_content(
                 thread_results.append(MediaDownloadError(str(e)))
                 continue
             if isinstance(image, Image):
-                preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
-                thread_results.append([(url, preprocessed_image[0]), ])
+                try:
+                    preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
+                except OSError as e:
+                    if "image file is truncated" in str(e):
+                        thread_results.append(PreprocessingError(f"Image file is truncated: {url}"))
+                        continue
+                    else:
+                        raise e
+                thread_results.append([(url, preprocessed_image[0])])
             else:
                 raise ValueError(f"Unexpected image type: {type(image)}")
     return thread_results
