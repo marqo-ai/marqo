@@ -16,7 +16,7 @@ import orjson
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
+from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.marqo_docs import update_documents_response
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
@@ -834,7 +834,7 @@ class VespaClient:
         doc_id = document.id
         data = {'fields': document.fields}
         types = document.field_types
-        create_timestamp = document.create_timestamp
+        version_uuid = document.version_uuid
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
@@ -845,11 +845,11 @@ class VespaClient:
                 for key, value in types.items():
                     data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}==\"{value}\")'
                                           f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
-            if create_timestamp is not None:
-                data["condition"] += f' and {schema}.{VESPA_DOC_CREATE_TIMESTAMP}=={create_timestamp}'
+            if version_uuid is not None:
+                data["condition"] += f' and {schema}.{VESPA_DOC_VERSION_UUID}=="{version_uuid}"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
-                if resp.status_code == 412 and types is None and create_timestamp is None:
+                if resp.status_code == 412 and types is None and version_uuid is None:
                     # If Vespa response is 412, and the request is for structured index, it means the document does not exist
                     # in the index, as we don't have type checks / timestamp (version) checks for structured indexes.
                     # We return a 404 error for this case.
