@@ -10,6 +10,9 @@ on:
         required: true
         options:
           - random_index_and_tensor_search.py
+          - unstructured_add_documents.py
+          - structured_partial_updates.py
+          - unstructured_partial_updates.py
         description: >
           Location of the locustfile that contains the test suite. This works as the entrypoint
 
