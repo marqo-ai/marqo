@@ -80,7 +80,7 @@ def on_test_start(environment: Environment, **kwargs):
             }
             initial_docs.append(doc)
         
-        marqo_client.index(INDEX_NAME).add_documents(documents=initial_docs, tensor_fields=['category'])
+        marqo_client.index(INDEX_NAME).add_documents(documents=initial_docs)
 
 
 @events.quitting.add_listener
