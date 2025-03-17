@@ -1,4 +1,3 @@
-import copy
 from typing import Dict, Any, Optional
 
 import marqo.core.constants as index_constants
@@ -13,7 +12,6 @@ from marqo.core.unstructured_vespa_index.unstructured_document import Unstructur
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.core import constants
 from marqo.exceptions import InternalError, InvalidArgumentError
-import semver
 
 
 class UnstructuredVespaIndex(VespaIndex):
