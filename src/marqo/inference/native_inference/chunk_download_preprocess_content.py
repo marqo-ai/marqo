@@ -5,10 +5,11 @@ The reason that we need to do these 3 steps together is that:
     1. For Audio and Video, we need to chunk the content before downloading it.
     2. For Text, we need to chunk the content before preprocessing it.
     3. For Image, we need to preprocess the content right after downloading it to avoid memory issues.
-Thus this module is responsible for handling the chunking, downloading, and preprocessing of content for inference.
+Thus, this module is responsible for handling the chunking, downloading, and preprocessing of content for native
+inference.
 """
 
-from marqo.inference.media_download_and_preprocess.media_dowload_and_preprocess import (
+from marqo.inference.media_download_and_preprocess.media_download_and_preprocess import (
     process_batch)
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.media_download_and_preprocess.split_text import split_text, prefix_text_chunks
