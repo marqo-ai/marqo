@@ -29,6 +29,7 @@ _available_models = dict()
 MODEL_PROPERTIES = load_model_properties()
 lock = threading.Lock()
 
+
 def load_model(model_name: str, model_properties: dict, model_auth: ModelAuth, device: str) -> AbstractEmbeddingModel:
     """
     Load the model and preprocessor if not already loaded

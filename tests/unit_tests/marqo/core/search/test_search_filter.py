@@ -1,5 +1,5 @@
 from marqo.core.search.search_filter import *
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestMarqoFilterStringParser(MarqoTestCase):
