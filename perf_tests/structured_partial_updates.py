@@ -52,12 +52,10 @@ def on_test_start(environment: Environment, **kwargs):
     if local_run:
         # Create structured index if running locally
         marqo_client = marqo.Client(url=host)
-        settings = {
-                "treat_urls_and_pointers_as_images": False,
-                "model": None,  # Structured index doesn't need a model
-                "normalize_embeddings": True
-        }
-        marqo_client.create_index(INDEX_NAME, settings_dict=settings)
+        marqo_client.create_index(index_name=INDEX_NAME,
+                                 type="structured",
+                                 all_fields=[{"name": "category", "type": "text"}, {"name": "tags", "type": "array<text>"}, {"name": "in_stock", "type": "bool"}, {"name": "price", "type": "float"}, {"name": "inventory_counts", "type": "map<text, int>"}, {"name": "price_history", "type": "map<text, float>"}],
+                                 tensor_fields=["title"])
 
         # Add initial documents
         initial_docs = []
@@ -66,7 +64,19 @@ def on_test_start(environment: Environment, **kwargs):
             doc = {
                 '_id': f"doc_{i}",
                 'category': random.choice(['electronics', 'books', 'clothing', 'food']),
-                'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3))
+                'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3)),
+                'in_stock': random.choice([True, False]),
+                'price': round(random.uniform(10.0, 1000.0), 2),
+                'inventory_counts': {
+                    'warehouse_1': random.randint(0, 100),
+                    'warehouse_2': random.randint(0, 50),
+                    'warehouse_3': random.randint(0, 75)
+                },
+                'price_history': {
+                    'jan': round(random.uniform(10.0, 1000.0), 2),
+                    'feb': round(random.uniform(10.0, 1000.0), 2),
+                    'mar': round(random.uniform(10.0, 1000.0), 2)
+                }
             }
             initial_docs.append(doc)
         

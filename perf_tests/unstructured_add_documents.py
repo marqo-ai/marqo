@@ -41,12 +41,7 @@ def on_test_start(environment: Environment, **kwargs):
     if local_run:
         # Create index if running locally
         marqo_client = marqo.Client(url=host)
-        settings = {
-                "treat_urls_and_pointers_as_images": False,
-                "model": os.getenv('MARQO_INDEX_MODEL_NAME', 'hf/e5-base-v2'),
-                "normalize_embeddings": True
-        }
-        marqo_client.create_index(INDEX_NAME, settings_dict=settings)
+        marqo_client.create_index(INDEX_NAME, model=os.getenv('MARQO_INDEX_MODEL_NAME', 'hf/e5-base-v2'))
 
         # Add initial documents
         s = RandomSentence()
