@@ -76,6 +76,10 @@ on:
         description: >
           Embedding model to use to create the index. This is ignored when testing Marqo Cloud
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   Start-Runner:
     uses: ./.github/workflows/start_ec2_runner.yml
