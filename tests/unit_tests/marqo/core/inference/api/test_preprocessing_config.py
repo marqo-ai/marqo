@@ -43,6 +43,15 @@ class TestChunkConfig(unittest.TestCase):
                 except ValidationError:
                     self.fail(f"TextChunkConfig raised ValidationError unexpectedly for '{split_method}' method!")
 
+    def test_split_length_greater_than_overlap(self):
+        """Test that split_length must be greater than split_overlap."""
+        with self.assertRaises(ValidationError):
+            TextChunkConfig(
+                split_length=10,
+                split_overlap=20,
+                split_method='word'
+            )
+
     def test_text_chunk_config_invalid_split_method(self):
         """Test TextChunkConfig with invalid split_method."""
         with self.assertRaises(ValidationError):
