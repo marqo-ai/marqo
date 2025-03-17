@@ -10,7 +10,6 @@ from marqo.inference.type import *
 class InferencePipeline:
     def __init__(self, inference_request: InferenceRequest):
         self.inference_request = inference_request
-        self.model = None
 
     def run_pipeline(self) -> InferenceResult:
         model = load_model(
@@ -21,13 +20,14 @@ class InferencePipeline:
         )
 
         if isinstance(model, OPEN_CLIP):
-            self._run_open_clip_inference_pipeline(model, self.inference_request)
+            return self._run_open_clip_inference_pipeline(model)
         elif isinstance(model, HuggingFaceModel):
-            self._run_hf_inference_pipeline(model, self.inference_request)
+            return self._run_hf_inference_pipeline(model, self.inference_request)
         elif isinstance(model, LanguagebindModel):
-            self._run_languagebind_inference_pipeline(model, self.inference_request)
+            return self._run_languagebind_inference_pipeline(model, self.inference_request)
         else:
             raise ValueError(f"Model type {type(model)} not supported")
+
 
     def _run_open_clip_inference_pipeline(self, model) -> InferenceResult:
         # Chunk, download, and preprocess the content
@@ -38,22 +38,20 @@ class InferencePipeline:
             preprocessor=model.get_preprocessor(),
         )
 
-
-        # TODO - Add support for batching division
-        # Encode the processed content
         embeddings: List[Tensor] = encode_processed_content(
             model=model,
             preprocessed_content_list=preprocessed_content_list,
             modality=self.inference_request.modality,
-            normalize=self.inference_request.model_config.normalize_embeddings
+            normalize=self.inference_request.model_config.normalize_embeddings,
+            max_batch_size=16
         )
 
         # Format the results
         formated_result = format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _run_languagebind_inference_pipeline(self, model, inference_request):
+    def _run_languagebind_inference_pipeline(self, model, inference_request) -> InferenceResult:
         pass
 
-    def _run_hf_inference_pipeline(self, model, inference_request):
+    def _run_hf_inference_pipeline(self, model, inference_request) -> InferenceResult:
         pass
