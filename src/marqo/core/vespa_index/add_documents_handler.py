@@ -7,7 +7,8 @@ from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError
 from marqo.core.inference.api import Modality, InferenceError, InferenceRequest, TextPreprocessingConfig, \
-    TextChunkConfig, ImagePreprocessingConfig, AudioVideoPreprocessingConfig, ChunkConfig, Inference, ModelConfig
+    TextChunkConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, ChunkConfig, \
+    Inference, ModelConfig
 from marqo.core.models import MarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
@@ -367,7 +368,7 @@ class AddDocumentsHandler(ABC):
                 patch_method=None if not for_top_level_field or not patch_method else patch_method.value
             )
         elif modality == Modality.AUDIO:
-            return AudioVideoPreprocessingConfig(
+            return AudioPreprocessingConfig(
                 should_chunk=True,
                 download_thread_count=self.add_docs_params.media_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
@@ -377,7 +378,7 @@ class AddDocumentsHandler(ABC):
                 )
             )
         elif modality == Modality.VIDEO:
-            return AudioVideoPreprocessingConfig(
+            return VideoPreprocessingConfig(
                 should_chunk=True,
                 download_thread_count=self.add_docs_params.media_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
