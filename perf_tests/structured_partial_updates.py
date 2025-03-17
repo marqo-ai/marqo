@@ -53,11 +53,9 @@ def on_test_start(environment: Environment, **kwargs):
         # Create structured index if running locally
         marqo_client = marqo.Client(url=host)
         settings = {
-            "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
                 "model": None,  # Structured index doesn't need a model
                 "normalize_embeddings": True
-            }
         }
         marqo_client.create_index(INDEX_NAME, settings_dict=settings)
 
