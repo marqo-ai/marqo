@@ -43,7 +43,7 @@ class InferencePipeline:
             preprocessed_content_list=preprocessed_content_list,
             modality=self.inference_request.modality,
             normalize=self.inference_request.model_config.normalize_embeddings,
-            max_batch_size=16
+            maximum_batch_size=16
         )
 
         # Format the results
