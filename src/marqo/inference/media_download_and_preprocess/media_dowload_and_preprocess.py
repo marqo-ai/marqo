@@ -22,7 +22,7 @@ def threaded_download_and_preprocess_content(
         modality: Modality,
         media_download_headers: Optional[Dict] = None,
         download_timeout_ms: int = 3000,
-        audio_video_preprocessing_config: Optional[VideoPreprocessingConfig, AudioPreprocessingConfig] = None,
+        audio_video_preprocessing_config: Union[None, VideoPreprocessingConfig, AudioPreprocessingConfig] = None,
         metric_obj: Optional[RequestMetrics] = None,
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download images for its allocated documents
@@ -86,7 +86,7 @@ def process_batch(
         thread_count: int,
         media_download_headers: Optional[Dict] = None,
         download_timeout_ms: int = 3000,
-        audio_video_preprocessing_config: Optional[AudioVideoPreprocessingConfig] = None,
+        audio_video_preprocessing_config: Union[None, AudioPreprocessingConfig, VideoPreprocessingConfig] = None,
 ) -> list[PreprocessedContent]:
 
     results: list[PreprocessedContent] = []

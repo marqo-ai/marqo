@@ -18,7 +18,7 @@ from marqo.inference.type import *
 def chunk_download_preprocess_content(
         content: list[str], modality: Modality, preprocessor: AbstractPreprocessor,
         preprocessing_config: Union[PreprocessingConfig,
-        TextPreprocessingConfig, ImagePreprocessingConfig, AudioVideoPreprocessingConfig]) \
+        TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig]) \
         -> list[PreprocessedContent]:
     """
     The function that handles the chunking, downloading, and preprocessing of content with the given modality.
