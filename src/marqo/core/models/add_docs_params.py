@@ -22,7 +22,7 @@ class BatchVectorisationMode(enum.Enum):
 
 
 class AddDocsParams(BaseModel):
-    """Represents the parameters of the tensor_search.add_documents() function
+    """Represents the parameters of the document.add_documents() function
 
     Params:
         index_name: name of the index

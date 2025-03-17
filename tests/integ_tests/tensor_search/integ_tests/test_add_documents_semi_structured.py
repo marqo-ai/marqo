@@ -6,8 +6,10 @@ from unittest import mock
 
 import pytest
 
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import BadRequestError
+from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
+from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -781,3 +783,191 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertEqual(valid_url, doc["non_tensor_field"])
         self.assertEqual(1, len(doc[enums.TensorField.tensor_facets]))
         self.assertIn("title", doc[enums.TensorField.tensor_facets][0])
+
+    def _assert_field_types(self, vespa_fields, field_names, field_types, id):
+        for field_name, field_type in zip(field_names, field_types):
+            self.assertEqual(vespa_fields['marqo__field_types'][field_name], field_type.value,
+                             f"Expected {field_name} to have type {field_type.value} for document {id}")
+
+    def test_original_document_has_correct_field_types(self):
+        """
+        This test is added in 2.16 release where we launched support for partial updates for unstructured indexes.
+        As part of this we introduced a new field in Vespa called marqo__field_types.
+        This field is used to store the field types of the fields that are added to the document.
+
+        Test that the original document has the correct field types for the fields that are added.
+        """
+        self.doc = {
+            '_id': '1',
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+        }
+        self.doc2 = {
+            '_id': '2',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            },
+            "lexical_field": "some string that signifies lexical field"
+        }
+        self.doc3 = {
+            '_id': '3',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }
+        self.add_documents(self.config, add_docs_params=AddDocsParams(
+            index_name=self.default_text_index,
+            docs=[self.doc, self.doc2, self.doc3],
+            tensor_fields=['tensor_field', 'custom_vector_field', 'multimodal_combo_field'],
+            mappings = {
+                "custom_vector_field": {"type": "custom_vector"},
+                "multimodal_combo_field": {
+                    "type": "multimodal_combination",
+                    "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
+                }
+            }
+        ))
+        self.index = self.config.index_management.get_index(self.default_text_index)
+
+        for doc in [self.doc, self.doc2, self.doc3]:
+            id = doc['_id']
+            raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(
+                self.index.name).schema_name)
+            vespa_fields = raw_vespa_doc.document.dict().get('fields')
+
+            field_names = [
+                'int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'bool_field',
+                'short_string_field', 'long_string_field', 'int_field', 'float_field',
+                'bool_field2', 'custom_vector_field', 'tensor_field', 'tensor_subfield',
+                'multimodal_combo_field'
+            ]
+            field_types = [
+                MarqoFieldTypes.INT_MAP, MarqoFieldTypes.INT_MAP, MarqoFieldTypes.FLOAT_MAP,
+                MarqoFieldTypes.FLOAT_MAP, MarqoFieldTypes.BOOL, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING, MarqoFieldTypes.INT, MarqoFieldTypes.FLOAT,
+                MarqoFieldTypes.BOOL, MarqoFieldTypes.TENSOR, MarqoFieldTypes.TENSOR,
+                MarqoFieldTypes.TENSOR, MarqoFieldTypes.TENSOR
+            ]
+
+            if id in ['1', '2']:
+                self._assert_field_types(vespa_fields, ['string_array', 'string_array2'], [MarqoFieldTypes.STRING_ARRAY, MarqoFieldTypes.STRING_ARRAY], id)
+            if id in ['2', '3']:
+                self._assert_field_types(vespa_fields, field_names, field_types, id)
+            if id is '2':
+                self._assert_field_types(vespa_fields, ['lexical_field'], [MarqoFieldTypes.STRING], id)
+
+    def test_original_document_has_correct_field_types_tensor_field(self):
+        """
+        This test is added in 2.16 release where we launched support for partial updates for unstructured indexes.
+        As part of this we introduced a new field in Vespa called marqo__field_types.
+        This field is used to store the field types of the fields that are added to the document.
+
+        Test that the original document has the correct field types for the fields that are added.
+        """
+        self.doc = {
+            '_id': '1',
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+        }
+        self.doc2 = {
+            '_id': '2',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            },
+            "lexical_field": "some string that signifies lexical field"
+        }
+        self.doc3 = {
+            '_id': '3',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }
+        self.add_documents(self.config, add_docs_params=AddDocsParams(
+            index_name=self.default_text_index,
+            docs=[self.doc, self.doc2],
+            tensor_fields=['tensor_field', 'custom_vector_field', 'multimodal_combo_field'],
+            mappings = {
+                "custom_vector_field": {"type": "custom_vector"},
+                "multimodal_combo_field": {
+                    "type": "multimodal_combination",
+                    "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
+                }
+            }
+        ))
+        resp = self.add_documents(self.config, add_docs_params=AddDocsParams(
+            index_name=self.default_text_index,
+            docs=[self.doc3],
+            tensor_fields=['custom_vector_field'],
+            mappings = {
+                "custom_vector_field": {"type": "custom_vector"},
+            }
+        ))
+
+        self.index = self.config.index_management.get_index(self.default_text_index)
+
+        for doc in [self.doc3]:
+            id = doc['_id']
+            raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(
+                self.index.name).schema_name)
+            vespa_fields = raw_vespa_doc.document.dict().get('fields')
+            field_names = [
+                'int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'bool_field',
+                'short_string_field', 'long_string_field', 'int_field', 'float_field',
+                'bool_field2', 'custom_vector_field', 'tensor_field', 'tensor_subfield'
+            ]
+            field_types = [
+                MarqoFieldTypes.INT_MAP, MarqoFieldTypes.INT_MAP, MarqoFieldTypes.FLOAT_MAP,
+                MarqoFieldTypes.FLOAT_MAP, MarqoFieldTypes.BOOL, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING, MarqoFieldTypes.INT, MarqoFieldTypes.FLOAT,
+                MarqoFieldTypes.BOOL, MarqoFieldTypes.TENSOR, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING
+            ]
+            self._assert_field_types(vespa_fields, field_names, field_types, id)

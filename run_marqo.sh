@@ -75,7 +75,8 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
       echo "Marqo did not find an existing vector store. Setting up vector store..."
 
       # Generate and deploy the application package
-      python3 /app/scripts/vespa_local/vespa_local.py generate-and-deploy
+      # Set log level to WARNING to skip logging
+      python3 /app/scripts/vespa_local/vespa_local.py generate-and-deploy --LogLevel WARNING
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for vector store to be available..."

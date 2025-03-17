@@ -1000,7 +1000,7 @@ class TestSearch(MarqoTestCase):
 
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
