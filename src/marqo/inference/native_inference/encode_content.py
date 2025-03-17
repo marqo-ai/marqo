@@ -6,7 +6,7 @@ from marqo.inference.type import *
 
 
 def encode_processed_content(model, preprocessed_content_list: list[PreprocessedContent],
-                             modality, normalize, maximum_batch_size=16) -> list[Tensor]:
+                             modality: Modality, normalize: bool, maximum_batch_size: int=16) -> list[Tensor]:
     """
     Encode the processed content using the model.
 
