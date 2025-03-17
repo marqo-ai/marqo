@@ -68,7 +68,9 @@ def _split_prefix_preprocess_text(
             )
             if preprocessing_config.text_prefix is not None:
                 splitted_text = prefix_text_chunks(splitted_text, preprocessing_config.text_prefix)
-            preprocessed_text_list: list[Tensor] = preprocessor.preprocess(splitted_text, Modality.TEXT)
+            preprocessed_text_list: list[Tensor] = preprocessor.preprocess(inputs=splitted_text, modality=Modality.TEXT)
+            if len(splitted_text) != len(preprocessed_text_list):
+                raise ValueError("The number of preprocessed text does not match the number of splitted text")
             results.append([(splitted_text[i], preprocessed_text_list[i]) for i in range(len(splitted_text))])
     else:
         if preprocessing_config.text_prefix is not None:

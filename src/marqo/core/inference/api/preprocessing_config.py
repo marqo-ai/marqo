@@ -18,6 +18,15 @@ class ChunkConfig(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+    @root_validator
+    def check_split_length_greater_than_overlap(cls, values):
+        split_length = values.get('split_length')
+        split_overlap = values.get('split_overlap')
+        if split_length is not None and split_overlap is not None:
+            if split_length <= split_overlap:
+                raise ValueError('split_length must be greater than split_overlap')
+        return values
+
 
 class TextChunkConfig(ChunkConfig):
     split_method: Literal['character', 'word', 'sentence', 'passage'] = pydantic.Field(alias='splitMethod')
