@@ -2,7 +2,7 @@ import unittest
 
 import pytest
 
-from marqo.core.inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties
+from marqo.inference.native_inference.embedding_models import OpenCLIPModelProperties
 
 
 @pytest.mark.unittest

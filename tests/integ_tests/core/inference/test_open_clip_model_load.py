@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.model_registry import _get_open_clip_properties

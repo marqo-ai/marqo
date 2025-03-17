@@ -3,8 +3,6 @@ import unittest
 import pytest
 from pydantic import ValidationError
 
-from marqo.core.inference.embedding_models.languagebind_model_properties import *
-
 
 @pytest.mark.unittest
 class TestLanguagebindModelProperties(unittest.TestCase):

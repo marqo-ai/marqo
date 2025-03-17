@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 from marqo.s2_inference.errors import ModelDownloadError
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
-from marqo.core.inference.download_model_from_hf import download_model_from_hf
+from marqo.inference.model_download.download_model_from_hf import download_model_from_hf
 from huggingface_hub.errors import RepositoryNotFoundError
 from marqo.s2_inference.configs import ModelCache
 

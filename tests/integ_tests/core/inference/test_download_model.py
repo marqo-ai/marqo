@@ -1,7 +1,7 @@
 import unittest
 import urllib
 from unittest.mock import patch, MagicMock
-from marqo.core.inference.model_download import (
+from marqo.inference.model_download.model_download import (
     download_pretrained_from_s3, download_model, download_pretrained_from_url,
     ModelDownloadError, S3Auth, S3Location, ModelAuth, ModelLocation
 )
