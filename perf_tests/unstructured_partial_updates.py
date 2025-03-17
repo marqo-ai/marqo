@@ -26,11 +26,11 @@ class UnstructuredUpdateUser(MarqoLocustHttpUser):
             'title': self.s.sentence(),
             'description': ' '.join([self.s.sentence() for _ in range(random.randint(1, 3))]),
             'int_map': {
-                random.randint(1, 10): random.randint(1, 100) 
+                str(random.randint(1, 10)): random.randint(1, 100)
                 for _ in range(random.randint(2, 5))
             },
             'float_map': {
-                round(random.uniform(0.1, 10.0), 2): round(random.uniform(10.0, 100.0), 2)
+                str(round(random.uniform(0.1, 10.0), 2)): round(random.uniform(10.0, 100.0), 2)
                 for _ in range(random.randint(2, 5))
             },
             'string_array': [self.s.sentence() for _ in range(random.randint(2, 4))]
