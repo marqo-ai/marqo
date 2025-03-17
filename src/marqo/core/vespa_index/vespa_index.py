@@ -222,13 +222,7 @@ class VespaIndex(ABC):
             base_rerank_depth = query.limit + query.offset
             additional_hits = 0
 
-        # Set rerank depth provided by query, with minimum of base_rerank_depth
-        if query.rerank_depth_tensor is not None:
-            rerank_depth = max(base_rerank_depth, query.rerank_depth_tensor)
-        else:
-            rerank_depth = base_rerank_depth
-
-        return rerank_depth, additional_hits
+        return query.rerank_depth_tensor if query.rerank_depth_tensor else base_rerank_depth, additional_hits
 
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
