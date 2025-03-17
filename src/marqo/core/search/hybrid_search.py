@@ -187,7 +187,7 @@ class HybridSearch:
             ef_search=ef_search,
             approximate=approximate,
             offset=offset,
-            rerank_depth=rerank_depth,
+            global_rerank_depth=rerank_depth,
             or_phrases=optional_terms,
             and_phrases=required_terms,
             attributes_to_retrieve=attributes_to_retrieve,

@@ -13,7 +13,6 @@ from marqo.core.unstructured_vespa_index.unstructured_document import Unstructur
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.core import constants
 from marqo.exceptions import InternalError, InvalidArgumentError
-from marqo.tensor_search.helper import get_rerank_depth_and_additional_hits_from_query
 import semver
 
 
@@ -111,7 +110,7 @@ class UnstructuredVespaIndex(VespaIndex):
     def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        rerank_depth, additional_hits = get_rerank_depth_and_additional_hits_from_query(marqo_query)
+        rerank_depth, additional_hits = self._get_rerank_depth_and_additional_hits_from_query(marqo_query)
 
         if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
             query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
@@ -298,10 +297,9 @@ class UnstructuredVespaIndex(VespaIndex):
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # This is for legacy unstructured index only. Searchable attributes is not supported
         # Tensor term
-        tensor_marqo_query = copy.deepcopy(marqo_query)
-        tensor_marqo_query.rerank_depth = marqo_query.hybrid_parameters.rerankDepthTensor
+        marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
 
-        tensor_term = self._get_tensor_search_term(tensor_marqo_query)
+        tensor_term = self._get_tensor_search_term(marqo_query)
         # Lexical term
         lexical_term = self._get_lexical_search_term(marqo_query)
 

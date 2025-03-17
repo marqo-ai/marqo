@@ -1070,7 +1070,7 @@ def _vector_text_search(
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
-        rerank_depth=rerank_depth
+        rerank_depth_tensor=rerank_depth
     )
 
     vespa_index = vespa_index_factory(marqo_index)

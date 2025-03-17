@@ -10,7 +10,6 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from marqo.tensor_search.helper import get_rerank_depth_and_additional_hits_from_query
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -495,9 +494,8 @@ class StructuredVespaIndex(VespaIndex):
         )
         tensor_term = "False"
         if fields_to_search_tensor:
-            tensor_marqo_query = copy.deepcopy(marqo_query)
-            tensor_marqo_query.rerank_depth = marqo_query.hybrid_parameters.rerankDepthTensor
-            tensor_term = self._get_tensor_search_term(tensor_marqo_query)
+            marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
+            tensor_term = self._get_tensor_search_term(marqo_query)
 
         # Lexical term
         fields_to_search_lexical = self._get_lexical_fields_to_search(
@@ -591,8 +589,8 @@ class StructuredVespaIndex(VespaIndex):
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
-        if marqo_query.rerank_depth is not None:
-            query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.rerank_depth
+        if marqo_query.global_rerank_depth is not None:
+            query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
         return query
 
@@ -667,7 +665,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        rerank_depth, additional_hits = get_rerank_depth_and_additional_hits_from_query(marqo_query)
+        rerank_depth, additional_hits = self._get_rerank_depth_and_additional_hits_from_query(marqo_query)
 
         terms = []
         for field in fields_to_search:
