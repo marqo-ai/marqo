@@ -152,7 +152,12 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
         media_download_headers (dict): header for the image download
         timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
+<<<<<<< HEAD
         UnidentifiedImageError: If the image is irretrievable or can't be opened.
+=======
+        ValueError: If the local path is invalid, and is not a url
+        UnidentifiedImageError: If the image is irretrievable or unprocessable.
+>>>>>>> li/inference-server-1-move-models
 
     Returns:
         ImageType: In-memory PIL image.
