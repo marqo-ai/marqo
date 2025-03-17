@@ -3,7 +3,7 @@ import unittest
 from pydantic import ValidationError
 
 from marqo.core.inference.api import ChunkConfig, TextChunkConfig, TextPreprocessingConfig, ImagePreprocessingConfig, \
-    AudioVideoPreprocessingConfig, Modality
+    AudioPreprocessingConfig, VideoPreprocessingConfig
 
 
 class TestChunkConfig(unittest.TestCase):
@@ -185,9 +185,6 @@ class TestTextPreprocessingConfig(unittest.TestCase):
         self.assertIn('"TextPreprocessingConfig" is immutable and does not support item assignment',
                       str(context.exception))
 
-    def test_supported_modalities(self):
-        self.assertSetEqual(TextPreprocessingConfig().supported_modalities, {Modality.TEXT})
-
 
 class TestImagePreprocessingConfig(unittest.TestCase):
     def test_default_values(self):
@@ -271,20 +268,17 @@ class TestImagePreprocessingConfig(unittest.TestCase):
             config.should_chunk = True
         self.assertIn('"ImagePreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
 
-    def test_supported_modalities(self):
-        self.assertSetEqual(ImagePreprocessingConfig().supported_modalities, {Modality.IMAGE})
 
-
-class TestAudioVideoPreprocessingConfig(unittest.TestCase):
+class TestAudioPreprocessingConfig(unittest.TestCase):
     def test_default_values(self):
-        config = AudioVideoPreprocessingConfig()
+        config = AudioPreprocessingConfig()
         self.assertFalse(config.should_chunk)
         self.assertIsNone(config.chunk_config)
         self.assertIsNone(config.download_header)
         self.assertIsNone(config.download_thread_count)
 
     def test_valid_configuration_without_chunking(self):
-        config = AudioVideoPreprocessingConfig(
+        config = AudioPreprocessingConfig(
             should_chunk=False,
             download_header={"Authorization": "Bearer token"},
             download_thread_count=4,
@@ -296,7 +290,7 @@ class TestAudioVideoPreprocessingConfig(unittest.TestCase):
         self.assertEqual(config.download_thread_count, 4)
 
     def test_valid_configuration_with_chunking(self):
-        config = AudioVideoPreprocessingConfig(
+        config = AudioPreprocessingConfig(
             should_chunk=True,
             download_header={"Authorization": "Bearer token"},
             download_thread_count=4,
@@ -316,7 +310,7 @@ class TestAudioVideoPreprocessingConfig(unittest.TestCase):
         Test that a ValidationError is raised when should_chunk is False but chunk_config is provided.
         """
         with self.assertRaises(ValidationError) as context:
-            AudioVideoPreprocessingConfig(
+            AudioPreprocessingConfig(
                 should_chunk=False,
                 chunk_config=ChunkConfig(split_length=10, split_overlap=2),
             )
@@ -327,14 +321,14 @@ class TestAudioVideoPreprocessingConfig(unittest.TestCase):
         Test that a ValidationError is raised when should_chunk is False but chunk_config is provided.
         """
         with self.assertRaises(ValidationError) as context:
-            AudioVideoPreprocessingConfig(
+            AudioPreprocessingConfig(
                 should_chunk=True
             )
         self.assertIn("`chunk_config` must be provided when `should_chunk` is True.", str(context.exception))
 
     def test_aliases_are_handled_correctly(self):
         """Test that aliases are correctly parsed."""
-        config = AudioVideoPreprocessingConfig(
+        config = AudioPreprocessingConfig(
             shouldChunk=True,
             downloadThreadCount=2,
             downloadHeader={"Content-Type": "application/json"},
@@ -346,10 +340,84 @@ class TestAudioVideoPreprocessingConfig(unittest.TestCase):
         self.assertEqual(config.chunk_config, ChunkConfig(splitLength=10, splitOverlap=2))
 
     def test_immutability(self):
-        config = AudioVideoPreprocessingConfig()
+        config = AudioPreprocessingConfig()
         with self.assertRaises(TypeError) as context:
             config.should_chunk = True
-        self.assertIn('"AudioVideoPreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
+        self.assertIn('"AudioPreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
 
-    def test_supported_modalities(self):
-        self.assertSetEqual(AudioVideoPreprocessingConfig().supported_modalities, {Modality.AUDIO, Modality.VIDEO})
+
+class TestVideoPreprocessingConfig(unittest.TestCase):
+    def test_default_values(self):
+        config = VideoPreprocessingConfig()
+        self.assertFalse(config.should_chunk)
+        self.assertIsNone(config.chunk_config)
+        self.assertIsNone(config.download_header)
+        self.assertIsNone(config.download_thread_count)
+
+    def test_valid_configuration_without_chunking(self):
+        config = VideoPreprocessingConfig(
+            should_chunk=False,
+            download_header={"Authorization": "Bearer token"},
+            download_thread_count=4,
+        )
+
+        self.assertFalse(config.should_chunk)
+        self.assertIsNone(config.chunk_config)
+        self.assertEqual(config.download_header, {"Authorization": "Bearer token"})
+        self.assertEqual(config.download_thread_count, 4)
+
+    def test_valid_configuration_with_chunking(self):
+        config = VideoPreprocessingConfig(
+            should_chunk=True,
+            download_header={"Authorization": "Bearer token"},
+            download_thread_count=4,
+            chunk_config=ChunkConfig(
+                split_length=10,
+                split_overlap=2
+            )
+        )
+
+        self.assertTrue(config.should_chunk)
+        self.assertEqual(config.download_header, {"Authorization": "Bearer token"})
+        self.assertEqual(config.download_thread_count, 4)
+        self.assertEqual(config.chunk_config, ChunkConfig(split_length=10, split_overlap=2))
+
+    def test_should_not_chunk_with_chunk_config(self):
+        """
+        Test that a ValidationError is raised when should_chunk is False but chunk_config is provided.
+        """
+        with self.assertRaises(ValidationError) as context:
+            VideoPreprocessingConfig(
+                should_chunk=False,
+                chunk_config=ChunkConfig(split_length=10, split_overlap=2),
+            )
+        self.assertIn("`chunk_config` must not be provided when `should_chunk` is False.", str(context.exception))
+
+    def test_should_chunk_without_chunk_config(self):
+        """
+        Test that a ValidationError is raised when should_chunk is False but chunk_config is provided.
+        """
+        with self.assertRaises(ValidationError) as context:
+            VideoPreprocessingConfig(
+                should_chunk=True
+            )
+        self.assertIn("`chunk_config` must be provided when `should_chunk` is True.", str(context.exception))
+
+    def test_aliases_are_handled_correctly(self):
+        """Test that aliases are correctly parsed."""
+        config = VideoPreprocessingConfig(
+            shouldChunk=True,
+            downloadThreadCount=2,
+            downloadHeader={"Content-Type": "application/json"},
+            chunkConfig=ChunkConfig(splitLength=10, splitOverlap=2),
+        )
+        self.assertTrue(config.should_chunk)
+        self.assertEqual(config.download_thread_count, 2)
+        self.assertEqual(config.download_header, {"Content-Type": "application/json"})
+        self.assertEqual(config.chunk_config, ChunkConfig(splitLength=10, splitOverlap=2))
+
+    def test_immutability(self):
+        config = VideoPreprocessingConfig()
+        with self.assertRaises(TypeError) as context:
+            config.should_chunk = True
+        self.assertIn('"VideoPreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
