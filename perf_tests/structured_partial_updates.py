@@ -55,7 +55,7 @@ def on_test_start(environment: Environment, **kwargs):
         marqo_client.create_index(index_name=INDEX_NAME,
                                  type="structured",
                                  all_fields=[{"name": "category", "type": "text"}, {"name": "tags", "type": "array<text>"}, {"name": "in_stock", "type": "bool"}, {"name": "price", "type": "float"}, {"name": "inventory_counts", "type": "map<text, int>"}, {"name": "price_history", "type": "map<text, float>"}],
-                                 tensor_fields=["title"])
+                                 tensor_fields=["category"])
 
         # Add initial documents
         initial_docs = []
