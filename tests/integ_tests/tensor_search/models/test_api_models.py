@@ -46,10 +46,10 @@ class TestSearchQuery(MarqoTestCase):
         # TODO: Remove this test when rerank_depth is supported for tensor, lexical, tensor/lexical, lexical/tensor search.
 
         # Non-hybrid search
-        for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
+        for search_method in [SearchMethod.LEXICAL]:
             with self.assertRaises(ValueError) as e:
                 _ = SearchQuery(q="test", searchMethod=search_method, rerankDepth=5)
-            self.assertIn("only supported for 'HYBRID' search", str(e.exception))
+            self.assertIn("not supported for 'LEXICAL' search method", str(e.exception))
 
         # Hybrid search with non-RRF rankingMethod
         for retrieval_method, ranking_method in [
