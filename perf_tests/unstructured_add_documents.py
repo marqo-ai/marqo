@@ -29,7 +29,8 @@ class AddDocumentsUser(MarqoLocustHttpUser):
         
         self.client.index(INDEX_NAME).add_documents(
             documents=[doc],
-            use_existing_tensors=True
+            use_existing_tensors=True,
+            tensor_fields=['title', 'description']
         )
 
 

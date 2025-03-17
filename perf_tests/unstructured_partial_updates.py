@@ -37,8 +37,7 @@ class UnstructuredUpdateUser(MarqoLocustHttpUser):
         }
         
         self.client.index(INDEX_NAME).update_documents(
-            documents=[update_doc],
-            tensor_fields=['title', 'description']
+            documents=[update_doc]
         )
 
 

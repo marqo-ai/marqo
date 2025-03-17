@@ -23,22 +23,20 @@ class StructuredUpdateUser(MarqoLocustHttpUser):
         doc_id = f"doc_{random.randint(0, 99)}"  # Random doc from 100 docs
         update_doc = {
             '_id': doc_id,
-            'metadata': {
-                'rating': random.randint(1, 5),
-                'category': random.choice(['electronics', 'books', 'clothing', 'food']),
-                'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3)),
-                'in_stock': random.choice([True, False]),
-                'price': round(random.uniform(10.0, 1000.0), 2),
-                'inventory_counts': {
-                    'warehouse_1': random.randint(0, 100),
-                    'warehouse_2': random.randint(0, 50),
-                    'warehouse_3': random.randint(0, 75)
-                },
-                'price_history': {
-                    'jan': round(random.uniform(10.0, 1000.0), 2),
-                    'feb': round(random.uniform(10.0, 1000.0), 2),
-                    'mar': round(random.uniform(10.0, 1000.0), 2)
-                }
+            'rating': random.randint(1, 5),
+            'category': random.choice(['electronics', 'books', 'clothing', 'food']),
+            'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3)),
+            'in_stock': random.choice([True, False]),
+            'price': round(random.uniform(10.0, 1000.0), 2),
+            'inventory_counts': {
+                'warehouse_1': random.randint(0, 100),
+                'warehouse_2': random.randint(0, 50),
+                'warehouse_3': random.randint(0, 75)
+            },
+            'price_history': {
+                'jan': round(random.uniform(10.0, 1000.0), 2),
+                'feb': round(random.uniform(10.0, 1000.0), 2),
+                'mar': round(random.uniform(10.0, 1000.0), 2)
             }
         }
         
@@ -69,14 +67,12 @@ def on_test_start(environment: Environment, **kwargs):
         for i in range(100):
             doc = {
                 '_id': f"doc_{i}",
-                'metadata': {
-                    'category': random.choice(['electronics', 'books', 'clothing', 'food']),
-                    'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3))
-                }
+                'category': random.choice(['electronics', 'books', 'clothing', 'food']),
+                'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3))
             }
             initial_docs.append(doc)
         
-        marqo_client.index(INDEX_NAME).add_documents(documents=initial_docs)
+        marqo_client.index(INDEX_NAME).add_documents(documents=initial_docs, tensor_fields=['category'])
 
 
 @events.quitting.add_listener
