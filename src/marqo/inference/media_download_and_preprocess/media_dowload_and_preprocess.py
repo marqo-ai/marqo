@@ -1,5 +1,4 @@
 """Functions used to fulfill the add_documents endpoint"""
-import concurrent
 import logging
 import math
 import threading
@@ -7,17 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 import PIL
 from PIL.Image import Image
-from torch import Tensor
 
-from marqo.core.inference.api import *
-from marqo.core.models.marqo_index import *
 from marqo.inference.media_download_and_preprocess.download_image import load_image_from_path
-from marqo.s2_inference.s2_inference import Modality
+from marqo.inference.type import *
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
-
-from marqo.inference.type import *
+from marqo.tensor_search.telemetry import RequestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +22,7 @@ def threaded_download_and_preprocess_content(
         modality: Modality,
         media_download_headers: Optional[Dict] = None,
         download_timeout_ms: int = 3000,
-        audio_video_preprocessing_config: Optional[AudioVideoPreprocessingConfig] = None,
+        audio_video_preprocessing_config: Optional[VideoPreprocessingConfig, AudioPreprocessingConfig] = None,
         metric_obj: Optional[RequestMetrics] = None,
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download images for its allocated documents
