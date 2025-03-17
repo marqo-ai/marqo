@@ -4,7 +4,6 @@ from typing import List, Dict, Optional
 
 import numpy as np
 import torch
-from sentence_transformers.util import normalize_embeddings
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs

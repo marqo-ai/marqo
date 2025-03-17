@@ -1,7 +1,7 @@
 import torch
 from unittest import TestCase
 from unittest.mock import patch
-from marqo.inference.chunk_download_preprocess_content import _split_prefix_preprocess_text
+from marqo.inference.native_inference.chunk_download_preprocess_content import _split_prefix_preprocess_text
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.core.inference.api import TextPreprocessingConfig, TextChunkConfig
 

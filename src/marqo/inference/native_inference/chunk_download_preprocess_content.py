@@ -8,13 +8,10 @@ The reason that we need to do these 3 steps together is that:
 Thus this module is responsible for handling the chunking, downloading, and preprocessing of content for inference.
 """
 
-from torch import Tensor
-
-from marqo.core.inference.api import *
 from marqo.inference.media_download_and_preprocess.media_dowload_and_preprocess import (
     process_batch)
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from marqo.inference.split_text import split_text, prefix_text_chunks
+from marqo.inference.media_download_and_preprocess.split_text import split_text, prefix_text_chunks
 from marqo.inference.type import *
 
 
