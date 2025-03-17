@@ -18,7 +18,7 @@ def preprocess_side_effect(inputs, modality="language"):
     A side effect function for preprocess mock.
     Returns a list of tensors where each tensor depends on the length of the text.
     """
-    return [torch.ones(size=(1, 12)) * len(text) for text in inputs]
+    return [torch.ones(size=(1, 12)), ] * len(inputs)
 
 
 def faulty_preprocess_side_effect(inputs, modality="language"):
