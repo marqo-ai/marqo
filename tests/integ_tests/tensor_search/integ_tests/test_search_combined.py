@@ -1122,3 +1122,42 @@ class TestSearch(MarqoTestCase):
                         ORJSONResponse(res)
                     except TypeError as e:
                         self.fail(f"Result is not JSON serializable: {e}")
+
+    def test_rerank_depth_tensor_search(self):
+        """Test that rerank_depth restricts reranking to top-N documents."""
+        docs = [{
+            "_id": f"doc_{i}",
+            "text_field_1": f"sample text {i}"
+        } for i in range(10)]
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_fields = ["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=docs, tensor_fields=tensor_fields
+                    )
+                )
+
+                # Search without rerank_depth
+                full_rerank_res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="sample text", result_count=10
+                )
+
+                # Search with rerank_depth=3
+                partial_rerank_res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="sample text", result_count=10, rerank_depth=3
+                )
+
+                # Ensure all hits are returned
+                self.assertEqual(len(full_rerank_res["hits"]), 10)
+
+                # Ensure only top 3 hits are returned
+                self.assertEqual(len(partial_rerank_res["hits"]), 3)
+
+                # Ensure the top 3 hits are the same in both results
+                self.assertEqual(
+                    [hit["_id"] for hit in full_rerank_res["hits"][:3]],
+                    [hit["_id"] for hit in partial_rerank_res["hits"]]
+                )

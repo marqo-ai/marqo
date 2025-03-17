@@ -2715,3 +2715,61 @@ class TestHybridSearch(MarqoTestCase):
             # rerank_depth=3, # This should not raise an error
             result_count=3
         )
+
+    def test_rerank_depth_tensor_hybrid_search(self):
+        """Test that rerank_depth restricts hybrid reranking to top-N documents."""
+        docs = [{
+            "_id": f"doc_{i}",
+            "text_field_1": f"sample text {i}"
+        } for i in range(10)]
+
+        for index in [self.semi_structured_default_text_index, self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                tensor_fields = ["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                # Full rerank results
+                full_rerank_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="sample text",
+                    search_method="HYBRID",
+                    result_count=10,
+                    hybrid_parameters=HybridParameters(
+                        verbose=True,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor
+                    )
+                )
+
+                # Partial results (rerank_depth_tensor=3)
+                partial_rerank_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="sample text",
+                    search_method="HYBRID",
+                    result_count=10,
+                    hybrid_parameters=HybridParameters(
+                        rerankDepthTensor=3,
+                        verbose=True,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor
+                    )
+                )
+
+                # Ensure correct number of hits
+                self.assertEqual(len(full_rerank_res["hits"]), 10)
+                self.assertEqual(len(partial_rerank_res["hits"]), 3)
+
+                # Ensure top 3 hits are the same in both results
+                for i in range(3):
+                    self.assertEqual(full_rerank_res["hits"][i]["_id"], partial_rerank_res["hits"][i]["_id"])
+
