@@ -6,8 +6,8 @@ from typing import Tuple, Callable, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from marqo.inference.native_inference.embedding_models import AbstractEmbeddingModel
-from marqo.inference.native_inference.embedding_models import HuggingFaceModelProperties, \
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
     PoolingMethod, HuggingFaceModelFlags, HuggingFaceTokenizerFlags
 from pydantic import ValidationError
 from transformers import (AutoModel, AutoTokenizer)
