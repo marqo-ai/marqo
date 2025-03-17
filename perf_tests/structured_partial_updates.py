@@ -24,7 +24,6 @@ class StructuredUpdateUser(MarqoLocustHttpUser):
         update_doc = {
             '_id': doc_id,
             'rating': random.randint(1, 5),
-            'category': random.choice(['electronics', 'books', 'clothing', 'food']),
             'tags': random.sample(['new', 'sale', 'clearance', 'limited', 'featured', 'bestseller', 'seasonal'], random.randint(1, 3)),
             'in_stock': random.choice([True, False]),
             'price': round(random.uniform(10.0, 1000.0), 2),
