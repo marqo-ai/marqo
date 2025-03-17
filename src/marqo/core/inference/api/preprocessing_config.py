@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Literal, List, Set
+from typing import Optional, Dict, Literal, List, Set, Union
 
 import pydantic
 from pydantic import root_validator
@@ -10,12 +10,8 @@ from marqo.core.inference.api.modality import Modality
 
 class PreprocessingConfig(ImmutableBaseModel, ABC):
     """Parent class of preprocessing config for all modality types"""
+    modality: str
     should_chunk: bool = pydantic.Field(default=False, alias='shouldChunk')
-
-    @property
-    @abstractmethod
-    def supported_modalities(self) -> Set[Modality]:
-        pass
 
 
 class ChunkConfig(ImmutableBaseModel):
@@ -29,6 +25,7 @@ class TextChunkConfig(ChunkConfig):
 
 class TextPreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for text modality"""
+    modality: Literal[Modality.TEXT] = Modality.TEXT
     text_prefix: Optional[str] = pydantic.Field(default=None, alias='textPrefix')
     chunk_config: Optional[TextChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
 
@@ -42,13 +39,10 @@ class TextPreprocessingConfig(PreprocessingConfig):
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
         return values
 
-    @property
-    def supported_modalities(self) -> Set[Modality]:
-        return {Modality.TEXT}
-
 
 class ImagePreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for image modality"""
+    modality: Literal[Modality.IMAGE] = Modality.IMAGE
     download_timeout_ms: Optional[int] = pydantic.Field(default=None, alias='downloadTimeoutMs')
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
@@ -72,13 +66,10 @@ class ImagePreprocessingConfig(PreprocessingConfig):
             raise ValueError("`patch_method` must not be provided when `should_chunk` is False.")
         return values
 
-    @property
-    def supported_modalities(self) -> Set[Modality]:
-        return {Modality.IMAGE}
 
-
-class AudioVideoPreprocessingConfig(PreprocessingConfig):
-    """Preprocessing config for audio and video modality"""
+class AudioPreprocessingConfig(PreprocessingConfig):
+    """Preprocessing config for audio modality"""
+    modality: Literal[Modality.AUDIO] = Modality.AUDIO
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
     chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
@@ -93,7 +84,25 @@ class AudioVideoPreprocessingConfig(PreprocessingConfig):
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
         return values
 
-    @property
-    def supported_modalities(self) -> Set[Modality]:
-        return {Modality.AUDIO, Modality.VIDEO}
 
+class VideoPreprocessingConfig(PreprocessingConfig):
+    """Preprocessing config for video modality"""
+    modality: Literal[Modality.VIDEO] = Modality.VIDEO
+    download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
+    download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
+    chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+
+    @root_validator
+    def validate_chunk_config(cls, values):
+        should_chunk = values.get('should_chunk')
+        chunk_config = values.get('chunk_config')
+        if should_chunk and chunk_config is None:
+            raise ValueError("`chunk_config` must be provided when `should_chunk` is True.")
+        if not should_chunk and chunk_config is not None:
+            raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
+        return values
+
+
+PreprocessingConfigType = Union[
+    TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig
+]
