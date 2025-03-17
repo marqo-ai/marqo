@@ -6,7 +6,7 @@ from marqo.inference.type import *
 
 
 def encode_processed_content(model, preprocessed_content_list: list[PreprocessedContent],
-                             modality, normalize) -> list[Tensor]:
+                             modality, normalize, maximum_batch_size=16) -> list[Tensor]:
     """
     Encode the processed content using the model.
 
@@ -22,8 +22,16 @@ def encode_processed_content(model, preprocessed_content_list: list[Preprocessed
 
     flattened_content: List[Tensor] = _collect_tensors(preprocessed_content_list)
     if len(flattened_content) > 0:
+        embeddings = []
         stacked_content = torch.cat(flattened_content)
-        embeddings = model.encode(stacked_content, modality, normalize)
+        for i in range(0, len(stacked_content), maximum_batch_size):
+            batch = stacked_content[i:i + maximum_batch_size]
+            batch_embeddings = model.encode(batch, modality, normalize)
+            embeddings.extend(batch_embeddings)
+
+        if len(embeddings) != len(flattened_content):
+            raise ValueError("The number of embeddings does not match the number of contents")
+
         return embeddings
     else:
         return []
