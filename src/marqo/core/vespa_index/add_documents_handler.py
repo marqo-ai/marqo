@@ -352,7 +352,7 @@ class AddDocumentsHandler(ABC):
         if modality == Modality.TEXT:
             return TextPreprocessingConfig(
                 should_chunk=for_top_level_field,
-                text_prefix=self.add_docs_params.text_chunk_prefix,
+                text_prefix=self.marqo_index.model.get_text_chunk_prefix(self.add_docs_params.text_chunk_prefix),
                 chunk_config=None if not for_top_level_field else TextChunkConfig(
                     split_length=self.marqo_index.text_preprocessing.split_length,
                     split_overlap=self.marqo_index.text_preprocessing.split_overlap,

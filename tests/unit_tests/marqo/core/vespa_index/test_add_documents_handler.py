@@ -13,7 +13,7 @@ from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import TextPreProcessing, TextSplitMethod, ImagePreProcessing, PatchMethod, \
-    AudioPreProcessing, VideoPreProcessing
+    AudioPreProcessing, VideoPreProcessing, Model
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
@@ -252,7 +252,12 @@ class TestAddDocumentHandler(unittest.TestCase):
                     split_length=100,
                     split_overlap=10,
                     split_method=TextSplitMethod.Word
-                )),
+                ),
+                model=Model(
+                    name='hf/all_datasets_v4_MiniLM-L6',
+                    text_chunk_prefix='default_prefix:'
+                )
+            ),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[{'_id': '1', 'field1': 'hello'}],
@@ -267,6 +272,38 @@ class TestAddDocumentHandler(unittest.TestCase):
 
         for_subfield = handler._get_preprocessing_config(Modality.TEXT, for_top_level_field=False)
         self.assertEqual(for_subfield.text_prefix, 'prefix1:')
+        self.assertFalse(for_subfield.should_chunk)
+        self.assertIsNone(for_subfield.chunk_config)
+
+    def test_preprocessing_config_for_text_modality_with_default_prefix(self):
+        handler = DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            inference=self.inference,
+            marqo_index=MarqoTestCase.unstructured_marqo_index(
+                'index1', 'index1',
+                text_preprocessing=TextPreProcessing(
+                    split_length=100,
+                    split_overlap=10,
+                    split_method=TextSplitMethod.Word
+                ),
+                model=Model(
+                    name='hf/all_datasets_v4_MiniLM-L6',
+                    text_chunk_prefix='default_prefix:'
+                )
+            ),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[{'_id': '1', 'field1': 'hello'}],
+            ),
+        )
+
+        for_top_level_field = handler._get_preprocessing_config(Modality.TEXT, for_top_level_field=True)
+        self.assertEqual(for_top_level_field.text_prefix, 'default_prefix:')
+        self.assertTrue(for_top_level_field.should_chunk)
+        self.assertEqual(for_top_level_field.chunk_config, TextChunkConfig(split_length=100, split_overlap=10, split_method='word'))
+
+        for_subfield = handler._get_preprocessing_config(Modality.TEXT, for_top_level_field=False)
+        self.assertEqual(for_subfield.text_prefix, 'default_prefix:')
         self.assertFalse(for_subfield.should_chunk)
         self.assertIsNone(for_subfield.chunk_config)
 
