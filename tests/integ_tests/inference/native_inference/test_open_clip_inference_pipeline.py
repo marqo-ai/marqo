@@ -1,14 +1,12 @@
-from unittest import TestCase
-
 import numpy as np
 
+from integ_tests.inference.inference_test_case import InferenceTestCase
+from integ_tests.marqo_test import TestImageUrls
 from marqo.core.inference.api import *
 from marqo.inference.native_inference.inference_pipeline import InferencePipeline
-from numpy import ndarray
-from integ_tests.marqo_test import TestImageUrls
 
 
-class TestOpenCLIPInferencePipeline(TestCase):
+class TestOpenCLIPInferencePipeline(InferenceTestCase):
 
     def test_inference_text_no_chunk_no_prefix(self):
         text_inference_request = InferenceRequest(

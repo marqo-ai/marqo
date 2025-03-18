@@ -11,7 +11,7 @@ from marqo.inference.media_download_and_preprocess.image_download import load_im
 from marqo.inference.type import *
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.telemetry import RequestMetrics
+from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,9 @@ def process_batch(
         results.extend(partial_result)
 
     # Fix up metric_obj to make it not mention thread-ids
-    # metric_obj = RequestMetricsStore.for_request()
-    # metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-    # metric_obj.times = reduce_thread_metrics(metric_obj.times)
+    metric_obj = RequestMetricsStore.for_request()
+    metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+    metric_obj.times = reduce_thread_metrics(metric_obj.times)
     return results
 
 

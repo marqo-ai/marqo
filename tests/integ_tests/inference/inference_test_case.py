@@ -4,7 +4,8 @@ from unittest.mock import patch, Mock
 from marqo.tensor_search.telemetry import RequestMetricsStore
 
 
-class MarqoTestCase(TestCase):
+class InferenceTestCase(TestCase):
+
     @classmethod
     def configure_request_metrics(cls):
         """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
