@@ -2,7 +2,7 @@ from marqo.inference.native_inference.embedding_models.hugging_face_stella_model
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
-from marqo.inference.native_inference.embedding_models.open_clip_model import o import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.random_utils import Random
