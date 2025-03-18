@@ -290,3 +290,6 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         else:
             # return the directory path or repo_id directory
             return path
+
+    def get_preprocessor(self):
+        return NotImplementedError

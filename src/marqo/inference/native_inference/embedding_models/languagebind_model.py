@@ -520,3 +520,6 @@ class LanguagebindModel(AbstractEmbeddingModel):
         finally:
             if os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
+
+    def get_preprocessor(self):
+        raise NotImplementedError
