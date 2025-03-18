@@ -1,10 +1,9 @@
-
 from enum import Enum
 from typing import Optional, List
 
 from pydantic import Field, root_validator
 
-from marqo.core.inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation
 
 

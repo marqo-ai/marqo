@@ -5,13 +5,16 @@ from contextlib import contextmanager
 import torch
 from pydantic import ValidationError
 
+from marqo.base_model import MarqoBaseModel
 from marqo.core.exceptions import InternalError
-from marqo.core.inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.embedding_models.languagebind_model_properties import *
-from marqo.core.inference.image_download import format_and_load_CLIP_images, download_media_from_url
-from marqo.core.inference.model_download import (download_model_from_hf, download_pretrained_from_url,
-                                                 download_pretrained_from_s3, extract_zip_file)
 from marqo.exceptions import InternalError
+from marqo.inference.media_download_and_preprocess.image_download import format_and_load_CLIP_images, \
+    download_media_from_url
+from marqo.inference.model_download.model_download import (download_model_from_hf, download_pretrained_from_url,
+                                                           download_pretrained_from_s3, extract_zip_file)
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.languagebind_model_properties import LanguagebindModelProperties, \
+    ModalityLocation
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, MediaMismatchError
 from marqo.s2_inference.languagebind import LanguageBindImageTokenizer, LanguageBind, transform_dict, to_device

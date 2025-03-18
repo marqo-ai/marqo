@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 
 
@@ -26,11 +26,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://huggingface.co/Marqo/marqo-fashionSigLIP/resolve/main/open_clip_pytorch_model.bin",
             "imagePreprocessor": "SigLIP"
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model",
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.create_model",
                    return_value=MagicMock()) as mock_create_model, \
-            patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
+            patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
                    return_value=MagicMock()) as mock_tokenizer, \
-            patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+            patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                   return_value="my_test_model.pt"), \
             patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
 
@@ -58,11 +58,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://a-dummy-url/clip_vit_l_14.pt",
             "dimensions": 768,
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model",
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.create_model",
                    return_value=MagicMock()) as mock_create_model, \
-            patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
+            patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
                    return_value=MagicMock()) as mock_tokenizer, \
-            patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+            patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                   return_value="my_test_model.pt"), \
             patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
 
