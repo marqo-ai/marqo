@@ -6,15 +6,15 @@ from typing import Tuple, Callable, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from marqo.core.inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
     PoolingMethod, HuggingFaceModelFlags, HuggingFaceTokenizerFlags
 from pydantic import ValidationError
 from transformers import (AutoModel, AutoTokenizer)
 
 from marqo import marqo_docs
 from marqo.core.exceptions import InternalError
-from marqo.core.inference.model_download import download_model
+from marqo.inference.model_download.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.types import Union, FloatTensor, List

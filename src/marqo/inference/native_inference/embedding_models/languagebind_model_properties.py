@@ -4,7 +4,7 @@ from pydantic import Field, root_validator
 from pydantic import validator
 
 from marqo.base_model import MarqoBaseModel
-from marqo.core.inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.s2_inference.types import Modality
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.external_apis.s3 import S3Location
