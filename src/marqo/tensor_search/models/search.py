@@ -1,12 +1,12 @@
 import json
+from typing import Any, Union, List, Dict, Optional, NewType
 
 from pydantic import BaseModel, validator, ValidationError
-from typing import Any, Union, List, Dict, Optional, NewType, Literal
 
 from marqo.api.exceptions import InvalidArgError
-from marqo.core.models import MarqoQuery
+from marqo.core.inference.api import Modality
+
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.s2_inference.multimodal_model_load import Modality
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
 JHash = NewType('JHash', int) # hash of a VectoriseJob. Used for quick access of VectorisedJobs

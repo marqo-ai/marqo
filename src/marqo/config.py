@@ -3,6 +3,7 @@ from typing import Optional, Union
 from kazoo.handlers.threading import KazooTimeoutError
 
 from marqo.core.inference.device_manager import DeviceManager
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceServerClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
@@ -55,6 +56,9 @@ class Config:
         self.recommender = Recommender(vespa_client, self.index_management)
         self.embed = Embed(vespa_client, self.index_management, self.default_device)
         self.device_manager = DeviceManager()
+
+        inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_SERVER_URL)
+        self.inference = NativeInferenceServerClient(inference_server_url)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

@@ -59,6 +59,8 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        EnvVars.MARQO_INFERENCE_SERVER_URL: "http://localhost:8081",
+
         # Inference
         EnvVars.MARQO_MODELS_TO_PRELOAD: ["hf/e5-base-v2", "open_clip/ViT-B-32/laion2b_s34b_b79k"],
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
