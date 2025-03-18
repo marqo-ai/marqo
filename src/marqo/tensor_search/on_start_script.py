@@ -29,6 +29,7 @@ logger = get_logger(__name__)
 def on_start(config: config.Config):
     to_run_on_start = (
         BootstrapVespa(config),
+        PopulateCache(config),
         DownloadStartText(),
         InitializeRedis("localhost", 6379),
         DownloadFinishText(),
@@ -62,6 +63,17 @@ class BootstrapVespa:
                 f"{marqo_docs.configuring_marqo()} for more details. Error: {e}"
             )
             raise e
+
+
+class PopulateCache:
+    """Populates the cache on start"""
+
+    def __init__(self, config: config.Config):
+        self.config = config
+
+    def run(self):
+        logger.debug('Starting index cache refresh thread')
+        index_meta_cache.start_refresh_thread(self.config)
 
 
 def _preload_model(model, content, device):
