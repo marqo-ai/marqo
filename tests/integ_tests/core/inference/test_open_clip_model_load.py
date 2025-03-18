@@ -31,9 +31,9 @@ class TestOpenCLIPModelLoad(TestCase):
             "dimensions": 512
         }
 
-        with patch("marqo.core.inference.embedding_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
                    return_value=(MagicMock(), MagicMock())) as mock_load_method:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.OPEN_CLIP._load_tokenizer_from_checkpoint",
+            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OPEN_CLIP._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     model = OPEN_CLIP(model_properties=model_properties, device="cpu")
@@ -50,11 +50,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "type": "open_clip",
             "dimensions": 512
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -86,11 +86,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "image_preprocessor": "SigLIP",
             "size": 322  # Override the default size 224
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -197,12 +197,12 @@ class TestOpenCLIPModelLoad(TestCase):
             "dimensions": 512,
             "type": "open_clip"
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    with patch("marqo.core.inference.embedding_models.open_clip_model.os.path.exists",
+                    with patch("marqo.inference.native_inference.embedding_models.open_clip_model.os.path.exists",
                                return_value=True) as mock_path_exists:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -237,7 +237,7 @@ class TestOpenCLIPModelLoad(TestCase):
             aws_secret_access_key="my_secret_key",
         ))
 
-        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model") as mock_download_model:
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
             with self.assertRaises(RuntimeError):
                 model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
@@ -266,7 +266,7 @@ class TestOpenCLIPModelLoad(TestCase):
 
         model_auth = ModelAuth(**{"hf": {"token":"my_hf_token"}})
 
-        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model") as mock_download_model:
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
             with self.assertRaises(RuntimeError) as e:
                 model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
