@@ -23,7 +23,6 @@ class Config:
             self,
             vespa_client: VespaClient,
             zookeeper_client: Optional[ZookeeperClient] = None,
-            default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
@@ -41,8 +40,6 @@ class Config:
         self.timeout = timeout
         self.backend = backend if backend is not None else enums.SearchDb.vespa
         # TODO [Refactoring device logic] deprecate default_device since it's not used
-        self.default_device = default_device if default_device is not None else (
-            utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE))
 
         # Initialize Core layer dependencies
         deployment_lock_timeout = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT)
@@ -53,8 +50,7 @@ class Config:
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)
-        self.embed = Embed(vespa_client, self.index_management, self.default_device)
-        self.device_manager = DeviceManager()
+        self.embed = Embed(vespa_client, self.index_management)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]
