@@ -41,7 +41,7 @@ class TestOpenCLIPInferencePipeline(TestCase):
         self.assertTrue(isinstance(results_1[0], tuple))
         self.assertTrue(isinstance(results_1[0][0], str))
         self.assertTrue(isinstance(results_1[0][1], np.ndarray))
-        self.assertEqual(512, results_1[0][1])
+        self.assertEqual((512, ), results_1[0][1].shape)
         self.assertEqual("text", results_1[0][0])
 
         results_2: list[tuple[str, ndarray]] = results.result[1]
@@ -50,7 +50,7 @@ class TestOpenCLIPInferencePipeline(TestCase):
         self.assertTrue(isinstance(results_2[0], tuple))
         self.assertTrue(isinstance(results_2[0][0], str))
         self.assertTrue(isinstance(results_2[0][1], np.ndarray))
-        self.assertEqual(512, results_2[0][1])
+        self.assertEqual((512, ), results_2[0][1].shape)
         self.assertEqual("very long long long long text", results_2[0][0])
 
     def test_inference_image(self):
@@ -89,7 +89,7 @@ class TestOpenCLIPInferencePipeline(TestCase):
         self.assertTrue(isinstance(results_1[0], tuple))
         self.assertTrue(isinstance(results_1[0][0], str))
         self.assertTrue(isinstance(results_1[0][1], np.ndarray))
-        self.assertEqual(512, results_1[0][1])
+        self.assertEqual((512, ), results_1[0][1].shape)
         self.assertEqual(TestImageUrls.IMAGE1.value, results_1[0][0])
 
         results_2: list[tuple[str, ndarray]] = results.result[1]
@@ -98,5 +98,5 @@ class TestOpenCLIPInferencePipeline(TestCase):
         self.assertTrue(isinstance(results_2[0], tuple))
         self.assertTrue(isinstance(results_2[0][0], str))
         self.assertTrue(isinstance(results_2[0][1], np.ndarray))
-        self.assertEqual(512, results_2[0][1])
+        self.assertEqual((512, ), results_2[0][1].shape)
         self.assertEqual(TestImageUrls.IMAGE2.value, results_2[0][0])
