@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from pytest import mark
 
-from marqo.inference.native_inference.embedding_models import LanguagebindModel
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.inference.media_download_and_preprocess.image_download import format_and_load_CLIP_images
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.external_apis.hf import HfAuth
