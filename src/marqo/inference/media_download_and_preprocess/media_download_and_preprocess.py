@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import PIL
 from PIL.Image import Image
 
-from marqo.inference.media_download_and_preprocess.download_image import load_image_from_path
+from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.type import *
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
