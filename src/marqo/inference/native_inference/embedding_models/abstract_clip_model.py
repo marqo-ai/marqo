@@ -2,15 +2,12 @@ from abc import abstractmethod
 
 import numpy as np
 import torch
-from PIL import UnidentifiedImageError
 from PIL.Image import Image
-from marqo.core.inference.image_download import (_is_image, format_and_load_CLIP_images,
-                                                 format_and_load_CLIP_image)
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 
-from marqo.inference.media_download_and_preprocess.image_download import (_is_image, format_and_load_CLIP_images,
+from marqo.inference.media_download_and_preprocess.image_download import (format_and_load_CLIP_images,
                                                                           format_and_load_CLIP_image)
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
