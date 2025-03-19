@@ -29,7 +29,7 @@ import semver
 
 class HybridSearch:
     def search(
-            self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[str, CustomVectorQuery]],
+            self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
@@ -128,19 +128,29 @@ class HybridSearch:
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
+        # split queries into lexical and tensor
+        if query is None:
+            tensor_query = hybrid_parameters.queryTensor
+            lexical_query = hybrid_parameters.queryLexical
+        elif isinstance(query, CustomVectorQuery):
+            tensor_query = query
+            lexical_query = None
+        else:
+            tensor_query = query
+            lexical_query = query
 
         # Edge cases for q data type
-        if isinstance(query, CustomVectorQuery):
+        if isinstance(tensor_query, CustomVectorQuery):
             query_text_vectorise = None
-            query_text_search = query.customVector.content
+            query_text_search = tensor_query.customVector.content
 
             if context is None:
                 context = SearchContext(
-                    tensor=[SearchContextTensor(vector=query.customVector.vector, weight=1)]
+                    tensor=[SearchContextTensor(vector=tensor_query.customVector.vector, weight=1)]
                 )
             else:
-                context.tensor.append(SearchContextTensor(vector=query.customVector.vector, weight=1))
-        elif query is None:
+                context.tensor.append(SearchContextTensor(vector=tensor_query.customVector.vector, weight=1))
+        elif tensor_query is None and lexical_query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
             # Treated like normal tensor search with context.
             if not (hybrid_parameters.retrievalMethod.upper() == SearchMethod.TENSOR and
@@ -155,8 +165,8 @@ class HybridSearch:
             query_text_search = None
 
         else:  # string or dict query
-            query_text_vectorise = query
-            query_text_search = query
+            query_text_vectorise = tensor_query
+            query_text_search = lexical_query
 
         queries = [BulkSearchQueryEntity(
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,

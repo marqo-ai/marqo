@@ -100,16 +100,37 @@ class SearchQuery(BaseMarqoModel):
         search_method = values.get('searchMethod')
         query = values.get('q')
         context = values.get('context')
+        hybrid_parameters = values.get('hybridParameters')
 
-        if search_method in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
-            if query is None and context is None:
-                raise ValueError(f"One of Query(q) or context is required for {search_method} "
-                                 f"search but both are missing")
-        elif search_method == SearchMethod.LEXICAL:
-            if query is None:
-                raise ValueError("Query(q) is required for lexical search")
-        else:
+        if search_method not in [SearchMethod.TENSOR, SearchMethod.HYBRID, SearchMethod.LEXICAL]:
             raise ValueError(f"Invalid search method {search_method}")
+
+        if query is None:
+            if search_method == SearchMethod.LEXICAL:
+                raise ValueError("Query(q) is required for lexical search")
+            elif search_method == SearchMethod.TENSOR:
+                if context is None:
+                    raise ValueError(
+                        f"One of Query(q) or context is required for {search_method} search but both are missing"
+                    )
+            elif search_method == SearchMethod.HYBRID:
+                if context is None and (not hybrid_parameters or (
+                        hybrid_parameters.queryTensor is None and hybrid_parameters.queryLexical is None
+                    )
+                ):
+                    raise ValueError(
+                        f"One of Query(q), context, hybridParameters.queryTensor, or "
+                        f"hybridParameters.contextTensor is required for {search_method} search but all are missing"
+                    )
+        else:
+            if search_method == SearchMethod.HYBRID:
+                if cls.__name__ == 'SearchQuery': # This check is only relevant for Initial SearchQuery, not BulkSearchQuery
+                    if hybrid_parameters and (hybrid_parameters.queryTensor or hybrid_parameters.queryLexical):
+                        raise ValueError(
+                            f"Query(q) cannot be provided for {search_method} search when hybridParameters.queryTensor or "
+                            f"hybridParameters.queryLexical is provided"
+                        )
+
         return values
 
     @root_validator(pre=False)
