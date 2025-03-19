@@ -55,7 +55,7 @@ def format_results(preprocessed_content_list: list[PreprocessedContent], embeddi
     embedding_index = 0
     for chunk in preprocessed_content_list:
         chunk_results = []
-        if isinstance(chunk, (MediaDownloadError, PreprocessingError)):
+        if isinstance(chunk, InferenceErrorModel):
             results.append(chunk)
             continue
         elif isinstance(chunk, list):

@@ -143,4 +143,4 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
         self.assertEqual(TestImageUrls.IMAGE1.value, results_1[0][0])
 
         results_2 = results.result[1]
-        self.assertTrue(isinstance(results_2, InferenceError))
+        self.assertTrue(isinstance(results_2, InferenceErrorModel))
