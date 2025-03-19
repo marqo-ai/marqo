@@ -2,7 +2,7 @@ from abc import ABC
 
 from pydantic import Field
 
-from marqo.base_model import MarqoBaseModel, ImmutableBaseModel
+from marqo.base_model import ImmutableBaseModel
 
 
 class MarqoBaseModelProperties(ImmutableBaseModel, ABC):

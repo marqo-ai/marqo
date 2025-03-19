@@ -20,6 +20,18 @@ from marqo.s2_inference.errors import InvalidModelPropertiesError, MediaMismatch
 from marqo.s2_inference.languagebind import LanguageBindImageTokenizer, LanguageBind, transform_dict, to_device
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+
+
+class LanguagebindPreprocessor(AbstractPreprocessor):
+
+    def __init__(self, preprocessor):
+        super().__init__()
+        self.preprocessor = preprocessor
+
+    def preprocess(self, inputs, modality: Modality):
+        return self.preprocessor(inputs)
+
 
 
 class CLIPType(MarqoBaseModel):
@@ -508,3 +520,6 @@ class LanguagebindModel(AbstractEmbeddingModel):
         finally:
             if os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
+
+    def get_preprocessor(self):
+        raise NotImplementedError

@@ -1,18 +1,22 @@
 import os
 
+import numpy as np
 import open_clip
 import torch
+from PIL.Image import Image
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
 from pydantic import ValidationError
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
-from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPModel
-from marqo.inference.native_inference.embedding_models.hf_tokenizer import HFTokenizer
-from marqo.inference.native_inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
-from marqo.inference.model_download.model_download import download_model
 from marqo.exceptions import InternalError
+from marqo.inference.model_download.model_download import download_model
+from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPModel
+from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPPreprocessor
+from marqo.inference.native_inference.embedding_models.hf_tokenizer import HFTokenizer
+from marqo.inference.native_inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, \
+    ImagePreprocessor
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.logger import get_logger
@@ -23,6 +27,45 @@ logger = get_logger(__name__)
 
 HF_HUB_PREFIX = "hf-hub:"
 MARQO_OPEN_CLIP_REGISTRY_PREFIX = "open_clip/"
+
+
+class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
+
+    def __init__(self, tokenizer, image_preprocessor):
+        super().__init__(tokenizer, image_preprocessor)
+
+    def preprocess(self, inputs: Union[list[Image], list[str]], modality: Modality):
+        if modality == Modality.TEXT:
+            return self._tokenize_text(inputs)
+        elif modality == Modality.IMAGE:
+            return self._preprocess_image(inputs)
+
+    def _tokenize_text(self, inputs: list[str]) -> List[Tensor]:
+        """
+        Preprocess the text using the tokenizer.
+        Args:
+            inputs: A list of strings to preprocess.
+
+        Returns:
+            A list of preprocessed images in the form of tensors.
+            Each tensor has the shape (N, M) where N is the batch_size,
+             M is the length of the tokenized text.
+        """
+        return [self.tokenizer(text) for text in inputs]
+
+    def _preprocess_image(self, inputs: list[Image]) -> List[Tensor]:
+        """
+        Preprocess the images using the image preprocessor.
+        Args:
+            inputs: A list of images to preprocess.
+
+        Returns:
+            A list of preprocessed images in the form of tensors.
+            Each tensor has the shape (N, 3, H, W) where N is the batch_size,
+             H and W are the height and width of the image.
+        """
+        # Need unsqueeze(0) to add the batch dimension
+        return [self.image_preprocessor(image).unsqueeze(0) for image in inputs]
 
 
 class OPEN_CLIP(AbstractCLIPModel):
@@ -37,6 +80,8 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         self.model_properties = self._build_model_properties(model_properties)
         self.preprocess_config = None
+        self.preprocess = None
+        self.preprocessor = None
 
     def _build_model_properties(self, model_properties: dict) -> OpenCLIPModelProperties:
         """Convert the user input model_properties to OpenCLIPModelProperties."""
@@ -66,6 +111,12 @@ class OPEN_CLIP(AbstractCLIPModel):
             )
         self.model = self.model.to(self.device)
         self.model.eval()
+        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.preprocess)
+
+
+    def get_preprocessor(self) -> OpenCLIPPreprocessor:
+        return self.preprocessor
+
 
     def _check_loaded_components(self):
         """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
@@ -250,18 +301,16 @@ class OPEN_CLIP(AbstractCLIPModel):
                 f' filepath `{model_file_path}`')
         return model_file_path
 
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     media_download_headers: Optional[Dict] = None,
-                     normalize=True) -> FloatTensor:
+    def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
 
-        image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
+        images = torch.cat(images, dim=0)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(image_input_processed).to(torch.float32)
+                    outputs = self.model.encode_image(images).to(torch.float32)
             else:
-                outputs = self.model.encode_image(image_input_processed).to(torch.float32)
+                outputs = self.model.encode_image(images).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -269,12 +318,10 @@ class OPEN_CLIP(AbstractCLIPModel):
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
+    def encode_text(self, text: List[Tensor], normalize=True) -> List[ndarray]:
+        text = torch.cat(text, dim=0)
         if self.model is None:
             self.load()
-
-        text = self.tokenizer(sentence).to(self.device)
-
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
