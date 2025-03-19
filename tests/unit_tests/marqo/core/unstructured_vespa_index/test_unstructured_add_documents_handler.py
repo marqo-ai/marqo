@@ -6,7 +6,7 @@ import numpy as np
 
 # TODO should I move utility method from integ_tests.MarqoTestCase to MarqoTestCase?
 from integ_tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import AddDocumentsError
+from marqo.core.exceptions import AddDocumentsError, InternalError
 from marqo.core.inference.api import Inference, Modality, MediaDownloadError, InferenceRequest, InferenceResult, \
     InferenceError, InferenceErrorModel
 from marqo.core.inference.tensor_fields_container import TensorField
@@ -317,7 +317,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             ]
         ))
 
-        with self.assertRaises(InferenceError) as context:
+        with self.assertRaises(InternalError) as context:
             handler.add_documents()
         self.assertEqual('Inference result contains chunks and embeddings for 1 fields, but 2 are expected',
                          str(context.exception))
