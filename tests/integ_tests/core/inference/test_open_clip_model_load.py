@@ -10,7 +10,7 @@ from marqo.s2_inference.model_registry import _get_open_clip_properties
 from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
-@pytest.mark.unittest
+
 class TestOpenCLIPModelLoad(TestCase):
     """A test suite for loading OpenCLIP models.
 
