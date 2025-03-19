@@ -8,7 +8,7 @@ import numpy as np
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.type import *
 from tests.integ_tests.marqo_test import TestImageUrls
-from marqo.inference.native_inference.content_preprocessing import _download_and_preprocess_image
+from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_image
 from unit_tests.marqo_test import MarqoTestCase
 
 
@@ -52,10 +52,10 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_valid_url(self, mock_preprocess, mock_download_image):
+    def testdownload_and_preprocess_image_valid_url(self, mock_preprocess, mock_download_image):
         content = [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value]
         preprocessor = CLIPPreprocessor()
-        results = _download_and_preprocess_image(
+        results = download_and_preprocess_image(
             content=content,
             preprocessor=preprocessor,
             preprocessing_config=self.preprocessing_config,
@@ -77,11 +77,11 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
 
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
-    def test_download_and_preprocess_image_invalid_url_returns_individual_error(self, mock_download_image):
+    def testdownload_and_preprocess_image_invalid_url_returns_individual_error(self, mock_download_image):
         """Check behavior when a non-existent image URL is provided."""
         content = ["http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
-        results = _download_and_preprocess_image(
+        results = download_and_preprocess_image(
             content=content,
             preprocessor=preprocessor,
             preprocessing_config=self.preprocessing_config,
@@ -94,13 +94,13 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
 
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
-    def test_download_and_preprocess_image_invalid_url_raises_error_when_return_individual_error_is_false(self, mock_download_image):
+    def testdownload_and_preprocess_image_invalid_url_raises_error_when_return_individual_error_is_false(self, mock_download_image):
         """Check behavior when a non-existent image URL is provided."""
         content = ["http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            _download_and_preprocess_image(
+            download_and_preprocess_image(
                 content=content,
                 preprocessor=preprocessor,
                 preprocessing_config=self.preprocessing_config,
@@ -111,12 +111,12 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_partial_failure(self, mock_preprocess, mock_download_image):
+    def testdownload_and_preprocess_image_partial_failure(self, mock_preprocess, mock_download_image):
         """One image succeeds, one fails, returned list reflects both outcomes."""
         content = [TestImageUrls.IMAGE1.value, "http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
 
-        results = _download_and_preprocess_image(
+        results = download_and_preprocess_image(
             content=content,
             preprocessor=preprocessor,
             preprocessing_config=self.preprocessing_config,
@@ -143,7 +143,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_all_failures(self, mock_preprocess, mock_download_image):
+    def testdownload_and_preprocess_image_all_failures(self, mock_preprocess, mock_download_image):
         """All images fail, returns list of MediaDownloadErrors."""
         content = [
             "http://invalid-url.com/does-not-exist1.jpg",
@@ -151,7 +151,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = _download_and_preprocess_image(
+        results = download_and_preprocess_image(
             content=content,
             preprocessor=preprocessor,
             preprocessing_config=self.preprocessing_config,
@@ -171,7 +171,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_first_fails_rest_succeed(self, mock_preprocess, mock_download_image):
+    def testdownload_and_preprocess_image_first_fails_rest_succeed(self, mock_preprocess, mock_download_image):
         """First URL fails, others succeed."""
         content = [
             "http://invalid-url.com/fail-first.jpg",
@@ -180,7 +180,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = _download_and_preprocess_image(
+        results = download_and_preprocess_image(
             content=content,
             preprocessor=preprocessor,
             preprocessing_config=self.preprocessing_config,
@@ -208,7 +208,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
            side_effect=mock_load_image_from_path)
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_first_fails_raise_error_when_not_returning_individual_error(
+    def testdownload_and_preprocess_image_first_fails_raise_error_when_not_returning_individual_error(
             self, mock_preprocess, mock_download_image):
         """First URL fails, skip the others."""
         content = [
@@ -219,7 +219,7 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            _download_and_preprocess_image(
+            download_and_preprocess_image(
                 content=content,
                 preprocessor=preprocessor,
                 preprocessing_config=self.preprocessing_config,
