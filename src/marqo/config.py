@@ -2,8 +2,6 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.core.inference.device_manager import DeviceManager
-from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
@@ -14,6 +12,7 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
 
@@ -39,7 +38,6 @@ class Config:
 
         self.timeout = timeout
         self.backend = backend if backend is not None else enums.SearchDb.vespa
-        # TODO [Refactoring device logic] deprecate default_device since it's not used
 
         # Initialize Core layer dependencies
         deployment_lock_timeout = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT)
