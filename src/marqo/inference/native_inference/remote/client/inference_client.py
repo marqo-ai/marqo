@@ -6,8 +6,6 @@ from marqo.core.inference.api import Inference, InferenceResult, InferenceReques
 import msgpack
 import msgpack_numpy
 
-from marqo.inference.native_inference.remote.models.models import InferenceResponse
-
 msgpack_numpy.patch()
 
 
@@ -57,6 +55,6 @@ class NativeInferenceServerClient(Inference):
         # Unpack the MessagePack response (with numpy support)
         try:
             result_dict = msgpack.unpackb(response.content, raw=False)
-            return InferenceResponse.parse_obj(result_dict).to_inference_result()
+            return InferenceResult.parse_obj(result_dict)
         except Exception as e:
             raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e

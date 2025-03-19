@@ -4,10 +4,9 @@ from starlette import status
 
 from marqo import version, logging
 from marqo.inference.native_inference.remote.server.inference_config import Config
-from marqo.inference.native_inference.remote.models.models import InferenceResponse
 from marqo.inference.native_inference.remote.server.on_start_script import on_start
 from marqo.tensor_search.telemetry import TelemetryMiddleware
-from fastapi import FastAPI, Request, Response, Depends, HTTPException
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, Body
 from marqo.core.inference.api import InferenceRequest, InferenceError
 import uvicorn
 import msgpack
@@ -72,8 +71,8 @@ def root():
             "version": app.version}
 
 
-@app.post("/vectorise", )
-def vectorise(request: Request, config: Config = Depends(get_config)):
+@app.post("/vectorise")
+def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = Depends(get_config)):
     """
     Vectorise a list of contents (str) in a given modality, using the model specified in the request.
     This endpoint expect the reqeust to be encoded in `application/msgpack` media type, and returns the
@@ -83,10 +82,9 @@ def vectorise(request: Request, config: Config = Depends(get_config)):
 
     # Convert request to InferenceRequest
     try:
-        raw_body = request.body()
         request_data = msgpack.unpackb(raw_body, raw=False)
         inference_request = InferenceRequest.parse_obj(request_data)
-    except (msgpack.ExtraData, msgpack.UnpackException, msgpack.FormatError, msgpack.StackError) as e:
+    except (msgpack.ExtraData, msgpack.UnpackException) as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid MessagePack format: {str(e)}"
@@ -103,15 +101,14 @@ def vectorise(request: Request, config: Config = Depends(get_config)):
     except InferenceError as e:
         # TODO distinguish recoverable error from unrecoverable error, return different error code
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"An error occurred during vectorisation. {e.message}"
         ) from e
 
     # Converts result to response
     # Serialize the result to a dict and then encode it using MessagePack (with numpy support)
     # TODO if telemetry is set to true, we will need to attach the telemetry data
-    result_dict = InferenceResponse.from_inference_result(result).dict()
-    result_msgpack = msgpack.packb(result_dict, use_bin_type=True)
+    result_msgpack = msgpack.packb(result.dict(), use_bin_type=True)
     return Response(content=result_msgpack, media_type="application/msgpack")
 
 
