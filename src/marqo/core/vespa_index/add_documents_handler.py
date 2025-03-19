@@ -8,7 +8,7 @@ from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError
 from marqo.core.inference.api import Modality, InferenceError, InferenceRequest, TextPreprocessingConfig, \
     TextChunkConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, ChunkConfig, \
-    Inference, ModelConfig
+    Inference, ModelConfig, InferenceErrorModel
 from marqo.core.models import MarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
@@ -335,12 +335,15 @@ class AddDocumentsHandler(ABC):
             if doc_id in erroneous_doc_ids:
                 continue
 
-            if isinstance(r, InferenceError):
-                logger.warning(f'Encountered error when vectorising field {field_name} in document {doc_id}: {str(r)}')
+            if isinstance(r, InferenceErrorModel):
+                logger.warning(f'Encountered error when vectorising field {field_name} in document {doc_id}: '
+                               f'{r.error_message}')
                 erroneous_doc_ids.add(doc_id)
                 self.tensor_fields_container.remove_doc(doc_id)
                 self.add_docs_response_collector.collect_error_response(
-                    doc_id, AddDocumentsError(f'Encountered error when vectorising field {field_name}: {r.message}'))
+                    doc_id,
+                    AddDocumentsError(error_message=r.error_message, error_code=r.error_code, status_code=r.status_code)
+                )
             else:
                 field.populate_chunks_and_embeddings(
                     chunks=[chunk for chunk, _ in r],

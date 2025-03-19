@@ -8,7 +8,7 @@ import numpy as np
 from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.inference.api import Inference, Modality, MediaDownloadError, InferenceRequest, InferenceResult, \
-    InferenceError
+    InferenceError, InferenceErrorModel
 from marqo.core.inference.tensor_fields_container import TensorField
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import PatchMethod, ImagePreProcessing
@@ -35,7 +35,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             result = []
             for content in request.contents:
                 if content.startswith('error:'):
-                    result.append(InferenceError(content))
+                    result.append(InferenceErrorModel(error_message=content))
                 elif request.preprocessing_config.should_chunk:
                     result.append([('chunk1', np.array([1.0, 2.0])), ('chunk2', np.array([2.0, 4.0]))])
                 else:
@@ -210,7 +210,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
 
         self.assertTrue(res.errors)
         self.assertEqual(res.items[0].status, 400)
-        self.assertEqual(res.items[0].message, 'Encountered error when vectorising field text_field: error:oops')
+        self.assertEqual(res.items[0].message, 'error:oops')
 
     def test_vectorise_tensor_fields_should_populate_chunks_and_embeddings(self):
         handler = self._get_handler(treat_as_images=False, treat_as_media=False, add_docs_params=AddDocsParams(
