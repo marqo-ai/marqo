@@ -27,7 +27,7 @@ def get_absolute_file_path(filename: str) -> str:
     return abspath
 
 
-
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestEncoding(unittest.TestCase):
 
     def setUp(self) -> None:

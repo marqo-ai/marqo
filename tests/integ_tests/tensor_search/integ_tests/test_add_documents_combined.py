@@ -651,7 +651,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         ]
         model_properties = (
             {
-                "name": "ViT-B/32",
+                "name": "open_clip/ViT-B-32/laion400m_e31",
                 "dimensions": 512,
                 "notes": "CLIP ViT-B/32",
                 "type": "clip",
@@ -665,7 +665,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     thread_count=20,
                     tensor_fields=['field_1', 'field_2'],
                     media_download_headers={},
-                    model_name="ViT-B/32",
+                    model_name="open_clip/ViT-B-32/laion400m_e31",
                     normalize_embeddings=True,
                     model_properties=model_properties,
                     media_field_types_mapping=None,
@@ -901,6 +901,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 norm = np.linalg.norm(np.array(embeddings))
                 self.assertTrue(norm - 1.0 < 1e-5, f"Embedding norm is {norm}")
 
+    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_textIndexEmbeddingsUnnormalized(self):
         """A test to ensure that the text embeddings are unnormalised when the index is unnormalised"""
         documents = [

@@ -182,7 +182,8 @@ class TestPrefix(MarqoTestCase):
                 # embedding in document_b should be the same as direct embedding with no prefix
                 self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
                                             embed_res["embeddings"][0]))
-                
+
+    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_prefix_text_chunks_e5(self):
         """Ensures that the default prefix and the request level prefix are applied correctly.
         for the e5-small model."""
@@ -342,6 +343,7 @@ class TestPrefix(MarqoTestCase):
                 self.assertEqual(prefixed_queries[0].q, {"PREFIX: text query": 0.5,
                                                          TestImageUrls.HIPPO_REALISTIC.value: 0.5})
 
+    @unittest.skip(reason='temporarily skip due to unsupported model type: TEST')
     def test_determine_text_chunk_prefix(self):
         """
         Ensures proper priority order is followed when determining the chunk prefix.

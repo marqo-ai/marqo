@@ -31,7 +31,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         text_index_6 = cls.unstructured_marqo_index_request()
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True
         )

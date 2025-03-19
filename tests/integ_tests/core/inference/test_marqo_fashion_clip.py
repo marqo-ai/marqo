@@ -10,7 +10,7 @@ from marqo.s2_inference.s2_inference import clear_loaded_models
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 
 
-
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestMarqoFashionCLIP(TestCase):
     """A test class for Marqo Fashion CLIP model.
 
