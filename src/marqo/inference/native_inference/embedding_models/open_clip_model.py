@@ -42,9 +42,9 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
 
     def _tokenize_text(self, inputs: list[str]) -> List[Tensor]:
         """
-        Preprocess the images using the image preprocessor.
+        Preprocess the text using the tokenizer.
         Args:
-            inputs: A list of images to preprocess.
+            inputs: A list of strings to preprocess.
 
         Returns:
             A list of preprocessed images in the form of tensors.
