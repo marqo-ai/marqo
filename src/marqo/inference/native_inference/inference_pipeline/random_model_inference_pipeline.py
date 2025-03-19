@@ -46,7 +46,7 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
             preprocessed_content_list: A list of preprocessed content.
 
         Returns:
-            List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension,) shape.
+            List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
         content_to_encode: List[str] = self._collect_valid_content_to_encode(preprocessed_content_list)
         if len(content_to_encode) > 0:

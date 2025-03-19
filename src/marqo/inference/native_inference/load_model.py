@@ -37,6 +37,7 @@ def load_model(model_name: str, model_properties: dict, model_auth: ModelAuth, d
     validated_model_properties = model_properties
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
+
     _update_available_models(
         model_cache_key, model_name, validated_model_properties, device, normalize_embeddings=True, model_auth=model_auth
     )

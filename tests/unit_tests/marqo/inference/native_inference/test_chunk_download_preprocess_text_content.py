@@ -29,8 +29,12 @@ def faulty_preprocess_side_effect(inputs, modality="language"):
 class TestSplitPrefixPreprocessText(TestCase):
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testsplit_prefix_preprocess_text_with_prefix(self, mock_preprocess):
-        """Check that the text is split and preprocessed correctly with a prefix."""
+    def test_split_prefix_preprocess_text_with_prefix(self, mock_preprocess):
+        """Check that the text is split and preprocessed correctly with a prefix.
+
+        The preprocessor should take the prefixed text as input, while the chunk
+        should not include the prefix.
+        """
         content = ["This is a test sentence", "Test"]
         preprocessor = CLIPPreprocessor()
         preprocessing_config = TextPreprocessingConfig(
@@ -45,6 +49,10 @@ class TestSplitPrefixPreprocessText(TestCase):
         self.assertEqual(len(result_1), 2)
         self.assertTrue(all(isinstance(t, tuple) for t in result_1))
         self.assertTrue(all(isinstance(t[0], str) for t in result_1))
+        self.assertTrue(all(not t.startswith("this is a prefix: ") for t, _ in result_1))
+        self.assertEqual("This is a", result_1[0][0])
+        self.assertEqual("a test sentence", result_1[1][0])
+
         self.assertTrue(all(isinstance(t[1], torch.Tensor) for t in result_1))
 
         result_2 = results[1]
@@ -52,16 +60,18 @@ class TestSplitPrefixPreprocessText(TestCase):
         self.assertEqual(len(result_2), 1)
         self.assertTrue(all(isinstance(t, tuple) for t in result_2))
         self.assertTrue(all(isinstance(t[0], str) for t in result_2))
+        self.assertTrue(all(not t.startswith("this is a prefix: ") for t, _ in result_2))
+        self.assertEqual("Test", result_2[0][0])
         self.assertTrue(all(isinstance(t[1], torch.Tensor) for t in result_2))
 
         mock_preprocess.assert_called()
         for call in mock_preprocess.call_kwargs_list:
             args, _ = call
             for text in args[0]:
-                self.assertTrue(text.startswith("this is a prefix"))
+                self.assertTrue(text.startswith("this is a prefix: "))
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testsplit_prefix_preprocess_text_without_prefix(self, mock_preprocess):
+    def test_split_prefix_preprocess_text_without_prefix(self, mock_preprocess):
         """Check the case where the text prefix is None."""
         content = ["This is a test sentence", "Test"]
         preprocessor = CLIPPreprocessor()
@@ -94,7 +104,7 @@ class TestSplitPrefixPreprocessText(TestCase):
                 self.assertFalse(text.startswith("this is a prefix"))
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testsplit_prefix_preprocess_text_no_chunking(self, mock_preprocess):
+    def test_split_prefix_preprocess_text_no_chunking(self, mock_preprocess):
         """Check the case where the text is not chunked and has a prefix."""
         content = ["This is a test sentence", "Test"]
         preprocessor = CLIPPreprocessor()
@@ -126,7 +136,7 @@ class TestSplitPrefixPreprocessText(TestCase):
                 self.assertTrue(text.startswith("this is a prefix"))
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testsplit_prefix_preprocess_text_empty_content(self, mock_preprocess):
+    def test_split_prefix_preprocess_text_empty_content(self, mock_preprocess):
         """Check behavior when content is an empty list."""
         content = []
         preprocessor = CLIPPreprocessor()
@@ -142,7 +152,7 @@ class TestSplitPrefixPreprocessText(TestCase):
         mock_preprocess.assert_not_called()
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testsplit_prefix_preprocess_text_long_text_many_chunks(self, mock_preprocess):
+    def test_split_prefix_preprocess_text_long_text_many_chunks(self, mock_preprocess):
         """Check long content chunking with small split length."""
         long_text = "word " * 100  # 100 repetitions -> 100 words
         content = [long_text]
@@ -162,7 +172,8 @@ class TestSplitPrefixPreprocessText(TestCase):
 
         for chunk in chunks:
             text, tensor = chunk
-            self.assertTrue(text.startswith("prefix: "))
+            self.assertFalse(text.startswith("prefix: "))
+            self.assertEqual(text, " ".join(text.split()))
             self.assertIsInstance(tensor, torch.Tensor)
 
         mock_preprocess.assert_called()
@@ -208,7 +219,7 @@ class TestSplitPrefixPreprocessText(TestCase):
         for chunk_list in results:
             for text, tensor in chunk_list:
                 self.assertIsInstance(text, str)
-                self.assertTrue(text.startswith("prefix: "))
+                self.assertFalse(text.startswith("prefix: "))
                 self.assertIsInstance(tensor, torch.Tensor)
 
         mock_preprocess.assert_called()
@@ -250,6 +261,6 @@ class TestSplitPrefixPreprocessText(TestCase):
         with self.assertRaises(ValueError) as context:
             split_prefix_preprocess_text(content, preprocessor, preprocessing_config)
 
-        self.assertIn("The number of preprocessed text does not match the number of splitted text",
+        self.assertIn("The number of preprocessed texts does not match the number of chunks",
                       str(context.exception))
         mock_preprocess.assert_called()

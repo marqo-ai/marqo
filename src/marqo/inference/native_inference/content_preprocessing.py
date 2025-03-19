@@ -17,28 +17,76 @@ from marqo.inference.type import *
 
 
 def split_prefix_preprocess_text(
-        content: list[str], preprocessor: AbstractPreprocessor,
-        preprocessing_config: TextPreprocessingConfig) -> list[PreprocessedContent]:
+        content: list[str],
+        preprocessor: AbstractPreprocessor,
+        preprocessing_config: TextPreprocessingConfig
+) -> list[PreprocessedContent]:
+    """
+    The function that handles the chunking(splitting), prefixing, and preprocessing of text content.
+    Args:
+        content: the content to be chunked, downloaded, and preprocessed.
+        preprocessor: the preprocessor to be used for preprocessing the content.
+        preprocessing_config: the preprocessing configuration to be used for preprocessing the content. This
+            includes the text splitting configuration, text prefix, and chunking configuration for audio and video.
+
+    Returns:
+        Results in the form of a list[list[tuple[str, Any]]], where Any depends on the preprocessor used.
+
+    Examples:
+        The input is ["This is a test sentence", "Test"] with the text prefix "prefix: ", and split by word, and the
+        preprocessor is a text preprocessor that returns tensors.
+
+        The output will be
+            [
+                [("This is a", tensor), ("prefix: a test sentence", tensor)], # 2 chunks for the first content
+                [("Test", tensor)] # 1 chunk for the second content
+            ]
+
+        IMPORTANT: That the tensor is generated with prefix, while the chunk does not contain the prefix.
+    """
+
+    def apply_prefix(text_list: list[str]) -> list[str]:
+        if preprocessing_config.text_prefix is not None:
+            return prefix_text_chunks(text_list, preprocessing_config.text_prefix)
+        return text_list
+
     results: list[PreprocessedContent] = []
+
+    # If chunking is enabled
     if preprocessing_config.should_chunk:
         for text in content:
-            splitted_text: list[str] = split_text(
+            # Split the text into chunks
+            chunks = split_text(
                 text,
                 split_by=preprocessing_config.chunk_config.split_method,
                 split_length=preprocessing_config.chunk_config.split_length,
                 split_overlap=preprocessing_config.chunk_config.split_overlap
             )
-            if preprocessing_config.text_prefix is not None:
-                splitted_text = prefix_text_chunks(splitted_text, preprocessing_config.text_prefix)
-            preprocessed_text_list: list[Tensor] = preprocessor.preprocess(inputs=splitted_text, modality=Modality.TEXT)
-            if len(splitted_text) != len(preprocessed_text_list):
-                raise ValueError("The number of preprocessed text does not match the number of splitted text")
-            results.append([(splitted_text[i], preprocessed_text_list[i]) for i in range(len(splitted_text))])
+            raw_content = chunks.copy()
+
+            # Apply prefix if needed
+            prefixed_chunks = apply_prefix(chunks)
+
+            # Preprocess chunks
+            preprocessed_chunks = preprocessor.preprocess(prefixed_chunks, Modality.TEXT)
+
+            # Validation
+            if len(prefixed_chunks) != len(preprocessed_chunks):
+                raise ValueError("The number of preprocessed texts does not match the number of chunks")
+
+            # Collect paired results
+            results.append(list(zip(raw_content, preprocessed_chunks)))
+
+    # If no chunking
     else:
-        if preprocessing_config.text_prefix is not None:
-            content = prefix_text_chunks(content, preprocessing_config.text_prefix)
-        preprocessed_text_list: list[Tensor] = preprocessor.preprocess(content, Modality.TEXT)
-        results = [[(content[i], preprocessed_text_list[i])] for i in range(len(content))]
+        raw_content = content.copy()
+        prefixed_content = apply_prefix(content)
+
+        preprocessed_content = preprocessor.preprocess(prefixed_content, Modality.TEXT)
+
+        # Pair each raw input with its processed output
+        results = [[(raw_content[i], preprocessed_content[i])] for i in range(len(content))]
+
     return results
 
 
