@@ -3,7 +3,7 @@ from typing import Optional, Union
 from kazoo.handlers.threading import KazooTimeoutError
 
 from marqo.core.inference.device_manager import DeviceManager
-from marqo.core.inference.dummy_inference import DummyInference
+from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
@@ -51,7 +51,7 @@ class Config:
                                                 enable_index_operations=True,
                                                 deployment_lock_timeout_seconds=deployment_lock_timeout)
 
-        self.inference = DummyInference()
+        self.inference = NativeInferenceLocal()
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management)
