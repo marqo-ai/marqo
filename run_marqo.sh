@@ -34,8 +34,8 @@ function wait_for_process () {
     return 0
 }
 
-# Set the default Marqo mode to COMBINED
-export MARQO_MODE=${MARQO_MODE:-COMBINED}
+# Set the default Marqo mode to API
+export MARQO_MODE=${MARQO_MODE:-API}
 
 VESPA_IS_INTERNAL=False
 # Vespa local run
@@ -152,7 +152,7 @@ export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
 case "$MARQO_MODE" in
-  API|COMBINED)
+  API)
     # Start the tensor search web app in the background
     cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
     uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
@@ -163,7 +163,7 @@ case "$MARQO_MODE" in
     uvicorn inference_api:app --host 0.0.0.0 --port 8881 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
     ;;
   *)
-    echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'COMBINED', 'API' and 'INFERENCE'"
+    echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'API' and 'INFERENCE'"
     exit 1
     ;;
 esac
