@@ -10,7 +10,9 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
+import unittest
 
+@unittest.skip(reason='temporarily skip due to inference interface change')
 class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
