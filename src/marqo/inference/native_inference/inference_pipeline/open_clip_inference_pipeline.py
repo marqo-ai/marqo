@@ -1,7 +1,6 @@
-from marqo.inference.native_inference.chunk_download_preprocess_content import split_prefix_preprocess_text, \
+from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
     download_and_preprocess_image
 from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
-from marqo.inference.native_inference.encode_content import format_results
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
@@ -17,14 +16,14 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
 
 
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._chunk_download_preprocess_content()
+        preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
 
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 
-        formated_result: InferenceResult = format_results(preprocessed_content_list, embeddings)
+        formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _chunk_download_preprocess_content(self) -> List[OpenCLIPPreprocessedContent]:
+    def _content_preprocessing(self) -> List[OpenCLIPPreprocessedContent]:
         if self.inference_request.modality == Modality.TEXT:
             results = split_prefix_preprocess_text(
                 self.inference_request.contents,
