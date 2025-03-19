@@ -972,10 +972,11 @@ class TestSearch(MarqoTestCase):
         search_query = SearchQuery(q="test")
         self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
 
-    def test_lexical_search_DoesNotErrorWithEscapedQuotes(self):
+    def test_lexical_search_DoesNotErrorWithEscapedCharacters(self):
         """
-        Ensure that lexical search handles double quotes properly, both escaped and wrong quotes.
-        Expected behavior: escaped quotes are passed to vespa. Incorrect quotes are treated like whitespace.
+        Ensure that lexical search handles double quotes and backslashes properly, both escaped and wrong quotes.
+        Expected behavior: escaped quotes are passed to vespa (with the escape character included). Incorrect quotes are treated like whitespace.
+        Escaped backslashes should also be passed.
         """
 
         docs_list = [
@@ -983,19 +984,33 @@ class TestSearch(MarqoTestCase):
             {"_id": "doc2", "text_field_1": 'exact match'},
             {"_id": "doc3", "text_field_1": 'exacto wrong syntax'},
             {"_id": "doc4", "text_field_1": '"escaped"'},
+            {"_id": "doc5", "text_field_1": 'back\\slash'},
+            {"_id": "doc6", "text_field_1": '\\'},  # This token alone cannot be searched for some reason.
+            {"_id": "doc7", "text_field_1": 'backslashinfront'},
+            {"_id": "doc8", "text_field_1": 'backslashatend\\'},
+            {"_id": "doc9", "text_field_1": 'literalbackslashthenquote'},
 
+            {"_id": "red_herring_0", "text_field_1": 'word'},
             {"_id": "red_herring_1", "text_field_1": '12'},
-            {"_id": "red_herring_2", "text_field_1": 'escaped'},
-            {"_id": "red_herring_3", "text_field_1": 'wrong"'}
+            {"_id": "red_herring_4", "text_field_1": 'escaped'},
+            {"_id": "red_herring_5", "text_field_1": 'backslash'},
+
         ]
         test_cases = [
-            ('1\\"2', ['doc1']),                        # Match off of '1"2'
-            ('"exact match"', ['doc2']),                # Match off of 'exact match'
-            ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
-            ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
-            ('""', []),                          # Single quote should return no results (treated as whitespace)
-            ('"', []),                           # Double quote should return no results (treated as whitespace)
-            ('', [])                            # Empty string should return no results
+            ('hello\\normal char', []),
+            ('1\\"2', ['doc1']),
+            ('"exact match"', ['doc2']),
+            ('\\"escaped\\"', ['doc4', 'red_herring_4']),   # Vespa tokenizer removes " so both docs are retrieved
+            ('escaped', ['doc4', 'red_herring_4']),         # Vespa tokenizer removes " so both docs are retrieved
+            ('"exacto" wrong"', ['doc3']),
+            ('""', []),
+            ('"', []),
+            ('back\\\\slash', ['doc5']),    # escaped backslash
+            ('\\\\"backslashinfront', ['doc7']),       # escaped backslash before double quote (quote will be treated as whitespace)
+            ('\\\\"backslashatend\\\\"', ['doc8']),       # escaped backslash before double quote on both sides (quote will be treated as whitespace)
+            ('\\\\\\"literalbackslashthenquote', ['doc9']),   # escaped backslash before escaped double quote
+            ('\\word', ['red_herring_0']),         # backslash to escape normal character (removed)
+            ('word\\', ['red_herring_0'])    # stray backslash (removed)
         ]
 
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
@@ -1007,6 +1022,11 @@ class TestSearch(MarqoTestCase):
                         docs=docs_list,
                         tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
+                )
+                get_res = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index.name,
+                    document_ids=[doc['_id'] for doc in docs_list]
                 )
 
                 for query, expected_ids in test_cases:

@@ -203,6 +203,10 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
     All other terms go into blob, split by whitespace. blob starts as a string then splits into
     a list by space.
 
+    Backslash will be used to escape " or \, but if it is not followed by " or \,
+    it should be IGNORED. This is to prevent hanging backslashes accidentally escaping query quotes or inserting bad
+    characters into query (for example \a causes a Vespa 400).
+
     Syntax:
         Required strings must be enclosed by quotes. These quotes must be enclosed by spaces or the start
         or end of the text. Quotes always come in pairs.
@@ -214,16 +218,21 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
     Notes:
         - Correct double quote can be either opening, closing, or escaped.
         - Escaped double quotes are interpreted literally.
+        - Escaped backslashes are interpreted literally
 
-    Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+    PYTHON NOTE:
+    Users using python need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+    Unneeded if using CLI or raw string.
 
     Return:
         2-tuple of <required terms> (for "must" clause) <optional terms> (for "should" clause)
     """
+    CHARACTERS_TO_BE_ESCAPED_IN_VESPA = ('"', '\\')
     required_terms = []
     blob = ""
     opening_quote_idx = None
     current_quote_pair_is_faulty = False
+    escape = False
 
     if not isinstance(text, str):
         raise TypeError("parse_lexical_query must have string as input")
@@ -232,14 +241,17 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
         # Add every character to blob initially
         blob += text[i]
 
-        if text[i] == '"':
-            # Check if ESCAPED
-            if i > 0 and text[i - 1] == '\\':
-                # Read quote literally. Backslash should be passed directly to Vespa.
-                pass
-
+        # Every character immediately after a \\ should be read literally
+        if escape:
+            escape = False
+        elif text[i] == "\\":
+            escape = True
+            # Stray backslashes should be removed (not followed by special char, or is last char)
+            if i == len(text) - 1 or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA:
+                blob = blob[:-1]
+        elif text[i] == '"':
             # OPENING QUOTE
-            elif (opening_quote_idx is None):
+            if (opening_quote_idx is None):
                 opening_quote_idx = i
                 blob_opening_quote_idx = len(blob) - 1 # Opening quote index in blob is different from text
 

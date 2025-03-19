@@ -242,11 +242,6 @@ class TestUtils(unittest.TestCase):
             ('""" python docstring appeared"""', ([], ['python', 'docstring', 'appeared'])),
             ('""', ([], [])),
             ('what about backticks `?', ([], ['what', 'about', 'backticks', '`?'])),
-            (
-                '\\" escaped quotes\\"  what happens here?',
-                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
-            ),
-            ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
             ('double  spaces  get  removed', ([], ['double', 'spaces', 'get', 'removed'])),
             ('"go"od"', ([], ['go', 'od'])),
             ('"ter"m1" term2', ([], ['ter','m1', 'term2'])),
@@ -267,7 +262,43 @@ class TestUtils(unittest.TestCase):
             ('sa"ma" hello!', ([], ['sa', 'ma', 'hello!'])),    # Bad opening, good closing
             ('"sam"?', ([], ['sam', '?'])),
             ('"朋友"你好', ([], ['朋友', '你好'])),
+        ]
+        for input, expected_output in cases:
+            with self.subTest(input):
+                self.assertEqual(expected_output, utils.parse_lexical_query(input))
 
+    def test_parse_lexical_query_escaped_characters(self):
+        """
+        The \ and " must always be escaped in vespa with a \.
+        We must NEVER pass a raw one of these to vespa.
+
+        \\ is used to represent \ in these tests because \ is a special character in python strings.
+        """
+        # 2-tuples of input text, and expected parse_lexical_query() output
+        cases = [
+            (
+                '\\" escaped quotes\\"  what happens here?',
+                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
+            ),
+            ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
+            # escaped backslash
+            ('\\\\hello', ([], ['\\\\hello'])),
+            # escaped backslash before double quote (quote will be treated as whitespace)
+            ('\\\\"hello', ([], ['\\\\', 'hello'])),
+            # escaped backslash before double quote on both sides (quote will be treated as whitespace)
+            ('\\\\"hello\\\\"', ([], ['\\\\', 'hello\\\\'])),
+            # escaped backslash before escaped double quote
+            ('\\\\\\"hello', ([], ['\\\\\\"hello'])),
+            # backslash to escape a normal character (removed)
+            ('\\a', ([], ['a'])),
+            # stray unescaped backslash (removed)
+            ('\\\\"hello\\', ([], ['\\\\', 'hello'])),
+            # Combine all cases
+            ('single\\double\\\\triple\\\\\\quote"ba"d escaped\\" "proper double quote" stray\\',
+             (['proper double quote'],
+              ['singledouble\\\\triple\\\\quote', 'ba', 'd', 'escaped\\"', 'stray']
+              )
+             ),
         ]
         for input, expected_output in cases:
             with self.subTest(input):
