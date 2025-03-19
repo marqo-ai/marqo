@@ -1,20 +1,19 @@
 from typing import Optional
 
 import numpy as np
-from PIL.Image import Image
 
 from marqo.core.inference.api.inference import ModelAuth
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.native_inference.embedding_models.random_model_properties import RandomModelProperties
-from marqo.s2_inference.types import Union, List, ndarray, Modality
+from marqo.s2_inference.types import List, ndarray, Modality
 
 
 class RandomModelPreprocessor(AbstractPreprocessor):
     def __init__(self) -> None:
         super().__init__()
 
-    def preprocess(self, inputs: Union[list[Image], list[str]], modality) -> Union[list[Image], list[str]]:
+    def preprocess(self, inputs: list[str], modality) -> list[str]:
         """No preprocessing is done for the random model"""
         return inputs
 
@@ -39,7 +38,7 @@ class RandomModel(AbstractEmbeddingModel):
     def _build_model_properties(self) -> RandomModelProperties:
         return RandomModelProperties(**self.model_properties)
 
-    def encode(self, inputs: Union[list[str], list[Image]], modality: Modality, normalize: bool = True) -> List[ndarray]:
+    def encode(self, inputs: List[str], modality: Modality, normalize: bool = True) -> List[ndarray]:
         raw_embeddings = np.random.rand(len(inputs), self._model_properties.dimensions)
         if normalize:
             raw_embeddings = raw_embeddings / np.linalg.norm(raw_embeddings, axis=1)[:, None]

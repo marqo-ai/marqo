@@ -11,6 +11,13 @@ class AbstractInferencePipeline(ABC):
 
     @abstractmethod
     def run_pipeline(self) -> InferenceResult:
+        """
+        The main method to run the inference pipeline.
+
+        Returns:
+            InferenceResult: The result of the inference pipeline.
+
+        """
         pass
 
     @staticmethod
