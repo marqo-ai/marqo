@@ -18,8 +18,7 @@ from marqo.inference.type import *
 
 def chunk_download_preprocess_content(
         content: list[str], modality: Modality, preprocessor: AbstractPreprocessor,
-        preprocessing_config: Union[PreprocessingConfig,
-        TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig]) \
+        preprocessing_config: PreprocessingConfigType, return_individual_error: bool = True) \
         -> list[PreprocessedContent]:
     """
     The function that handles the chunking, downloading, and preprocessing of content with the given modality.
@@ -29,6 +28,8 @@ def chunk_download_preprocess_content(
         preprocessor: the preprocessor to be used for preprocessing the content.
         preprocessing_config: the preprocessing configuration to be used for preprocessing the content. This
             includes the text splitting configuration, text prefix, and chunking configuration for audio and video.
+        return_individual_error: whether we capture errors for each content. If set to False, any error will be raised
+            directly. If set to True, an Error is converted to InferenceErrorModel and stored in the result.
     Returns:
         Results in the form of a list[list[tuple[str, Tensor]]].
         The length of the results must be the same as the length of the input content, while each tuple may contain.
@@ -46,7 +47,7 @@ def chunk_download_preprocess_content(
     if modality == Modality.TEXT:
         results = _split_prefix_preprocess_text(content, preprocessor, preprocessing_config)
     elif modality == Modality.IMAGE:
-        results = _download_and_preprocess_image(content, preprocessor, preprocessing_config)
+        results = _download_and_preprocess_image(content, preprocessor, preprocessing_config, return_individual_error)
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
@@ -83,7 +84,8 @@ def _split_prefix_preprocess_text(
 
 def _download_and_preprocess_image(
         content: list[str], preprocessor: AbstractPreprocessor,
-        preprocessing_config: ImagePreprocessingConfig) -> list[PreprocessedContent]:
+        preprocessing_config: ImagePreprocessingConfig, return_individual_error: bool = True) \
+            -> list[PreprocessedContent]:
 
     results = process_batch(
         content=content,
@@ -92,6 +94,7 @@ def _download_and_preprocess_image(
         thread_count=preprocessing_config.download_thread_count,
         media_download_headers=preprocessing_config.download_header,
         download_timeout_ms=preprocessing_config.download_timeout_ms,
-        audio_video_preprocessing_config=None
+        audio_video_preprocessing_config=None,
+        return_individual_error=return_individual_error
     )
     return results

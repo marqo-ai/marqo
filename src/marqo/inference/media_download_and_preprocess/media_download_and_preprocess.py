@@ -24,6 +24,7 @@ def threaded_download_and_preprocess_content(
         download_timeout_ms: int = 3000,
         audio_video_preprocessing_config: Union[None, VideoPreprocessingConfig, AudioPreprocessingConfig] = None,
         metric_obj: Optional[RequestMetrics] = None,
+        return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download images for its allocated documents
 
@@ -36,14 +37,14 @@ def threaded_download_and_preprocess_content(
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         media_download_headers: A dict of headers for image download. Can be used
             to authenticate image downloads
-        force_download: If True, skip the _is_image check and download the fields as images.
+        return_individual_error: If True, collect individual errors in the thread_results, otherwise, raise an error.
     Side Effects:
         Adds members to the image_repo dict. Each key is a string which is identified as a URL.
         Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
         the image.
         For example:
         {
-            'https://google.com/my_dog.png': UnidentifiedImageError, # error because such an image doesn't exist
+            'https://google.com/my_dog.png': InferenceErrorModel, # error because such an image doesn't exist
             'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png': <PIL image>
         }
     Returns:
@@ -51,7 +52,7 @@ def threaded_download_and_preprocess_content(
 
     """
     _id = f'image_download.{threading.get_ident()}'
-    thread_results: list[Union[MediaDownloadError, PreprocessingError, list[Tuple[str, Tensor]]]] = []
+    thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
             try:
@@ -60,20 +61,30 @@ def threaded_download_and_preprocess_content(
                 )
             except PIL.UnidentifiedImageError as e:
                 metric_obj.increment_counter(f"{url}.UnidentifiedImageError")
-                thread_results.append(MediaDownloadError(str(e)))
+                if return_individual_error:
+                    thread_results.append(InferenceErrorModel(error_message=str(e)))
+                else:
+                    raise MediaDownloadError(str(e))
                 continue
             if isinstance(image, Image):
                 try:
                     preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
                 except OSError as e:
                     if "image file is truncated" in str(e):
-                        thread_results.append(PreprocessingError(f"Image file is truncated: {url}"))
+                        if return_individual_error:
+                            thread_results.append(InferenceErrorModel(error_message=f"Image file is truncated: {url}"))
+                        else:
+                            raise PreprocessingError(f"Image file is truncated: {url}")
                         continue
                     else:
                         raise e
                 thread_results.append([(url, preprocessed_image[0])])
             else:
-                raise ValueError(f"Unexpected image type: {type(image)}")
+                if return_individual_error:
+                    thread_results.append(InferenceErrorModel(error_message=f"Unexpected image type: {type(image)} "
+                                                                            f"for image: {url}"))
+                else:
+                    raise ValueError(f"Unexpected image type: {type(image)} for image: {url}")
     return thread_results
 
 
@@ -94,6 +105,7 @@ def process_batch(
         media_download_headers: Optional[Dict] = None,
         download_timeout_ms: int = 3000,
         audio_video_preprocessing_config: Union[None, AudioPreprocessingConfig, VideoPreprocessingConfig] = None,
+        return_individual_error: bool = True
 ) -> list[PreprocessedContent]:
 
     results: list[PreprocessedContent] = []
@@ -114,7 +126,8 @@ def process_batch(
                     media_download_headers,
                     download_timeout_ms,
                     audio_video_preprocessing_config,
-                    m[i]
+                    m[i],
+                    return_individual_error
                 )
                 for i, allocation in enumerate(thread_allocated_docs)
             ]
