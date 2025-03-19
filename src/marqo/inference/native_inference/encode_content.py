@@ -41,8 +41,7 @@ def _collect_tensors(preprocessed_content: list[list[tuple[str, Tensor]]]) -> li
     for chunk in preprocessed_content:
         if isinstance(chunk, list):
             for _, tensor in chunk:
-                if isinstance(tensor, Tensor):
-                    collected_tensors.append(tensor)
+                collected_tensors.append(tensor)
         elif isinstance(chunk, (MediaDownloadError, PreprocessingError)):
             continue
     return collected_tensors

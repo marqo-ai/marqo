@@ -45,3 +45,6 @@ class RandomModel(AbstractEmbeddingModel):
             raw_embeddings = raw_embeddings / np.linalg.norm(raw_embeddings, axis=1)[:, None]
 
         return [embedding for embedding in raw_embeddings]
+
+    def get_preprocessor(self) -> RandomModelPreprocessor:
+        return self.preprocessor

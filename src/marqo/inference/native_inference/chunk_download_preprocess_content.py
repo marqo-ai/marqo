@@ -16,47 +16,7 @@ from marqo.inference.media_download_and_preprocess.split_text import split_text,
 from marqo.inference.type import *
 
 
-def chunk_download_preprocess_content(
-        content: list[str], modality: Modality, preprocessor: AbstractPreprocessor,
-        preprocessing_config: PreprocessingConfigType, return_individual_error: bool = True) \
-        -> List[PreprocessedContent]:
-    """
-    The function that handles the chunking, downloading, and preprocessing of content with the given modality.
-    Args:
-        content: the content to be chunked, downloaded, and preprocessed.
-        modality: the modality of the content.
-        preprocessor: the preprocessor to be used for preprocessing the content.
-        preprocessing_config: the preprocessing configuration to be used for preprocessing the content. This
-            includes the text splitting configuration, text prefix, and chunking configuration for audio and video.
-        return_individual_error: whether we capture errors for each content. If set to False, any error will be raised
-            directly. If set to True, an Error is converted to InferenceErrorModel and stored in the result.
-    Returns:
-        Results in the form of a list[list[tuple[str, Tensor]]].
-        The length of the results must be the same as the length of the input content, while each tuple may contain.
-        Each element in the list is a chunk of the content, and each chunk is a list of tuples.
-        Each tuple contains the original content and the preprocessed tensor.
-
-        e.g., The input is ["This is a test sentence", "Test"] with the text prefix "prefix: ", and split by word,
-        The output will be
-            [
-                [("prefix: This is a", tensor), ("prefix: a test sentence", tensor)], # 2 chunks for the first content
-                [("prefix: Test", tensor)] # 1 chunk for the second content
-            ]
-        So the output will be a list of 2 lists, the first list contains 2 tuples, and the second list contains 1 tuple.
-    """
-    if modality == Modality.TEXT:
-        results = _split_prefix_preprocess_text(content, preprocessor, preprocessing_config)
-    elif modality == Modality.IMAGE:
-        results = _download_and_preprocess_image(content, preprocessor, preprocessing_config, return_individual_error)
-    else:
-        raise ValueError(f"Unsupported modality: {modality}")
-
-    if len(results) != len(content):
-        raise ValueError("The processed content length does not match the input content length")
-    return results
-
-
-def _split_prefix_preprocess_text(
+def split_prefix_preprocess_text(
         content: list[str], preprocessor: AbstractPreprocessor,
         preprocessing_config: TextPreprocessingConfig) -> list[PreprocessedContent]:
     results: list[PreprocessedContent] = []
@@ -82,7 +42,7 @@ def _split_prefix_preprocess_text(
     return results
 
 
-def _download_and_preprocess_image(
+def download_and_preprocess_image(
         content: list[str], preprocessor: AbstractPreprocessor,
         preprocessing_config: ImagePreprocessingConfig, return_individual_error: bool = True) \
             -> list[PreprocessedContent]:
