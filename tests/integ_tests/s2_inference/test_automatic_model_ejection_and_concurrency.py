@@ -25,7 +25,6 @@ def racing_vectorise_call(test_model, test_content, q):
         q.put(e)
         pass
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
 class TestAutomaticModelEject(unittest.TestCase):
     def setUp(self) -> None:
         clear_loaded_models()

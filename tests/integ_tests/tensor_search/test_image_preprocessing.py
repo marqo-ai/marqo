@@ -9,7 +9,7 @@ from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 import unittest
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestImagePreprocessing(MarqoTestCase):
 
     @classmethod

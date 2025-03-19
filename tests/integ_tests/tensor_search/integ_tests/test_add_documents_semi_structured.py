@@ -16,7 +16,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestAddDocumentsSemiStructured(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:

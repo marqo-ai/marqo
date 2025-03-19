@@ -15,7 +15,7 @@ from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestMonitoring(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
