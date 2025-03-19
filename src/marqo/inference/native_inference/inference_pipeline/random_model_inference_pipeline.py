@@ -92,6 +92,6 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
                         valid_content_to_encode.append(content_to_encode)
                     else:
                         raise ValueError(f"Expected {valid_content_to_encode_type} but got {type(content_to_encode)}")
-            elif isinstance(chunk, (MediaDownloadError, PreprocessingError)):
+            elif isinstance(chunk, InferenceErrorModel):
                 continue
         return valid_content_to_encode
