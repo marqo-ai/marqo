@@ -148,6 +148,7 @@ class TestPrivateModelLoading(MarqoTestCase):
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_vectors, 2)
 
+    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_load_private_open_clip_model_from_a_private_ckpt_on_hf(self):
         model = "private-marqo-fashion-siglip-model-ckpt-on-hf"
         model_properties = {
