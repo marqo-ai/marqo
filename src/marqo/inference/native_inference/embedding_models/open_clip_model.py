@@ -301,7 +301,10 @@ class OPEN_CLIP(AbstractCLIPModel):
                 f' filepath `{model_file_path}`')
         return model_file_path
 
-    def encode_image(self, images: Tensor, normalize=True) -> np.ndarray:
+    def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
+
+        images = torch.cat(images, dim=0)
+
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
@@ -315,10 +318,10 @@ class OPEN_CLIP(AbstractCLIPModel):
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode_text(self, text: Tensor, normalize=True) -> np.ndarray:
+    def encode_text(self, text: List[Tensor], normalize=True) -> List[ndarray]:
+        text = torch.cat(text, dim=0)
         if self.model is None:
             self.load()
-
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():

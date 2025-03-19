@@ -1,12 +1,11 @@
 import torch
-from torch import Tensor
 
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.inference.type import *
 
 
 def encode_processed_content(model, preprocessed_content_list: list[PreprocessedContent],
-                             modality: Modality, normalize: bool, maximum_batch_size: int=16) -> list[Tensor]:
+                             modality: Modality, normalize: bool, maximum_batch_size: int=16) -> list[ndarray]:
     """
     Encode the processed content using the model.
 
@@ -17,17 +16,17 @@ def encode_processed_content(model, preprocessed_content_list: list[Preprocessed
         normalize (bool): Whether to normalize the embeddings.
 
     Returns:
-        list[Tensor]: The embeddings of the processed content.
+        list[ndarray]: The embeddings of the processed content. Each ndarray should be a (Dim, ) array of floats
+        representing the embedding of the corresponding content.
     """
 
     flattened_content: List[Tensor] = _collect_tensors(preprocessed_content_list)
     if len(flattened_content) > 0:
         embeddings = []
-        stacked_content = torch.cat(flattened_content)
-        for i in range(0, len(stacked_content), maximum_batch_size):
-            batch = stacked_content[i:i + maximum_batch_size]
-            batch_embeddings = model.encode(batch, modality, normalize)
-            embeddings.extend(batch_embeddings)
+        for i in range(0, len(flattened_content), maximum_batch_size):
+            batch: List[Tensor] = flattened_content[i:i + maximum_batch_size]
+            batch_embeddings: List[ndarray] = model.encode(batch, modality, normalize)
+            embeddings.extend([embeddings for embeddings in batch_embeddings])
 
         if len(embeddings) != len(flattened_content):
             raise ValueError("The number of embeddings does not match the number of contents")
@@ -49,7 +48,7 @@ def _collect_tensors(preprocessed_content: list[list[tuple[str, Tensor]]]) -> li
     return collected_tensors
 
 
-def format_results(preprocessed_content_list: list[PreprocessedContent], embeddings) \
+def format_results(preprocessed_content_list: list[PreprocessedContent], embeddings: list[ndarray]) \
         -> InferenceResult:
     results = []
     embedding_index = 0

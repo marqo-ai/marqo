@@ -4,6 +4,7 @@ from marqo.inference.native_inference.embedding_models.languagebind_model import
 from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.inference.native_inference.encode_content import encode_processed_content, format_results
 from marqo.inference.native_inference.load_model import load_model
+from marqo.inference.native_inference.embedding_models.random_model import RandomModel
 from marqo.inference.type import *
 
 
@@ -22,9 +23,11 @@ class InferencePipeline:
         if isinstance(model, OPEN_CLIP):
             return self._run_open_clip_inference_pipeline(model)
         elif isinstance(model, HuggingFaceModel):
-            return self._run_hf_inference_pipeline(model, self.inference_request)
+            return self._run_hf_inference_pipeline(model)
         elif isinstance(model, LanguagebindModel):
-            return self._run_languagebind_inference_pipeline(model, self.inference_request)
+            return self._run_languagebind_inference_pipeline(model)
+        elif isinstance(model, RandomModel):
+            return self._run_random_model_inference_pipeline(model)
         else:
             raise ValueError(f"Model type {type(model)} not supported")
 
@@ -38,7 +41,7 @@ class InferencePipeline:
             preprocessor=model.get_preprocessor(),
         )
 
-        embeddings: List[Tensor] = encode_processed_content(
+        embeddings: List[ndarray] = encode_processed_content(
             model=model,
             preprocessed_content_list=preprocessed_content_list,
             modality=self.inference_request.modality,
@@ -50,8 +53,32 @@ class InferencePipeline:
         formated_result = format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _run_languagebind_inference_pipeline(self, model, inference_request) -> InferenceResult:
+    def _run_random_model_inference_pipeline(self, model) -> InferenceResult:
+        # Chunk, download, and preprocess the content
+        preprocessed_content_list: List[PreprocessedContent] = chunk_download_preprocess_content(
+            content=self.inference_request.contents,
+            modality=self.inference_request.modality,
+            preprocessing_config=self.inference_request.preprocessing_config,
+            preprocessor=model.get_preprocessor(),
+        )
+        #
+        #
+        # embeddings: List[Tensor] = encode_processed_content(
+        #     model=model,
+        #     preprocessed_content_list=preprocessed_content_list,
+        #     modality=self.inference_request.modality,
+        #     normalize=self.inference_request.model_config.normalize_embeddings,
+        #     maximum_batch_size=16
+        # )
+
+
+
+        formated_result = format_results(preprocessed_content_list, embeddings)
+        return formated_result
+
+
+    def _run_languagebind_inference_pipeline(self, model) -> InferenceResult:
         pass
 
-    def _run_hf_inference_pipeline(self, model, inference_request) -> InferenceResult:
+    def _run_hf_inference_pipeline(self, model) -> InferenceResult:
         pass

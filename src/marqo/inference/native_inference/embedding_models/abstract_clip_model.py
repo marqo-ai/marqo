@@ -3,6 +3,7 @@ from abc import abstractmethod
 import numpy as np
 import torch
 from PIL.Image import Image
+from numpy import ndarray
 
 from marqo.inference.media_download_and_preprocess.image_download import (format_and_load_CLIP_images,
                                                                           format_and_load_CLIP_image)
@@ -68,14 +69,14 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         self.image_preprocessor = None # The new preprocessor
 
     @abstractmethod
-    def encode_text(self, inputs: Tensor, normalize: bool = True) -> np.ndarray:
+    def encode_text(self, inputs: List[Tensor], normalize: bool = True) -> List[ndarray]:
         pass
 
     @abstractmethod
-    def encode_image(self, inputs: Tensor, normalize: bool = True, media_download_headers: dict = None) -> np.ndarray:
+    def encode_image(self, inputs: List[Tensor], normalize: bool = True) -> List[ndarray]:
         pass
 
-    def encode(self, inputs: Tensor, modality, normalize=True) -> np.ndarray:
+    def encode(self, inputs: List[Tensor], modality, normalize=True) -> List[ndarray]:
         if modality == Modality.IMAGE:
             return self.encode_image(inputs, normalize=normalize)
         elif modality == Modality.TEXT:
@@ -83,40 +84,12 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         else:
             raise ValueError(f"Unsupported modality: {modality}")
 
-    def _convert_output(self, output):
+    def _convert_output(self, output: Tensor) -> List[ndarray]:
         if self.device == 'cpu':
-            return output.numpy()
+            return [single_ndarray for single_ndarray in output.numpy()]
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            return [single_ndarray for single_ndarray in output.cpu().numpy()]
 
     @staticmethod
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
-
-    def _preprocess_images(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
-                           media_download_headers: Optional[Dict] = None) -> Tensor:
-        """Preprocess the input image to be ready for the model.
-
-        Args:
-            images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
-            can be a str(url), a PIL image, or a tensor, or a list of them
-            media_download_headers (Optional[Dict]): headers for the image download
-        Return:
-            Tensor: the processed image tensor with shape (batch_size, channel, n_px, n_px)
-        """
-        if self.model is None:
-            self.load()
-        if media_download_headers is None:
-            media_download_headers = dict()
-
-        # default to batch encoding
-        if isinstance(images, list):
-            image_input: List[Union[ImageType, Tensor]] \
-                = format_and_load_CLIP_images(images, media_download_headers)
-        else:
-            image_input: List[Union[ImageType, Tensor]] = [format_and_load_CLIP_image(images, media_download_headers)]
-
-        image_input_processed: Tensor = torch.stack([self.preprocess(_img).to(self.device) \
-                                                         if not isinstance(_img, torch.Tensor) else _img \
-                                                     for _img in image_input])
-        return image_input_processed

@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List, Any
 
 from marqo.core.inference.api.inference import ModelAuth
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from numpy import ndarray
+from marqo.core.inference.api.modality import Modality
 
 
 class AbstractEmbeddingModel(ABC):
@@ -45,9 +47,20 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def encode(self, inputs, modality, normalize):
-        """Encode the input data."""
-        # downloading and preprocess inside the encode method
+    def encode(self, inputs: List, modality: Modality, normalize: bool) -> List[ndarray]:
+        """Encode the input data.
+
+        Args:
+            inputs: The input data to be encoded, in the form of a list. The individual elements of the list
+                is model specific.
+            modality: The modality of the input data.
+            normalize: Whether to normalize the embeddings.
+
+        Returns:
+            The encoded data. A list of numpy arrays, where each array is the embedding of the corresponding input.
+            Thus, each element of the list should be a (Dim, ) array of floats.
+            It should be the same length as the input list.
+        """
         pass
 
     @abstractmethod

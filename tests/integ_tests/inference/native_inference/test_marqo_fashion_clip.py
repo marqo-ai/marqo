@@ -3,8 +3,8 @@ from unittest import TestCase
 import numpy as np
 
 from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.load_model import clear_loaded_models
 from marqo.s2_inference.model_registry import _get_open_clip_properties
-from marqo.s2_inference.s2_inference import clear_loaded_models
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 

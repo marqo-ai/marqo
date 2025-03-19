@@ -3,8 +3,7 @@ import numpy as np
 from integ_tests.inference.inference_test_case import InferenceTestCase
 from integ_tests.marqo_test import TestImageUrls
 from marqo.core.inference.api import *
-from marqo.inference.native_inference.inference_pipeline import InferencePipeline
-
+from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 
 class TestOpenCLIPInferencePipeline(InferenceTestCase):
 
@@ -28,7 +27,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = InferencePipeline(text_inference_request).run_pipeline()
+        results = NativeInferenceLocal().vectorise(text_inference_request)
 
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
@@ -77,7 +76,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = InferencePipeline(image_inference_request).run_pipeline()
+        results = NativeInferenceLocal().vectorise(image_inference_request)
 
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
@@ -127,7 +126,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = InferencePipeline(image_inference_request).run_pipeline()
+        results = NativeInferenceLocal().vectorise(image_inference_request)
 
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
