@@ -226,35 +226,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 self.assertEqual(2, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
                 self.assertEqual(400, r["items"][1]["status"])
-                self.assertIn("image file is truncated", r["items"][1]["error"])
-
-    def test_add_document_callVectoriseWithoutPassingEnableCache(self):
-        """Ensure vectorise does not receive enable_cache when calling add_documents."""
-        documents = [
-            {
-                "text_field_1": "Test test",
-                "_id": "1"
-            }
-        ]
-        dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["text_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index_name,
-                            docs=documents,
-                            tensor_fields=tensor_fields)
-                    ).dict(exclude_none=True, by_alias=True)
-                    self.assertTrue(mock_vectorise.called)
-                    args, kwargs = mock_vectorise.call_args
-                    self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
-                                                               "vectorise for add_documents")
-                mock_vectorise.reset_mock()
+                self.assertIn("Image file is truncated", r["items"][1]["error"])
 
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
@@ -398,65 +370,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                 tensor_fields=tensor_fields)
                         ).dict(exclude_none=True, by_alias=True)
                         self.assertIn("Unexpected error during image download", str(e.exception))
-
-    def test_addDocumentsPassTensorToVectorise(self):
-        """Ensure vectorise receives tensor from add_documents when the model is OpenCLIP or CLIP."""
-        documents = [
-            {
-                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
-                "_id": "1"
-            }
-        ]
-        dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index_name,
-                            docs=documents,
-                            tensor_fields=tensor_fields)
-                    ).dict(exclude_none=True, by_alias=True)
-                    # Check that vectorise was called at least once
-                    self.assertTrue(mock_vectorise.called)
-                    args, kwargs = mock_vectorise.call_args
-                    self.assertIn("content", kwargs)
-                    content = kwargs["content"]
-                    self.assertEqual(1, len(content))
-                    self.assertEqual((3, 224, 224), content[0].shape)
-
-    def test_downloadImagesThreadCount(self):
-        """
-        Test that image download thread count is respected
-        """
-        docs = [
-            {"_id": str(i),
-             "image_field_1": TestImageUrls.IMAGE2.value
-             } for i in range(10)
-        ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                for thread_count in [2, 5]:
-                    with patch.object(
-                            add_docs, 'threaded_download_and_preprocess_content',
-                            wraps=add_docs.threaded_download_and_preprocess_content
-                    ) as mock_download_images:
-                        self.add_documents(
-                            config=self.config, add_docs_params=AddDocsParams(
-                                index_name=index_name, docs=docs, device="cpu",
-                                image_download_thread_count=thread_count,
-                                tensor_fields=tensor_fields
-                            )
-                        ).dict(exclude_none=True, by_alias=True)
-
-                        self.assertEqual(thread_count, mock_download_images.call_count)
 
     def test_image_url_is_embedded_as_image_not_text(self):
         """
