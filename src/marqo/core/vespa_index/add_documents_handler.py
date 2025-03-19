@@ -323,8 +323,8 @@ class AddDocumentsHandler(ABC):
         inference_result = self.inference.vectorise(request)
 
         if len(tensor_fields) != len(inference_result.result):
-            raise InferenceError(f'Inference result contains chunks and embeddings for {len(inference_result.result)} '
-                                 f'fields, but {len(tensor_fields)} are expected')
+            raise InternalError(f'Inference result contains chunks and embeddings for {len(inference_result.result)} '
+                                f'fields, but {len(tensor_fields)} are expected')
 
         erroneous_doc_ids = set()
         for index, r in enumerate(inference_result.result):
