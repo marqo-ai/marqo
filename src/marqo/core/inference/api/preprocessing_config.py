@@ -52,7 +52,7 @@ class TextPreprocessingConfig(PreprocessingConfig):
 class ImagePreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for image modality"""
     modality: Literal[Modality.IMAGE] = Modality.IMAGE
-    download_timeout_ms: Optional[int] = pydantic.Field(default=None, alias='downloadTimeoutMs')
+    download_timeout_ms: int = pydantic.Field(default=3000, alias='downloadTimeoutMs')  # default to 3000ms
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
 

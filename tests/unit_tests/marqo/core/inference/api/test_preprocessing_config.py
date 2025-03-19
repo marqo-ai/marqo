@@ -200,7 +200,7 @@ class TestImagePreprocessingConfig(unittest.TestCase):
         """Test that default values are set correctly."""
         config = ImagePreprocessingConfig()
         self.assertFalse(config.should_chunk)
-        self.assertIsNone(config.download_timeout_ms)
+        self.assertEqual(3000, config.download_timeout_ms)
         self.assertIsNone(config.download_thread_count)
         self.assertIsNone(config.download_header)
         self.assertIsNone(config.patch_method)
