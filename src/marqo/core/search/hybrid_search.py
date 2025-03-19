@@ -165,8 +165,8 @@ class HybridSearch:
             query_text_search = None
 
         else:  # string or dict query
-            query_text_vectorise = tensor_query
-            query_text_search = lexical_query
+            query_text_vectorise = tensor_query if tensor_query else ""
+            query_text_search = lexical_query if lexical_query else ""
 
         queries = [BulkSearchQueryEntity(
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,

@@ -2715,3 +2715,99 @@ class TestHybridSearch(MarqoTestCase):
             # rerank_depth=3, # This should not raise an error
             result_count=3
         )
+
+    def test_weighted_tensor_query(self):
+        """
+        Tests that a weighted tensor query can be made.
+        """
+
+        # Add documents
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Adding documents
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Reference results
+                tensor_res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID",
+                    text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": 1.0,
+                        }
+                    ),
+                    result_count=10
+                    )
+
+                # Results with reverse weights for dogs
+                tensor_res_reverse = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID",
+                    text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": -1.0,
+                        }
+                    ),
+                    result_count=5
+                )
+
+                # Check that top result is not present in reverse weighted query
+                top_hit = tensor_res["hits"][0]
+                self.assertIsNone(
+                    next((doc for doc in tensor_res_reverse["hits"] if doc["_id"] == top_hit["_id"]), None)
+                )
+
+    def test_lexical_retrieval_tensor_rerank_with_weighted_query(self):
+        """
+                Tests that a weighted tensor query can be made.
+                """
+
+        # Add documents
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Adding documents
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Reference results
+                res = tensor_search.search(
+                    config=self.config, index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID", text=None, hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": 1.0,
+                        },
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                # Results with reverse weights for dogs
+                res_reverse = tensor_search.search(
+                    config=self.config, index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID", text=None, hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": -1.0,
+                        },
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                # Check that top result is lowest in reverse weighted query
+                assert res["hits"][0]["_id"] == res_reverse["hits"][-1]["_id"]
+
