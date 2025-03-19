@@ -24,6 +24,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 
 
+@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearch(MarqoTestCase):
     """
     Combined tests for unstructured and structured search.

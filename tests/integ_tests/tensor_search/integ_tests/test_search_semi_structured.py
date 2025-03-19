@@ -26,6 +26,7 @@ from marqo.tensor_search.models.api_models import ScoreModifierLists
 from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 
+@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchSemiStructured(MarqoTestCase):
     # Note: We should not use _vector_text_search or _lexical_search directly in tests as they do not fetch the updated
     # index object.

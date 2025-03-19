@@ -651,10 +651,11 @@ class TestAddDocumentsCombined(MarqoTestCase):
         ]
         model_properties = (
             {
-                "name": "open_clip/ViT-B-32/laion400m_e31",
-                "dimensions": 512,
-                "notes": "CLIP ViT-B/32",
-                "type": "clip",
+                'name': 'open_clip/ViT-B-32/laion400m_e31',
+                'dimensions': 512,
+                'note': 'open_clip models',
+                'type': 'open_clip',
+                'pretrained': 'laion400m_e31'
             }
         )
 

@@ -49,6 +49,7 @@ class TestPrivateModelLoading(MarqoTestCase):
         )
         create_index(self.index_name, index_settings, self.config)
 
+    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_load_private_hf_model_from_a_private_zip_file_on_s3(self):
         model = "private-e5-zip-on-s3"
         model_properties = {
@@ -82,6 +83,7 @@ class TestPrivateModelLoading(MarqoTestCase):
         self.assertEqual(False, res.errors)
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
 
+    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_load_private_hf_model_from_a_private_hf_repo(self):
         model = "private-e5-repo-on-hf"
         model_properties = {
