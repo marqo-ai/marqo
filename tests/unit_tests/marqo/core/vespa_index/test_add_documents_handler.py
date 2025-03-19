@@ -1,10 +1,8 @@
-import unittest
 from typing import Dict, Any, List
 from unittest.mock import MagicMock
 
 import numpy as np
 
-from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import AddDocumentsError, MarqoDocumentParsingError
 from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality, TextChunkConfig, \
@@ -18,6 +16,8 @@ from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from marqo.vespa.vespa_client import VespaClient
+from unit_tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import MarqoTestCase as fixture
 
 
 class DummyAddDocumentsHandler(AddDocumentsHandler):
@@ -56,11 +56,7 @@ class DummyAddDocumentsHandler(AddDocumentsHandler):
         return Modality.TEXT
 
 
-class TestAddDocumentHandler(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        MarqoTestCase.configure_request_metrics()
+class TestAddDocumentHandler(MarqoTestCase):
 
     def setUp(self):
         self.vespa_client = MagicMock(spec=VespaClient)
@@ -88,7 +84,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            marqo_index=fixture.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1',
                 tensor_fields=['field1'],
@@ -130,7 +126,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            marqo_index=fixture.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[
@@ -151,7 +147,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            marqo_index=fixture.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[
@@ -189,7 +185,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            marqo_index=fixture.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[
@@ -246,7 +242,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index(
+            marqo_index=fixture.unstructured_marqo_index(
                 'index1', 'index1',
                 text_preprocessing=TextPreProcessing(
                     split_length=100,
@@ -279,7 +275,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index(
+            marqo_index=fixture.unstructured_marqo_index(
                 'index1', 'index1',
                 text_preprocessing=TextPreProcessing(
                     split_length=100,
@@ -311,7 +307,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index('index1', 'index1'),
+            marqo_index=fixture.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
                 docs=[{'_id': '1', 'field1': 'hello'}],
@@ -336,7 +332,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index(
+            marqo_index=fixture.unstructured_marqo_index(
                 'index1', 'index1',
                 image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Simple)
             ),
@@ -363,7 +359,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index(
+            marqo_index=fixture.unstructured_marqo_index(
                 'index1', 'index1',
                 audio_preprocessing=AudioPreProcessing(split_length=25, split_overlap=5)
             ),
@@ -391,7 +387,7 @@ class TestAddDocumentHandler(unittest.TestCase):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
-            marqo_index=MarqoTestCase.unstructured_marqo_index(
+            marqo_index=fixture.unstructured_marqo_index(
                 'index1', 'index1',
                 video_preprocessing=VideoPreProcessing(split_length=25, split_overlap=5)
             ),

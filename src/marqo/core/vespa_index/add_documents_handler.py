@@ -278,7 +278,11 @@ class AddDocumentsHandler(ABC):
 
     def _infer_modalities(self) -> Set[Modality]:
         all_modalities = set()
+        erroneous_doc_ids = set()
         for field in self.tensor_fields_container.select_unresolved_tensor_fields():
+            if field.doc_id in erroneous_doc_ids:
+                continue
+
             try:
                 modality = self._infer_modality(field)
                 field.modality = modality
@@ -286,6 +290,7 @@ class AddDocumentsHandler(ABC):
             except AddDocumentsError as e:
                 self.add_docs_response_collector.collect_error_response(field.doc_id, e)
                 self.tensor_fields_container.remove_doc(field.doc_id)
+                erroneous_doc_ids.add(field.doc_id)
         return all_modalities
 
     def _vectorise_fields(self, modality: Modality, for_top_level_field: bool = True):
