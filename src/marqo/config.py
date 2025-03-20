@@ -44,7 +44,7 @@ class Config:
         self.inference = inference
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
-        self.recommender = Recommender(vespa_client, self.index_management)
+        self.recommender = Recommender(vespa_client, self.index_management, self.inference)
         self.embed = Embed(vespa_client, self.index_management, self.inference)
 
     def set_is_remote(self, vespa_client: VespaClient):

@@ -81,7 +81,7 @@ class TestRecommender(MarqoTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.recommender = Recommender(self.vespa_client, self.index_management)
+        self.recommender = Recommender(self.vespa_client, self.index_management, self.config.inference)
 
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
