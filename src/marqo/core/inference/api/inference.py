@@ -25,21 +25,32 @@ class InferenceRequest(ImmutableBaseModel):
     model_config: ModelConfig = pydantic.Field(alias='modelConfig')
     preprocessing_config: PreprocessingConfigType = pydantic.Field(alias='preprocessingConfig')
     use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
+    # whether we should return error for individual content, when set to false, any error should fail the whole batch
+    return_individual_error: bool = pydantic.Field(default=True, alias='returnIndividualError')
 
     @root_validator(pre=False)
     def check_preprocessing_config_matches_modality(cls, values):
         modality: Modality = values.get('modality')
         preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
 
-        if not modality or modality.value != preprocessing_config.modality:
-            raise ValueError(f"{type(preprocessing_config)} only supports modality: {preprocessing_config.modality}, "
-                             f"but modality: {modality} is specified in the request")
+        if not modality or not preprocessing_config or modality.value != preprocessing_config.modality:
+            raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
+                             f"does not support modality: {modality}")
 
         return values
 
 
+class InferenceErrorModel(ImmutableBaseModel):
+    """
+    A model class to store error information for each individual content
+    """
+    status_code: int = pydantic.Field(default=400)
+    error_code: str = pydantic.Field(default='inference_error')
+    error_message: str
+
+
 class InferenceResult(ImmutableBaseModel):
-    result: List[Union[InferenceError, List[Tuple[str, ndarray]]]]
+    result: List[Union[InferenceErrorModel, List[Tuple[str, ndarray]]]]
 
     class Config(ImmutableBaseModel.Config):
         arbitrary_types_allowed = True

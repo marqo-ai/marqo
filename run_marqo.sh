@@ -135,7 +135,7 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
             break
         fi
         sleep 0.1
-        
+
     done
     echo "Marqo throttling is now running"
 
