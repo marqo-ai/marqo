@@ -1,4 +1,3 @@
-import enum
 from typing import List
 from typing import Optional, Union, Any, Sequence
 
@@ -8,17 +7,10 @@ from pydantic import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
-
+from marqo.tensor_search.enums import EnvVars
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
-
-
-class BatchVectorisationMode(enum.Enum):
-    PER_FIELD = 'per_field'
-    PER_DOCUMENT = 'per_document'
-    PER_BATCH = 'per_batch'
 
 
 class AddDocsParams(BaseModel):

@@ -1,4 +1,5 @@
 import os
+import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -10,8 +11,8 @@ import requests
 import torch
 from torch import Tensor
 
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
@@ -20,8 +21,6 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
-import unittest
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -744,96 +743,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
         image_url_no_extension = "https://il.redbubble.net/catalogue/image/by-rb-work/157037551/simple-preview"
         modality = infer_modality(image_url_no_extension)
         self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
-
-    def test_different_batching_strategy_adds_the_same_documents(self):
-        test_docs = [
-            {
-                "image_field_1": TestImageUrls.IMAGE1.value,
-                "text_field_1": "this is a valid image",
-                "text_field_2": "some dogs biting me",
-                "_id": "1"
-            },
-            {
-                "image_field_1": TestImageUrls.IMAGE2.value,
-                "text_field_1": "this is another image due to int id",
-                "text_field_2": "cats walking on the wall",
-                "_id": "2"
-            }
-        ]
-
-        def assert_get_documents_response_equals(result1: MarqoGetDocumentsByIdsResponse,
-                                                 result2: MarqoGetDocumentsByIdsResponse,
-                                                 msg: str):
-            def remove_tensor_facets(get_documents_results: list):
-                return [{key: value for key, value in doc.items() if key != '_tensor_facets'}
-                        for doc in get_documents_results]
-
-            def all_embeddings(get_documents_results: list) -> Dict[str, List[float]]:
-                """Extract embeddings from _tensor_facet in to a map {docid_field: embedding}"""
-                embeddings_map = {}
-                for doc in get_documents_results:
-                    for field in doc['_tensor_facets']:
-                        for key, value in field.items():
-                            if key != '_embedding':
-                                embeddings_map[f'{doc["_id"]}_{key}'] = field['_embedding']
-                return embeddings_map
-
-            self.assertListEqual(remove_tensor_facets(result1.results), remove_tensor_facets(result2.results),
-                                 msg=f'{msg}: documents differ')
-
-            result1_embeddings = all_embeddings(result1.results)
-            result2_embeddings = all_embeddings(result2.results)
-            self.assertSetEqual(set(result1_embeddings.keys()), set(result2_embeddings.keys()),
-                                msg=f'{msg}: tensor fields differ')
-            for key in result1_embeddings.keys():
-                # assert two embeddings are close enough: abs(a - b) < 1e-5 * abs(b) + 1e-6
-                self.assertTrue(np.allclose(result1_embeddings[key], result2_embeddings[key], atol=1e-6),
-                                msg=f'{msg}: embeddings for {key} differ, '
-                                    f'result1: {result1_embeddings[key]} '
-                                    f'result2: {result2_embeddings[key]}')
-
-        for index in self.image_indexes:
-            tensor_fields = ["image_field_1", "text_field_1", "text_field_2"] \
-                if isinstance(index, UnstructuredMarqoIndex) else None
-
-            def add_docs(batch_vectorisation_mode: BatchVectorisationMode):
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=test_docs,
-                        batch_vectorisation_mode=batch_vectorisation_mode,
-                        tensor_fields=tensor_fields)
-                )
-
-            def get_docs():
-                return tensor_search.get_documents_by_ids(
-                    config=self.config, index_name=index.name,
-                    document_ids=[doc['_id'] for doc in test_docs],
-                    show_vectors=True
-                )
-
-            self.maxDiff = None  # allow output all diffs
-            with self.subTest(f'{index.name} with type {index.type}'):
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_FIELD)
-                docs_added_using_per_field_strategy = get_docs()
-
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_doc_strategy = get_docs()
-
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_batch_strategy = get_docs()
-
-                assert_get_documents_response_equals(
-                    docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
-                    msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
-                assert_get_documents_response_equals(
-                    docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
-                    msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
-
 
     def test_imageIndexEmbeddingsUnnormalised(self):
         """Test to ensure that the image embeddings are unnormalised when the index is unnormalised"""
