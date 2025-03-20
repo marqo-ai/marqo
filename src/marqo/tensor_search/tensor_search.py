@@ -797,10 +797,16 @@ def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHa
             if len(inference_result.result) != len(v.content):
                 raise InternalError(f'Inference result contains embeddings for {len(inference_result.result)} '
                                     f'query items, but {len(v.content)} is expected')
-            if any([isinstance(r, InferenceErrorModel) for r in inference_result.result]):
-                raise InternalError(f'Individual errors returned when vectorising query: {v.content}')
-            if any([len(chunks) > 1 for chunks in inference_result.result]):
-                raise InternalError(f'Some query items have multiple chunks: {v.content}')
+            individual_errors = [f'{v.content[index]}: {r.error_message}'
+                                 for index, r in enumerate(inference_result.result)
+                                 if isinstance(r, InferenceErrorModel)]
+            if individual_errors:
+                raise InternalError(f'Individual errors returned when vectorising query string: {individual_errors}')
+            chunked_contents = [(v.content[index], len(chunks)) for index, chunks in enumerate(inference_result.result)
+                                if len(chunks) > 1]
+            if chunked_contents:
+                raise InternalError(f'Tensor query string should not be chunked but some '
+                                    f'query items have multiple chunks: {chunked_contents}')
 
             # The per_content_result format is [('chunk', np.array())]
             vectors = [per_content_result[0][1].tolist() for per_content_result in inference_result.result]
