@@ -47,14 +47,13 @@ class Config:
                                                 enable_index_operations=True,
                                                 deployment_lock_timeout_seconds=deployment_lock_timeout)
 
-        self.inference = NativeInferenceLocal()
+        inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+        self.inference = NativeInferenceClient(inference_server_url)
+        # self.inference = NativeInferenceLocal()
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management)
         self.embed = Embed(vespa_client, self.index_management)
-
-        # inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
-        # self.inference = NativeInferenceClient(inference_server_url)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]
