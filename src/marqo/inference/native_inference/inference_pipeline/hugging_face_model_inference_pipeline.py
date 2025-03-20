@@ -61,22 +61,24 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
         content_to_encode: List[str] = self._collect_valid_content_to_encode(preprocessed_content_list)
-        if len(content_to_encode) > 0:
-            embeddings = []
-            for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-                batch: List[str] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
-                batch_embeddings: List[ndarray] = self.model.encode(
-                    inputs=batch,
-                    modality=self.inference_request.modality,
-                    normalize=self.inference_request.model_config.normalize_embeddings)
-                embeddings.extend([embeddings for embeddings in batch_embeddings])
 
-            if len(embeddings) != len(content_to_encode):
-                raise ValueError("The number of embeddings does not match the number of contents")
-
-            return embeddings
-        else:
+        if not content_to_encode:
             return []
+
+        embeddings: List[ndarray] = []
+        for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
+            batch: List[str] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+            batch_embeddings: List[ndarray] = self.model.encode(
+                inputs=batch,
+                modality=self.inference_request.modality,
+                normalize=self.inference_request.model_config.normalize_embeddings
+            )
+            embeddings.extend(batch_embeddings)
+
+        if len(embeddings) != len(content_to_encode):
+            raise ValueError("The number of embeddings does not match the number of contents")
+
+        return embeddings
 
     def _collect_valid_content_to_encode(self, preprocessed_content: list[HuggingFacePreprocessedContent]) \
             -> list[str]:
@@ -108,6 +110,9 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
                         )
             elif isinstance(chunk, InferenceErrorModel):
                 continue
+            else:
+                raise ValueError(f"Unexpected content type: {type(chunk)}. "
+                                 f"Should be a list of tuples or an InferenceError")
         return valid_content_to_encode
 
 
