@@ -7,6 +7,7 @@ from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.logging import get_logger
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
@@ -49,6 +50,9 @@ class Config:
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)
         self.embed = Embed(vespa_client, self.index_management)
+
+        inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+        self.inference = NativeInferenceClient(inference_server_url)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

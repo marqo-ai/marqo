@@ -1,27 +1,12 @@
-import json
-import os
-import time
-from threading import Lock
-
-import nltk
-import torch
-from PIL import Image
-
 from marqo import config, version
 from marqo import marqo_docs
 from marqo.api import exceptions
 from marqo.connections import redis_driver
-from marqo.s2_inference.constants import PATCH_MODELS
-from marqo.s2_inference.processing.image import chunk_image
 from marqo.s2_inference.s2_inference import vectorise
 # we need to import backend before index_meta_cache to prevent circular import error:
-from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo import marqo_docs
-import subprocess
-import nltk
 
 logger = get_logger(__name__)
 
@@ -30,9 +15,7 @@ def on_start(config: config.Config):
     to_run_on_start = (
         BootstrapVespa(config),
         PopulateCache(config),
-        DownloadStartText(),
         InitializeRedis("localhost", 6379),
-        DownloadFinishText(),
         PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
@@ -122,30 +105,6 @@ class InitializeRedis:
         # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
         if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
             redis_driver.init_from_app(self.host, self.port)
-
-
-class DownloadStartText:
-
-    def run(self):
-        print('\n')
-        print("###########################################################")
-        print("###########################################################")
-        print("###### STARTING DOWNLOAD OF MARQO ARTEFACTS################")
-        print("###########################################################")
-        print("###########################################################")
-        print('\n', flush=True)
-
-
-class DownloadFinishText:
-
-    def run(self):
-        print('\n')
-        print("###########################################################")
-        print("###########################################################")
-        print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
-        print("###########################################################")
-        print("###########################################################")
-        print('\n', flush=True)
 
 
 class PrintVersion:
