@@ -269,7 +269,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
                             self.assertEqual(res.status_code, 500)
 
 
-
 class TestApiErrors(MarqoTestCase):
     """
     Execute requests that trigger core/base errors.

@@ -6,6 +6,7 @@ from marqo.core.inference.api import *
 from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 
+
 class TestOpenCLIPInferencePipeline(InferenceTestCase):
     
     def setUp(self):
