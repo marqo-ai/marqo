@@ -28,7 +28,6 @@ from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_
 from marqo.tensor_search import index_meta_cache
 
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchStructured(MarqoTestCase):
 
     @classmethod
@@ -488,6 +487,7 @@ class TestSearchStructured(MarqoTestCase):
     # TODO: All filtering tests have been moved to test_search_combined.py
     # Do the same with all other tests.
 
+    @unittest.skip(reason='temporarily skip due to inference interface changes')
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 

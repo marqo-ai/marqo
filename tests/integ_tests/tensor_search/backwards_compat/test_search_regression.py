@@ -14,7 +14,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: SBERT')
+
 class TestSearchRegression(MarqoTestCase):
     """
     Tests for search result and score regression
@@ -25,7 +25,7 @@ class TestSearchRegression(MarqoTestCase):
         super().setUpClass()
         # STRUCTURED indexes
         structured_text_index_score_modifiers = cls.structured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -46,7 +46,7 @@ class TestSearchRegression(MarqoTestCase):
         )
 
         unstructured_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2")
+            model=Model(name="hf/all-MiniLM-L6-v2")
         )
 
         cls.indexes = cls.create_indexes([

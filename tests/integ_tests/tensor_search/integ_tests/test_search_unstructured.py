@@ -27,7 +27,6 @@ from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchUnstructured(MarqoTestCase):
     """
     This has the same test suite as test_search_semi_structured.py, we only specify the marqo_version of
@@ -676,6 +675,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         result_count=3, filter=filter_string, verbose=0
                     )
 
+    @unittest.skip(reason='temporarily skip due to inference interface changes')
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 

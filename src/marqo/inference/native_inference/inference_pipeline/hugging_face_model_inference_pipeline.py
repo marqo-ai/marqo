@@ -1,30 +1,43 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text
-from marqo.inference.native_inference.embedding_models.random_model import RandomModel
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
-RandomModelPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
+HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
 
-class RandomModelInferencePipeline(AbstractInferencePipeline):
+class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
+    """
+    A class that handles the inference pipeline for HuggingFace models.
 
-    MAX_BATCH_SIZE = 128
+    This class is responsible for the content preprocessing, encoding, and formatting the results for HuggingFace models.
 
-    def __init__(self, model: RandomModel, inference_request: InferenceRequest):
+    Attributes:
+        VALID_CONTENT_TO_ENCODE_TYPE (tuple): The valid content type to passed to the model.encode method,
+            this is a model specific type. In this case, it is a string.
+        MAX_BATCH_SIZE (int): The maximum batch size to encode the content.
+    """
+    VALID_CONTENT_TO_ENCODE_TYPE = (str, )
+    MAX_BATCH_SIZE = 32
+
+    def __init__(self, model: HuggingFaceModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
+
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[RandomModelPreprocessedContent] = self._content_preprocessing()
+        preprocessed_content_list: List[HuggingFacePreprocessedContent] = self._content_preprocessing()
+
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
+
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _content_preprocessing(self) -> List[RandomModelPreprocessedContent]:
+    def _content_preprocessing(self) -> List[HuggingFacePreprocessedContent]:
         """
         Preprocess the content based on the modality.
 
         Returns:
-            List[RandomModelPreprocessedContent]: The preprocessed content.
+            List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
         if self.inference_request.modality == Modality.TEXT:
             results = split_prefix_preprocess_text(
@@ -32,13 +45,12 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config
             )
-        elif self.inference_request.modality == Modality.IMAGE:
-            return [[(content, content), ] for content in self.inference_request.contents]
         else:
             raise ValueError(f"Unsupported modality: {modality}")
         return results
 
-    def _encode_processed_content(self, preprocessed_content_list: List[RandomModelPreprocessedContent]) -> List[ndarray]:
+    def _encode_processed_content(self, preprocessed_content_list: List[HuggingFacePreprocessedContent]) \
+            -> List[ndarray]:
         """
         Encode the preprocessed content into embeddings.
 
@@ -49,6 +61,7 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
         content_to_encode: List[str] = self._collect_valid_content_to_encode(preprocessed_content_list)
+
         if not content_to_encode:
             return []
 
@@ -67,36 +80,39 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
 
         return embeddings
 
-    def _collect_valid_content_to_encode(self, preprocessed_content: list[RandomModelPreprocessedContent]) -> list[str]:
+    def _collect_valid_content_to_encode(self, preprocessed_content: list[HuggingFacePreprocessedContent]) \
+            -> list[str]:
         """
         Collect the valid content to encode from the preprocessed content. Each individual content can be
         an InferenceError, or a list of tuples with the original text and the preprocessed content. The
-        valid content to encode in this model is string.
+        valid content to encode in this model is Tensor.
 
         Args:
             preprocessed_content: A list of preprocessed content.
 
         Returns:
-            list[str]: A list of valid content to encode.
+            list[Tensor]: A list of valid content to encode.
 
         Raises:
             ValueError: If the content is not a tensor, nor an InferenceError. This means there is an
             unexpected content type.
         """
         valid_content_to_encode = []
-        valid_content_to_encode_type = (str, )
-
         for chunk in preprocessed_content:
             if isinstance(chunk, list):
                 for _, content_to_encode in chunk:
-                    if isinstance(content_to_encode, valid_content_to_encode_type):
+                    if isinstance(content_to_encode, self.VALID_CONTENT_TO_ENCODE_TYPE):
                         valid_content_to_encode.append(content_to_encode)
                     else:
-                        raise ValueError(f"Expected {valid_content_to_encode_type} "
-                                         f"but got {type(content_to_encode)}")
+                        raise ValueError(
+                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but "
+                            f"got {type(content_to_encode)}"
+                        )
             elif isinstance(chunk, InferenceErrorModel):
                 continue
             else:
                 raise ValueError(f"Unexpected content type: {type(chunk)}. "
                                  f"Should be a list of tuples or an InferenceError")
         return valid_content_to_encode
+
+

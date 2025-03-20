@@ -47,9 +47,9 @@ class TestVectoriseJobs(unittest.TestCase):
         test_cases = [
             # modality, expected preprocessing config
             (Modality.TEXT, TextPreprocessingConfig()),
-            (Modality.IMAGE, ImagePreprocessingConfig(download_header={'header1': 'value1'})),
-            (Modality.AUDIO, AudioPreprocessingConfig(download_header={'header1': 'value1'})),
-            (Modality.VIDEO, VideoPreprocessingConfig(download_header={'header1': 'value1'})),
+            (Modality.IMAGE, ImagePreprocessingConfig(download_header={'header1': 'value1'}, download_thread_count=1)),
+            (Modality.AUDIO, AudioPreprocessingConfig(download_header={'header1': 'value1'}, download_thread_count=1)),
+            (Modality.VIDEO, VideoPreprocessingConfig(download_header={'header1': 'value1'}, download_thread_count=1)),
         ]
 
         for modality, expected_preprocessing in test_cases:
