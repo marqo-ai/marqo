@@ -25,6 +25,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -62,7 +63,12 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    return config.Config(vespa_client, zookeeper_client)
+    inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+    inference = NativeInferenceClient(inference_server_url)
+    # TODO support combined mode in the future, without model pre-warm?
+    #   self.inference = NativeInferenceLocal(DeviceManager())
+
+    return config.Config(vespa_client, inference, zookeeper_client)
 
 
 _config = generate_config()

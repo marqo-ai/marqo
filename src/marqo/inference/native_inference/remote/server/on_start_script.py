@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 from threading import Lock
+from typing import Dict
 
 import nltk
 import torch
@@ -12,11 +13,14 @@ from marqo import marqo_docs
 from marqo import version
 from marqo.api import exceptions  # TODO EnvVarError and StartupSanityCheckError will need to be replicated here
 from marqo.core.inference.api import ModelConfig, InferenceRequest, Modality, TextPreprocessingConfig
+from marqo.exceptions import InvalidArgumentError
 from marqo.inference.native_inference.remote.server.inference_config import Config
 from marqo.logging import get_logger
 
 # TODO remove deps of s2_inference
+from marqo.s2_inference import s2_inference
 from marqo.s2_inference.constants import PATCH_MODELS
+from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 from marqo.s2_inference.processing.image import chunk_image
 
 # TODO remove these deps
@@ -152,12 +156,12 @@ class CacheModels:
                 self.logger.debug(f"Loading model: {model} on device: {device}")
 
                 # warm it up
-                # _ = self._preload_model(model=model, content=test_string, device=device)
+                _ = self._preload_model(model=model, content=test_string, device=device)
 
                 t = 0
                 for n in range(N):
                     t0 = time.time()
-                    # _ = self._preload_model(model=model, content=test_string, device=device)
+                    _ = self._preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t) / float((N))} for {model} and {device}"
@@ -181,6 +185,7 @@ class CacheModels:
             # For models IN REGISTRY
             model_config = ModelConfig(
                 model_name=model,
+                model_properties=self._load_model_properties_from_model_registry(model)
             )
         elif isinstance(model, dict):
             # For models from URL
@@ -207,6 +212,19 @@ class CacheModels:
             preprocessing_config=TextPreprocessingConfig(),
             device=device
         ))
+
+    def _load_model_properties_from_model_registry(self, model_name: str) -> Dict[str, str]:
+        try:
+            return s2_inference.get_model_properties_from_registry(model_name)
+        except UnknownModelError:
+            raise InvalidArgumentError(
+                f'Could not find model properties for model={model_name}. '
+                f'Please check that the model name is correct. '
+                f'Please provide model_properties if the model is a custom model and is not supported by default')
+        except InvalidModelPropertiesError as e:
+            raise InvalidArgumentError(
+                f'Invalid model properties for model={model_name}. Reason: {e}.'
+            )
 
 
 class CachePatchModels:

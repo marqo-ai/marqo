@@ -59,41 +59,6 @@ class PopulateCache:
         index_meta_cache.start_refresh_thread(self.config)
 
 
-def _preload_model(model, content, device):
-    """
-        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
-        If `model` is a str, it should be a model name in the registry
-        If `model is a dict, it should be an object containing `model_name` and `model_properties`
-        Model properties will be passed to vectorise call if object exists
-    """
-    if isinstance(model, str):
-        # For models IN REGISTRY
-        _ = vectorise(
-            model_name=model,
-            content=content,
-            device=device
-        )
-    elif isinstance(model, dict):
-        # For models from URL
-        """
-        TODO: include validation from on start script (model name properties etc)
-        _check_model_name(index_settings)
-        """
-        try:
-            _ = vectorise(
-                model_name=model["model"],
-                model_properties=model["modelProperties"],
-                content=content,
-                device=device
-            )
-        except KeyError as e:
-            raise exceptions.EnvVarError(
-                f"Your custom model {model} is missing either `model` or `model_properties`."
-                f"To add a custom model, it must be a dict with keys `model` and `model_properties`. "
-                f"See the examples defined in {marqo_docs.configuring_preloaded_models()}"
-            ) from e
-
-
 class InitializeRedis:
 
     def __init__(self, host: str, port: int):

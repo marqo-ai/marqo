@@ -154,8 +154,6 @@ class TestOnStartScript(unittest.TestCase):
                 return True
         assert run()
     
-    # TODO: test bad/no names/URLS in end-to-end tests, as this logic is done in vectorise call
-
     def test_set_best_available_device(self):
         """
         Makes sure best available device corresponds to whether or not cuda is available

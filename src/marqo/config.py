@@ -2,10 +2,10 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -23,16 +23,11 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
+            inference: Inference,
             zookeeper_client: Optional[ZookeeperClient] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
-        """
-        Parameters
-        ----------
-        url:
-            The url to the S2Search API (ex: http://localhost:9200)
-        """
         self.vespa_client = vespa_client
         self.set_is_remote(vespa_client)
         self._zookeeper_client = zookeeper_client
@@ -47,9 +42,7 @@ class Config:
                                                 enable_index_operations=True,
                                                 deployment_lock_timeout_seconds=deployment_lock_timeout)
 
-        inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
-        self.inference = NativeInferenceClient(inference_server_url)
-        # self.inference = NativeInferenceLocal()
+        self.inference = inference
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management)

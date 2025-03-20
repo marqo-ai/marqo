@@ -16,12 +16,14 @@ class NativeInferenceClient(Inference):
     def __init__(self, base_url: str):
         """
         Args:
-            base_url (str): The base URL of the remote inference FastAPI service.
+            base_url (str): The base URL of the remote inference service.
         """
         self.base_url = base_url.rstrip("/")
 
         # TODO is default connection pooling config good enough, or do we want to config the limit here?
         #   limits=httpx.Limits(max_keepalive_connections=?, max_connections=?)
+        # TODO set proper timeout
+        # TODO see if retry is needed
         self.client = httpx.Client(base_url=base_url)
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
