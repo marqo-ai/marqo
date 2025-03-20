@@ -1,33 +1,41 @@
-from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
-    download_and_preprocess_image
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
-OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
+HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
 
-class OpenCLIPInferencePipeline(AbstractInferencePipeline):
+class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
+    """
+    A class that handles the inference pipeline for HuggingFace models.
 
-    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor,)
-    MAX_BATCH_SIZE = 16
+    This class is responsible for the content preprocessing, encoding, and formatting the results for HuggingFace models.
 
-    def __init__(self, model: OPEN_CLIP, inference_request: InferenceRequest):
+    Attributes:
+        VALID_CONTENT_TO_ENCODE_TYPE (tuple): The valid content type to passed to the model.encode method,
+            this is a model specific type. In this case, it is a string.
+        MAX_BATCH_SIZE (int): The maximum batch size to encode the content.
+    """
+    VALID_CONTENT_TO_ENCODE_TYPE = (str, )
+    MAX_BATCH_SIZE = 32
+
+    def __init__(self, model: HuggingFaceModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
 
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
+        preprocessed_content_list: List[HuggingFacePreprocessedContent] = self._content_preprocessing()
 
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _content_preprocessing(self) -> List[OpenCLIPPreprocessedContent]:
+    def _content_preprocessing(self) -> List[HuggingFacePreprocessedContent]:
         """
         Preprocess the content based on the modality.
-        
+
         Returns:
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
@@ -37,19 +45,12 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config
             )
-        elif self.inference_request.modality == Modality.IMAGE:
-            results = download_and_preprocess_image(
-                self.inference_request.contents,
-                self.model.get_preprocessor(),
-                self.inference_request.preprocessing_config,
-                self.inference_request.return_individual_error
-            )
         else:
             raise ValueError(f"Unsupported modality: {modality}")
         return results
 
-    def _encode_processed_content(self, preprocessed_content_list: List[OpenCLIPPreprocessedContent]) -> List[
-        ndarray]:
+    def _encode_processed_content(self, preprocessed_content_list: List[HuggingFacePreprocessedContent]) \
+            -> List[ndarray]:
         """
         Encode the preprocessed content into embeddings.
 
@@ -59,11 +60,11 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
         Returns:
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
-        content_to_encode: List[Tensor] = self._collect_valid_content_to_encode(preprocessed_content_list)
+        content_to_encode: List[str] = self._collect_valid_content_to_encode(preprocessed_content_list)
         if len(content_to_encode) > 0:
             embeddings = []
             for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-                batch: List[Tensor] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+                batch: List[str] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
                 batch_embeddings: List[ndarray] = self.model.encode(
                     inputs=batch,
                     modality=self.inference_request.modality,
@@ -77,7 +78,8 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
         else:
             return []
 
-    def _collect_valid_content_to_encode(self, preprocessed_content: list[OpenCLIPPreprocessedContent]) -> list[Tensor]:
+    def _collect_valid_content_to_encode(self, preprocessed_content: list[HuggingFacePreprocessedContent]) \
+            -> list[str]:
         """
         Collect the valid content to encode from the preprocessed content. Each individual content can be
         an InferenceError, or a list of tuples with the original text and the preprocessed content. The
@@ -94,7 +96,6 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
             unexpected content type.
         """
         valid_content_to_encode = []
-
         for chunk in preprocessed_content:
             if isinstance(chunk, list):
                 for _, content_to_encode in chunk:
@@ -102,8 +103,8 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
                         valid_content_to_encode.append(content_to_encode)
                     else:
                         raise ValueError(
-                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but got "
-                            f"{type(content_to_encode)}"
+                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but "
+                            f"got {type(content_to_encode)}"
                         )
             elif isinstance(chunk, InferenceErrorModel):
                 continue

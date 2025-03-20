@@ -33,13 +33,26 @@ def split_prefix_preprocess_text(
         Results in the form of a list[list[tuple[str, Any]]], where Any depends on the preprocessor used.
 
     Examples:
-        The input is ["This is a test sentence", "Test"] with the text prefix "prefix: ", and split by word, and the
-        preprocessor is a text preprocessor that returns tensors.
+        E.g., 1
+            The input is ["This is a test sentence", "Test"] with the text prefix "prefix: ", and split by word, and the
+            preprocessor is a text preprocessor that returns tensors.
 
-        The output will be
+            The output will be
+                [
+                    [("This is a", tensor), ("prefix: a test sentence", tensor)], # 2 chunks for the first content
+                    [("Test", tensor)] # 1 chunk for the second content
+                ]
+        E.g., 2
+            The input is ["This is a test sentence", "Test"] with the text prefix "prefix: ", and split by word, and the
+            preprocessor is a text preprocessor from HuggingFace that returns dictionaries.
+
+            The output will be
             [
-                [("This is a", tensor), ("prefix: a test sentence", tensor)], # 2 chunks for the first content
-                [("Test", tensor)] # 1 chunk for the second content
+                # 2 chunks for the first content
+                [("This is a", {"input_ids": tensor, "attention_mask": tensor}),
+                ("prefix: a test sentence", {"input_ids": tensor, "attention_mask": tensor})],
+                # 1 chunk for the second content
+                [("Test", {"input_ids": tensor, "attention_mask": tensor})]
             ]
 
         IMPORTANT: That the tensor is generated with prefix, while the chunk does not contain the prefix.

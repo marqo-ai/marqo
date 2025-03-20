@@ -302,8 +302,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         return model_file_path
 
     def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
-
-        images = torch.cat(images, dim=0)
+        images = torch.cat(images, dim=0).to(self.device)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
@@ -319,7 +318,8 @@ class OPEN_CLIP(AbstractCLIPModel):
         return self._convert_output(outputs)
 
     def encode_text(self, text: List[Tensor], normalize=True) -> List[ndarray]:
-        text = torch.cat(text, dim=0)
+        text = torch.cat(text, dim=0).to(self.device)
+
         if self.model is None:
             self.load()
         with torch.no_grad():
