@@ -22,12 +22,12 @@ Notes on search behaviour with caching and searchable attributes:
         - Searching an existing but uncached field will return the best result
             (the uncached field will be searched)
         - Searching all fields will return a poor result
-            (the uncached field won’t be searched)
+            (the uncached field won't be searched)
     Vector search:
         - Searching an existing but uncached field will return no results (the
-            uncached field won’t be searched)
+            uncached field won't be searched)
         - Searching all fields will return a poor result (the uncached field
-            won’t be searched)
+            won't be searched)
 
 """
 import typing
@@ -398,15 +398,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
 
-    # TODO [Refactoring device logic] use device info gathered from device manager
-    if device is None:
-        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        if selected_device is None:
-            raise api_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-    else:
-        selected_device = device
-
     # Fetch marqo index to pass to search method
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     marqo_index_version = marqo_index.parsed_marqo_version()
@@ -434,7 +425,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             search_result = _vector_text_search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
-                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
+                filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
@@ -446,7 +437,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 rerank_depth=rerank_depth,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
-                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
+                filter_string=filter, device=device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
@@ -480,7 +471,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             RequestMetricsStore.for_request().start(f"search.rerank")
             rerank.rerank_search_results(search_result=search_result, query=text,
                                          model_name=reranker,
-                                         device=selected_device,
+                                         device=device,
                                          searchable_attributes=searchable_attributes,
                                          num_highlights=1)
             total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
@@ -491,7 +482,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
     if isinstance(text, CustomVectorQuery):
-        search_result["query"] = text.dict()    # Make object JSON serializable
+        search_result["query"] = text.dict()  # Make object JSON serializable
     else:
         search_result["query"] = text
 
@@ -625,7 +616,7 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], media_down
         pass
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
-    return QueryContentCollector(queries = query_content_list)
+    return QueryContentCollector(queries=query_content_list)
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -674,6 +665,7 @@ def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set
     """
     return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve_set or
             '.' in k and k.split('.', maxsplit=1)[0] in attributes_to_retrieve_set}
+
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs],
@@ -852,12 +844,12 @@ def get_query_vectors_from_jobs(
                 vectorised_ordered_queries = [
                     (
                         get_content_vector(
-                        possible_jobs=qidx_to_job[qidx],
-                        job_to_vectors=job_to_vectors,
-                        content=content
+                            possible_jobs=qidx_to_job[qidx],
+                            job_to_vectors=job_to_vectors,
+                            content=content
                         ),
-                     weight,
-                     content
+                        weight,
+                        content
                     ) for content, weight in ordered_queries
                 ]
                 # TODO how do we ensure order?
@@ -1189,5 +1181,3 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
-
-
