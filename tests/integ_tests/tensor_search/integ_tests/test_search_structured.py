@@ -28,7 +28,6 @@ from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_
 from marqo.tensor_search import index_meta_cache
 
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchStructured(MarqoTestCase):
 
     @classmethod

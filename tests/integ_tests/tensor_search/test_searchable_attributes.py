@@ -10,7 +10,6 @@ from integ_tests.marqo_test import MarqoTestCase
 import pytest
 
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchableAttributes(MarqoTestCase):
 
     @classmethod

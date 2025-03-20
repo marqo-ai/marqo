@@ -183,7 +183,6 @@ class TestPrefix(MarqoTestCase):
                 self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
                                             embed_res["embeddings"][0]))
 
-    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_prefix_text_chunks_e5(self):
         """Ensures that the default prefix and the request level prefix are applied correctly.
         for the e5-small model."""
