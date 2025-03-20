@@ -8,11 +8,10 @@ from pydantic import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
-
+from marqo.tensor_search.enums import EnvVars
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class BatchVectorisationMode(enum.Enum):
@@ -58,10 +57,6 @@ class AddDocsParams(BaseModel):
     text_chunk_prefix: Optional[str] = None
 
     def __init__(self, **data: Any):
-        # TODO [Refactoring device logic] use device info gathered from device manager
-        # Ensure `None` and passing nothing are treated the same for device
-        if "device" not in data or data["device"] is None:
-            data["device"] = get_best_available_device()
         super().__init__(**data)
 
     @root_validator

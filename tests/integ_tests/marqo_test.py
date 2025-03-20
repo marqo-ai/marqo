@@ -97,7 +97,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True,
                                                deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
+        cls.config = config.Config(vespa_client=vespa_client, 
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
