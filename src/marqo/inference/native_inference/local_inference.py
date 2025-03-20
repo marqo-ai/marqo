@@ -1,6 +1,6 @@
 import marqo.core.inference.api.exceptions as inference_api_exceptions
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.embedding_models.random_model import RandomModel
 from marqo.inference.native_inference.inference_pipeline.hugging_face_model_inference_pipeline import \
     HuggingFaceModelInferencePipeline
@@ -25,7 +25,7 @@ class NativeInferenceLocal(Inference):
         except S2InferenceError as e:
             raise inference_api_exceptions.ModelError(str(e)) from e
 
-        if isinstance(model, OPEN_CLIP):
+        if isinstance(model, OpenCLIPModel):
             return OpenCLIPInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, RandomModel):
             return RandomModelInferencePipeline(model, request).run_pipeline()

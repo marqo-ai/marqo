@@ -68,7 +68,7 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
         return [self.image_preprocessor(image).unsqueeze(0) for image in inputs]
 
 
-class OPEN_CLIP(AbstractCLIPModel):
+class OpenCLIPModel(AbstractCLIPModel):
     def __init__(
             self,
             device: Optional[str] = None,
