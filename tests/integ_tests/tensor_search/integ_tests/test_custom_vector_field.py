@@ -22,7 +22,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Custom settings indexes
         unstructured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
@@ -30,14 +30,14 @@ class TestCustomVectorField(MarqoTestCase):
         )
 
         semi_structured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular
         )
 
         structured_custom_index = cls.structured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
             fields=[
@@ -185,7 +185,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         with self.assertRaises(pydantic.error_wrappers.ValidationError) as err:
             self.create_indexes([self.structured_marqo_index_request(
-                model=Model(name='ViT-B/32'),
+                model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
                 normalize_embeddings=False,
                 distance_metric=DistanceMetric.Angular,
                 fields=[
@@ -1169,7 +1169,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
 
         # Custom settings indexes
         test_unstructured_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=True, #Set normalize_embeddings to True
             distance_metric=DistanceMetric.Angular,
@@ -1177,7 +1177,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
         )
 
         test_semi_structured_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=True,  # Set normalize_embeddings to True
             distance_metric=DistanceMetric.Angular
@@ -1185,7 +1185,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
 
 
         test_structured_index_request = cls.structured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             normalize_embeddings=True,
             distance_metric=DistanceMetric.Angular,
             fields=[

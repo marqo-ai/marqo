@@ -11,6 +11,8 @@ from marqo.inference.native_inference.inference_pipeline.random_model_inference_
 from marqo.inference.native_inference.load_model import load_model
 from marqo.inference.type import *
 from marqo.s2_inference.errors import S2InferenceError
+from marqo.s2_inference.models.model_type import ModelType
+from marqo.s2_inference.no_model_utils import NO_MODEL
 
 
 class NativeInferenceLocal(Inference):
@@ -32,5 +34,14 @@ class NativeInferenceLocal(Inference):
             return RandomModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, HuggingFaceModel):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
+        elif isinstance(model, NO_MODEL):
+            # TODO do we need to create a pipeline class for this?
+            error = f"Cannot vectorise anything with '{ModelType.NO_MODEL}'. " \
+                    f"This model is intended for adding documents and searching with custom vectors only. " \
+                    f"If vectorisation is needed, please use a different model "
+            if request.return_individual_error:
+                return InferenceResult(result=[InferenceErrorModel(error_message=error)for _ in request.contents])
+            else:
+                raise InferenceError(error)
         else:
             raise ValueError(f"Model type {type(model)} not supported")

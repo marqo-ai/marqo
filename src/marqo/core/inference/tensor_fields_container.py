@@ -77,7 +77,7 @@ class TensorField(BaseModel):
         if (not chunks or not embeddings
                 or not isinstance(chunks, list) or not isinstance(chunks[0], str)
                 or not isinstance(embeddings, list) or not isinstance(embeddings[0], list)
-                or not isinstance(embeddings[0][0], float)):
+                or not isinstance(embeddings[0][0], (float, int))):  # custom vector can be integers
             raise ValueError(f'Invalid chunks and embeddings for doc: {self.doc_id}, field: {self.field_name}')
 
         if len(chunks) != len(embeddings):

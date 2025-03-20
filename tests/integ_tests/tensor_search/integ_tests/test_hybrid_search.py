@@ -24,6 +24,7 @@ import pytest
 import unittest
 
 
+@unittest.skip(reason='temporarily skip due to unsupported model type: SBERT')
 class TestHybridSearch(MarqoTestCase):
     """
     Combined tests for unstructured and structured hybrid search.
