@@ -8,6 +8,7 @@ import marqo.api.exceptions as api_exceptions
 import marqo.s2_inference.errors as s2_inference_errors
 from marqo import exceptions as base_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
 from marqo.tensor_search import utils
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -23,9 +24,10 @@ class EmbedContentType(str, Enum):
     Document = "document"
 
 class Embed:
-    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
         self.index_management = index_management
+        self.inference = inference
 
     def embed_content(
             self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
@@ -61,6 +63,7 @@ class Embed:
         from marqo.tensor_search import tensor_search, index_meta_cache
         temp_config = config.Config(
             vespa_client=self.vespa_client,
+            inference=self.inference
         )
         
         # Content validation is done in API model layer

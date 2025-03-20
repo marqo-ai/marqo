@@ -1,27 +1,22 @@
 import os
 import unittest
-import time
+from unittest import mock
 
 import numpy as np
-from unittest import mock
-from unittest.mock import Mock, patch
-from marqo.core.embed.embed import Embed
-from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
+
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.models.embed_request import EmbedRequest
-from marqo.tensor_search import enums
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.api import embed
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
-from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
+from marqo.core.models.marqo_index import FieldFeature
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
     ImagePreProcessing, VideoPreProcessing, AudioPreProcessing, Model, DistanceMetric, VectorNumericType, \
     HnswConfig, TextSplitMethod, IndexType
-from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
-                                                   FieldRequest, MarqoIndexRequest)
-
+from marqo.core.models.marqo_index_request import (FieldRequest)
 from marqo.s2_inference import s2_inference
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.tensor_search import enums
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.api import embed
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 
 
 def pass_through_vectorise(*args, **kwargs):
@@ -132,21 +127,19 @@ class TestPrefix(MarqoTestCase):
                 # A) Add normal text document (1 chunk)
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-                    device=self.config.default_device,
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
                 # B) Add same text document but WITH PREFIX (1 chunk)
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
-                    device=self.config.default_device, text_chunk_prefix="PREFIX: ",
+                    text_chunk_prefix="PREFIX: ",
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
                 # C) Add document with prefix built into text itself (1 chunk)
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_c", "text": "PREFIX: hello"}], auto_refresh=True,
-                    device=self.config.default_device,
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
@@ -192,21 +185,20 @@ class TestPrefix(MarqoTestCase):
                 # A) prefix should default to "passage: " with the e5-small model
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-                    device=self.config.default_device,
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
                 # B) manually set prefix at the request level
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
-                    device=self.config.default_device, text_chunk_prefix="passage: ",
+                    text_chunk_prefix="passage: ",
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
                 # C) Set no prefix 
                 self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_c", "text": "hello"}], auto_refresh=True,
-                    device=self.config.default_device, text_chunk_prefix="custom_prefix: ",
+                    text_chunk_prefix="custom_prefix: ",
                     tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
@@ -367,7 +359,6 @@ class TestPrefix(MarqoTestCase):
         # doc_a should default to the override prefix
         self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.unstructured_index_with_override.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-            device=self.config.default_device,
             tensor_fields=["text"] if isinstance(self.unstructured_index_with_override, UnstructuredMarqoIndex) else None
         ))
 

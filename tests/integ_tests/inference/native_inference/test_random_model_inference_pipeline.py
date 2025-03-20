@@ -3,9 +3,14 @@ import numpy as np
 from integ_tests.inference.inference_test_case import InferenceTestCase
 from integ_tests.marqo_test import TestImageUrls
 from marqo.core.inference.api import *
+from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 
+
 class TestRandomModelInferencePipeline(InferenceTestCase):
+
+    def setUp(self):
+        self.inference = NativeInferenceLocal(device_manager=DeviceManager())
 
     def test_inference_text_no_chunk_no_prefix(self):
         """Test that the pipeline returns the embeddings for the two texts without chunking or prefix."""
@@ -29,7 +34,7 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = NativeInferenceLocal().vectorise(text_inference_request)
+        results = self.inference.vectorise(text_inference_request)
 
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
@@ -80,7 +85,7 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = NativeInferenceLocal().vectorise(image_inference_request)
+        results = self.inference.vectorise(image_inference_request)
 
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
@@ -144,7 +149,7 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         )
 
         # Perform vectorisation
-        native_inference = NativeInferenceLocal()
+        native_inference = self.inference
 
         single_result = native_inference.vectorise(single_inference_request)
         multi_result = native_inference.vectorise(multi_inference_request)

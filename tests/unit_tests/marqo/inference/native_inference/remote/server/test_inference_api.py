@@ -12,6 +12,7 @@ from starlette.status import (
     HTTP_415_UNSUPPORTED_MEDIA_TYPE,
 )
 
+from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceError
 from marqo.inference.native_inference.remote.server.inference_api import app
@@ -154,3 +155,22 @@ class TestInferenceAPI(unittest.TestCase):
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
         self.assertIn("Unsupported Content-Type", unpacked_response["detail"])
+
+    def test_healthz_happy_pass(self):
+        response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
+    @unittest.skip(reason='not supported yet')
+    def test_healthz_fails_if_exception_raised(self):
+        for cuda_exception in [
+            CudaDeviceNotAvailableError('CUDA device(s) have become unavailable'),
+            CudaOutOfMemoryError('CUDA device cuda:0(Tesla T4) is out of memory')
+        ]:
+            with self.subTest(cuda_exception):
+                with patch("marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
+                           side_effect=cuda_exception):
+                    response = self.client.get("/healthz")
+                    self.assertEqual(response.status_code, 503)
+                    self.assertIn(cuda_exception.message, response.json()['message'])
+

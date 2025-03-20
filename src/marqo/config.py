@@ -45,7 +45,7 @@ class Config:
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management)
-        self.embed = Embed(vespa_client, self.index_management)
+        self.embed = Embed(vespa_client, self.index_management, self.inference)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]
