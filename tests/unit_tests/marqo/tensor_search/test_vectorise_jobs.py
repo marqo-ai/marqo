@@ -122,7 +122,7 @@ class TestVectoriseJobs(unittest.TestCase):
 
         with self.assertRaises(InternalError) as context:
             vectorise_jobs(self.inference, [job])
-        self.assertEqual("Individual errors returned when vectorising query: ['a', 'b']",
+        self.assertEqual("Individual errors returned when vectorising query string: ['a: an error']",
                          str(context.exception))
 
     def test_vectorise_jobs_should_raise_internal_error_when_inference_result_is_chunked(self):
@@ -136,7 +136,8 @@ class TestVectoriseJobs(unittest.TestCase):
 
         with self.assertRaises(InternalError) as context:
             vectorise_jobs(self.inference, [job])
-        self.assertEqual("Some query items have multiple chunks: ['a', 'b']",
+        self.assertEqual("Tensor query string should not be chunked but some query items "
+                         "have multiple chunks: [('a', 2)]",
                          str(context.exception))
 
     def test_vectorise_jobs_should_raise_bad_request_error_when_model_error_is_raised(self):
