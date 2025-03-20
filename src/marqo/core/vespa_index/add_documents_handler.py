@@ -6,13 +6,13 @@ from typing import List, Dict, Optional, Any, Tuple, Set
 from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError
-from marqo.core.inference.api import Modality, InferenceError, InferenceRequest, TextPreprocessingConfig, \
+from marqo.core.inference.api import Modality, InferenceRequest, TextPreprocessingConfig, \
     TextChunkConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, ChunkConfig, \
     Inference, ModelConfig, InferenceErrorModel
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.core.models import MarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.logging import get_logger
 from marqo.tensor_search import validation
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -270,6 +270,17 @@ class AddDocumentsHandler(ABC):
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def _vectorise_tensor_fields(self) -> None:
+        """
+        This step vectorises all the unresolved tensor fields.
+        1. It infers modality for each field based on the content, and index settings.
+            * For unstructured index, it infers modality based on the treat_url_as_image or media config
+            * For structured, it also checks is the modality matches the field type defined in the index setting
+        2. For each modality, we collect the fields and send to Inference for vectorisation, up to 2 times
+            * The first time is for top level tensor fields
+            * The second time is for subfields of multi-modal combo fields
+        3. The result will be then populated to the tensor field. Individual errors happened during preprocessing
+            and vectorisation will also be returned and collected by the `add_docs_response_collector`
+        """
         modalities = self._infer_modalities()
 
         for modality in modalities:
@@ -350,9 +361,12 @@ class AddDocumentsHandler(ABC):
                     AddDocumentsError(error_message=r.error_message, error_code=r.error_code, status_code=r.status_code)
                 )
             else:
+                # unzip the result for each content. format of r is [(chunk1, embedding1), (chunk2, embedding2)]
+                # after the unzipping, chunks is (chunk1, chunk2), embeddings is (embedding1, embedding2)
+                chunks, embeddings = zip(*r)
                 field.populate_chunks_and_embeddings(
-                    chunks=[chunk for chunk, _ in r],
-                    embeddings=[embedding.tolist() for _, embedding in r],
+                    chunks=list(chunks),
+                    embeddings=[embedding.tolist() for embedding in embeddings],
                     for_top_level_field=for_top_level_field
                 )
 
