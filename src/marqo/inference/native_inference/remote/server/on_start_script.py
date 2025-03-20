@@ -18,7 +18,6 @@ from marqo.logging import get_logger
 # TODO remove deps of s2_inference
 from marqo.s2_inference.constants import PATCH_MODELS
 from marqo.s2_inference.processing.image import chunk_image
-from marqo.s2_inference.s2_inference import vectorise
 
 # TODO remove these deps
 from marqo.tensor_search import constants
