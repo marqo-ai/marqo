@@ -2,19 +2,19 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
-from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.logging import get_logger
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
 
@@ -24,7 +24,6 @@ class Config:
             self,
             vespa_client: VespaClient,
             zookeeper_client: Optional[ZookeeperClient] = None,
-            default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
@@ -41,9 +40,6 @@ class Config:
 
         self.timeout = timeout
         self.backend = backend if backend is not None else enums.SearchDb.vespa
-        # TODO [Refactoring device logic] deprecate default_device since it's not used
-        self.default_device = default_device if default_device is not None else (
-            utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE))
 
         # Initialize Core layer dependencies
         deployment_lock_timeout = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT)
@@ -51,12 +47,13 @@ class Config:
                                                 enable_index_operations=True,
                                                 deployment_lock_timeout_seconds=deployment_lock_timeout)
 
-        self.inference = NativeInferenceLocal()
+        inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+        self.inference = NativeInferenceClient(inference_server_url)
+        # self.inference = NativeInferenceLocal()
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management)
-        self.embed = Embed(vespa_client, self.index_management, self.default_device)
-        self.device_manager = DeviceManager()
+        self.embed = Embed(vespa_client, self.index_management)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

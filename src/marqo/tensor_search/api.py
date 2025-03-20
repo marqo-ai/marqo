@@ -15,6 +15,7 @@ from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
@@ -27,7 +28,6 @@ from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
@@ -62,10 +62,7 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    # Determine default device
-    default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
-
-    return config.Config(vespa_client, zookeeper_client, default_device)
+    return config.Config(vespa_client, zookeeper_client)
 
 
 _config = generate_config()

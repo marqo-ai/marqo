@@ -1,3 +1,15 @@
+"""
+This test file is completely obsolete and skipped. 
+
+All default device logic has been removed from the codebase:
+1. There is no more MARQO_BEST_AVAILABLE_DEVICE environment variable
+2. The get_best_available_device() function has been removed
+3. Device validation has been removed as inference runs in a separate service
+4. Device parameters are now optional - if not provided, a downstream service will pick the appropriate device
+
+These tests are kept for historical reference only.
+"""
+
 import os
 import unittest
 
@@ -9,7 +21,11 @@ from integ_tests.marqo_test import MarqoTestCase
 from unittest.mock import patch, ANY
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.utils import get_best_available_device
+# Note: get_best_available_device function has been removed
+# from marqo.tensor_search.utils import get_best_available_device
+
+# This test is skipped and obsolete since Marqo no longer picks default devices
+# All device parameters must be explicitly provided
 @unittest.skip
 class TestDefaultDevice(MarqoTestCase):
 

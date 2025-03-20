@@ -1,3 +1,4 @@
+from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.inference_pipeline.open_clip_inference_pipeline import OpenCLIPInferencePipeline
 from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.inference.native_inference.load_model import load_model
@@ -13,13 +14,17 @@ from marqo.s2_inference.no_model_utils import NO_MODEL
 
 class NativeInferenceLocal(Inference):
 
+    def __init__(self, device_manager: DeviceManager):
+        self.device_manager = device_manager
+
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         try:
             model = load_model(
                 model_name=request.model_config.model_name,
                 model_properties=request.model_config.model_properties,
                 model_auth=request.model_config.model_auth,
-                device=request.device
+                # TODO improve this to validate the device passed in from client
+                device=request.device or self.device_manager.best_available_device_type.value
             )
         except S2InferenceError as e:
             raise inference_api_exceptions.ModelError(str(e)) from e
