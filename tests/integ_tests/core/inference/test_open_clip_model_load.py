@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.model_registry import _get_open_clip_properties
@@ -31,12 +31,12 @@ class TestOpenCLIPModelLoad(TestCase):
             "dimensions": 512
         }
 
-        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
+        with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OpenCLIPModel._load_model_and_image_preprocessor_from_checkpoint", \
                    return_value=(MagicMock(), MagicMock())) as mock_load_method:
-            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OPEN_CLIP._load_tokenizer_from_checkpoint",
+            with patch("marqo.inference.native_inference.embedding_models.open_clip_model.OpenCLIPModel._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                    model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_load_method.assert_called_once()
                     mock_load_tokenizer.assert_called_once()
@@ -56,7 +56,7 @@ class TestOpenCLIPModelLoad(TestCase):
                     as mock_tokenizer:
                 with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                         model.load()
                         mock_create_model.assert_called_once_with(
                             model_name="ViT-B-108",
@@ -92,7 +92,7 @@ class TestOpenCLIPModelLoad(TestCase):
                     as mock_tokenizer:
                 with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                         model.load()
                         mock_create_model.assert_called_once_with(
                             model_name="test-siglip",
@@ -124,7 +124,7 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                    model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_create_model.assert_called_once_with(
                         model_name="hf-hub:my_test_hub",
@@ -146,7 +146,7 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                    model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_create_model.assert_called_once_with(
                         model_name="ViT-B-32",
@@ -166,7 +166,7 @@ class TestOpenCLIPModelLoad(TestCase):
         }
 
         with self.assertRaises(InvalidModelPropertiesError) as context:
-            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model = OpenCLIPModel(model_properties=model_properties, device="cpu")
             model.load()
 
         self.assertIn("validation error", str(context.exception))
@@ -183,7 +183,7 @@ class TestOpenCLIPModelLoad(TestCase):
         }
 
         with self.assertRaises(InvalidModelPropertiesError) as context:
-            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model = OpenCLIPModel(model_properties=model_properties, device="cpu")
             model.load()
 
         self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'CLIPA'", str(context.exception))
@@ -204,7 +204,7 @@ class TestOpenCLIPModelLoad(TestCase):
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     with patch("marqo.inference.native_inference.embedding_models.open_clip_model.os.path.exists",
                                return_value=True) as mock_path_exists:
-                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model = OpenCLIPModel(model_properties=model_properties, device="cpu")
                         model.load()
                         mock_create_model.assert_called_once_with(
                             model_name="ViT-B-32",
@@ -240,7 +240,7 @@ class TestOpenCLIPModelLoad(TestCase):
         with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
             with self.assertRaises(RuntimeError):
-                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model = OpenCLIPModel(model_properties=model_properties, device="cpu", model_auth=model_auth)
                 model.load()
 
             mock_download_model.assert_called_once_with(
@@ -269,7 +269,7 @@ class TestOpenCLIPModelLoad(TestCase):
         with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
             with self.assertRaises(RuntimeError) as e:
-                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model = OpenCLIPModel(model_properties=model_properties, device="cpu", model_auth=model_auth)
                 model.load()
 
             mock_download_model.assert_called_once_with(
@@ -285,5 +285,5 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e32-46683a32.pt",
             "dimensions": 512
         }
-        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+        model = OpenCLIPModel(model_properties=model_properties, device="cpu")
         model.load()

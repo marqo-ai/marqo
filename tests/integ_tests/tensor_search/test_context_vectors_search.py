@@ -54,7 +54,6 @@ class TestContextVectors(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_search(self):
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             with self.subTest(msg=index_name):
@@ -66,7 +65,6 @@ class TestContextVectors(MarqoTestCase):
                                                **{"tensor": [{"vector": [1, ] * self.DIMENSION, "weight": 2},
                                                              {"vector": [2, ] * self.DIMENSION, "weight": -1}]}))
 
-    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_search_with_incorrect_tensor_dimension(self):
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             with self.subTest(msg=index_name):
@@ -89,7 +87,6 @@ class TestContextVectors(MarqoTestCase):
                 self.assertIn("This is not supported as the context only works when the query is a dictionary.",
                               str(e.exception.message))
 
-    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_search_score(self):
         """Test to ensure that the score is the same for the same query with different context vectors combinations."""
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:

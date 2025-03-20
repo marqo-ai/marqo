@@ -811,7 +811,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 norm = np.linalg.norm(np.array(embeddings))
                 self.assertTrue(norm - 1.0 < 1e-5, f"Embedding norm is {norm}")
 
-    @unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
     def test_textIndexEmbeddingsUnnormalized(self):
         """A test to ensure that the text embeddings are unnormalised when the index is unnormalised"""
         documents = [

@@ -23,7 +23,8 @@ from marqo.api.exceptions import InvalidArgError
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
+
+@unittest.skip(reason='temporarily skip due to unsupported model type: test_prefix')
 class TestEmbed(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:

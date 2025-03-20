@@ -7,7 +7,7 @@ class AbstractPreprocessor(ABC):
     """This is the abstract base class for all preprocessors in Marqo."""
 
     @abstractmethod
-    def preprocess(self, inputs, modality: Modality) -> list[Tensor]:
+    def preprocess(self, inputs: list, modality: Modality) -> list:
         """Preprocess the input data.
 
         Args:

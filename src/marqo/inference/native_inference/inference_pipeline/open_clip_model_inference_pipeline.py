@@ -1,17 +1,18 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
     download_and_preprocess_image
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
 OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
 
 
-class OpenCLIPInferencePipeline(AbstractInferencePipeline):
+class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
+    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor,)
     MAX_BATCH_SIZE = 16
 
-    def __init__(self, model: OPEN_CLIP, inference_request: InferenceRequest):
+    def __init__(self, model: OpenCLIPModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
 
@@ -59,22 +60,23 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
         content_to_encode: List[Tensor] = self._collect_valid_content_to_encode(preprocessed_content_list)
-        if len(content_to_encode) > 0:
-            embeddings = []
-            for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-                batch: List[Tensor] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
-                batch_embeddings: List[ndarray] = self.model.encode(
-                    inputs=batch,
-                    modality=self.inference_request.modality,
-                    normalize=self.inference_request.model_config.normalize_embeddings)
-                embeddings.extend([embeddings for embeddings in batch_embeddings])
-
-            if len(embeddings) != len(content_to_encode):
-                raise ValueError("The number of embeddings does not match the number of contents")
-
-            return embeddings
-        else:
+        if not content_to_encode:
             return []
+
+        embeddings: List[ndarray] = []
+        for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
+            batch: List[Tensor] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+            batch_embeddings: List[ndarray] = self.model.encode(
+                inputs=batch,
+                modality=self.inference_request.modality,
+                normalize=self.inference_request.model_config.normalize_embeddings
+            )
+            embeddings.extend(batch_embeddings)
+
+        if len(embeddings) != len(content_to_encode):
+            raise ValueError("The number of embeddings does not match the number of contents")
+
+        return embeddings
 
     def _collect_valid_content_to_encode(self, preprocessed_content: list[OpenCLIPPreprocessedContent]) -> list[Tensor]:
         """
@@ -93,17 +95,22 @@ class OpenCLIPInferencePipeline(AbstractInferencePipeline):
             unexpected content type.
         """
         valid_content_to_encode = []
-        valid_content_to_encode_type = (Tensor, )
 
         for chunk in preprocessed_content:
             if isinstance(chunk, list):
                 for _, content_to_encode in chunk:
-                    if isinstance(content_to_encode, valid_content_to_encode_type):
+                    if isinstance(content_to_encode, self.VALID_CONTENT_TO_ENCODE_TYPE):
                         valid_content_to_encode.append(content_to_encode)
                     else:
-                        raise ValueError(f"Expected {valid_content_to_encode_type} but got {type(content_to_encode)}")
+                        raise ValueError(
+                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but got "
+                            f"{type(content_to_encode)}"
+                        )
             elif isinstance(chunk, InferenceErrorModel):
                 continue
+            else:
+                raise ValueError(f"Unexpected content type: {type(chunk)}. "
+                                 f"Should be a list of tuples or an InferenceError")
         return valid_content_to_encode
 
 
