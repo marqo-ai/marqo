@@ -19,7 +19,7 @@ msgpack_numpy.patch()
 logger = logging.get_logger(__name__)
 
 _config = Config()
-if __name__ in ["__main__", "api"]:
+if __name__ in ["__main__", "inference_api"]:
     on_start(_config)
 app = FastAPI(
     name='Marqo Inference',
