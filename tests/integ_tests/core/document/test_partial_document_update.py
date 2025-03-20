@@ -21,7 +21,7 @@ from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestUpdate(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -422,7 +422,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(TestImageUrls.IMAGE2.value,
                          updated_doc["image_pointer_field"])
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_update_multimodal_image_field(self):
         """
         Test that updating an image field in a multimodal context properly embeds the image as an image and not as text.

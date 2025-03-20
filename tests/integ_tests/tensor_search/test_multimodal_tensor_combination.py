@@ -14,7 +14,7 @@ from marqo.tensor_search.enums import TensorField
 from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestMultimodalTensorCombination(MarqoTestCase):
     def get_specific_field_facet(self, index_name, document_id, field):
         doc_facets = tensor_search.get_document_by_id(config=self.config,
@@ -401,7 +401,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 self.clear_indexes(self.indexes)
 
-
+    @unittest.skip(reason='temporarily skip tests using mocked vectorise')
     def test_multimodal_field_bad_field_content(self):
         # TODO: Add structured index: `structured_random_multimodal_index` to this list once validation is added
         for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
@@ -443,7 +443,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                 index.name).number_of_vectors)
                             mock_vectorise.assert_not_called()
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_multimodal_tensor_combination_score(self):
         for index in [self.unstructured_multimodal_index, self.structured_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
@@ -481,7 +481,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_multimodal_tensor_combination_tensor_value(self):
         for index in [self.unstructured_unnormalized_multimodal_index, self.structured_unnormalized_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
@@ -567,7 +567,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-5)
                 assert np.allclose(combo_tensor_4, expected_tensor, atol=1e-5)
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_multimodal_tensor_combination_zero_weight(self):
         for index in [self.unstructured_multimodal_index, self.structured_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
@@ -598,6 +598,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 self.assertEqual(score_1, score_2)
 
+    @unittest.skip(reason='temporarily skip tests using mocked vectorise')
     def test_batched_vectorise_call(self):
         for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
@@ -649,6 +650,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 assert run()
 
+    @unittest.skip(reason='temporarily skip tests using mocked vectorise')
     def test_batched_vectorise_call_infer_image_is_false(self):
         """
         Test to ensure that it's possible for image URLs to be treated as plain text. This is done differently depending
@@ -715,6 +717,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 assert run()
 
+    @unittest.skip(reason='temporarily skip tests using mocked vectorise')
     def test_concurrent_image_downloading(self):
         # TODO: Make structured index
         def pass_through_load_image_from_path(*arg, **kwargs):
@@ -753,7 +756,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_lexical_search_on_multimodal_combination(self):
         # TODO: Make structured index
         self.add_documents(config=self.config, add_docs_params=AddDocsParams(

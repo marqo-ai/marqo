@@ -131,7 +131,7 @@ class TestVectoriseInferenceCache(unittest.TestCase):
             _ = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
             mock_encode.assert_called_once()
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_vectorise_cacheWorkForImagePath(self):
         """Test if the cache works for image paths."""
         vectorise = self._import_vectorise_with_inference_cache()

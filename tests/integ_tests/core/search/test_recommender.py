@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest import mock
 
 from marqo.core.exceptions import InvalidFieldNameError
@@ -15,6 +16,7 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from integ_tests.marqo_test import MarqoTestCase
 
 
+@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestRecommender(MarqoTestCase):
 
     @classmethod

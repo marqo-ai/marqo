@@ -1,4 +1,3 @@
-import enum
 from typing import List
 from typing import Optional, Union, Any, Sequence
 
@@ -8,17 +7,10 @@ from pydantic import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
-
+from marqo.tensor_search.enums import EnvVars
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
-
-
-class BatchVectorisationMode(enum.Enum):
-    PER_FIELD = 'per_field'
-    PER_DOCUMENT = 'per_document'
-    PER_BATCH = 'per_batch'
 
 
 class AddDocsParams(BaseModel):
@@ -36,8 +28,6 @@ class AddDocsParams(BaseModel):
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
         text_chunk_prefix: an optional prefix to add to each text chunk
-        batch_vectorisation_mode: choose how we batch vectorisation requests to the embedding model.
-                                  supports per_field, per_document and per_batch [Experimental]
     """
 
     class Config:
@@ -58,8 +48,6 @@ class AddDocsParams(BaseModel):
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
     text_chunk_prefix: Optional[str] = None
-    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
-    batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
         # TODO [Refactoring device logic] use device info gathered from device manager

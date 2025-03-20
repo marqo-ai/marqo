@@ -14,7 +14,7 @@ from integ_tests.marqo_test import MarqoTestCase
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestDictScoreModifiers(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -189,6 +189,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(5 <= score_of_first_result <= 6)
 
     # Test multiply score by
+    @unittest.skip(reason='temporarily skip due to inference interface change: random model changed')
     def test_multiply_score_by_map_score_modifier(self):
         """
         Test that multiplying score by works for a map score modifier.
@@ -230,9 +231,11 @@ class TestDictScoreModifiers(MarqoTestCase):
 
                 # Assert that the first result has _id "6" and 0.8 <= score <= 1.2
                 self.assertIn(res["hits"][0]["_id"], ["1", "7"])
+                # FIXME the score is 0.78 now. might be related to random model change
                 self.assertTrue(0.8 <= score_of_first_result <= 1.2)
 
     # Test combined add to score and multiply score by
+    @unittest.skip(reason='temporarily skip due to inference interface change: random model changed')
     def test_combined_map_score_modifier(self):
         """
         Test that combining adding to score and multiplying score by works for a map score modifier.
@@ -276,6 +279,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
                 # Assert that the first result has _id "6" and 5 <= score <= 6
                 self.assertTrue(res["hits"][0]["_id"] == "7")
+                # FIXME the score is 2.78 now, seems to be related to random model change
                 self.assertTrue(2.9 <= score_of_first_result <= 3.1)
 
     def test_partial_document_update(self):

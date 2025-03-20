@@ -27,7 +27,7 @@ def get_absolute_file_path(filename: str) -> str:
     return abspath
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -324,7 +324,8 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestOpenClipModelEncoding(unittest.TestCase):
     '''
     This test is for open clip models as they are heavily used in production.

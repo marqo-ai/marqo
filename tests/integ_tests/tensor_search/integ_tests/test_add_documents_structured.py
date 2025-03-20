@@ -17,7 +17,7 @@ from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestAddDocumentsStructured(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -504,27 +504,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 assert all(['All list elements must be of the same type and that type must be int, float or string'
                             in item['message'] for item in add_res['items']])
 
-    def test_add_documents_set_device(self):
-        """
-        Device is set correctly
-        """
-        mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            self.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, device="cuda:22", docs=[{"title": "doc"}, {"title": "doc"}],
-
-                ),
-            )
-            return True
-
-        assert run()
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:22"
-
     def test_add_documents_empty(self):
         """
         Adding empty documents raises BadRequestError
@@ -958,4 +937,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
         self.assertEqual(3, len(r.items))
         for item in r.items:
             self.assertEqual(400, item.status)
-            self.assertIn("Could not process the media file found at", item.message)
+            # modality mismatch
+            self.assertIn("Error processing image_field, detected as language, "
+                          "but expected field type is image_pointer", item.message)

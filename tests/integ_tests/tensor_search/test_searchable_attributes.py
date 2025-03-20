@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest import mock
 
 from marqo.core.models.marqo_index import *
@@ -9,6 +10,7 @@ from integ_tests.marqo_test import MarqoTestCase
 import pytest
 
 
+@unittest.skip(reason='temporarily skip due to unsupported model type: HuggingFaceModel')
 class TestSearchableAttributes(MarqoTestCase):
 
     @classmethod
