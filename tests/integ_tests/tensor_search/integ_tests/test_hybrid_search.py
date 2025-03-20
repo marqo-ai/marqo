@@ -21,6 +21,8 @@ from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 import pytest
 
+import unittest
+
 
 class TestHybridSearch(MarqoTestCase):
     """
@@ -31,7 +33,7 @@ class TestHybridSearch(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         semi_structured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='sentence-transformers/all-MiniLM-L6-v2')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
         semi_structured_default_image_index = cls.unstructured_marqo_index_request(
@@ -45,13 +47,13 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         semi_structured_text_index_2_14 = cls.unstructured_marqo_index_request(
-            model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
+            model=Model(name='hf/all-MiniLM-L6-v2'),
             marqo_version='2.14.0'
         )
 
         # Legacy UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
+            model=Model(name='hf/all-MiniLM-L6-v2'),
             marqo_version='2.12.0'
         )
 
@@ -90,7 +92,7 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         structured_text_index_score_modifiers = cls.structured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -124,7 +126,7 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         structured_index_empty = cls.structured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[],
             tensor_fields=[]
         )

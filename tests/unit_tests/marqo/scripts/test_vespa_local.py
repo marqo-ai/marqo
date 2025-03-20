@@ -1,16 +1,10 @@
-import io
-import math
+import builtins
 import os
 import tempfile
-import unittest
-import yaml
-import docker
-from xml.etree import ElementTree as ET
-from xml.dom import minidom
 from unittest.mock import patch, mock_open, call
-from unit_tests.marqo_test import MarqoTestCase
+
 from scripts.vespa_local.vespa_local import VespaLocalSingleNode, VespaLocalMultiNode
-import builtins
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestVespaLocal(MarqoTestCase):

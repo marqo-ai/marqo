@@ -12,6 +12,8 @@ from unittest.mock import patch
 import os
 import pprint
 
+import unittest
+
 
 class TestGetDocument(MarqoTestCase):
 
