@@ -53,7 +53,7 @@ class ImagePreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for image modality"""
     modality: Literal[Modality.IMAGE] = Modality.IMAGE
     download_timeout_ms: int = pydantic.Field(default=3000, alias='downloadTimeoutMs')  # default to 3000ms
-    download_thread_count: int = pydantic.Field(default=10, alias='downloadThreadCount')
+    download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
 
     # image chunking TODO this is going away in future versions

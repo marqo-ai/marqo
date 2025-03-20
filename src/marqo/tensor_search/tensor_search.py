@@ -760,11 +760,11 @@ def _get_preprocessing_config(modality: Modality, media_download_headers: Option
     if modality == Modality.TEXT:
         return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
-        return ImagePreprocessingConfig(download_header=media_download_headers)
+        return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.AUDIO:
-        return AudioPreprocessingConfig(download_header=media_download_headers)
+        return AudioPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.VIDEO:
-        return VideoPreprocessingConfig(download_header=media_download_headers)
+        return VideoPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     else:
         raise InferenceError(f'Unsupported modality: {modality}')
 
