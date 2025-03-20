@@ -152,12 +152,12 @@ class CacheModels:
                 self.logger.debug(f"Loading model: {model} on device: {device}")
 
                 # warm it up
-                _ = self._preload_model(model=model, content=test_string, device=device)
+                # _ = self._preload_model(model=model, content=test_string, device=device)
 
                 t = 0
                 for n in range(N):
                     t0 = time.time()
-                    _ = self._preload_model(model=model, content=test_string, device=device)
+                    # _ = self._preload_model(model=model, content=test_string, device=device)
                     t1 = time.time()
                     t += (t1 - t0)
                 message = f"{(t) / float((N))} for {model} and {device}"

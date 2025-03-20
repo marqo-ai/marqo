@@ -6,6 +6,7 @@ from marqo.core.inference.api import Inference, InferenceRequest, InferenceResul
 
 # TODO move device manager to native_inference
 from marqo.core.inference.device_manager import DeviceManager
+from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 
 
 class Config:
@@ -20,27 +21,5 @@ class Config:
         # TODO load env vars to this class and expose them as properties
 
         self.device_manager: DeviceManager = DeviceManager()
-        self.local_inference: Inference = DummyInference()
+        self.local_inference: Inference = NativeInferenceLocal(device_manager=self.device_manager)
 
-
-class DummyInference(Inference):
-    def __init__(self, model_dimension: int = 512, chunks: int = 2, error_on_prefix: Optional[str] = None):
-        self.model_dimension = model_dimension
-        self.chunks = chunks
-        self.error_on_prefix = error_on_prefix
-
-    def vectorise(self, request: InferenceRequest) -> InferenceResult:
-        results = []
-        for content in request.contents:
-            try:
-                if self.error_on_prefix and content.startswith(self.error_on_prefix):
-                    raise Exception(content)
-                if request.preprocessing_config.should_chunk:
-                    results.append([(f'chunk_{i}', np.random.rand(self.model_dimension)) for i in range(self.chunks)])
-                else:
-                    results.append([(content, np.random.rand(self.model_dimension))])
-            except Exception as e:
-                # If an error occurs for this specific content, add an InferenceError.
-                results.append(InferenceError(f"Error processing content: {content}. Error: {str(e)}"))
-
-        return InferenceResult(result=results)

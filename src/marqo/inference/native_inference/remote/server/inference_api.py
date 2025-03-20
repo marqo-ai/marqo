@@ -129,4 +129,4 @@ def _check_content_type_msgpack(request):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8881)
+    uvicorn.run(app, host="0.0.0.0", port=8881)

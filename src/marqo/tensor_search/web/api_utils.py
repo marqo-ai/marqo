@@ -141,5 +141,4 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         use_existing_tensors=use_existing_tensors, media_download_headers=media_download_headers,
         image_download_thread_count=image_download_thread_count,
         mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix,
-        batch_vectorisation_mode=body.batchVectorisationMode,
     )
