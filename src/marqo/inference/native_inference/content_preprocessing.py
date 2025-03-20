@@ -47,11 +47,10 @@ def split_prefix_preprocess_text(
             preprocessor is a text preprocessor from HuggingFace that returns strings.
 
             The output will be
-            The output will be
                 [
                     [
                         ("This is a", "prefix: this is a"),
-                        ("a test sentence", "prefix: a test sentece")
+                        ("a test sentence", "prefix: a test sentence")
                     ], # 2 chunks for the first content
                     [
                         ("Test", "prefix: Test")
