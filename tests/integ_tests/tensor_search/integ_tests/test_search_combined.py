@@ -371,7 +371,7 @@ class TestSearch(MarqoTestCase):
                         if expected_id:
                             self.assertEqual(expected_id, res["hits"][0]["_id"])
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_filtering_list_case_image(self):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
@@ -1038,7 +1038,7 @@ class TestSearch(MarqoTestCase):
                     self.assertIn("Error downloading media file", str(e.exception))
                     self.assertIn("403 Client Error", str(e.exception))
 
-    @unittest.skip(reason='temporarily skip due to inference interface change')
+    
     def test_search_invalid_image_url_image_return_proper_error(self):
         """A test to ensure that InvalidArgumentError is raised when searching for an invalid image url."""
         test_queries_list = [

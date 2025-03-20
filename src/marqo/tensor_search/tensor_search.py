@@ -45,6 +45,10 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
+    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
+    ModelError, InferenceErrorModel
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
@@ -53,10 +57,10 @@ from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.exceptions import InternalError
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.reranking import rerank
-from marqo.s2_inference.s2_inference import infer_modality, Modality
 from marqo.tensor_search import delete_docs
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation
@@ -714,7 +718,7 @@ def assign_query_to_vector_job(
                 normalize_embeddings=index_info.normalize_embeddings,
                 media_download_headers=q.mediaDownloadHeaders,
                 model_auth=q.modelAuth,
-                modality = modality
+                modality=modality
             )
             # If exists, add content to vector job. Otherwise create new
             if jobs.get(vector_job.groupby_key()) is not None:
@@ -752,43 +756,66 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     return qidx_to_job, jobs
 
 
-def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[float]]]:
-    """ Run s2_+inference.vectorise() on against each vector jobs.
-    TODO: return a mapping of mapping: <JHash: <content: vector> >
-    """
+def _get_preprocessing_config(modality: Modality, media_download_headers: Optional[Dict[str, str]]):
+    if modality == Modality.TEXT:
+        return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
+    elif modality == Modality.IMAGE:
+        return ImagePreprocessingConfig(download_header=media_download_headers)
+    elif modality == Modality.AUDIO:
+        return AudioPreprocessingConfig(download_header=media_download_headers)
+    elif modality == Modality.VIDEO:
+        return VideoPreprocessingConfig(download_header=media_download_headers)
+    else:
+        raise InferenceError(f'Unsupported modality: {modality}')
+
+
+def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[float]]]:
+    """ Run inference.vectorise() against each vector jobs."""
     result: Dict[JHash, Dict[str, List[float]]] = dict()
     for v in jobs:
-        # TODO: Handle exception for single job, and allow others to run.
+        if not v.content:
+            continue
         try:
-            if v.content:
-                modality = infer_modality(
-                    v.content[0] if isinstance(v.content, list) else v.content,
-                    media_download_headers=v.media_download_headers
-                )
-                vectors = s2_inference.vectorise(
-                    model_name=v.model_name, model_properties=v.model_properties,
-                    content=v.content, device=v.device,
-                    normalize_embeddings=v.normalize_embeddings,
-                    media_download_headers=v.media_download_headers,
+            inference_request = InferenceRequest(
+                modality=v.modality,
+                contents=v.content,
+                model_config=ModelConfig(
+                    model_name=v.model_name,
+                    model_properties=v.model_properties,
                     model_auth=v.model_auth,
-                    enable_cache=True,
-                    modality=modality
-                )
-                result[v.groupby_key()] = dict(zip(v.content, vectors))
+                    normalize_embeddings=v.normalize_embeddings,
+                ),
+                device=v.device,
+                use_inference_cache=True,
+                return_individual_error=False,
+                preprocessing_config=_get_preprocessing_config(v.modality, v.media_download_headers),
+            )
 
-        # TODO: This is a temporary addition.
-        except (s2_inference_errors.UnknownModelError,
-                s2_inference_errors.InvalidModelPropertiesError,
-                s2_inference_errors.ModelLoadError,
-                s2_inference.ModelDownloadError) as e:
+            inference_result = inference.vectorise(inference_request)
+
+            # Sanity check the response from Inference
+            if len(inference_result.result) != len(v.content):
+                raise InternalError(f'Inference result contains embeddings for {len(inference_result.result)} '
+                                    f'query items, but {len(v.content)} is expected')
+            if any([isinstance(r, InferenceErrorModel) for r in inference_result.result]):
+                raise InternalError(f'Individual errors returned when vectorising query: {v.content}')
+            if any([len(chunks) > 1 for chunks in inference_result.result]):
+                raise InternalError(f'Some query items have multiple chunks: {v.content}')
+
+            # The per_content_result format is [('chunk', np.array())]
+            vectors = [per_content_result[0][1].tolist() for per_content_result in inference_result.result]
+            result[v.groupby_key()] = dict(zip(v.content, vectors))
+
+        except ModelError as e:
             raise api_exceptions.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(e)}',
                 link=marqo_docs.list_of_models()
             ) from e
 
-        except s2_inference_errors.S2InferenceError as e:
+        except InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
-            raise api_exceptions.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}') from e
+            raise api_exceptions.InvalidArgError(message=f'Error vectorising content: {v.content}. '
+                                                         f'Message: {e.message}') from e
     return result
 
 
@@ -965,7 +992,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
     # TODO: we need to enable str/PIL image structure:
-    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(list(jobs.values()))
+    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(

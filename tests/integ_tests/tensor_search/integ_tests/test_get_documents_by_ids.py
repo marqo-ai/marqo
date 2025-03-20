@@ -19,7 +19,7 @@ from marqo.tensor_search import tensor_search
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestGetDocuments(MarqoTestCase):
 
     @classmethod

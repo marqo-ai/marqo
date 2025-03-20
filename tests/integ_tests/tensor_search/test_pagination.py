@@ -22,7 +22,7 @@ from integ_tests.marqo_test import MarqoTestCase
 from integ_tests.utils.transition import add_docs_caller
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestPagination(MarqoTestCase):
 
     @classmethod

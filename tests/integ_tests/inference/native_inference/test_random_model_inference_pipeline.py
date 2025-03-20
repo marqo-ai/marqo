@@ -103,3 +103,60 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         self.assertTrue(isinstance(results_2[0][1], np.ndarray))
         self.assertEqual((32, ), results_2[0][1].shape)
         self.assertEqual(TestImageUrls.IMAGE2.value, results_2[0][0])
+
+    def test_to_ensure_same_content_generate_same_embeddings(self):
+        """Ensure that the same content generates the same embeddings,
+        whether it is in a list with other content or on its own."""
+
+        # Common parameters
+        device = "cpu"
+        model_config = ModelConfig(
+            model_name="random/small",
+            normalize_embeddings=True,
+            model_properties={
+                "name": "random/small",
+                "dimensions": 32,
+                "tokens": 128,
+                "type": "random",
+                "notes": ""
+            }
+        )
+
+        # The text we want to check
+        target_text = "consistent text"
+
+        # First inference request: single item list
+        single_inference_request = InferenceRequest(
+            modality=Modality.TEXT,
+            contents=[target_text],
+            device=device,
+            model_config=model_config,
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False)
+        )
+
+        # Second inference request: target_text in the middle of other inputs
+        multi_inference_request = InferenceRequest(
+            modality=Modality.TEXT,
+            contents=["another text", target_text, "yet another text"],
+            device=device,
+            model_config=model_config,
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False)
+        )
+
+        # Perform vectorisation
+        native_inference = NativeInferenceLocal()
+
+        single_result = native_inference.vectorise(single_inference_request)
+        multi_result = native_inference.vectorise(multi_inference_request)
+
+        # Extract embeddings from the inference result
+        # single_result.result = [[(content, embedding)]]
+        single_embedding = single_result.result[0][0][1]  # (content, embedding)
+        multi_embedding = multi_result.result[1][0][1]
+
+        other_embedding_1 = multi_result.result[0][0][1]
+        other_embedding_2 = multi_result.result[2][0][1]
+
+        self.assertTrue(np.allclose(single_embedding, multi_embedding))
+        self.assertFalse(np.allclose(single_embedding, other_embedding_1))
+        self.assertFalse(np.allclose(single_embedding, other_embedding_2))

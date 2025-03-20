@@ -23,7 +23,7 @@ import pytest
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestHybridSearch(MarqoTestCase):
     """
     Combined tests for unstructured and structured hybrid search.

@@ -23,7 +23,7 @@ from marqo.api.exceptions import InvalidArgError
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestEmbed(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:

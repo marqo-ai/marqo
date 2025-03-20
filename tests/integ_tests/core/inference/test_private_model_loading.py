@@ -9,7 +9,7 @@ from marqo.tensor_search.models.index_settings import IndexSettings
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestPrivateModelLoading(MarqoTestCase):
     """A test class for loading private models end to end in Marqo."""
 

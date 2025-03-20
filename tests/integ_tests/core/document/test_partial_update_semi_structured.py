@@ -10,7 +10,7 @@ from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldT
 from marqo.tensor_search import tensor_search
 
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestPartialUpdate(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:

@@ -14,7 +14,7 @@ from integ_tests.marqo_test import MarqoTestCase
 
 import unittest
 
-@unittest.skip(reason='temporarily skip due to inference interface change')
+
 class TestDictScoreModifiers(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
