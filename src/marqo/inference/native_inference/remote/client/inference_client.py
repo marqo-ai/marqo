@@ -12,7 +12,7 @@ msgpack_numpy.patch()
 logger = logging.get_logger(__name__)
 
 
-class NativeInferenceServerClient(Inference):
+class NativeInferenceClient(Inference):
     def __init__(self, base_url: str):
         """
         Args:
