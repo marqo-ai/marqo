@@ -7,7 +7,7 @@ from marqo.inference.type import *
 OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
 
 
-class OpenCLIPInferencePipeline(AbstractInferencePipeline):
+class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
     VALID_CONTENT_TO_ENCODE_TYPE = (Tensor,)
     MAX_BATCH_SIZE = 16
