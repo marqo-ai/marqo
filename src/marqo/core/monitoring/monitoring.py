@@ -1,7 +1,5 @@
 from typing import Optional
 
-import torch
-
 import marqo.logging
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.index_management.index_management import IndexManagement
@@ -154,6 +152,7 @@ class Monitoring:
         )
 
     def get_cuda_info(self) -> MarqoCudaInfoResponse:
+        # TODO move this to Inference
         # TODO [Refactoring device logic] move this logic to device manager
         """A function to get information about the CUDA devices on the machine
 
@@ -163,6 +162,7 @@ class Monitoring:
         Raise:
             HardwareCompatabilityError: If CUDA is not available on the machine
         """
+        import torch
         if torch.cuda.is_available():
             cuda_devices = []
             for device_id in range(torch.cuda.device_count()):

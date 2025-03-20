@@ -1,6 +1,7 @@
 import pydantic
 from orjson import orjson
 from starlette import status
+from starlette.responses import JSONResponse
 
 from marqo import version, logging
 from marqo.inference.native_inference.remote.server.inference_config import Config
@@ -128,5 +129,20 @@ def _check_content_type_msgpack(request):
         )
 
 
+@app.get("/healthz", include_in_schema=False)
+def liveness_check(config: Config = Depends(get_config)) -> JSONResponse:
+    """
+    This liveness check endpoint does a quick status check, and error out if any component encounters unrecoverable
+    issues. This only does a check on the cuda devices right now.
+    Docker schedulers could leverage this endpoint to decide whether to restart the Marqo container.
+
+    Returns:
+        200 - if all checks pass
+        500 - if any check fails
+    """
+    config.device_manager.cuda_device_health_check()
+    return JSONResponse(content={"status": "ok"}, status_code=200)
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8881)
+    uvicorn.run(app, host="localhost", port=8881)

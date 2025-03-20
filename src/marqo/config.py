@@ -8,7 +8,6 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import Inference
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
-from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.logging import get_logger
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
