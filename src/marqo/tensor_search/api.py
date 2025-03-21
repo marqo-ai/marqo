@@ -368,7 +368,8 @@ def recommend(query: RecommendQuery, index_name: str,
             reranker=query.reRanker,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
-            score_modifiers=query.scoreModifiers
+            score_modifiers=query.scoreModifiers,
+            rerank_depth=query.rerankDepth
         )
 
 

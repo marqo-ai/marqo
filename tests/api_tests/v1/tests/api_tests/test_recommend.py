@@ -200,3 +200,39 @@ class TestRecommend(MarqoTestCase):
                 documents=['1', '2', '3'], tensor_fields=["void"]
             )
         self.assertIn("Available tensor fields: title, content", str(e.exception))
+
+    def test_recommender_rerankDepth(self):
+        docs = []
+        for i in range(10):
+            docs.append(
+                {
+                    "title": f"Doc {i}",
+                    "content": "some extra info",
+                    "_id": str(i)
+                }
+            )
+
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
+                searchable_attributes = ["title"]
+                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                if add_docs_results["errors"]:
+                    raise Exception(f"Failed to add documents to index {index_name}")
+
+                res = self.client.index(index_name).recommend(
+                    documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
+                    exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
+                    searchable_attributes=searchable_attributes, show_highlights=True,
+                    attributes_to_retrieve=["title"], rerank_depth=3
+                )
+                res_higher_rerank_depth = self.client.index(index_name).recommend(
+                    documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
+                    exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
+                    searchable_attributes=searchable_attributes, show_highlights=True, attributes_to_retrieve=["title"],
+                    rerank_depth=10
+                )
+                total_hits_in_res = len(res["hits"])
+                total_hits_in_res_higher_rerank_depth = len(res_higher_rerank_depth["hits"])
+                assert total_hits_in_res_higher_rerank_depth > total_hits_in_res

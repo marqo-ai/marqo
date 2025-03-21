@@ -646,3 +646,38 @@ class TestRecommender(MarqoTestCase):
                         ),
                         processing_start=mock.ANY
                     )
+
+    def test_recommend_with_rerank_depth(self):
+        """
+        Test that the recommender calls the search method with the correct arguments,
+        validate that there are fewer results with rerank_depth parameter set to low value.
+        """
+        docs = []
+        for i in range(10):
+            docs.append(
+                {
+                    "title": f"Doc {i}",
+                    "content": "some extra info",
+                    "_id": str(i)
+                }
+            )
+
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self.add_documents(
+                    self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=docs, tensor_fields=["title", "content"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                res = self.recommender.recommend(
+                    documents=['1', '2'], result_count=10,
+                    rerank_depth=3, index_name=index.name
+                )
+                res_higher_rerank_depth = self.recommender.recommend(
+                    documents=['1', '2'], result_count=10,
+                    rerank_depth=10, index_name=index.name
+                )
+
+                assert len(res["hits"]) < len(res_higher_rerank_depth["hits"])
+

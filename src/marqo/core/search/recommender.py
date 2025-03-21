@@ -35,7 +35,8 @@ class Recommender:
                   reranker: Union[str, Dict] = None,
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
-                  score_modifiers: Optional[ScoreModifierLists] = None
+                  score_modifiers: Optional[ScoreModifierLists] = None,
+                  rerank_depth: Optional[int] = None
                   ):
         """
         Recommend documents similar to the provided documents.
@@ -57,6 +58,7 @@ class Recommender:
             filter: Filter string
             attributes_to_retrieve: List of attributes to retrieve
             score_modifiers: Score modifiers to apply
+            rerank_depth: Rerank depth
         """
         # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
@@ -191,7 +193,8 @@ class Recommender:
             filter=recommend_filter,
             attributes_to_retrieve=attributes_to_retrieve,
             score_modifiers=score_modifiers,
-            processing_start=t0
+            processing_start=t0,
+            rerank_depth=rerank_depth
         )
 
         return results
