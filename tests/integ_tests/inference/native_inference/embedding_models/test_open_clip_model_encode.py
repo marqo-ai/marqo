@@ -105,7 +105,8 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertTrue(np.linalg.norm(raw_embedding) -1 < self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
 
-    def test_open_clip_encode_text_not_normalized(self):
+    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
+    def test_open_clip_encode_text_not_normalized(self, mock_autocast):
         """
         A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to False.
@@ -131,7 +132,10 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertTrue(np.linalg.norm(raw_embedding) - 1 > unnormlised_epsilon)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
 
-    def test_open_clip_encode_image_not_normalized(self):
+        mock_autocast.assert_not_called()
+
+    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
+    def test_open_clip_encode_image_not_normalized(self, mock_autocast):
         """
         A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to False.
@@ -161,3 +165,5 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
             self.assertTrue(np.linalg.norm(raw_embedding) -1 > unnormlised_epsilon)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
+
+        mock_autocast.assert_not_called()
