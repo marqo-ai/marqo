@@ -1,10 +1,9 @@
-import numpy as np
 from parameterized import parameterized_class
 
 from integ_tests.inference.inference_test_case import *
+from integ_tests.marqo_test import TestImageUrls
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
-from marqo.inference.native_inference.load_model import load_model
-from tests.integ_tests.marqo_test import TestImageUrls
+from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
 
 OPEN_CLIP_TEST_MODELS = [
     'open_clip/RN50/yfcc15m',
@@ -90,9 +89,9 @@ class TestOpenClipModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) - 1 < self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
+            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
+            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
     def test_open_clip_encode_image_normalized(self):
         """
@@ -121,9 +120,10 @@ class TestOpenClipModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) -1 < self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
+            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
+            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
+
 
     @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
     def test_open_clip_encode_text_not_normalized(self, mock_autocast):
@@ -153,9 +153,9 @@ class TestOpenClipModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) - 1 > self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
+            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
+            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
 
         mock_autocast.assert_not_called()
 
@@ -193,8 +193,8 @@ class TestOpenClipModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) -1 > self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
+            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
+            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
 
         mock_autocast.assert_not_called()

@@ -1,8 +1,10 @@
 from unittest import TestCase
 from unittest.mock import patch, Mock
 
+import numpy as np
+
 from marqo.core.inference.api import *
-from marqo.inference.native_inference.load_model import MODEL_PROPERTIES, clear_loaded_models
+from marqo.inference.native_inference.load_model import MODEL_PROPERTIES
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search.telemetry import RequestMetricsStore
 
@@ -22,6 +24,12 @@ class InferenceTestCase(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.configure_request_metrics()
+
+    def validate_norm(self, embedding: ndarray, epsilon: float = 1e-6, normalize: bool = True):
+        if normalize:
+            return self.assertTrue(abs(np.linalg.norm(embedding) - 1) < epsilon, np.linalg.norm(embedding))
+        else:
+            return self.assertTrue(abs(np.linalg.norm(embedding) - 1) > epsilon, np.linalg.norm(embedding))
 
     def get_model_properties_from_registry(self, model_name: str) -> dict:
         return MODEL_PROPERTIES["models"][model_name]
