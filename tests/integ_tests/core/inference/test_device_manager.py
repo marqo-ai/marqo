@@ -5,7 +5,7 @@ from unittest import mock
 
 import torch
 
-from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
+from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError, DeviceError
 from marqo.core.inference.device_manager import DeviceManager, Device
 
 
@@ -134,3 +134,37 @@ class TestDeviceManager(unittest.TestCase):
         self.assertEqual('error', mock_logger.mock_calls[1][0])
         self.assertEqual('Encountered issue inspecting CUDA device cuda:1(Tesla H200): random exception',
                          mock_logger.mock_calls[1][1][0])
+
+    def test_pick_and_validate_device_should_pick_best_device_when_not_provided(self):
+        with self.subTest('should pick cuda when available'):
+            device_manager = self._device_manager_with_cuda()
+
+            device = device_manager.pick_and_validate_device(None)
+            self.assertEqual("cuda", device)
+
+        with self.subTest('should pick cpu when cuda not available'):
+            device_manager = self._device_manager_without_cuda()
+
+            device = device_manager.pick_and_validate_device(None)
+            self.assertEqual("cpu", device)
+
+    def test_pick_and_validate_device_should_return_device_if_valid(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices()
+
+        for device in [
+            "cuda:0", "cuda:1", "cuda", "cpu"
+        ]:
+            with self.subTest(device=device):
+                self.assertEqual(device, device_manager.pick_and_validate_device(device))
+
+    def test_pick_and_validate_device_should_raise_device_error_if_not_valid(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices()
+
+        for device in [
+            "cuda:2", "gpu", "tpu", "dish washer"
+        ]:
+            with self.subTest(device=device):
+                with self.assertRaises(DeviceError) as context:
+                    device_manager.pick_and_validate_device(device)
+                self.assertEqual(f'`{device}` is not a valid device. Valid devices are [cpu, cuda:0, cuda:1]',
+                                 str(context.exception))

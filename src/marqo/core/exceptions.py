@@ -114,6 +114,7 @@ class TooManyFieldsError(MarqoError):
     pass
 
 
+# TODO inherit InferenceError?
 class DeviceError(MarqoError):
     pass
 

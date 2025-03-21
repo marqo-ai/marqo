@@ -5,10 +5,10 @@ from typing import List, Optional
 import torch
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
+from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError, DeviceError
 from marqo.logging import get_logger
 
-logger = get_logger('device_manager')
+logger = get_logger(__name__)
 
 
 class DeviceType(str, Enum):
@@ -22,9 +22,20 @@ class Device(ImmutableBaseModel):
     type: DeviceType
     total_memory: Optional[int] = None
 
-    @property
-    def full_name(self) -> str:
-        return f'{self.type.value}:{self.id}({self.name})'
+    def __repr__(self) -> str:
+        if self.type == DeviceType.CPU:
+            return self.type.value
+        else:
+            return f'{self.type.value}:{self.id}'
+
+    def __str__(self) -> str:
+        if self.type == DeviceType.CPU:
+            return self.type.value
+        else:
+            return f'{self.type.value}:{self.id}({self.name})'
+
+    def matches(self, device: str):
+        return device == self.type.value or device == f'{self.type.value}:{self.id}'
 
     @classmethod
     def cpu(cls) -> 'Device':
@@ -57,6 +68,18 @@ class DeviceManager:
         logger.debug(f'Found devices {self.devices}. Best available device set to: '
                      f'{self.best_available_device_type.value}.')
 
+    def pick_and_validate_device(self, device: Optional[str] = None) -> str:
+        if device is None:
+            logger.debug(f'Device is not provided, pick the default device `{self.best_available_device_type.value}`')
+            return self.best_available_device_type.value
+
+        # otherwise, check if the device passed in is valid
+        if any([d.matches(device) for d in self.devices]):
+            logger.debug(f'Device {device} matches one of the devices: {self.devices}')
+            return device
+
+        raise DeviceError(f'`{device}` is not a valid device. Valid devices are {self.devices}')
+
     @cached_property
     def cuda_devices(self):
         return [device for device in self.devices if device.type == DeviceType.CUDA]
@@ -86,7 +109,7 @@ class DeviceManager:
             try:
                 cuda_device = torch.device(f'cuda:{device.id}')
                 memory_stats = torch.cuda.memory_stats(cuda_device)
-                logger.debug(f'CUDA device {device.full_name} with total memory {device.total_memory}. '
+                logger.debug(f'CUDA device {device} with total memory {device.total_memory}. '
                              f'Memory stats: {str(memory_stats)}')
 
                 # Marqo usually allocates 20MiB cuda memory at a time when processing media files. When OOM happens,
@@ -100,18 +123,18 @@ class DeviceManager:
                 torch.randn(tensor_size, device=cuda_device)
             except RuntimeError as e:
                 if 'out of memory' in str(e).lower():
-                    logger.error(f'CUDA device {device.full_name} is out of memory. Original error: {str(e)}. '
+                    logger.error(f'CUDA device {device} is out of memory. Original error: {str(e)}. '
                                  f'Memory stats: {str(memory_stats)}.')
                     allocated_mem = memory_stats.get("allocated_bytes.all.current", None) if memory_stats else None
                     reserved_mem = memory_stats.get("reserved_bytes.all.current", None) if memory_stats else None
-                    oom_errors.append(f'CUDA device {device.full_name} is out of memory (reserved: {reserved_mem}, '
+                    oom_errors.append(f'CUDA device {device} is out of memory (reserved: {reserved_mem}, '
                                       f'allocated: {allocated_mem}, total: {device.total_memory})')
                 else:
                     # Log out a warning message when encounter other transient errors.
-                    logger.error(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
+                    logger.error(f'Encountered issue inspecting CUDA device {device}: {str(e)}')
             except Exception as e:
                 # Log out a warning message when encounter other transient errors.
-                logger.error(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
+                logger.error(f'Encountered issue inspecting CUDA device {device}: {str(e)}')
 
         if oom_errors:
             # We error out if any CUDA device is out of memory. If this happens consistently, the memory might be held

@@ -1,3 +1,4 @@
+from marqo.core.exceptions import DeviceError
 from marqo.core.inference.device_manager import DeviceManager
 import marqo.core.inference.api.exceptions as inference_api_exceptions
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
@@ -27,10 +28,9 @@ class NativeInferenceLocal(Inference):
                 model_name=request.model_config.model_name,
                 model_properties=request.model_config.model_properties,
                 model_auth=request.model_config.model_auth,
-                # TODO improve this to validate the device passed in from client
-                device=request.device or self.device_manager.best_available_device_type.value
+                device=self.device_manager.pick_and_validate_device()
             )
-        except S2InferenceError as e:
+        except (S2InferenceError, DeviceError) as e:
             raise inference_api_exceptions.ModelError(str(e)) from e
 
         if isinstance(model, OpenCLIPModel):
