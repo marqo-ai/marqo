@@ -63,8 +63,11 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    inference_server_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
-    inference = NativeInferenceClient(inference_server_url)
+    inference = NativeInferenceClient(
+        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+        timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
+    )
     # TODO support combined mode in the future, without model pre-warm?
     #   self.inference = NativeInferenceLocal(DeviceManager())
 

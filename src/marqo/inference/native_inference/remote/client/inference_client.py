@@ -1,4 +1,5 @@
 import httpx
+from httpx import Timeout
 
 from marqo import logging
 from marqo.core.inference.api import Inference, InferenceResult, InferenceRequest, InferenceError
@@ -13,18 +14,16 @@ logger = logging.get_logger(__name__)
 
 
 class NativeInferenceClient(Inference):
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, pool_size: int = 20, timeout: int = 300):
         """
         Args:
             base_url (str): The base URL of the remote inference service.
         """
         self.base_url = base_url.rstrip("/")
 
-        # TODO is default connection pooling config good enough, or do we want to config the limit here?
-        #   limits=httpx.Limits(max_keepalive_connections=?, max_connections=?)
-        # TODO set proper timeout
-        # TODO see if retry is needed
-        self.client = httpx.Client(base_url=base_url)
+        self.client = httpx.Client(base_url=base_url,
+                                   limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size),
+                                   timeout=Timeout(timeout=timeout))
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """

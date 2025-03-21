@@ -59,9 +59,13 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        # Inference Client config (In API)
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
+        EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
+        EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
 
-        # Inference
+
+        # Inference Server config (In Inference)
         EnvVars.MARQO_MODELS_TO_PRELOAD: ["open_clip/ViT-B-32/laion2b_s34b_b79k"],
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
