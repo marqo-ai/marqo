@@ -1,4 +1,6 @@
 import numpy as np
+import pytest
+import torch
 from parameterized import parameterized_class
 
 from integ_tests.inference.inference_test_case import *
@@ -6,24 +8,28 @@ from marqo.inference.media_download_and_preprocess.image_download import load_im
 from marqo.inference.native_inference.load_model import load_model
 from tests.integ_tests.marqo_test import TestImageUrls
 
-OPEN_CLIP_TEST_MODELS = [
-    'open_clip/RN50/yfcc15m',
-    'Marqo/ViT-B-32.laion2b_s34b_b79k',
-    'open_clip/ViT-B-32/laion2b_s34b_b79k',
-    'open_clip/ViT-B-32/laion400m_e31',
-    'open_clip/ViT-B-16/laion2b_s34b_b88k',
-    'Marqo/ViT-B-16.laion2b_s34b_b88k',
-    'open_clip/convnext_base/laion400m_s13b_b51k',
-    'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
-    'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
-    'open_clip/EVA02-B-16/merged2b_s8b_b131k',
-    # "open_clip/MobileCLIP-B/datacompdr_lt",
-    # "open_clip/MobileCLIP-S1/datacompdr"
+LARGE_OPEN_CLIP_TEST_MODELS = [
+    'open_clip/ViT-L-14/laion400m_e32',
+    'Marqo/ViT-L-14.laion400m_e32',
+    'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
+    'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
+    'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
+    'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
+    'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+    'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k',
+    'open_clip/ViT-H-14-378-quickgelu/dfn5b',
+    'open_clip/ViT-SO400M-14-SigLIP-384/webli',
+    "visheratin/nllb-siglip-mrl-large",
+    "visheratin/nllb-clip-large-siglip",
+    "visheratin/nllb-siglip-mrl-base",
+    "visheratin/nllb-clip-base-siglip"
 ]
 
-
-@parameterized_class([{"model_name": model_name} for model_name in OPEN_CLIP_TEST_MODELS])
-class TestOpenClipModelEncode(InferenceTestCase):
+@pytest.mark.largemodel
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
+@parameterized_class([{"model_name": model_name} for model_name in LARGE_OPEN_CLIP_TEST_MODELS])
+class TestLargeModelOpenClipModelEncode(InferenceTestCase):
     """
     Tests for OpenCLIP models, which are heavily used in production.
 
@@ -37,7 +43,8 @@ class TestOpenClipModelEncode(InferenceTestCase):
       dynamically created at runtime.
     - To run the tests, execute the entire test file (test_open_clip_model_encode.py) using pytest/unittest.
       Example:
-          pytest -v tests/integ_tests/inference/native_inference/embedding_models/test_open_clip_model_encode.py
+          pytest -v tests/integ_tests/inference/native_inference/embedding_models/
+          test_large_model_open_clip_model_encode.py
     - Be aware that running the full test file will download and load multiple models. This can consume
       significant time and disk space.
 
@@ -47,7 +54,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
     """
 
     model_name: str # A class variable to store the model name that will be populated by the parameterized decorator
-    device = "cpu"
+    device = "cuda"
 
     @classmethod
     def tearDownClass(cls):
@@ -131,11 +138,6 @@ class TestOpenClipModelEncode(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to False.
         """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
@@ -157,7 +159,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
-        mock_autocast.assert_not_called()
+        mock_autocast.assert_called()
 
     @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
     def test_open_clip_encode_image_not_normalized(self, mock_autocast):
@@ -165,11 +167,6 @@ class TestOpenClipModelEncode(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to False.
         """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         image_urls = [
             TestImageUrls.IMAGE0.value,
@@ -197,4 +194,4 @@ class TestOpenClipModelEncode(InferenceTestCase):
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
-        mock_autocast.assert_not_called()
+        mock_autocast.assert_called()
