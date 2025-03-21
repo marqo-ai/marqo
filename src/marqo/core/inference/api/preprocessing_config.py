@@ -18,6 +18,15 @@ class ChunkConfig(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+    @root_validator
+    def check_split_length_greater_than_overlap(cls, values):
+        split_length = values.get('split_length')
+        split_overlap = values.get('split_overlap')
+        if split_length is not None and split_overlap is not None:
+            if split_length <= split_overlap:
+                raise ValueError('split_length must be greater than split_overlap')
+        return values
+
 
 class TextChunkConfig(ChunkConfig):
     split_method: Literal['character', 'word', 'sentence', 'passage'] = pydantic.Field(alias='splitMethod')
@@ -43,7 +52,7 @@ class TextPreprocessingConfig(PreprocessingConfig):
 class ImagePreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for image modality"""
     modality: Literal[Modality.IMAGE] = Modality.IMAGE
-    download_timeout_ms: Optional[int] = pydantic.Field(default=None, alias='downloadTimeoutMs')
+    download_timeout_ms: int = pydantic.Field(default=3000, alias='downloadTimeoutMs')  # default to 3000ms
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
 

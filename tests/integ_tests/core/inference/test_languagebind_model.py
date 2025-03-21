@@ -4,16 +4,16 @@ from unittest.mock import patch
 
 from pytest import mark
 
-from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
-from marqo.core.inference.embedding_models.languagebind_model_properties import *
-from marqo.core.inference.image_download import format_and_load_CLIP_images
+from integ_tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
+from marqo.core.inference.api.modality import Modality
+from marqo.inference.media_download_and_preprocess.image_download import format_and_load_CLIP_images
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
-from integ_tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
 
 
 @mark.unittest
@@ -264,9 +264,9 @@ class TestLanguagebindModels(unittest.TestCase):
             device="cuda", model_properties=model_properties
         )
         raised_exception = RuntimeError("Stop here")
-        with (patch("marqo.core.inference.model_download.get_presigned_s3_url",side_effect=raised_exception)
+        with (patch("marqo.inference.model_download.model_download.get_presigned_s3_url",side_effect=raised_exception)
               as mock_presigned_url):
-            with patch("marqo.core.inference.model_download.check_s3_model_already_exists", return_value=False):
+            with patch("marqo.inference.model_download.model_download.check_s3_model_already_exists", return_value=False):
                 with self.assertRaises(RuntimeError) as context:
                     model.load()
 

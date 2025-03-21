@@ -1,17 +1,19 @@
+import unittest
 import uuid
 from unittest.mock import patch
 
 import pytest
 
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.exceptions import IndexNotFoundError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, \
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+
 
 
 class TestMonitoring(MarqoTestCase):

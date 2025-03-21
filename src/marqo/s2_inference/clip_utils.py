@@ -19,9 +19,7 @@ from torchvision.transforms import InterpolationMode
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
 from marqo.tensor_search.enums import EnvVars
-from marqo.core.inference.embedding_models.abstract_clip_model import AbstractCLIPModel
-from marqo.core.inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
-from marqo.core.inference.model_download import download_model
+from marqo.inference.model_download.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger

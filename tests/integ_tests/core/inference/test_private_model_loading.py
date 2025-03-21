@@ -1,4 +1,5 @@
 import os
+import unittest
 from typing import Dict
 
 from marqo.core.exceptions import IndexNotFoundError
@@ -6,6 +7,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.api import create_index
 from marqo.tensor_search.models.index_settings import IndexSettings
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+
 
 
 class TestPrivateModelLoading(MarqoTestCase):

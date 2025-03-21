@@ -588,7 +588,8 @@ class VespaClient:
 
         raise VespaError(f'Get all index settings returns invalid response: {index_list}')
 
-    def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
+    @classmethod
+    def translate_vespa_document_response(cls, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
         """A helper function to translate Vespa document response into the expected status, message that
         is used in Marqo document API responses.
 

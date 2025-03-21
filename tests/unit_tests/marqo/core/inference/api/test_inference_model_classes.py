@@ -4,7 +4,8 @@ import numpy as np
 from pydantic import ValidationError
 
 from marqo.core.inference.api import ModelConfig, InferenceRequest, Modality, TextPreprocessingConfig, \
-    AudioPreprocessingConfig, VideoPreprocessingConfig, ImagePreprocessingConfig, InferenceError, InferenceResult
+    AudioPreprocessingConfig, VideoPreprocessingConfig, ImagePreprocessingConfig, InferenceResult, \
+    InferenceErrorModel
 from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -185,6 +186,7 @@ class TestInferenceRequest(unittest.TestCase):
         )
         self.assertIsNone(request.device)
         self.assertFalse(request.use_inference_cache)
+        self.assertTrue(request.return_individual_error)
 
     def test_custom_device_and_use_inference_cache(self):
         """Test setting custom values for optional fields."""
@@ -194,10 +196,12 @@ class TestInferenceRequest(unittest.TestCase):
             device="cuda",
             use_inference_cache=True,
             model_config=self.model_config,
-            preprocessing_config=AudioPreprocessingConfig()
+            preprocessing_config=AudioPreprocessingConfig(),
+            return_individual_error=False,
         )
         self.assertEqual(request.device, "cuda")
         self.assertTrue(request.use_inference_cache)
+        self.assertFalse(request.return_individual_error)
 
     def test_alias_fields(self):
         """Test that alias fields are correctly handled."""
@@ -228,12 +232,14 @@ class TestInferenceRequest(unittest.TestCase):
 
 
 class TestInferenceResult(unittest.TestCase):
-    def test_valid_inference_error(self):
-        error = InferenceError(message="An error occurred")
+    def test_inference_error(self):
+        error = InferenceErrorModel(error_message="An error occurred")
         result = InferenceResult(result=[error])
         self.assertEqual(len(result.result), 1)
-        self.assertIsInstance(result.result[0], InferenceError)
-        self.assertEqual(result.result[0].message, "An error occurred")
+        self.assertIsInstance(result.result[0], InferenceErrorModel)
+        self.assertEqual(result.result[0].error_message, "An error occurred")
+        self.assertEqual(result.result[0].error_code, "inference_error")
+        self.assertEqual(result.result[0].status_code, 400)
 
     def test_valid_success_result(self):
         data = [("item1", np.array([1, 2, 3])), ("item2", np.array([4, 5, 6]))]
@@ -246,11 +252,11 @@ class TestInferenceResult(unittest.TestCase):
         np.testing.assert_array_equal(result.result[0][0][1], np.array([1, 2, 3]))
 
     def test_mixed_results(self):
-        error = InferenceError(message="Partial error")
+        error = InferenceErrorModel(error_message="Partial error")
         data = [("item3", np.array([7, 8, 9]))]
         result = InferenceResult(result=[error, data])
         self.assertEqual(len(result.result), 2)
-        self.assertIsInstance(result.result[0], InferenceError)
+        self.assertIsInstance(result.result[0], InferenceErrorModel)
         self.assertIsInstance(result.result[1], list)
         self.assertEqual(result.result[1][0][0], "item3")
         self.assertIsInstance(result.result[1][0][1], np.ndarray)
@@ -262,7 +268,7 @@ class TestInferenceResult(unittest.TestCase):
 
     def test_invalid_union_type(self):
         with self.assertRaises(ValidationError):
-            InferenceResult(result=[123])  # Invalid type, neither InferenceError nor list of tuples
+            InferenceResult(result=[123])  # Invalid type, neither InferenceErrorModel nor list of tuples
 
     def test_invalid_tuple_structure(self):
         with self.assertRaises(ValidationError):
