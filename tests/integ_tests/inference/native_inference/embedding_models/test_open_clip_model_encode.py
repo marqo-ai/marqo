@@ -143,15 +143,13 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             normalize_embeddings=False
         )
 
-        unnormlised_epsilon = 1e-3
-
         for i, raw_embedding in enumerate(raw_embeddings):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) - 1 > unnormlised_epsilon)
+            self.assertTrue(np.linalg.norm(raw_embedding) - 1 > self.eps)
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
+            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
         mock_autocast.assert_not_called()
 
@@ -166,7 +164,6 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             TestImageUrls.IMAGE1.value,
             TestImageUrls.IMAGE2.value,
         ]
-        unnormlised_epsilon = 1e-3
 
         images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
 
@@ -184,8 +181,8 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) -1 > unnormlised_epsilon)
+            self.assertTrue(np.linalg.norm(raw_embedding) -1 > self.eps)
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
+            self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
         mock_autocast.assert_not_called()
