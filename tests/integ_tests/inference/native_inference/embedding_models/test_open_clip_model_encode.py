@@ -135,7 +135,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             # This model always normalizes embeddings
             "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
         ]:
-            return True
+            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
@@ -169,7 +169,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             # This model always normalizes embeddings
             "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
         ]:
-            return True
+            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         image_urls = [
             TestImageUrls.IMAGE0.value,
