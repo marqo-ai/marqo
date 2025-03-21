@@ -174,7 +174,7 @@ class TestInferenceRequest(unittest.TestCase):
                         model_config=self.model_config,
                         preprocessing_config=preprocessing_config
                     )
-                self.assertIn('only supports modality:', str(context.exception))
+                self.assertIn('does not support modality:', str(context.exception))
 
     def test_default_values(self):
         """Test that default values are set correctly when optional fields are not provided."""
