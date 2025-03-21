@@ -90,7 +90,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) - 1 < self.eps)
+            self.assertTrue(np.linalg.norm(raw_embedding) - 1 < self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
 
@@ -131,6 +131,12 @@ class TestOpenClipModelEncoding(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to False.
         """
+        if self.model_name in [
+            # This model always normalizes embeddings
+            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
+        ]:
+            return True
+
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
         tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
@@ -147,7 +153,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) - 1 > self.eps)
+            self.assertTrue(np.linalg.norm(raw_embedding) - 1 > self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
@@ -159,6 +165,12 @@ class TestOpenClipModelEncoding(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to False.
         """
+        if self.model_name in [
+            # This model always normalizes embeddings
+            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
+        ]:
+            return True
+
         image_urls = [
             TestImageUrls.IMAGE0.value,
             TestImageUrls.IMAGE1.value,
@@ -181,7 +193,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(np.linalg.norm(raw_embedding) -1 > self.eps)
+            self.assertTrue(np.linalg.norm(raw_embedding) -1 > self.eps, np.linalg.norm(raw_embedding))
             self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > self.eps)
 
