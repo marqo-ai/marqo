@@ -73,6 +73,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
             self.assertTrue(np.linalg.norm(raw_embedding) - 1 < self.eps)
+            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
 
     def test_open_clip_encode_image_normalized(self):
@@ -103,6 +104,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
             self.assertTrue(np.linalg.norm(raw_embedding) -1 < self.eps, np.linalg.norm(raw_embedding))
+            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 < self.eps)
 
     @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
@@ -130,6 +132,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
             self.assertTrue(np.linalg.norm(raw_embedding) - 1 > unnormlised_epsilon)
+            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
 
         mock_autocast.assert_not_called()
@@ -164,6 +167,7 @@ class TestOpenClipModelEncoding(InferenceTestCase):
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
             self.assertTrue(np.linalg.norm(raw_embedding) -1 > unnormlised_epsilon)
+            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.assertTrue(np.linalg.norm(pipeline_embedding) -1 > unnormlised_epsilon)
 
         mock_autocast.assert_not_called()
