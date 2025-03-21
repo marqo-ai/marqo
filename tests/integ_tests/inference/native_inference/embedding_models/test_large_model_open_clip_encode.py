@@ -137,6 +137,10 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to False.
         """
+        if self.model_name in [
+            "open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k"
+        ]:
+            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
@@ -166,6 +170,11 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to False.
         """
+        if self.model_name in [
+            "open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k"
+        ]:
+            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
+
 
         image_urls = [
             TestImageUrls.IMAGE0.value,
