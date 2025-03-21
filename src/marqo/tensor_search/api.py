@@ -28,7 +28,7 @@ from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
-from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.models.api_models import SearchQuery, FacetsQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -311,6 +311,29 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
+@app.post("/indexes/{index_name}/facets")
+def facets(facets_query: FacetsQuery, index_name:str, device: str = Depends(api_validation.validate_device),
+           marqo_config: config.Config = Depends(get_config)):
+    """
+    Search for documents matching a specific query in the given index and extract and return facets.
+    """
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/facets"):
+        result = tensor_search.search(
+            config=marqo_config, text=facets_query.q,
+            index_name=index_name,
+            searchable_attributes=facets_query.searchableAttributes,
+            search_method=facets_query.searchMethod,
+            result_count=facets_query.limit, offset=facets_query.offset,
+            ef_search=facets_query.efSearch, approximate=facets_query.approximate,
+            filter=facets_query.filter, device=device,
+            boost=facets_query.boost,
+            media_download_headers = facets_query.mediaDownloadHeaders,
+            context=facets_query.context,
+            model_auth=facets_query.modelAuth,
+            text_query_prefix=facets_query.textQueryPrefix,
+        )
+        return ORJSONResponse(result)
+
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
@@ -368,7 +391,8 @@ def recommend(query: RecommendQuery, index_name: str,
             reranker=query.reRanker,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
-            score_modifiers=query.scoreModifiers
+            score_modifiers=query.scoreModifiers,
+            rerank_depth=query.rerankDepth
         )
 
 

@@ -20,3 +20,4 @@ class RecommendQuery(BaseMarqoModel):
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
     scoreModifiers: Optional[ScoreModifierLists] = None
+    rerankDepth: Optional[int] = None

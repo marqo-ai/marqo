@@ -241,6 +241,7 @@ class VespaClient:
         query = {key: value for key, value in query.items() if value is not None}
 
         logger.debug(f'Query: {query}')
+        print(query)
 
         try:
             resp = self.http_client.post(f'{self.query_url}/search/', json=query)
@@ -248,6 +249,7 @@ class VespaClient:
             raise VespaError(e) from e
 
         self._query_raise_for_status(resp)
+        print(resp.text)
 
         return QueryResult(**orjson.loads(resp.text))
 
