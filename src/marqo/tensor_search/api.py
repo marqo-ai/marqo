@@ -63,13 +63,19 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    inference = NativeInferenceClient(
-        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
-        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
-        timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
-    )
-    # TODO support combined mode in the future, without model pre-warm?
-    #   self.inference = NativeInferenceLocal(DeviceManager())
+    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
+        import marqo.inference.native_inference.remote.server.inference_config as inference_config
+        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
+
+        native_inference_local_config = inference_config.Config()
+        inference_on_start(native_inference_local_config)  # pre-warm the model
+        inference = native_inference_local_config.local_inference
+    else:
+        inference = NativeInferenceClient(
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+            pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+            timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
+        )
 
     return config.Config(vespa_client, inference, zookeeper_client)
 
@@ -602,4 +608,4 @@ def check_health(marqo_config: config.Config = Depends(get_config)):
 
 
 if __name__ == "__main__":
-    uvicorn.run('api:app', host="localhost", port=8882, workers=2)
+    uvicorn.run(app, host="localhost", port=8882)

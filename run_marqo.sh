@@ -35,8 +35,8 @@ function wait_for_process () {
 }
 
 
-# Set the default Marqo mode to API
-export MARQO_MODE=${MARQO_MODE:-API}
+# Set the default Marqo mode to COMBINED
+export MARQO_MODE=${MARQO_MODE:-COMBINED}
 
 VESPA_IS_INTERNAL=False
 # Vespa local run
@@ -153,21 +153,26 @@ export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
 case "$MARQO_MODE" in
+  COMBINED)
+    # Start the combined Marqo API and Inference in the background
+    cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
+    uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    ;;
   API)
     # set default number of workers to 1
     set -q MARQO_API_WORKERS; or set MARQO_API_WORKERS 1
 
-    # Start the tensor search web app in the background
+    # Start the Marqo API in the background
     cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
     uvicorn api:app --host 0.0.0.0 --port 8882 --workers $MARQO_API_WORKERS --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
     ;;
   INFERENCE)
-    # Start the native inference server app in the background
+    # Start the native Inference server app in the background
     cd /app/src/marqo/inference/native_inference/remote/server || { echo "Failed to navigate to inference server directory"; exit 1; }
     uvicorn inference_api:app --host 0.0.0.0 --port 8881 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
     ;;
   *)
-    echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'API' and 'INFERENCE'"
+    echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'COMBINED', 'API' and 'INFERENCE'"
     exit 1
     ;;
 esac
