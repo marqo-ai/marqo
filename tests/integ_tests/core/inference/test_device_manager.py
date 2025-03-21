@@ -40,14 +40,14 @@ class TestDeviceManager(unittest.TestCase):
     def test_init_with_cpu(self):
         device_manager = self._device_manager_without_cuda()
 
-        self.assertEqual(device_manager.best_available_device_type, 'cpu')
+        self.assertEqual(device_manager._best_available_device, 'cpu')
         self.assertEqual(device_manager.devices, [Device.cpu()])
         self.assertFalse(device_manager._is_cuda_available_at_startup)
 
     def test_init_with_gpu(self):
         device_manager = self._device_manager_with_cuda(total_memory=1_000_000)
 
-        self.assertEqual(device_manager.best_available_device_type, 'cuda')
+        self.assertEqual(device_manager._best_available_device, 'cuda')
         self.assertEqual(device_manager.devices, [Device.cpu(), Device.cuda(0, 'Tesla T4', 1_000_000)])
         self.assertTrue(device_manager._is_cuda_available_at_startup)
 

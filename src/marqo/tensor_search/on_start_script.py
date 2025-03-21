@@ -1,9 +1,6 @@
 from marqo import config, version
 from marqo import marqo_docs
-from marqo.api import exceptions
 from marqo.connections import redis_driver
-from marqo.s2_inference.s2_inference import vectorise
-# we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
@@ -17,8 +14,10 @@ def on_start(config: config.Config):
         PopulateCache(config),
         InitializeRedis("localhost", 6379),
         PrintVersion(),
-        MarqoWelcome(),
-        MarqoPhrase(),
+
+        # TODO do we still need print banners?
+        # MarqoWelcome(),
+        # MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:

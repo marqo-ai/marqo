@@ -55,23 +55,22 @@ class DeviceManager:
     def __init__(self):
         self._is_cuda_available_at_startup: bool = torch.cuda.is_available()
         self.devices: List[Device] = [Device.cpu()]
-        self.best_available_device_type = DeviceType.CPU
+        self._best_available_device = DeviceType.CPU.value
 
         if self._is_cuda_available_at_startup:
-            self.best_available_device_type = DeviceType.CUDA
+            self._best_available_device = DeviceType.CUDA.value
             device_count = torch.cuda.device_count()
             for device_id in range(device_count):
                 self.devices.append(Device.cuda(device_id,
                                                 torch.cuda.get_device_name(device_id),
                                                 torch.cuda.get_device_properties(device_id).total_memory))
 
-        logger.debug(f'Found devices {self.devices}. Best available device set to: '
-                     f'{self.best_available_device_type.value}.')
+        logger.info(f'Found devices {self.devices}. Best available device set to: {self._best_available_device}.')
 
     def pick_and_validate_device(self, device: Optional[str] = None) -> str:
         if device is None:
-            logger.debug(f'Device is not provided, pick the default device `{self.best_available_device_type.value}`')
-            return self.best_available_device_type.value
+            logger.debug(f'Device is not provided, pick the default device `{self._best_available_device}`')
+            return self._best_available_device
 
         # otherwise, check if the device passed in is valid
         if any([d.matches(device) for d in self.devices]):

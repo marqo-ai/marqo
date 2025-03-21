@@ -33,19 +33,19 @@ logger = get_logger(__name__)
 
 def on_start(config: Config):
     to_run_on_start = (
-        DownloadStartText(),
-        CUDAAvailable(),
-        SetBestAvailableDevice(),
+        # DownloadStartText(),
+        # CUDAAvailable(),
+        # SetBestAvailableDevice(),
         SetEnableVideoGPUAcceleration(),
         CheckNLTKTokenizers(),
         CacheModels(config),
         # CachePatchModels(),  # TODO patch model can be deprecated, we comment it out for now
-        DownloadFinishText(),
+        # DownloadFinishText(),
         PrintVersion(),
 
         # TODO do we still need banners? or a different banner?
-        MarqoWelcome(),
-        MarqoPhrase(),
+        # MarqoWelcome(),
+        # MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:
