@@ -24,9 +24,27 @@ OPEN_CLIP_TEST_MODELS = [
 
 @parameterized_class([{"model_name": model_name} for model_name in OPEN_CLIP_TEST_MODELS])
 class TestOpenClipModelEncoding(InferenceTestCase):
-    '''
-    This test is for open clip models as they are heavily used in production.
-    '''
+    """
+    Tests for OpenCLIP models, which are heavily used in production.
+
+    This test class is dynamically generated for each model in the OPEN_CLIP_TEST_MODELS list using
+    the @parameterized_class decorator. Each model gets its own dedicated test class at runtime. This ensures
+    that all tests are run sequentially for a single model before moving on to the next one, improving efficiency
+    and making it easier to identify model-specific failures.
+
+    ⚠️ Note:
+    - You won't be able to run this test class or its methods directly via the IDE, as the test classes are
+      dynamically created at runtime.
+    - To run the tests, execute the entire test file (test_open_clip_model_encode.py) using pytest/unittest.
+      Example:
+          pytest -v tests/integ_tests/inference/native_inference/embedding_models/test_open_clip_model_encode.py
+    - Be aware that running the full test file will download and load multiple models. This can consume
+      significant time and disk space.
+
+    These tests validate:
+    - That OpenCLIP models produce consistent and normalized embeddings for both text and image inputs.
+    - That the model outputs match the results from the pipeline encode methods.
+    """
 
     model_name: str # A class variable to store the model name that will be populated by the parameterized decorator
     device = "cpu"
