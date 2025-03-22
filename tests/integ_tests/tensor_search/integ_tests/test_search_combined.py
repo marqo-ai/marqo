@@ -654,6 +654,136 @@ class TestSearch(MarqoTestCase):
                         for expected_id in expected_ids:
                             self.assertIn(expected_id, [hit['_id'] for hit in res['hits']])
 
+    def test_filter_with_special_characters_in_eq_and_range_statement(self):
+        """
+        Try special characters " and \ in the EQUALITY and RANGE statements.
+        Try escaped & non-escaped. No errors should be raised.
+
+        For unstructured indexes only, try special characters in field names.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                docs = [
+                    {"_id": "doc1", "text_field_1": "some text", "float_field_1": 0.5},
+                    {"_id": "doc2", "text_field_1": "some text", "float_field_1": 2},
+                    {"_id": "doc3", "text_field_1": "another text", "float_field_1": 2},
+
+                    # Docs with vespa special chars in field content
+                    {"_id": "doc4", "text_field_1": "som\"e text"},
+                    {"_id": "doc5", "text_field_1": "som\\e text"},
+                ]
+
+                # Define test parameters as tuples expected_ids)
+                eq_test_cases = [
+                    ('text_field_1:(some text)', ["doc1", "doc2"]),
+                    ('text_field_1:(som\\e text)', ["doc1", "doc2"]),
+                    ('text_field_1:(som\\\\e text)', ["doc5"]),
+                    ('text_field_1:(som"e text)', ["doc4"]),
+                    ('text_field_1:(som\\"e text)', ["doc4"]),
+                ]
+
+                unstructured_eq_test_cases = [
+                    ('text_f\\ield_1:(some text)', ["doc1", "doc2"]),
+                    ('text_f\\\\ield_1:(some text)', []),
+                    ('text_f"ield_1:(some text)', []),
+                    ('text_f\\"ield_1:(some text)', []),
+                ]
+
+                unstructured_range_test_cases = [
+                    ('float_f\\ield_1:[0 TO 1]', ["doc1"]),
+                    ('float_f\\\\ield_1:[0 TO 3]', []),
+                    ('float_f"ield_1:[0.5 TO 2]', []),
+                    ('float_f\\"ield_1:[0.5 TO 2.5]', []),
+                ]
+
+                test_cases = eq_test_cases
+
+                if isinstance(index, UnstructuredMarqoIndex):
+                    # Unstructured tests have the cases for field names with special chars
+                    # Not adding extra docs because docs with \ or " in field name are not allowed.
+                    test_cases += unstructured_eq_test_cases + unstructured_range_test_cases
+
+                # Add documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=['text_field_1', 'text_f\\ield_1', 'text_f\\\\ield_1',
+                                       'text_f"ield_1', 'text_f\\"ield_1'] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
+                    ),
+                )
+
+                for filter_string, expected_ids in test_cases:
+                    with self.subTest(f"filter_string={filter_string}, expected_ids={expected_ids}"):
+                        res = tensor_search.search(
+                            config=self.config, index_name=index.name, text='',
+                            filter=filter_string, verbose=0
+                        )
+                        for expected_id in expected_ids:
+                            self.assertIn(expected_id, [hit['_id'] for hit in res['hits']])
+
+    def test_filter_with_special_characters_in_in_statement(self):
+        """
+        For structured indexes only, while IN statement is only supported here.
+        Try special characters in the IN statement.
+        Try escaped & non-escaped. No errors should be raised.
+
+        The filter string parser will not encode unescaped \ (we use it as an escape character)
+        Vespa query builder will then prefix \ to all \ and " chars
+        """
+
+        # Special chars in marqo filter DSL
+        MARQO_FILTER_STRING_SPECIAL_CHARS = [' ', ',', '(', ')']
+
+        for index in [self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc1", "text_field_1": "some text"},
+                            {"_id": "doc2", "text_field_1": "some text"},
+                            {"_id": "doc3", "text_field_1": "another text"},
+
+                            # Docs with vespa special chars
+                            {"_id": "doc4", "text_field_1": "som\"e text"},
+                            {"_id": "doc5", "text_field_1": "som\\e text"},
+                        ] + [
+                            # Docs with marqo filter special chars
+                            {"_id": f"doc with {char}", "text_field_1": f"som{char}e text"}
+                            for char in MARQO_FILTER_STRING_SPECIAL_CHARS
+                        ],
+                    )
+                )
+
+                # Define test parameters as tuples expected_ids)
+                test_cases = [
+                    ('text_field_1 in ((some text), (hello))', ["doc1", "doc2"]),
+
+                    # Special chars in vespa YQL DSL --> '\', '"'
+                    ('text_field_1 in ((som\\e text), (hello))', ["doc1", "doc2"]),    # e does not need to be escaped. \ is ignored. Will retrieve normal text.
+                    ('text_field_1 in ((som\\\\e text), (hello))', ["doc5"]),  # \ is escaped
+                    ('text_field_1 in ((som"e text), (hello))', ["doc4"]),
+                    ('text_field_1 in ((som\\"e text), (hello))', ["doc4"]),    # " does not need to be escaped. \ is ignored.
+                ] + [
+                    # Testing marqo filter special chars
+                    (f'text_field_1 in ((som\\{char}e text), (hello))', [f"doc with {char}"])
+                    for char in MARQO_FILTER_STRING_SPECIAL_CHARS
+                ]
+
+                for filter_string, expected_ids in test_cases:
+                    with self.subTest(f"filter_string={filter_string}, expected_ids={expected_ids}"):
+                        res = tensor_search.search(
+                            config=self.config, index_name=index.name, text='',
+                            filter=filter_string, verbose=0
+                        )
+                        for expected_id in expected_ids:
+                            self.assertIn(expected_id, [hit['_id'] for hit in res['hits']])
+
     def test_filtering_bad_syntax(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index):

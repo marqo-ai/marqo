@@ -710,7 +710,7 @@ class StructuredVespaIndex(VespaIndex):
             for i in range(len(value_list)):
                 # str type fields
                 if marqo_field_type in STR_FIELD_TYPES:
-                    in_list += f'"{value_list[i]}"'
+                    in_list += f'"{self.escape(value_list[i])}"'
                 # int type fields
                 elif marqo_field_type in INT_FIELD_TYPES:
                     try:
@@ -791,7 +791,7 @@ class StructuredVespaIndex(VespaIndex):
                         raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
                     return (f'{marqo_field_name} in '
-                            f'{self.escape(_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type))}')
+                            f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
 
             raise InternalError(f'Unknown node type {type(node)}')
 
