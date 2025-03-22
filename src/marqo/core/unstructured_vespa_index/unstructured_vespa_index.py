@@ -139,8 +139,8 @@ class UnstructuredVespaIndex(VespaIndex):
             filter_parts = []
 
             # Escape special characters in field name and value
-            node.field = self.escape(node.field)
-            node.value = self.escape(node.value)
+            node.field = cls.escape(node.field)
+            node.value = cls.escape(node.value)
 
             # Filter on `_id`
             if node.field == index_constants.MARQO_DOC_ID:
@@ -187,7 +187,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
             # Escape special characters in field name
-            node.field = self.escape(node.field)
+            node.field = cls.escape(node.field)
 
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
