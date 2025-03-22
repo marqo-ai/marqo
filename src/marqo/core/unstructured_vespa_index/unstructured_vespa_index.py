@@ -134,17 +134,15 @@ class UnstructuredVespaIndex(VespaIndex):
 
     @classmethod
     def _get_filter_term(cls, marqo_query: MarqoQuery) -> Optional[str]:
+        def escape(s: str) -> str:
+            return s.replace('\\', '\\\\').replace('"', '\\"')
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
 
-            # Escape special characters in field name and value
-            node.field = cls.escape(node.field)
-            node.value = cls.escape(node.value)
-
             # Filter on `_id`
             if node.field == index_constants.MARQO_DOC_ID:
-                return f'({unstructured_common.VESPA_FIELD_ID} contains "{node.value}")'
+                return f'({unstructured_common.VESPA_FIELD_ID} contains "{escape(node.value)}")'
 
             # Bool Filter
             if node.value.lower() in cls._FILTER_STRING_BOOL_VALUES:
@@ -156,12 +154,12 @@ class UnstructuredVespaIndex(VespaIndex):
             # Short String Filter
             short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '
                                           f'contains sameElement(key contains "{node.field}", '
-                                          f'value contains "{node.value}"))')
+                                          f'value contains "{escape(node.value)}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
             string_array_filter_string = (f'({unstructured_common.STRING_ARRAY} contains '
-                                          f'"{node.field}::{node.value}")')
+                                          f'"{node.field}::{escape(node.value)}")')
             filter_parts.append(string_array_filter_string)
 
             # Numeric Filter
@@ -186,9 +184,6 @@ class UnstructuredVespaIndex(VespaIndex):
             return final_filter_string
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
-            # Escape special characters in field name
-            node.field = cls.escape(node.field)
-
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
             bound = f'{lower}, {higher}' if lower and higher else f'{lower}{higher}'
