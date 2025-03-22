@@ -14,6 +14,7 @@ from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
+from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
@@ -137,6 +138,9 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # Base exceptions
         (base_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
+
+        # Inference exceptions
+        (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None

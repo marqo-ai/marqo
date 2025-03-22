@@ -73,8 +73,3 @@ class TestModlCacheManagement(MarqoTestCase):
                 r = self.client.index(index_name).search("q", device="cpu")
                 res = self.client.index(index_name).eject_model("hf/all-MiniLM-L6-v2", "cpu")
                 self.assertIn("successfully eject", str(res))
-
-
-
-
-

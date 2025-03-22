@@ -26,7 +26,7 @@ class VectorisedJobs(BaseModel):
     model_name: str
     model_properties: Dict[str, Any]
     content: List[Union[str, List[str]]]
-    device: str
+    device: Optional[str]
     normalize_embeddings: bool
     media_download_headers: Optional[Dict]
     model_auth: Optional[ModelAuth]

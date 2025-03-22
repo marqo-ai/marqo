@@ -382,7 +382,7 @@ class TestCreateIndex(MarqoTestCase):
         """
         self.client.create_index(index_name=self.index_name,
                                  type="structured",
-                                 model="ViT-B/32",
+                                 model="open_clip/ViT-B-32/laion400m_e31",
                                  all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
                                               "features": ["lexical_search", "filter"]}],
                                  tensor_fields=["my_custom_vector"],

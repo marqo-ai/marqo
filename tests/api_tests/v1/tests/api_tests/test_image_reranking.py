@@ -1,3 +1,4 @@
+import unittest
 import uuid
 
 from marqo.errors import MarqoWebError
@@ -89,6 +90,7 @@ class TestImageReranking(MarqoTestCase):
                                                            reranker='google/owlvi-base-patch32')
             self.assertIn("could not find model_name=", str(e.exception.message))
 
+    @unittest.skip(reason="Skipped due to image chunk support is removed")
     def test_image_reranking_with_chunking(self):
         documents = [
             {
