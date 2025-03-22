@@ -1,19 +1,18 @@
 from timeit import default_timer as timer
 from typing import Dict, List, Tuple, Optional
 
-import semver
-
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError, MarqoDocumentParsingError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION, \
-    VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
+    VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
     SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
@@ -26,7 +25,6 @@ from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
-from marqo.version import get_version
 
 logger = get_logger(__name__)
 
@@ -34,22 +32,25 @@ logger = get_logger(__name__)
 class Document:
     """A class that handles the document API in Marqo"""
 
-    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
         self.index_management = index_management
+        self.inference = inference
 
     def add_documents(self, add_docs_params: AddDocsParams,
                       field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
         marqo_index = self.index_management.get_index(add_docs_params.index_name)
 
         if isinstance(marqo_index, StructuredMarqoIndex):
-            add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+            add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,
+                                                             self.inference)
         elif isinstance(marqo_index, SemiStructuredMarqoIndex):
             add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
                                                                  self.vespa_client, self.index_management,
-                                                                 field_count_config)
+                                                                 self.inference, field_count_config)
         elif isinstance(marqo_index, UnstructuredMarqoIndex):
-            add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+            add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,
+                                                               self.inference)
         else:
             raise InternalError(f"Unknown index type {type(marqo_index)}")
 
@@ -139,7 +140,7 @@ class Document:
         # 2. If there's any documents that dont' exist in Vespa, we will append them to unsuccessful_docs
         if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
             get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps.keys()), fields = [
-                VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP], schema = marqo_index.schema_name)
+                VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID], schema = marqo_index.schema_name)
             responses = get_batch_response.responses
             for resp in responses:
                 if resp.document:

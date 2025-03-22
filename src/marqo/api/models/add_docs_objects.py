@@ -4,7 +4,6 @@ from typing import Optional, Any, Sequence
 from pydantic import BaseModel, root_validator
 from pydantic import Field
 
-from marqo.core.models.add_docs_params import BatchVectorisationMode
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
@@ -28,8 +27,6 @@ class AddDocsBodyParams(BaseModel):
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     mediaDownloadThreadCount: Optional[int]
     textChunkPrefix: Optional[str] = None
-    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
-    batchVectorisationMode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     @root_validator
     def validate_thread_counts(cls, values):

@@ -79,6 +79,7 @@ jobs:
     name: Run Large Model Integration Tests (Part ${{ matrix.part }}/3)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
+      fail-fast: false
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner

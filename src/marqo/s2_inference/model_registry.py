@@ -1,11 +1,11 @@
-from marqo.core.inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
-from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
+from marqo.inference.native_inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
-from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
-from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
+from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
-from marqo.s2_inference.random_utils import Random
+from marqo.inference.native_inference.embedding_models.random_model import RandomModel
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.types import Dict
@@ -2284,14 +2284,14 @@ def _get_no_model_properties() -> Dict:
 def _get_model_load_mappings() -> Dict:
     return {
         'clip': CLIP,
-        'open_clip': OPEN_CLIP,
+        'open_clip': OpenCLIPModel,
         'sbert': SBERT,
         'test': TEST,
         'sbert_onnx': SBERT_ONNX,
         'clip_onnx': CLIP_ONNX,
         "multilingual_clip": MULTILINGUAL_CLIP,
         "fp16_clip": FP16_CLIP,
-        'random': Random,
+        'random': RandomModel,
         'hf': HuggingFaceModel,
         'hf_stella': HuggingFaceStellaModel,
         "no_model": NO_MODEL,

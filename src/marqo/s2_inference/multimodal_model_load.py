@@ -7,7 +7,7 @@ from typing import Optional, Union, List
 import magic
 import requests
 
-from marqo.core.inference.image_download import encode_url
+from marqo.inference.media_download_and_preprocess.image_download import encode_url
 from marqo.s2_inference.clip_utils import validate_url
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.types import Modality

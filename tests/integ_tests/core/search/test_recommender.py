@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest import mock
 
 from marqo.core.exceptions import InvalidFieldNameError

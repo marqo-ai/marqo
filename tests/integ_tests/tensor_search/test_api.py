@@ -18,6 +18,8 @@ import importlib
 import sys
 import os
 
+import unittest
+
 
 class ApiTests(MarqoTestCase):
     def setUp(self):
@@ -122,6 +124,7 @@ class ApiTests(MarqoTestCase):
                 self.assertIn(f"The search result offset must be less than or equal "
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
+
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
