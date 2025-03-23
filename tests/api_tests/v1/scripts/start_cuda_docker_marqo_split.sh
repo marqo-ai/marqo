@@ -41,7 +41,7 @@ ENV_FILE=$TEMP_ENV_FILE MARQO_DOCKER_IMAGE=$MARQO_DOCKER_IMAGE docker compose -f
 set +x
 
 # Follow docker logs (since it is detached)
-docker-compose -f $SCRIPT_DIR/../docker-compose.yml --profile cuda logs -f marqo-cuda &
+docker compose -f $SCRIPT_DIR/../docker-compose.yml --profile cuda logs -f marqo-cuda &
 LOGS_PID=$!
 
 # Wait for marqo to start
