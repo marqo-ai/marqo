@@ -1,17 +1,19 @@
 services:
-  # Base configurations that will be extended (not meant to be run directly)
-  marqo-base:
+  # Default profile services
+  marqo:
     image: ${MARQO_DOCKER_IMAGE}
     container_name: marqo
+    profiles: ["default"]
     ports:
       - "8882:8882"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
+    depends_on:
+      - inference
     env_file:
       - ${ENV_FILE:-.env.default}
     environment:
-      # Common env vars across all profiles
       - MARQO_MODE=API
       - MARQO_API_WORKERS=4
       - MARQO_ENABLE_THROTTLING=FALSE
@@ -26,11 +28,11 @@ services:
       - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
       - HF_HUB_ENABLE_HF_TRANSFER=1
       - MARQO_MODELS_TO_PRELOAD=[]
-#    runtime: nvidia
 
-  inference-base:
+  inference:
     image: ${MARQO_DOCKER_IMAGE}
     container_name: inference
+    profiles: ["default"]
     ports:
       - "8881:8881"
     env_file:
@@ -42,48 +44,106 @@ services:
       - MARQO_ENABLE_THROTTLING=FALSE
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-#    runtime: nvidia
-
-  # Default profile services
-  marqo:
-    extends: marqo-base
-    profiles: ["default"]
-    depends_on:
-      - inference
-
-  inference:
-    extends: inference-base
-    profiles: ["default"]
 
   # Local profile services
   marqo-local:
-    extends: marqo-base
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: marqo
     profiles: ["local"]
+    ports:
+      - "8882:8882"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
     depends_on:
       - inference-local
+    env_file:
+      - ${ENV_FILE:-.env.default}
     environment:
-      # Local-specific settings
+      - MARQO_MODE=API
+      - MARQO_API_WORKERS=4
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - MARQO_REMOTE_INFERENCE_URL=http://inference:8881
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_ENABLE_BATCH_APIS=true
+      - VESPA_CONFIG_URL=http://host.docker.internal:19071
+      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
+      - VESPA_QUERY_URL=http://host.docker.internal:8080
+      - ZOOKEEPER_HOSTS=host.docker.internal:2181
+      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MARQO_MODELS_TO_PRELOAD=[]
       - MARQO_MAX_CPU_MODEL_MEMORY=1.6
 
   inference-local:
-    extends: inference-base
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: inference
     profiles: ["local"]
+    ports:
+      - "8881:8881"
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      - MARQO_MODE=INFERENCE
+      - MARQO_MODELS_TO_PRELOAD=[]
+      - MARQO_INFERENCE_WORKER_COUNT=1
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
   # CUDA profile services
   marqo-cuda:
-    extends: marqo-base
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: marqo
     profiles: ["cuda"]
     network_mode: "host"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
     depends_on:
       - inference-cuda
-
-  inference-cuda:
-    extends: inference-base
-    profiles: ["cuda"]
-    network_mode: "host"
+    env_file:
+      - ${ENV_FILE:-.env.default}
     environment:
+      - MARQO_MODE=API
+      - MARQO_API_WORKERS=4
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - MARQO_REMOTE_INFERENCE_URL=http://inference:8881
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_ENABLE_BATCH_APIS=true
+      - VESPA_CONFIG_URL=http://host.docker.internal:19071
+      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
+      - VESPA_QUERY_URL=http://host.docker.internal:8080
+      - ZOOKEEPER_HOSTS=host.docker.internal:2181
+      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MARQO_MODELS_TO_PRELOAD=[]
       - MARQO_MAX_CUDA_MODEL_MEMORY=15
       - MARQO_MAX_CPU_MODEL_MEMORY=15
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  inference-cuda:
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: inference
+    profiles: ["cuda"]
+    network_mode: "host"
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      - MARQO_MODE=INFERENCE
+      - MARQO_MODELS_TO_PRELOAD=[]
+      - MARQO_INFERENCE_WORKER_COUNT=1
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     deploy:
       resources:
         reservations:
