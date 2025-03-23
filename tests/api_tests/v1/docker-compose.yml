@@ -98,6 +98,7 @@ services:
     container_name: marqo
     profiles: ["cuda"]
     network_mode: "host"
+    privileged: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
