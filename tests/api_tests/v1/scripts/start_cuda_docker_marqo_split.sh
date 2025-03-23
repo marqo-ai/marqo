@@ -4,11 +4,13 @@
 # $@ : env_vars - strings representing all args to pass to docker-compose
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 MARQO_DOCKER_IMAGE="$1"
 shift
 
 # Clean up any existing containers
-docker-compose -f ../docker-compose.yml --profile cuda down 2>/dev/null || true
+docker compose -f $SCRIPT_DIR/../docker-compose.yml --profile cuda down 2>/dev/null || true
 
 # Create a temporary .env file to store all passed environment variables
 TEMP_ENV_FILE=$(mktemp)
@@ -35,11 +37,11 @@ done
 
 set -x
 # Start the containers using docker-compose with the cuda profile
-ENV_FILE=$TEMP_ENV_FILE MARQO_DOCKER_IMAGE=$MARQO_DOCKER_IMAGE docker-compose -f ../docker-compose.yml --profile cuda up -d
+ENV_FILE=$TEMP_ENV_FILE MARQO_DOCKER_IMAGE=$MARQO_DOCKER_IMAGE docker compose -f $SCRIPT_DIR/../docker-compose.yml --profile cuda up -d
 set +x
 
 # Follow docker logs (since it is detached)
-docker-compose -f ../docker-compose.yml --profile cuda logs -f marqo-cuda &
+docker-compose -f $SCRIPT_DIR/../docker-compose.yml --profile cuda logs -f marqo-cuda &
 LOGS_PID=$!
 
 # Wait for marqo to start
