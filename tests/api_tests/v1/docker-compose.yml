@@ -1,0 +1,91 @@
+services:
+  # Base marqo service with common configuration
+  marqo:
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: marqo
+    ports:
+      - "8882:8882"
+    profiles: ["default"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    depends_on:
+      - inference
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      # Common env vars across all profiles
+      - MARQO_MODE=API
+      - MARQO_API_WORKERS=4
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - MARQO_REMOTE_INFERENCE_URL=http://inference:8881
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_ENABLE_BATCH_APIS=true
+      - VESPA_CONFIG_URL=http://host.docker.internal:19071
+      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
+      - VESPA_QUERY_URL=http://host.docker.internal:8080
+      - ZOOKEEPER_HOSTS=host.docker.internal:2181
+      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MARQO_MODELS_TO_PRELOAD=[]
+#    runtime: nvidia
+
+  # Profile for local setup (with Vespa on the host)
+  marqo-local:
+    extends: marqo
+    profiles: ["local"]
+    environment:
+      # Local-specific settings
+      - MARQO_MAX_CPU_MODEL_MEMORY=1.6
+
+  # Profile for CUDA-enabled setup
+  marqo-cuda:
+    extends: marqo
+    profiles: ["cuda"]
+    network_mode: "host"
+    depends_on:
+      - inference-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      # CUDA-specific settings
+      - MARQO_MAX_CUDA_MODEL_MEMORY=15
+      - MARQO_MAX_CPU_MODEL_MEMORY=15
+
+  # Base inference service
+  inference:
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: inference
+    profiles: ["default", "local"]
+    ports:
+      - "8881:8881"
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      - MARQO_MODE=INFERENCE
+      - MARQO_MODELS_TO_PRELOAD=[]
+      - MARQO_INFERENCE_WORKER_COUNT=1
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+#    runtime: nvidia
+
+  # CUDA-enabled inference service
+  inference-cuda:
+    extends: inference
+    profiles: ["cuda"]
+    container_name: inference
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
