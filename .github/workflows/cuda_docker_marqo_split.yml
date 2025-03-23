@@ -26,6 +26,13 @@ on:
       - releases/*
     paths-ignore:
       - '**.md'
+  pull_request:
+    branches:
+      - mainline
+      - releases/*
+      - yihan/*
+    paths-ignore:
+      - '**.md'
 
 permissions:
   contents: read
