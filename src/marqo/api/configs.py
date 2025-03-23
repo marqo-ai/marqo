@@ -66,7 +66,7 @@ def default_env_vars() -> dict:
 
 
         # Inference Server config (In Inference)
-        EnvVars.MARQO_MODELS_TO_PRELOAD: ["open_clip/ViT-B-32/laion2b_s34b_b79k"],
+        EnvVars.MARQO_MODELS_TO_PRELOAD: ["hf/e5-base-v2", "open_clip/ViT-B-32/laion2b_s34b_b79k"],
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
 
