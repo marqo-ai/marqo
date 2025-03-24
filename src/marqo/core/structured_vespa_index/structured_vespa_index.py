@@ -663,7 +663,14 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        rerank_depth, additional_hits = self._get_rerank_depth_and_additional_hits_from_query(marqo_query)
+        if marqo_query.ef_search is not None:
+            base_rerank_depth = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
+        else:
+            base_rerank_depth = marqo_query.limit + marqo_query.offset
+            additional_hits = 0
+
+        rerank_depth = marqo_query.rerank_depth_tensor if marqo_query.rerank_depth_tensor else base_rerank_dept
 
         terms = []
         for field in fields_to_search:

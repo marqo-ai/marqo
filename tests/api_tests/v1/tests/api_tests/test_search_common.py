@@ -166,3 +166,71 @@ class TestSearchCommon(MarqoTestCase):
                 )
                 self.assertIn("Cannot set both imageDownloadHeaders and mediaDownloadHeaders.",
                               str(cm.exception.message))
+
+    def test_rerank_depth(self):
+        for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+
+            # add 10 docs
+            docs = []
+            for i in range(10):
+                docs.append({
+                    "title": f"Doc {i}",
+                    "content": "some extra info",
+                    "_id": str(i)
+                })
+
+            self.client.index(index_name).add_documents(docs, tensor_fields=["title", "content"] if index_name == self.unstructured_image_index_name else None)
+
+            # search for "Doc" with rerank_depth=5
+            search_res = self.client.index(index_name).search(q="Doc", rerank_depth=5, limit=10, search_method="TENSOR")
+            # due to additional hits sometimes the result may not be 5
+            self.assertNotEqual(len(search_res["hits"]), 10)
+
+            # search for "Doc" without rerank_depth
+            search_res = self.client.index(index_name).search(q="Doc", limit=10, search_method="TENSOR")
+            self.assertEqual(len(search_res["hits"]), 10)
+
+    def test_rerank_depth_hybrid(self):
+        for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+
+            # add 10 docs
+            docs = []
+            for i in range(10):
+                docs.append(
+                    {
+                        "title": f"Doc {i}",
+                        "content": "some extra info",
+                        "_id": str(i)
+                    }
+                )
+
+            self.client.index(index_name).add_documents(docs, tensor_fields=["title", "content"] if index_name == self.unstructured_image_index_name else None)
+
+            # search for "Doc" with rerank_depth=5
+            search_res = self.client.index(index_name).search(
+                q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                    "rankingMethod": "tensor",
+                    "retrievalMethod": "tensor",
+                    "rerankDepthTensor": 5
+                }
+            )
+            # due to additional hits sometimes the result may not be 5
+            self.assertNotEqual(len(search_res["hits"]), 10)
+
+            # search for "Doc" without rerank_depth
+            search_res = self.client.index(index_name).search(
+                q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                    "rankingMethod": "tensor",
+                    "retrievalMethod": "tensor",
+                }
+            )
+            self.assertEqual(len(search_res["hits"]), 10)
+
+            with self.assertRaises(MarqoWebError):
+                self.client.index(index_name).search(
+                    q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                        "rankingMethod": "tensor",
+                        "retrievalMethod": "tensor",
+                        "rerankDepthTensor": -1
+                    }
+                )

@@ -1169,3 +1169,43 @@ class TestSearch(MarqoTestCase):
                     [hit["_id"] for hit in full_rerank_res["hits"][:3]],
                     [hit["_id"] for hit in partial_rerank_res["hits"]]
                 )
+
+    def test_rerank_depth_tensor_search_with_limit_offset_and_ef_search(self):
+        """Test that rerank_depth restricts reranking to top-N documents."""
+        docs = [{
+            "_id": f"doc_{i}",
+            "text_field_1": f"sample text {i}"
+        } for i in range(10)]
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_fields = ["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=docs, tensor_fields=tensor_fields
+                    )
+                )
+
+                # test limit is not overwritten
+                limited_res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="sample text", rerank_depth=5, result_count=3
+                )
+                self.assertEqual(len(limited_res["hits"]), 3)
+
+                # test offset higher than rerank depth returns no results
+
+                lower_offset = tensor_search.search(
+                    config=self.config, index_name=index.name, text="sample text",
+                    rerank_depth=2, offset=1, result_count=1
+                )
+
+                # Search with high rerank_depth (higher precision expected)
+                higher_offset = tensor_search.search(
+                    config=self.config, index_name=index.name, text="sample text",
+                    rerank_depth=2, offset=2, result_count=1
+                )
+
+                self.assertEqual(len(lower_offset["hits"]), 1)
+                self.assertEqual(len(higher_offset["hits"]), 0)
+
