@@ -6,6 +6,16 @@ from integ_tests.inference.inference_test_case import *
 from integ_tests.marqo_test import TestImageUrls
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
+import json
+import os
+from pathlib import Path
+
+from parameterized import parameterized_class
+
+from integ_tests.inference.inference_test_case import *
+from integ_tests.marqo_test import TestImageUrls
+from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
+from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
 
 LARGE_OPEN_CLIP_TEST_MODELS = [
     'open_clip/ViT-L-14/laion400m_e32',
@@ -64,6 +74,14 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
     def setUpClass(cls):
         super().setUpClass()
         clear_loaded_models()
+        current_file = Path(__file__).resolve()
+        target_dir = current_file.parent.parent.parent
+        json_file = target_dir / "embeddings_reference" / "embeddings_large_open_clip_python_3_8.json"
+        if not os.path.exists(json_file):
+            raise FileNotFoundError(f"File {json_file} not found, which is needed to compare embeddings.")
+
+        with open(json_file, 'r') as f:
+            cls.open_clip_embeddings_reference = json.load(f)
 
     def setUp(self):
         super().setUp()
@@ -74,6 +92,25 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
             device=self.device
         )
         self.eps = 1e-6
+
+    def test_embeddings_regression(self):
+        try:
+            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
+        except KeyError:
+            self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
+
+        text_texts = ['hello', 'this is a test sentence. so is this.']
+        for text in text_texts:
+            with self.subTest(f"Test text: {text}"):
+                embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
+                pipeline_embeddings = self.encode_content_helper(
+                    content=[text],
+                    model_name=self.model_name,
+                    modality=Modality.TEXT,
+                    device=self.device,
+                    normalize_embeddings=False
+                )
+                self.assertTrue(np.allclose(np.array(embeddings_reference), pipeline_embeddings[0], atol=1e-5))
 
     def test_open_clip_encode_text_normalized(self):
         """
