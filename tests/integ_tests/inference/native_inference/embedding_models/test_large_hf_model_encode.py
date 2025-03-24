@@ -10,9 +10,9 @@ from marqo.inference.native_inference.load_model import load_model, clear_loaded
 
 LARGE_HF_TEST_MODELS = [
     "hf/e5-large",
-    "hf/e5-large-unsupervised"
+    "hf/e5-large-unsupervised",
     "hf/bge-large-zh-v1.5",
-    "hf/bge-large-en-v1.5"
+    "hf/bge-large-en-v1.5",
     "hf/snowflake-arctic-embed-l",
     "hf/multilingual-e5-small",
     "hf/multilingual-e5-base",

@@ -17,18 +17,16 @@ HF_TEST_MODELS = [
     "hf/e5-small-unsupervised",
     "hf/e5-base-unsupervised",
     "hf/e5-base-v2",
-    "intfloat/e5-base-v2",
     "hf/multilingual-e5-small",
-    "intfloat/multilingual-e5-small",
-    "intfloat/multilingual-e5-large",
-    "intfloat/e5-large-v2",
-    "intfloat/e5-small-v2",
-    "intfloat/multilingual-e5-base",
+    "hf/multilingual-e5-large",
+    "hf/e5-large-v2",
+    "hf/e5-small-v2",
+    "hf/multilingual-e5-base",
     "hf/bge-small-en-v1.5",
     "hf/bge-base-en-v1.5",
-    "BAAI/bge-base-en-v1.5",
-    "BAAI/bge-large-en-v1.5",
-    "hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"
+    "hf/bge-large-en-v1.5",
+    "hf/snowflake-arctic-embed-m",
+    "hf/snowflake-arctic-embed-m-v1.5"
 ]
 
 
