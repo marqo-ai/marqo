@@ -236,3 +236,12 @@ class TestRecommend(MarqoTestCase):
                 total_hits_in_res = len(res["hits"])
                 total_hits_in_res_higher_rerank_depth = len(res_higher_rerank_depth["hits"])
                 assert total_hits_in_res_higher_rerank_depth > total_hits_in_res
+
+                with self.assertRaises(MarqoWebError):
+                    # rerank_depth cannot be negative
+                    self.client.index(index_name).recommend(
+                        documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
+                        exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
+                        searchable_attributes=searchable_attributes, show_highlights=True, attributes_to_retrieve=["title"],
+                        rerank_depth=-1
+                    )
