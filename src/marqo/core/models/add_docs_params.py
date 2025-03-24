@@ -20,8 +20,7 @@ class AddDocsParams(BaseModel):
         index_name: name of the index
         docs: List of documents
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
-        device: Device used to carry out the document update, if `None` is given, it will be determined by
-                EnvVars.MARQO_BEST_AVAILABLE_DEVICE
+        device: Device used to carry out the document update, if `None` is given, it will be determined inference
         image_download_thread_count: number of threads used to concurrently download images
         media_download_headers: headers to authenticate media download requests
         mappings: a dictionary used to handle all the object field content in the doc,

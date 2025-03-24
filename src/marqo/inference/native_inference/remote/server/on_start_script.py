@@ -35,7 +35,6 @@ def on_start(config: Config):
     to_run_on_start = (
         # DownloadStartText(),
         # CUDAAvailable(),
-        # SetBestAvailableDevice(),
         SetEnableVideoGPUAcceleration(),
         CheckNLTKTokenizers(),
         CacheModels(config),
@@ -75,25 +74,6 @@ class CUDAAvailable:
             device_names.append({'id': device_id, 'name': id_to_device(device_id)})
 
         self.logger.info(f"Found devices {device_names}")
-
-
-class SetBestAvailableDevice:
-    # TODO [Refactoring device logic] move this logic to device manager, get rid of MARQO_BEST_AVAILABLE_DEVICE envvar
-    """sets the MARQO_BEST_AVAILABLE_DEVICE env var
-    """
-    logger = get_logger('SetBestAvailableDevice')
-
-    def run(self):
-        """
-            This is set once at startup time. We assume it will NOT change,
-            if it does, health check should throw a warning.
-        """
-        if torch.cuda.is_available():
-            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
-        else:
-            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
-
-        self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
 class CacheModels:

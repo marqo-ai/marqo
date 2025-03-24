@@ -80,6 +80,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_INFERENCE_CACHE_TYPE: "LRU",
 
-        EnvVars.MARQO_BEST_AVAILABLE_DEVICE: "cpu",  # on_start_script will determine this.
         EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: None,  # on_start_script will determine this.
     }
