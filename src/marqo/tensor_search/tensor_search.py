@@ -1051,9 +1051,6 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    if not device:
-        raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
-
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
     index_name = marqo_index.name
