@@ -6,7 +6,7 @@ from unittest import mock
 import torch
 
 from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError, DeviceError
-from marqo.core.inference.device_manager import DeviceManager, Device
+from marqo.inference.native_inference.device_manager import DeviceManager, Device
 
 
 class TestDeviceManager(unittest.TestCase):
@@ -54,7 +54,7 @@ class TestDeviceManager(unittest.TestCase):
     def test_cuda_health_check_should_skip_without_cuda_devices(self):
         device_manager = self._device_manager_without_cuda()
 
-        with mock.patch("marqo.core.inference.device_manager.torch") as mock_cuda:
+        with mock.patch("marqo.inference.native_inference.device_manager.torch") as mock_cuda:
             device_manager.cuda_device_health_check()
         self.assertEqual(0, len(mock_cuda.mock_calls))
 
@@ -63,7 +63,7 @@ class TestDeviceManager(unittest.TestCase):
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.randn", return_value=torch.tensor([1, 2, 3])), \
-                mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
+                mock.patch("marqo.inference.native_inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
         # verify there's no warning or error level logging
@@ -124,7 +124,7 @@ class TestDeviceManager(unittest.TestCase):
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.cuda.memory_stats", side_effect=[RuntimeError("not a memory issue"), Exception("random exception")]), \
-                mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
+                mock.patch("marqo.inference.native_inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
         self.assertEqual('error', mock_logger.mock_calls[0][0])
