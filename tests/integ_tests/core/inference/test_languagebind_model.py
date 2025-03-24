@@ -16,6 +16,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 
 
+@unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
 @mark.unittest
 @mark.largemodel
 class TestLanguagebindModels(unittest.TestCase):
