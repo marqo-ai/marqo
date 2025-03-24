@@ -400,14 +400,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
 
-    # TODO [Refactoring device logic] use device info gathered from device manager
-    if device is None:
-        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        if selected_device is None:
-            raise api_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-    else:
-        selected_device = device
+    selected_device = device
 
     # Fetch marqo index to pass to search method
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)

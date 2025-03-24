@@ -50,7 +50,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.exception_handler(Exception)
-async def http_exception_handler(request: Request, exc: Exception):
+async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Encountered exception: {str(exc)}", exc_info=True)
     media_type = request.headers.get("Accept", "application/json")
     error_response = {"detail": str(exc)}

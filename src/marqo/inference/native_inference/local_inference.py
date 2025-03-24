@@ -28,7 +28,7 @@ class NativeInferenceLocal(Inference):
                 model_name=request.model_config.model_name,
                 model_properties=request.model_config.model_properties,
                 model_auth=request.model_config.model_auth,
-                device=self.device_manager.pick_and_validate_device()
+                device=self.device_manager.pick_and_validate_device(device=request.device)
             )
         except (S2InferenceError, DeviceError) as e:
             raise inference_api_exceptions.ModelError(str(e)) from e
