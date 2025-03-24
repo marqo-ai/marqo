@@ -108,7 +108,7 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
                     model_name=self.model_name,
                     modality=Modality.TEXT,
                     device=self.device,
-                    normalize_embeddings=False
+                    normalize_embeddings=True
                 )
                 self.assertTrue(np.allclose(np.array(embeddings_reference), pipeline_embeddings[0], atol=1e-5))
 
