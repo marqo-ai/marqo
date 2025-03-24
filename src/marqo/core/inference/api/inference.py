@@ -33,7 +33,10 @@ class InferenceRequest(ImmutableBaseModel):
         modality: Modality = values.get('modality')
         preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
 
-        if not modality or not preprocessing_config or modality.value != preprocessing_config.modality:
+        if not modality or not preprocessing_config:
+            raise ValueError("Modality or preprocessing_config is missing.")
+
+        if modality.value != preprocessing_config.modality:
             raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
                              f"does not support modality: {modality}")
 
