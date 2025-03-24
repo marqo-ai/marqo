@@ -60,7 +60,7 @@ class TestOpenClipModelPreprocessor(InferenceTestCase):
 
         for text_output in text_outputs:
             self.assertIsInstance(text_output, Tensor)
-            self.assertEqual(text_output.device, self.device)
+            self.assertEqual(text_output.device.type, self.device)
 
     def test_to_device_called_on_preprocessor_for_image(self):
         """A test to ensure the Tensor is moved to the correct device when self.preprocessor.preprocess is called."""
