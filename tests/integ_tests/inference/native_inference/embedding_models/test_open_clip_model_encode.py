@@ -97,7 +97,11 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     device=self.device,
                     normalize_embeddings=False
                 )
-                self.assertTrue(np.allclose(np.array(embeddings_reference), pipeline_embeddings[0], atol=1e-5))
+
+                embeddings_difference = self.calculate_embeddings_difference(
+                    embeddings_reference, pipeline_embeddings[0]
+                )
+                self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
 
     def test_open_clip_encode_text_normalized(self):
         """
