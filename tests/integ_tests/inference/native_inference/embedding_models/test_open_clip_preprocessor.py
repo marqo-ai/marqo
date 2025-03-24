@@ -121,7 +121,7 @@ class TestOpenClipModelPreprocessorCuda(InferenceTestCase):
         text_outputs = self.preprocessor.preprocess(test_texts, modality=Modality.TEXT)
 
         self.assertIsInstance(text_outputs, list)
-        self.assertEqual(0, len(text_outputs))
+        self.assertEqual(2, len(text_outputs))
 
         for text_output in text_outputs:
             self.assertIsInstance(text_output, Tensor)
@@ -136,7 +136,7 @@ class TestOpenClipModelPreprocessorCuda(InferenceTestCase):
 
         # Assertions for image tensors
         self.assertIsInstance(image_outputs, list)
-        self.assertGreater(2, len(image_outputs))
+        self.assertEqual(2, len(image_outputs))
 
         for tensor in image_outputs:
             self.assertIsInstance(tensor, Tensor)
