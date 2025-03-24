@@ -160,7 +160,9 @@ case "$MARQO_MODE" in
     ;;
   API)
     # set default number of workers to 1
-    set -q MARQO_API_WORKERS; or set MARQO_API_WORKERS 1
+    if [ -z "${MARQO_API_WORKERS}" ]; then
+      export MARQO_API_WORKERS=1
+    fi
 
     # Start the Marqo API in the background
     cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
