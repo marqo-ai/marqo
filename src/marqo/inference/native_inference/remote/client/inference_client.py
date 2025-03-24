@@ -15,16 +15,17 @@ logger = logging.get_logger(__name__)
 
 
 class NativeInferenceClient(Inference):
-    def __init__(self, base_url: str, min_pool_size: int = 20, timeout: int = 300):
+    def __init__(self, base_url: str, pool_size: int = 20, timeout: int = 300):
         """
         Args:
             base_url (str): The base URL of the remote inference service.
+            pool_size (int): The connection pool size of the httpx client. Please note that we don't cap the active
+                connection number. So if throttling limit is raised, the requests to inference server will not queue up.
+            timeout (int): The timeout of httpx client to inference server in seconds. We set a large default timeout
+                to cater for batch inference requests containing multiple images or media files
         """
         self.base_url = base_url.rstrip("/")
-
-        # Please note that we don't cap the pool size. So if throttling limit is raised, the
-        # inference requests won't queue up here.
-        limits = httpx.Limits(max_keepalive_connections=min_pool_size, max_connections=None)
+        limits = httpx.Limits(max_keepalive_connections=pool_size, max_connections=None)
         self.client = httpx.Client(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout))
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
