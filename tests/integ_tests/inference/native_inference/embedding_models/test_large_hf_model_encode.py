@@ -45,14 +45,14 @@ class TestLargeHFModelEncode(InferenceTestCase):
             target_dir / "embeddings_reference" / "embeddings_large_multilingual_e5_python_3_8.json",
         ]
 
-        cls.open_clip_embeddings_reference = {}
+        cls.hf_embeddings_reference = {}
 
         for file in files:
             if not os.path.exists(file):
                 raise FileNotFoundError(f"File {file} not found, which is needed to compare embeddings.")
 
             with open(file, 'r') as f:
-                cls.open_clip_embeddings_reference.update(json.load(f))
+                cls.hf_embeddings_reference.update(json.load(f))
 
     def setUp(self):
         super().setUp()
@@ -66,7 +66,7 @@ class TestLargeHFModelEncode(InferenceTestCase):
 
     def test_embeddings_regression(self):
         try:
-            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
+            self.model_embeddings_reference = self.hf_embeddings_reference[self.model_name]
         except KeyError:
             self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
 
