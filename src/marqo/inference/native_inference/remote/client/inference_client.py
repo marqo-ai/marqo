@@ -48,7 +48,7 @@ class NativeInferenceClient(Inference):
                     error_response = msgpack.unpackb(e.response.content, raw=False)
                     error_message = error_response["detail"]
                 except Exception as parse_error:
-                    logger.warning(f'Error parsing error message: {str(parse_error)}')
+                    logger.warning(f'Error parsing error message: {str(parse_error)}', exc_info=True)
                     error_message = 'Error parsing error message in msgpack format'
             else:
                 error_message = str(e)
