@@ -4,6 +4,7 @@ from unittest.mock import patch, Mock
 import numpy as np
 
 from marqo.core.inference.api import *
+from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.load_model import MODEL_PROPERTIES
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -86,7 +87,7 @@ class InferenceTestCase(TestCase):
             preprocessing_config=preprocessing_config
         )
 
-        results: InferenceResult = NativeInferenceLocal().vectorise(inference_request)
+        results: InferenceResult = NativeInferenceLocal(DeviceManager()).vectorise(inference_request)
         embeddings = [result[0][1] for result in results.result]
         return embeddings
 
