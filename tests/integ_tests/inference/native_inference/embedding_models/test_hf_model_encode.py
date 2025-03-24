@@ -89,7 +89,7 @@ class TestHFModelEncode(InferenceTestCase):
                 )
                 self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
 
-    def test_open_hf_text_normalized(self):
+    def test_hf_text_normalized(self):
         """
         A test to ensure that the hf model generates the same embeddings as the pipeline for text inputs when
         normalize is set to True.
