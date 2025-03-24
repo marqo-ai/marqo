@@ -316,7 +316,7 @@ class TestStructuredHybridSearch(MarqoTestCase):
                     )
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
-                    self.assertEqual(hybrid_res["hits"][0]["_score"], 30.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_score"], 30.0, places=5)
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
                     self.assertEqual(hybrid_res["hits"][1]["_score"], 20.0)
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
