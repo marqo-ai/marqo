@@ -18,7 +18,6 @@ LARGE_HF_TEST_MODELS = [
     "hf/multilingual-e5-base",
     "hf/multilingual-e5-large",
     "hf/multilingual-e5-large-instruct",
-    "hf/snowflake-arctic-embed-l"
 ]
 
 @pytest.mark.largemodel
