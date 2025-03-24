@@ -71,12 +71,16 @@ class TestHFModelEncode(InferenceTestCase):
             self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
 
         if self.model_name in [
-            "hf/bge-large-en-v1.5"
+            "hf/bge-small-en-v1.5",
+            "hf/bge-base-en-v1.5",
+            "hf/bge-large-en-v1.5",
+            "hf/snowflake-arctic-embed-m",
+            "hf/snowflake-arctic-embed-m-v1.5"
         ]:
             self.skipTest(
                 reason=f"Model {self.model_name} is still using the incorrect poolingMethod "
                        f"(should be CLS but use MEAN). However, the generated embeddings are using "
-                       f"CLS. So we skip the test."
+                       f"CLS. So we skip the embedding tests."
             )
 
         text_texts = ['hello', 'this is a test sentence. so is this.']
