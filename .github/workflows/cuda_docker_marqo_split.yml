@@ -86,7 +86,7 @@ jobs:
           bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
 
           bash scripts/start_cuda_docker_marqo_split.sh $MARQO_IMAGE_NAME
-          
+          df -k
           pytest tests/
 
   Stop-Runner:
