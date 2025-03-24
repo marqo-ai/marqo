@@ -14,7 +14,7 @@ from starlette.applications import Starlette
 from marqo import config, version
 from marqo.config import Config
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.inference.device_manager import DeviceManager
+from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import *

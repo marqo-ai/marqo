@@ -1,7 +1,7 @@
 from marqo.core.inference.api import Inference
+from marqo.inference.native_inference.device_manager import DeviceManager
 
 # TODO move device manager to native_inference
-from marqo.core.inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 
 
