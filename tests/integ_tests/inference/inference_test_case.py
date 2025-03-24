@@ -89,3 +89,19 @@ class InferenceTestCase(TestCase):
         results: InferenceResult = NativeInferenceLocal().vectorise(inference_request)
         embeddings = [result[0][1] for result in results.result]
         return embeddings
+
+    def calculate_embeddings_difference(self, embedding_1: ndarray, embedding_2: ndarray):
+        """
+        Calculate the difference between two embeddings.
+
+        We use the mean absolute error (MAE) to calculate the difference between the two embeddings after normalizing
+        them.
+        """
+
+        if embedding_1.shape != embedding_2.shape:
+            raise ValueError("The two embeddings must have the same shape.")
+
+        embedding_1 = embedding_1 / np.linalg.norm(embedding_1)
+        embedding_2 = embedding_2 / np.linalg.norm(embedding_2)
+
+        return np.mean(np.abs(embedding_1 - embedding_2))

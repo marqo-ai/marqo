@@ -1,3 +1,7 @@
+import json
+import os
+from pathlib import Path
+
 import pytest
 import torch
 from parameterized import parameterized_class
@@ -64,6 +68,14 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
     def setUpClass(cls):
         super().setUpClass()
         clear_loaded_models()
+        current_file = Path(__file__).resolve()
+        target_dir = current_file.parent.parent.parent
+        json_file = target_dir / "embeddings_reference" / "embeddings_large_open_clip_python_3_8.json"
+        if not os.path.exists(json_file):
+            raise FileNotFoundError(f"File {json_file} not found, which is needed to compare embeddings.")
+
+        with open(json_file, 'r') as f:
+            cls.open_clip_embeddings_reference = json.load(f)
 
     def setUp(self):
         super().setUp()
@@ -74,6 +86,29 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
             device=self.device
         )
         self.eps = 1e-6
+
+    def test_embeddings_regression(self):
+        try:
+            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
+        except KeyError:
+            self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
+
+        text_texts = ['hello', 'this is a test sentence. so is this.']
+        for text in text_texts:
+            with self.subTest(f"Test text: {text}"):
+                embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
+                pipeline_embeddings = self.encode_content_helper(
+                    content=[text],
+                    model_name=self.model_name,
+                    modality=Modality.TEXT,
+                    device=self.device,
+                    normalize_embeddings=True
+                )
+
+                embeddings_difference = self.calculate_embeddings_difference(
+                    embeddings_reference, pipeline_embeddings[0]
+                )
+                self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
 
     def test_open_clip_encode_text_normalized(self):
         """
