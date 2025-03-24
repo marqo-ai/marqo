@@ -31,8 +31,9 @@ MARQO_OPEN_CLIP_REGISTRY_PREFIX = "open_clip/"
 
 class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
 
-    def __init__(self, tokenizer, image_preprocessor):
+    def __init__(self, tokenizer, image_preprocessor, device: str):
         super().__init__(tokenizer, image_preprocessor)
+        self.device = device
 
     def preprocess(self, inputs: Union[list[Image], list[str]], modality: Modality):
         if modality == Modality.TEXT:
@@ -51,7 +52,7 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
             Each tensor has the shape (N, M) where N is the batch_size,
              M is the length of the tokenized text.
         """
-        return [self.tokenizer(text) for text in inputs]
+        return [self.tokenizer(text).to(self.device) for text in inputs]
 
     def _preprocess_image(self, inputs: list[Image]) -> List[Tensor]:
         """
@@ -65,7 +66,7 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
              H and W are the height and width of the image.
         """
         # Need unsqueeze(0) to add the batch dimension
-        return [self.image_preprocessor(image).unsqueeze(0) for image in inputs]
+        return [self.image_preprocessor(image).unsqueeze(0).to(self.device) for image in inputs]
 
 
 class OpenCLIPModel(AbstractCLIPModel):
@@ -111,7 +112,7 @@ class OpenCLIPModel(AbstractCLIPModel):
             )
         self.model = self.model.to(self.device)
         self.model.eval()
-        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.preprocess)
+        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.preprocess, device=self.device)
 
 
     def get_preprocessor(self) -> OpenCLIPPreprocessor:
@@ -302,7 +303,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         return model_file_path
 
     def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
-        images = torch.cat(images, dim=0).to(self.device)
+        images = torch.cat(images, dim=0)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
@@ -318,7 +319,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         return self._convert_output(outputs)
 
     def encode_text(self, text: List[Tensor], normalize=True) -> List[ndarray]:
-        text = torch.cat(text, dim=0).to(self.device)
+        text = torch.cat(text, dim=0)
 
         if self.model is None:
             self.load()
