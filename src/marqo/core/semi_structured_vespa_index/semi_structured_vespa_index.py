@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional, Type, Union, cast
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.search import search_filter
@@ -83,7 +84,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
         # Hybrid must be checked first since it is a subclass of Tensor and Lexical
         if isinstance(marqo_query, MarqoHybridQuery):
-            return StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
+            return self._to_vespa_hybrid_query(marqo_query)
         elif isinstance(marqo_query, MarqoTensorQuery):
             return StructuredVespaIndex._to_vespa_tensor_query(self, marqo_query)
         elif isinstance(marqo_query, MarqoLexicalQuery):
@@ -91,6 +92,45 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
+
+    def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
+        vespa_query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
+        if marqo_query.return_facets:
+            grouping_query_suffix = self.build_grouping_suffix(
+                marqo_query.facets_parameters if marqo_query.facets_parameters else FacetsParameters()
+            )
+            vespa_query['marqo__yql.tensor'] += grouping_query_suffix
+            vespa_query['marqo__yql.lexical'] += grouping_query_suffix
+        return vespa_query
+
+    def build_grouping_suffix(self, facets_parameters: FacetsParameters):
+        """ Build vespa grouping syntax based query on passed parameters.
+        Query consists of 4 parts:
+        1. groups selection
+        2. max results specification
+        3. sorting specification
+        4. facet function
+        """
+        grouping_query = ""
+        if facets_parameters.maxResults:
+            grouping_query += f"max({facets_parameters.maxResults}) "
+        if facets_parameters.maxDepth:
+            grouping_query += f"precision({facets_parameters.maxDepth}) "
+        grouping_query += f"order({'-' if facets_parameters.order == 'DESC' else ''}count()) "
+        grouping_query += " each(output(count()))"
+
+        final_query = ""
+
+        if facets_parameters.facetFields:
+            for field in facets_parameters.facetFields:
+                final_query += ' | all(group(%s{"%s"})%s)' % (SHORT_STRINGS_FIELDS, field, grouping_query)
+        else:
+            final_query += " | all(group(%s.key) each(group(%s.value)%s))" % (
+                SHORT_STRINGS_FIELDS, SHORT_STRINGS_FIELDS, grouping_query
+            )
+
+        return final_query
+
 
     def _get_string_array_attributes_to_retrieve(self, attributes_to_retrieve: List) -> List[str]:
         name_to_string_array_field_map = self.get_marqo_index().name_to_string_array_field_map

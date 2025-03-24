@@ -7,6 +7,7 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
@@ -22,7 +23,8 @@ from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreMo
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
+from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger, \
+    gather_facets_from_response
 from marqo.vespa.exceptions import VespaStatusError
 import semver
 
@@ -37,7 +39,9 @@ class HybridSearch:
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
-            hybrid_parameters: HybridParameters = None
+            hybrid_parameters: HybridParameters = None,
+            return_facets: bool = False,
+            facets_parameters: FacetsParameters = None
     ) -> Dict:
         """
 
@@ -61,6 +65,9 @@ class HybridSearch:
                 highlights: if True, highlights will be returned
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
+                    default values will be used.
+                return_facets: if True, facets will be returned
+                facets_parameters: FacetsParameters object to specify all parameters for grouping. If not provided,
                     default values will be used.
             Returns:
 
@@ -198,7 +205,9 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersLexical is not None else None,
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
-            hybrid_parameters=hybrid_parameters
+            hybrid_parameters=hybrid_parameters,
+            return_facets=return_facets,
+            facets_parameters=facets_parameters,
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -233,12 +242,15 @@ class HybridSearch:
 
         # SEARCH TIMER-LOGGER (post-processing)
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
-        gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+        if not return_facets:
+            gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+        else:
+            gathered_facets = gather_facets_from_response(responses, facets_parameters.facetFields)
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
-            f"{len(gathered_docs)} results from Vespa."
+            f"{len(gathered_docs if not return_facets else gathered_facets)} results from Vespa."
         )
 
-        return gathered_docs
+        return gathered_docs if not return_facets else gathered_facets

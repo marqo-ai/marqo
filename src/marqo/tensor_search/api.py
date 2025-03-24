@@ -322,7 +322,6 @@ def facets(facets_query: FacetsQuery, index_name:str, device: str = Depends(api_
             config=marqo_config, text=facets_query.q,
             index_name=index_name,
             searchable_attributes=facets_query.searchableAttributes,
-            search_method=facets_query.searchMethod,
             result_count=facets_query.limit, offset=facets_query.offset,
             ef_search=facets_query.efSearch, approximate=facets_query.approximate,
             filter=facets_query.filter, device=device,
@@ -331,6 +330,8 @@ def facets(facets_query: FacetsQuery, index_name:str, device: str = Depends(api_
             context=facets_query.context,
             model_auth=facets_query.modelAuth,
             text_query_prefix=facets_query.textQueryPrefix,
+            hybrid_parameters=facets_query.hybridParameters,
+            facets_parameters=facets_query.groupingParameters
         )
         return ORJSONResponse(result)
 
@@ -361,6 +362,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             model_auth=search_query.modelAuth,
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters,
+            return_facets=search_query.returnFacets,
+            facets_parameters=search_query.facetsParameters,
         )
         return ORJSONResponse(result)
 

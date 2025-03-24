@@ -45,6 +45,7 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
@@ -310,7 +311,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
-           grouping_parameters: Optional[GroupingParameters] = None,
+           return_facets: bool = False,
+           facets_parameters: Optional[FacetsParameters] = None,
+
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -340,7 +343,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
-        grouping_parameters: Parameters for grouping
+        return_facets: Whether to return facets
+        facets_parameters: Parameters for grouping
     Returns:
 
     """
@@ -451,7 +455,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters
+                hybrid_parameters=hybrid_parameters, return_facets=return_facets, facets_parameters=facets_parameters
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -661,6 +665,23 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         hits.append(marqo_doc)
 
     return {'hits': hits}
+
+def gather_facets_from_response(response: QueryResult, facet_fields: Optional[list[str]]) -> Dict[str, Any]:
+    """
+    Convert a VespaQueryResponse to a Marqo search response
+    """
+    facets = {}
+    if not facet_fields:
+        root_0_group = [group for group in response.facets if group.id == 'group:root:0'][0]
+        print("FACETS")
+        print(response.facets[-1])
+        for field in root_0_group.children[0].children:
+            field_name = field.id.split(':')[-1] # field is formatted as 'group:string:field'
+            facets[field_name] = {}
+            for value in field.children[0].children:
+                sub_field_name = value.id.split(':')[-1]
+                facets[field_name][sub_field_name] = value.fields['count()']
+    return {'facets': facets}
 
 
 def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set[str]) -> Dict[str, Any]:

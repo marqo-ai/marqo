@@ -10,6 +10,7 @@ import pydantic
 from pydantic import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
@@ -55,6 +56,8 @@ class SearchQuery(BaseMarqoModel):
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
+    returnFacets: Optional[bool] = None
+    facetsParameters: Optional[FacetsParameters] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -181,6 +184,8 @@ class FacetsQuery(BaseMarqoModel):
     context: Optional[SearchContext] = None
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
+    hybridParameters: Optional[HybridParameters] = None
+    groupingParameters: Optional[FacetsParameters] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
