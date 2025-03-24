@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Any
+from typing import Optional, List
+
+from numpy import ndarray
 
 from marqo.core.inference.api.inference import ModelAuth
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from numpy import ndarray
 from marqo.core.inference.api.modality import Modality
 
 
@@ -64,6 +64,6 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def get_preprocessor(self)-> AbstractPreprocessor:
+    def get_preprocessor(self):
         """Get the preprocessor for the model."""
         pass
