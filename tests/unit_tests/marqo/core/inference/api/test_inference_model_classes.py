@@ -155,7 +155,7 @@ class TestInferenceRequest(unittest.TestCase):
                 model_config=self.model_config,
                 preprocessing_config=TextPreprocessingConfig()
             )
-        self.assertIn('Modality or preprocessing_config is missing.', str(context.exception))
+        self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
 
     def test_invalid_inference_request_with_missing_preprocessing_config(self):
         with self.assertRaises(ValidationError) as context:
@@ -165,7 +165,7 @@ class TestInferenceRequest(unittest.TestCase):
                 model_config=self.model_config,
                 preprocessing_config=None
             )
-        self.assertIn('Modality or preprocessing_config is missing.', str(context.exception))
+        self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
 
     def test_invalid_inference_request_for_non_matching_modality(self):
         for modality, preprocessing_config in [
