@@ -70,6 +70,11 @@ class TestOpenClipModelEncode(InferenceTestCase):
         with open(json_file, 'r') as f:
             cls.open_clip_embeddings_reference = json.load(f)
 
+        try:
+            cls.model_embeddings_reference = cls.open_clip_embeddings_reference[cls.model_name]
+        except KeyError:
+            raise KeyError(f"Model {cls.model_name} not found in embeddings reference file.")
+
 
     def setUp(self):
         super().setUp()
@@ -80,10 +85,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
             device=self.device
         )
         self.eps = 1e-6
-        try:
-            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
-        except KeyError:
-            raise KeyError(f"Model {self.model_name} not found in embeddings reference file.")
+
 
     def test_embeddings_regression(self):
         text_texts = ['hello', 'this is a test sentence. so is this.']
