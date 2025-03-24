@@ -972,7 +972,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
-                 "poolingMethod": "mean",
+                 "poolingMethod": "cls",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-small-zh-v1.5":
