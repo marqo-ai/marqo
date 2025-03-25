@@ -4,6 +4,7 @@ from starlette import status
 from starlette.responses import JSONResponse
 
 from marqo import version, logging
+from marqo.inference.native_inference import load_model
 from marqo.inference.native_inference.remote.server.inference_config import Config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start
 from marqo.tensor_search.telemetry import TelemetryMiddleware
@@ -142,6 +143,16 @@ def liveness_check(config: Config = Depends(get_config)) -> JSONResponse:
     """
     config.device_manager.cuda_device_health_check()
     return JSONResponse(content={"status": "ok"}, status_code=200)
+
+
+@app.get("/models")
+def get_loaded_models(config: Config = Depends(get_config)):
+    return config.model_manager.get_loaded_models()
+
+
+@app.delete("/models")
+def eject_model(model_name: str, model_device: str, config: Config = Depends(get_config)):
+    return config.model_manager.eject_model(model_name, model_device)
 
 
 if __name__ == "__main__":

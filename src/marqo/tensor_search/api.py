@@ -14,7 +14,7 @@ from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
-from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.inference.api import exceptions as inference_exceptions, ModelManager
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
@@ -26,7 +26,9 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
+from marqo.inference.native_inference import load_model
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
+from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -71,14 +73,18 @@ def generate_config() -> config.Config:
         native_inference_local_config = inference_config.Config()
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference
+        model_manager = native_inference_local_config.model_manager
     else:
         inference = NativeInferenceClient(
             base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
             pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
             timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
         )
+        model_manager = ModelManagerClient(
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+        )
 
-    return config.Config(vespa_client, inference, zookeeper_client)
+    return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -486,21 +492,21 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 
 @app.get("/models")
-def get_loaded_models():
+def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
     """
     Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
     [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
     """
-    return tensor_search.get_loaded_models()
+    return marqo_config.model_manager.get_loaded_models()
 
 
 @app.delete("/models")
-def eject_model(model_name: str, model_device: str):
+def eject_model(model_name: str, model_device: str, marqo_config: config.Config = Depends(get_config)):
     """
     Eject a model from a specific device. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
-    return tensor_search.eject_model(model_name=model_name, device=model_device)
+    return marqo_config.model_manager.eject_model(model_name=model_name, device=model_device)
 
 
 @app.get("/device/cpu")
@@ -605,7 +611,7 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.get("/health" , include_in_schema=False)
+@app.get("/health", include_in_schema=False)
 def check_health(marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health()
     return HealthResponse.from_marqo_health_status(health_status)

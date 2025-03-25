@@ -5,7 +5,7 @@ from kazoo.handlers.threading import KazooTimeoutError
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.inference.api import Inference
+from marqo.core.inference.api import Inference, ModelManager
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
 from marqo.logging import get_logger
@@ -23,6 +23,7 @@ class Config:
             self,
             vespa_client: VespaClient,
             inference: Inference,
+            model_manager: ModelManager,
             zookeeper_client: Optional[ZookeeperClient] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
@@ -46,6 +47,8 @@ class Config:
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management, self.inference)
         self.embed = Embed(vespa_client, self.index_management, self.inference)
+
+        self.model_manager = model_manager
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

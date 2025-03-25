@@ -6,7 +6,7 @@ from numpy import ndarray
 from pydantic import StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.inference.api import InferenceError, Modality, PreprocessingConfigType
+from marqo.core.inference.api import Modality, PreprocessingConfigType
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -80,3 +80,12 @@ class Inference(ABC):
         """
         pass
 
+
+class ModelManager(ABC):
+    @abstractmethod
+    def get_loaded_models(self) -> dict:
+        pass
+
+    @abstractmethod
+    def eject_model(self, model_name: str, device: str) -> dict:
+        pass
