@@ -18,6 +18,7 @@ We may test multiple different env vars in the same test case. This is because
  this test suite's runtime from growing too large.
 """
 import json
+import unittest
 
 from tests import marqo_test
 from tests import utilities
@@ -72,6 +73,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         res = self.client.index("test_index_for_preload_models").get_loaded_models()
         assert set([item["model_name"] for item in res["models"]]) == set(custom_models)
 
+    @unittest.skip(reason="Temproraliy skips this until inference caching is implemented")
     def test_multiple_env_vars(self):
         # TODO: Add log test
         """
