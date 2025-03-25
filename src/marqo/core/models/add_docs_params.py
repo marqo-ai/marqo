@@ -10,7 +10,7 @@ from marqo.api.exceptions import BadRequestError
 from marqo.tensor_search.enums import EnvVars
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class AddDocsParams(BaseModel):
@@ -20,8 +20,7 @@ class AddDocsParams(BaseModel):
         index_name: name of the index
         docs: List of documents
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
-        device: Device used to carry out the document update, if `None` is given, it will be determined by
-                EnvVars.MARQO_BEST_AVAILABLE_DEVICE
+        device: Device used to carry out the document update, if `None` is given, it will be determined inference
         image_download_thread_count: number of threads used to concurrently download images
         media_download_headers: headers to authenticate media download requests
         mappings: a dictionary used to handle all the object field content in the doc,
@@ -50,10 +49,6 @@ class AddDocsParams(BaseModel):
     text_chunk_prefix: Optional[str] = None
 
     def __init__(self, **data: Any):
-        # TODO [Refactoring device logic] use device info gathered from device manager
-        # Ensure `None` and passing nothing are treated the same for device
-        if "device" not in data or data["device"] is None:
-            data["device"] = get_best_available_device()
         super().__init__(**data)
 
     @root_validator

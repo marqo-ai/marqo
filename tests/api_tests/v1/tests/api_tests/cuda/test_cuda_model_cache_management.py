@@ -1,3 +1,4 @@
+import unittest
 import uuid
 
 import pytest
@@ -20,7 +21,7 @@ class TestModlCacheManagement(MarqoTestCase):
             {
                 "indexName": cls.structured_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text"},
                 ],
@@ -28,7 +29,7 @@ class TestModlCacheManagement(MarqoTestCase):
             },
             {
                 "indexName": cls.unstructured_index_name,
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "type": "unstructured",
             }
         ])
@@ -76,5 +77,5 @@ class TestModlCacheManagement(MarqoTestCase):
             with self.subTest(index_name):
                 # Do a search to ensure the model is cached
                 r = self.client.index(index_name).search("q", device="cuda")
-                res = self.client.index(index_name).eject_model("sentence-transformers/all-MiniLM-L6-v2", "cuda")
+                res = self.client.index(index_name).eject_model("hf/all-MiniLM-L6-v2", "cuda")
                 self.assertIn("successfully eject", str(res))

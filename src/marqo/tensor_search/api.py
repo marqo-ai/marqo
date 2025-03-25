@@ -15,6 +15,7 @@ from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
@@ -23,11 +24,13 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
+from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
@@ -62,10 +65,25 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    # Determine default device
-    default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
+    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
+        import marqo.inference.native_inference.remote.server.inference_config as inference_config
+        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
 
-    return config.Config(vespa_client, zookeeper_client, default_device)
+        native_inference_local_config = inference_config.Config()
+        inference_on_start(native_inference_local_config)  # pre-warm the model
+        inference = native_inference_local_config.local_inference
+        model_manager = native_inference_local_config.model_manager
+    else:
+        inference = NativeInferenceClient(
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+            pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+            timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
+        )
+        model_manager = ModelManagerClient(
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+        )
+
+    return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -107,7 +125,6 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
-        (core_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
         (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
@@ -125,6 +142,10 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # Base exceptions
         (base_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
+
+        # Inference exceptions
+        (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
+        (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
     ]
 
     converted_error = None
@@ -470,21 +491,21 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 
 @app.get("/models")
-def get_loaded_models():
+def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
     """
     Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
     [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
     """
-    return tensor_search.get_loaded_models()
+    return marqo_config.model_manager.get_loaded_models()
 
 
 @app.delete("/models")
-def eject_model(model_name: str, model_device: str):
+def eject_model(model_name: str, model_device: str, marqo_config: config.Config = Depends(get_config)):
     """
     Eject a model from a specific device. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
-    return tensor_search.eject_model(model_name=model_name, device=model_device)
+    return marqo_config.model_manager.eject_model(model_name=model_name, device=model_device)
 
 
 @app.get("/device/cpu")
@@ -496,6 +517,7 @@ def get_cpu_info():
     return tensor_search.get_cpu_info()
 
 
+# TODO move this to Inference
 @app.get("/device/cuda")
 def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
     """
@@ -588,25 +610,10 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.get("/health" , include_in_schema=False)
+@app.get("/health", include_in_schema=False)
 def check_health(marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health()
     return HealthResponse.from_marqo_health_status(health_status)
-
-
-@app.get("/healthz", include_in_schema=False)
-def liveness_check(marqo_config: config.Config = Depends(get_config)) -> JSONResponse:
-    """
-    This liveness check endpoint does a quick status check, and error out if any component encounters unrecoverable
-    issues. This only does a check on the cuda devices right now.
-    Docker schedulers could leverage this endpoint to decide whether to restart the Marqo container.
-
-    Returns:
-        200 - if all checks pass
-        500 - if any check fails
-    """
-    marqo_config.device_manager.cuda_device_health_check()
-    return JSONResponse(content={"status": "ok"}, status_code=200)
 
 
 if __name__ == "__main__":

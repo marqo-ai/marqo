@@ -65,6 +65,7 @@ class TestOpenClipModelPreprocessor(InferenceTestCase):
     def test_to_device_called_on_preprocessor_for_image(self):
         """A test to ensure the Tensor is moved to the correct device when self.preprocessor.preprocess is called."""
         test_image_path = [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value]
+
         test_images = [
             load_image_from_path(image_path, media_download_headers=dict()) for image_path in test_image_path
         ]
