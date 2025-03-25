@@ -61,7 +61,6 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
         return results
 
-
     def _encode_processed_content(self, preprocessed_content_list: List[HuggingFacePreprocessedContent]) \
             -> List[ndarray]:
         """
