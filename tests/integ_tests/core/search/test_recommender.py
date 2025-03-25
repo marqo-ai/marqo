@@ -686,6 +686,7 @@ class TestRecommender(MarqoTestCase):
         """
         Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
         """
+
         docs = [{
             "_id": f"doc_{i}",
             "title": f"Document {i}",
@@ -693,7 +694,7 @@ class TestRecommender(MarqoTestCase):
         } for i in range(10)]
 
         for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index_type=index.name):
                 tensor_fields = ["title", "content"] if isinstance(index, UnstructuredMarqoIndex) else None
 
                 self.add_documents(
@@ -702,21 +703,24 @@ class TestRecommender(MarqoTestCase):
                     )
                 )
 
-                # Test result_count is respected even if rerank_depth is larger
-                limited_res = self.recommender.recommend(
-                    index_name=index.name, documents=["doc_0", "doc_1"], result_count=3, rerank_depth=5
-                )
-                self.assertEqual(len(limited_res["hits"]), 3)
+                # Subtest 1: result_count is respected even if rerank_depth is larger
+                with self.subTest(case="limited_result_count", rerank_depth=5, result_count=3, offset=0):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=3, rerank_depth=5
+                    )
+                    self.assertEqual(len(res["hits"]), 3)
 
-                # Offset > rerank_depth should return no results
-                offset_beyond_rerank = self.recommender.recommend(
-                    index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=5, rerank_depth=4
-                )
-                self.assertEqual(len(offset_beyond_rerank["hits"]), 0)
+                # Subtest 2: offset > rerank_depth returns no results
+                with self.subTest(case="offset_beyond_rerank_depth", rerank_depth=4, result_count=1, offset=5):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=5, rerank_depth=4
+                    )
+                    self.assertEqual(len(res["hits"]), 0)
 
-                # Offset within rerank_depth should return expected results
-                offset_within_rerank = self.recommender.recommend(
-                    index_name=index.name, documents=["doc_0", "doc_1"], result_count=2, offset=2, rerank_depth=5
-                )
-                self.assertEqual(len(offset_within_rerank["hits"]), 2)
+                # Subtest 3: offset within rerank_depth returns results
+                with self.subTest(case="offset_within_rerank_depth", rerank_depth=5, result_count=2, offset=2):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=2, offset=2, rerank_depth=5
+                    )
+                    self.assertEqual(len(res["hits"]), 2)
 
