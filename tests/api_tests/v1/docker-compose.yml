@@ -130,6 +130,7 @@ services:
   inference-cuda:
     image: ${MARQO_DOCKER_IMAGE}
     container_name: inference
+    privileged: true
     profiles: ["cuda"]
     network_mode: "host"
     env_file:
