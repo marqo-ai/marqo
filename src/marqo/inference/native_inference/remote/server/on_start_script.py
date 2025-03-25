@@ -33,19 +33,18 @@ logger = get_logger(__name__)
 
 def on_start(config: Config):
     to_run_on_start = (
-        # DownloadStartText(),
-        # CUDAAvailable(),
-        # SetBestAvailableDevice(),
+        DownloadStartText(),
+        CUDAAvailable(),
         SetEnableVideoGPUAcceleration(),
         CheckNLTKTokenizers(),
         CacheModels(config),
         # CachePatchModels(),  # TODO patch model can be deprecated, we comment it out for now
-        # DownloadFinishText(),
+        DownloadFinishText(),
         PrintVersion(),
 
         # TODO do we still need banners? or a different banner?
-        # MarqoWelcome(),
-        # MarqoPhrase(),
+        MarqoWelcome(),
+        MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:
@@ -77,25 +76,6 @@ class CUDAAvailable:
         self.logger.info(f"Found devices {device_names}")
 
 
-class SetBestAvailableDevice:
-    # TODO [Refactoring device logic] move this logic to device manager, get rid of MARQO_BEST_AVAILABLE_DEVICE envvar
-    """sets the MARQO_BEST_AVAILABLE_DEVICE env var
-    """
-    logger = get_logger('SetBestAvailableDevice')
-
-    def run(self):
-        """
-            This is set once at startup time. We assume it will NOT change,
-            if it does, health check should throw a warning.
-        """
-        if torch.cuda.is_available():
-            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
-        else:
-            os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
-
-        self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
-
-
 class CacheModels:
     """warms the in-memory model cache by preloading good defaults
     """
@@ -115,7 +95,7 @@ class CacheModels:
                 raise exceptions.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
                     f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
-                    f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["ViT-L/14", "onnx/all_datasets_v4_MiniLM-L6"]'"""
+                    f"""export {EnvVars.MARQO_MODELS_TO_PRELOAD}='["hf/e5-base-v2", "open_clip/ViT-B-32/laion2b_s34b_b79k"]'"""
                     f"To add a custom model, it must be a dict with keys `model` and `model_properties` "
                     f"as defined in {marqo_docs.bring_your_own_model()}"
                 ) from e
@@ -215,6 +195,7 @@ class CacheModels:
 
     def _load_model_properties_from_model_registry(self, model_name: str) -> Dict[str, str]:
         try:
+            # TODO expose this via model manager class !!!
             return s2_inference.get_model_properties_from_registry(model_name)
         except UnknownModelError:
             raise InvalidArgumentError(

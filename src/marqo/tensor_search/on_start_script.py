@@ -14,10 +14,8 @@ def on_start(config: config.Config):
         PopulateCache(config),
         InitializeRedis("localhost", 6379),
         PrintVersion(),
-
-        # TODO do we still need print banners?
-        # MarqoWelcome(),
-        # MarqoPhrase(),
+        MarqoWelcome(),
+        MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:

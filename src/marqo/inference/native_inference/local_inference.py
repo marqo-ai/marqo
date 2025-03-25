@@ -1,6 +1,6 @@
 from marqo.core.exceptions import DeviceError
-from marqo.core.inference.device_manager import DeviceManager
 import marqo.core.inference.api.exceptions as inference_api_exceptions
+from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.embedding_models.random_model import RandomModel
@@ -28,7 +28,7 @@ class NativeInferenceLocal(Inference):
                 model_name=request.model_config.model_name,
                 model_properties=request.model_config.model_properties,
                 model_auth=request.model_config.model_auth,
-                device=self.device_manager.pick_and_validate_device()
+                device=self.device_manager.pick_and_validate_device(device=request.device)
             )
         except (S2InferenceError, DeviceError) as e:
             raise inference_api_exceptions.ModelError(str(e)) from e

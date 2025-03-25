@@ -6,7 +6,7 @@ from numpy import ndarray
 from pydantic import StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.inference.api import InferenceError, Modality, PreprocessingConfigType
+from marqo.core.inference.api import Modality, PreprocessingConfigType
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -33,7 +33,10 @@ class InferenceRequest(ImmutableBaseModel):
         modality: Modality = values.get('modality')
         preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
 
-        if not modality or not preprocessing_config or modality.value != preprocessing_config.modality:
+        if not modality or not preprocessing_config:
+            raise ValueError("Modality or preprocessing_config is missing")
+
+        if modality.value != preprocessing_config.modality:
             raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
                              f"does not support modality: {modality}")
 
@@ -77,3 +80,35 @@ class Inference(ABC):
         """
         pass
 
+
+class ModelManager(ABC):
+    @abstractmethod
+    def get_loaded_models(self) -> dict:
+        """
+        Retrieve information about models loaded in all devices
+
+        Returns: All loaded models, in following format:
+            {"models": [
+                {"model_name": "model1", "model_device": "cpu"},
+                {"model_name": "model2", "model_device": "cuda"},
+            ]}
+        """
+        pass
+
+    @abstractmethod
+    def eject_model(self, model_name: str, device: str) -> dict:
+        """
+        Eject a model from the model cache
+
+        Args:
+            model_name (str): the name of the model
+            device (str): the device the model is loaded to
+
+        Returns: The result of the rejection, in following format:
+          {"result": "success",
+           "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+
+        Raises:
+            ModelError: If model is not found or not in the model cache
+        """
+        pass

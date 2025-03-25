@@ -154,31 +154,6 @@ class TestOnStartScript(unittest.TestCase):
                 return True
         assert run()
     
-    def test_set_best_available_device(self):
-        """
-        Makes sure best available device corresponds to whether or not cuda is available
-        """
-        test_cases = [
-            (True, "cuda"),
-            (False, "cpu")
-        ]
-        mock_cuda_is_available = mock.MagicMock()
-
-        for given_cuda_available, expected_best_device in test_cases:
-            mock_cuda_is_available.return_value = given_cuda_available
-            @mock.patch("torch.cuda.is_available", mock_cuda_is_available)
-            def run():
-                # make sure env var is empty first
-                os.environ.pop("MARQO_BEST_AVAILABLE_DEVICE", None)
-                assert "MARQO_BEST_AVAILABLE_DEVICE" not in os.environ
-
-                set_best_available_device_script = on_start_script.SetBestAvailableDevice()
-                set_best_available_device_script.run()
-                assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == expected_best_device
-                return True
-            
-            assert run()
-
     def test_SetEnableVideoGPUAcceleration_none_input_check_fails(self):
         """Test when the env variable is None(not set by the users) and the check fails, the env var is set to 'FALSE'."""
         with mock.patch.dict('marqo.inference.native_inference.remote.server.on_start_script.os.environ',

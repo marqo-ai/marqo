@@ -1,4 +1,5 @@
 import httpx
+import pydantic
 from httpx import Timeout
 
 from marqo import logging
@@ -18,12 +19,14 @@ class NativeInferenceClient(Inference):
         """
         Args:
             base_url (str): The base URL of the remote inference service.
+            pool_size (int): The connection pool size of the httpx client. Please note that we don't cap the active
+                connection number. So if throttling limit is raised, the requests to inference server will not queue up.
+            timeout (int): The timeout of httpx client to inference server in seconds. We set a large default timeout
+                to cater for batch inference requests containing multiple images or media files
         """
         self.base_url = base_url.rstrip("/")
-
-        self.client = httpx.Client(base_url=base_url,
-                                   limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size),
-                                   timeout=Timeout(timeout=timeout))
+        limits = httpx.Limits(max_keepalive_connections=pool_size, max_connections=None)
+        self.client = httpx.Client(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout))
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """
@@ -46,8 +49,8 @@ class NativeInferenceClient(Inference):
                 try:
                     error_response = msgpack.unpackb(e.response.content, raw=False)
                     error_message = error_response["detail"]
-                except Exception as parse_error:
-                    logger.warning(f'Error parsing error message: {str(parse_error)}')
+                except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError):
+                    logger.warning('Error parsing error message', exc_info=True)
                     error_message = 'Error parsing error message in msgpack format'
             else:
                 error_message = str(e)
@@ -57,5 +60,5 @@ class NativeInferenceClient(Inference):
         try:
             result_dict = msgpack.unpackb(response.content, raw=False)
             return InferenceResult.parse_obj(result_dict)
-        except Exception as e:
+        except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, pydantic.ValidationError) as e:
             raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e
