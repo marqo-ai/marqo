@@ -34,6 +34,10 @@ on:
     paths-ignore:
       - '**.md'
 
+concurrency:
+  group: cuda_docker_marqo_split-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   id-token: write
