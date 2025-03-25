@@ -21,6 +21,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
+from marqo.inference.native_inference.load_model import NativeModelManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
@@ -100,6 +101,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
                                    inference=NativeInferenceLocal(DeviceManager()),
+                                   model_manager=NativeModelManager(),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
