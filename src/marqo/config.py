@@ -23,7 +23,7 @@ class Config:
             self,
             vespa_client: VespaClient,
             inference: Inference,
-            model_manager: ModelManager,
+            model_manager: Optional[ModelManager] = None,
             zookeeper_client: Optional[ZookeeperClient] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
