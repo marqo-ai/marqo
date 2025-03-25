@@ -109,6 +109,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # Override base requirements with marqo requirements if needed: 
+          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 

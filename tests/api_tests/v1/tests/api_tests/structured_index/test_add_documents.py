@@ -25,7 +25,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": False,
                 "allFields": [
                     {"name": "title", "type": "text"},
@@ -85,7 +85,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_with_normalize_embeddings_true,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
                 "allFields": [
                     {"name": "title", "type": "text"},

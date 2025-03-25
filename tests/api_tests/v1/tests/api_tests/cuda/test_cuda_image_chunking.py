@@ -1,3 +1,4 @@
+import unittest
 import uuid
 from typing import Dict
 
@@ -29,6 +30,7 @@ def generate_unstructured_index_settings_dict(index_name, image_preprocessing_me
 
 
 @pytest.mark.cuda_test
+@unittest.skip(reason='Image chunking is not supported any more')
 class TestUnstructuredImageChunking(MarqoTestCase):
     """Test for image chunking as a preprocessing step
     """

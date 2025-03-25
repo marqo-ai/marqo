@@ -401,14 +401,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
 
-    # TODO [Refactoring device logic] use device info gathered from device manager
-    if device is None:
-        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        if selected_device is None:
-            raise api_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-    else:
-        selected_device = device
+    selected_device = device
 
     # Fetch marqo index to pass to search method
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
@@ -474,24 +467,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
     if reranker is not None:
-        logger.info("reranking using {}".format(reranker))
-        if searchable_attributes is None:
-            raise api_exceptions.InvalidArgError(
-                f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
-        try:
-            # SEARCH TIMER-LOGGER (reranking)
-            RequestMetricsStore.for_request().start(f"search.rerank")
-            rerank.rerank_search_results(search_result=search_result, query=text,
-                                         model_name=reranker,
-                                         device=selected_device,
-                                         searchable_attributes=searchable_attributes,
-                                         num_highlights=1)
-            total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
-            logger.debug(
-                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
-            )
-        except Exception as e:
-            raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
+        raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
         search_result["query"] = text.dict()    # Make object JSON serializable
@@ -1062,9 +1038,6 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    if not device:
-        raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
-
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
     index_name = marqo_index.name

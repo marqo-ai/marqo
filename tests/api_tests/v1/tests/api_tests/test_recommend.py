@@ -19,7 +19,7 @@ class TestRecommend(MarqoTestCase):
                 {
                     "indexName": cls.structured_index_name,
                     "type": "structured",
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
+                    "model": "hf/all-MiniLM-L6-v2",
                     "allFields": [
                         {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
                         {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},
@@ -31,7 +31,7 @@ class TestRecommend(MarqoTestCase):
                 {
                     "indexName": cls.unstructured_index_name,
                     "type": "unstructured",
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
+                    "model": "hf/all-MiniLM-L6-v2",
                 }
             ]
         )
