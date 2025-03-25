@@ -40,6 +40,7 @@ class TestLargeHFModelEncode(InferenceTestCase):
         target_dir = current_file.parent.parent.parent
 
         files = [
+            target_dir / "embeddings_reference" / "embeddings_all_models_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_e5_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_multilingual_e5_python_3_8.json",
         ]
