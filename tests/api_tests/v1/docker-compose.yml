@@ -110,7 +110,7 @@ services:
       - MARQO_MODE=API
       - MARQO_API_WORKERS=4
       - MARQO_ENABLE_THROTTLING=FALSE
-      - MARQO_REMOTE_INFERENCE_URL=http://host.docker.internal:8881
+      - MARQO_REMOTE_INFERENCE_URL=http://inference:8881
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MARQO_ENABLE_BATCH_APIS=true
