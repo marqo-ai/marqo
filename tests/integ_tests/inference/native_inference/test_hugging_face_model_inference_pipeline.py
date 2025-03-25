@@ -53,7 +53,8 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
         self.assertEqual("very long long long long text", results_2[0][0])
 
     def test_inference_pipe_do_not_care_about_modality(self):
-        """Ensure that the HuggingFaceModelInferencePipeline does not care about the modality of the content."""
+        """Ensure that the HuggingFaceModelInferencePipeline can still vectorise the content even if the modality is not
+        TEXT."""
         text_inference_request = InferenceRequest(
             modality=Modality.IMAGE,
             contents=[TestImageUrls.IMAGE1.value],
@@ -65,19 +66,19 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
                     "dimensions": 768,
                     "tokens": 512,
                     "type": "hf",
-                    "model_size": 0.438,
                 },
                 normalize_embeddings=True
             ),
-            preprocessing_config=TextPreprocessingConfig(
-                should_chunk=False,
+            preprocessing_config=ImagePreprocessingConfig(
+                download_header=dict(),
+                download_thread_count=1,
             )
         )
 
         results = NativeInferenceLocal().vectorise(text_inference_request)
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
-        self.assertTrue(len(results.result) == 2)
+        self.assertTrue(len(results.result) == 1)
 
         results_1: list[tuple[str, ndarray]] = results.result[0]
         self.assertTrue(isinstance(results_1, list))
@@ -86,13 +87,4 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
         self.assertTrue(isinstance(results_1[0][0], str))
         self.assertTrue(isinstance(results_1[0][1], np.ndarray))
         self.assertEqual((768, ), results_1[0][1].shape)
-        self.assertEqual("text", results_1[0][0])
-
-        results_2: list[tuple[str, ndarray]] = results.result[1]
-        self.assertTrue(isinstance(results_2, list))
-        self.assertTrue(len(results_2) == 1)
-        self.assertTrue(isinstance(results_2[0], tuple))
-        self.assertTrue(isinstance(results_2[0][0], str))
-        self.assertTrue(isinstance(results_2[0][1], np.ndarray))
-        self.assertEqual((768, ), results_2[0][1].shape)
-        self.assertEqual("very long long long long text", results_2[0][0])
+        self.assertEqual(TestImageUrls.IMAGE1.value, results_1[0][0])

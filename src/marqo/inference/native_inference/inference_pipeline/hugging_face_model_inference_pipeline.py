@@ -34,17 +34,33 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
 
     def _content_preprocessing(self) -> List[HuggingFacePreprocessedContent]:
         """
-        Preprocess the content. For HF models, we don't care the modality, we just preprocess the given string, no
-        matter if it is text or a URL of any media type.
+        Preprocess the content based on the modality.
+
+        If it is a text modality, the content will be split, prefixed, and preprocessed as required by the
+        preprocessing_config.
+
+        However, if it's an image, audio, or video modality, this normally means the content is a URL from the
+        search request. In this case, we just use a default TextPreprocessingConfig to preprocess the content.
 
         Returns:
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
-        return split_prefix_preprocess_text(
+        if self.inference_request.modality == Modality.TEXT:
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config
             )
+        elif self.inference_request.modality in [Modality.IMAGE, Modality.AUDIO, Modality.VIDEO]:
+            results = split_prefix_preprocess_text(
+                self.inference_request.contents,
+                self.model.get_preprocessor(),
+                TextPreprocessingConfig() # Use a default TextPreprocessingConfig
+            )
+        else:
+            raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
+        return results
+
 
     def _encode_processed_content(self, preprocessed_content_list: List[HuggingFacePreprocessedContent]) \
             -> List[ndarray]:
