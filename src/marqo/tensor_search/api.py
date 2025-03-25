@@ -14,7 +14,6 @@ from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
-from marqo.core.inference.api import exceptions as inference_exceptions, ModelManager
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
@@ -25,8 +24,8 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
-from marqo.inference.native_inference import load_model
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger
@@ -126,7 +125,6 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
-        (core_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
         (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
@@ -147,6 +145,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
 
         # Inference exceptions
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
+        (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
     ]
 
     converted_error = None

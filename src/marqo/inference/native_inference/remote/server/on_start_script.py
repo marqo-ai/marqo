@@ -195,6 +195,7 @@ class CacheModels:
 
     def _load_model_properties_from_model_registry(self, model_name: str) -> Dict[str, str]:
         try:
+            # TODO expose this via model manager class !!!
             return s2_inference.get_model_properties_from_registry(model_name)
         except UnknownModelError:
             raise InvalidArgumentError(

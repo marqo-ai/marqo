@@ -1,8 +1,7 @@
 import httpx
 
 from marqo import logging
-from marqo.core.inference.api import ModelManager
-
+from marqo.core.inference.api import ModelManager, ModelError
 
 logger = logging.get_logger(__name__)
 
@@ -18,7 +17,6 @@ class ModelManagerClient(ModelManager):
         self.base_url = base_url.rstrip("/")
         self.client = httpx.Client(base_url=base_url, timeout=timeout)
 
-
     def get_loaded_models(self) -> dict:
         """
         Retrieves the loaded models from the remote inference service.
@@ -30,9 +28,17 @@ class ModelManagerClient(ModelManager):
             httpx.HTTPError: If an HTTP error occurs.
             Exception: For any other exceptions.
         """
-        response = self.client.get("/models")
-        response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
-        return response.json()
+        try:
+            response = self.client.get("/models")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as http_err:
+            if http_err.response.status_code == 400:
+                error_detail = http_err.response.json().get('detail', 'Bad Request')
+                raise ModelError(f"Failed to retrieve loaded models: {error_detail}") from http_err
+            else:
+                # Re-raise the original HTTPStatusError for other status codes
+                raise
 
     def eject_model(self, model_name: str, device: str) -> dict:
         """
@@ -53,6 +59,15 @@ class ModelManagerClient(ModelManager):
             "model_name": model_name,
             "model_device": device
         }
-        response = self.client.delete("/models", params=params)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = self.client.delete("/models", params=params)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as http_err:
+            if http_err.response.status_code == 400:
+                error_detail = http_err.response.json().get('detail', 'Bad Request')
+                raise ModelError(
+                    f"Failed to eject model '{model_name}' from device '{device}': {error_detail}") from http_err
+            else:
+                # Re-raise the original HTTPStatusError for other status codes
+                raise

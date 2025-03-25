@@ -84,8 +84,31 @@ class Inference(ABC):
 class ModelManager(ABC):
     @abstractmethod
     def get_loaded_models(self) -> dict:
+        """
+        Retrieve information about models loaded in all devices
+
+        Returns: All loaded models, in following format:
+            {"models": [
+                {"model_name": "model1", "model_device": "cpu"},
+                {"model_name": "model2", "model_device": "cuda"},
+            ]}
+        """
         pass
 
     @abstractmethod
     def eject_model(self, model_name: str, device: str) -> dict:
+        """
+        Eject a model from the model cache
+
+        Args:
+            model_name (str): the name of the model
+            device (str): the device the model is loaded to
+
+        Returns: The result of the rejection, in following format:
+          {"result": "success",
+           "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+
+        Raises:
+            ModelError: If model is not found or not in the model cache
+        """
         pass
