@@ -202,46 +202,68 @@ class TestRecommend(MarqoTestCase):
         self.assertIn("Available tensor fields: title, content", str(e.exception))
 
     def test_recommender_rerankDepth(self):
-        docs = []
-        for i in range(10):
-            docs.append(
-                {
-                    "title": f"Doc {i}",
-                    "content": "some extra info",
-                    "_id": str(i)
-                }
-            )
+        """Test that rerank_depth affects hit count and handles edge cases based on expected behavior."""
+        docs = [{
+            "_id": str(i),
+            "title": f"Doc {i}",
+            "content": "some extra info"
+        } for i in range(10)]
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
-            with self.subTest(index_name):
+            with self.subTest(index_name=index_name):
                 tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
                 searchable_attributes = ["title"]
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
 
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
-                res = self.client.index(index_name).recommend(
-                    documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
-                    exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
-                    searchable_attributes=searchable_attributes, show_highlights=True,
-                    attributes_to_retrieve=["title"], rerank_depth=3
+                base_kwargs = dict(
+                    documents=["1", "2"], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
+                    exclude_input_documents=True, approximate=True,
+                    searchable_attributes=searchable_attributes, show_highlights=True, attributes_to_retrieve=["title"]
                 )
-                res_higher_rerank_depth = self.client.index(index_name).recommend(
-                    documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
-                    exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
-                    searchable_attributes=searchable_attributes, show_highlights=True, attributes_to_retrieve=["title"],
-                    rerank_depth=10
-                )
-                total_hits_in_res = len(res["hits"])
-                total_hits_in_res_higher_rerank_depth = len(res_higher_rerank_depth["hits"])
-                assert total_hits_in_res_higher_rerank_depth > total_hits_in_res
 
-                with self.assertRaises(MarqoWebError):
-                    # rerank_depth cannot be negative
-                    self.client.index(index_name).recommend(
-                        documents=['1', '2'], tensor_fields=["title"], interpolation_method=InterpolationMethod.SLERP,
-                        exclude_input_documents=True, limit=10, offset=0, ef_search=100, approximate=True,
-                        searchable_attributes=searchable_attributes, show_highlights=True, attributes_to_retrieve=["title"],
-                        rerank_depth=-1
+                # Case 1: result_count < rerank_depth → limit is respected
+                with self.subTest(case="result_count_less_than_rerank_depth"):
+                    res = self.client.index(index_name).recommend(
+                        **base_kwargs, limit=3, offset=0, rerank_depth=5
                     )
+                    self.assertEqual(len(res["hits"]), 3)
+
+                # Case 2: rerank_depth < offset + result_count → results are present; offset + limit is respected
+                with self.subTest(case="offset_beyond_rerank_depth"):
+                    res = self.client.index(index_name).recommend(
+                        **base_kwargs, limit=1, offset=2, rerank_depth=2
+                    )
+                    self.assertEqual(len(res["hits"]), 1)
+
+                # Case 3: offset + result_count <= rerank_depth → return all requested hits
+                with self.subTest(case="offset_within_rerank_depth"):
+                    res = self.client.index(index_name).recommend(
+                        **base_kwargs, limit=2, offset=2, rerank_depth=5
+                    )
+                    self.assertEqual(len(res["hits"]), 2)
+
+                # Case 4: rerank_depth < result_count → result_count overrides rerank_depth
+                with self.subTest(case="result_count_exceeds_rerank_depth"):
+                    res = self.client.index(index_name).recommend(
+                        **base_kwargs, limit=5, offset=0, rerank_depth=3
+                    )
+                    self.assertEqual(len(res["hits"]), 5)
+
+                # Case 5: ef_search < rerank_depth → ef_search limits rerank pool
+                with self.subTest(case="ef_search_limits_rerank_pool"):
+                    res = self.client.index(index_name).recommend(
+                        **base_kwargs, limit=10, offset=0, rerank_depth=5, ef_search=3
+                    )
+                    self.assertEqual(len(res["hits"]), 3)
+
+                # Case 6: rerank_depth is negative → should raise error
+                with self.subTest(case="invalid_negative_rerank_depth"):
+                    with self.assertRaises(MarqoWebError):
+                        self.client.index(index_name).recommend(
+                            **base_kwargs, limit=10, offset=0, rerank_depth=-1
+                        )

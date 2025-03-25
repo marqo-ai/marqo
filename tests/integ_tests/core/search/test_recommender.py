@@ -648,40 +648,6 @@ class TestRecommender(MarqoTestCase):
                         processing_start=mock.ANY
                     )
 
-    def test_recommend_with_rerank_depth(self):
-        """
-        Test that the recommender calls the search method with the correct arguments,
-        validate that there are fewer results with rerank_depth parameter set to low value.
-        """
-        docs = []
-        for i in range(10):
-            docs.append(
-                {
-                    "title": f"Doc {i}",
-                    "content": "some extra info",
-                    "_id": str(i)
-                }
-            )
-
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(type=index.type):
-                self.add_documents(
-                    self.config, add_docs_params=AddDocsParams(
-                        index_name=index.name, docs=docs, tensor_fields=["title", "content"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                res = self.recommender.recommend(
-                    documents=['1', '2'], result_count=10,
-                    rerank_depth=3, index_name=index.name
-                )
-                res_higher_rerank_depth = self.recommender.recommend(
-                    documents=['1', '2'], result_count=10,
-                    rerank_depth=10, index_name=index.name
-                )
-
-                assert len(res["hits"]) < len(res_higher_rerank_depth["hits"])
-
     def test_recommend_rerank_depth_with_limit_and_offset(self):
         """
         Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
@@ -703,24 +669,39 @@ class TestRecommender(MarqoTestCase):
                     )
                 )
 
-                # Subtest 1: result_count is respected even if rerank_depth is larger
-                with self.subTest(case="limited_result_count", rerank_depth=5, result_count=3, offset=0):
+                # Case 1: result_count < rerank_depth — should return result_count documents
+                with self.subTest(case="result_count_less_than_rerank_depth"):
                     res = self.recommender.recommend(
                         index_name=index.name, documents=["doc_0", "doc_1"], result_count=3, rerank_depth=5
                     )
                     self.assertEqual(len(res["hits"]), 3)
 
-                # Subtest 2: offset > rerank_depth returns no results
-                with self.subTest(case="offset_beyond_rerank_depth", rerank_depth=4, result_count=1, offset=5):
+                # Case 2: offset > rerank_depth — offset + limit is higher, result must be present
+                with self.subTest(case="offset_beyond_rerank_depth"):
                     res = self.recommender.recommend(
-                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=5, rerank_depth=4
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=4, rerank_depth=3
                     )
-                    self.assertEqual(len(res["hits"]), 0)
+                    self.assertEqual(len(res["hits"]), 1)
 
-                # Subtest 3: offset within rerank_depth returns results
-                with self.subTest(case="offset_within_rerank_depth", rerank_depth=5, result_count=2, offset=2):
+                # Case 3: result_count + offset < rerank_depth — enough reranked results to fulfill offset and count
+                with self.subTest(case="offset_within_rerank_depth"):
                     res = self.recommender.recommend(
                         index_name=index.name, documents=["doc_0", "doc_1"], result_count=2, offset=2, rerank_depth=5
                     )
                     self.assertEqual(len(res["hits"]), 2)
+
+                # Case 4: rerank_depth < result_count — offset + limit is higher than rerank_depth gets overwritten
+                with self.subTest(case="result_count_greater_than_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=5, rerank_depth=3
+                    )
+                    self.assertEqual(len(res["hits"]), 5)
+
+                # Case 5: ef_search < rerank_depth < result_count — ef_search overrides rerank_depth/limit
+                with self.subTest(case="ef_search_limits_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=10, rerank_depth=5,
+                        ef_search=3
+                    )
+                    self.assertEqual(len(res["hits"]), 3)
 

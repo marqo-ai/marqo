@@ -2719,7 +2719,8 @@ class TestHybridSearch(MarqoTestCase):
         )
 
     def test_rerank_depth_tensor_hybrid_search(self):
-        """Test that rerank_depth restricts hybrid reranking to top-N documents."""
+        """Test hybrid search with rerankDepthTensor across different scenarios."""
+
         docs = [{
             "_id": f"doc_{i}",
             "text_field_1": f"sample text {i}"
@@ -2730,48 +2731,51 @@ class TestHybridSearch(MarqoTestCase):
                 tensor_fields = ["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
 
                 self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=docs,
-                        tensor_fields=tensor_fields
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=docs, tensor_fields=tensor_fields
                     )
                 )
 
-                # Full rerank results
-                full_rerank_res = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="sample text",
-                    search_method="HYBRID",
-                    result_count=10,
-                    hybrid_parameters=HybridParameters(
-                        verbose=True,
-                        retrievalMethod=RetrievalMethod.Tensor,
-                        rankingMethod=RankingMethod.Tensor
-                    )
+                base_kwargs = dict(
+                    config=self.config, index_name=index.name, text="sample text", search_method="HYBRID"
                 )
 
-                # Partial results (rerank_depth_tensor=3)
-                partial_rerank_res = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="sample text",
-                    search_method="HYBRID",
-                    result_count=10,
-                    hybrid_parameters=HybridParameters(
-                        rerankDepthTensor=3,
-                        verbose=True,
-                        retrievalMethod=RetrievalMethod.Tensor,
-                        rankingMethod=RankingMethod.Tensor
+                # Case 1: rerankDepthTensor < result_count → result_count is respected
+                with self.subTest(case="rerankDepthTensor_limits_final_hits"):
+                    res = tensor_search.search(
+                        **base_kwargs, result_count=5, hybrid_parameters=HybridParameters(
+                            rerankDepthTensor=3, verbose=True, retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        )
                     )
-                )
+                    self.assertEqual(len(res["hits"]), 5)
 
-                # Ensure correct number of hits
-                self.assertEqual(len(full_rerank_res["hits"]), 10)
-                self.assertEqual(len(partial_rerank_res["hits"]), 3)
+                # Case 2: rerankDepthTensor > result_count + offset → return full page
+                with self.subTest(case="rerank_depth_greater_than_offset_plus_limit"):
+                    res = tensor_search.search(
+                        **base_kwargs, result_count=3, offset=2, hybrid_parameters=HybridParameters(
+                            rerankDepthTensor=10, verbose=True, retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        )
+                    )
+                    self.assertEqual(len(res["hits"]), 3)
 
-                # Ensure top 3 hits are the same in both results
-                for i in range(3):
-                    self.assertEqual(full_rerank_res["hits"][i]["_id"], partial_rerank_res["hits"][i]["_id"])
+                # Case 3: rerankDepthTensor < offset → limit + offset are respected
+                with self.subTest(case="offset_beyond_rerank_depth"):
+                    res = tensor_search.search(
+                        **base_kwargs, result_count=1, offset=5, hybrid_parameters=HybridParameters(
+                            rerankDepthTensor=3, verbose=True, retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        )
+                    )
+                    self.assertGreaterEqual(len(res["hits"]), 1)
+
+                # Case 4: rerankDepthTensor omitted → return full limit
+                with self.subTest(case="no_rerankDepthTensor"):
+                    res = tensor_search.search(
+                        **base_kwargs, result_count=10, hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Tensor
+                        )
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
 

@@ -168,69 +168,84 @@ class TestSearchCommon(MarqoTestCase):
                               str(cm.exception.message))
 
     def test_rerank_depth(self):
+        """Test rerank_depth behavior in TENSOR search."""
         for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+            with self.subTest(index=index_name):
+                docs = [{
+                            "title": f"Doc {i}",
+                            "content": "some extra info",
+                            "_id": str(i)
+                        } for i in range(10)]
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
 
-            # add 10 docs
-            docs = []
-            for i in range(10):
-                docs.append({
-                    "title": f"Doc {i}",
-                    "content": "some extra info",
-                    "_id": str(i)
-                })
+                add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                if add_res["errors"]:
+                    raise Exception(f"Failed to add docs to index {index_name}")
 
-            self.client.index(index_name).add_documents(docs, tensor_fields=["title", "content"] if index_name == self.unstructured_image_index_name else None)
+                # Case 1: rerank_depth < result_count → limit overrides rerank_depth
+                with self.subTest(case="rerank_depth_smaller_than_limit"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", rerank_depth=5, limit=10, search_method="TENSOR"
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
 
-            # search for "Doc" with rerank_depth=5
-            search_res = self.client.index(index_name).search(q="Doc", rerank_depth=5, limit=10, search_method="TENSOR")
-            # due to additional hits sometimes the result may not be 5
-            self.assertNotEqual(len(search_res["hits"]), 10)
+                # Case 2: rerank_depth is negative → error expected
+                with self.subTest(case="invalid_negative_rerank_depth"):
+                    with self.assertRaises(MarqoWebError):
+                        self.client.index(index_name).search(
+                            q="Doc", rerank_depth=-1, limit=10, search_method="TENSOR"
+                        )
 
-            # search for "Doc" without rerank_depth
-            search_res = self.client.index(index_name).search(q="Doc", limit=10, search_method="TENSOR")
-            self.assertEqual(len(search_res["hits"]), 10)
+                # Case 3: no rerank_depth → should return full limit
+                with self.subTest(case="no_rerank_depth"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="TENSOR"
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
 
     def test_rerank_depth_hybrid(self):
+        """Test rerankDepthTensor behavior in HYBRID search."""
         for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+            with self.subTest(index=index_name):
+                docs = [{
+                            "title": f"Doc {i}",
+                            "content": "some extra info",
+                            "_id": str(i)
+                        } for i in range(10)]
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
 
-            # add 10 docs
-            docs = []
-            for i in range(10):
-                docs.append(
-                    {
-                        "title": f"Doc {i}",
-                        "content": "some extra info",
-                        "_id": str(i)
-                    }
-                )
+                add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                if add_res["errors"]:
+                    raise Exception(f"Failed to add docs to index {index_name}")
 
-            self.client.index(index_name).add_documents(docs, tensor_fields=["title", "content"] if index_name == self.unstructured_image_index_name else None)
+                # Case 1: rerankDepthTensor < result_count → rerank_depth is overridden
+                with self.subTest(case="rerank_depth_tensor_less_than_limit"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor",
+                            "rerankDepthTensor": 5
+                        }
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
 
-            # search for "Doc" with rerank_depth=5
-            search_res = self.client.index(index_name).search(
-                q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
-                    "rankingMethod": "tensor",
-                    "retrievalMethod": "tensor",
-                    "rerankDepthTensor": 5
-                }
-            )
-            # due to additional hits sometimes the result may not be 5
-            self.assertNotEqual(len(search_res["hits"]), 10)
+                # Case 2: rerankDepthTensor is negative → raises error
+                with self.subTest(case="invalid_negative_rerank_depth_tensor"):
+                    with self.assertRaises(MarqoWebError):
+                        self.client.index(index_name).search(
+                            q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                                "retrievalMethod": "tensor",
+                                "rankingMethod": "tensor",
+                                "rerankDepthTensor": -1
+                            }
+                        )
 
-            # search for "Doc" without rerank_depth
-            search_res = self.client.index(index_name).search(
-                q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
-                    "rankingMethod": "tensor",
-                    "retrievalMethod": "tensor",
-                }
-            )
-            self.assertEqual(len(search_res["hits"]), 10)
-
-            with self.assertRaises(MarqoWebError):
-                self.client.index(index_name).search(
-                    q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
-                        "rankingMethod": "tensor",
-                        "retrievalMethod": "tensor",
-                        "rerankDepthTensor": -1
-                    }
-                )
+                # Case 3: No rerankDepthTensor → should return full limit
+                with self.subTest(case="no_rerank_depth_tensor"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor"
+                        }
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
