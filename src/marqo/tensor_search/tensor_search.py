@@ -466,24 +466,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
     if reranker is not None:
-        logger.info("reranking using {}".format(reranker))
-        if searchable_attributes is None:
-            raise api_exceptions.InvalidArgError(
-                f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
-        try:
-            # SEARCH TIMER-LOGGER (reranking)
-            RequestMetricsStore.for_request().start(f"search.rerank")
-            rerank.rerank_search_results(search_result=search_result, query=text,
-                                         model_name=reranker,
-                                         device=selected_device,
-                                         searchable_attributes=searchable_attributes,
-                                         num_highlights=1)
-            total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
-            logger.debug(
-                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
-            )
-        except Exception as e:
-            raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
+        raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
         search_result["query"] = text.dict()    # Make object JSON serializable
