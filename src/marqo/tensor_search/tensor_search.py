@@ -666,21 +666,65 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
 
     return {'hits': hits}
 
-def gather_facets_from_response(response: QueryResult, facet_fields: Optional[list[str]]) -> Dict[str, Any]:
+
+def gather_facets_from_response(response: QueryResult, facet_fields: Optional[list[str]]) -> Dict[str, Dict]:
     """
-    Convert a VespaQueryResponse to a Marqo search response
+    Convert a Vespa `QueryResult` into Marqo-style facets response format.
+
+    Vespa facet group IDs can have different formats:
+      - If `facet_fields` is None, they look like: `group:string:field`
+      - If `facet_fields` is set, they look like: `group:marqo__short_string_fields{"field_name"}`
+
+    This function parses those IDs and organizes the facets into:
+        {
+            "field_name": {
+                "facet_value_1": count,
+                "facet_value_2": count,
+                ...
+            },
+            ...
+        }
+
+    Parameters:
+    - response: Vespa query result containing facet groups
+    - facet_fields: Optional list of facet field names. If None, fallback parsing is used.
+
+    Returns:
+    - Dictionary with 'facets' key containing parsed facets
     """
+
+    def extract_field_name(field_id: str) -> str:
+        """
+        Extracts the facet field name from a field ID string.
+        """
+        if not facet_fields:
+            # Example: 'group:string:brand' -> 'brand'
+            return field_id.split(':')[-1]
+        else:
+            # Example: 'group:marqo__short_string_fields{"brand"}' -> 'brand'
+            return field_id.split('{')[1].split('}')[0].strip('"')
+
     facets = {}
-    if not facet_fields:
-        root_0_group = [group for group in response.facets if group.id == 'group:root:0'][0]
-        print("FACETS")
-        print(response.facets[-1])
-        for field in root_0_group.children[0].children:
-            field_name = field.id.split(':')[-1] # field is formatted as 'group:string:field'
+
+    # Loop through all top-level groups in Vespa facet results
+    for group in response.facets:
+        if not group.id.startswith("group:root:"):
+            continue  # Skip non-root groups
+
+        # Depending on facet_fields, structure of children differs
+        groups_to_process = group.children[0].children if not facet_fields else group.children
+
+        for field in groups_to_process:
+            field_name = extract_field_name(field.id)
             facets[field_name] = {}
-            for value in field.children[0].children:
-                sub_field_name = value.id.split(':')[-1]
-                facets[field_name][sub_field_name] = value.fields['count()']
+
+            # Similarly, structure of sub-groups (actual values) depends on facet_fields
+            values_to_process = field.children[0].children if not facet_fields else field.children
+
+            for value in values_to_process:
+                value_key = value.id.split(':')[-1]  # e.g., 'blue', 'Nike', etc.
+                facets[field_name][value_key] = value.fields['count()']
+
     return {'facets': facets}
 
 
