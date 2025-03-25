@@ -52,14 +52,12 @@ class TestModlCacheManagement(MarqoTestCase):
                 self.assertIn("memory_used_percent", r)
                 self.assertIn("memory_used_gb", r)
 
-    @unittest.skip(reason='Models endpoints does not work now')
     def test_get_loaded_models_format(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
                 r = self.client.index(index_name).get_loaded_models()
                 self.assertIn("models", r)
 
-    @unittest.skip(reason='Models endpoints does not work now')
     def test_eject_no_cached_model(self) -> None:
         # test eject a model that is NOT cached
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
@@ -68,7 +66,6 @@ class TestModlCacheManagement(MarqoTestCase):
                     self.client.index(index_name).eject_model("void_model", "void_device")
                 self.assertIn("model_not_in_cache", str(e.exception.message))
 
-    @unittest.skip(reason='Models endpoints does not work now')
     def test_eject_model(self) -> None:
         # test eject a model that is cached
         for index_name in [self.structured_index_name, self.unstructured_index_name]:

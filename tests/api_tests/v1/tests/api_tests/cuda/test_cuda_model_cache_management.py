@@ -8,7 +8,6 @@ from tests.marqo_test import MarqoTestCase
 
 
 @pytest.mark.cuda_test
-@unittest.skip(reason='Models endpoints does not work now')
 class TestModlCacheManagement(MarqoTestCase):
 
     @classmethod
