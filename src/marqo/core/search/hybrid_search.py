@@ -242,15 +242,17 @@ class HybridSearch:
 
         # SEARCH TIMER-LOGGER (post-processing)
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
-        if not return_facets:
-            gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
-        else:
-            gathered_facets = gather_facets_from_response(responses, facets_parameters.facetFields)
+        gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+        total_results = len(gathered_results["hits"])
+        if return_facets:
+            gathered_results.update(gather_facets_from_response(responses, facets_parameters.facetFields))
+            total_results += len(gathered_results["facets"])
+
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
-            f"{len(gathered_docs if not return_facets else gathered_facets)} results from Vespa."
+            f"{total_results} results from Vespa."
         )
 
-        return gathered_docs if not return_facets else gathered_facets
+        return gathered_results
