@@ -64,7 +64,7 @@ class TestModlCacheManagement(MarqoTestCase):
             with self.subTest(index_name):
                 with self.assertRaises(MarqoWebError) as e:
                     self.client.index(index_name).eject_model("void_model", "void_device")
-                self.assertIn("model_not_in_cache", str(e.exception.message))
+                self.assertIn("The model_name `void_model` device `void_device` is not cached or found", str(e.exception.message))
 
     def test_eject_model(self) -> None:
         # test eject a model that is cached
