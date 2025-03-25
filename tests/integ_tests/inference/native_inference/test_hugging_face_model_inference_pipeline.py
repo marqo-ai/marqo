@@ -80,7 +80,7 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
             )
         )
 
-        results = NativeInferenceLocal().vectorise(text_inference_request)
+        results = self.inference.vectorise(text_inference_request)
         self.assertTrue(isinstance(results, InferenceResult))
         self.assertTrue(isinstance(results.result, list))
         self.assertTrue(len(results.result) == 1)
