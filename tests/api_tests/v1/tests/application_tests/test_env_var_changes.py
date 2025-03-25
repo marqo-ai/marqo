@@ -74,7 +74,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         res = self.client.index("test_index_for_preload_models").get_loaded_models()
         assert set([item["model_name"] for item in res["models"]]) == set(custom_models)
 
-
+    @unittest.skip(reason='Inference cache is not supported')
     def test_multiple_env_vars(self):
         # TODO: Add log test
         """

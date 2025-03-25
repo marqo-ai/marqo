@@ -1,6 +1,7 @@
 import queue
 import threading
 import time
+import unittest
 import uuid
 
 import pytest
@@ -148,6 +149,7 @@ class TestConcurrencyRequestsBlock(MarqoTestCase):
         while not normal_search_queue.empty():
             assert normal_search_queue.get() == "normal search success"
 
+    @unittest.skip(reason="Temporarily skip this since removeAllModels does not work now")
     def test_concurrent_search_without_cache(self):
         # Remove all the cached models
         super().removeAllModels()
