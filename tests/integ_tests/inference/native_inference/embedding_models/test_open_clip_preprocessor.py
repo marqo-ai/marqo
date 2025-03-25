@@ -56,22 +56,24 @@ class TestOpenClipModelPreprocessor(InferenceTestCase):
         text_outputs = self.preprocessor.preprocess(test_texts, modality=Modality.TEXT)
 
         self.assertIsInstance(text_outputs, list)
-        self.assertEqual(0, len(text_outputs))
+        self.assertEqual(2, len(text_outputs))
 
         for text_output in text_outputs:
             self.assertIsInstance(text_output, Tensor)
-            self.assertEqual(text_output.device, self.device)
+            self.assertEqual(text_output.device.type, self.device)
 
     def test_to_device_called_on_preprocessor_for_image(self):
         """A test to ensure the Tensor is moved to the correct device when self.preprocessor.preprocess is called."""
         test_image_path = [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value]
-        test_images = [load_image_from_path(image_path) for image_path in test_image_path]
+        test_images = [
+            load_image_from_path(image_path, media_download_headers=dict()) for image_path in test_image_path
+        ]
 
         image_outputs = self.preprocessor.preprocess(test_images, modality=Modality.IMAGE)
 
         # Assertions for image tensors
         self.assertIsInstance(image_outputs, list)
-        self.assertGreater(2, len(image_outputs))
+        self.assertEqual(2, len(image_outputs))
 
         for tensor in image_outputs:
             self.assertIsInstance(tensor, Tensor)
@@ -119,11 +121,11 @@ class TestOpenClipModelPreprocessorCuda(InferenceTestCase):
         text_outputs = self.preprocessor.preprocess(test_texts, modality=Modality.TEXT)
 
         self.assertIsInstance(text_outputs, list)
-        self.assertEqual(0, len(text_outputs))
+        self.assertEqual(2, len(text_outputs))
 
         for text_output in text_outputs:
             self.assertIsInstance(text_output, Tensor)
-            self.assertEqual(text_output.device, self.device)
+            self.assertEqual(text_output.device.type, self.device)
 
     def test_to_device_called_on_preprocessor_for_image(self):
         """A test to ensure the Tensor is moved to the correct device when self.preprocessor.preprocess is called."""
@@ -134,7 +136,7 @@ class TestOpenClipModelPreprocessorCuda(InferenceTestCase):
 
         # Assertions for image tensors
         self.assertIsInstance(image_outputs, list)
-        self.assertGreater(2, len(image_outputs))
+        self.assertEqual(2, len(image_outputs))
 
         for tensor in image_outputs:
             self.assertIsInstance(tensor, Tensor)
