@@ -604,7 +604,8 @@ class TestRecommender(MarqoTestCase):
                         score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
-                        processing_start=mock.ANY
+                        processing_start=mock.ANY,
+                        rerank_depth=None
                     )
 
                 # Repeat with different values to ensure it didn't pass due to default values matching
@@ -645,7 +646,8 @@ class TestRecommender(MarqoTestCase):
                         score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
-                        processing_start=mock.ANY
+                        processing_start=mock.ANY,
+                        rerank_depth=None
                     )
 
     def test_recommend_rerank_depth_with_limit_and_offset(self):
@@ -679,7 +681,7 @@ class TestRecommender(MarqoTestCase):
                 # Case 2: offset > rerank_depth — offset + limit is higher, result must be present
                 with self.subTest(case="offset_beyond_rerank_depth"):
                     res = self.recommender.recommend(
-                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=4, rerank_depth=3
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=3, rerank_depth=2
                     )
                     self.assertEqual(len(res["hits"]), 1)
 
