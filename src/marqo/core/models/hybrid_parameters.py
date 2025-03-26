@@ -95,6 +95,22 @@ class HybridParameters(StrictBaseModel):
             if values.get('rankingMethod') not in [RankingMethod.Lexical, RankingMethod.Tensor]:
                 raise ValueError("For retrievalMethod: tensor or lexical, rankingMethod must be: tensor or lexical")
 
+        # if one of queryLexical and queryTensor is present but other one is not
+        if (values.get('queryLexical') is None) != (values.get('queryTensor') is None):
+            if values.get('retrievalMethod') == RetrievalMethod.Disjunction:
+                raise ValueError(
+                    "Both queryLexical and queryTensor or q(Query) must be present when "
+                    "disjunction retrieval method is used."
+                )
+
+        # if tensor query is an empty dict
+        if isinstance(values.get('queryTensor'), dict):
+            if not len(values.get('queryTensor')):
+                raise ValueError(
+                    "Multi-query search for queryTensor requires at least one query! Received empty dictionary. "
+                )
+
+
         return values
 
     @validator('alpha')

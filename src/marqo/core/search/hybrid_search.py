@@ -7,7 +7,7 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -143,6 +143,13 @@ class HybridSearch:
         else:
             tensor_query = query
             lexical_query = query
+
+        if (tensor_query is None) != (lexical_query is None):
+            if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+                raise core_exceptions.InvalidArgumentError(
+                    "Both queryLexical and queryTensor or q(Query) must be present when "
+                    "disjunction retrieval method is used."
+                )
 
         # Edge cases for q data type
         if isinstance(tensor_query, CustomVectorQuery):

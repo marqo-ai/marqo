@@ -3015,16 +3015,15 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                res = tensor_search.search(
-                    config=self.config, index_name=index.name, text=None, search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        queryTensor={},  # Edge case
-                        queryLexical="dogs", retrievalMethod=RetrievalMethod.Disjunction,
-                        rankingMethod=RankingMethod.RRF
-                    ), result_count=5
-                )
-
-                self.assertGreater(len(res["hits"]), 0)
+                with self.assertRaises(ValueError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, text=None, search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={},  # Edge case
+                            queryLexical="dogs", retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
 
     def test_query_tensor_as_string_equivalent_to_single_query(self):
         """String tensor query should work like dict with one key."""
@@ -3167,6 +3166,50 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             queryTensor=None,
                             queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_none_query_lexical_disjunction_retrieval(self):
+        """Ensure that a None query lexical and tensor with disjunction retrieval does not raise errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(ValueError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor="dogs",
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_none_query_tensor_disjunction_retrieval(self):
+        """Ensure that a None query tensor and lexical with disjunction retrieval does not raise errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(ValueError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical="dogs",
                             retrievalMethod=RetrievalMethod.Disjunction,
                             rankingMethod=RankingMethod.RRF
                         ), result_count=5
