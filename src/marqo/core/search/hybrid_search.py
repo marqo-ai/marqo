@@ -124,6 +124,12 @@ class HybridSearch:
                 f"`searchableAttributesLexical`. Please set these attributes to None."
             )
 
+        if query and hybrid_parameters.queryLexical and hybrid_parameters.queryTensor:
+            raise ValueError(
+                "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or "
+                "hybridParameters.queryLexical is provided"
+            )
+
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
         # split queries into lexical and tensor
@@ -163,8 +169,8 @@ class HybridSearch:
             query_text_search = None
 
         else:  # string or dict query
-            query_text_vectorise = tensor_query if tensor_query else ""
-            query_text_search = lexical_query if lexical_query else ""
+            query_text_vectorise = tensor_query
+            query_text_search = lexical_query
 
         queries = [BulkSearchQueryEntity(
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,

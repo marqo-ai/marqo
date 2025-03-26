@@ -166,3 +166,80 @@ class TestSearchCommon(MarqoTestCase):
                 )
                 self.assertIn("Cannot set both imageDownloadHeaders and mediaDownloadHeaders.",
                               str(cm.exception.message))
+
+    def test_hybrid_search_validations(self):
+        # Add docs
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            }
+        ]
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with no query or context should raise an error
+                with self.subTest("Hybrid search with no query or context"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID"
+                        )
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+
+                with self.subTest("Hybrid search with no query or context should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={}
+                        )
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+
+                with self.subTest("Hybrid search with query and queryTensor/queryLexical should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            q="Cool",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                            }
+                        )
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            q="Cool",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                            }
+                        )
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+
+
+                with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryTensor": {"Cool": 1},
+                        }
+                    )
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryLexical": "Cool",
+                        }
+                    )
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryTensor": {"Cool": 1},
+                            "queryLexical": "Cool",
+                        }
+                    )

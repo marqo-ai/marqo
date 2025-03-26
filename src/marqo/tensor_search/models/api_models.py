@@ -120,11 +120,14 @@ class SearchQuery(BaseMarqoModel):
                 ):
                     raise ValueError(
                         f"One of Query(q), context, hybridParameters.queryTensor, or "
-                        f"hybridParameters.contextTensor is required for {search_method} search but all are missing"
+                        f"hybridParameters.queryTensor is required for {search_method} search but all are missing"
                     )
         else:
             if search_method == SearchMethod.HYBRID:
-                if cls.__name__ == 'SearchQuery': # This check is only relevant for Initial SearchQuery, not BulkSearchQuery
+                if cls.__name__ == 'SearchQuery':
+                    # This check is needed because BulkSearchQuery inherits SearchQuery and because of the way we set
+                    # query for it, it causes this check to fail since we previously provided queryTensor/queryLexical
+                    # parameters
                     if hybrid_parameters and (hybrid_parameters.queryTensor or hybrid_parameters.queryLexical):
                         raise ValueError(
                             f"Query(q) cannot be provided for {search_method} search when hybridParameters.queryTensor or "
