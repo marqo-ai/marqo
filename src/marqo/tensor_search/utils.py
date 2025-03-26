@@ -16,6 +16,7 @@ from marqo.api import exceptions, configs
 from marqo.marqo_logging import logger
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
+from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -227,7 +228,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
     Return:
         2-tuple of <required terms> (for "must" clause) <optional terms> (for "should" clause)
     """
-    CHARACTERS_TO_BE_ESCAPED_IN_VESPA = ('"', '\\')
+
     required_terms = []
     blob = ""
     opening_quote_idx = None
