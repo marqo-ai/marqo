@@ -1,0 +1,56 @@
+services:
+  # CUDA profile services
+  marqo-cuda:
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: marqo
+    network_mode: "host"
+    privileged: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    depends_on:
+      - inference-cuda
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      - MARQO_MODE=API
+      - MARQO_API_WORKERS=4
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - MARQO_REMOTE_INFERENCE_URL=http://host.docker.internal:8881
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_ENABLE_BATCH_APIS=true
+      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
+      - MARQO_MODELS_TO_PRELOAD=[]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  inference-cuda:
+    image: ${MARQO_DOCKER_IMAGE}
+    container_name: inference
+    privileged: true
+    network_mode: "host"
+    env_file:
+      - ${ENV_FILE:-.env.default}
+    environment:
+      - MARQO_MODE=INFERENCE
+      - MARQO_MODELS_TO_PRELOAD=[]
+      - MARQO_INFERENCE_WORKER_COUNT=1
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_MAX_CUDA_MODEL_MEMORY=15
+      - MARQO_MAX_CPU_MODEL_MEMORY=15
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

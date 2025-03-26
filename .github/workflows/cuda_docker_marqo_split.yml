@@ -1,0 +1,105 @@
+name: cuda_docker_marqo_API_tests_split
+# runs API Tests on cuda-enabled instance with Vespa and Marqo running in the same container
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      py_marqo_branch:
+        required: false
+        default: mainline
+        description: >
+          The "py-marqo" branch this test is running against.
+          This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
+          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and 
+          it will use the latest pypi release.
+      image_identifier:
+        required: false
+        # This is the name of the docker image that is built by the build script:
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified Docker image is tested. For example "marqoai/marqo:test"
+  push:
+    branches:
+      - mainline
+      - releases/*
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - mainline
+      - releases/*
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: cuda_docker_marqo_split-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Start-Runner:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets: inherit
+
+
+  Test-Marqo:
+    name: Run CUDA Docker Marqo API Tests
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    defaults:
+      run:
+        working-directory: tests/api_tests/v1
+    environment: marqo-test-suite
+
+    steps:
+
+      - name: Checkout Marqo repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install py-marqo
+        run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Run CUDA Integration Tests - CUDA Docker Marqo
+        run: |
+          CUSTOM_TEST_IMG="${{ github.event.inputs.image_identifier }}"
+          export TESTING_CONFIGURATION=CUDA_DOCKER_MARQO
+          export MARQO_API_TESTS_ROOT=$(pwd)
+          export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          
+          bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
+
+          bash scripts/start_cuda_docker_marqo_split.sh $MARQO_IMAGE_NAME
+          df -k
+          pytest tests/
+
+  Stop-Runner:
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    uses: ./.github/workflows/stop_ec2_runner.yml
+    with:
+      label: ${{ needs.start-runner.outputs.label }}
+      ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+    secrets: inherit
+
