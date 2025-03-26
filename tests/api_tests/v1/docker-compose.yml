@@ -1,102 +1,8 @@
 services:
-  # Default profile services
-  marqo:
-    image: ${MARQO_DOCKER_IMAGE}
-    container_name: marqo
-    profiles: ["default"]
-    ports:
-      - "8882:8882"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: always
-    depends_on:
-      - inference
-    env_file:
-      - ${ENV_FILE:-.env.default}
-    environment:
-      - MARQO_MODE=API
-      - MARQO_API_WORKERS=4
-      - MARQO_ENABLE_THROTTLING=FALSE
-      - MARQO_REMOTE_INFERENCE_URL=http://host.docker.internal:8881
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - MARQO_ENABLE_BATCH_APIS=true
-      - VESPA_CONFIG_URL=http://host.docker.internal:19071
-      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
-      - VESPA_QUERY_URL=http://host.docker.internal:8080
-      - ZOOKEEPER_HOSTS=host.docker.internal:2181
-      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
-      - HF_HUB_ENABLE_HF_TRANSFER=1
-      - MARQO_MODELS_TO_PRELOAD=[]
-
-  inference:
-    image: ${MARQO_DOCKER_IMAGE}
-    container_name: inference
-    profiles: ["default"]
-    ports:
-      - "8881:8881"
-    env_file:
-      - ${ENV_FILE:-.env.default}
-    environment:
-      - MARQO_MODE=INFERENCE
-      - MARQO_MODELS_TO_PRELOAD=[]
-      - MARQO_INFERENCE_WORKER_COUNT=1
-      - MARQO_ENABLE_THROTTLING=FALSE
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
-  # Local profile services
-  marqo-local:
-    image: ${MARQO_DOCKER_IMAGE}
-    container_name: marqo
-    profiles: ["local"]
-    ports:
-      - "8882:8882"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: always
-    depends_on:
-      - inference-local
-    env_file:
-      - ${ENV_FILE:-.env.default}
-    environment:
-      - MARQO_MODE=API
-      - MARQO_API_WORKERS=4
-      - MARQO_ENABLE_THROTTLING=FALSE
-      - MARQO_REMOTE_INFERENCE_URL=http://inference:8881
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - MARQO_ENABLE_BATCH_APIS=true
-      - VESPA_CONFIG_URL=http://host.docker.internal:19071
-      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
-      - VESPA_QUERY_URL=http://host.docker.internal:8080
-      - ZOOKEEPER_HOSTS=host.docker.internal:2181
-      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
-      - HF_HUB_ENABLE_HF_TRANSFER=1
-      - MARQO_MODELS_TO_PRELOAD=[]
-      - MARQO_MAX_CPU_MODEL_MEMORY=1.6
-
-  inference-local:
-    image: ${MARQO_DOCKER_IMAGE}
-    container_name: inference
-    profiles: ["local"]
-    ports:
-      - "8881:8881"
-    env_file:
-      - ${ENV_FILE:-.env.default}
-    environment:
-      - MARQO_MODE=INFERENCE
-      - MARQO_MODELS_TO_PRELOAD=[]
-      - MARQO_INFERENCE_WORKER_COUNT=1
-      - MARQO_ENABLE_THROTTLING=FALSE
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
   # CUDA profile services
   marqo-cuda:
     image: ${MARQO_DOCKER_IMAGE}
     container_name: marqo
-    profiles: ["cuda"]
     network_mode: "host"
     privileged: true
     extra_hosts:
@@ -131,7 +37,6 @@ services:
     image: ${MARQO_DOCKER_IMAGE}
     container_name: inference
     privileged: true
-    profiles: ["cuda"]
     network_mode: "host"
     env_file:
       - ${ENV_FILE:-.env.default}

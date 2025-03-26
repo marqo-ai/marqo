@@ -45,12 +45,12 @@ cat $TEMP_ENV_FILE
 set -x
 # Start the containers using docker-compose with the cuda profile
 # Use --env-file to pass the environment variables
-docker compose --env-file $TEMP_ENV_FILE -f $SCRIPT_DIR/../docker-compose.yml --profile cuda up -d
+docker compose --env-file $TEMP_ENV_FILE -f $SCRIPT_DIR/../docker-compose.yml up -d
 set +x
 
 # Follow docker logs (since it is detached)
 # Also use --env-file for logs
-docker compose --env-file $TEMP_ENV_FILE -f $SCRIPT_DIR/../docker-compose.yml --profile cuda logs -f marqo-cuda &
+docker compose --env-file $TEMP_ENV_FILE -f $SCRIPT_DIR/../docker-compose.yml logs -f marqo-cuda &
 LOGS_PID=$!
 
 # Wait for marqo to start
