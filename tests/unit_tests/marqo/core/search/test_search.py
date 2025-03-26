@@ -1,3 +1,6 @@
+import numpy as np
+
+from marqo.core.inference.api import InferenceResult
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.tensor_search import tensor_search
 import unittest
@@ -62,7 +65,16 @@ class SearchTest(unittest.TestCase):
 
         # Mock VespaClient and Config
         cls.vespa_client_mock = MagicMock()
-        cls.config = Config(cls.vespa_client_mock)
+        cls.inference_mock = MagicMock()
+        def make_mock_vectorise_result(contents):
+            return InferenceResult(
+                result=[
+                    [("chunk", np.random.rand(5))] for _ in contents  # assuming 5-dim vector per content
+                ]
+            )
+
+        cls.inference_mock.vectorise.side_effect = lambda req: make_mock_vectorise_result(req.contents)
+        cls.config = Config(cls.vespa_client_mock, cls.inference_mock)
         cls.logger_mock = MagicMock()
 
         # Patch the get_index method to return the structured index
@@ -85,13 +97,13 @@ class SearchTest(unittest.TestCase):
         cls.logger_patcher.stop()
         cls.metrics_store_patcher.stop()
 
-    def get_expected_tensor_yql(self, rerank_depth=3):
+    def get_expected_tensor_yql(self, rerank_depth=3, additional_hits=1995):
         yql = f"select * from {self.current_index.schema_name} where ("
         for field in self.current_index.fields:
             if field.type in (FieldType.Float, FieldType.Int):
                 continue
             yql += (
-                f"({{targetHits:{rerank_depth}, approximate:True, hnsw.exploreAdditionalHits:1997}}"
+                f"({{targetHits:{rerank_depth}, approximate:True, hnsw.exploreAdditionalHits:{additional_hits}}}"
                 f"nearestNeighbor({field.name}, marqo__query_embedding)) OR "
             )
         return yql[:-4] + ")"
@@ -124,7 +136,7 @@ class SearchTest(unittest.TestCase):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor")
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql())
+        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql(additional_hits=1997))
         self.assertEqual(call_args['model_restrict'], 'test_schema')
         self.assertEqual(call_args['hits'], 3)
         self.assertEqual(call_args['offset'], 0)
@@ -153,7 +165,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql()
+            self.get_expected_tensor_yql(additional_hits=1997),
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
@@ -190,7 +202,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql()
+            self.get_expected_tensor_yql(additional_hits=1997),
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
