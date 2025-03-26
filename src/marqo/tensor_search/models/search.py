@@ -69,7 +69,6 @@ class SearchContext(BaseModel):
 
     def __init__(self, **data):
         try:
-            print(data)
             super().__init__(**data)
         except ValidationError as e:
             raise InvalidArgError(message=e.json())

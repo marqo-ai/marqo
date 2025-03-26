@@ -128,8 +128,6 @@ class SearchQuery(BaseMarqoModel):
                     # This check is needed because BulkSearchQuery inherits SearchQuery and because of the way we set
                     # query for it, it causes this check to fail since we previously provided queryTensor/queryLexical
                     # parameters
-                    print("VALIDATING HERE")
-                    print(hybrid_parameters)
                     if hybrid_parameters is not None and (hybrid_parameters.queryTensor is not None or hybrid_parameters.queryLexical is not None):
                         raise ValueError(
                             f"Query(q) cannot be provided for {search_method} search when hybridParameters.queryTensor or "

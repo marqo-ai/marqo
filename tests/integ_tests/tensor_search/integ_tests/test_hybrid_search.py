@@ -3149,3 +3149,25 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod=RankingMethod.RRF
                         ), result_count=5
                     )
+
+    def test_none_query_lexical_and_tensor_disjunction_retrieval(self):
+        """Ensure that a None query lexical and tensor with disjunction retrieval does not raise errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
