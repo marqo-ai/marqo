@@ -21,10 +21,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MARQO_ENABLE_BATCH_APIS=true
       - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
-      - HF_HUB_ENABLE_HF_TRANSFER=1
       - MARQO_MODELS_TO_PRELOAD=[]
-      - MARQO_MAX_CUDA_MODEL_MEMORY=15
-      - MARQO_MAX_CPU_MODEL_MEMORY=15
     deploy:
       resources:
         reservations:
@@ -47,6 +44,9 @@ services:
       - MARQO_ENABLE_THROTTLING=FALSE
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_MAX_CUDA_MODEL_MEMORY=15
+      - MARQO_MAX_CPU_MODEL_MEMORY=15
+      - HF_HUB_ENABLE_HF_TRANSFER=1
     deploy:
       resources:
         reservations:
