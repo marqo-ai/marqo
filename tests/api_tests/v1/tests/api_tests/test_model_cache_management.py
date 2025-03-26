@@ -58,6 +58,7 @@ class TestModlCacheManagement(MarqoTestCase):
                 r = self.client.index(index_name).get_loaded_models()
                 self.assertIn("models", r)
 
+    @unittest.skip(reason="Not implemented yet in the new inference server")
     def test_eject_no_cached_model(self) -> None:
         # test eject a model that is NOT cached
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
