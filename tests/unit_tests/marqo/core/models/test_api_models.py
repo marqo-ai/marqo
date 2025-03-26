@@ -38,11 +38,19 @@ class TestSearchQueryModel(unittest.TestCase):
         self.assertEqual(sq.searchMethod, SearchMethod.LEXICAL)
 
     def test_hybrid_query_with_only_queryTensor(self):
-        sq = SearchQuery(searchMethod="HYBRID", hybridParameters=HybridParameters(queryTensor={"dogs": 1.0}))
+        sq = SearchQuery(searchMethod="HYBRID", hybridParameters=HybridParameters(
+            queryTensor={"dogs": 1.0},
+            retrievalMethod=RetrievalMethod.Tensor,
+            rankingMethod=RankingMethod.Tensor
+        ))
         self.assertEqual(sq.searchMethod, SearchMethod.HYBRID)
 
     def test_hybrid_query_with_only_queryLexical(self):
-        sq = SearchQuery(searchMethod="HYBRID", hybridParameters=HybridParameters(queryLexical="dogs"))
+        sq = SearchQuery(searchMethod="HYBRID", hybridParameters=HybridParameters(
+            queryLexical="dogs",
+            retrievalMethod=RetrievalMethod.Lexical,
+            rankingMethod=RankingMethod.Lexical
+        ))
         self.assertEqual(sq.searchMethod, SearchMethod.HYBRID)
 
     def test_hybrid_query_with_q_and_tensor_fails(self):

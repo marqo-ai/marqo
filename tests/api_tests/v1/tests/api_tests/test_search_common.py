@@ -222,18 +222,38 @@ class TestSearchCommon(MarqoTestCase):
                         )
                     assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
 
+                with self.subTest("Hybrid search with only one queryTensor/queryLexical and retrievalMethod=disjunction raises an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                            }
+                        )
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                            }
+                        )
+
 
                 with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
                     self.client.index(index_name).search(
                         search_method="HYBRID",
                         hybrid_parameters={
                             "queryTensor": {"Cool": 1},
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor"
                         }
                     )
                     self.client.index(index_name).search(
                         search_method="HYBRID",
                         hybrid_parameters={
                             "queryLexical": "Cool",
+                            "retrievalMethod": "lexical",
+                            "rankingMethod": "lexical"
                         }
                     )
                     self.client.index(index_name).search(
