@@ -2750,7 +2750,9 @@ class TestHybridSearch(MarqoTestCase):
                             search_method="HYBRID",
                             text=None,
                             hybrid_parameters=HybridParameters(
-                                queryTensor=tensor_query[0]
+                                queryTensor=tensor_query[0],
+                                retrievalMethod=RetrievalMethod.Tensor,
+                                rankingMethod=RankingMethod.Tensor
                             ),
                             result_count=10
                             )
@@ -3182,7 +3184,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.assertRaises(ValueError):
+                with self.assertRaises(InvalidArgumentError):
                     tensor_search.search(
                         config=self.config, index_name=index.name, search_method="HYBRID", text=None,
                         hybrid_parameters=HybridParameters(
@@ -3204,7 +3206,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.assertRaises(ValueError):
+                with self.assertRaises(InvalidArgumentError):
                     tensor_search.search(
                         config=self.config, index_name=index.name, search_method="HYBRID", text=None,
                         hybrid_parameters=HybridParameters(
