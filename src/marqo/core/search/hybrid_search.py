@@ -7,7 +7,7 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -189,9 +189,16 @@ class HybridSearch:
             hybridParameters=hybrid_parameters
         )]
 
-        with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
-        vectorised_text = list(qidx_to_vectors.values())[0]
+        if not (
+            (hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical)
+            and
+            (hybrid_parameters.rankingMethod == RankingMethod.Lexical)
+        ):
+            with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
+                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+            vectorised_text = list(qidx_to_vectors.values())[0]
+        else:
+            vectorised_text = None
 
         # Parse text into required and optional terms.
         if query_text_search:

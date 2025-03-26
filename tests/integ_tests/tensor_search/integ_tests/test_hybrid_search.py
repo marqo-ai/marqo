@@ -3144,8 +3144,8 @@ class TestHybridSearch(MarqoTestCase):
                         config=self.config, index_name=index.name, search_method="HYBRID", text=None,
                         hybrid_parameters=HybridParameters(
                             queryLexical=None,
-                            retrievalMethod=RetrievalMethod.Disjunction,
-                            rankingMethod=RankingMethod.RRF
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical
                         ), result_count=5
                     )
 
@@ -3214,3 +3214,49 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod=RankingMethod.RRF
                         ), result_count=5
                     )
+
+    def test_none_provided_for_tensor_lexical_retrieval_works(self):
+        """Ensure that None can be provided for retrievalMethod and rankingMethod."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=None,
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Lexical,
+                    ), result_count=5
+                )
+
+                self.assertIn("hits", res)
+
+    def test_none_provided_for_lexical_tensor_retrieval_works(self):
+        """Ensure that None can be provided for retrievalMethod and rankingMethod."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor="dogs",
+                        queryLexical=None,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor,
+                    ), result_count=5
+                )
+
+                self.assertIn("hits", res)

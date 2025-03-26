@@ -551,6 +551,9 @@ class StructuredVespaIndex(VespaIndex):
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
+        tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
+        lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}'
+
         query = {
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
@@ -565,8 +568,12 @@ class StructuredVespaIndex(VespaIndex):
             'presentation.summary': summary,
 
             # Custom searcher parameters
-            'marqo__yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
-            'marqo__yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}',
+            'marqo__yql.tensor': None if (
+                    marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
+                    and
+                    marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
+            ) else tensor_yql,
+            'marqo__yql.lexical': lexical_yql,
 
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
