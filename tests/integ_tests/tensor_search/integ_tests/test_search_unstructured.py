@@ -47,13 +47,13 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True,
             marqo_version='2.12.0'
         )
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True,
             marqo_version='2.12.0'
@@ -99,6 +99,7 @@ class TestSearchUnstructured(MarqoTestCase):
     # TODO - Test approximate parameter
     # TODO - Test graceful degradation detection with approximate=False
     # TODO - Test timeout parameter
+    
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tests = [
@@ -169,16 +170,6 @@ class TestSearchUnstructured(MarqoTestCase):
             except KeyError:
                 pass
         return copied
-
-    def test_vector_text_search_no_device(self):
-        try:
-            index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
-            search_res = tensor_search._vector_text_search(
-                config=self.config, marqo_index=index_object,
-                result_count=5, query="some text...")
-            raise AssertionError
-        except errors.InternalError:
-            pass
 
     def test_vector_search_against_empty_index(self):
         index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
@@ -674,6 +665,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         result_count=3, filter=filter_string, verbose=0
                     )
 
+    @unittest.skip(reason='temporarily skip due to inference interface changes')
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
 

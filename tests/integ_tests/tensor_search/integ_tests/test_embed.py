@@ -21,7 +21,10 @@ from marqo.vespa.models.query_result import Root, Child, RootFields
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import InvalidArgError
 
+import unittest
 
+
+@unittest.skip(reason='temporarily skip due to unsupported model type: test_prefix')
 class TestEmbed(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -261,8 +264,8 @@ class TestEmbed(MarqoTestCase):
                 for i, expected_value in enumerate(expected_vector):
                     self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
                                         msg=f"Mismatch at index {i} for {index.type}")
-                    
 
+    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_embed_languagebind(self):

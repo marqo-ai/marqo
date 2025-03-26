@@ -1,14 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 
-from marqo.tensor_search.models.private_models import ModelAuth
+from numpy import ndarray
+
+from marqo.core.inference.api.inference import ModelAuth
+from marqo.core.inference.api.modality import Modality
 
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
-    def __init__(self, model_properties: Optional[dict] = None, device: Optional[str] = None,
-                 model_auth: Optional[ModelAuth] = None):
+    def __init__(self, model_properties: dict, device: str, model_auth: Optional[ModelAuth] = None):
         """Load the model with the given properties.
 
         Args:
@@ -16,12 +18,8 @@ class AbstractEmbeddingModel(ABC):
             device (str): The device to load the model on.
             model_auth (dict): The authentication information for the model.
         """
-        if device is None:
-            raise ValueError("`device` is required for loading CLIP models!")
 
-        if model_properties is None:
-            model_properties = dict()
-
+        self.model_properties = model_properties
         self.device = device
         self.model_auth = model_auth
 
@@ -49,6 +47,23 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def encode(self):
-        """Encode the input data."""
+    def encode(self, inputs: List, modality: Modality, normalize: bool) -> List[ndarray]:
+        """Encode the input data.
+
+        Args:
+            inputs: The input data to be encoded, in the form of a list. The individual elements of the list
+                is model specific.
+            modality: The modality of the input data.
+            normalize: Whether to normalize the embeddings.
+
+        Returns:
+            The encoded data. A list of numpy arrays, where each array is the embedding of the corresponding input.
+            Thus, each element of the list should be a (Dim, ) array of floats.
+            It should be the same length as the input list.
+        """
+        pass
+
+    @abstractmethod
+    def get_preprocessor(self):
+        """Get the preprocessor for the model."""
         pass

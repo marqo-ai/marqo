@@ -3,6 +3,7 @@ from typing import Dict, List, Union, Optional
 
 from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
@@ -15,9 +16,10 @@ from marqo.vespa.vespa_client import VespaClient
 
 
 class Recommender:
-    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
         self.index_management = index_management
+        self.inference = inference
 
     def recommend(self,
                   index_name: str,
@@ -99,7 +101,7 @@ class Recommender:
         t0 = timer()
 
         marqo_documents = tensor_search.get_documents_by_ids(
-            config.Config(self.vespa_client),
+            config.Config(self.vespa_client, inference=self.inference),
             index_name, document_ids, show_vectors=True
         ).dict(exclude_none=True, by_alias=True)
 
@@ -176,7 +178,7 @@ class Recommender:
             recommend_filter = filter
 
         results = tensor_search.search(
-            config.Config(self.vespa_client),
+            config.Config(self.vespa_client, inference=self.inference),
             index_name,
             text=None,
             context=SearchContext(tensor=[SearchContextTensor(vector=interpolated_vector, weight=1)]),

@@ -1,12 +1,15 @@
+import unittest
 from typing import List, Dict, Any
 
 import pytest
 
+from integ_tests.marqo_test import MarqoTestCase
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.tensor_search import tensor_search
-from integ_tests.marqo_test import MarqoTestCase
+
+
 
 class TestPartialUpdate(MarqoTestCase):
     @classmethod

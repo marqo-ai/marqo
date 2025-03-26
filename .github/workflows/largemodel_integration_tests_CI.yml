@@ -79,6 +79,7 @@ jobs:
     name: Run Large Model Integration Tests (Part ${{ matrix.part }}/3)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
+      fail-fast: false
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
@@ -108,6 +109,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # Override base requirements with marqo requirements if needed: 
+          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 

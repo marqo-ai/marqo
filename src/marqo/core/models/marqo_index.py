@@ -14,6 +14,8 @@ from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, Stric
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
+
+# TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 

@@ -25,7 +25,7 @@ class TestCudaStructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},
@@ -35,7 +35,7 @@ class TestCudaStructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.filter_test_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "field_a", "type": "text", "features": ["filter"]},
                     {"name": "field_b", "type": "text", "features": ["filter"]},
@@ -296,7 +296,7 @@ class TestCudaUnstructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
             },
             {
                 "indexName": cls.image_index_name,

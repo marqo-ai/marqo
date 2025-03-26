@@ -3,22 +3,36 @@ import tarfile
 import zipfile
 from typing import Tuple, Callable, Optional
 
-import numpy as np
 import torch
 import torch.nn.functional as F
-from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
-    PoolingMethod, HuggingFaceModelFlags, HuggingFaceTokenizerFlags
+from numpy import ndarray
 from pydantic import ValidationError
+from torch import Tensor
 from transformers import (AutoModel, AutoTokenizer)
 
 from marqo import marqo_docs
 from marqo.core.exceptions import InternalError
+from marqo.core.inference.api.modality import Modality
 from marqo.inference.model_download.model_download import download_model
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+    PoolingMethod, HuggingFaceModelFlags, HuggingFaceTokenizerFlags
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.types import Union, FloatTensor, List
+from marqo.s2_inference.types import List
 from marqo.tensor_search.models.private_models import ModelAuth
+
+
+class HuggingFacePreprocessor(AbstractPreprocessor):
+    """The abstract base class for all Hugging Face preprocessors."""
+
+    def __init__(self):
+        super().__init__()
+
+    def preprocess(self, inputs: List[str], modality: Modality) -> List[str]:
+        # No preprocessing is needed for Hugging Face models
+        return inputs
 
 
 class HuggingFaceModel(AbstractEmbeddingModel):
@@ -42,6 +56,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         self._model = None
         self._tokenizer = None
         self._pooling_func = None
+        self._preprocessor = HuggingFacePreprocessor()
 
     def _build_model_properties(self, model_properties: dict) -> HuggingFaceModelProperties:
         """Convert the user input model_properties to HuggingFaceModelProperties."""
@@ -169,15 +184,16 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         else:
             raise InternalError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
-    def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
-        if isinstance(sentence, str):
-            sentence = [sentence]
+    def encode(self, inputs: List[str], modality, normalize=True) -> List[ndarray]:
+
+        if not isinstance(inputs, list) or not isinstance(inputs[0], str):
+            raise ValueError(f"The input data should be a list of strings, but received: {inputs}")
 
         if self._model is None:
             self.load()
 
         tokenized_texts = self._tokenizer(
-            sentence,
+            inputs,
             padding=True,
             truncation=True,
             max_length=self.model_properties.tokens,
@@ -196,11 +212,11 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
         return self._convert_output(embeddings)
 
-    def _convert_output(self, output):
+    def _convert_output(self, output: Tensor) -> List[ndarray]:
         if self.device == 'cpu':
-            return output.numpy()
+            return [single_ndarray for single_ndarray in output.numpy()]
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            return [single_ndarray for single_ndarray in output.cpu().numpy()]
 
     @staticmethod
     def _average_pool_func(model_output, attention_mask):
@@ -278,3 +294,6 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         else:
             # return the directory path or repo_id directory
             return path
+
+    def get_preprocessor(self):
+        return self._preprocessor

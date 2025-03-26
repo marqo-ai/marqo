@@ -168,6 +168,14 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
+        except OSError as e:
+            if "could not create decoder object" in str(e):
+                raise UnidentifiedImageError(
+                    f"Marqo encountered an error when downloading the image from {image_path}. "
+                    f"The image could not be decoded properly. Original error: {e}"
+                )
+            else:
+                raise e
         finally:
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")

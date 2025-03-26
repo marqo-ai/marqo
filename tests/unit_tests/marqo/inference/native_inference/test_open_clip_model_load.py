@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.s2_inference.configs import ModelCache
 
 
@@ -34,7 +34,7 @@ class TestOpenCLIPModelLoad(TestCase):
                   return_value="my_test_model.pt"), \
             patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
 
-            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model = OpenCLIPModel(model_properties=model_properties, device="cpu")
             model.load()
             mock_create_model.assert_called_once_with(
                 model_name="hf-hub:timm/ViT-B-16-SigLIP",
@@ -66,7 +66,7 @@ class TestOpenCLIPModelLoad(TestCase):
                   return_value="my_test_model.pt"), \
             patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
 
-            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model = OpenCLIPModel(model_properties=model_properties, device="cpu")
             model.load()
             mock_create_model.assert_called_once_with(
                 # This remains unchanged and open_clip.create_model will handle the replacement

@@ -1,15 +1,10 @@
-from unittest import TestCase
-
 import numpy as np
 
-from marqo.inference.native_inference.embedding_models.open_clip_model import OPEN_CLIP
-from marqo.s2_inference.model_registry import _get_open_clip_properties
-from marqo.s2_inference.s2_inference import clear_loaded_models
-
-OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
+from integ_tests.inference.inference_test_case import InferenceTestCase
+from marqo.inference.native_inference.load_model import clear_loaded_models
 
 
-class TestMarqoFashionCLIP(TestCase):
+class TestMarqoFashionCLIPEncode(InferenceTestCase):
     """A test class for Marqo Fashion CLIP model.
 
     There are generally 3 parts in a OpenCLIP model:
@@ -566,17 +561,15 @@ class TestMarqoFashionCLIP(TestCase):
         """Test the load method of MarqoFashionCLIPModel."""
 
         model_tag = "Marqo/marqo-fashionSigLIP"
-        model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
-        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
 
-        model.load()
-
-        self.assertIsNotNone(model.model)
-        self.assertIsNotNone(model.tokenizer)
-        self.assertIsNotNone(model.preprocess)
-
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+        marqo_image_embeddings = self.encode_content_helper(
+            content=[self.IMAGE_CONTENT], model_name=model_tag,
+            modality="image"
+        )[0]
+        marqo_text_embeddings = self.encode_content_helper(
+            content=[self.TEXT_CONTENT], model_name=model_tag,
+            modality="language"
+        )[0]
 
         image_difference = np.linalg.norm(marqo_image_embeddings - self.SiGLIP_IMAGE_EMBEDDING) / len(
             marqo_image_embeddings)
@@ -595,7 +588,6 @@ class TestMarqoFashionCLIP(TestCase):
 
         We need to ensure this works as expected. We use FashionSigLIP model for this test.
         """
-
         model_properties = {
             "name": "hf-hub:timm/ViT-B-16-SigLIP",
             "type": "open_clip",
@@ -603,16 +595,15 @@ class TestMarqoFashionCLIP(TestCase):
             "url": "https://huggingface.co/Marqo/marqo-fashionSigLIP/resolve/main/open_clip_pytorch_model.bin",
             "imagePreprocessor": "SigLIP"
         }
-        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
 
-        model.load()
-
-        self.assertIsNotNone(model.model)
-        self.assertIsNotNone(model.tokenizer)
-        self.assertIsNotNone(model.preprocess)
-
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+        marqo_image_embeddings = self.encode_content_helper(
+            content=[self.IMAGE_CONTENT], model_properties=model_properties,
+            modality="image"
+        )[0]
+        marqo_text_embeddings = self.encode_content_helper(
+            content=[self.TEXT_CONTENT], model_properties=model_properties,
+            modality="language"
+        )[0]
 
         image_difference = np.linalg.norm(marqo_image_embeddings - self.SiGLIP_IMAGE_EMBEDDING) / len(
             marqo_image_embeddings)
@@ -628,22 +619,19 @@ class TestMarqoFashionCLIP(TestCase):
         """Test the load method of MarqoFashionCLIPModel."""
 
         model_tag = "Marqo/marqo-fashionCLIP"
-        model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
-        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
+        marqo_image_embeddings = self.encode_content_helper(
+            content=[self.IMAGE_CONTENT], model_name=model_tag,
+            modality="image"
+        )[0]
+        marqo_text_embeddings = self.encode_content_helper(
+            content=[self.TEXT_CONTENT], model_name=model_tag,
+            modality="language"
+        )[0]
 
-        model.load()
-
-        self.assertIsNotNone(model.model)
-        self.assertIsNotNone(model.tokenizer)
-        self.assertIsNotNone(model.preprocess)
-
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
-
-        image_difference = (np.linalg.norm(marqo_image_embeddings - self.FASHIONCLIP_IMAGE_EMBEDDING)
-                            / len(marqo_image_embeddings))
-        text_difference = (np.linalg.norm(marqo_text_embeddings - self.FASHIONCLIP_TEXT_EMBEDDING)
-                           / len(marqo_text_embeddings))
+        image_difference = np.linalg.norm(marqo_image_embeddings - self.FASHIONCLIP_IMAGE_EMBEDDING) / len(
+            marqo_image_embeddings)
+        text_difference = np.linalg.norm(marqo_text_embeddings - self.FASHIONCLIP_TEXT_EMBEDDING) / len(
+            marqo_text_embeddings)
 
         self.assertLess(image_difference, 1e-4, f"Image embeddings are not close enough. "
                                                 f"The average difference is: {image_difference}")
