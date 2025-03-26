@@ -3107,3 +3107,45 @@ class TestHybridSearch(MarqoTestCase):
                     res_with_same_id = next((r for r in multi_res['hits'] if r['_id'] == res['_id']), None)
                     if res_with_same_id:
                         self.assertNotEqual(res['_score'], res_with_same_id['_score'])
+
+    def test_none_query_tensor(self):
+        """Ensure that a None query tensor does not raise errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        ), result_count=5
+                    )
+
+    def test_none_query_lexical(self):
+        """Ensure that a None query lexical does not raise errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
