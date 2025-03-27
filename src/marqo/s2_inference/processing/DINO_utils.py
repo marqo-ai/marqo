@@ -4,7 +4,7 @@ from torchvision import transforms as pth_transforms
 import numpy as np
 import cv2
 
-from marqo.s2_inference.s2_inference import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Any, Literal
 from marqo.s2_inference.errors import ModelLoadError
 from marqo.api.exceptions import InternalError

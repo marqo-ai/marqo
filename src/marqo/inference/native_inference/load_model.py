@@ -15,7 +15,7 @@ from marqo.s2_inference.configs import get_default_normalization, get_default_se
 from marqo.s2_inference.errors import (
     InvalidModelPropertiesError, ModelLoadError,
     ModelNotInCacheError, ModelDownloadError)
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.types import *

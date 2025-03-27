@@ -4,7 +4,7 @@ from torch import nn
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.types import *
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 logger = get_logger(__name__)
 
 

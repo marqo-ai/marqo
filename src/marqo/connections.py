@@ -3,7 +3,7 @@ import time
 
 import redis
 
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 
 """
 Drivers for connecting to other applications should be put here.
