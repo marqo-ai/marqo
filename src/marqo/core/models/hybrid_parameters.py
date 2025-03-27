@@ -33,6 +33,7 @@ class HybridParameters(StrictBaseModel):
     scoreModifiersLexical: Optional[ScoreModifierLists] = None
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
 
+    rerankDepthTensor: Optional[int] = None
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
 
