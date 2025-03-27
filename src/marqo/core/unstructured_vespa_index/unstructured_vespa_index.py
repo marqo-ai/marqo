@@ -18,6 +18,8 @@ from marqo.core.unstructured_vespa_index.unstructured_document import Unstructur
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.core import constants
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -114,12 +116,13 @@ class UnstructuredVespaIndex(VespaIndex):
     def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        if marqo_query.ef_search is not None:
-            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
-        else:
-            target_hits = marqo_query.limit + marqo_query.offset
-            additional_hits = 0
+        marqo_query.ef_search = marqo_query.ef_search if marqo_query.ef_search is not None else max(
+            utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+            marqo_query.limit + marqo_query.offset
+        )
+
+        target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+        additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
 
         if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
             query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING

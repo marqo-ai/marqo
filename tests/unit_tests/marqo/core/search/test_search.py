@@ -8,7 +8,8 @@ from unittest.mock import patch, MagicMock, ANY
 
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, ImagePreProcessing,
-    DistanceMetric, VectorNumericType, HnswConfig, FieldType, FieldFeature, IndexType, Field, TensorField
+    DistanceMetric, VectorNumericType, HnswConfig, FieldType, FieldFeature, IndexType, Field, TensorField,
+    UnstructuredMarqoIndex
 )
 from marqo.config import Config
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -63,6 +64,15 @@ class SearchTest(unittest.TestCase):
                 )]
         )
 
+        cls.legacy_unstructured_index = UnstructuredMarqoIndex(
+            name="legacy_index_name", schema_name="legacy_test_schema", model=cls.model, normalize_embeddings=True,
+            text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
+            image_preprocessing=ImagePreProcessing(patch_method=None), distance_metric=DistanceMetric.Euclidean,
+            vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=200, m=16),
+            marqo_version=get_version(), created_at=1234567890, updated_at=1234567890,
+            treat_urls_and_pointers_as_images=True, filter_string_max_length=1000
+        )
+
         # Mock VespaClient and Config
         cls.vespa_client_mock = MagicMock()
         cls.inference_mock = MagicMock()
@@ -97,7 +107,7 @@ class SearchTest(unittest.TestCase):
         cls.logger_patcher.stop()
         cls.metrics_store_patcher.stop()
 
-    def get_expected_tensor_yql(self, rerank_depth=3, additional_hits=1995):
+    def get_expected_tensor_yql(self, rerank_depth=3, additional_hits=1997):
         yql = f"select * from {self.current_index.schema_name} where ("
         for field in self.current_index.fields:
             if field.type in (FieldType.Float, FieldType.Int):
@@ -136,7 +146,7 @@ class SearchTest(unittest.TestCase):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor")
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql(additional_hits=1997))
+        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql())
         self.assertEqual(call_args['model_restrict'], 'test_schema')
         self.assertEqual(call_args['hits'], 3)
         self.assertEqual(call_args['offset'], 0)
@@ -145,7 +155,7 @@ class SearchTest(unittest.TestCase):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", rerank_depth=5)
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql(rerank_depth=5))
+        self.assertEqual(call_args['yql'], self.get_expected_tensor_yql(rerank_depth=5, additional_hits=1995))
 
     def test_lexical_search(self):
         tensor_search.search(self.config, "index_name", "query", search_method="lexical")
@@ -165,7 +175,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql(additional_hits=1997),
+            self.get_expected_tensor_yql(),
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
@@ -177,7 +187,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql(rerank_depth=5)
+            self.get_expected_tensor_yql(rerank_depth=5, additional_hits=1995),
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
@@ -189,7 +199,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql(rerank_depth=5)
+            self.get_expected_tensor_yql(rerank_depth=5, additional_hits=1995)
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
@@ -202,9 +212,86 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.tensor'],
-            self.get_expected_tensor_yql(additional_hits=1997),
+            self.get_expected_tensor_yql(),
         )
         self.assertEqual(
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
         )
         self.assertEqual(call_args['marqo__hybrid.rerankDepthGlobal'], 15)
+
+    def test_rerank_depth_higher_than_default_ef_search_overrides_it(self):
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", rerank_depth=3000)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(rerank_depth=3000, additional_hits=0),
+        )
+
+    def test_ef_search_higher_than_default_ef_search_overrides_it(self):
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", ef_search=3000)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(rerank_depth=3, additional_hits=2997),
+        )
+
+    def test_ef_search_and_rerank_depth_specified_minimal_is_selected(self):
+        scenarios = [
+            (1500, 1000),
+            (1000, 1500),
+            (1500, 1500),
+        ]
+        expected_results = [
+            self.get_expected_tensor_yql(rerank_depth=1000, additional_hits=500),
+            self.get_expected_tensor_yql(rerank_depth=1000, additional_hits=0),
+            self.get_expected_tensor_yql(rerank_depth=1500, additional_hits=0),
+        ]
+        for i in range(len(scenarios)):
+            with self.subTest(ef_search=scenarios[i][0], rerank_depth=scenarios[i][1]):
+                tensor_search.search(
+                    self.config, "index_name", "query", search_method="tensor",
+                    ef_search=scenarios[i][0], rerank_depth=scenarios[i][1]
+                )
+                call_args = self.vespa_client_mock.query.call_args[1]
+                self.assertEqual(
+                    call_args['yql'],
+                    expected_results[i],
+                )
+
+    def test_legacy_unstructured_ef_search(self):
+        tensor_search.search(self.config, "legacy_index_name", "query", search_method="tensor", ef_search=3000)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(rerank_depth=3, additional_hits=2997),
+        )
+
+    def test_legacy_structured_default_ef_search(self):
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor")
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(),
+        )
+
+    def test_legacy_structured_default_ef_search_with_limit(self):
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", result_count=100)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(rerank_depth=100, additional_hits=1900),
+        )
+
+    def test_legacy_structured_ef_search_with_limit_higher_than_ef_search(self):
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", result_count=100, ef_search=50)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['yql'],
+            self.get_expected_tensor_yql(rerank_depth=50, additional_hits=0),
+        )

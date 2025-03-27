@@ -8,6 +8,8 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -663,15 +665,21 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
+
         if marqo_query.rerank_depth_tensor is not None:
             rerank_depth = max(marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset)
         else:
             rerank_depth = marqo_query.limit + marqo_query.offset
-        additional_hits = 0
 
         if marqo_query.ef_search is not None:
             rerank_depth = min(rerank_depth, marqo_query.ef_search)
-            additional_hits = max(marqo_query.ef_search - rerank_depth, 0)
+        else:
+            # efSearch must be min result_count + offset
+            marqo_query.ef_search = max(
+                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+                marqo_query.limit + marqo_query.offset
+            )
+        additional_hits = max(marqo_query.ef_search - rerank_depth, 0)
 
         terms = []
         for field in fields_to_search:
