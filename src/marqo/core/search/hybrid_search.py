@@ -77,8 +77,6 @@ class HybridSearch:
             """
 
         # # SEARCH TIMER-LOGGER (pre-processing)
-        if not device:
-            raise api_exceptions.InternalError("_hybrid_search cannot be called without `device`!")
         if boost is not None:
             raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
 

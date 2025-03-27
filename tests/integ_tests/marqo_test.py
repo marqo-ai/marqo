@@ -11,13 +11,18 @@ import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
 
-from marqo import config, version, tensor_search
+from marqo import config, version
+from marqo.config import Config
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.inference.native_inference.device_manager import DeviceManager
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
-from marqo.tensor_search import tensor_search
+from marqo.inference.native_inference.load_model import NativeModelManager
+from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -60,7 +65,6 @@ class TestVideoUrls(str, Enum):
     AVI_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.avi"
 
 
-
 class MarqoTestCase(unittest.TestCase):
     indexes = []
 
@@ -95,7 +99,9 @@ class MarqoTestCase(unittest.TestCase):
         cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True,
                                                deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
+        cls.config = config.Config(vespa_client=vespa_client,
+                                   inference=NativeInferenceLocal(DeviceManager()),
+                                   model_manager=NativeModelManager(),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
@@ -110,9 +116,8 @@ class MarqoTestCase(unittest.TestCase):
         return indexes
 
     @classmethod
-    def add_documents(cls, *args, **kwargs):
-        # TODO change to use config.document.add_documents when tensor_search.add_documents is removed
-        return tensor_search.add_documents(*args, **kwargs)
+    def add_documents(cls, config: Config, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
+        return config.document.add_documents(add_docs_params)
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)

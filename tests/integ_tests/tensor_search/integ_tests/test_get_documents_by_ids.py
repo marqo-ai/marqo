@@ -17,6 +17,8 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 
+import unittest
+
 
 class TestGetDocuments(MarqoTestCase):
 

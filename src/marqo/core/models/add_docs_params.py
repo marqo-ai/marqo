@@ -1,4 +1,3 @@
-import enum
 from typing import List
 from typing import Optional, Union, Any, Sequence
 
@@ -8,36 +7,26 @@ from pydantic import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
-
+from marqo.tensor_search.enums import EnvVars
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
-
-
-class BatchVectorisationMode(enum.Enum):
-    PER_FIELD = 'per_field'
-    PER_DOCUMENT = 'per_document'
-    PER_BATCH = 'per_batch'
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class AddDocsParams(BaseModel):
-    """Represents the parameters of the tensor_search.add_documents() function
+    """Represents the parameters of the document.add_documents() function
 
     Params:
         index_name: name of the index
         docs: List of documents
         use_existing_tensors: Whether to use the vectors already in doc (for update docs)
-        device: Device used to carry out the document update, if `None` is given, it will be determined by
-                EnvVars.MARQO_BEST_AVAILABLE_DEVICE
+        device: Device used to carry out the document update, if `None` is given, it will be determined inference
         image_download_thread_count: number of threads used to concurrently download images
         media_download_headers: headers to authenticate media download requests
         mappings: a dictionary used to handle all the object field content in the doc,
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
         text_chunk_prefix: an optional prefix to add to each text chunk
-        batch_vectorisation_mode: choose how we batch vectorisation requests to the embedding model.
-                                  supports per_field, per_document and per_batch [Experimental]
     """
 
     class Config:
@@ -58,14 +47,8 @@ class AddDocsParams(BaseModel):
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
     text_chunk_prefix: Optional[str] = None
-    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
-    batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
-        # TODO [Refactoring device logic] use device info gathered from device manager
-        # Ensure `None` and passing nothing are treated the same for device
-        if "device" not in data or data["device"] is None:
-            data["device"] = get_best_available_device()
         super().__init__(**data)
 
     @root_validator

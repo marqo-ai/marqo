@@ -130,15 +130,6 @@ class TestVectorSearch(MarqoTestCase):
                 config=self.config, index_name=self.index_name_1, text="Exact match hehehe"
             )
 
-    def test_vector_text_search_no_device(self):
-        try:
-            search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.index_name_1,
-                result_count=5, query="some text...")
-            raise AssertionError
-        except InternalError:
-            pass
-
     def test_vector_search_against_empty_index(self):
         search_res = tensor_search._vector_text_search(
             config=self.config, index_name=self.index_name_1,

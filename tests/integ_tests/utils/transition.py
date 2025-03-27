@@ -7,7 +7,6 @@ from copy import deepcopy
 from marqo.config import Config
 from marqo.tensor_search.enums import EnvVars
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
@@ -23,7 +22,7 @@ def add_docs_caller(config: Config, **kwargs):
     if "device" not in kwargs:
         kwargs["device"] = "cpu"
     
-    return add_documents(config=config, add_docs_params=AddDocsParams(**kwargs))
+    return config.document.add_documents(add_docs_params=AddDocsParams(**kwargs))
 
 
 def add_docs_batched(config: Config,
@@ -39,6 +38,4 @@ def add_docs_batched(config: Config,
     del kwargs_without_docs["docs"]
 
     for i in range(0, len(docs), batch_size):
-        add_documents(
-            config=config, add_docs_params=AddDocsParams(docs=docs[i:i+batch_size], **kwargs_without_docs)
-        )
+        config.document.add_documents(add_docs_params=AddDocsParams(docs=docs[i:i+batch_size], **kwargs_without_docs))

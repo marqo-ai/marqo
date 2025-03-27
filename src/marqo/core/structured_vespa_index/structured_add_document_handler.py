@@ -3,9 +3,11 @@ from typing import Dict, Any, List
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
+from marqo.core.inference.api import Modality, MediaDownloadError, Inference
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.exceptions import InvalidArgumentError
@@ -18,10 +20,19 @@ from marqo.tensor_search import validation
 from marqo.vespa.vespa_client import VespaClient
 
 
+MODALITY_FIELD_TYPE_MAP = {
+    Modality.TEXT: FieldType.Text,
+    Modality.IMAGE: FieldType.ImagePointer,
+    Modality.VIDEO: FieldType.VideoPointer,
+    Modality.AUDIO: FieldType.AudioPointer,
+}
+
+
 class StructuredAddDocumentsHandler(AddDocumentsHandler):
-    def __init__(self, marqo_index: StructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
+    def __init__(self, marqo_index: StructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient,
+                 inference: Inference):
         self._validate_add_docs_params(add_docs_params, marqo_index)
-        super().__init__(marqo_index, add_docs_params, vespa_client)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.marqo_index = marqo_index
         self.vespa_index = StructuredVespaIndex(marqo_index)
 
@@ -58,12 +69,25 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         self._validate_field(field_name, field_content)
         content = self.tensor_fields_container.collect(
             marqo_doc[MARQO_DOC_ID], field_name, field_content,
-            self._infer_field_type
+            self.marqo_index.field_map[field_name].type
         )
         marqo_doc[field_name] = content
 
-    def _infer_field_type(self, field_name:str, field_content: Any) -> FieldType:
-        return self.marqo_index.field_map[field_name].type
+    def _infer_modality(self, tensor_field: TensorField) -> Modality:
+        if tensor_field.field_type == FieldType.Text:
+            return Modality.TEXT
+
+        url = tensor_field.field_content
+        try:
+            modality = infer_modality(url, self.add_docs_params.media_download_headers)
+        except MediaDownloadError as err:
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
+
+        if MODALITY_FIELD_TYPE_MAP[modality] != tensor_field.field_type:
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}, detected as {modality.value}, "
+                                    f"but expected field type is {tensor_field.field_type}")
+
+        return modality
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:

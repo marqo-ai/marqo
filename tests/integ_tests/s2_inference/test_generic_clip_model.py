@@ -6,11 +6,9 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
-from marqo.core.inference.model_download import download_pretrained_from_s3
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.s2_inference import (
-    vectorise,
-    validate_model_properties
+    vectorise
 )
 
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls

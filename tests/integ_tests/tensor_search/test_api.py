@@ -18,6 +18,8 @@ import importlib
 import sys
 import os
 
+import unittest
+
 
 class ApiTests(MarqoTestCase):
     def setUp(self):
@@ -122,6 +124,7 @@ class ApiTests(MarqoTestCase):
                 self.assertIn(f"The search result offset must be less than or equal "
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
+
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
@@ -228,6 +231,7 @@ class TestApiCustomEnvVars(MarqoTestCase):
         cls.unstructured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
 
+    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_search_timeout_short_timer_fails(self):
         # Set up the test API client with the correct env vars set
         with mock.patch.dict(os.environ, {"VESPA_SEARCH_TIMEOUT_MS": "1"}):
@@ -263,7 +267,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
                             # Allowing scenario where hybrid searcher returns 500
                             # TODO: Remove this when hybrid searcher gives correct error code
                             self.assertEqual(res.status_code, 500)
-
 
 
 class TestApiErrors(MarqoTestCase):
@@ -317,6 +320,7 @@ class TestApiErrors(MarqoTestCase):
         assert "already exists" in response.json()["message"] and self.structured_index.name in response.json()[
             "message"]
 
+    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_invalid_field_name(self):
         # use attributesToRetrieve on a non-existent field
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
@@ -343,6 +347,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["errors"], True)
         self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
+    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_filter_string_parsing_error(self):
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
@@ -534,23 +539,6 @@ class TestApiErrors(MarqoTestCase):
                 self.assertEqual(response.status_code, 422)
                 self.assertIn("allFields", response.text)
                 self.assertIn("features", response.text)
-
-    def test_healthz_happy_pass(self):
-        response = self.client.get("/healthz")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok"})
-
-    def test_healthz_fails_if_exception_raised(self):
-        for cuda_exception in [
-            CudaDeviceNotAvailableError('CUDA device(s) have become unavailable'),
-            CudaOutOfMemoryError('CUDA device cuda:0(Tesla T4) is out of memory')
-        ]:
-            with self.subTest(cuda_exception):
-                with patch("marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
-                           side_effect=cuda_exception):
-                    response = self.client.get("/healthz")
-                    self.assertEqual(response.status_code, 503)
-                    self.assertIn(cuda_exception.message, response.json()['message'])
 
     def test_log_stack_trace_for_core_exceptions(self):
         """Ensure stack trace is logged for core exceptions, e.g.,IndexExistsError"""

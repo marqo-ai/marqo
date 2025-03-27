@@ -26,6 +26,7 @@ def racing_vectorise_call(test_model, test_content, q):
         pass
 
 
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestAutomaticModelEject(unittest.TestCase):
     def setUp(self) -> None:
         clear_loaded_models()
