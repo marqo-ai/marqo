@@ -2717,3 +2717,553 @@ class TestHybridSearch(MarqoTestCase):
             # rerank_depth=3, # This should not raise an error
             result_count=3
         )
+
+    def test_weighted_tensor_query(self):
+        """
+        Tests that a weighted tensor query can be made.
+        """
+
+        # Add documents
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Adding documents
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Reference results
+                tensor_queries_list = [
+                    # tensor query with 1 field
+                    [{"dogs": 1.0}, {"dogs": -1}],
+                    # tensor query with 3 fields
+                    [{"dogs": 1.0, "cats": 0.5, "birds": 0.25}, {"dogs": -1, "cats": -0.5, "birds": -0.25}],
+                ]
+                for tensor_query in tensor_queries_list:
+                    with self.subTest(tensor_query=tensor_query):
+                        # Results with normal weights
+                        tensor_res = tensor_search.search(
+                            config=self.config,
+                            index_name=self.structured_text_index_score_modifiers.name,
+                            search_method="HYBRID",
+                            text=None,
+                            hybrid_parameters=HybridParameters(
+                                queryTensor=tensor_query[0],
+                                retrievalMethod=RetrievalMethod.Tensor,
+                                rankingMethod=RankingMethod.Tensor
+                            ),
+                            result_count=10
+                            )
+
+                        # Results with reverse weights
+                        tensor_res_reverse = tensor_search.search(
+                            config=self.config,
+                            index_name=self.structured_text_index_score_modifiers.name,
+                            search_method="HYBRID",
+                            text=None,
+                            hybrid_parameters=HybridParameters(
+                                queryTensor=tensor_query[1],
+                                retrievalMethod=RetrievalMethod.Tensor,
+                                rankingMethod=RankingMethod.Tensor
+                            ),
+                            result_count=5
+                        )
+
+                        # Check that top result is not present in reverse weighted query
+                        top_hit = tensor_res["hits"][0]
+                        self.assertIsNone(
+                            next((doc for doc in tensor_res_reverse["hits"] if doc["_id"] == top_hit["_id"]), None)
+                        )
+
+    def test_different_retrieval_and_ranking_combinations_with_weighted_queries(self):
+        """
+        Tests that different search and retrieval combinations can be made with weighted queries.
+        """
+
+        # Add documents
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Adding documents
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                base_parameters = {
+                    "config": self.config,
+                    "index_name": index.name,
+                    "search_method": "HYBRID",
+                    "text": None,
+                }
+
+                with self.subTest("Lexical retrieval, Tensor ranking - opposite weights should provide opposite results"):
+                    res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": 1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor
+                        ),
+                        result_count=10
+                    )
+
+                    reverse_res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": -1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor
+                        ),
+                        result_count=5
+                    )
+
+                    # Check that top result is lowest in reverse weighted query
+                    assert res["hits"][0]["_id"] == reverse_res["hits"][-1]["_id"]
+
+                with self.subTest("tensor retrieval, lexical ranking - opposite weights result should not be included"):
+                    res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": 1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Lexical
+                        ),
+                        result_count=10
+                    )
+
+                    reverse_res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": -1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Lexical
+                        ),
+                        result_count=5
+                    )
+
+                    # Check that top result is lowest in reverse weighted query
+                    assert not any(r["_id"] for r in reverse_res["hits"] if r["_id"] == res["hits"][0]["_id"])
+
+                with self.subTest("tensor retrieval, tensor ranking - opposite weights result should not be included"):
+                    res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": 1.0,
+                            },
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        ),
+                        result_count=10
+                    )
+
+                    reverse_res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": -1.0,
+                            },
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        ),
+                        result_count=5
+                    )
+
+                    # Check that top result is lowest in reverse weighted query
+                    assert not any(r["_id"] for r in reverse_res["hits"] if r["_id"] == res["hits"][0]["_id"])
+
+                with self.subTest("disjunction retrieval, RRF ranking - opposite weights should provide opposite results"):
+                    res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": 1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ),
+                        result_count=10
+                    )
+
+                    reverse_res = tensor_search.search(
+                        **base_parameters,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={
+                                "dogs": -1.0,
+                            },
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ),
+                        result_count=5
+                    )
+
+                    # Check that top result is lowest in reverse weighted query
+                    assert res["hits"][0]["_id"] == reverse_res["hits"][-1]["_id"]
+
+
+
+    def test_lexical_retrieval_tensor_rerank_with_weighted_query(self):
+        """
+        Tests that a weighted tensor query can be made.
+        """
+
+        # Add documents
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Adding documents
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Reference results
+                res = tensor_search.search(
+                    config=self.config, index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID", text=None, hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": 1.0,
+                        },
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                # Results with reverse weights for dogs
+                res_reverse = tensor_search.search(
+                    config=self.config, index_name=self.structured_text_index_score_modifiers.name,
+                    search_method="HYBRID", text=None, hybrid_parameters=HybridParameters(
+                        queryTensor={
+                            "dogs": -1.0,
+                        },
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                # Check that top result is lowest in reverse weighted query
+                assert res["hits"][0]["_id"] == res_reverse["hits"][-1]["_id"]
+
+    def test_empty_tensor_query_dict(self):
+        """Ensure empty tensor query dict does not raise errors and behaves correctly."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(ValueError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, text=None, search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            queryTensor={},  # Edge case
+                            queryLexical="dogs", retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_query_tensor_as_string_equivalent_to_single_query(self):
+        """String tensor query should work like dict with one key."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                string_query = "dogs"
+                dict_query = {
+                    "dogs": 1.0
+                }
+
+                str_res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=string_query,
+                        rankingMethod=RankingMethod.Tensor,
+                        retrievalMethod=RetrievalMethod.Tensor
+                    ), result_count=5
+                )
+
+                dict_res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=dict_query,
+                        rankingMethod=RankingMethod.Tensor,
+                        retrievalMethod=RetrievalMethod.Tensor
+                    ), result_count=5
+                )
+
+                self.assertEqual(
+                    [hit["_id"] for hit in str_res["hits"]], [hit["_id"] for hit in dict_res["hits"]],
+                    "String queryTensor should behave like single-entry dict"
+                )
+
+    def test_query_tensor_as_multi_values_dict_produces_different_results_to_single_value_dict(self):
+        """Ensure that a query tensor with multiple values produces different results to a single value dict."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                single_query = {
+                    "dogs": 1.0
+                }
+
+                multi_query = {
+                    "dogs": 1.0,
+                    "cats": 0.5
+                }
+
+                single_res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=single_query,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                multi_res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=multi_query,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor
+                    ), result_count=5
+                )
+
+                for res in single_res['hits']:
+                    res_with_same_id = next((r for r in multi_res['hits'] if r['_id'] == res['_id']), None)
+                    if res_with_same_id:
+                        self.assertNotEqual(res['_score'], res_with_same_id['_score'])
+
+    def test_none_query_tensor(self):
+        """Ensure that a None query tensor raises an errors."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor
+                        ), result_count=5
+                    )
+
+    def test_none_query_lexical(self):
+        """Ensure that a None query lexical raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical
+                        ), result_count=5
+                    )
+
+    def test_none_query_lexical_and_tensor_disjunction_retrieval(self):
+        """Ensure that a None query lexical and tensor with disjunction retrieval raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_none_query_lexical_disjunction_retrieval(self):
+        """Ensure that a None query lexical and tensor with disjunction retrieval raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor="dogs",
+                            queryLexical=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_none_query_tensor_disjunction_retrieval(self):
+        """Ensure that a None query tensor and lexical with disjunction retrieval raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF
+                        ), result_count=5
+                    )
+
+    def test_none_provided_for_tensor_lexical_retrieval_works(self):
+        """Ensure that None can be provided for tensor query when retrievalMethod and rankingMethod are lexical."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor=None,
+                        queryLexical="dogs",
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Lexical,
+                    ), result_count=5
+                )
+
+                self.assertIn("hits", res)
+
+    def test_none_provided_for_lexical_tensor_retrieval_works(self):
+        """Ensure that None can be provided for lexical query when retrievalMethod and rankingMethod are Tensor."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                    hybrid_parameters=HybridParameters(
+                        queryTensor="dogs",
+                        queryLexical=None,
+                        retrievalMethod=RetrievalMethod.Tensor,
+                        rankingMethod=RankingMethod.Tensor,
+                    ), result_count=5
+                )
+
+                self.assertIn("hits", res)
+
+    def test_tensor_query_provided_for_lexical_retrieval_lexical_ranking_raises_error(self):
+        """Ensure that providing a tensor query for lexical retrieval and ranking raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor="dogs",
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical,
+                        ), result_count=5
+                    )
+
+    def test_lexical_query_provided_for_tensor_retrieval_tensor_ranking_raises_error(self):
+        """Ensure that providing a lexical query for tensor retrieval and ranking raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor,
+                        ), result_count=5
+                    )

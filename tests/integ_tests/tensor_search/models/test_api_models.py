@@ -86,3 +86,22 @@ class TestSearchQuery(MarqoTestCase):
 
         search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5)
         self.assertEqual(None, search_query.rerankDepth)
+
+
+    def test_hybrid_search_without_queries_or_context_fails(self):
+        with self.assertRaises(ValueError) as e:
+            _ = SearchQuery(searchMethod=SearchMethod.HYBRID)
+
+        self.assertIn("One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing", str(e.exception))
+
+    def test_query_with_tensor_query_fails(self):
+        with self.assertRaises(ValueError) as e:
+            _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, hybridParameters=HybridParameters(queryTensor="test"))
+
+        self.assertIn("Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided", str(e.exception))
+
+    def test_query_with_lexical_query_fails(self):
+        with self.assertRaises(ValueError) as e:
+            _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, hybridParameters=HybridParameters(queryLexical="test"))
+
+        self.assertIn("Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided", str(e.exception))
