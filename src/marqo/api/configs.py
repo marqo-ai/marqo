@@ -9,7 +9,7 @@ def default_env_vars() -> dict:
     return {
         # Common
         EnvVars.MARQO_LOG_LEVEL: "info",
-        EnvVars.MARQO_LOG_FORMAT: "json",
+        EnvVars.MARQO_LOG_FORMAT: "plain",
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",

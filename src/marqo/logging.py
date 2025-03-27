@@ -7,7 +7,6 @@ from marqo.api.exceptions import EnvVarError
 from marqo.tensor_search.enums import EnvVars
 
 
-# TODO confirm why we don't accept CRITICAL as a valid option
 VALID_LOG_LEVELS = ["error", "warning", "info", "debug"]
 VALID_LOG_FORMATS = ["plain", "json"]
 
