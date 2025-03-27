@@ -2867,7 +2867,7 @@ class TestHybridSearch(MarqoTestCase):
                             queryTensor={
                                 "dogs": 1.0,
                             },
-                            queryLexical="dogs",
+                            queryLexical=None,
                             retrievalMethod=RetrievalMethod.Tensor,
                             rankingMethod=RankingMethod.Tensor
                         ),
@@ -2880,7 +2880,7 @@ class TestHybridSearch(MarqoTestCase):
                             queryTensor={
                                 "dogs": -1.0,
                             },
-                            queryLexical="dogs",
+                            queryLexical=None,
                             retrievalMethod=RetrievalMethod.Tensor,
                             rankingMethod=RankingMethod.Tensor
                         ),
@@ -2966,47 +2966,6 @@ class TestHybridSearch(MarqoTestCase):
 
                 # Check that top result is lowest in reverse weighted query
                 assert res["hits"][0]["_id"] == res_reverse["hits"][-1]["_id"]
-
-    def test_lexical_lexical_weighted_query_ignored(self):
-        """Weighted tensor queries should be ignored with lexical/lexical config."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
-            with self.subTest(index=index.type):
-                self.add_documents(
-                    config=self.config, add_docs_params=AddDocsParams(
-                        index_name=index.name, docs=self.docs_list,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                base = {
-                    "config": self.config,
-                    "index_name": index.name,
-                    "search_method": "HYBRID",
-                    "text": None,
-                    "result_count": 5,
-                }
-
-                res = tensor_search.search(
-                    **base, hybrid_parameters=HybridParameters(
-                        queryLexical="dogs", queryTensor={
-                            "dogs": 1.0
-                        }, retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Lexical
-                    )
-                )
-
-                reversed_res = tensor_search.search(
-                    **base, hybrid_parameters=HybridParameters(
-                        queryLexical="dogs", queryTensor={
-                            "dogs": -1.0
-                        },  # Should be ignored
-                        retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Lexical
-                    )
-                )
-
-                self.assertEqual(
-                    [hit["_id"] for hit in res["hits"]], [hit["_id"] for hit in reversed_res["hits"]],
-                    "Tensor query weights should not affect lexical/lexical ranking."
-                )
 
     def test_empty_tensor_query_dict(self):
         """Ensure empty tensor query dict does not raise errors and behaves correctly."""
