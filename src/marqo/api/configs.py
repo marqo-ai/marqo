@@ -8,8 +8,8 @@ def default_env_vars() -> dict:
     """
     return {
         # Common
-        # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_LOG_LEVEL: "info",
+        EnvVars.MARQO_LOG_FORMAT: "plain",
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",

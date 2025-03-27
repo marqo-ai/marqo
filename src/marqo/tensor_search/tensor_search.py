@@ -76,7 +76,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 

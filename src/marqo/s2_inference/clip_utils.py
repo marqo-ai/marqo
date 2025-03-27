@@ -22,7 +22,7 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.inference.model_download.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import *
 from marqo.s2_inference.types import Modality
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints

@@ -10,7 +10,7 @@ from pydantic import Field, validator, root_validator
 from marqo.base_model import ImmutableBaseModel
 from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.tensor_search.models.private_models import ModelLocation
 
 logger = get_logger(__name__)

@@ -20,7 +20,7 @@ from marqo.s2_inference.s2_inference import (_create_model_cache_key, _float_ten
                                              _nd_array_to_list, get_available_models)
 from marqo.s2_inference.configs import ModelCache
 
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 logger = get_logger(__name__)
 
 def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float]]) -> List[float]:

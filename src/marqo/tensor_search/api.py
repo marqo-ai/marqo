@@ -28,7 +28,7 @@ from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
-from marqo.logging import get_logger
+from marqo.logging import get_logger, LOGGING_CONFIG
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
@@ -618,4 +618,4 @@ def check_health(marqo_config: config.Config = Depends(get_config)):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8882)
+    uvicorn.run(app, host="localhost", port=8882, log_config=LOGGING_CONFIG)

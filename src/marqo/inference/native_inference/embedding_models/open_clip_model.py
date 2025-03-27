@@ -19,7 +19,7 @@ from marqo.inference.native_inference.embedding_models.open_clip_model_propertie
     ImagePreprocessor
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
