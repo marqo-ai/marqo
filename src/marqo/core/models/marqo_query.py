@@ -58,6 +58,7 @@ class MarqoLexicalQuery(MarqoQuery):
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     hybrid_parameters: HybridParameters
+    vector_query: Optional[List[float]] # overrides tensor parameter to allow None value.
 
     # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
