@@ -11,6 +11,7 @@ from marqo.core.models.marqo_index import (
     DistanceMetric, VectorNumericType, HnswConfig, FieldType, FieldFeature, IndexType, Field, TensorField,
     UnstructuredMarqoIndex
 )
+
 from marqo.config import Config
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.version import get_version
@@ -119,6 +120,9 @@ class SearchTest(unittest.TestCase):
         return yql[:-4] + ")"
 
     def get_expected_lexical_yql(self, query):
+        return f'select * from {self.current_index.schema_name} where weakAnd(default contains "{query}")'
+
+    def get_expected_lexical_yql2(self, query):
         return f'select * from {self.current_index.schema_name} where (weakAnd(default contains "{query}"))'
 
     def set_index_to_return(self, index):
@@ -161,7 +165,7 @@ class SearchTest(unittest.TestCase):
         tensor_search.search(self.config, "index_name", "query", search_method="lexical")
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(call_args['yql'], self.get_expected_lexical_yql("query"))
+        self.assertEqual(call_args['yql'], self.get_expected_lexical_yql2("query"))
         self.assertEqual(call_args['query_features'], {'text_field_2': 1, 'text_field_1': 1})
         self.assertEqual(call_args['ranking'], 'bm25')
         self.assertEqual(call_args['hits'], 3)
@@ -174,11 +178,11 @@ class SearchTest(unittest.TestCase):
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
-            call_args['marqo__yql.tensor'],
             self.get_expected_tensor_yql(),
+            call_args['marqo__yql.tensor']
         )
         self.assertEqual(
-            call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
+            self.get_expected_lexical_yql("query"), call_args['marqo__yql.lexical']
         )
 
     def test_hybrid_search_with_rerank_depth_tensor(self):
@@ -295,3 +299,6 @@ class SearchTest(unittest.TestCase):
             call_args['yql'],
             self.get_expected_tensor_yql(rerank_depth=50, additional_hits=0),
         )
+
+if __name__ == '__main__':
+    unittest.main()
