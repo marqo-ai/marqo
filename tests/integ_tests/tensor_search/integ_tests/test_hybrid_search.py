@@ -3112,7 +3112,7 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertNotEqual(res['_score'], res_with_same_id['_score'])
 
     def test_none_query_tensor(self):
-        """Ensure that a None query tensor does not raise errors."""
+        """Ensure that a None query tensor raises an errors."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3133,7 +3133,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
 
     def test_none_query_lexical(self):
-        """Ensure that a None query lexical does not raise errors."""
+        """Ensure that a None query lexical raises an error."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3154,7 +3154,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
 
     def test_none_query_lexical_and_tensor_disjunction_retrieval(self):
-        """Ensure that a None query lexical and tensor with disjunction retrieval does not raise errors."""
+        """Ensure that a None query lexical and tensor with disjunction retrieval raises an error."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3176,7 +3176,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
 
     def test_none_query_lexical_disjunction_retrieval(self):
-        """Ensure that a None query lexical and tensor with disjunction retrieval does not raise errors."""
+        """Ensure that a None query lexical and tensor with disjunction retrieval raises an error."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3198,7 +3198,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
 
     def test_none_query_tensor_disjunction_retrieval(self):
-        """Ensure that a None query tensor and lexical with disjunction retrieval does not raise errors."""
+        """Ensure that a None query tensor and lexical with disjunction retrieval raises an error."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3220,7 +3220,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
 
     def test_none_provided_for_tensor_lexical_retrieval_works(self):
-        """Ensure that None can be provided for retrievalMethod and rankingMethod."""
+        """Ensure that None can be provided for tensor query when retrievalMethod and rankingMethod are lexical."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3243,7 +3243,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("hits", res)
 
     def test_none_provided_for_lexical_tensor_retrieval_works(self):
-        """Ensure that None can be provided for retrievalMethod and rankingMethod."""
+        """Ensure that None can be provided for lexical query when retrievalMethod and rankingMethod are Tensor."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3264,3 +3264,47 @@ class TestHybridSearch(MarqoTestCase):
                 )
 
                 self.assertIn("hits", res)
+
+    def test_tensor_query_provided_for_lexical_retrieval_lexical_ranking_raises_error(self):
+        """Ensure that providing a tensor query for lexical retrieval and ranking raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor="dogs",
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical,
+                        ), result_count=5
+                    )
+
+    def test_lexical_query_provided_for_tensor_retrieval_tensor_ranking_raises_error(self):
+        """Ensure that providing a lexical query for tensor retrieval and ranking raises an error."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(InvalidArgumentError):
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
+                        hybrid_parameters=HybridParameters(
+                            queryTensor=None,
+                            queryLexical="dogs",
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Tensor,
+                        ), result_count=5
+                    )

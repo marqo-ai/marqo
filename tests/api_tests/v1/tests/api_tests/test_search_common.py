@@ -192,6 +192,7 @@ class TestSearchCommon(MarqoTestCase):
                         self.client.index(index_name).search(
                             search_method="HYBRID"
                         )
+                    assert e.exception.status_code == 422
                     assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
 
                 with self.subTest("Hybrid search with no query or context should raise an error"):
@@ -200,6 +201,7 @@ class TestSearchCommon(MarqoTestCase):
                             search_method="HYBRID",
                             hybrid_parameters={}
                         )
+                    assert e.exception.status_code == 422
                     assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
 
                 with self.subTest("Hybrid search with query and queryTensor/queryLexical should raise an error"):
@@ -211,6 +213,7 @@ class TestSearchCommon(MarqoTestCase):
                                 "queryTensor": {"Cool": 1},
                             }
                         )
+                    assert e.exception.status_code == 422
                     assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
@@ -220,6 +223,7 @@ class TestSearchCommon(MarqoTestCase):
                                 "queryLexical": "Cool",
                             }
                         )
+                    assert e.exception.status_code == 422
                     assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
 
                 with self.subTest("Hybrid search with only one queryTensor/queryLexical and retrievalMethod=disjunction raises an error"):
@@ -230,6 +234,8 @@ class TestSearchCommon(MarqoTestCase):
                                 "queryTensor": {"Cool": 1},
                             }
                         )
+                    assert e.exception.status_code == 400
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -237,6 +243,8 @@ class TestSearchCommon(MarqoTestCase):
                                 "queryLexical": "Cool",
                             }
                         )
+                    assert e.exception.status_code == 400
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
 
 
                 with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
@@ -263,3 +271,29 @@ class TestSearchCommon(MarqoTestCase):
                             "queryLexical": "Cool",
                         }
                     )
+
+                with self.subTest("Hybrid search with lexicalQuery and retrieval/ranking methods 'Tensor' should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                                "retrievalMethod": "tensor",
+                                "rankingMethod": "tensor"
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "'hybridParameters.queryLexical' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'tensor'." in str(e.exception)
+
+                with self.subTest("Hybrid search with tensorQuery and retrieval/ranking methods 'Lexical' should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                                "retrievalMethod": "lexical",
+                                "rankingMethod": "lexical"
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)

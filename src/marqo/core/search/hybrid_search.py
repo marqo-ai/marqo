@@ -126,8 +126,8 @@ class HybridSearch:
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
             raise ValueError(
-                "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or "
-                "hybridParameters.queryLexical is provided"
+                "'q' cannot be provided for HYBRID search when hybridParameters.queryTensor or "
+                "'hybridParameters.queryLexical' is provided"
             )
 
 
@@ -137,6 +137,17 @@ class HybridSearch:
         if query is None:
             tensor_query = hybrid_parameters.queryTensor
             lexical_query = hybrid_parameters.queryLexical
+
+            if tensor_query is not None:
+                if hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and hybrid_parameters.rankingMethod == RankingMethod.Lexical:
+                    raise core_exceptions.InvalidArgumentError(
+                        "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'."
+                    )
+            if lexical_query is not None:
+                if hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor and hybrid_parameters.rankingMethod == RankingMethod.Tensor:
+                    raise core_exceptions.InvalidArgumentError(
+                        "'hybridParameters.queryLexical' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'tensor'."
+                    )
         elif isinstance(query, CustomVectorQuery):
             tensor_query = query.customVector.vector
             lexical_query = query.customVector.content
@@ -147,8 +158,8 @@ class HybridSearch:
         if (tensor_query is None) != (lexical_query is None):
             if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 raise core_exceptions.InvalidArgumentError(
-                    "Both queryLexical and queryTensor or q(Query) must be present when "
-                    "disjunction retrieval method is used."
+                    "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when "
+                    "'disjunction' retrieval method is used."
                 )
 
         # Edge cases for q data type
@@ -189,10 +200,10 @@ class HybridSearch:
             hybridParameters=hybrid_parameters
         )]
 
-        if not (
-            (hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical)
-            and
-            (hybrid_parameters.rankingMethod == RankingMethod.Lexical)
+        if (
+                hybrid_parameters.retrievalMethod in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction]
+                or
+                hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
         ):
             with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
                 qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
