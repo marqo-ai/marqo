@@ -83,7 +83,7 @@ jobs:
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
-    environment: marqo-test-suite
+    
     timeout-minutes: 60
 
     steps:
