@@ -28,8 +28,6 @@ if raw_log_format.lower() not in VALID_LOG_FORMATS:
 LOG_LEVEL = raw_log_level.upper()
 LOG_FORMAT = raw_log_format.lower()
 
-from pythonjsonlogger.orjson import OrjsonFormatter
-
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,  # Allows integration with third-party loggers
@@ -44,7 +42,8 @@ LOGGING_CONFIG = {
                 "asctime": "timestamp",
                 "levelname": "level",
             },
-            # "json_ensure_ascii": False
+            "exc_info_as_array": True,
+            "stack_info_as_array": True,
         },
         "access-plain": {
             "()": "uvicorn.logging.AccessFormatter",
