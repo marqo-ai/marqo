@@ -26,7 +26,7 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": False,
             },
             {
@@ -45,7 +45,7 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_with_normalize_embeddings_true,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
             }
             ])

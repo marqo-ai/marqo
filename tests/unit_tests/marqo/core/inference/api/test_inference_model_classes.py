@@ -147,6 +147,26 @@ class TestInferenceRequest(unittest.TestCase):
                 self.assertEqual(request.modality, modality)
                 self.assertEqual(request.preprocessing_config, preprocessing_config)
 
+    def test_invalid_inference_request_with_missing_modality(self):
+        with self.assertRaises(ValidationError) as context:
+            InferenceRequest(
+                modality=None,
+                contents=["some content"],
+                model_config=self.model_config,
+                preprocessing_config=TextPreprocessingConfig()
+            )
+        self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
+
+    def test_invalid_inference_request_with_missing_preprocessing_config(self):
+        with self.assertRaises(ValidationError) as context:
+            InferenceRequest(
+                modality=Modality.TEXT,
+                contents=["some content"],
+                model_config=self.model_config,
+                preprocessing_config=None
+            )
+        self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
+
     def test_invalid_inference_request_for_non_matching_modality(self):
         for modality, preprocessing_config in [
             (Modality.TEXT, ImagePreprocessingConfig()),
@@ -174,7 +194,7 @@ class TestInferenceRequest(unittest.TestCase):
                         model_config=self.model_config,
                         preprocessing_config=preprocessing_config
                     )
-                self.assertIn('only supports modality:', str(context.exception))
+                self.assertIn('does not support modality:', str(context.exception))
 
     def test_default_values(self):
         """Test that default values are set correctly when optional fields are not provided."""

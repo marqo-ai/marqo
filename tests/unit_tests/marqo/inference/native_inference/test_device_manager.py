@@ -5,8 +5,8 @@ from unittest import mock
 
 import torch
 
-from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
-from marqo.core.inference.device_manager import DeviceManager, Device
+from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError, DeviceError
+from marqo.inference.native_inference.device_manager import DeviceManager, Device
 
 
 class TestDeviceManager(unittest.TestCase):
@@ -40,21 +40,21 @@ class TestDeviceManager(unittest.TestCase):
     def test_init_with_cpu(self):
         device_manager = self._device_manager_without_cuda()
 
-        self.assertEqual(device_manager.best_available_device_type, 'cpu')
+        self.assertEqual(device_manager._best_available_device, 'cpu')
         self.assertEqual(device_manager.devices, [Device.cpu()])
         self.assertFalse(device_manager._is_cuda_available_at_startup)
 
     def test_init_with_gpu(self):
         device_manager = self._device_manager_with_cuda(total_memory=1_000_000)
 
-        self.assertEqual(device_manager.best_available_device_type, 'cuda')
+        self.assertEqual(device_manager._best_available_device, 'cuda')
         self.assertEqual(device_manager.devices, [Device.cpu(), Device.cuda(0, 'Tesla T4', 1_000_000)])
         self.assertTrue(device_manager._is_cuda_available_at_startup)
 
     def test_cuda_health_check_should_skip_without_cuda_devices(self):
         device_manager = self._device_manager_without_cuda()
 
-        with mock.patch("marqo.core.inference.device_manager.torch") as mock_cuda:
+        with mock.patch("marqo.inference.native_inference.device_manager.torch") as mock_cuda:
             device_manager.cuda_device_health_check()
         self.assertEqual(0, len(mock_cuda.mock_calls))
 
@@ -63,7 +63,7 @@ class TestDeviceManager(unittest.TestCase):
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.randn", return_value=torch.tensor([1, 2, 3])), \
-                mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
+                mock.patch("marqo.inference.native_inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
         # verify there's no warning or error level logging
@@ -124,7 +124,7 @@ class TestDeviceManager(unittest.TestCase):
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.cuda.memory_stats", side_effect=[RuntimeError("not a memory issue"), Exception("random exception")]), \
-                mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
+                mock.patch("marqo.inference.native_inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
         self.assertEqual('error', mock_logger.mock_calls[0][0])
@@ -134,3 +134,37 @@ class TestDeviceManager(unittest.TestCase):
         self.assertEqual('error', mock_logger.mock_calls[1][0])
         self.assertEqual('Encountered issue inspecting CUDA device cuda:1(Tesla H200): random exception',
                          mock_logger.mock_calls[1][1][0])
+
+    def test_pick_and_validate_device_should_pick_best_device_when_not_provided(self):
+        with self.subTest('should pick cuda when available'):
+            device_manager = self._device_manager_with_cuda()
+
+            device = device_manager.pick_and_validate_device(None)
+            self.assertEqual("cuda", device)
+
+        with self.subTest('should pick cpu when cuda not available'):
+            device_manager = self._device_manager_without_cuda()
+
+            device = device_manager.pick_and_validate_device(None)
+            self.assertEqual("cpu", device)
+
+    def test_pick_and_validate_device_should_return_device_if_valid(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices()
+
+        for device in [
+            "cuda:0", "cuda:1", "cuda", "cpu"
+        ]:
+            with self.subTest(device=device):
+                self.assertEqual(device, device_manager.pick_and_validate_device(device))
+
+    def test_pick_and_validate_device_should_raise_device_error_if_not_valid(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices()
+
+        for device in [
+            "cuda:2", "gpu", "tpu", "dish washer"
+        ]:
+            with self.subTest(device=device):
+                with self.assertRaises(DeviceError) as context:
+                    device_manager.pick_and_validate_device(device)
+                self.assertEqual(f'`{device}` is not a valid device. Valid devices are [cpu, cuda:0, cuda:1]',
+                                 str(context.exception))

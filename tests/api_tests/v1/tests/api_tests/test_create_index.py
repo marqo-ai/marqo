@@ -79,7 +79,7 @@ class TestCreateIndex(MarqoTestCase):
                                  model_properties={"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
                                                    "dimensions": 384,
                                                    "tokens": 128,
-                                                   "type": "sbert"}
+                                                   "type": "hf"}
                                  )
         documents = [{"test": "test"}]
         self.client.index(self.index_name).add_documents(documents, tensor_fields=["test"])
@@ -96,7 +96,7 @@ class TestCreateIndex(MarqoTestCase):
         self.assertEqual({"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
                           "dimensions": 384,
                           "tokens": 128,
-                          "type": "sbert"}, index_settings['modelProperties'])
+                          "type": "hf"}, index_settings['modelProperties'])
 
     def test_created_unstructured_image_index_with_preprocessing(self):
         self.client.create_index(index_name=self.index_name, type="unstructured",
@@ -317,7 +317,7 @@ class TestCreateIndex(MarqoTestCase):
                                  model_properties={"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
                                                    "dimensions": 384,
                                                    "tokens": 128,
-                                                   "type": "sbert"},
+                                                   "type": "hf"},
                                  all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]}],
                                  tensor_fields=["test"])
         documents = [{"test": "test"}]
@@ -334,7 +334,7 @@ class TestCreateIndex(MarqoTestCase):
         self.assertEqual({"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
                           "dimensions": 384,
                           "tokens": 128,
-                          "type": "sbert"}, index_settings['modelProperties'])
+                          "type": "hf"}, index_settings['modelProperties'])
 
     def test_create_structured_image_index_with_preprocessing(self):
         self.client.create_index(index_name=self.index_name,
@@ -382,7 +382,7 @@ class TestCreateIndex(MarqoTestCase):
         """
         self.client.create_index(index_name=self.index_name,
                                  type="structured",
-                                 model="ViT-B/32",
+                                 model="open_clip/ViT-B-32/laion400m_e31",
                                  all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
                                               "features": ["lexical_search", "filter"]}],
                                  tensor_fields=["my_custom_vector"],

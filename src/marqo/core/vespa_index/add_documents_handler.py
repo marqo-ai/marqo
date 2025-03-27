@@ -159,23 +159,27 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
-                result = self.vespa_client.get_batch(ids=list(self.add_docs_response_collector.valid_original_ids()),
-                                                     schema=self.marqo_index.schema_name)
+                with RequestMetricsStore.for_request().time("add_documents.vespa._get_batch"):
+                    result = self.vespa_client.get_batch(ids=list(self.add_docs_response_collector.valid_original_ids()),
+                                                         schema=self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self._populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
             self._vectorise_tensor_fields()
 
-        # FIXME this step is not timed in the original implementation
-        vespa_docs = self._convert_to_vespa_docs()
+        with RequestMetricsStore.for_request().time("add_documents.vespa.to_vespa_docs"):
+            vespa_docs = self._convert_to_vespa_docs()
 
         self._pre_persist_to_vespa()
 
         # persist to vespa if there are still valid docs
-        response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+            response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
-        self._handle_vespa_response(response)
+        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+            self._handle_vespa_response(response)
+
         return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
     @abstractmethod
