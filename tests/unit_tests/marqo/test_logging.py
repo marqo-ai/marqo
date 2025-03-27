@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from marqo import logging as marqo_logging
 from marqo.api.exceptions import EnvVarError
+from marqo.logging import LogLevel, LogFormat
 
 
 class TestLoggingConfig(unittest.TestCase):
@@ -20,10 +21,8 @@ class TestLoggingConfig(unittest.TestCase):
 
     def test_valid_log_levels(self):
         """Test that only valid log levels are accepted"""
-        from marqo.logging import VALID_LOG_LEVELS
-
         # Test each valid level
-        for level in VALID_LOG_LEVELS:
+        for level in LogLevel:
             with patch.dict(os.environ, {'MARQO_LOG_LEVEL': level, 'MARQO_LOG_FORMAT': 'plain'}):
                 # Should not raise an exception
                 importlib.reload(marqo_logging)  # Need to reload module to re-execute the config
@@ -36,10 +35,8 @@ class TestLoggingConfig(unittest.TestCase):
 
     def test_valid_log_formats(self):
         """Test that only valid log formats are accepted"""
-        from marqo.logging import VALID_LOG_FORMATS
-
         # Test each valid format
-        for fmt in VALID_LOG_FORMATS:
+        for fmt in LogFormat:
             with patch.dict(os.environ, {'MARQO_LOG_FORMAT': fmt, 'MARQO_LOG_LEVEL': 'info'}):
                 # Should not raise an exception
                 importlib.reload(marqo_logging)
