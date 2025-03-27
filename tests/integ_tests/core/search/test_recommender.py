@@ -655,11 +655,21 @@ class TestRecommender(MarqoTestCase):
         Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
         """
 
-        docs = [{
-            "_id": f"doc_{i}",
-            "title": f"Document {i}",
-            "content": f"Extra content {i}"
-        } for i in range(10)]
+        docs = [
+            {"_id": "doc_0", "title": "Project Overview",
+             "content": "Summary of the project's goals and deliverables."},
+            {"_id": "doc_1", "title": "Team Roles", "content": "Descriptions of each team member's responsibilities."},
+            {"_id": "doc_2", "title": "Timeline", "content": "Key milestones and deadlines for the project."},
+            {"_id": "doc_3", "title": "Budget Estimate", "content": "Projected costs and resource allocation."},
+            {"_id": "doc_4", "title": "Tech Stack", "content": "Overview of technologies and tools being used."},
+            {"_id": "doc_5", "title": "Risk Assessment", "content": "Potential risks and mitigation strategies."},
+            {"_id": "doc_6", "title": "Client Feedback", "content": "Summary of feedback received from stakeholders."},
+            {"_id": "doc_7", "title": "Testing Plan", "content": "Details on testing strategies and coverage."},
+            {"_id": "doc_8", "title": "Deployment Guide",
+             "content": "Steps and procedures for deploying the application."},
+            {"_id": "doc_9", "title": "Post-Mortem",
+             "content": "Analysis of what went well and areas for improvement."},
+        ]
 
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(index_type=index.name):
@@ -706,4 +716,3 @@ class TestRecommender(MarqoTestCase):
                         ef_search=3
                     )
                     self.assertEqual(len(res["hits"]), 3)
-
