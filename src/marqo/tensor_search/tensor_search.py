@@ -313,7 +313,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
-           hybrid_parameters: Optional[HybridParameters] = None) -> Dict:
+           hybrid_parameters: Optional[HybridParameters] = None,
+           ) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -416,12 +417,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
-        if ef_search is None:
-            # efSearch must be min result_count + offset
-            ef_search = max(
-                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
-                result_count + offset
-            )
         if approximate is None:
             approximate = True
 
@@ -432,7 +427,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -992,7 +987,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+) -> Dict:
     """
     
     Args:
@@ -1012,6 +1008,8 @@ def _vector_text_search(
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
         highlights: if True, highlights will be returned
+        text_query_prefix: prefix to add to text queries
+        rerank_depth: the number of hits per shard during retrieval
     Returns:
 
     Note:
@@ -1054,7 +1052,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
@@ -1071,7 +1069,8 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        rerank_depth_tensor=rerank_depth
     )
 
     vespa_index = vespa_index_factory(marqo_index)

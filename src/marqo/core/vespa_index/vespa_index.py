@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *

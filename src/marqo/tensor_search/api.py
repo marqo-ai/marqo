@@ -358,7 +358,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
             text_query_prefix=search_query.textQueryPrefix,
-            hybrid_parameters=search_query.hybridParameters
+            hybrid_parameters=search_query.hybridParameters,
         )
         return ORJSONResponse(result)
 
@@ -389,7 +389,8 @@ def recommend(query: RecommendQuery, index_name: str,
             reranker=query.reRanker,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
-            score_modifiers=query.scoreModifiers
+            score_modifiers=query.scoreModifiers,
+            rerank_depth=query.rerankDepth
         )
 
 
