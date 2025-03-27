@@ -2764,7 +2764,9 @@ class TestHybridSearch(MarqoTestCase):
                             search_method="HYBRID",
                             text=None,
                             hybrid_parameters=HybridParameters(
-                                queryTensor=tensor_query[1]
+                                queryTensor=tensor_query[1],
+                                retrievalMethod=RetrievalMethod.Tensor,
+                                rankingMethod=RankingMethod.Tensor
                             ),
                             result_count=5
                         )

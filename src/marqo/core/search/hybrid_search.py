@@ -138,8 +138,8 @@ class HybridSearch:
             tensor_query = hybrid_parameters.queryTensor
             lexical_query = hybrid_parameters.queryLexical
         elif isinstance(query, CustomVectorQuery):
-            tensor_query = query
-            lexical_query = None
+            tensor_query = query.customVector.vector
+            lexical_query = query.customVector.content
         else:
             tensor_query = query
             lexical_query = query
@@ -152,16 +152,16 @@ class HybridSearch:
                 )
 
         # Edge cases for q data type
-        if isinstance(tensor_query, CustomVectorQuery):
+        if isinstance(query, CustomVectorQuery):
             query_text_vectorise = None
-            query_text_search = tensor_query.customVector.content
+            query_text_search = lexical_query
 
             if context is None:
                 context = SearchContext(
-                    tensor=[SearchContextTensor(vector=tensor_query.customVector.vector, weight=1)]
+                    tensor=[SearchContextTensor(vector=tensor_query, weight=1)]
                 )
             else:
-                context.tensor.append(SearchContextTensor(vector=tensor_query.customVector.vector, weight=1))
+                context.tensor.append(SearchContextTensor(vector=tensor_query, weight=1))
         elif tensor_query is None and lexical_query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
             # Treated like normal tensor search with context.
