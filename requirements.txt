@@ -2,3 +2,4 @@
 
 msgpack==1.1.0
 msgpack_numpy==0.4.8
+python-json-logger==3.3.0

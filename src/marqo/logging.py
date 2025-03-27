@@ -8,47 +8,67 @@ from marqo.tensor_search.enums import EnvVars
 
 
 # TODO confirm why we don't accept CRITICAL as a valid option
-VALID_LOG_LEVELS = {"ERROR", "WARNING", "INFO", "DEBUG"}
+VALID_LOG_LEVELS = ["error", "warning", "info", "debug"]
+VALID_LOG_FORMATS = ["plain", "json"]
 
 # Please note that calling os.environ directly is required to avoid cyclic dependency
 raw_log_level = os.environ.get(EnvVars.MARQO_LOG_LEVEL, default_env_vars()[EnvVars.MARQO_LOG_LEVEL])
+raw_log_format = os.environ.get(EnvVars.MARQO_LOG_FORMAT, default_env_vars()[EnvVars.MARQO_LOG_FORMAT])
 
-if raw_log_level.upper() not in VALID_LOG_LEVELS:
+if raw_log_level.lower() not in VALID_LOG_LEVELS:
     raise EnvVarError(f"The provided environment variable `{EnvVars.MARQO_LOG_LEVEL}` = `{raw_log_level}` is not "
-                      f"supported. The environment variable `{EnvVars.MARQO_LOG_LEVEL}` should be one of `error`, "
-                      f"`warning`, `info`, `debug`. Check {marqo_docs.configuring_marqo()} for more info.")
+                      f"supported. The environment variable `{EnvVars.MARQO_LOG_LEVEL}` should be one of "
+                      f"{', '.join(VALID_LOG_LEVELS)}. Check {marqo_docs.configuring_marqo()} for more info.")
+
+if raw_log_format.lower() not in VALID_LOG_FORMATS:
+    raise EnvVarError(f"The provided environment variable `{EnvVars.MARQO_LOG_FORMAT}` = `{raw_log_format}` is not "
+                      f"supported. The environment variable `{EnvVars.MARQO_LOG_FORMAT}` should be one of "
+                      f"{', '.join(VALID_LOG_FORMATS)}. Check {marqo_docs.configuring_marqo()} for more info.")
 
 LOG_LEVEL = raw_log_level.upper()
+LOG_FORMAT = raw_log_format.lower()
+
+from pythonjsonlogger.orjson import OrjsonFormatter
 
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,  # Allows integration with third-party loggers
     "formatters": {
-        "default": {
+        "default-plain": {
             "format": "[%(asctime)s] %(process)d %(levelname)s %(name)s: %(message)s"
         },
-        # TODO json format is a better option for some log collection tool, define it here for future use
-        "json": {
+        "default-json": {
+            "()": "pythonjsonlogger.orjson.OrjsonFormatter",
+            "fmt": "%(asctime) %(process) %(levelname) %(name) %(message)",
+            "rename_fields": {
+                "asctime": "timestamp",
+                "levelname": "level",
+            },
+            # "json_ensure_ascii": False
+        },
+        "access-plain": {
+            "()": "uvicorn.logging.AccessFormatter",
+            "fmt": '[%(asctime)s] %(process)d %(levelname)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+        },
+        "access-json": {
+            "()": "uvicorn.logging.AccessFormatter",
             "format": (
                 '{"timestamp": "%(asctime)s", '
                 '"process": "%(process)d", '
                 '"level": "%(levelname)s", '
-                '"name": "%(name)s", '
-                '"message": "%(message)s"}'
+                '"client_addr": "%(client_addr)s", '
+                '"request_line": "%(request_line)s", '
+                '"status_code": "%(status_code)s"}'
             )
-        },
-        "access": {
-            "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '[%(asctime)s] %(process)d %(levelname)s %(client_addr)s - "%(request_line)s" %(status_code)s',  # noqa: E501
-        },
+        }
     },
     "handlers": {
         "default": {
+            "formatter": f"default-{LOG_FORMAT}",
             "class": "logging.StreamHandler",
-            "formatter": "default",  # Change to "json" for structured logging output if needed
         },
         "access": {
-            "formatter": "access",
+            "formatter": f"access-{LOG_FORMAT}",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         }
