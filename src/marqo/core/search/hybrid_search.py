@@ -37,7 +37,8 @@ class HybridSearch:
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
-            hybrid_parameters: HybridParameters = None) -> Dict:
+            hybrid_parameters: HybridParameters = None
+    ) -> Dict:
         """
 
             Args:
@@ -226,7 +227,7 @@ class HybridSearch:
             ef_search=ef_search,
             approximate=approximate,
             offset=offset,
-            rerank_depth=rerank_depth,
+            global_rerank_depth=rerank_depth,
             or_phrases=optional_terms,
             and_phrases=required_terms,
             attributes_to_retrieve=attributes_to_retrieve,
