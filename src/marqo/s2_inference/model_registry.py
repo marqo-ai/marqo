@@ -626,6 +626,7 @@ def _get_sbert_properties() -> Dict:
                 "tokens":128,
                 "type":"sbert",
                 "notes": ""},
+            # These two models are currently loaded with the HF loader and not the sbert loader
             # "sentence-transformers/all-MiniLM-L6-v2":
             #     {"name": "sentence-transformers/all-MiniLM-L6-v2",
             #     "dimensions": 384,

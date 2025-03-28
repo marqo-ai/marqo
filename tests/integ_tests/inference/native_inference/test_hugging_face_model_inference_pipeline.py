@@ -97,7 +97,7 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
 
     @pytest.mark.largemodel
     def test_stella_model_also_work(self):
-        """Stella models inherits from HuggingFaceModel, so it should work with the same pipeline.
+        """Stella models inherit from HuggingFaceModel, so it should work with the same pipeline.
         This is a test to ensure that the pipeline can handle it."""
 
         text_inference_request = InferenceRequest(
