@@ -76,7 +76,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 
@@ -313,7 +313,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
-           hybrid_parameters: Optional[HybridParameters] = None) -> Dict:
+           hybrid_parameters: Optional[HybridParameters] = None,
+           ) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -400,14 +401,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
 
-    # TODO [Refactoring device logic] use device info gathered from device manager
-    if device is None:
-        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        if selected_device is None:
-            raise api_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-    else:
-        selected_device = device
+    selected_device = device
 
     # Fetch marqo index to pass to search method
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
@@ -423,12 +417,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
-        if ef_search is None:
-            # efSearch must be min result_count + offset
-            ef_search = max(
-                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
-                result_count + offset
-            )
         if approximate is None:
             approximate = True
 
@@ -439,7 +427,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -473,24 +461,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
 
     if reranker is not None:
-        logger.info("reranking using {}".format(reranker))
-        if searchable_attributes is None:
-            raise api_exceptions.InvalidArgError(
-                f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
-        try:
-            # SEARCH TIMER-LOGGER (reranking)
-            RequestMetricsStore.for_request().start(f"search.rerank")
-            rerank.rerank_search_results(search_result=search_result, query=text,
-                                         model_name=reranker,
-                                         device=selected_device,
-                                         searchable_attributes=searchable_attributes,
-                                         num_highlights=1)
-            total_rerank_time = RequestMetricsStore.for_request().stop(f"search.rerank")
-            logger.debug(
-                f"search ({search_method.lower()}) reranking using {reranker}: took {(total_rerank_time):.3f}ms to rerank results."
-            )
-        except Exception as e:
-            raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
+        raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
         search_result["query"] = text.dict()    # Make object JSON serializable
@@ -1016,7 +987,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+) -> Dict:
     """
     
     Args:
@@ -1036,6 +1008,8 @@ def _vector_text_search(
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
         highlights: if True, highlights will be returned
+        text_query_prefix: prefix to add to text queries
+        rerank_depth: the number of hits per shard during retrieval
     Returns:
 
     Note:
@@ -1058,9 +1032,6 @@ def _vector_text_search(
         - searching a non existent index should return a HTTP-type error
     """
     # # SEARCH TIMER-LOGGER (pre-processing)
-    if not device:
-        raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
-
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
     index_name = marqo_index.name
@@ -1081,7 +1052,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
@@ -1098,7 +1069,8 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        rerank_depth_tensor=rerank_depth
     )
 
     vespa_index = vespa_index_factory(marqo_index)

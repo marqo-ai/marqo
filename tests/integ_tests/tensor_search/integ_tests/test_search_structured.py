@@ -195,16 +195,6 @@ class TestSearchStructured(MarqoTestCase):
                 )
                 assert len(search_res['hits']) == 2
 
-    def test_vector_text_search_no_device(self):
-        try:
-            index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
-            search_res = tensor_search._vector_text_search(
-                config=self.config, marqo_index=index_object,
-                result_count=5, query="some text...")
-            raise AssertionError
-        except errors.InternalError:
-            pass
-
     def test_vector_search_against_empty_index(self):
         index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         search_res = tensor_search._vector_text_search(

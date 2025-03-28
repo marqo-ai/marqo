@@ -442,12 +442,18 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             field_type = vespa_field_types.get(field_name) # Get field type from the field passed in the request
 
             if not field_exists_in_original_doc or field_value_changed:
-                vespa_fields[vespa_field_name] = {"assign": field_value}
+                vespa_fields[vespa_field_name] = {"assign": field_value} # assign statement for adding / updating the field value in marqo__int_fields / marqo__float_fields
 
                 # Set field type metadata by creating an assign statement
-                vespa_fields[vespa_field_types_field_name] = {"assign": field_type}
+                vespa_fields[vespa_field_types_field_name] = {"assign": field_type} # assign statement for adding / updating the field type in marqo__field_types
+                
+                # Handle creating update statements for the map field name. 
+                if "." in field_name:
+                    # For fields like "map1.key1", extract the map name "map1"
+                    map_name = self._extract_map_name_from_field(field_name)
+                    # Create assign statement for adding / updating statement for the map field. This is done for the prefix in a flattened map field name.
+                    vespa_fields[f'{common.VESPA_DOC_FIELD_TYPES}{{{map_name}}}'] = {"assign": vespa_field_types.get(map_name)}
 
-                # Update field type metadata dictionary, so we can use it later when defining the update pre-condition to send to vespa
                 fields_changed = True
 
         # Remove fields no longer in map
@@ -458,16 +464,34 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if (original_field_name not in numeric_field_map and
                 original_doc.fixed_fields.field_types.get(original_field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)):
 
+                map_name = self._extract_map_name_from_field(original_field_name)
                 vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
                 vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{original_field_name}}}'
 
-                vespa_fields[vespa_field_name] = {"remove": 0}
-                vespa_fields[vespa_field_types_field_name] = {"remove": 0}
+                vespa_fields[vespa_field_name] = {"remove": 0} # remove statement for removing the field from marqo__int_fields / marqo__float_fields
+                vespa_fields[vespa_field_types_field_name] = {"remove": 0} # remove statement for removing the field from marqo__field_types.
                 vespa_field_types.pop(original_field_name, None)
+
+                if vespa_field_types.get(map_name) is None: # Remove statement for removing the map field from marqo__field_types. This is prefix for a flattened map field.
+                    vespa_fields[f'{common.VESPA_DOC_FIELD_TYPES}{{{map_name}}}'] = {"remove": 0}
+                    
                 fields_changed = True
 
         return fields_changed
     
+    def _extract_map_name_from_field(self, field_name: str) -> str:
+        """Extract the map name from a flattened field name.
+        For fields like "map_name.key_name", this method extracts the map name portion.
+        
+        Args:
+            field_name: The flattened field name (e.g., "map1.key1")
+        Returns:
+            The map name portion of the field (e.g., "map1")
+        """
+        if "." in field_name:
+            return field_name.split(".", 1)[0]
+        return field_name
+
     def _handle_boolean_field(
         self,
         field_name: str,

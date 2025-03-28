@@ -1,21 +1,21 @@
 import datetime
 import threading
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 
-import numpy as np
 import torch
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
 from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.core.inference.api import ModelError, ModelManager
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.s2_inference import constants
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     InvalidModelPropertiesError, ModelLoadError,
     ModelNotInCacheError, ModelDownloadError)
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.types import *
@@ -396,3 +396,41 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 
     return MODEL_PROPERTIES['loaders'][model_type]
+
+
+class NativeModelManager(ModelManager):
+    """
+    A class to retrieve all loaded models and eject models by key
+    """
+    def get_loaded_models(self) -> dict:
+        """Returns the available models in the cache."""
+
+        return {"models": [{"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]}
+                           for ix in _available_models if isinstance(ix, str)]}
+
+    def eject_model(self, model_name: str, device: str) -> dict:
+        model_cache_keys = _available_models.keys()
+
+        model_cache_key = None
+
+        # we can't handle the situation where there are two models with the same name and device
+        # but different properties.
+        for key in model_cache_keys:
+            if isinstance(key, str):
+                if key.startswith(model_name) and key.endswith(device):
+                    model_cache_key = key
+                    break
+            else:
+                continue
+
+        if model_cache_key is None:
+            raise ModelError(f"The model_name `{model_name}` device `{device}` is not cached or found")
+
+        if model_cache_key in _available_models:
+            del _available_models[model_cache_key]
+            if device.startswith("cuda"):
+                torch.cuda.empty_cache()
+            return {"result": "success",
+                    "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+        else:
+            raise ModelError(f"The model_name `{model_name}` device `{device}` is not cached or found")

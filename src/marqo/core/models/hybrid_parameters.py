@@ -1,6 +1,6 @@
 from enum import Enum
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import validator, root_validator
 
@@ -32,6 +32,10 @@ class HybridParameters(StrictBaseModel):
     # Input for API, but form will change before being passed to core Hybrid Query.
     scoreModifiersLexical: Optional[ScoreModifierLists] = None
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
+
+    rerankDepthTensor: Optional[int] = None
+    queryLexical: Optional[str] = None
+    queryTensor: Optional[Union[str, dict]] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
@@ -91,6 +95,14 @@ class HybridParameters(StrictBaseModel):
         if values.get('retrievalMethod') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:
             if values.get('rankingMethod') not in [RankingMethod.Lexical, RankingMethod.Tensor]:
                 raise ValueError("For retrievalMethod: tensor or lexical, rankingMethod must be: tensor or lexical")
+
+        # if tensor query is an empty dict
+        if isinstance(values.get('queryTensor'), dict):
+            if not len(values.get('queryTensor')):
+                raise ValueError(
+                    "Multi-query search for queryTensor requires at least one query! Received empty dictionary. "
+                )
+
 
         return values
 

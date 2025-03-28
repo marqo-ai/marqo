@@ -20,7 +20,7 @@ class TestStructuredDeleteDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "content", "type": "text"},

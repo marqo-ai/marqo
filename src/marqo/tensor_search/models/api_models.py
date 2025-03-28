@@ -100,16 +100,40 @@ class SearchQuery(BaseMarqoModel):
         search_method = values.get('searchMethod')
         query = values.get('q')
         context = values.get('context')
+        hybrid_parameters = values.get('hybridParameters')
 
-        if search_method in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
-            if query is None and context is None:
-                raise ValueError(f"One of Query(q) or context is required for {search_method} "
-                                 f"search but both are missing")
-        elif search_method == SearchMethod.LEXICAL:
-            if query is None:
-                raise ValueError("Query(q) is required for lexical search")
-        else:
+        if search_method not in [SearchMethod.TENSOR, SearchMethod.HYBRID, SearchMethod.LEXICAL]:
             raise ValueError(f"Invalid search method {search_method}")
+
+        if query is None:
+            if search_method == SearchMethod.LEXICAL:
+                raise ValueError("Query(q) is required for lexical search")
+            elif search_method == SearchMethod.TENSOR:
+                if context is None:
+                    raise ValueError(
+                        f"One of Query(q) or context is required for {search_method} search but both are missing"
+                    )
+            elif search_method == SearchMethod.HYBRID:
+                if context is None and (not hybrid_parameters or (
+                        hybrid_parameters.queryTensor is None and hybrid_parameters.queryLexical is None
+                    )
+                ):
+                    raise ValueError(
+                        f"One of Query(q), context, hybridParameters.queryTensor, or "
+                        f"hybridParameters.queryTensor is required for {search_method} search but all are missing"
+                    )
+        else:
+            if search_method == SearchMethod.HYBRID:
+                if cls is SearchQuery:
+                    # This check is needed because BulkSearchQuery inherits SearchQuery and because of the way we set
+                    # query for it, it causes this check to fail since we previously provided queryTensor/queryLexical
+                    # parameters
+                    if hybrid_parameters is not None and (hybrid_parameters.queryTensor is not None or hybrid_parameters.queryLexical is not None):
+                        raise ValueError(
+                            f"Query(q) cannot be provided for {search_method} search when hybridParameters.queryTensor or "
+                            f"hybridParameters.queryLexical is provided"
+                        )
+
         return values
 
     @root_validator(pre=False)
@@ -130,12 +154,14 @@ class SearchQuery(BaseMarqoModel):
         rerank_depth = values.get('rerankDepth')
 
         if rerank_depth is not None:
-            if search_method.upper() != SearchMethod.HYBRID:
-                raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search method.")
+            if search_method.upper() == SearchMethod.LEXICAL:
+                raise ValueError(f"'rerankDepth' is currently not supported for 'LEXICAL' search method.")
             if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
                 raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
             if rerank_depth < 0:
                 raise ValueError(f"rerankDepth cannot be negative.")
+        if hybrid_parameters and hybrid_parameters.rerankDepthTensor and hybrid_parameters.rerankDepthTensor < 0:
+            raise ValueError(f"rerankDepthTensor cannot be negative.")
 
         return values
 

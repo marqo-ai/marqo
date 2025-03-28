@@ -5,7 +5,7 @@ import numpy as np
 import onnxruntime
 from torchvision import transforms
 
-from marqo.s2_inference.s2_inference import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ChunkerMethodProcessError

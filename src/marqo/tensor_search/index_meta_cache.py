@@ -13,7 +13,7 @@ from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.vespa.exceptions import VespaError, VespaStatusError
 
 logger = get_logger(__name__)
