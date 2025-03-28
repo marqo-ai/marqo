@@ -25,7 +25,7 @@ HF_TEST_MODELS = [
     "hf/bge-small-en-v1.5",
     "hf/bge-base-en-v1.5",
     "hf/snowflake-arctic-embed-m",
-    "hf/snowflake-arctic-embed-m-v1.5"
+    "hf/snowflake-arctic-embed-m-v1.5",
 ]
 
 
