@@ -518,10 +518,7 @@ class DockerManager:
                 self.docker_client.images.pull(variant)
                 self.logger.info(f"Successfully pulled image: {variant}")
                 return
-            except ImageNotFound:
-                self.logger.info(f"Image {variant} not found in DockerHub. Trying next variant.")
-                continue
             except APIError as e:
-                raise RuntimeError(f"Failed to pull image {image_name}: {str(e)}")
+                self.logger.info(f"Failed to pull image {image_name}: {str(e)}")
 
         raise RuntimeError(f"Failed to pull image {image_name} and its variants = {variants} from DockerHub.")
