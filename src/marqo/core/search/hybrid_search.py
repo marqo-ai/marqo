@@ -40,7 +40,7 @@ class HybridSearch:
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None,
-            return_facets: bool = False,
+            collect_facets: bool = False,
             facets_parameters: FacetsParameters = None
     ) -> Dict:
         """
@@ -66,7 +66,7 @@ class HybridSearch:
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
-                return_facets: if True, facets will be returned
+                collect_facets: if True, facets will be returned
                 facets_parameters: FacetsParameters object to specify all parameters for grouping. If not provided,
                     default values will be used.
             Returns:
@@ -206,7 +206,7 @@ class HybridSearch:
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters,
-            return_facets=return_facets,
+            collect_facets=collect_facets,
             facets_parameters=facets_parameters,
         )
 
@@ -244,7 +244,7 @@ class HybridSearch:
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
         gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
         total_results = len(gathered_results["hits"])
-        if return_facets:
+        if collect_facets:
             gathered_results.update(gather_facets_from_response(responses, facets_parameters.facetFields))
             total_results += len(gathered_results["facets"])
 

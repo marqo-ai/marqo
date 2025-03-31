@@ -56,7 +56,7 @@ class SearchQuery(BaseMarqoModel):
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
-    returnFacets: Optional[bool] = None
+    collectFacets: Optional[bool] = None
     facetsParameters: Optional[FacetsParameters] = None
 
     @validator("searchMethod", pre=True)

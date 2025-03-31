@@ -362,7 +362,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             model_auth=search_query.modelAuth,
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters,
-            return_facets=search_query.returnFacets,
+            collect_facets=search_query.collectFacets,
             facets_parameters=search_query.facetsParameters,
         )
         return ORJSONResponse(result)

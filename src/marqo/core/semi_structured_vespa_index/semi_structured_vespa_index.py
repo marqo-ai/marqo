@@ -95,15 +95,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         vespa_query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
-        if marqo_query.return_facets:
-            grouping_query_suffix = self.build_grouping_suffix(
+        if marqo_query.collect_facets:
+            grouping_query_suffix = self._get_facets_term(
                 marqo_query.facets_parameters if marqo_query.facets_parameters else FacetsParameters()
             )
             vespa_query['marqo__yql.tensor'] += grouping_query_suffix
             vespa_query['marqo__yql.lexical'] += grouping_query_suffix
         return vespa_query
 
-    def build_grouping_suffix(self, facets_parameters: FacetsParameters):
+    def _get_facets_term(self, facets_parameters: FacetsParameters):
         """ Build vespa grouping syntax based query on passed parameters.
         Query consists of 4 parts:
         1. groups selection

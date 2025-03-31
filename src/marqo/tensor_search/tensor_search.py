@@ -311,9 +311,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
-           return_facets: bool = False,
+           collect_facets: bool = False,
            facets_parameters: Optional[FacetsParameters] = None,
-
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -343,7 +342,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
-        return_facets: Whether to return facets
+        collect_facets: Whether to return facets
         facets_parameters: Parameters for grouping
     Returns:
 
@@ -455,7 +454,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, return_facets=return_facets, facets_parameters=facets_parameters
+                hybrid_parameters=hybrid_parameters, collect_facets=collect_facets, facets_parameters=facets_parameters
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -1144,8 +1143,6 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
-    # vespa_query['yql'] = vespa_query['yql'] + ' | all(group(predefined(marqo__short_string_fields.key) each(group(marqo__short_string_fields.value) max(2) order(-count()) each(output(count()))))'
-    # vespa_query['yql'] = vespa_query['yql'] + ' | all(group(marqo__short_string_fields{"color"})  max(2) order(-count()) each(output(count())))'
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
