@@ -6,7 +6,7 @@ import datetime
 from marqo.config import Config
 from marqo.tensor_search import validation, utils, enums
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsResponse, MqDeleteDocsRequest
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -3,7 +3,7 @@ from marqo import marqo_docs
 from marqo.connections import redis_driver
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -9,7 +9,7 @@ from marqo.inference.media_download_and_preprocess.image_download import (format
                                                                           format_and_load_CLIP_image)
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
 

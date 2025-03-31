@@ -14,7 +14,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)

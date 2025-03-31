@@ -11,11 +11,13 @@ from typing import (
 
 from fastapi import HTTPException
 
+from marqo import logging
 from marqo.api import exceptions, configs
-from marqo.marqo_logging import logger
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
 
+
+logger = logging.get_logger(__name__)
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
     """Turns a list of dicts into a JSONL string"""

@@ -28,7 +28,7 @@ from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
-from marqo.logging import get_logger
+from marqo.logging import get_logger, LOGGING_CONFIG
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
@@ -358,7 +358,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
             text_query_prefix=search_query.textQueryPrefix,
-            hybrid_parameters=search_query.hybridParameters
+            hybrid_parameters=search_query.hybridParameters,
         )
         return ORJSONResponse(result)
 
@@ -389,7 +389,8 @@ def recommend(query: RecommendQuery, index_name: str,
             reranker=query.reRanker,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
-            score_modifiers=query.scoreModifiers
+            score_modifiers=query.scoreModifiers,
+            rerank_depth=query.rerankDepth
         )
 
 
@@ -617,4 +618,4 @@ def check_health(marqo_config: config.Config = Depends(get_config)):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8882)
+    uvicorn.run(app, host="localhost", port=8882, log_config=LOGGING_CONFIG)

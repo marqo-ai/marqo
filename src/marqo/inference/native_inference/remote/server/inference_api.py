@@ -4,9 +4,9 @@ from starlette import status
 from starlette.responses import JSONResponse
 
 from marqo import version, logging
-from marqo.inference.native_inference import load_model
 from marqo.inference.native_inference.remote.server.inference_config import Config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start
+from marqo.logging import LOGGING_CONFIG
 from marqo.tensor_search.telemetry import TelemetryMiddleware
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, Body
 from marqo.core.inference.api import InferenceRequest, InferenceError
@@ -156,4 +156,4 @@ def eject_model(model_name: str, model_device: str, config: Config = Depends(get
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8881)
+    uvicorn.run(app, host="localhost", port=8881, log_config=LOGGING_CONFIG)

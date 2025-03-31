@@ -1,5 +1,5 @@
-from marqo.core.exceptions import DeviceError
 import marqo.core.inference.api.exceptions as inference_api_exceptions
+from marqo.core.exceptions import DeviceError
 from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
