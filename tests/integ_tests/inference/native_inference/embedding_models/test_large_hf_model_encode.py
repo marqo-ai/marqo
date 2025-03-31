@@ -18,6 +18,7 @@ LARGE_HF_TEST_MODELS = [
     "hf/multilingual-e5-base",
     "hf/multilingual-e5-large",
     "hf/multilingual-e5-large-instruct",
+    "Marqo/dunzhang-stella_en_400M_v5"
 ]
 
 @pytest.mark.largemodel
@@ -43,6 +44,7 @@ class TestLargeHFModelEncode(InferenceTestCase):
             target_dir / "embeddings_reference" / "embeddings_all_models_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_e5_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_multilingual_e5_python_3_8.json",
+            target_dir / "embeddings_reference" / "embeddings_stella_python_3_8.json",
         ]
 
         cls.hf_embeddings_reference = {}
