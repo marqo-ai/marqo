@@ -504,11 +504,21 @@ class DockerManager:
         Raises:
             RuntimeError: If the image cannot be pulled.
         """
-        try:
-            self.logger.debug(f"Pulling image: {image_name}")
-            self.docker_client.images.pull(image_name)
-            self.logger.info(f"Successfully pulled image: {image_name}")
-        except ImageNotFound:
-            raise RuntimeError(f"Image not found: {image_name}")
-        except APIError as e:
-            raise RuntimeError(f"Failed to pull image {image_name}: {str(e)}")
+
+        variants = [
+            image_name,
+            image_name + "-cloud",
+        ]
+
+        for variant in variants:
+            try:
+                self.logger.debug(f"Pulling image: {variant}")
+                self.docker_client.images.pull(variant)
+                self.logger.info(f"Successfully pulled image: {variant}")
+            except ImageNotFound:
+                self.logger.info(f"Image {variant} not found in DockerHub. Trying next variant.")
+                continue
+            except APIError as e:
+                raise RuntimeError(f"Failed to pull image {image_name}: {str(e)}")
+
+        raise RuntimeError(f"Failed to pull image {image_name} and its variants = {variants} from DockerHub.")
