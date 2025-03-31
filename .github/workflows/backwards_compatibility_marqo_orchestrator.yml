@@ -28,7 +28,7 @@ jobs:
     # We do not want to build and push the image if it already exists in the ECR registry, which will be the case if this is a manual developer initiated re-run using the same commit.
     name: Check if image already exists in ECR
     runs-on: ubuntu-latest
-    environment: marqo-test-suite
+
     outputs:
       image_exists: ${{ steps.check-image.outputs.image_exists }}
       image_identifier: ${{ steps.check-image.outputs.image_identifier }}
@@ -89,7 +89,7 @@ jobs:
     outputs:
       list: ${{ steps.generate-versions.outputs.list }}
       to_version: ${{ steps.get-to-version.outputs.to_version }}
-    environment: marqo-test-suite
+
     steps:
       # Step to check out the Marqo repository
       - name: Checkout marqo repo

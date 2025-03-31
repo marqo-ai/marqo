@@ -45,7 +45,7 @@ jobs:
     defaults:
       run:
         working-directory: tests/api_tests/v1
-    environment: marqo-test-suite
+
     
     steps:
 
