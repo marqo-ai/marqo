@@ -517,6 +517,9 @@ class DockerManager:
                 self.logger.debug(f"Pulling image: {variant}")
                 self.docker_client.images.pull(variant)
                 self.logger.info(f"Successfully pulled image: {variant}")
+                image = self.docker_client.images.get(variant)
+                # Tag the image to the original name without the "-cloud" suffix to match the version
+                image.tag(image_name.split(":")[0], variant.split(":")[1])
                 return
             except APIError as e:
                 self.logger.info(f"Failed to pull image {image_name}: {str(e)}")
