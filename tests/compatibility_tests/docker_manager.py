@@ -517,6 +517,7 @@ class DockerManager:
                 self.logger.debug(f"Pulling image: {variant}")
                 self.docker_client.images.pull(variant)
                 self.logger.info(f"Successfully pulled image: {variant}")
+                return
             except ImageNotFound:
                 self.logger.info(f"Image {variant} not found in DockerHub. Trying next variant.")
                 continue
