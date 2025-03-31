@@ -494,6 +494,19 @@ class DockerManager:
             raise RuntimeError(
                 f"Failed to prepare volume {source_volume} for rollback using image {image_name}: {e}") from e
 
+    def _check_image_exists_on_dockerhub(self, image_name: str) -> bool:
+        """Check if a Docker image exists on DockerHub."""
+        try:
+            namespace, repo_tag = image_name.split("/")
+            repo, tag = repo_tag.split(":")
+        except ValueError:
+            raise ValueError(f"Invalid image name format: {image_name}. Expected format: namespace/repo:tag")
+
+        url = f"https://hub.docker.com/v2/repositories/{namespace}/{repo}/tags/{tag}"
+        response = requests.get(url)
+        return response.status_code == 200
+
+
     def pull_image_from_dockerhub(self, image_name: str):
         """
         Pull a Docker image using the Docker SDK.
@@ -512,16 +525,23 @@ class DockerManager:
             image_name + "-cloud",
         ]
 
-        for variant in variants:
-            try:
-                self.logger.debug(f"Pulling image: {variant}")
-                self.docker_client.images.pull(variant)
-                self.logger.info(f"Successfully pulled image: {variant}")
-                image = self.docker_client.images.get(variant)
-                # Tag the image to the original name without the "-cloud" suffix to match the version
-                image.tag(image_name.split(":")[0], image_name.split(":")[1])
-                return
-            except APIError as e:
-                self.logger.info(f"Failed to pull image {image_name}: {str(e)}")
+        available_variants = [v for v in variants if self._check_image_exists_on_dockerhub(v)]
+            
+        if not available_variants:
+            raise RuntimeError(f"Image {image_name} and its variants = {variants} do not exist on DockerHub.")
+        
 
-        raise RuntimeError(f"Failed to pull image {image_name} and its variants = {variants} from DockerHub.")
+        if len(available_variants) > 1:
+            self.logger.warning(f"Multiple variants exist on DockerHub: {available_variants}. We will use the first one "
+                                f"{available_variants[0]}.")
+
+        target_image = available_variants[0]
+        try:
+            self.logger.debug(f"Trying to pull image: {target_image}")
+            self.docker_client.images.pull(target_image)
+            self.logger.info(f"Successfully pulled image: {target_image}")
+            image = self.docker_client.images.get(target_image)
+            # Retag to base image name
+            image.tag(image_name.split(":")[0], image_name.split(":")[1])
+        except APIError as e:
+            raise RuntimeError(f"Failed to pull image {target_image} from DockerHub.")
