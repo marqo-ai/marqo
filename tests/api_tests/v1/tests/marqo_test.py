@@ -78,6 +78,7 @@ class MarqoTestCase(unittest.TestCase):
         # A function that can be called to remove loaded models in Marqo.
         # Use it whenever you think there is a risk of OOM problem.
         # E.g., add it into the `tearDown` function to remove models between test cases.
+
         client = Client(**cls.client_settings)
         index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
         for index_name in index_names_list:

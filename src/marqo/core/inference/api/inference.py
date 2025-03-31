@@ -6,7 +6,7 @@ from numpy import ndarray
 from pydantic import StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.inference.api import InferenceError, Modality, PreprocessingConfigType
+from marqo.core.inference.api import Modality, PreprocessingConfigType
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -25,21 +25,35 @@ class InferenceRequest(ImmutableBaseModel):
     model_config: ModelConfig = pydantic.Field(alias='modelConfig')
     preprocessing_config: PreprocessingConfigType = pydantic.Field(alias='preprocessingConfig')
     use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
+    # whether we should return error for individual content, when set to false, any error should fail the whole batch
+    return_individual_error: bool = pydantic.Field(default=True, alias='returnIndividualError')
 
     @root_validator(pre=False)
     def check_preprocessing_config_matches_modality(cls, values):
         modality: Modality = values.get('modality')
         preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
 
-        if not modality or modality.value != preprocessing_config.modality:
-            raise ValueError(f"{type(preprocessing_config)} only supports modality: {preprocessing_config.modality}, "
-                             f"but modality: {modality} is specified in the request")
+        if not modality or not preprocessing_config:
+            raise ValueError("Modality or preprocessing_config is missing")
+
+        if modality.value != preprocessing_config.modality:
+            raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
+                             f"does not support modality: {modality}")
 
         return values
 
 
+class InferenceErrorModel(ImmutableBaseModel):
+    """
+    A model class to store error information for each individual content
+    """
+    status_code: int = pydantic.Field(default=400)
+    error_code: str = pydantic.Field(default='inference_error')
+    error_message: str
+
+
 class InferenceResult(ImmutableBaseModel):
-    result: List[Union[InferenceError, List[Tuple[str, ndarray]]]]
+    result: List[Union[InferenceErrorModel, List[Tuple[str, ndarray]]]]
 
     class Config(ImmutableBaseModel.Config):
         arbitrary_types_allowed = True
@@ -66,3 +80,35 @@ class Inference(ABC):
         """
         pass
 
+
+class ModelManager(ABC):
+    @abstractmethod
+    def get_loaded_models(self) -> dict:
+        """
+        Retrieve information about models loaded in all devices
+
+        Returns: All loaded models, in following format:
+            {"models": [
+                {"model_name": "model1", "model_device": "cpu"},
+                {"model_name": "model2", "model_device": "cuda"},
+            ]}
+        """
+        pass
+
+    @abstractmethod
+    def eject_model(self, model_name: str, device: str) -> dict:
+        """
+        Eject a model from the model cache
+
+        Args:
+            model_name (str): the name of the model
+            device (str): the device the model is loaded to
+
+        Returns: The result of the rejection, in following format:
+          {"result": "success",
+           "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+
+        Raises:
+            ModelError: If model is not found or not in the model cache
+        """
+        pass

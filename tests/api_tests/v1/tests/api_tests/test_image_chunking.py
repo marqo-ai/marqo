@@ -1,3 +1,4 @@
+import unittest
 import uuid
 from typing import Dict
 
@@ -26,7 +27,7 @@ def generate_unstructured_index_settings_dict(index_name, image_preprocessing_me
     }
 
 
-
+@unittest.skip(reason="Skipped due to image chunk support is removed")
 class TestUnstructuredImageChunking(MarqoTestCase):
     """Test for image chunking as a preprocessing step
     """

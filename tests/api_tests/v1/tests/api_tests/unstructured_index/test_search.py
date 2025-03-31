@@ -6,6 +6,7 @@ import marqo
 from marqo import enums
 from marqo.client import Client
 from marqo.enums import SearchMethods
+from marqo.errors import MarqoWebError
 
 from tests.marqo_test import MarqoTestCase
 
@@ -31,12 +32,12 @@ class TestUnstructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
             },
             {
                 "indexName": cls.text_index_2_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
             },
             {
                 "indexName": cls.image_index_name,

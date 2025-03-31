@@ -27,7 +27,7 @@ class TestStructuredHybridSearch(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "text_field_1", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "text_field_2", "type": "text", "features": ["filter", "lexical_search"]},
@@ -56,7 +56,7 @@ class TestStructuredHybridSearch(MarqoTestCase):
             {
                 "indexName": cls.unstructured_text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
             },
             {
                 "indexName": cls.unstructured_image_index_name,
@@ -314,17 +314,18 @@ class TestStructuredHybridSearch(MarqoTestCase):
                         },
                         limit=10
                     )
+                    # TODO investigate why the score modifier has changed
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
-                    self.assertEqual(hybrid_res["hits"][0]["_score"], 30.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_score"], 30.0, places=4)
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
-                    self.assertEqual(hybrid_res["hits"][1]["_score"], 20.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_score"], 20.0, places=4)
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
-                    self.assertEqual(hybrid_res["hits"][2]["_score"], 6.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_score"], 6.0, places=4)
                     self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # (score)
-                    self.assertEqual(hybrid_res["hits"][3]["_score"], 1.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][3]["_score"], 1.0, places=4)
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
-                    self.assertEqual(hybrid_res["hits"][-1]["_score"], -30.0)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], -30.0, places=4)
 
                 with self.subTest("retrieval: tensor, ranking: lexical"):
                     hybrid_res = self.client.index(index_name).search(

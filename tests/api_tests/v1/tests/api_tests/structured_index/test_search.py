@@ -26,7 +26,7 @@ class TestStructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},
@@ -36,7 +36,7 @@ class TestStructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.filter_test_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "field_a", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "field_b", "type": "text", "features": ["filter"]},

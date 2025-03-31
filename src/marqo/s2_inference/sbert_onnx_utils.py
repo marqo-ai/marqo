@@ -9,7 +9,7 @@ from transformers import AutoModel, AutoTokenizer
 from pathlib import Path
 
 from marqo.s2_inference.types import *
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.configs import ModelCache
 
 logger = get_logger(__name__)

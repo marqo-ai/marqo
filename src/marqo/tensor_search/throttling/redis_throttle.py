@@ -1,7 +1,7 @@
 from marqo.connections import redis_driver, generate_redis_warning
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search import utils
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.api.exceptions import TooManyRequestsError
 from functools import wraps
 from threading import Thread

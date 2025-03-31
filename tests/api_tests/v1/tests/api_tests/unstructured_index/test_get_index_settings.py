@@ -44,7 +44,7 @@ class TestGetSettings(MarqoTestCase):
         model_properties = {'name': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
                             'dimensions': 384,
                             'tokens': 128,
-                            'type': 'sbert'}
+                            'type': 'hf'}
 
         index_settings = {
             "type": "unstructured",

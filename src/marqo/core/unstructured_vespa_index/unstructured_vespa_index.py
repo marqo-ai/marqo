@@ -1,3 +1,9 @@
+"""
+LEGACY MODULE - DO NOT UPDATE
+
+This file contains legacy code that is still supported but no longer actively maintained.
+Avoid making changes unless strictly necessary for compatibility or bug fixes.
+"""
 from typing import Dict, Any, Optional
 
 import marqo.core.constants as index_constants
@@ -12,6 +18,8 @@ from marqo.core.unstructured_vespa_index.unstructured_document import Unstructur
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.core import constants
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -108,7 +116,13 @@ class UnstructuredVespaIndex(VespaIndex):
     def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        rerank_depth, additional_hits = self._get_rerank_depth_and_additional_hits_from_query(marqo_query)
+        marqo_query.ef_search = marqo_query.ef_search if marqo_query.ef_search is not None else max(
+            utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+            marqo_query.limit + marqo_query.offset
+        )
+
+        target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
+        additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
 
         if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
             query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
@@ -118,7 +132,7 @@ class UnstructuredVespaIndex(VespaIndex):
         return (
             f"("
             f"{{"
-            f"targetHits:{rerank_depth}, "
+            f"targetHits:{target_hits}, "
             f"approximate:{str(marqo_query.approximate)}, "
             f'hnsw.exploreAdditionalHits:{additional_hits}'
             f"}}"
@@ -295,8 +309,6 @@ class UnstructuredVespaIndex(VespaIndex):
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # This is for legacy unstructured index only. Searchable attributes is not supported
         # Tensor term
-        marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
-
         tensor_term = self._get_tensor_search_term(marqo_query)
         # Lexical term
         lexical_term = self._get_lexical_search_term(marqo_query)

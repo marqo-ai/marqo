@@ -9,14 +9,15 @@ from typing import (
     List, Optional, Union, Sequence, Dict, Tuple
 )
 
-import torch
 from fastapi import HTTPException
 
+from marqo import logging
 from marqo.api import exceptions, configs
-from marqo.marqo_logging import logger
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
 
+
+logger = logging.get_logger(__name__)
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
     """Turns a list of dicts into a JSONL string"""
@@ -85,43 +86,6 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
         raise exceptions.MarqoError(f"Could not parse url: {url_base}")
     http_part, domain_part = url_split
     return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
-
-
-def check_device_is_available(device: str) -> bool:
-    # TODO [Refactoring device logic] move this logic to device manager
-    """Checks if a device is available on the machine
-
-    Args:
-        device: assumes device is a valid device strings (e.g: 'cpu' or
-            'cuda:1')
-
-    Returns:
-        True, IFF it is available
-
-    Raises:
-        MarqoError if device is determined to be invalid
-    """
-    lowered = device.lower()
-    if lowered == "cpu":
-        return True
-
-    split = lowered.split(":")
-    if split[0] != "cuda":
-        raise exceptions.MarqoError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
-
-    if not torch.cuda.is_available():
-        return False
-
-    if len(split) < 2:
-        return True
-
-    if int(split[1]) < 0:
-        raise exceptions.MarqoError(f"Invalid cuda device number! {device}. It must not be negative")
-
-    if int(split[1]) < torch.cuda.device_count():
-        return True
-    else:
-        return False
 
 
 def merge_dicts(base: dict, preferences: dict) -> dict:
@@ -339,17 +303,6 @@ def generate_batches(seq: Sequence, batch_size: int):
 
     for i in range(0, len(seq), batch_size):
         yield seq[i:i + batch_size]
-
-
-def get_best_available_device() -> str:
-    # TODO [Refactoring device logic] replace this with device manager
-    """Get the best available device for Marqo to use and validate it."""
-    device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
-    if device is None or not check_device_is_available(device):
-        raise exceptions.InternalError(
-            f"Marqo encountered an error when loading device from environment variable `MARQO_BEST_AVAILABLE_DEVICE`. "
-            f"Invalid device: {device}. Must be either 'cpu' or start with 'cuda'.")
-    return device
 
 
 def is_tensor_field(field: str,

@@ -52,7 +52,7 @@ class TestStructuredGetSettings(MarqoTestCase):
         'allFields': [{'name': 'title', 'type': 'text', 'features': []}, {'name': 'content', 'type': 'text', 'features': []}],
         'tensorFields': ['title', 'content'],
         'model': 'test-model',
-        'modelProperties': {'name': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 'dimensions': 384, 'tokens': 128, 'type': 'sbert'},
+        'modelProperties': {'name': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 'dimensions': 384, 'tokens': 128, 'type': 'hf'},
         'normalizeEmbeddings': True,
         'textPreprocessing': {'splitLength': 2, 'splitOverlap': 0, 'splitMethod': 'sentence'},
         'imagePreprocessing': {},
@@ -63,7 +63,7 @@ class TestStructuredGetSettings(MarqoTestCase):
         model_properties = {'name': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
                             'dimensions': 384,
                             'tokens': 128,
-                            'type': 'sbert'}
+                            'type': 'hf'}
 
         index_settings = {
             "type": "structured",
