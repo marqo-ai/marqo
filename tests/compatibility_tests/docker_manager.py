@@ -529,7 +529,6 @@ class DockerManager:
             
         if not available_variants:
             raise RuntimeError(f"Image {image_name} and its variants = {variants} do not exist on DockerHub.")
-        
 
         if len(available_variants) > 1:
             self.logger.warning(f"Multiple variants exist on DockerHub: {available_variants}. We will use the first one "
