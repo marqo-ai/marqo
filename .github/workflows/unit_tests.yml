@@ -24,7 +24,7 @@ jobs:
   Test-Marqo:
     name: Run Unit Tests
     runs-on: ubuntu-latest
-    environment: marqo-test-suite
+    
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
