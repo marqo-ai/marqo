@@ -498,6 +498,8 @@ class DockerManager:
         """
         Pull a Docker image using the Docker SDK.
 
+        Starting from 2.17.0, the image name will have a "-cloud" suffix. E.g., "marqoai/marqo:2.17.0-cloud".
+
         Args:
             image_name (str): The name of the Docker image to pull.
 
