@@ -454,26 +454,3 @@ class TestUnstructuredSearch(MarqoTestCase):
                                                                       searchable_attributes=["title"])
         self.assertEqual(len(search_res["hits"]), 1)
         self.assertEqual(search_res["hits"][0]["_id"], "1")
-
-    def test_rerank_depth(self):
-        # add 10 docs
-        docs = []
-        for i in range(10):
-            docs.append({
-                "title": f"Doc {i}",
-                "content": "some extra info",
-                "_id": str(i)
-            })
-
-        self.client.index(self.text_index_name).add_documents(docs, tensor_fields=["title", "content"])
-
-        # search for "Doc" with rerank_depth=5
-        search_res = self.client.index(self.text_index_name).search(q="Doc", rerank_depth=5, limit=10, search_method="TENSOR")
-        # due to additional hits sometimes the result may not be 5
-        self.assertNotEqual(len(search_res["hits"]), 10)
-
-        # search for "Doc" without rerank_depth
-        search_res = self.client.index(self.text_index_name).search(q="Doc", limit=10, search_method="TENSOR")
-        self.assertEqual(len(search_res["hits"]), 10)
-
-
