@@ -1,7 +1,7 @@
 import time
 from typing import Dict, Any, Optional, List, Union
 
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core

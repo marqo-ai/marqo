@@ -2,7 +2,7 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import validator, root_validator
+from pydantic.v1 import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters

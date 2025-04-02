@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import *

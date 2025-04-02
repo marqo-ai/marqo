@@ -11,7 +11,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 import pprint
 
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 import os
 
 @unittest.skip

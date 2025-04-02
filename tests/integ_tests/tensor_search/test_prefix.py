@@ -154,10 +154,7 @@ class TestPrefix(MarqoTestCase):
 
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbedRequest(
-                        content=["hello"],
-                        content_type=None
-                    ),
+                    embedding_request_dict={"content": ["hello"]},
                     device="cpu"
                 )
 
@@ -213,19 +210,13 @@ class TestPrefix(MarqoTestCase):
 
                 embed_res_document_prefix = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbedRequest(
-                        content=["hello"],
-                        content_type="document"
-                    ),
+                    embedding_request_dict={"content": ["hello"], "content_type": "document"},
                     device="cpu"
                 )
 
                 embed_res_no_prefix = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbedRequest(
-                        content=["custom_prefix: hello"],
-                        content_type=None
-                    ),
+                    embedding_request_dict={"content": ["custom_prefix: hello"], "content_type": None},
                     device="cpu"
                 )
 
@@ -371,10 +362,7 @@ class TestPrefix(MarqoTestCase):
         # we hardcode the prefix into the text chunk and embed
         embed_res = embed(
             marqo_config=self.config, index_name=self.unstructured_index_with_override.name,
-            embedding_request=EmbedRequest(
-                content=["index-override: hello"],
-                content_type=None
-            ),
+            embedding_request_dict={"content": ["index-override: hello"]},
             device="cpu"
         )
 
@@ -414,10 +402,7 @@ class TestPrefix(MarqoTestCase):
                 # Embed request the same text
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbedRequest(
-                        content=["PREFIX: testing query"],
-                        content_type=None
-                    ),
+                    embedding_request_dict={"content": ["PREFIX: testing query"]},
                     device="cpu"
                 )
 

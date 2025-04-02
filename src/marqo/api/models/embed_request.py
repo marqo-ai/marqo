@@ -6,7 +6,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.embed.embed import EmbedContentType
@@ -21,7 +21,7 @@ class EmbedRequest(MarqoBaseModel):
     modelAuth: Optional[ModelAuth] = None
     content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")
 
-    @pydantic.validator('content')
+    @pydantic.v1.validator('content')
     def validate_content(cls, value):
         # Iterate through content list items
         if (isinstance(value, list) or isinstance(value, dict)) and len(value) == 0:

@@ -1,7 +1,7 @@
 import unittest
 
 import pytest
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.core.inference.api.modality import Modality
 from marqo.inference.native_inference.embedding_models.languagebind_model_properties import *

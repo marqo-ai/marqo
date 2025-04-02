@@ -2,7 +2,7 @@ from typing import Dict, List, Union, Optional
 
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.models.api_models import BaseMarqoModel
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 

@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 import re
 
 import pydantic
-from pydantic import root_validator, validator
+from pydantic.v1 import root_validator, validator
 
 import marqo.core.models.marqo_index as marqo_index
 from marqo.base_model import StrictBaseModel, ImmutableStrictBaseModel
@@ -48,7 +48,7 @@ class FieldRequest(StrictBaseModel):
     name: str
     type: marqo_index.FieldType
     features: List[marqo_index.FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
+    dependent_fields: Optional[Dict[str, float]] = pydantic.v1.Field(alias='dependentFields')
     
     @validator('type', pre=True, always=True)
     def normalize_type(cls, v):

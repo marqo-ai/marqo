@@ -1,3 +1,7 @@
+import importlib
+import os
+import sys
+import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -5,20 +9,14 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
+from integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
-from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
-from integ_tests.marqo_test import MarqoTestCase
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-import importlib
-import sys
-import os
-
-import unittest
 
 
 class ApiTests(MarqoTestCase):

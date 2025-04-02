@@ -7,7 +7,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import BaseModel, root_validator, validator, Field
+from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -169,7 +169,7 @@ class SearchQuery(BaseMarqoModel):
 
         return values
 
-    @pydantic.validator('searchMethod')
+    @pydantic.v1.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(
             value=value, enum_class=SearchMethod,
