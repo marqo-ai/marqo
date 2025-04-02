@@ -25,11 +25,11 @@ from marqo.vespa.vespa_client import VespaClient
 
 class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
     # TODO find a way to decouple from env vars when retrieving configurations
-    max_lexical_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+    max_lexical_field_count: int = pydantic.v1.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED))
-    max_tensor_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+    max_tensor_field_count: int = pydantic.v1.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED))
-    max_string_array_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+    max_string_array_field_count: int = pydantic.v1.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED))
 
 

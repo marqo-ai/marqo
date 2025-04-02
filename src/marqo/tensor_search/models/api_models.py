@@ -165,7 +165,7 @@ class SearchQuery(BaseMarqoModel):
 
         return values
 
-    @pydantic.validator('searchMethod')
+    @pydantic.v1.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(
             value=value, enum_class=SearchMethod,

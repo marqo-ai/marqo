@@ -21,7 +21,7 @@ class EmbedRequest(MarqoBaseModel):
     modelAuth: Optional[ModelAuth] = None
     content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")
 
-    @pydantic.validator('content')
+    @pydantic.v1.validator('content')
     def validate_content(cls, value):
         # Iterate through content list items
         if (isinstance(value, list) or isinstance(value, dict)) and len(value) == 0:
