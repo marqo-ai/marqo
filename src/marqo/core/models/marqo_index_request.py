@@ -48,7 +48,7 @@ class FieldRequest(StrictBaseModel):
     name: str
     type: marqo_index.FieldType
     features: List[marqo_index.FieldFeature] = []
-    dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
+    dependent_fields: Optional[Dict[str, float]] = pydantic.v1.Field(alias='dependentFields')
     
     @validator('type', pre=True, always=True)
     def normalize_type(cls, v):
