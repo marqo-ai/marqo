@@ -7,7 +7,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import BaseModel, root_validator, validator, Field
+from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters

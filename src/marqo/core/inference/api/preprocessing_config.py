@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Literal, List, Set, Union
 
 import pydantic
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api.modality import Modality
