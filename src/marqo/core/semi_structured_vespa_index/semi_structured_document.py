@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import List, Dict, Any, Union
 
-from pydantic import Field
+from pydantic.v1 import Field
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants, constants

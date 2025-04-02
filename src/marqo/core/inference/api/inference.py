@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 
 import pydantic
 from numpy import ndarray
-from pydantic import StrictStr, root_validator
+from pydantic.v1 import StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType

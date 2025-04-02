@@ -2,8 +2,8 @@ from typing import List
 from typing import Optional, Union, Any, Sequence
 
 import numpy as np
-from pydantic import BaseModel, validator, root_validator
-from pydantic import Field
+from pydantic.v1 import BaseModel, validator, root_validator
+from pydantic.v1 import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError

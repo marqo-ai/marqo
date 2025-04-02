@@ -2,7 +2,7 @@ from enum import Enum
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import validator, root_validator
+from pydantic.v1 import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists

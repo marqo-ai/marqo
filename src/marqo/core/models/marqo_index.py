@@ -5,10 +5,10 @@ from typing import List, Optional, Dict, Any, Set, Union
 
 import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants

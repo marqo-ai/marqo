@@ -6,7 +6,7 @@ import torch
 from PIL.Image import Image
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs

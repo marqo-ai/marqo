@@ -6,7 +6,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.embed.embed import EmbedContentType
