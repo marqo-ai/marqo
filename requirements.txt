@@ -3,3 +3,7 @@
 msgpack==1.1.0
 msgpack_numpy==0.4.8
 python-json-logger==3.3.0
+pydantic==2.11.1
+fastapi==0.115.12
+fastapi-utils==0.8.0
+uvicorn==0.34.0
