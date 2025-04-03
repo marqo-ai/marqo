@@ -1,30 +1,28 @@
 import copy
-import math
 import os
 import random
 import unittest
 import uuid
 from unittest import mock
 
+import math
 import requests
-from pydantic import ValidationError
 
 import marqo.core.exceptions as core_exceptions
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
-from marqo.vespa.exceptions import VespaStatusError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search.models.search import SearchContext
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
-
+from marqo.tensor_search.models.search import SearchContext
+from marqo.vespa.exceptions import VespaStatusError
 
 
 class TestSearchSemiStructured(MarqoTestCase):
