@@ -25,7 +25,7 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Sequence[Dict[str, Any]]
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-    mediaDownloadThreadCount: Optional[int]
+    mediaDownloadThreadCount: Optional[int] = None
     textChunkPrefix: Optional[str] = None
 
     @root_validator

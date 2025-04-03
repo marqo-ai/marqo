@@ -7,7 +7,9 @@ import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.params import Body
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from marqo import config, marqo_docs
@@ -335,13 +337,15 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
-def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+def search(index_name: str, search_query_dict: dict = Body(...), device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        search_query = parse_obj_as(SearchQuery, search_query_dict)
+
         result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
@@ -418,8 +422,8 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        body: AddDocsBodyParams,
         index_name: str,
+        body_dict: dict = Body(...),
         marqo_config: config.Config = Depends(get_config),
         device: str = Depends(api_validation.validate_device)):
     """
@@ -427,6 +431,7 @@ def add_or_replace_documents(
     Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
     for details.
     """
+    body = parse_obj_as(AddDocsBodyParams, body_dict)
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device)
 
