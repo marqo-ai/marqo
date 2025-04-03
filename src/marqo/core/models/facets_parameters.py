@@ -3,6 +3,9 @@ from marqo.base_model import StrictBaseModel
 from pydantic import Field, validator
 
 class RangeConfiguration(StrictBaseModel):
+    class Config:
+        allow_population_by_field_name = False # disable ability to pass from_ or to_, only alias
+
     from_: Optional[float] = Field(None, alias="from")
     to_: Optional[float] = Field(None, alias="to")
     name: Optional[str] = None
@@ -15,6 +18,8 @@ class RangeConfiguration(StrictBaseModel):
         return to_value
 
 class FieldFacetsConfiguration(StrictBaseModel):
+    class Config:
+        allow_population_by_field_name = False # disable ability to pass max_results, only alias
     type: Literal["int", "string", "float"]
     order: Optional[Literal["asc", "desc"]] = None
     max_results: Optional[int] = Field(None, alias="maxResults")
@@ -45,6 +50,8 @@ class FieldFacetsConfiguration(StrictBaseModel):
         return ranges
 
 class FacetsParameters(StrictBaseModel):
+    class Config:
+        allow_population_by_field_name = False # disable ability to pass max_depth or max_results, only alias
     fields: Dict[str, FieldFacetsConfiguration]
     max_depth: Optional[int] = Field(None, alias="maxDepth")
     max_results: Optional[int] = Field(None, alias="maxResults")
