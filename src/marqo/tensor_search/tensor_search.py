@@ -60,6 +60,7 @@ from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import 
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
+from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.reranking import rerank
@@ -78,7 +79,6 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 
@@ -626,9 +626,9 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        if doc.id.startswith("group:facet:"): # Not an actual document id but group's id returned by vespa
+        if doc.id.startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
             continue
-        marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
+        marqo_doc = vespa_index.to_marqo_document(doc.model_dump(), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 
         if attributes_to_retrieve_set is not None:

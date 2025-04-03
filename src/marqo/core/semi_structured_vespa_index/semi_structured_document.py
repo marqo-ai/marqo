@@ -2,9 +2,9 @@ import json
 import uuid
 from typing import List, Dict, Any, Union, Optional
 
-from pydantic.v1 import Field
+from pydantic import Field
 
-from marqo.base_model import MarqoBaseModel
+from marqo.base_model import MarqoBaseModelV2
 from marqo.core import constants as index_constants, constants
 from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
     InvalidTensorFieldError
@@ -19,7 +19,11 @@ def generate_uuid_str() -> str:
     return str(uuid.uuid4()).replace('-', '')
 
 
-class SemiStructuredVespaDocumentFields(MarqoBaseModel):
+_VESPA_DOC_FIELDS = "fields"
+_VESPA_DOC_ID = "id"
+
+
+class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
     version_uuid: Optional[str] = Field(default_factory=None, alias=common.VESPA_DOC_VERSION_UUID)
@@ -34,7 +38,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPES)
 
 
-class SemiStructuredVespaDocument(MarqoBaseModel):
+class SemiStructuredVespaDocument(MarqoBaseModelV2):
     """A helper class to handle the conversion between Vespa and Marqo documents for a semi-structured index.
     The object can be instantiated from a Marqo document using the from_marqo_document method,
     or can be instantiated from a Vespa document using the from_vespa_document method.
@@ -49,11 +53,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     index_supports_partial_updates: bool = False
 
     # For hybrid search
-    raw_tensor_score: float = None
-    raw_lexical_score: float = None
-
-    _VESPA_DOC_FIELDS = "fields"
-    _VESPA_DOC_ID = "id"
+    raw_tensor_score: Optional[float] = None
+    raw_lexical_score: Optional[float] = None
 
     @classmethod
     def from_vespa_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
@@ -61,7 +62,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         Instantiate an SemiStructuredVespaDocument from a Vespa document.
         Used in get_document_by_id or get_documents_by_ids
         """
-        fields = document.get(cls._VESPA_DOC_FIELDS, {})
+        fields = document.get(_VESPA_DOC_FIELDS, {})
         tensor_fields = {}
         text_fields = {}
         string_arrays_dict = {}
@@ -107,7 +108,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls(id=document[cls._VESPA_DOC_ID],
+            return cls(id=document[_VESPA_DOC_ID],
                     fixed_fields=fixed_fields,
                     tensor_fields=tensor_fields,
                     text_fields=text_fields,
@@ -143,7 +144,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls(id=document[cls._VESPA_DOC_ID],
+            return cls(id=document[_VESPA_DOC_ID],
                     fixed_fields=fixed_fields,
                     tensor_fields=tensor_fields,
                     text_fields=text_fields,
@@ -361,7 +362,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         else:
             vespa_fields[common.STRING_ARRAY] = self.fixed_fields.string_arrays
 
-        return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
+        return {_VESPA_DOC_ID: self.id, _VESPA_DOC_FIELDS: vespa_fields}
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """
