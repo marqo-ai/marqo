@@ -315,8 +315,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
-           collect_facets: bool = False,
-           facets_parameters: Optional[FacetsParameters] = None,
+           facets: Optional[Dict] = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -346,8 +345,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
-        collect_facets: Whether to return facets
-        facets_parameters: Parameters for grouping
+        facets: Parameters for facets
     Returns:
 
     """
@@ -445,7 +443,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, collect_facets=collect_facets, facets_parameters=facets_parameters
+                hybrid_parameters=hybrid_parameters, facets=facets
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -626,7 +624,7 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        if doc.id.startswith("group:root:"):
+        if doc.id.startswith("group:facet:"):
             continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
@@ -642,66 +640,112 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     return {'hits': hits}
 
 
-def gather_facets_from_response(response: QueryResult, facet_fields: Optional[list[str]]) -> Dict[str, Dict]:
-    """
-    Convert a Vespa `QueryResult` into Marqo-style facets response format.
+def gather_facets_from_response(response: QueryResult, facets: FacetsParameters) -> Dict[str, Dict]:
+    """Convert a Vespa QueryResult into a Marqo-style facets response.
 
-    Vespa facet group IDs can have different formats:
-      - If `facet_fields` is None, they look like: `group:string:field`
-      - If `facet_fields` is set, they look like: `group:marqo__short_string_fields{"field_name"}`
-
-    This function parses those IDs and organizes the facets into:
-        {
-            "field_name": {
-                "facet_value_1": count,
-                "facet_value_2": count,
-                ...
-            },
+    Returns a dictionary of the form:
+    {
+        "field_name": {
+            "facet_value_1": { stats... },
+            "facet_value_2": { stats... },
             ...
-        }
-
-    Parameters:
-    - response: Vespa query result containing facet groups
-    - facet_fields: Optional list of facet field names. If None, fallback parsing is used.
-
-    Returns:
-    - Dictionary with 'facets' key containing parsed facets
+        },
+        ...
+    }
     """
+    facet_field_map = _build_field_map(facets)
+    facets_response = {}
 
-    def extract_field_name(field_id: str) -> str:
-        """
-        Extracts the facet field name from a field ID string.
-        """
-        if not facet_fields:
-            # Example: 'group:string:brand' -> 'brand'
-            return field_id.split(':')[-1]
-        else:
-            # Example: 'group:marqo__short_string_fields{"brand"}' -> 'brand'
-            return field_id.split('{')[1].split('}')[0].strip('"')
+    # Process root groups only
+    root_groups = (group for group in response.facets if group.id.startswith("group:facet:"))
+    for group in root_groups:
+        if group.children is None:
+            continue
+        for field in group.children:
+            field_name = _extract_field_name(field.id, facets)
+            facets_response.setdefault(field_name, {})
 
-    facets = {}
+            for value in field.children:
+                group_type, value_key = _parse_value_id(value.id)
+                processed_stats = _process_value_stats(value.fields)
 
-    # Loop through all top-level groups in Vespa facet results
-    for group in response.facets:
-        if not group.id.startswith("group:root:"):
-            continue  # Skip non-root groups
+                if group_type == 'string':
+                    facets_response[field_name][value_key] = processed_stats
+                elif group_type == 'long':
+                    facets_response[field_name] = processed_stats
+                else:
+                    _process_range_facets(
+                        field_name, value_key, processed_stats,
+                        facet_field_map, facets_response
+                    )
 
-        # Depending on facet_fields, structure of children differs
-        groups_to_process = group.children[0].children if not facet_fields else group.children
+    # Sort range facets by upper bound
+    for field_name, field_data in facets_response.items():
+        if facet_field_map.get(field_name).ranges is not None:
+            facets_response[field_name] = _sort_range_facets(field_data)
 
-        for field in groups_to_process:
-            field_name = extract_field_name(field.id)
-            facets[field_name] = {}
+    return {'facets': facets_response}
 
-            # Similarly, structure of sub-groups (actual values) depends on facet_fields
-            values_to_process = field.children[0].children if not facet_fields else field.children
+def _build_field_map(facets: FacetsParameters) -> Dict[str, Any]:
+    """Build a mapping from field names to their facet parameters."""
+    return {
+        field_name: params
+        for facet_field in facets.fields
+        for field_name, params in facet_field.items()
+    }
 
-            for value in values_to_process:
-                value_key = value.id.split(':')[-1]  # e.g., 'blue', 'Nike', etc.
-                facets[field_name][value_key] = value.fields['count()']
+def _extract_field_name(field_id: str, facets: FacetsParameters) -> str:
+    """Extract the field name from a Vespa field ID."""
+    if "marqo" not in field_id:
+        group_index = int(field_id.split(':')[1])
+        return next(iter(facets.fields[group_index].keys()))
+    return field_id.split('{')[1].split('}')[0].strip('"')
 
-    return {'facets': facets}
+def _parse_value_id(value_id: str) -> Tuple[str, str]:
+    """Parse a Vespa value ID into group type and value key."""
+    parts = value_id.split(':')
+    return parts[-2], parts[-1]
 
+def _process_value_stats(fields: Dict) -> Dict:
+    """Process field statistics, removing Vespa-specific suffixes."""
+    return {k.split('(')[0]: v for k, v in fields.items()}
+
+def _process_range_facets(
+        field_name: str,
+        value_key: str,
+        stats: Dict,
+        field_map: Dict,
+        response: Dict
+) -> None:
+    """Process range facets for a field."""
+    params = field_map.get(field_name)
+    if params is None or params.ranges is None:
+        return
+
+    for facet_range in params.ranges:
+        if (value_key == "Infinity" and facet_range.to_ is None) or float(value_key) == facet_range.to_:
+            range_name = _get_range_name(facet_range, value_key)
+            if range_name:
+                response[field_name][range_name] = stats, (facet_range.to_ if facet_range.to_ else float('inf'))
+
+def _get_range_name(facet_range: Any, value_key: str) -> Optional[str]:
+    """Get the name for a range facet."""
+    if facet_range.name is not None:
+        if facet_range.to_ is not None:
+            if float(value_key) == facet_range.to_:
+                return facet_range.name
+        elif value_key == "Infinity":
+            return facet_range.name
+        return None
+
+    from_val = "-Infinity" if facet_range.from_ is None else str(facet_range.from_)
+    to_val = "Infinity" if facet_range.to_ is None else str(facet_range.to_)
+    return f"{from_val}:{to_val}"
+
+def _sort_range_facets(field_data: Dict) -> Dict:
+    """Sort range facets by their upper bound, with None (Infinity) at the end."""
+    sorted_items = sorted(field_data.items(), key=lambda kv: kv[1][1])
+    return {k: v[0] for k, v in sorted_items}
 
 def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set[str]) -> Dict[str, Any]:
     """

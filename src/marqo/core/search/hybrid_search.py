@@ -40,8 +40,7 @@ class HybridSearch:
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None,
-            collect_facets: bool = False,
-            facets_parameters: FacetsParameters = None
+            facets: Optional[FacetsParameters] = None,
     ) -> Dict:
         """
 
@@ -66,9 +65,7 @@ class HybridSearch:
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
-                collect_facets: if True, facets will be returned
-                facets_parameters: FacetsParameters object to specify all parameters for grouping. If not provided,
-                    default values will be used.
+                facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
             Returns:
 
             Output format:
@@ -246,8 +243,7 @@ class HybridSearch:
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters,
-            collect_facets=collect_facets,
-            facets_parameters=facets_parameters,
+            facets=facets,
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -284,8 +280,8 @@ class HybridSearch:
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
         gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
         total_results = len(gathered_results["hits"])
-        if collect_facets:
-            gathered_results.update(gather_facets_from_response(responses, facets_parameters.facetFields))
+        if facets is not None:
+            gathered_results.update(gather_facets_from_response(responses, facets))
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(

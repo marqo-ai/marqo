@@ -56,8 +56,7 @@ class SearchQuery(BaseMarqoModel):
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
-    collectFacets: Optional[bool] = None
-    facetsParameters: Optional[FacetsParameters] = None
+    facets: Optional[FacetsParameters] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -174,6 +173,33 @@ class SearchQuery(BaseMarqoModel):
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
+
+    @root_validator(pre=False)
+    def validate_facets_only_for_hybrid_search(cls, values):
+        """Validate that facets are only provided for hybrid search"""
+        facets = values.get('facets')
+        search_method = values.get('searchMethod')
+        if facets is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"Facets can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_facet_excludes_in_filter(cls, values):
+        """Validate that excluded facet fields appear in filter"""
+        facets = values.get('facets')
+        filter_str = values.get('filter')
+
+        if not facets or not facets.fields or not filter_str:
+            return values
+
+        for field in facets.fields:
+            field_name, field_parameters = next(iter(field.items()))
+            if field_parameters.exclude:
+                missing_exclusions = [ex for ex in field_parameters.exclude if ex not in filter_str]
+                if missing_exclusions:
+                    raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
+        return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""

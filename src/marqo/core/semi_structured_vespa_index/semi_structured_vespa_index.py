@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional, Type, Union, cast
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
-from marqo.core.models.facets_parameters import FacetsParameters
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.search import search_filter
@@ -95,41 +95,93 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         vespa_query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
-        if marqo_query.collect_facets:
-            grouping_query_suffix = self._get_facets_term(
-                marqo_query.facets_parameters if marqo_query.facets_parameters else FacetsParameters()
-            )
-            vespa_query['marqo__yql.tensor'] += grouping_query_suffix
-            vespa_query['marqo__yql.lexical'] += grouping_query_suffix
+        # if marqo_query.facets is not None:
+        #     facets_grouping = self._get_facets_term(marqo_query.facets)
+            # vespa_query['marqo__yql.facets'] = f"{vespa_query['marqo__yql.lexical']} limit 0 | {facets_grouping}"
         return vespa_query
 
-    def _get_facets_term(self, facets_parameters: FacetsParameters):
-        """ Build vespa grouping syntax based query on passed parameters.
-        Query consists of 4 parts:
-        1. groups selection
-        2. max results specification
-        3. sorting specification
-        4. facet function
+    def _get_facets_term(self, facets_parameters: FacetsParameters, exclusions: List[str] = None) -> str:
         """
-        grouping_query = ""
-        if facets_parameters.maxResults:
-            grouping_query += f"max({facets_parameters.maxResults}) "
-        if facets_parameters.maxDepth:
-            grouping_query += f"precision({facets_parameters.maxDepth}) "
-        grouping_query += f"order({'-' if facets_parameters.order == 'DESC' else ''}count()) "
-        grouping_query += " each(output(count()))"
+        Build a facets grouping query string from the provided facets_parameters.
+        """
+        FIELD_TYPES = {
+            "int": INT_FIELDS,
+            "float": FLOAT_FIELDS,
+            "string": SHORT_STRINGS_FIELDS
+        }
 
-        final_query = ""
+        global_max_results = facets_parameters.max_results or ""
+        global_sort_order = facets_parameters.order or ""
 
-        if facets_parameters.facetFields:
-            for field in facets_parameters.facetFields:
-                final_query += ' | all(group(%s{"%s"})%s)' % (SHORT_STRINGS_FIELDS, field, grouping_query)
-        else:
-            final_query += " | all(group(%s.key) each(group(%s.value)%s))" % (
-                SHORT_STRINGS_FIELDS, SHORT_STRINGS_FIELDS, grouping_query
-            )
+        def build_group_parameters(field_config) -> str:
+            """Build the max and order parameters for a group."""
+            parts = []
 
-        return final_query
+            # Add max results if specified
+            if field_config.max_results is not None:
+                parts.append(f"max({field_config.max_results})")
+            elif global_max_results:
+                parts.append(f"max({global_max_results})")
+
+            # Add sort order if specified
+            if field_config.order:
+                prefix = '-' if field_config.order == 'desc' else ''
+                parts.append(f"order({prefix}count())")
+            elif global_sort_order:
+                prefix = '-' if global_sort_order == 'desc' else ''
+                parts.append(f"order({prefix}count())")
+
+            return " ".join(parts)
+
+        def build_group_expression(field_config, field_name, field_id) -> str:
+            """Build the group expression for a field."""
+            field_type = FIELD_TYPES[field_config.type]
+
+            # Handle numeric fields with ranges
+            if field_config.type in ["int", "float"] and field_config.ranges:
+                buckets = []
+                for range_config in field_config.ranges:
+                    from_val = range_config.from_ if range_config.from_ is not None else "-inf"
+                    to_val = range_config.to_ if range_config.to_ is not None else "inf"
+                    buckets.append(f'bucket({from_val}, {to_val})')
+                return f'predefined({field_type}{{"{field_name}"}}, {", ".join(buckets)})'
+
+            # Handle fields without ranges
+            return str(field_id) if field_config.type in ["int", "float"] else f'{field_type}{{"{field_name}"}}'
+
+        def build_field_group(field_config, field_name, field_id) -> str:
+            """Build the complete group request for a field."""
+            group_expr = build_group_expression(field_config, field_name, field_id)
+            params = build_group_parameters(field_config)
+
+            # Build output expression
+            if field_config.type in ["int", "float"]:
+                aggregations = ["sum", "avg", "min", "max"]
+                funcs = [f'{func}({FIELD_TYPES[field_config.type]}{{"{field_name}"}})' for func in aggregations]
+                funcs.append("count()")
+                output = f"each(output({', '.join(funcs)}))"
+            else:
+                output = "each(output(count()))"
+
+            return f"all(group({group_expr}) {params} {output})"
+
+        # Start building the overall grouping query.
+        grouping_query = "all( "
+        if facets_parameters.max_depth is not None:
+            grouping_query += f"max({facets_parameters.max_depth}) "
+
+        for field_id, field_data in enumerate(facets_parameters.fields):
+            field_name, field_parameters = next(iter(field_data.items()))
+            if field_parameters.exclude is not None:
+                # We want this field to be in a separate query if any of the exclusions are not in the exclusions list
+                if exclusions is None or any([exclusion not in exclusions for exclusion in field_parameters.exclude]):
+                    continue
+            elif exclusions is not None:
+                continue
+            grouping_query += build_field_group(field_parameters, field_name, field_id)
+
+        grouping_query += ")"
+        return grouping_query
 
 
     def _get_string_array_attributes_to_retrieve(self, attributes_to_retrieve: List) -> List[str]:
@@ -137,7 +189,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return [name_to_string_array_field_map[att].string_array_field_name for att in attributes_to_retrieve if
                 name_to_string_array_field_map.get(att)]
 
-    def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
+    def _get_filter_term(self, marqo_query: MarqoQuery, exclude: Optional[List[str]]=None) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
@@ -210,7 +262,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             return f'({float_field_string} OR {int_field_string})'
 
-        def tree_to_filter_string(node: search_filter.Node) -> str:
+        def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
             if isinstance(node, search_filter.Operator):
                 if isinstance(node, search_filter.And):
                     operator = 'AND'
@@ -218,19 +270,44 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     operator = 'OR'
                 else:
                     raise InternalError(f'Unknown operator type {type(node)}')
-                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
+
+                # Get both sides, filtering out excluded terms
+                left = tree_to_filter_string(node.left)
+                right = tree_to_filter_string(node.right)
+
+                # If either side was excluded, skip this operator
+                if left is None or right is None:
+                    if left is not None or right is not None:
+                        # If one side is excluded, return the other side
+                        if left is None:
+                            return f'({right})'
+                        if right is None:
+                            return f'({left})'
+                    return None
+
+                return f'({left} {operator} {right})'
+
             elif isinstance(node, search_filter.Modifier):
                 if isinstance(node, search_filter.Not):
-                    return f'!({tree_to_filter_string(node.modified)})'
+                    modified = tree_to_filter_string(node.modified)
+                    if modified is None:
+                        return None
+                    return f'!({modified})'
                 else:
                     raise InternalError(f'Unknown modifier type {type(node)}')
+
             elif isinstance(node, search_filter.Term):
+                # Skip any terms with excluded fields
+                if exclude and node.field in exclude:
+                    return None
+
                 if isinstance(node, search_filter.EqualityTerm):
                     return generate_equality_filter_string(node)
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
                     raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:

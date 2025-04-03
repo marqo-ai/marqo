@@ -65,8 +65,7 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
     global_rerank_depth: Optional[int] = None
-    collect_facets: Optional[bool] = False
-    facets_parameters: Optional[FacetsParameters] = None
+    facets: Optional[FacetsParameters] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

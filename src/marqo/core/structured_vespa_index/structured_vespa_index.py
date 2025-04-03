@@ -556,9 +556,44 @@ class StructuredVespaIndex(VespaIndex):
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
-        tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
-        lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}'
+        tensor_yql_no_filter = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
+        lexical_yql_no_filter = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}'
+        tensor_yql = f'{tensor_yql_no_filter}{filter_term}'
+        lexical_yql = f'{lexical_yql_no_filter}{filter_term}'
+        facet_queries = None
 
+        if marqo_query.facets:
+            facets_query_skeleton = '%s limit 0 | %s'
+            unique_exclusions = []
+            base_yql = lexical_yql_no_filter
+            if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term} OR {tensor_term})'
+            elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
+                base_yql = tensor_yql_no_filter
+            facet_queries = [
+                facets_query_skeleton % (f'{base_yql}{filter_term}', self._get_facets_term(marqo_query.facets))
+            ]
+
+            # Using a unique delimiter that's unlikely to appear in YQL
+            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
+
+            for facet_fields in marqo_query.facets.fields:
+                facet_name, facet_parameters = next(iter(facet_fields.items()))
+                if facet_parameters.exclude is not None:
+                    if any(set(facet_parameters.exclude) == unique_exclusion for unique_exclusion in unique_exclusions):
+                        continue
+                    unique_exclusions.append(set(facet_parameters.exclude))
+                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude)
+                    if new_filter_term:
+                        new_filter_term = f' AND {new_filter_term}'
+                    else:
+                        new_filter_term = ''
+                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude)
+
+                    query_yql = f'{base_yql}{new_filter_term}'
+
+                    facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+            facet_queries = QUERY_DELIMITER.join(facet_queries)
         query = {
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
@@ -573,12 +608,9 @@ class StructuredVespaIndex(VespaIndex):
             'presentation.summary': summary,
 
             # Custom searcher parameters
-            'marqo__yql.tensor': None if (
-                    marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
-                    and
-                    marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
-            ) else tensor_yql,
+            'marqo__yql.tensor': tensor_yql,
             'marqo__yql.lexical': lexical_yql,
+            'marqo__yql.facets': facet_queries,
 
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
