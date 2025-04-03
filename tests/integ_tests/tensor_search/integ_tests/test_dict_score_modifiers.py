@@ -321,7 +321,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 r = update_documents(
                     marqo_config=self.config,
                     index_name=index.name,
-                    body=UpdateDocumentsBodyParams(documents=[updated_doc])
+                    body_dict={"documents": [updated_doc]}
                 )
 
                 # Get updated document and assert that the score modifier is 1.5
