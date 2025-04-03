@@ -1,32 +1,18 @@
-* **What kind of change does this PR introduce?** (Bug fix, feature, docs update, ...)
+## Change Summary
+<!-- Describe the key changes this PR introduces -->
 
+## Related Issue
+<!-- Link to related issues if any (e.g. Fixes #123) -->
 
-* **What is the current behavior?** (You can also link to an open issue here)
+## Checklist
+<!-- Check items that apply, add items if needed -->
+- [ ] Tests have been added for changes
+- [ ] Documentation has been updated
+- [ ] Breaking changes are clearly identified
+- [ ] Python client changes linked or N/A
 
-
-* **What is the new behavior?**
-
-
-* **Does this PR introduce a breaking change?** (What changes might users need to make in their application due to this PR?)
-
-
-
-
-* **Related Python client changes** (link commit/PR here)
-
-
-* **Related documentation changes** (link commit/PR here)
-
-
-* **Other information**:
-
-
-* **Please check if the PR fulfills these requirements**
-- [ ] The commit message follows our guidelines
-- [ ] Tests for the changes have been added (for bug fixes/features)
-- [ ] Docs have been added / updated (for bug fixes / features)
-
-* **For new field types, have you verified:**
+<!-- Special test requirements for certain changes -->
+### For new field types:
 - [ ] Tests cover score modifier usage of this new type
-- [ ] Test indexes have been updated to cover the new type for all APIs (add docs, search, partial update, etc.)
+- [ ] Test indexes updated to cover the new type for all APIs (add docs, search, partial update, etc.)
 
