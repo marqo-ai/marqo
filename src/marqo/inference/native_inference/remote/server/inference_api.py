@@ -91,7 +91,7 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid MessagePack format: {str(e)}"
         ) from e
-    except pydantic.ValidationError as e:
+    except pydantic.v1.ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=e.errors()

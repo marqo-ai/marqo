@@ -205,8 +205,8 @@ async def api_validation_exception_handler(request: Request, exc: RequestValidat
     )
 
 
-@app.exception_handler(pydantic.ValidationError)
-async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
+@app.exception_handler(pydantic.v1.ValidationError)
+async def validation_exception_handler(request, exc: pydantic.v1.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
     error_messages = [{
         'loc': error.get('loc', ''),
