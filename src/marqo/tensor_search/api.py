@@ -256,13 +256,16 @@ def root():
 
 
 @app.post("/indexes/{index_name}")
-def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
+def create_index(index_name: str, settings_dict: dict, marqo_config: config.Config = Depends(get_config)):
     """
     Create index with settings. Please refer to the following documents for details about creating different types
     of index:
     - [Unstructured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-index/)
     - [Structured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-structured-index/)
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  IndexSettings can be injected after migrated to v2
+    settings = parse_obj_as(IndexSettings, settings_dict)
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     return JSONResponse(
         content={
@@ -337,13 +340,15 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
-def search(index_name: str, search_query_dict: dict = Body(...), device: str = Depends(api_validation.validate_device),
+def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  SearchQuery can be injected after migrated to v2
         search_query = parse_obj_as(SearchQuery, search_query_dict)
 
         result = tensor_search.search(
@@ -371,7 +376,7 @@ def search(index_name: str, search_query_dict: dict = Body(...), device: str = D
 
 @app.post("/indexes/{index_name}/recommend")
 @throttle(RequestType.SEARCH)
-def recommend(query: RecommendQuery, index_name: str,
+def recommend(query_dict: dict, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
     """
     Recommend similar documents. Input a list of existing document IDs or dict of IDs and weights, and the response
@@ -380,6 +385,10 @@ def recommend(query: RecommendQuery, index_name: str,
     Please refer to [Recommend API document](https://docs.marqo.ai/latest/reference/api/search/recommend/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  RecommendQuery can be injected after migrated to v2
+        query = parse_obj_as(RecommendQuery, query_dict)
+
         return marqo_config.recommender.recommend(
             index_name=index_name,
             documents=query.documents,
@@ -402,7 +411,7 @@ def recommend(query: RecommendQuery, index_name: str,
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.SEARCH)
-def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
+def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
     """
     Vectorise a piece of content (string or weighted dictionary) or list of content and return the corresponding
@@ -410,6 +419,10 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
     details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  EmbedRequest can be injected after migrated to v2
+        embedding_request = parse_obj_as(EmbedRequest, embedding_request_dict)
+
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
             index_name=index_name, device=device,
@@ -423,7 +436,7 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
         index_name: str,
-        body_dict: dict = Body(...),
+        body_dict: dict,
         marqo_config: config.Config = Depends(get_config),
         device: str = Depends(api_validation.validate_device)):
     """
@@ -431,6 +444,8 @@ def add_or_replace_documents(
     Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
     for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  AddDocsBodyParams can be injected after migrated to v2
     body = parse_obj_as(AddDocsBodyParams, body_dict)
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device)
@@ -443,13 +458,17 @@ def add_or_replace_documents(
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
-        body: UpdateDocumentsBodyParams,
+        body_dict: dict,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """
     Update an array of documents in a given index. Please refer to
     [Update document API](https://docs.marqo.ai/latest/reference/api/documents/update-documents/) for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  UpdateDocumentsBodyParams can be injected after migrated to v2
+    body = parse_obj_as(UpdateDocumentsBodyParams, body_dict)
+
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
@@ -546,19 +565,21 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
 
 @app.post("/batch/indexes/create", include_in_schema=False)
 @utils.enable_batch_apis()
-def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
+def batch_create_indexes(index_settings_with_name_list: List[dict],
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  IndexSettingsWithName can be injected after migrated to v2
+    index_settings = [parse_obj_as(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
 
-    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for
-                            settings in index_settings_with_name_list]
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)
 
     return JSONResponse(
         content={
             "acknowledged": True,
-            "index_names": [settings.indexName for settings in index_settings_with_name_list]
+            "index_names": [settings.indexName for settings in index_settings]
         },
         status_code=200
     )

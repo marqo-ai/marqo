@@ -468,7 +468,7 @@ class TestApiErrors(MarqoTestCase):
                     json=test_case
                 )
 
-                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.status_code, 400)
                 self.assertTrue(f"Invalid field name '{field}'" in response.text)
 
         for test_case, test_name in test_cases_pass:
@@ -506,7 +506,7 @@ class TestApiErrors(MarqoTestCase):
                     f"/indexes/{index_name}",
                     json=test_settings
                 )
-                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.status_code, 400)
                 self.assertIn("allFields", response.text)
                 self.assertIn("type", response.text)
 
@@ -534,7 +534,7 @@ class TestApiErrors(MarqoTestCase):
                     f"/indexes/{index_name}",
                     json=test_settings
                 )
-                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.status_code, 400)
                 self.assertIn("allFields", response.text)
                 self.assertIn("features", response.text)
 
