@@ -1,8 +1,8 @@
 ## Change Summary
 <!-- Describe the key changes this PR introduces -->
 
-## Related Issue
-<!-- Link to related issues if any (e.g. Fixes #123) -->
+## Related Jira Ticket
+<!-- Link to Jira ticket (e.g. MAR-123) -->
 
 ## Checklist
 <!-- Check items that apply, add items if needed -->
