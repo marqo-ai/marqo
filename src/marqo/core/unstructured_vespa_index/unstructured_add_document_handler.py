@@ -134,7 +134,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 if self.tensor_fields_container.is_custom_tensor_field(field_name):
                     # TODO should is_non_tensor_field check be moved out to AddDocsParams validation?
                     # Please note that if one of the documents in the batch has a custom field which does not exist
-                    # in the tensor field, the whole batch will fail and user will get a 400 pydantic.ValidationError.
+                    # in the tensor field, the whole batch will fail and user will get a 400 pydantic.v1.ValidationError.
                     # We keep this behaviour unchanged to be compatible with the legacy unstructured index.
                     validate_custom_vector(field_content, not is_tensor_field, self.marqo_index.model.get_dimension())
                 elif self.marqo_index.parsed_marqo_version() < self._MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS:

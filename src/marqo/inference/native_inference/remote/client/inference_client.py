@@ -60,5 +60,5 @@ class NativeInferenceClient(Inference):
         try:
             result_dict = msgpack.unpackb(response.content, raw=False)
             return InferenceResult.parse_obj(result_dict)
-        except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, pydantic.ValidationError) as e:
+        except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, pydantic.v1.ValidationError) as e:
             raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e
