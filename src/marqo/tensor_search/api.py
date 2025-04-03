@@ -458,7 +458,7 @@ def add_or_replace_documents(
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
-        body_dict: dict,
+        body: UpdateDocumentsBodyParams,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """
@@ -467,7 +467,7 @@ def update_documents(
     """
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  UpdateDocumentsBodyParams can be injected after migrated to v2
-    body = parse_obj_as(UpdateDocumentsBodyParams, body_dict)
+    # body = parse_obj_as(UpdateDocumentsBodyParams, body_dict)
 
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
