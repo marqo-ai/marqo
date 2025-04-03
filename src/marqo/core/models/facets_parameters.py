@@ -25,6 +25,8 @@ class FieldFacetsConfiguration(StrictBaseModel):
     def validate_max_results(cls, v):
         if v is not None and v <= 0:
             raise ValueError("max_results must be greater than 0")
+        if v is not None and v > 10000:
+            raise ValueError("max_results must be less than or equal to 10000")
         return v
 
     @validator('ranges')
@@ -43,7 +45,7 @@ class FieldFacetsConfiguration(StrictBaseModel):
         return ranges
 
 class FacetsParameters(StrictBaseModel):
-    fields: List[Dict[str, FieldFacetsConfiguration]]
+    fields: Dict[str, FieldFacetsConfiguration]
     max_depth: Optional[int] = Field(None, alias="maxDepth")
     max_results: Optional[int] = Field(None, alias="maxResults")
     order: Optional[Literal["asc", "desc"]] = None
@@ -52,12 +54,15 @@ class FacetsParameters(StrictBaseModel):
     def validate_max_depth(cls, v):
         if v is not None and v <= 0:
             raise ValueError("max_depth must be greater than 0")
+
         return v
 
     @validator('max_results')
     def validate_max_results(cls, v):
         if v is not None and v <= 0:
             raise ValueError("max_results must be greater than 0")
+        if v is not None and v > 10000:
+            raise ValueError("max_depth must be less than or equal to 10000")
         return v
 
 

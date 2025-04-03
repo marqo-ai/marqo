@@ -193,8 +193,8 @@ class SearchQuery(BaseMarqoModel):
         if not facets or not facets.fields or not filter_str:
             return values
 
-        for field in facets.fields:
-            field_name, field_parameters = next(iter(field.items()))
+        for facet_field in facets.fields.items():
+            field_name, field_parameters = facet_field
             if field_parameters.exclude:
                 missing_exclusions = [ex for ex in field_parameters.exclude if ex not in filter_str]
                 if missing_exclusions:

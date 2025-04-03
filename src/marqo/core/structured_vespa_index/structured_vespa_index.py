@@ -565,20 +565,23 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.facets:
             facets_query_skeleton = '%s limit 0 | %s'
             unique_exclusions = []
+            facet_queries = []
             base_yql = lexical_yql_no_filter
             if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term} OR {tensor_term})'
             elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
                 base_yql = tensor_yql_no_filter
-            facet_queries = [
-                facets_query_skeleton % (f'{base_yql}{filter_term}', self._get_facets_term(marqo_query.facets))
-            ]
+
+            facets_term = self._get_facets_term(marqo_query.facets)
+
+            if facets_term is not None:
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
 
             # Using a unique delimiter that's unlikely to appear in YQL
             QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
 
-            for facet_fields in marqo_query.facets.fields:
-                facet_name, facet_parameters = next(iter(facet_fields.items()))
+            for facet_field in marqo_query.facets.fields.items():
+                facet_name, facet_parameters = facet_field
                 if facet_parameters.exclude is not None:
                     if any(set(facet_parameters.exclude) == unique_exclusion for unique_exclusion in unique_exclusions):
                         continue

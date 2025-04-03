@@ -689,16 +689,16 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
 def _build_field_map(facets: FacetsParameters) -> Dict[str, Any]:
     """Build a mapping from field names to their facet parameters."""
     return {
-        field_name: params
-        for facet_field in facets.fields
-        for field_name, params in facet_field.items()
+        facet_field[0]: facet_field[1]
+        for facet_field in facets.fields.items()
     }
 
 def _extract_field_name(field_id: str, facets: FacetsParameters) -> str:
     """Extract the field name from a Vespa field ID."""
     if "marqo" not in field_id:
         group_index = int(field_id.split(':')[1])
-        return next(iter(facets.fields[group_index].keys()))
+        return next(iter(facet_field_name for i, facet_field_name in enumerate(facets.fields.keys()) if i == group_index))
+        # return facets.fields.items()[group_index][0]
     return field_id.split('{')[1].split('}')[0].strip('"')
 
 def _parse_value_id(value_id: str) -> Tuple[str, str]:

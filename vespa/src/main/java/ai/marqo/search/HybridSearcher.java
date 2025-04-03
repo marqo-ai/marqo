@@ -111,9 +111,6 @@ public class HybridSearcher extends Searcher {
                                 facetsYql);
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
-                logIfVerbose(
-                        "Facets subquery created and executed asynchronously: " + facetsYql,
-                        verbose);
             }
         }
         // --- End facets subquery handling ---

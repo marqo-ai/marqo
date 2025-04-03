@@ -167,21 +167,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # Start building the overall grouping query.
         grouping_query = "all( "
+        any_field = False
         if facets_parameters.max_depth is not None:
             grouping_query += f"max({facets_parameters.max_depth}) "
 
-        for field_id, field_data in enumerate(facets_parameters.fields):
-            field_name, field_parameters = next(iter(field_data.items()))
+        for field_id, field_data in enumerate(facets_parameters.fields.items()):
+            field_name, field_parameters = field_data
             if field_parameters.exclude is not None:
                 # We want this field to be in a separate query if any of the exclusions are not in the exclusions list
                 if exclusions is None or any([exclusion not in exclusions for exclusion in field_parameters.exclude]):
                     continue
             elif exclusions is not None:
                 continue
+            any_field = True
             grouping_query += build_field_group(field_parameters, field_name, field_id)
 
         grouping_query += ")"
-        return grouping_query
+        return grouping_query if any_field else None
 
 
     def _get_string_array_attributes_to_retrieve(self, attributes_to_retrieve: List) -> List[str]:
