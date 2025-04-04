@@ -631,7 +631,7 @@ def get_multilingual_clip_properties() -> Dict:
         "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
             {
                 "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
-                "visual_model": "openai/ViT-L/14",
+                "visual_model": "open_clip/ViT-L-14/openai",
                 "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
                 "dimensions": 768,
                 "type": "multilingual_clip",
@@ -649,7 +649,7 @@ def get_multilingual_clip_properties() -> Dict:
         "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
             {
                 "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
-                "visual_model": "openai/ViT-B/32",
+                "visual_model": "open_clip/ViT-B-32/openai",
                 "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-32',
                 "dimensions": 512,
                 "type": "multilingual_clip",
@@ -658,7 +658,7 @@ def get_multilingual_clip_properties() -> Dict:
         "multilingual-clip/LABSE-Vit-L-14":
             {
                 "name": "multilingual-clip/LABSE-Vit-L-14",
-                "visual_model": "openai/ViT-L/14",
+                "visual_model": "open_clip/ViT-L-14/openai",
                 "textual_model": 'M-CLIP/LABSE-Vit-L-14',
                 "dimensions": 768,
                 "type": "multilingual_clip",
