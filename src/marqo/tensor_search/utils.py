@@ -203,31 +203,34 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
         raise TypeError("parse_lexical_query must have string as input")
 
     for i in range(len(text)):
-        # Add every character to blob initially
-        blob += text[i]
-
         # Every character immediately after a \\ should be read literally
         if escape:
             escape = False
+            blob += text[i]
         elif text[i] == "\\":
             escape = True
-            # Stray backslashes should be removed (not followed by special char, or is last char)
-            if i == len(text) - 1 or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA:
-                blob = blob[:-1]
+            # Stray backslashes should be ignored (not followed by special char, or is last char)
+            if not (i == len(text) - 1 or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA):
+                blob += text[i]
         elif text[i] == '"':
             # OPENING QUOTE
             if (opening_quote_idx is None):
                 opening_quote_idx = i
-                blob_opening_quote_idx = len(blob) - 1 # Opening quote index in blob is different from text
+                blob_opening_quote_idx = len(blob) # Opening quote index in blob is different from text
 
                 # Bad syntax opening quote: flag it, replace quote with whitespace
                 if not (i == 0 or text[i - 1] == " "):
                     current_quote_pair_is_faulty = True
-                    blob = blob[:-1] + " "
+                    blob += " "
+                else:
+                    # Good syntax opening quote: add to blob
+                    blob += text[i]
             # CLOSING QUOTE
             else:
                 # Good syntax closing: must have space on the right (or is last character) while opening exists.
                 if (i == len(text) - 1 or text[i + 1] == " ") and not current_quote_pair_is_faulty:
+                    # Add this quote to the blob
+                    blob += text[i]
                     # Add everything in between the quotes as a required term
                     new_required_term = text[opening_quote_idx + 1:i]
                     if new_required_term:                           # Do not add empty strings as required terms
@@ -239,7 +242,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
                 else:
                     # Bad syntax closing: treat this and opening quote as whitespace
                     blob = blob[:blob_opening_quote_idx] + " " + \
-                                     blob[blob_opening_quote_idx + 1:-1] + " "
+                                     blob[blob_opening_quote_idx + 1:] + " "
 
                 # Clean up flags
                 opening_quote_idx = None
