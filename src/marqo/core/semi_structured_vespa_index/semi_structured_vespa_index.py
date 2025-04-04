@@ -100,7 +100,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # vespa_query['marqo__yql.facets'] = f"{vespa_query['marqo__yql.lexical']} limit 0 | {facets_grouping}"
         return vespa_query
 
-    def _get_facets_term(self, facets_parameters: FacetsParameters, exclusions: List[str] = None) -> str:
+    def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -173,11 +173,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
-            if field_parameters.exclude is not None:
+            if field_parameters.exclude_terms is not None:
                 # We want this field to be in a separate query if any of the exclusions are not in the exclusions list
-                if exclusions is None or any([exclusion not in exclusions for exclusion in field_parameters.exclude]):
+                if exclusion_terms is None or any([exclusion_term not in exclusion_terms for exclusion_term in field_parameters.exclude_terms]):
                     continue
-            elif exclusions is not None:
+            elif exclusion_terms is not None:
                 continue
             any_field = True
             grouping_query += build_field_group(field_parameters, field_name, field_id)
@@ -191,7 +191,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return [name_to_string_array_field_map[att].string_array_field_name for att in attributes_to_retrieve if
                 name_to_string_array_field_map.get(att)]
 
-    def _get_filter_term(self, marqo_query: MarqoQuery, exclude: Optional[List[str]]=None) -> Optional[str]:
+    def _get_filter_term(self, marqo_query: MarqoQuery, exclusions_terms: Optional[List[str]]=None) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
@@ -300,7 +300,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             elif isinstance(node, search_filter.Term):
                 # Skip any terms with excluded fields
-                if exclude and node.field in exclude:
+                print(node)
+                if exclusions_terms and node in exclusions_terms:
                     return None
 
                 if isinstance(node, search_filter.EqualityTerm):

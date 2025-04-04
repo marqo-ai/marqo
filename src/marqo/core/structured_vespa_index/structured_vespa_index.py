@@ -582,16 +582,16 @@ class StructuredVespaIndex(VespaIndex):
 
             for facet_field in marqo_query.facets.fields.items():
                 facet_name, facet_parameters = facet_field
-                if facet_parameters.exclude is not None:
-                    if any(set(facet_parameters.exclude) == unique_exclusion for unique_exclusion in unique_exclusions):
+                if facet_parameters.exclude_terms is not None:
+                    if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
                         continue
-                    unique_exclusions.append(set(facet_parameters.exclude))
-                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude)
+                    unique_exclusions.append(set(facet_parameters.exclude_terms))
+                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
                     if new_filter_term:
                         new_filter_term = f' AND {new_filter_term}'
                     else:
                         new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude)
+                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
 
                     query_yql = f'{base_yql}{new_filter_term}'
 

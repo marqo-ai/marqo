@@ -24,7 +24,7 @@ class FieldFacetsConfiguration(StrictBaseModel):
     order: Optional[Literal["asc", "desc"]] = None
     max_results: Optional[int] = Field(None, alias="maxResults")
     ranges: Optional[List[RangeConfiguration]] = None
-    exclude: Optional[List[str]] = None
+    exclude_terms: Optional[List[str]] = Field(None, alias="excludeTerms")
 
     @validator('max_results')
     def validate_max_results(cls, v):
