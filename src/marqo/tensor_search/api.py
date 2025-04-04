@@ -1,8 +1,10 @@
 """The API entrypoint for Tensor Search"""
 import json
-from typing import List
+import time
+from typing import List, Optional
 
 import pydantic
+from pydantic import ValidationError
 import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -205,14 +207,19 @@ async def api_validation_exception_handler(request: Request, exc: RequestValidat
     )
 
 
-@app.exception_handler(pydantic.ValidationError)
-async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request, exc: ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
-    error_messages = [{
-        'loc': error.get('loc', ''),
-        'msg': error.get('msg', ''),
-        'type': error.get('type', '')
-    } for error in exc.errors()]
+    # For pydantic v2, the error format has changed
+    # Convert errors to the format expected by the API
+    error_messages = []
+    for error in exc.errors():
+        error_message = {
+            'loc': error.get('loc', tuple()),
+            'msg': error.get('msg', ''),
+            'type': error.get('type', '')
+        }
+        error_messages.append(error_message)
 
     body = {
         "message": json.dumps(error_messages),

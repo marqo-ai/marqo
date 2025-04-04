@@ -1,11 +1,11 @@
 import json
 from enum import Enum
 from json import JSONDecodeError
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
-from pydantic import Field, validator, root_validator
+from pydantic import Field, field_validator, model_validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
@@ -62,18 +62,21 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
     trust_remote_code: bool = Field(False, alias="trustRemoteCode")
 
-    @validator("type")
+    @field_validator("type")
     def _validate_type(cls, v):
         if v not in ["hf", "hf_stella"]:
             raise ValueError("The type of the model should be 'hf' or 'hf_stella'.")
         return v
 
-    @root_validator(pre=True, skip_on_failure=True)
-    def _validate_or_infer_pooling_method(cls, values):
+    @model_validator(mode='before')
+    def _validate_or_infer_pooling_method(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Infer the pooling_method from the model name if it is not provided.
 
         If the pooling_method is provided, return the values as is.
         """
+        if not isinstance(values, dict):
+            return values
+            
         pooling_method = values.get("pooling_method") or values.get("poolingMethod")
         if pooling_method is not None:
             return values
@@ -123,15 +126,15 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         else:
             return log_warning_and_return_default()
 
-    @root_validator(skip_on_failure=True)
-    def _validate_minimum_required_fields_to_load(cls, values):
+    @model_validator(mode='after')
+    def _validate_minimum_required_fields_to_load(self) -> 'HuggingFaceModelProperties':
         """
         Validate that at least one of 'name', 'url', or 'model_location' is provided.
         But 'url' and 'model_location' should not be provided together.
         """
-        if values.get("url") and values.get("model_location"):
+        if self.url and self.model_location:
             raise ValueError("Only one of 'url' and 'model_location' should be provided.")
-        is_custom = values.get("url") or values.get("model_location")
-        if not values.get("name") and not is_custom:
+        is_custom = self.url or self.model_location
+        if not self.name and not is_custom:
             raise ValueError("At least one of 'name', 'url', or 'model_location' should be provided.")
-        return values
+        return self

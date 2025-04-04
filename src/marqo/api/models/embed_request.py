@@ -6,52 +6,41 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import Field, root_validator
+from pydantic import Field, field_validator, model_validator
 
-from marqo.base_model import MarqoBaseModel
+from marqo.base_model import StrictBaseModel, ImmutableBaseModel
 from marqo.core.embed.embed import EmbedContentType
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
-class EmbedRequest(MarqoBaseModel):
+class EmbedRequest(StrictBaseModel):
     # content can be a single query or list of queries. Queries can be a string or a dictionary.
-    content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
+    content: Union[str, List[str], Dict[str, List[str]]]
     imageDownloadHeaders: Optional[Dict] = Field(default=None, alias="image_download_headers")
     mediaDownloadHeaders: Optional[Dict] = None
-    modelAuth: Optional[ModelAuth] = None
+    model_name: str = Field(alias="modelName", default="")
+    model_properties: Optional[Dict] = Field(alias="modelProperties", default=None)
+    model_auth: Optional[ModelAuth] = Field(alias="modelAuth", default=None)
+    normalize_embeddings: bool = Field(alias="normalizeEmbeddings", default=True)
+    return_dimensions: Optional[bool] = Field(alias="returnDimensions", default=False)
+    use_cuda: Optional[bool] = Field(alias="useCuda", default=False)
     content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")
 
-    @pydantic.validator('content')
-    def validate_content(cls, value):
-        # Iterate through content list items
-        if (isinstance(value, list) or isinstance(value, dict)) and len(value) == 0:
-            raise ValueError("Embed content list should not be empty")
+    @field_validator('content')
+    def validate_non_empty_content(cls, v):
+        """
+        For the case when content is a string, make sure it's not empty. For the case when content is a list,
+        make sure it's not empty. For the case when content is a dict, make sure there's at least one key.
+        """
+        if isinstance(v, str) and v.strip() == "":
+            raise ValueError(f"content has no text when stripped: {v}")
+        elif isinstance(v, list) and len(v) == 0:
+            raise ValueError("empty content list detected.")
+        elif isinstance(v, dict) and len(v) == 0:
+            raise ValueError("empty content dictionary detected.")
+        return v
 
-        # Convert all types of content into a list
-        if isinstance(value, str) or isinstance(value, dict):
-            list_to_validate = [value]
-        elif isinstance(value, List):
-            list_to_validate = value
-        else:
-            raise ValueError("Embed content should be a string, a dictionary, or a list of strings or dictionaries")
-
-        for item in list_to_validate:
-            if isinstance(item, str):
-                continue
-            elif isinstance(item, dict):
-                if len(item) == 0:
-                    raise ValueError("Dictionary content should not be empty")
-                for key in item:
-                    if not isinstance(key, str):
-                        raise ValueError("Keys in dictionary content should all be strings")
-                    if not isinstance(item[key], float):
-                        raise ValueError("Values in dictionary content should all be floats")
-            else:
-                raise ValueError("Embed content should be a string, a dictionary, or a list of strings or dictionaries")
-
-        return value
-
-    @root_validator(skip_on_failure=True)
+    @model_validator(mode='after')
     def _validate_image_download_headers_and_media_download_headers(cls, values):
         """Validate imageDownloadHeaders and mediaDownloadHeaders. Raise an error if both are set.
 

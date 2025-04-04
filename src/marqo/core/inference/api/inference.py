@@ -1,82 +1,88 @@
+"""Classes for the inference API."""
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List, Tuple, Union
+from enum import Enum
+from typing import Dict, Any, List, Tuple, Union, Optional
 
 import pydantic
 from numpy import ndarray
-from pydantic import StrictStr, root_validator
+from pydantic import Field, StrictStr, model_validator
 
-from marqo.base_model import ImmutableBaseModel
+from marqo.base_model import ImmutableBaseModel, StrictBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class ModelConfig(ImmutableBaseModel):
-    model_name: StrictStr = pydantic.Field(alias='modelName')
-    model_properties: Optional[Dict[str, Any]] = pydantic.Field(default=None, alias='modelProperties')
-    model_auth: Optional[ModelAuth] = pydantic.Field(default=None, alias='modelAuth')
-    normalize_embeddings: bool = pydantic.Field(default=True, alias='normalizeEmbeddings')
+    model_name: StrictStr = Field(alias='modelName')
+    model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
+    model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
+    normalize_embeddings: bool = Field(default=True, alias='normalizeEmbeddings')
 
 
 class InferenceRequest(ImmutableBaseModel):
     modality: Modality
-    contents: List[str] = pydantic.Field(min_items=1)
-    device: Optional[str] = pydantic.Field(default=None)
-    model_config: ModelConfig = pydantic.Field(alias='modelConfig')
-    preprocessing_config: PreprocessingConfigType = pydantic.Field(alias='preprocessingConfig')
-    use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
+    contents: List[str] = Field(min_items=1)
+    device: Optional[str] = Field(default=None)
+    model_config: ModelConfig = Field(alias='modelConfig')
+    preprocessing_config: PreprocessingConfigType = Field(alias='preprocessingConfig')
+    use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
-    return_individual_error: bool = pydantic.Field(default=True, alias='returnIndividualError')
+    return_individual_error: bool = Field(default=True, alias='returnIndividualError')
 
-    @root_validator(pre=False)
-    def check_preprocessing_config_matches_modality(cls, values):
-        modality: Modality = values.get('modality')
-        preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
-
-        if not modality or not preprocessing_config:
+    @model_validator(mode='after')
+    def check_preprocessing_config_matches_modality(self) -> 'InferenceRequest':
+        if not self.modality or not self.preprocessing_config:
             raise ValueError("Modality or preprocessing_config is missing")
 
-        if modality.value != preprocessing_config.modality:
-            raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
-                             f"does not support modality: {modality}")
+        if self.modality.value != self.preprocessing_config.modality:
+            raise ValueError(f"preprocessing config of type {type(self.preprocessing_config)} "
+                            f"does not support modality: {self.modality}")
 
-        return values
+        return self
+
+
+class BaseError(StrictBaseModel):
+    """Base class for errors."""
+    status_code: int = Field(default=400)
+    error_code: str = Field(default='inference_error')
+    message: str
 
 
 class InferenceErrorModel(ImmutableBaseModel):
     """
     A model class to store error information for each individual content
     """
-    status_code: int = pydantic.Field(default=400)
-    error_code: str = pydantic.Field(default='inference_error')
+    status_code: int = Field(default=400)
+    error_code: str = Field(default='inference_error')
     error_message: str
 
 
 class InferenceResult(ImmutableBaseModel):
     result: List[Union[InferenceErrorModel, List[Tuple[str, ndarray]]]]
 
-    class Config(ImmutableBaseModel.Config):
-        arbitrary_types_allowed = True
+    model_config = ImmutableBaseModel.model_config.copy()
+    model_config.update({"arbitrary_types_allowed": True})
 
 
 class Inference(ABC):
+    """
+    The Inference interface is an abstraction for the embedding generation logic.
+    """
 
     @abstractmethod
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """
         The Inference interface is an abstraction for the embedding generation logic. It takes in a list of contents
-        for a given modality (either a piece of text or a URL of a media files), downloads, chunks, preprocesses,
-        and generates embeddings using the embedding model specified in the request.
+        and returns an embedding matrix as a numpy ndarray.
 
         Args:
             request (InferenceRequest): the inference request
 
         Returns: (InferenceResult)
-            The inference result, for each content, it's either an InferenceError or A list of tuples. Each tuple
-            represents a chunk with a string-typed key and the embedding in ndarray format.
+            an inference result object either contains error message for each content, or a list of tuples (content_id, embedding)
+            where the embedding is np.ndarray
 
-        Raises:
-            InferenceError: if an error impacting the whole batch of contents occurs during inference.
         """
         pass
 

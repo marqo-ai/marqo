@@ -3,3 +3,5 @@
 msgpack==1.1.0
 msgpack_numpy==0.4.8
 python-json-logger==3.3.0
+pydantic==2.8.2
+pydantic-core==2.20.1

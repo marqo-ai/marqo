@@ -1,22 +1,29 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MarqoBaseModel(BaseModel):
-    class Config:
-        allow_population_by_field_name = True  # accept both real name and alias (if present)
-        validate_assignment = True
+    model_config = ConfigDict(
+        populate_by_name=True,  # accept both real name and alias (if present)
+        validate_assignment=True
+    )
 
 
 class StrictBaseModel(MarqoBaseModel):
-    class Config(MarqoBaseModel.Config):
-        extra = "forbid"
+    model_config = ConfigDict(
+        **MarqoBaseModel.model_config,
+        extra="forbid"
+    )
 
 
 class ImmutableBaseModel(MarqoBaseModel):
-    class Config(MarqoBaseModel.Config):
-        allow_mutation = False
+    model_config = ConfigDict(
+        **MarqoBaseModel.model_config,
+        frozen=True
+    )
 
 
 class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):
-    class Config(StrictBaseModel.Config, ImmutableBaseModel.Config):
-        pass
+    model_config = ConfigDict(
+        **StrictBaseModel.model_config,
+        **{k: v for k, v in ImmutableBaseModel.model_config.items() if k != "populate_by_name" and k != "validate_assignment"}
+    )
