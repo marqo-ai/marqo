@@ -300,7 +300,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             elif isinstance(node, search_filter.Term):
                 # Skip any terms with excluded fields
-                if exclusions_terms and node in exclusions_terms:
+                if exclusions_terms is not None and str(node) in exclusions_terms:
                     return None
 
                 if isinstance(node, search_filter.EqualityTerm):
