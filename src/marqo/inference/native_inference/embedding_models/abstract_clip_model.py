@@ -69,14 +69,14 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         self.image_preprocessor = None # The new preprocessor
 
     @abstractmethod
-    def encode_text(self, inputs: List[Tensor], normalize: bool = True) -> List[ndarray]:
+    def encode_text(self, inputs: List, normalize: bool = True) -> List[ndarray]:
         pass
 
     @abstractmethod
-    def encode_image(self, inputs: List[Tensor], normalize: bool = True) -> List[ndarray]:
+    def encode_image(self, inputs: List, normalize: bool = True) -> List[ndarray]:
         pass
 
-    def encode(self, inputs: List[Tensor], modality: Modality, normalize=True) -> List[ndarray]:
+    def encode(self, inputs: List, modality: Modality, normalize=True) -> List[ndarray]:
         if modality == Modality.IMAGE:
             return self.encode_image(inputs, normalize=normalize)
         elif modality == Modality.TEXT:
