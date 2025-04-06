@@ -48,7 +48,6 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
     def setUpClass(cls):
         super().setUpClass()
 
-
     def setUp(self):
         super().setUp()
         self.model = load_model(
@@ -84,9 +83,9 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
                 )
                 self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
 
-    def test_open_clip_encode_text_normalized(self):
+    def test_multilingual_clip_encode_text_normalized(self):
         """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
+        A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to True.
         """
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
@@ -109,9 +108,9 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
-    def test_open_clip_encode_image_normalized(self):
+    def test_multilingual_clip_encode_image_normalized(self):
         """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
+        A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to True.
         """
         image_urls = [
@@ -140,19 +139,12 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
-
     @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
-    def test_open_clip_encode_text_not_normalized(self, mock_autocast):
+    def test_multilingual_clip_encode_text_not_normalized(self, mock_autocast):
         """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
+        A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to False.
         """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
-
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
         tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
@@ -175,17 +167,12 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
 
         mock_autocast.assert_not_called()
 
-    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
-    def test_open_clip_encode_image_not_normalized(self, mock_autocast):
+    @patch("marqo.inference.native_inference.embedding_models.multilingual_clip_model.torch.cuda.amp.autocast")
+    def test_multilingual_clip_encode_image_not_normalized(self, mock_autocast):
         """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
-        normalize is set to False.
+        A test to ensure that the multilingual clip models generates the same embeddings as the pipeline for image
+        inputs when normalize is set to False.
         """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
 
         image_urls = [
             TestImageUrls.IMAGE0.value,
@@ -213,4 +200,4 @@ class TestMULTILINGUALClipModelEncode(InferenceTestCase):
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
 
-        mock_autocast.assert_not_called()
+        mock_autocast.assert_called()
