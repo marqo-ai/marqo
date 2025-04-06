@@ -83,8 +83,9 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         )
 
         self._textual_model = pt_multilingual_clip.MultilingualCLIP.from_pretrained(
-            self.model_properties.textual_model, self.device
-        )
+            self.model_properties.textual_model
+        ).to(self.device)
+
         self._tokenizer = MultiLingualCLIPTokenizerWrapper(
             tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_properties.textual_model),
             device= self.device
@@ -142,8 +143,6 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         """
 
         images = torch.cat(images, dim=0)
-
-
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
