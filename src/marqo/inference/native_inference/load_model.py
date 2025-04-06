@@ -344,7 +344,7 @@ def _load_model(
     #  once we have all models refactored
     if model_type in (
             ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind,
-            ModelType.Random
+            ModelType.Random, ModelType.MultilingualClip
     ):
         model = loader(
             device=device,

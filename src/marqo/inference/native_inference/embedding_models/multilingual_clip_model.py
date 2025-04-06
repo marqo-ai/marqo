@@ -33,11 +33,11 @@ class MultiLingualCLIPTokenizerWrapper:
         self.tokenizer = tokenizer
         self.device = device
 
-    def __call__(self, inputs: list[str]):
-        return self.tokenize(inputs)
+    def __call__(self, inputs: list[str], padding: bool = True, return_tensors: str = "pt"):
+        return self.tokenize(inputs, padding=padding, return_tensors=return_tensors)
 
-    def tokenize(self, inputs: list[str]):
-        return self.tokenizer(inputs, padding=True, return_tensors="pt").to(self.device)
+    def tokenize(self, inputs: list[str], padding: bool = True, return_tensors: str = "pt"):
+        return self.tokenizer(inputs, padding=padding, return_tensors=return_tensors).to(self.device)
 
 
 class MultiLingualCLIPPreprocessor(AbstractCLIPPreprocessor):
@@ -91,8 +91,8 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         )
 
         self._preprocessor = MultiLingualCLIPPreprocessor(
-            tokenizer=self.tokenizer,
-            image_preprocessor=self.image_preprocessor,
+            tokenizer=self._tokenizer,
+            image_preprocessor=self._image_preprocessor,
             device=self.device
         )
 
@@ -131,7 +131,7 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
 
         return self._convert_output(outputs)
 
-    def encode_image(self, inputs: List[Tensor], normalize: bool = True) -> List[ndarray]:
+    def encode_image(self, images: List[Tensor], normalize: bool = True) -> List[ndarray]:
         """
         Args:
             inputs:
@@ -140,12 +140,17 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         Returns:
 
         """
+
+        images = torch.cat(images, dim=0)
+
+
+
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self._visual_model.encode_image(inputs).to(torch.float32)
+                    outputs = self._visual_model.encode_image(images).to(torch.float32)
             else:
-                outputs = self._visual_model.encode_image(inputs).to(torch.float32)
+                outputs = self._visual_model.encode_image(images).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
