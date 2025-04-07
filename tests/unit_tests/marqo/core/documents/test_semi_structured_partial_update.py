@@ -5,8 +5,6 @@ from marqo.core.semi_structured_vespa_index.semi_structured_document import Semi
 
 
 class TestSemiStructuredPartialUpdate(MarqoTestCase):
-
-
     def _semistructured_index_creation_helper(self, marqo_version: str):
         """Only used for testing the vespa document creation. You can only have one 'test_field'
         field in the document."""
