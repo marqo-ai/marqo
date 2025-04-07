@@ -35,6 +35,9 @@ class TestLargeMultilingualCLIPModelEncode(InferenceTestCase):
         super().tearDownClass()
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent.parent.parent
         json_file = target_dir / "embeddings_reference" / "embeddings_multilingual_clip_python_3_9.json"
@@ -43,10 +46,6 @@ class TestLargeMultilingualCLIPModelEncode(InferenceTestCase):
 
         with open(json_file, 'r') as f:
             cls.multilingual_clip_embeddings_reference = json.load(f)
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
 
     def setUp(self):
         super().setUp()
