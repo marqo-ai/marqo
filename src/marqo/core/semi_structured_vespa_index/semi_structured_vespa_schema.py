@@ -13,6 +13,7 @@ class SemiStructuredVespaSchema(VespaSchema):
     FIELD_CHUNKS_PREFIX = 'marqo__chunks_'
     FIELD_EMBEDDING_PREFIX = 'marqo__embeddings_'
     FIELD_STRING_ARRAY_PREFIX = 'marqo__string_array_'
+    SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION = semver.VersionInfo.parse("2.16.0")
 
     def __init__(self, index_request: UnstructuredMarqoIndexRequest):
         self._index_request = index_request
@@ -27,7 +28,7 @@ class SemiStructuredVespaSchema(VespaSchema):
     def generate_vespa_schema(cls, marqo_index: SemiStructuredMarqoIndex) -> str:
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
-        if marqo_index.index_supports_partial_updates:
+        if marqo_index.parsed_marqo_version() >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION:
             vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template_2_16.sd.jinja2")
         else:
             vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")

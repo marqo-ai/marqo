@@ -57,3 +57,5 @@ QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
 
 VESPA_DOC_HYBRID_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
 VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
+
+SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION = semver.VersionInfo.parse("2.16.0") #Denotes the Marqo version from which partial update support for semi-structured index was added
