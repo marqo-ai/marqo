@@ -611,6 +611,13 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
 
         return self._cache_or_get('tensor_subfield_map', generate)
 
+    @property
+    def index_supports_partial_updates(self) -> bool:
+        """
+        Check if the index supports partial updates.
+        """
+        return self.parsed_marqo_version() >= semver.VersionInfo.parse("2.16.0")
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'

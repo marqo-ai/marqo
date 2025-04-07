@@ -12,8 +12,8 @@ from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResp
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
-from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION, \
-    VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
+from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, \
+    VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
     SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
@@ -117,7 +117,7 @@ class Document:
         elif marqo_index.type is IndexType.Structured:
             pass
         elif marqo_index.type is IndexType.SemiStructured:
-            if marqo_index.parsed_marqo_version() < SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION: # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
+            if not marqo_index.index_supports_partial_updates: # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
                 raise UnsupportedFeatureError("Partial document update is not supported for this index version. "
                                           "Please upgrade the index version, or create a new index to use this feature.")
         else:
