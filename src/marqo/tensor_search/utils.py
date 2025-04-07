@@ -247,6 +247,9 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
                 # Clean up flags
                 opening_quote_idx = None
                 current_quote_pair_is_faulty = False
+        else:
+            # If not a special character, add to blob
+            blob += text[i]
 
     # Unpaired quote will be turned to whitespace
     if opening_quote_idx is not None:
