@@ -116,9 +116,10 @@ class Document:
         elif marqo_index.type is IndexType.SemiStructured:
             if not marqo_index.index_supports_partial_updates: # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
                 raise UnsupportedFeatureError(
-                    f"Partial document update is not supported for this index version {marqo_index.version}. "
-                    f"The minimum version required is 2.16.0. "
-                    f"Please upgrade the index version, or create a new index to use this feature")
+                    f"The 'update_documents' endpoint for an unstructured index "
+                    f"is only supported for indexes created with Marqo version 2.16.0 or "
+                    f"later. This index was created with Marqo {marqo_index.version}."
+                )
         else:
             raise ValueError(f"Invalid index type: {marqo_index.type}")
 
