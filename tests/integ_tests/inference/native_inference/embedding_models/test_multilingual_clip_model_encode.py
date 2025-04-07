@@ -32,6 +32,10 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
         super().tearDownClass()
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent.parent.parent
         json_file = target_dir / "embeddings_reference" / "embeddings_multilingual_clip_python_3_9.json"
@@ -40,10 +44,6 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
 
         with open(json_file, 'r') as f:
             cls.multilingual_clip_embeddings_reference = json.load(f)
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
 
 
     def setUp(self):
@@ -108,7 +108,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
 
     def test_multilingual_clip_encode_image_normalized(self):
         """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
+        A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for image inputs when
         normalize is set to True.
         """
         image_urls = [
@@ -138,7 +138,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
 
-    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
+    @patch("marqo.inference.native_inference.embedding_models.multilingual_clip_model.torch.cuda.amp.autocast")
     def test_multilingual_clip_encode_text_not_normalized(self, mock_autocast):
         """
         A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for text inputs when

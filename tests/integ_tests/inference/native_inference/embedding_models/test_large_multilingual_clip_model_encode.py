@@ -138,7 +138,7 @@ class TestLargeMultilingualCLIPModelEncode(InferenceTestCase):
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
-    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
+    @patch("marqo.inference.native_inference.embedding_models.multilingual_clip_model.torch.cuda.amp.autocast")
     def test_multilingual_clip_encode_text_not_normalized(self, mock_autocast):
         """
         A test to ensure that the multilingual_clip model generates the same embeddings as the pipeline for text inputs when
