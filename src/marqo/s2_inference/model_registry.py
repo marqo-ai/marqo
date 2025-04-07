@@ -2297,8 +2297,8 @@ def _get_multilingual_clip_properties() -> Dict:
                 "dimensions": 768,
                 "type": "multilingual_clip",
             },
-
         "multilingual-clip/XLM-R Large Vit-B/16+":
+            # Deprecated model name
             {
                 "name": "multilingual-clip/XLM-R Large Vit-B/16+",
                 "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
@@ -2306,7 +2306,16 @@ def _get_multilingual_clip_properties() -> Dict:
                 "dimensions": 640,
                 "type": "multilingual_clip",
             },
-
+        "multilingual-clip/XLM-Roberta-Large-Vit-B-16Plus":
+            # This model is exactly the same as the one above, but with a different name to avoid
+            # spaces and '+' in the name.
+            {
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
+            },
         "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
             {
                 "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
