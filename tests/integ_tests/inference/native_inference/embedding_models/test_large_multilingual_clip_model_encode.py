@@ -18,7 +18,7 @@ LARGE_MULTILINGUAL_CLIP_TEST_MODELS = [
 
 @pytest.mark.largemodel
 @parameterized_class([{"model_name": model_name} for model_name in LARGE_MULTILINGUAL_CLIP_TEST_MODELS])
-class TestMULTILINGUALClipModelEncode(InferenceTestCase):
+class TestLargeMultilingualCLIPModelEncode(InferenceTestCase):
     """
     Tests for multilingual CLIP models, on a CPU device.
     """
