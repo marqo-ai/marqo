@@ -1,13 +1,11 @@
 from timeit import default_timer as timer
 from typing import Dict, List, Tuple, Optional
 
-import semver
-
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError, MarqoDocumentParsingError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
     UnstructuredMarqoIndex
@@ -26,7 +24,6 @@ from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
-from marqo.version import get_version
 
 logger = get_logger(__name__)
 
@@ -118,8 +115,10 @@ class Document:
             pass
         elif marqo_index.type is IndexType.SemiStructured:
             if not marqo_index.index_supports_partial_updates: # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
-                raise UnsupportedFeatureError("Partial document update is not supported for this index version. "
-                                          "Please upgrade the index version, or create a new index to use this feature.")
+                raise UnsupportedFeatureError(
+                    f"Partial document update is not supported for this index version {marqo_index.version}. "
+                    f"The minimum version required is 2.16.0. "
+                    f"Please upgrade the index version, or create a new index to use this feature")
         else:
             raise ValueError(f"Invalid index type: {marqo_index.type}")
 
