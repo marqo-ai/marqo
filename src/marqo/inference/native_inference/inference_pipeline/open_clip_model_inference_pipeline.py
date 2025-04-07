@@ -15,7 +15,6 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
     def __init__(self, model: OpenCLIPModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
-
     def run_pipeline(self) -> InferenceResult:
         preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
 
@@ -45,7 +44,7 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
                 self.inference_request.return_individual_error
             )
         else:
-            raise ValueError(f"Unsupported modality: {modality}")
+            raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
         return results
 
     def _encode_processed_content(self, preprocessed_content_list: List[OpenCLIPPreprocessedContent]) -> List[
