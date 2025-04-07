@@ -10,7 +10,7 @@ import pytest
 import requests
 import semver
 
-from compatibility_test_logger import get_logger
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 from tests.compatibility_tests.docker_manager import DockerManager
 
