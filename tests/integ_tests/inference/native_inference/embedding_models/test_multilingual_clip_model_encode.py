@@ -8,6 +8,7 @@ from integ_tests.inference.inference_test_case import *
 from integ_tests.marqo_test import TestImageUrls
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
+from unittest import mock
 
 MULTILINGUAL_CLIP_TEST_MODELS = [
     "multilingual-clip/XLM-Roberta-Large-Vit-B-32"
@@ -31,6 +32,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
     def tearDownClass(cls):
         super().tearDownClass()
         clear_loaded_models()
+        cls.device_patcher.stop()
 
     @classmethod
     def setUpClass(cls):
@@ -44,6 +46,14 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
 
         with open(json_file, 'r') as f:
             cls.multilingual_clip_embeddings_reference = json.load(f)
+
+        # Temporarily set the MARQO_MAX_CPU_MODEL_MEMORY environment variable to 15 to load the
+        # multilingual clip model on CPU.
+        cls.device_patcher = mock.patch.dict(os.environ, {
+            "MARQO_MAX_CPU_MODEL_MEMORY": "15"
+        })
+
+        cls.device_patcher.start()
 
 
     def setUp(self):
