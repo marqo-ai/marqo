@@ -12,7 +12,7 @@ from marqo.inference.native_inference.load_model import load_model, clear_loaded
 
 LARGE_MULTILINGUAL_CLIP_TEST_MODELS = [
     "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
-    "multilingual-clip/XLM-Roberta-Large-Vit-B-16Plus"
+    "multilingual-clip/XLM-Roberta-Large-Vit-B-16Plus",
     "multilingual-clip/LABSE-Vit-L-14"
 ]
 
