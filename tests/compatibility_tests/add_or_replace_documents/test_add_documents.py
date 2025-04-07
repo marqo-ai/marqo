@@ -1,12 +1,20 @@
 import traceback
+from typing import List, Dict
 
 import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
+from marqo.errors import MarqoWebError
 
 @pytest.mark.marqo_version('2.0.0')
 class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
     """
-    This class tests the add_documents API on both structured and unstructured indexes
+    This class tests document API operations on both structured and unstructured indexes:
+    - get_document
+    - delete_documents 
+    - add_documents
+    
+    All operations are performed in a single test method to control execution sequence
+    and avoid interference with other tests.
     """
     structured_index_name = "test_add_doc_api_structured_index"
     unstructured_index_name = "test_add_doc_api_unstructured_index"
@@ -40,6 +48,20 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
         "_id": "article_591",
         "Genre": "Science"
     }]
+    
+    new_docs = [{
+        "Title": "The Odyssey",
+        "Description": "Ancient Greek epic poem attributed to Homer",
+        "Genre": "Epic poetry",
+        "_id": "article_701"
+    },
+    {
+        "Title": "Quantum Computing Basics",
+        "Description": "An introduction to quantum computing principles",
+        "_id": "article_702",
+        "Genre": "Science"
+    }]
+    
     @classmethod
     def tearDownClass(cls) -> None:
         cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
@@ -90,28 +112,58 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
         self.save_results_to_file(all_results)
 
     def test_add_doc(self):
-        self.logger.info(f"Running test_add_doc on {self.__class__.__name__}")
-        stored_results = self.load_results_from_file()
-        test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
-
+        """
+        Tests all document API operations in a controlled sequence:
+        1. get_document - Verifies initial documents can be retrieved
+        2. delete_documents - Tests document deletion functionality
+        3. add_documents - Tests adding new documents after deletion
+        """
+        self.logger.info(f"Running document API tests on {self.__class__.__name__}")
 
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
-            for doc in self.text_docs:
-                doc_id = doc['_id']
-                try:
-                    with self.subTest(index=index_name, doc_id=doc_id):
-                        expected_doc = stored_results[index_name][doc_id]
-                        actual_doc = self.client.index(index_name).get_document(doc_id)
-                        self.assertEqual(expected_doc, actual_doc)
-
-                except Exception as e:
-                    test_failures.append((index_name, doc_id, traceback.format_exc()))
-
-        # After all subtests, raise a comprehensive failure if any occurred
-        if test_failures:
-            failure_message = "\n".join([
-                f"Failure in index_name: {idx}, doc_id: {doc_id}: {error}"
-                for idx, doc_id, error in test_failures
-            ])
-            self.fail(f"Some subtests failed:\n {failure_message}")
+            
+            with self.subTest(index=index_name, operation="get_document"):
+                # Step 1: Test get_document
+                self.logger.info(f"Testing get_document on {index_name}")
+                stored_results = self.load_results_from_file()
+                
+                for doc in self.text_docs:
+                    doc_id = doc['_id']
+                    expected_doc = stored_results[index_name][doc_id]
+                    actual_doc = self.client.index(index_name).get_document(doc_id)
+                    self.assertEqual(expected_doc, actual_doc)
+            
+            # Step 2: Test delete_documents
+            with self.subTest(index=index_name, operation="delete_documents"):
+                self.logger.info(f"Testing delete_documents on {index_name}")
+                doc_ids = [doc['_id'] for doc in self.text_docs]
+                
+                # Delete documents
+                delete_result = self.client.index(index_name).delete_documents(ids=doc_ids)
+                self.assertEqual(len(doc_ids), delete_result.get('deleted', 0))
+                
+                # Verify documents are deleted
+                for doc_id in doc_ids:
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).get_document(doc_id)
+                    self.assertEqual(404, e.status_code)
+            
+            # Step 3: Test add_documents
+            with self.subTest(index=index_name, operation="add_documents"):
+                self.logger.info(f"Testing add_documents on {index_name}")
+                
+                # Add new documents
+                if index.get("type") is not None and index.get('type') == 'structured':
+                    add_result = self.client.index(index_name=index_name).add_documents(documents=self.new_docs)
+                else:
+                    add_result = self.client.index(index_name=index_name).add_documents(
+                        documents=self.new_docs,
+                        tensor_fields=["Description", "Genre", "Title"]
+                    )
+                
+                # Verify documents are added correctly
+                for doc in self.new_docs:
+                    doc_id = doc['_id']
+                    retrieved_doc = self.client.index(index_name).get_document(doc_id)
+                    self.assertEqual(doc, retrieved_doc) 
