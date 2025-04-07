@@ -602,7 +602,7 @@ class VespaClient:
             200: (200, None),
             404: (404, "Document does not exist in the index"),
             412: (400, "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details"), # Update documents get 412 from Vespa for document not found as we use condition
-            429: (429, "Marqo vector store receives too many requests. Please try again later"),
+            429: (429, "Marqo vector store received too many requests. Please try again later"),
             507: (400, "Marqo vector store is out of memory or disk space"),
         }
 
@@ -614,7 +614,7 @@ class VespaClient:
         else:
             logger.error(f"An unexpected error occurred from the Vespa document response. "
                          f"status: {status}, message: {message}")
-            return 500, f"Marqo vector store returns an unexpected error with this document. Original error: {message}"
+            return 500, f"Marqo vector store returned an unexpected error with this document. Original error: {message}"
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
