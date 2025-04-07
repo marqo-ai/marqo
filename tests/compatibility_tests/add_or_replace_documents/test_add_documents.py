@@ -51,10 +51,10 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-        self.logger.debug(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
+        self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
 
-        self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+        self.logger.info(f'Feeding documents to {self.indexes_to_test_on}')
 
         errors = []  # Collect errors to report them at the end
 
@@ -102,7 +102,6 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
                 try:
                     with self.subTest(index=index_name, doc_id=doc_id):
                         expected_doc = stored_results[index_name][doc_id]
-                        self.logger.debug(f"Printing expected doc {expected_doc}")
                         actual_doc = self.client.index(index_name).get_document(doc_id)
                         self.assertEqual(expected_doc, actual_doc)
 
