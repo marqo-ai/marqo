@@ -112,7 +112,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
@@ -143,7 +143,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
@@ -170,7 +170,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
 
@@ -204,7 +204,7 @@ class TestMultilingualCLIPModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
 
