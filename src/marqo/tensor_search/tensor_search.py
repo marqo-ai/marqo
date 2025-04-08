@@ -662,7 +662,7 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
         if group.children is None:
             continue
         for field in group.children:
-            field_name = _extract_field_name(field.id, facets)
+            field_name = _extract_facet_field_name(field.id, facets)
             facets_response.setdefault(field_name, {})
 
             for value in field.children:
@@ -670,12 +670,30 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
                 processed_stats = _process_value_stats(value.fields)
 
                 if group_type == 'string':
-                    facets_response[field_name][value_key] = processed_stats
-                elif group_type == 'long':
-                    facets_response[field_name] = processed_stats
-                else:
+                    if value_key[0] == '' and processed_stats["count"] == 1:
+                        # Vespa's value for not found
+                        continue
+                    # values might be nested deeply if user data is stored as a.b.c
+                    current_level = facets_response[field_name]
+                    for key in value_key:
+                        if key not in current_level:
+                            current_level[key] = {}
+                        current_level = current_level[key]
+                    current_level.update(processed_stats)
+                elif group_type == 'long': # int or float
+                    if any(value == -9223372036854775808 for value in processed_stats.values()):
+                        # Vespa's value for null
+                        continue
+                    # aggregate statistic between int and float
+                    facets_response[field_name] = _combine_number_stats(
+                        facets_response.get(field_name, {}), processed_stats
+                    )
+                elif group_type != "null":
+                    if any(value == -9223372036854775808 for value in processed_stats.values()):
+                        # Vespa's value for null for int and float
+                        continue
                     _process_range_facets(
-                        field_name, value_key, processed_stats,
+                        field_name, value_key[0], processed_stats,
                         facet_field_map, facets_response
                     )
 
@@ -693,10 +711,16 @@ def _build_field_map(facets: FacetsParameters) -> Dict[str, Any]:
         for facet_field in facets.fields.items()
     }
 
-def _extract_field_name(field_id: str, facets: FacetsParameters) -> str:
-    """Extract the field name from a Vespa field ID."""
+def _extract_facet_field_name(field_id: str, facets: FacetsParameters) -> str:
+    """Extract the facet field name from a Vespa field ID."""
+    if "marqo__string_array_" in field_id:
+        # strip group:marqo__string_array_ part of name
+        return field_id[30:]
     if "marqo" not in field_id:
-        group_index = int(field_id.split(':')[1])
+        if "neg" in field_id:  # :neg(n) - when combining
+            group_index = int(field_id.split(':')[1][4:-1])
+        else:
+            group_index = int(field_id.split(':')[1])
         return next(iter(facet_field_name for i, facet_field_name in enumerate(facets.fields.keys()) if i == group_index))
         # return facets.fields.items()[group_index][0]
     return field_id.split('{')[1].split('}')[0].strip('"')
@@ -704,11 +728,24 @@ def _extract_field_name(field_id: str, facets: FacetsParameters) -> str:
 def _parse_value_id(value_id: str) -> Tuple[str, str]:
     """Parse a Vespa value ID into group type and value key."""
     parts = value_id.split(':')
-    return parts[-2], parts[-1]
+    return parts[1], parts[2:]
 
 def _process_value_stats(fields: Dict) -> Dict:
     """Process field statistics, removing Vespa-specific suffixes."""
     return {k.split('(')[0]: v for k, v in fields.items()}
+
+def _combine_number_stats(current_stats, stats):
+    print(current_stats, stats)
+    if current_stats == {}:
+        return stats
+    aggregated_stats = {}
+    aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
+    aggregated_stats["count"] = current_stats["count"] + stats["count"]
+    aggregated_stats["avg"] = (current_stats["avg"] + stats["avg"]) / 2
+    aggregated_stats["min"] = min(current_stats["min"], stats["min"])
+    aggregated_stats["max"] = max(current_stats["max"], stats["max"])
+    return aggregated_stats
+
 
 def _process_range_facets(
         field_name: str,
@@ -726,7 +763,9 @@ def _process_range_facets(
         if (value_key == "Infinity" and facet_range.to_ is None) or float(value_key) == facet_range.to_:
             range_name = _get_range_name(facet_range, value_key)
             if range_name:
-                response[field_name][range_name] = stats, (facet_range.to_ if facet_range.to_ else float('inf'))
+                aggregated_stats = _combine_number_stats(response.get(field_name, {}).get(range_name, ({}, None))[0], stats)
+                # store ranges as stats, to_value to then sort and return from lower to higher.
+                response[field_name][range_name] = aggregated_stats, (facet_range.to_ if facet_range.to_ else float('inf'))
 
 def _get_range_name(facet_range: Any, value_key: str) -> Optional[str]:
     """Get the name for a range facet."""

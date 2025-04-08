@@ -93,13 +93,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
-    def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
-        vespa_query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
-        # if marqo_query.facets is not None:
-        #     facets_grouping = self._get_facets_term(marqo_query.facets)
-            # vespa_query['marqo__yql.facets'] = f"{vespa_query['marqo__yql.lexical']} limit 0 | {facets_grouping}"
-        return vespa_query
-
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
@@ -107,7 +100,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         FIELD_TYPES = {
             "int": INT_FIELDS,
             "float": FLOAT_FIELDS,
-            "string": SHORT_STRINGS_FIELDS
+            "string": SHORT_STRINGS_FIELDS,
+            "array": STRING_ARRAY,
         }
 
         global_max_results = facets_parameters.max_results or ""
@@ -130,15 +124,18 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             elif global_sort_order:
                 prefix = '-' if global_sort_order == 'desc' else ''
                 parts.append(f"order({prefix}count())")
+            else:
+                parts.append("order(-count())")
 
             return " ".join(parts)
 
-        def build_group_expression(field_config, field_name, field_id) -> str:
+        def build_group_expression(field_config, field_name, field_id, field_type_overwrite=None) -> str:
             """Build the group expression for a field."""
-            field_type = FIELD_TYPES[field_config.type]
+
+            field_type = FIELD_TYPES[field_type_overwrite if field_type_overwrite else field_config.type]
 
             # Handle numeric fields with ranges
-            if field_config.type in ["int", "float"] and field_config.ranges:
+            if field_type in [INT_FIELDS, FLOAT_FIELDS] and field_config.ranges:
                 buckets = []
                 for range_config in field_config.ranges:
                     from_val = range_config.from_ if range_config.from_ is not None else "-inf"
@@ -146,30 +143,35 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     buckets.append(f'bucket({from_val}, {to_val})')
                 return f'predefined({field_type}{{"{field_name}"}}, {", ".join(buckets)})'
 
-            # Handle fields without ranges
-            return str(field_id) if field_config.type in ["int", "float"] else f'{field_type}{{"{field_name}"}}'
+            elif field_type == STRING_ARRAY:
+                return f"{STRING_ARRAY}_{field_name}"
 
-        def build_field_group(field_config, field_name, field_id) -> str:
+            # Handle fields without ranges
+            return str(field_id) if field_type in [INT_FIELDS, FLOAT_FIELDS] else f'{field_type}{{"{field_name}"}}'
+
+        def build_field_group(field_config, field_name, field_id, field_type_overwrite=None) -> str:
             """Build the complete group request for a field."""
-            group_expr = build_group_expression(field_config, field_name, field_id)
+            group_expr = build_group_expression(field_config, field_name, field_id, field_type_overwrite)
             params = build_group_parameters(field_config)
 
             # Build output expression
-            if field_config.type in ["int", "float"]:
+            if field_config.type == "number":
                 aggregations = ["sum", "avg", "min", "max"]
-                funcs = [f'{func}({FIELD_TYPES[field_config.type]}{{"{field_name}"}})' for func in aggregations]
+                field_type = FIELD_TYPES[field_type_overwrite]
+                funcs = [f'{func}({field_type}{{"{field_name}"}})' for func in aggregations]
                 funcs.append("count()")
                 output = f"each(output({', '.join(funcs)}))"
             else:
                 output = "each(output(count()))"
 
-            return f"all(group({group_expr}) {params} {output})"
+            return f"all(group({group_expr}) {params} {output}) "
 
         # Start building the overall grouping query.
         grouping_query = "all( "
-        any_field = False
+        any_field = False # when exclusions are present, we need to check if any field is included in the default query
         if facets_parameters.max_depth is not None:
             grouping_query += f"max({facets_parameters.max_depth}) "
+            # all(max(n) - state of grouping query
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
@@ -180,10 +182,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             elif exclusion_terms is not None:
                 continue
             any_field = True
-            grouping_query += build_field_group(field_parameters, field_name, field_id)
+            if field_parameters.type == "number":
+                # we build 2 queries for number: flot and int
+                grouping_query += build_field_group(field_parameters, field_name, field_id, field_type_overwrite="int")
+                grouping_query += build_field_group(field_parameters, field_name, f"-{field_id}", field_type_overwrite="float")
+            else:
+                grouping_query += build_field_group(field_parameters, field_name, field_id)
 
         grouping_query += ")"
-        return grouping_query if any_field else None
+        return grouping_query if any_field else None # None if default query is empty (all queries have exclusions)
 
 
     def _get_string_array_attributes_to_retrieve(self, attributes_to_retrieve: List) -> List[str]:

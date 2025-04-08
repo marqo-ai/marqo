@@ -20,7 +20,7 @@ class RangeConfiguration(StrictBaseModel):
 class FieldFacetsConfiguration(StrictBaseModel):
     class Config:
         allow_population_by_field_name = False # disable ability to pass max_results, only alias
-    type: Literal["int", "string", "float"]
+    type: Literal["string", "array", "number"]
     order: Optional[Literal["asc", "desc"]] = None
     max_results: Optional[int] = Field(None, alias="maxResults")
     ranges: Optional[List[RangeConfiguration]] = None
