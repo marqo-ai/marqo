@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 
 from pydantic import Field
 
@@ -18,10 +18,11 @@ from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARA
 def generate_uuid_str() -> str:
     return str(uuid.uuid4()).replace('-', '')
 
+
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
-    version_uuid: str = Field(default_factory=generate_uuid_str, alias=common.VESPA_DOC_VERSION_UUID)
+    version_uuid: Optional[str] = Field(default_factory=None, alias=common.VESPA_DOC_VERSION_UUID)
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY) # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
@@ -78,9 +79,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 # Lexical fields are returned with original name from search
                 text_fields[field_name] = fields[field_name]
 
-        index_supports_partial_updates = marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
-
-        if index_supports_partial_updates:
+        if marqo_index.index_supports_partial_updates:
             for field_name in fields:
                 # Process tensor and text fields
                 process_field(field_name, fields)
@@ -184,7 +183,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             }
             vespa_doc = SemiStructuredVespaDocument.from_marqo_document(doc, index)
         """
-        index_supports_partial_updates = (marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
+        index_supports_partial_updates = marqo_index.index_supports_partial_updates
         if index_constants.MARQO_DOC_ID not in document:
             # Please note we still use unstructured in the error message since it will be exposed to user
             raise MarqoDocumentParsingError(
@@ -192,7 +191,14 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 f"This should be assigned for a valid document")
 
         doc_id = document[index_constants.MARQO_DOC_ID]
-        instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id), index_supports_partial_updates=index_supports_partial_updates)
+        instance = cls(
+            id=doc_id,
+            fixed_fields=SemiStructuredVespaDocumentFields(
+                marqo__id=doc_id,
+                version_uuid=generate_uuid_str() if index_supports_partial_updates else None,
+            ),
+            index_supports_partial_updates=index_supports_partial_updates
+        )
 
         # Process regular fields
         cls._process_regular_fields(document, instance, marqo_index, doc_id)
