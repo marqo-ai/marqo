@@ -97,7 +97,7 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     outputs:
       image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
-    environment: marqo-build-environment
+
 
     steps:
       - name: Set input variables

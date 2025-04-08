@@ -1,19 +1,17 @@
 import argparse
 import importlib
 import pkgutil
-import time
-
-import pytest
-from typing import Set
 import subprocess
 import sys
+from enum import Enum
+from typing import Set
+
+import pytest
 import requests
 import semver
-import requests
 
 from compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
-from enum import Enum
 from tests.compatibility_tests.docker_manager import DockerManager
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
