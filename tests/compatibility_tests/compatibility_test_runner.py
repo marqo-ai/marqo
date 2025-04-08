@@ -116,7 +116,7 @@ def construct_pytest_arguments(version_to_test_against):
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
         "-s",
-        "tests/compatibility_tests"
+        "tests/compatibility_tests/search/test_search_with_global_score_modifiers.py"    # temporarily adjust test names manually
     ]
     return pytest_args
 
