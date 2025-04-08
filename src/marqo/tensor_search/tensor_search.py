@@ -693,7 +693,7 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
                         # Vespa's value for null for int and float
                         continue
                     _process_range_facets(
-                        field_name, value_key[0], processed_stats,
+                        field_name, value_key[1], processed_stats,
                         facet_field_map, facets_response
                     )
 
@@ -735,7 +735,6 @@ def _process_value_stats(fields: Dict) -> Dict:
     return {k.split('(')[0]: v for k, v in fields.items()}
 
 def _combine_number_stats(current_stats, stats):
-    print(current_stats, stats)
     if current_stats == {}:
         return stats
     aggregated_stats = {}
