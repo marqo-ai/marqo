@@ -4,7 +4,8 @@ from unittest.mock import patch, MagicMock
 import requests
 
 from marqo.core.inference.api import Modality
-from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality
+from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, _infer_modality_based_on_extension, \
+    get_url_file_extension
 
 
 class TestMultimodalUtils(unittest.TestCase):
@@ -88,3 +89,29 @@ class TestMultimodalUtils(unittest.TestCase):
 
     def test_infer_modality_empty_bytes(self):
         self.assertEqual(infer_modality(b''), Modality.TEXT)
+
+    def test_infer_modality_extension_with_query_parameters(self):
+        test_cases = [
+            # Correct cases with query parameters
+            ("https://example.com/image.jpg?query=string", Modality.IMAGE, "Simple image URL with one query param"),
+            ("https://example.com/video.mp4?foo=bar&baz=qux", Modality.VIDEO, "Video URL with multiple query params"),
+            ("https://example.com/audio.mp3?abc=def&123=456", Modality.AUDIO,
+             "Audio URL with numeric and alpha query params"),
+
+            # Correct cases with more complex URLs
+            ("https://example.com/photo.jpeg?weirdparam=??&another=##", Modality.IMAGE,
+             "Valid image with strange query parameters"),
+            ("https://example.com/sound.mp3?", Modality.AUDIO, "Valid audio with empty query string"),
+            ("https://example.com/clip.mp4#fragment", Modality.VIDEO, "Video URL with fragment identifier"),
+
+            # Edge cases: missing or no extension
+            ("https://example.com/file.unknown?param=test", None, "Unknown extension should return None"),
+            ("https://example.com/no_extension?query=data", None, "URL with no extension should return None"),
+            ("https://example.com/imagejpg?query=string", None,
+             "URL with incorrect extension format (missing dot) should return None"),
+        ]
+
+        for url, expected_modality, message in test_cases:
+            with self.subTest(msg=message, url=url):
+                inferred_modality = _infer_modality_based_on_extension(get_url_file_extension(url))
+                self.assertEqual(expected_modality, inferred_modality)

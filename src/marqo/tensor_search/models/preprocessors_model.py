@@ -1,7 +1,7 @@
 from typing import Optional, Any
 
 from marqo.base_model import MarqoBaseModel
-from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.core.inference.modality_utils import Modality
 
 
 class Preprocessors(MarqoBaseModel):
