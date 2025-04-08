@@ -11,9 +11,9 @@ class TestDocumentAPIv2_0(BaseCompatibilityTestCase):
     """
     This class tests document API operations on both structured and unstructured indexes:
     - get_document
-    - delete_documents 
+    - delete_documents
     - add_documents
-    
+
     All operations are performed in a single test method to control execution sequence
     and avoid interference with other tests.
     """
@@ -140,13 +140,14 @@ class TestDocumentAPIv2_0(BaseCompatibilityTestCase):
 
                 # Delete documents
                 delete_result = self.client.index(index_name).delete_documents(ids=doc_ids)
-                self.assertEqual(len(doc_ids), delete_result.get('deleted', 0))
+                self.assertEqual('succeeded', delete_result['status'])
+                self.assertEqual(len(doc_ids), len(delete_result.get('items', [])))
 
                 # Verify documents are deleted
                 for doc_id in doc_ids:
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).get_document(doc_id)
-                    self.assertEqual(404, e.status_code)
+                    self.assertEqual(404, e.exception.status_code)
 
             # Step 3: Test add_documents
             with self.subTest(index=index_name, operation="add_documents"):
