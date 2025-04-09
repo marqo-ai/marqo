@@ -129,6 +129,11 @@ class HybridSearch:
                 f"`searchableAttributesLexical`. Please set these attributes to None."
             )
 
+        if facets is not None and not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"Facets are only supported for unstructured indexes"
+            )
+
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
             raise ValueError(
                 "'q' cannot be provided for HYBRID search when hybridParameters.queryTensor or "

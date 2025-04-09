@@ -49,6 +49,12 @@ class FieldFacetsConfiguration(StrictBaseModel):
                     raise ValueError("Range configurations must not overlap")
         return ranges
 
+    @validator('ranges')
+    def validate_ranges_used_only_for_number_field(cls, ranges, values):
+        if ranges and values.get('type') != "number":
+            raise ValueError("Ranges can only be used for 'number' facets")
+        return ranges
+
 class FacetsParameters(StrictBaseModel):
     class Config:
         allow_population_by_field_name = False # disable ability to pass max_depth or max_results, only alias

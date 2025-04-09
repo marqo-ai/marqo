@@ -191,17 +191,20 @@ class SearchQuery(BaseMarqoModel):
         facets = values.get('facets')
         filter_str = values.get('filter')
 
-        if not facets or not facets.fields or not filter_str:
-            return values
+        if facets and facets.fields:
+            if not filter_str:
+                if any(facet_field.exclude_terms for facet_field in facets.fields.values()):
+                    raise ValueError("Exclude terms can only be used with a filter string.")
+                return values
 
-        filter_str_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)
+            filter_str_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)
 
-        for facet_field in facets.fields.items():
-            field_name, field_parameters = facet_field
-            if field_parameters.exclude_terms:
-                missing_exclusions = [ex for ex in field_parameters.exclude_terms if ex not in filter_str_terms]
-                if missing_exclusions:
-                    raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
+            for facet_field in facets.fields.items():
+                field_name, field_parameters = facet_field
+                if field_parameters.exclude_terms:
+                    missing_exclusions = [ex for ex in field_parameters.exclude_terms if ex not in filter_str_terms]
+                    if missing_exclusions:
+                        raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
         return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
