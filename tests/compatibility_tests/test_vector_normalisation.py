@@ -44,10 +44,13 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
         cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
 
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.indexes_to_delete = cls.indexes_to_test_on
         super().setUpClass()
+        if cls.get_marqo_version() == "2.17.0":
+            cls.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
@@ -82,7 +85,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
 
-        if self.get_marqo_version == "2.17.0":
+        if self.get_marqo_version() == "2.17.0":
             self.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
 
         # This runs on to_version
