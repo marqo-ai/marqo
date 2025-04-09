@@ -69,7 +69,7 @@ class Modifier(Node, ABC):
         return type(self) == type(other) and self.modified == other.modified and self.raw == other.raw
 
     def __str__(self):
-        return f'{self.raw} ({str(self.modified)})'
+        return f'{self.raw} {str(self.modified)}'
 
     def __repr__(self):
         return f'{self.__class__.__name__}({repr(self.modified)}, {repr(self.raw)})'

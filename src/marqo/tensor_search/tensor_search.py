@@ -315,7 +315,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
-           facets: Optional[Dict] = None,
+           facets: Optional[FacetsParameters] = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -669,7 +669,7 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
                 group_type, value_key = _parse_value_id(value.id)
                 processed_stats = _process_value_stats(value.fields)
 
-                if group_type == 'string':
+                if facets.fields[field_name].type in ["string", "array"]:
                     if value_key[0] == '' and processed_stats["count"] == 1:
                         # Vespa's value for not found
                         continue
@@ -680,22 +680,23 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
                             current_level[key] = {}
                         current_level = current_level[key]
                     current_level.update(processed_stats)
-                elif group_type == 'long': # int or float
-                    if any(value == -9223372036854775808 for value in processed_stats.values()):
-                        # Vespa's value for null
-                        continue
-                    # aggregate statistic between int and float
-                    facets_response[field_name] = _combine_number_stats(
-                        facets_response.get(field_name, {}), processed_stats
-                    )
-                elif group_type != "null":
-                    if any(value == -9223372036854775808 for value in processed_stats.values()):
+                else:
+                    if any(value in [-9223372036854775808, 'NaN'] for value in processed_stats.values()):
                         # Vespa's value for null for int and float
                         continue
-                    _process_range_facets(
-                        field_name, value_key[1], processed_stats,
-                        facet_field_map, facets_response
-                    )
+                    if facets.fields[field_name].ranges is None:
+                        if any(value in [-9223372036854775808, 'NaN'] for value in processed_stats.values()):
+                            # Vespa's value for null
+                            continue
+                        # aggregate statistic between int and float
+                        facets_response[field_name] = _combine_number_stats(
+                            facets_response.get(field_name, {}), processed_stats
+                        )
+                    elif group_type != "null": # the case when there is no values in range
+                        _process_range_facets(
+                            field_name, value_key[1], processed_stats,
+                            facet_field_map, facets_response
+                        )
 
     # Sort range facets by upper bound
     for field_name, field_data in facets_response.items():

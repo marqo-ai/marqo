@@ -198,7 +198,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return [name_to_string_array_field_map[att].string_array_field_name for att in attributes_to_retrieve if
                 name_to_string_array_field_map.get(att)]
 
-    def _get_filter_term(self, marqo_query: MarqoQuery, exclusions_terms: Optional[List[str]]=None) -> Optional[str]:
+    def _get_filter_term(self, marqo_query: MarqoQuery, exclude_terms: Optional[List[str]]=None) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
@@ -272,6 +272,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return f'({float_field_string} OR {int_field_string})'
 
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
+            # Skip any terms with excluded fields first - check at node level
+            if (isinstance(node, search_filter.Term) or isinstance(node, search_filter.Modifier)) and exclude_terms is not None:
+                if str(node) in exclude_terms:
+                    return None
+
             if isinstance(node, search_filter.Operator):
                 if isinstance(node, search_filter.And):
                     operator = 'AND'
@@ -306,10 +311,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     raise InternalError(f'Unknown modifier type {type(node)}')
 
             elif isinstance(node, search_filter.Term):
-                # Skip any terms with excluded fields
-                if exclusions_terms is not None and str(node) in exclusions_terms:
-                    return None
-
                 if isinstance(node, search_filter.EqualityTerm):
                     return generate_equality_filter_string(node)
                 elif isinstance(node, search_filter.RangeTerm):
