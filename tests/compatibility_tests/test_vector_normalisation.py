@@ -5,6 +5,11 @@ import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 
+@pytest.fixture
+def version_to_compare_against(request):
+    return request.config.getoption("--version_to_compare_against")
+
+
 @pytest.mark.marqo_version('2.13.0')
 class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true"
@@ -49,8 +54,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def setUpClass(cls) -> None:
         cls.indexes_to_delete = cls.indexes_to_test_on
         super().setUpClass()
-        if cls.get_marqo_version() == "2.17.0":
-            cls.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
@@ -83,10 +86,10 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.logger.error(f"Exception occurred while adding documents / getting documents to / from index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail."
                               f"Exception traceback was: {traceback.format_exc()}")
 
-    def test_custom_vector_doc_in_normalized_embedding_true(self):
-
-        if self.get_marqo_version() == "2.17.0":
-            self.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
+    def test_custom_vector_doc_in_normalized_embedding_true(self, version_to_compare_against):
+        if version_to_compare_against == "2.17.0":
+            self.skipTest(f"Skipping test for version {version_to_compare_against} as "
+                          f"it is not supported in this version of Marqo.")
 
         # This runs on to_version
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions

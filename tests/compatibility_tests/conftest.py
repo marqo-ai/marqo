@@ -7,6 +7,7 @@ logger = get_logger(__name__)
 def pytest_addoption(parser):
     parser.addoption("--version_to_compare_against", action="store", default="2.7", help="version to start from")
 
+
 @pytest.fixture
 def version_to_compare_against(request):
     return request.config.getoption("--version_to_compare_against")
