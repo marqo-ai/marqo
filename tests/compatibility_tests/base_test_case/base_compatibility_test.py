@@ -9,8 +9,8 @@ from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
 
 
 @pytest.fixture
-def version_to_compare_against(request):
-    return request.config.getoption("--version_to_compare_against")
+def marqo_version_from_mark(request):
+    return request.node.get_closest_marker("marqo_version")
 
 
 class BaseCompatibilityTestCase(MarqoTestCase, ABC):
@@ -90,6 +90,6 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         cls.logger.info(f"Logging level changed to. {level.upper()}")
 
     @classmethod
-    def get_version_to_compare_against(cls):
+    def get_marqo_version(cls):
         """Get the currently running marqo version."""
-        return version_to_compare_against
+        return marqo_version_from_mark

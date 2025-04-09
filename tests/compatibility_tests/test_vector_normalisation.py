@@ -82,7 +82,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
 
-        if self.get_version_to_compare_against() == "2.17.0":
+        if self.get_marqo_version == "2.17.0":
             self.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
 
         # This runs on to_version
