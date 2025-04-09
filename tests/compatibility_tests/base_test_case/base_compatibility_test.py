@@ -2,7 +2,15 @@ import json
 import logging
 from abc import abstractmethod, ABC
 from pathlib import Path
+
+import pytest
+
 from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
+
+
+@pytest.fixture
+def version_to_compare_against(request):
+    return request.config.getoption("--version_to_compare_against")
 
 
 class BaseCompatibilityTestCase(MarqoTestCase, ABC):
@@ -80,3 +88,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         for handler in cls.logger.handlers:
             handler.setLevel(log_level)
         cls.logger.info(f"Logging level changed to. {level.upper()}")
+
+    @classmethod
+    def get_version_to_compare_against(cls):
+        """Get the currently running marqo version."""
+        return version_to_compare_against

@@ -81,10 +81,12 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                               f"Exception traceback was: {traceback.format_exc()}")
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
+
+        if self.get_version_to_compare_against() == "2.17.0":
+            self.skipTest("Skipping this test for version 2.17.0 the models is not available in this version")
+
         # This runs on to_version
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
-
-
         result_from_prepare_mode = self.load_results_from_file()
         for index_name in self.indexes_to_test_on:
             with self.subTest(index=index_name):
