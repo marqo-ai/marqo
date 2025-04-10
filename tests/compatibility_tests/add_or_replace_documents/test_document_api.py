@@ -160,6 +160,8 @@ class TestDocumentAPIv2_0(BaseCompatibilityTestCase):
                         tensor_fields=["Description", "Genre", "Title"]
                     )
 
+                self.assertEqual(False, add_result['errors'])
+
                 # Verify documents are added correctly
                 for doc in self.new_docs:
                     doc_id = doc['_id']
