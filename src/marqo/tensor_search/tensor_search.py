@@ -659,7 +659,6 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
     # Process root groups only
     root_groups = (group for group in response.facets if group.id.startswith("group:facet:"))
     for group in root_groups:
-        print(group)
         if group.children is None:
             continue
         for field in group.children:
@@ -671,7 +670,7 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
                 processed_stats = _process_value_stats(value.fields)
 
                 if facets.fields[field_name].type in ["string", "array"]:
-                    if value_key[0] == '' and processed_stats["count"] == 1:
+                    if value.id == "group:string:":
                         # Vespa's value for not found
                         continue
                     # values might be nested deeply if user data is stored as a.b.c
