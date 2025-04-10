@@ -7,7 +7,6 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 @pytest.fixture
 def marqo_version(request):
-    """Automatically set the version globally."""
     return request.config.getoption("--version_to_compare_against")
 
 
