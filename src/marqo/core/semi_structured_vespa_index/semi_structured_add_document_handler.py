@@ -11,7 +11,6 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField, \
     StringArrayField
-from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
@@ -66,7 +65,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         )
         if (is_string_array and
                 # This is required so that we can update schema on the fly
-                self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION):
+                self.marqo_index.index_supports_partial_updates):
             self._add_string_array_field_to_index(field_name)
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:

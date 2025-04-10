@@ -97,6 +97,11 @@ LOGGING_CONFIG = {
             "handlers": ["default"],
             "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",  # mute verbose httpx info level log
             "propagate": False,
+        },
+        "httpcore": {
+            "handlers": ["default"],
+            "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",  # mute verbose httpcore info level log
+            "propagate": False,
         }
     },
     "root": {
