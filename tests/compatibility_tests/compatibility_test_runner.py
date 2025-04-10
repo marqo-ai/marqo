@@ -98,7 +98,7 @@ def run_prepare_mode(version_to_test_against: str):
             logger.info(f"Detected 'skip' marker for class {test_class.__name__}, skipping prepare mode for this test class")
             continue
 
-        if skip_marqo_version_marker and version_to_test_against in skip_marqo_version_marker.args:
+        if skip_marqo_version_marker and (str(version_to_test_against) in skip_marqo_version_marker.args):
             logger.info(
                 f"Detected 'skip_marqo_version' marker for class {test_class.__name__}. "
                 f"These Marqo versions are skipped: {skip_marqo_version_marker.args}. "
