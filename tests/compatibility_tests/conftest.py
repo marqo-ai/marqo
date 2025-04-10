@@ -23,7 +23,7 @@ def pytest_collection_modifyitems(config, items):
 
         if skip_marqo_version_mark:
             skip_marqo_versions = skip_marqo_version_mark.args
-            if str(version_to_test_against) in  skip_marqo_versions:
+            if str(version_to_test_against) in skip_marqo_versions:
                 logger.debug(f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping.")
                 item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping."))
                 continue
