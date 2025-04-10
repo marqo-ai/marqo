@@ -81,7 +81,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.logger.error(f"Exception occurred while adding documents / getting documents to / from index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail."
                               f"Exception traceback was: {traceback.format_exc()}")
 
-    def test_custom_vector_doc_in_normalized_embedding_true(self, marqo_version):
+    def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
         result_from_prepare_mode = self.load_results_from_file()
