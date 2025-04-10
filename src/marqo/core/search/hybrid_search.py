@@ -11,6 +11,7 @@ from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.tensor_search import index_meta_cache
@@ -23,8 +24,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreMo
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger, \
-    gather_facets_from_response
+from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
 import semver
 
@@ -286,7 +286,8 @@ class HybridSearch:
         gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
         total_results = len(gathered_results["hits"])
         if facets is not None:
-            gathered_results.update(gather_facets_from_response(responses, facets))
+            if isinstance(vespa_index, SemiStructuredVespaIndex):
+                gathered_results.update(vespa_index.gather_facets_from_response(responses, facets))
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(

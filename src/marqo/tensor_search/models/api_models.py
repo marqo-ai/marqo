@@ -198,19 +198,21 @@ class SearchQuery(BaseMarqoModel):
                 return values
 
             # Remove nested parentheses and clean up the filter string
-            clean_filter = filter_str
-            while '(' in clean_filter:
-                clean_filter = re.sub(r'\([^()]*\)', lambda m: m.group()[1:-1], clean_filter)
-
+            filter_str = filter_str.replace("NOT", "")
+            print(filter_str)
             # Split by AND/OR operators and clean up terms
             filter_str_terms = []
-            raw_terms = re.split(r'\s*(?:AND|OR)\s*', clean_filter)
+            raw_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)
             for term in raw_terms:
                 # Handle range queries and clean up any remaining spaces
                 term = term.strip()
-                if ':' in term:
-                    # Extract the actual value after the colon
-                    filter_str_terms.append(term.strip())
+                while term.startswith('(') or term.count('(') != term.count(')'):
+                    if term.count('(') > term.count(')'):
+                        term = term[1:]
+                    elif term.count(')') > term.count('('):
+                        term = term[:-1]
+                # Append actual value
+                filter_str_terms.append(term.strip())
 
             for facet_field in facets.fields.items():
                 field_name, field_parameters = facet_field
