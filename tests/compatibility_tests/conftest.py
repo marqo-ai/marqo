@@ -7,6 +7,10 @@ logger = get_logger(__name__)
 def pytest_addoption(parser):
     parser.addoption("--version_to_compare_against", action="store", default="2.7", help="version to start from")
 
+@pytest.fixture
+def version_to_compare_against(request):
+    return request.config.getoption("--version_to_compare_against")
+
 
 def pytest_collection_modifyitems(config, items):
     version_to_test_against = semver.VersionInfo.parse(config.getoption("--version_to_compare_against")) # version_to_test_against will help us determine which test to skip v/s which test to collect.
