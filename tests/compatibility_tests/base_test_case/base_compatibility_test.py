@@ -4,7 +4,6 @@ from abc import abstractmethod, ABC
 from pathlib import Path
 
 from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
-from tests.compatibility_tests.conftest import VERSION_TO_COMPARE_AGAINST
 
 
 class BaseCompatibilityTestCase(MarqoTestCase, ABC):
@@ -25,8 +24,6 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
                 handler.setFormatter(formatter)
                 cls.logger.addHandler(handler)
             cls.logger.setLevel(logging.INFO)
-        cls.marqo_version = VERSION_TO_COMPARE_AGAINST
-        cls.logger.info(f"Set 'cls.marqo_version' to {cls.marqo_version}")
 
     @classmethod
     def get_results_file_path(cls):
