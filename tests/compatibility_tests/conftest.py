@@ -8,17 +8,6 @@ def pytest_addoption(parser):
     parser.addoption("--version_to_compare_against", action="store", default="2.7", help="version to start from")
 
 
-VERSION_TO_COMPARE_AGAINST = None  # global variable
-
-
-@pytest.fixture(scope="session", autouse=True)
-def set_version_to_compare_against(request):
-    """Automatically set the version globally."""
-    global VERSION_TO_COMPARE_AGAINST
-    VERSION_TO_COMPARE_AGAINST = request.config.getoption("--version_to_compare_against")
-    logger.info(f"VERSION_TO_COMPARE_AGAINST set to {VERSION_TO_COMPARE_AGAINST}")
-
-
 def pytest_collection_modifyitems(config, items):
     version_to_test_against = semver.VersionInfo.parse(config.getoption("--version_to_compare_against")) # version_to_test_against will help us determine which test to skip v/s which test to collect.
     # The actual value inside the version_to_test_against can be from_version value (in case of test run where we run prepare on a from_version marqo instance,
