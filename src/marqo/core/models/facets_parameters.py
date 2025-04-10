@@ -37,15 +37,23 @@ class FieldFacetsConfiguration(StrictBaseModel):
     @validator('ranges')
     def validate_ranges_overlap(cls, ranges):
         if ranges:
-            # Sort ranges by from_ value
+            # Sort ranges by from_ value, treating None as negative infinity
             sorted_ranges = sorted(ranges, key=lambda x: (x.from_ if x.from_ is not None else float('-inf')))
 
             for i in range(len(sorted_ranges) - 1):
                 current = sorted_ranges[i]
                 next_range = sorted_ranges[i + 1]
 
-                if (current.to_ is not None and next_range.from_ is not None
-                    and current.to_ > next_range.from_):
+                # If current.to_ is None, it extends to infinity and will overlap with any subsequent range
+                if current.to_ is None:
+                    raise ValueError("Open-ended ranges (missing 'to' value) will overlap with subsequent ranges")
+
+                # If next_range.from_ is None, it extends from -infinity and will overlap with any previous range
+                if next_range.from_ is None:
+                    raise ValueError("Open-ended ranges (missing 'from' value) will overlap with previous ranges")
+
+                # Check for regular overlap when both values are present
+                if current.to_ > next_range.from_:
                     raise ValueError("Range configurations must not overlap")
         return ranges
 

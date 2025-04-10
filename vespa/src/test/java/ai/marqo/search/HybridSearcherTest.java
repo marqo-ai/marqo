@@ -397,6 +397,157 @@ class HybridSearcherTest {
         }
     }
 
+    @Nested
+    class FacetsQueryTest {
+        @Test
+        void shouldProcessFacetsQueries() {
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            // Add facets YQL queries
+            String facetsQuery =
+                    "select * from sources * where default contains 'facet1'\n"
+                            + "---MARQO-YQL-QUERY-DELIMITER---\n"
+                            + "select * from sources * where default contains 'facet2'";
+            query.properties().set("marqo__yql.facets", facetsQuery);
+
+            // Create main result hits
+            HitGroup mainHits = new HitGroup();
+            mainHits.add(new Hit("index:test/0/main1", 1.0));
+            mainHits.add(new Hit("index:test/0/main2", 0.8));
+            Result mainResult = new Result(query, mainHits);
+
+            // Create facet results
+            HitGroup facet1Hits = new HitGroup();
+            Hit facet1GroupHit = new Hit("group:facet1", 1.0);
+            facet1GroupHit.setField("count", 5);
+            facet1Hits.add(facet1GroupHit);
+            Result facet1Result = new Result(query, facet1Hits);
+
+            HitGroup facet2Hits = new HitGroup();
+            Hit facet2GroupHit = new Hit("group:facet2", 1.0);
+            facet2GroupHit.setField("count", 3);
+            facet2Hits.add(facet2GroupHit);
+            Result facet2Result = new Result(query, facet2Hits);
+
+            ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+
+            // Mock responses for main query and facet queries
+            when(downstreamSearcher.process(queryCaptor.capture(), any(Execution.class)))
+                    .thenReturn(mainResult)
+                    .thenReturn(facet1Result)
+                    .thenReturn(facet2Result);
+
+            Result result = execution.search(query);
+
+            // Verify queries sent
+            List<Query> capturedQueries = queryCaptor.getAllValues();
+            assertThat(capturedQueries).hasSize(3);
+
+            // Verify main results
+            assertThat(result.hits().size()).isEqualTo(4); // 2 main hits + 2 facet group hits
+            assertThat(result.hits().get(0).getId().toString()).isEqualTo("index:test/0/main1");
+            assertThat(result.hits().get(1).getId().toString()).isEqualTo("index:test/0/main2");
+
+            // Verify facet results
+            assertThat(result.hits().get(2).getId().toString()).isEqualTo("group:facet:0:0");
+            assertThat(result.hits().get(2).getField("count")).isEqualTo(5);
+            assertThat(result.hits().get(3).getId().toString()).isEqualTo("group:facet:1:0");
+            assertThat(result.hits().get(3).getField("count")).isEqualTo(3);
+        }
+
+        @Test
+        void shouldHandleFacetsTimeout() {
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            query.properties().set("timeout", 100); // Set timeout in properties
+            query.properties().set(
+                    "marqo__yql.facets",
+                    "select * from sources * where default contains 'facet1'");
+
+            // Create main result hits
+            HitGroup mainHits = new HitGroup();
+            mainHits.add(new Hit("index:test/0/main1", 1.0));
+            Result mainResult = new Result(query, mainHits);
+
+            when(downstreamSearcher.process(any(Query.class), any(Execution.class)))
+                    .thenReturn(mainResult)
+                    .thenAnswer(invocation -> {
+                        Thread.sleep(150); // Simulate timeout
+                        Result timeoutResult = new Result(query);
+                        timeoutResult.hits().addError(
+                            ErrorMessage.createTimeout("Facet query timed out after 100ms"));
+                        return timeoutResult;
+                    });
+
+            RuntimeException exception =
+                    assertThrows(RuntimeException.class, () -> execution.search(query));
+            assertThat(exception).hasMessageContaining("Facet query timed out after 100ms");
+        }
+
+        @Test
+        void shouldHandleEmptyFacetsQuery() {
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            query.properties().set("marqo__yql.facets", "");
+
+            // Create main result hits
+            HitGroup mainHits = new HitGroup();
+            mainHits.add(new Hit("index:test/0/main1", 1.0));
+            Result mainResult = new Result(query, mainHits);
+
+            when(downstreamSearcher.process(any(Query.class), any(Execution.class)))
+                    .thenReturn(mainResult);
+
+            Result result = execution.search(query);
+
+            // Verify only main results are present
+            assertThat(result.hits().size()).isEqualTo(1);
+            assertThat(result.hits().get(0).getId().toString()).isEqualTo("index:test/0/main1");
+        }
+
+        @Test
+        void shouldHandleNullFacetsResults() {
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            query.properties()
+                    .set(
+                            "marqo__yql.facets",
+                            "select * from sources * where default contains 'facet1'");
+
+            // Create main result hits
+            HitGroup mainHits = new HitGroup();
+            mainHits.add(new Hit("index:test/0/main1", 1.0));
+            Result mainResult = new Result(query, mainHits);
+
+            // Mock null facet result
+            when(downstreamSearcher.process(any(Query.class), any(Execution.class)))
+                    .thenReturn(mainResult)
+                    .thenReturn(new Result(query)); // Return empty result instead of null
+
+            Result result = execution.search(query);
+
+            // Verify only main results are present
+            assertThat(result.hits().size()).isEqualTo(1);
+            assertThat(result.hits().get(0).getId().toString()).isEqualTo("index:test/0/main1");
+        }
+    }
+
     private static Query getHybridQuery(
             int k, double alpha, String queryString, String retrievalMethod, String rankingMethod) {
         Query query = new Query("search/?query=" + queryString);

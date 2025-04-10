@@ -659,6 +659,7 @@ def gather_facets_from_response(response: QueryResult, facets: FacetsParameters)
     # Process root groups only
     root_groups = (group for group in response.facets if group.id.startswith("group:facet:"))
     for group in root_groups:
+        print(group)
         if group.children is None:
             continue
         for field in group.children:

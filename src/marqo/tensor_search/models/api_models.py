@@ -197,12 +197,26 @@ class SearchQuery(BaseMarqoModel):
                     raise ValueError("Exclude terms can only be used with a filter string.")
                 return values
 
-            filter_str_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)
+            # Remove nested parentheses and clean up the filter string
+            clean_filter = filter_str
+            while '(' in clean_filter:
+                clean_filter = re.sub(r'\([^()]*\)', lambda m: m.group()[1:-1], clean_filter)
+
+            # Split by AND/OR operators and clean up terms
+            filter_str_terms = []
+            raw_terms = re.split(r'\s*(?:AND|OR)\s*', clean_filter)
+            for term in raw_terms:
+                # Handle range queries and clean up any remaining spaces
+                term = term.strip()
+                if ':' in term:
+                    # Extract the actual value after the colon
+                    filter_str_terms.append(term.strip())
 
             for facet_field in facets.fields.items():
                 field_name, field_parameters = facet_field
                 if field_parameters.exclude_terms:
-                    missing_exclusions = [ex for ex in field_parameters.exclude_terms if ex not in filter_str_terms]
+                    missing_exclusions = [ex for ex in field_parameters.exclude_terms
+                                       if not any(ex in term for term in filter_str_terms)]
                     if missing_exclusions:
                         raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
         return values
