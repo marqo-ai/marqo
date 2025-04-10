@@ -28,7 +28,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def __init__(self, marqo_index: SemiStructuredMarqoIndex):
         super().__init__(marqo_index)
-        self.index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
+        self.index_supports_partial_updates = marqo_index.index_supports_partial_updates
 
     def get_marqo_index(self) -> SemiStructuredMarqoIndex:
         if isinstance(self._marqo_index, SemiStructuredMarqoIndex):
