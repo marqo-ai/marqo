@@ -6,7 +6,7 @@ import torch
 
 from marqo.core.inference.api import *
 from marqo.inference.native_inference.embedding_models.multilingual_clip_model import (
-    MultiLingualCLIPModel, MultiLingualCLIPTokenizerWrapper, MultiLingualCLIPPreprocessor
+    MultilingualCLIPModel, MultilingualCLIPTokenizerWrapper, MultilingualCLIPPreprocessor
 )
 from marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline import (
     MultilingualCLIPModelInferencePipeline
@@ -19,7 +19,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_image")
     def test_content_preprocessing_text(self, mock_download, mock_split):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
         inference_request = InferenceRequest(
             modality=Modality.TEXT,
@@ -40,7 +40,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_image")
     def test_content_preprocessing_image(self, mock_download, mock_split):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
         inference_request = InferenceRequest(
             modality=Modality.IMAGE,
@@ -59,7 +59,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertEqual(result, [[("original image", torch.tensor([1.0]))]])
 
     def test_collect_valid_content_to_encode(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -74,7 +74,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertTrue(all(isinstance(x, torch.Tensor) for x in collected))
 
     def test_collect_valid_content_to_encode_with_inference_error(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -89,7 +89,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertIsInstance(collected[0], torch.Tensor)
 
     def test_collect_valid_content_to_encode_invalid_type(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -102,7 +102,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertIn("Unexpected content type", str(cm.exception))
 
     def test_encode_processed_content_empty(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -111,7 +111,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertEqual(embeddings, [])
 
     def test_encode_processed_content_success(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model.encode.return_value = [np.array([0.1, 0.2])]
         inference_request = MagicMock()
         inference_request.modality = Modality.TEXT
@@ -130,7 +130,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertTrue(isinstance(embeddings[0], np.ndarray))
 
     def test_encode_processed_content_mismatch(self):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model.encode.return_value = [np.array([0.1, 0.2])]  # Return fewer embeddings than inputs
         inference_request = MagicMock()
         inference_request.modality = Modality.TEXT
@@ -150,7 +150,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
     @patch.object(MultilingualCLIPModelInferencePipeline, '_content_preprocessing')
     @patch.object(MultilingualCLIPModelInferencePipeline, '_encode_processed_content')
     def test_run_pipeline(self, mock_encode_processed_content, mock_content_preprocessing):
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -169,10 +169,10 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         """
         Ensure that the tokenizer wrapper is called when preprocessing text.
         """
-        tokenizer_wrapper = MagicMock(spec=MultiLingualCLIPTokenizerWrapper)
+        tokenizer_wrapper = MagicMock(spec=MultilingualCLIPTokenizerWrapper)
         tokenizer_wrapper.tokenize.return_value = "tokenized_text"
 
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model.get_preprocessor.return_value = tokenizer_wrapper
 
         inference_request = InferenceRequest(
@@ -200,10 +200,10 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         """
         Ensure that the image preprocessor is called during image preprocessing.
         """
-        image_preprocessor = MagicMock(spec=MultiLingualCLIPPreprocessor)
+        image_preprocessor = MagicMock(spec=MultilingualCLIPPreprocessor)
         image_preprocessor._preprocess_image.return_value = torch.tensor([1.0])
 
-        model = MagicMock(spec=MultiLingualCLIPModel)
+        model = MagicMock(spec=MultilingualCLIPModel)
         model.get_preprocessor.return_value = image_preprocessor
 
         inference_request = InferenceRequest(

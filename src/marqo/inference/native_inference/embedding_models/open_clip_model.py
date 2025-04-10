@@ -80,9 +80,8 @@ class OpenCLIPModel(AbstractCLIPModel):
         super().__init__(device=device, model_properties=model_properties, model_auth=model_auth)
 
         self.model_properties = self._build_model_properties(model_properties)
-        self.preprocess_config = None
-        self.preprocess = None
-        self.preprocessor = None
+
+        self.image_preprocessor_config = None
 
     def _build_model_properties(self, model_properties: dict) -> OpenCLIPModelProperties:
         """Convert the user input model_properties to OpenCLIPModelProperties."""
@@ -96,13 +95,13 @@ class OpenCLIPModel(AbstractCLIPModel):
         """Load the open_clip model and tokenizer."""
         if self.model_properties.url is not None or self.model_properties.model_location is not None or \
                 self.model_properties.localpath is not None:
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
+            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_checkpoint()
             self.tokenizer = self._load_tokenizer_from_checkpoint()
         elif self.model_properties.name.startswith(HF_HUB_PREFIX):
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_hf_repo()
+            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_hf_repo()
             self.tokenizer = self._load_tokenizer_from_hf_repo()
         elif self.model_properties.name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_open_clip_repo()
+            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_open_clip_repo()
             self.tokenizer = self._load_tokenizer_from_open_clip_repo()
         else:
             raise InvalidModelPropertiesError(
@@ -112,12 +111,10 @@ class OpenCLIPModel(AbstractCLIPModel):
             )
         self.model = self.model.to(self.device)
         self.model.eval()
-        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.preprocess, device=self.device)
-
+        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.image_preprocessor, device=self.device)
 
     def get_preprocessor(self) -> OpenCLIPPreprocessor:
         return self.preprocessor
-
 
     def _check_loaded_components(self):
         """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
@@ -129,12 +126,12 @@ class OpenCLIPModel(AbstractCLIPModel):
             raise RuntimeError("The open_clip model is not loaded. Please load the model before inference.")
         if self.tokenizer is None:
             raise RuntimeError("The open_clip tokenizer is not loaded. Please load the tokenizer before inference.")
-        if self.preprocess is None:
+        if self.image_preprocessor is None:
             raise RuntimeError("The open_clip image preprocessor is not loaded. "
                                "Please load the image preprocessor before inference.")
 
     def _load_image_preprocessor(self) -> Callable:
-        return image_transform_v2(self.preprocess_config)
+        return image_transform_v2(self.image_preprocessor_config)
 
     def _aggregate_image_preprocessor_config(self) -> PreprocessCfg:
         """Aggregate the image preprocessor configuration for the open_clip model."""
@@ -181,8 +178,8 @@ class OpenCLIPModel(AbstractCLIPModel):
         logger.info(f"The name of the custom clip model is {self.model_properties.name}. We use open_clip loader")
 
         try:
-            self.preprocess_config = self._aggregate_image_preprocessor_config()
-            preprocess = image_transform_v2(self.preprocess_config, is_train=False)
+            self.image_preprocessor_config = self._aggregate_image_preprocessor_config()
+            preprocess = image_transform_v2(self.image_preprocessor_config, is_train=False)
             model = open_clip.create_model(
                 model_name=self.model_properties.name,
                 jit=self.model_properties.jit,

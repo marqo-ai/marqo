@@ -21,7 +21,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 logger = get_logger(__name__)
 
 
-class MultiLingualCLIPTokenizerWrapper:
+class MultilingualCLIPTokenizerWrapper:
     """
     A wrapper class for the tokenizer used in the multilingual CLIP model.
 
@@ -40,7 +40,7 @@ class MultiLingualCLIPTokenizerWrapper:
         return self.tokenizer(inputs, padding=padding, return_tensors=return_tensors).to(self.device)
 
 
-class MultiLingualCLIPPreprocessor(AbstractCLIPPreprocessor):
+class MultilingualCLIPPreprocessor(AbstractCLIPPreprocessor):
     def __init__ (self, tokenizer, image_preprocessor, device: str):
         super().__init__(tokenizer=tokenizer, image_preprocessor=image_preprocessor)
         self.device = device
@@ -52,7 +52,7 @@ class MultiLingualCLIPPreprocessor(AbstractCLIPPreprocessor):
         return [self.image_preprocessor(image).unsqueeze(0).to(self.device) for image in inputs]
 
 
-class MultiLingualCLIPModel(AbstractCLIPModel):
+class MultilingualCLIPModel(AbstractCLIPModel):
     """
     A class representing a multilingual CLIP model.
     This class inherits from the AbstractCLIPModel and implements the required methods.
@@ -61,11 +61,8 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         super().__init__(device=device, model_properties=model_properties, model_auth=model_auth)
 
         self.model_properties = self._build_model_properties(model_properties)
-        self._tokenizer = None
-        self._image_preprocessor = None
         self._textual_model = None
         self._visual_model = None
-        self._preprocessor = None
 
     def _build_model_properties(self, model_properties: dict) -> MultilingualCLIPModelProperties:
         """Convert the user input model_properties to MultilingualCLIPModelProperties."""
@@ -76,9 +73,12 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
                 from e
 
     def _load_necessary_components(self):
-        self._visual_model, _, self._image_preprocessor = open_clip.create_model_and_transforms(
-            model_name=self.model_properties.visual_model.split("/")[1],
-            pretrained=self.model_properties.visual_model.split("/")[2],
+
+        visual_model_load_components = self.model_properties.visual_model.split("/")
+
+        self._visual_model, _, self.image_preprocessor = open_clip.create_model_and_transforms(
+            model_name=visual_model_load_components[1],
+            pretrained=visual_model_load_components[2],
             device=self.device
         )
 
@@ -86,14 +86,14 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
             self.model_properties.textual_model
         ).to(self.device)
 
-        self._tokenizer = MultiLingualCLIPTokenizerWrapper(
+        self.tokenizer = MultilingualCLIPTokenizerWrapper(
             tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_properties.textual_model),
             device= self.device
         )
 
-        self._preprocessor = MultiLingualCLIPPreprocessor(
-            tokenizer=self._tokenizer,
-            image_preprocessor=self._image_preprocessor,
+        self.preprocessor = MultilingualCLIPPreprocessor(
+            tokenizer=self.tokenizer,
+            image_preprocessor=self.image_preprocessor,
             device=self.device
         )
 
@@ -101,15 +101,15 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
         self._visual_model.eval()
 
     def _check_loaded_components(self):
-        if any(
-                [
-                    self._visual_model is None,
-                    self._textual_model is None,
-                    self._image_preprocessor is None,
-                    self._tokenizer is None,
-                ]
-        ):
-            raise InternalError("Model components are not loaded correctly.")
+
+        for component in [
+            self._visual_model,
+            self._textual_model,
+            self.image_preprocessor,
+            self.tokenizer
+        ]:
+            if component is None:
+                raise InternalError(f"The model component {component.__name__} is not loaded correctly.")
 
     def encode_text(self, inputs: List[str], normalize: bool = True) -> List[ndarray]:
         """
@@ -123,7 +123,7 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
             List[ndarray]: A list of encoded text embeddings.
         """
         with torch.no_grad():
-            outputs = self._textual_model.forward(inputs, self._tokenizer)
+            outputs = self._textual_model.forward(inputs, self.tokenizer)
 
         if normalize:
             _shape_before = outputs.shape
@@ -158,6 +158,6 @@ class MultiLingualCLIPModel(AbstractCLIPModel):
 
         return self._convert_output(outputs)
 
-    def get_preprocessor(self):
-        return self._preprocessor
+    def get_preprocessor(self) -> MultilingualCLIPPreprocessor:
+        return self.preprocessor
 
