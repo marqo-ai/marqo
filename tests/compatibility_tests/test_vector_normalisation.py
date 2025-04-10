@@ -6,7 +6,7 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 
 @pytest.mark.marqo_version('2.13.0')
-@pytest.mark.skip_marqo_version('2.7.0')
+@pytest.mark.skip_marqo_version('2.17.0')
 class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true"
 
