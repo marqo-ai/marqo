@@ -8,9 +8,15 @@ def pytest_addoption(parser):
     parser.addoption("--version_to_compare_against", action="store", default="2.7", help="version to start from")
 
 
-@pytest.fixture
-def version_to_compare_against(request):
-    return request.config.getoption("--version_to_compare_against")
+VERSION_TO_COMPARE_AGAINST = None  # global variable
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_version_to_compare_against(request):
+    """Automatically set the version globally."""
+    global VERSION_TO_COMPARE_AGAINST
+    VERSION_TO_COMPARE_AGAINST = request.config.getoption("--version_to_compare_against")
+    logger.info(f"VERSION_TO_COMPARE_AGAINST set to {VERSION_TO_COMPARE_AGAINST}")
 
 
 def pytest_collection_modifyitems(config, items):
