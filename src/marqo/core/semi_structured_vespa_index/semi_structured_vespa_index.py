@@ -881,7 +881,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     facets_response[field_name] = self._sort_range_facets(field_data)
 
         response = {}
-        print(total_hits, response)
         if total_hits is not None:
             response["totalHits"] = total_hits
         if facets is not None:

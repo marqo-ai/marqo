@@ -283,3 +283,57 @@ class TestFacets(MarqoTestCase):
         self.assertIn("totalHits", res)
         self.assertEqual(res["totalHits"], 0)
         self.assertEqual(len(res["hits"]), 0)
+
+    def test_facets_filter_string_parsing_edge_cases(self):
+        """Tests handling of filter strings with different parentheses placements in facet queries via API"""
+        test_cases = [
+            {
+                "name": "Filter string with parentheses around the whole string",
+                "filter": "(price:[49 TO 49.1] AND NOT color:red)",
+                "exclude_terms": ["color:red"]
+            },
+            {
+                "name": "Filter string with parentheses around term",
+                "filter": "price:[49 TO 49.1] AND (NOT color:red)",
+                "exclude_terms": ["color:red"]
+            },
+            {
+                "name": "Filter string with parentheses around value",
+                "filter": "price:[49 TO 49.1] AND NOT color:(red)",
+                "exclude_terms": ["color:(red)"]
+            }
+        ]
+
+        for test_case in test_cases:
+            with self.subTest(test_case["name"]):
+                res = self.client.index(self.unstructured_text_index_name).search(
+                    "shirt",
+                    search_method="HYBRID",
+                    filter_string=test_case["filter"],
+                    facets={
+                        "fields": {
+                            "color": {
+                                "type": "string",
+                                "excludeTerms": test_case["exclude_terms"]
+                            }
+                        }
+                    }
+                )
+                self.assertIn("facets", res)
+                self.assertIn("color", res["facets"])
+
+    def test_non_existing_array_field_raises_error(self):
+        """Test that searching a non-existing array field raises an error"""
+        with self.assertRaises(MarqoWebError) as e:
+            self.client.index(self.unstructured_text_index_name).search(
+                "shirt",
+                search_method="HYBRID",
+                facets={
+                    "fields": {
+                        "non_existing_field": {
+                            "type": "array"
+                        }
+                    }
+                }
+            )
+        self.assertIn("is not present in any index document", str(e.exception))

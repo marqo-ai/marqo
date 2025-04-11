@@ -146,7 +146,7 @@ class HybridSearch:
                     )
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
-            raise core_exceptions.InvalidArgumentError(
+            raise ValueError(
                 "'q' cannot be provided for HYBRID search when hybridParameters.queryTensor or "
                 "'hybridParameters.queryLexical' is provided"
             )

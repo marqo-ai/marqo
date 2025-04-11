@@ -417,6 +417,54 @@ class TestFacets(MarqoTestCase):
                         filter_string="color:red AND NOT color:green"
                     )
 
+    def test_facets_filter_string_parsing_edge_cases(self):
+        self.add_fashion_docs(EXAMPLE_FASHION_DOCUMENTS)
+        for retrieval_method, ranking_method in (
+                (RetrievalMethod.Tensor, RankingMethod.Tensor),
+                (RetrievalMethod.Lexical, RankingMethod.Lexical),
+                (RetrievalMethod.Disjunction, RankingMethod.RRF),
+        ):
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                with self.subTest("Filter string with parentheses around the whole string"):
+                    facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(
+                        type="string", excludeTerms=["color:red"]
+                    )})
+                    res = tensor_search.search(
+                        config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                        facets=facets,
+                        search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                            retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                        ),
+                        filter="(price:[49 TO 49.1] AND NOT color:red)"
+                    )
+                    self.assertEqual(res["facets"]["color"]["red"]["count"], 1)
+                with self.subTest("Filter string with parentheses around term"):
+                    facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(
+                        type="string", excludeTerms=["color:red"]
+                    )})
+                    res = tensor_search.search(
+                        config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                        facets=facets,
+                        search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                            retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                        ),
+                        filter="price:[49 TO 49.1] AND (NOT color:red)"
+                    )
+                    self.assertEqual(res["facets"]["color"]["red"]["count"], 1)
+                with self.subTest("Filter string with parentheses around value"):
+                    facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(
+                        type="string", excludeTerms=["color:(red)"]
+                    )})
+                    res = tensor_search.search(
+                        config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                        facets=facets,
+                        search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                            retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                        ),
+                        filter="price:[49 TO 49.1] AND NOT color:(red)"
+                    )
+                    self.assertEqual(res["facets"]["color"]["red"]["count"], 1)
+
     def test_get_total_hits(self):
         """Test getting total hits for different retrieval methods"""
         self.add_fashion_docs()
@@ -475,4 +523,20 @@ class TestFacets(MarqoTestCase):
             )
             self.assertEqual(res["totalHits"], 0)
             self.assertEqual(len(res["hits"]), 0)
+
+    def test_get_non_existent_array_field_raises_an_error(self):
+        """
+        Test that a non-existent array field in facets raises an error
+        """
+        self.add_fashion_docs()
+        facets = FacetsParameters(fields={"non_existent_field": FieldFacetsConfiguration(type="array")})
+        with self.assertRaises(core_exceptions.InvalidArgumentError) as context:
+            tensor_search.search(
+                config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Tensor
+                ),
+                facets=facets
+            )
+        self.assertIn("is not present in any index document", str(context.exception))
 
