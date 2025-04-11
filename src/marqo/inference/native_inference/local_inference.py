@@ -16,7 +16,7 @@ from marqo.s2_inference.errors import S2InferenceError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.no_model_utils import NO_MODEL
 from marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline import MultilingualCLIPModelInferencePipeline
-from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultiLingualCLIPModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 
 
 class NativeInferenceLocal(Inference):
@@ -41,7 +41,7 @@ class NativeInferenceLocal(Inference):
             return RandomModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, HuggingFaceModel):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
-        elif isinstance(model, MultiLingualCLIPModel):
+        elif isinstance(model, MultilingualCLIPModel):
             return MultilingualCLIPModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, NO_MODEL):
             # TODO do we need to create a pipeline class for this?

@@ -1,6 +1,6 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
     download_and_preprocess_image
-from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultiLingualCLIPModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
@@ -21,7 +21,7 @@ class MultilingualCLIPModelInferencePipeline(AbstractInferencePipeline):
     VALID_CONTENT_TO_ENCODE_TYPE = (Tensor, str)
     MAX_BATCH_SIZE = 16
 
-    def __init__(self, model: MultiLingualCLIPModel, inference_request: InferenceRequest):
+    def __init__(self, model: MultilingualCLIPModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
 

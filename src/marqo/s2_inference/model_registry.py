@@ -3,7 +3,7 @@ from marqo.inference.native_inference.embedding_models.hugging_face_stella_model
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.embedding_models.random_model import RandomModel
-from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultiLingualCLIPModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 from marqo.s2_inference.clip_utils import CLIP, FP16_CLIP
 from marqo.s2_inference.no_model_utils import NO_MODEL
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
@@ -2352,7 +2352,7 @@ def _get_model_load_mappings() -> Dict:
         'test': TEST,
         'sbert_onnx': SBERT_ONNX,
         'clip_onnx': CLIP_ONNX,
-        "multilingual_clip": MultiLingualCLIPModel,
+        "multilingual_clip": MultilingualCLIPModel,
         "fp16_clip": FP16_CLIP,
         'random': RandomModel,
         'hf': HuggingFaceModel,
