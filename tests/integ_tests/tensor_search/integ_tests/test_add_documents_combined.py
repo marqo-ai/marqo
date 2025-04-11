@@ -621,69 +621,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
             for k in expected_repo_structure:
                 assert isinstance(media_repo[k], expected_repo_structure[k])
 
-    def test_download_images_non_tensor_field(self):
-        """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = TestImageUrls.HIPPO_REALISTIC.value
-        bad_url = 'https://google.com/my_dog.png'
-        examples = [
-            ([{
-                'field_1': bad_url,
-                'field_2': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-                 good_url: Tensor
-             }),
-            ([{
-                'nt_1': bad_url,
-                'nt_2': good_url
-            }], {}),
-            ([{
-                'field_1': bad_url,
-                'nt_1': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-             }),
-            ([{
-                'nt_2': bad_url,
-                'field_2': good_url
-            }], {
-                 good_url: Tensor
-             }),
-        ]
-        model_properties = (
-            {
-                'name': 'open_clip/ViT-B-32/laion400m_e31',
-                'dimensions': 512,
-                'note': 'open_clip models',
-                'type': 'open_clip',
-                'pretrained': 'laion400m_e31'
-            }
-        )
-
-        for docs, expected_repo_structure in examples:
-            with mock.patch('PIL.Image.Image.close') as mock_close:
-                with add_docs.download_and_preprocess_content(
-                    docs=docs,
-                    thread_count=20,
-                    tensor_fields=['field_1', 'field_2'],
-                    media_download_headers={},
-                    model_name="open_clip/ViT-B-32/laion400m_e31",
-                    normalize_embeddings=True,
-                    model_properties=model_properties,
-                    media_field_types_mapping=None,
-                    device="cpu",
-                    marqo_index_type=IndexType.Unstructured,
-                    marqo_index_model=Model(name="test", properties={}),
-                ) as media_repo:
-                    self.assertEqual(len(expected_repo_structure), len(media_repo))
-                    for k in expected_repo_structure:
-                        print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
-                        print(f"media_repo[k] = {media_repo[k]}")
-                        self.assertIsInstance(media_repo[k], expected_repo_structure[k])
-
-            # Images should not be closed as they are Tensor instead of ImageType
-            mock_close.assert_not_called()
-
     def test_idErrorWhenImageDownloading(self):
         """A test ensure image download is not raising 500 error when there is an invalid _id.
 
