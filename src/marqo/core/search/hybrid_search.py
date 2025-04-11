@@ -115,7 +115,6 @@ class HybridSearch:
                 f"This index was created with Marqo {marqo_index_version}."
             )
 
-
         # Use default hybrid settings if not provided
         if hybrid_parameters is None:
             hybrid_parameters = HybridParameters()
@@ -138,9 +137,16 @@ class HybridSearch:
             raise core_exceptions.UnsupportedFeatureError(
                 f"trackTotalHits is only supported for unstructured indexes"
             )
+        if isinstance(marqo_index, SemiStructuredMarqoIndex):
+            string_array_field_names = [string_array_field.name for string_array_field in marqo_index.string_array_fields]
+            for facet_field_name, facet_field_params in facets.fields.items():
+                if facet_field_params.type == "array" and facet_field_name not in string_array_field_names:
+                    raise core_exceptions.InvalidArgumentError(
+                        f"Facet field '{facet_field_name}' is of type 'array', but is not present in any index documents."
+                    )
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
-            raise ValueError(
+            raise core_exceptions.InvalidArgumentError(
                 "'q' cannot be provided for HYBRID search when hybridParameters.queryTensor or "
                 "'hybridParameters.queryLexical' is provided"
             )

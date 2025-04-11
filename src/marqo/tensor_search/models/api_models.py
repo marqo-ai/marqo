@@ -207,7 +207,7 @@ class SearchQuery(BaseMarqoModel):
                 # Handle range queries and clean up any remaining spaces
                 term = term.strip()
                 while term.startswith('(') or term.count('(') != term.count(')'):
-                    if term.count('(') > term.count(')'):
+                    if term.count('(') > term.count(')') or term.startswith('('):
                         term = term[1:]
                     elif term.count(')') > term.count('('):
                         term = term[:-1]
