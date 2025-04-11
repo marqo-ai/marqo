@@ -24,7 +24,7 @@ class TestFacetsTerm(unittest.TestCase):
             }
         )
         result = self.index._get_facets_term(facets)
-        expected = 'all( all(group(marqo__short_string_fields{"field1"}) order(-count()) each(output(count()))) )'
+        expected = 'all( all(group(marqo__short_string_fields{"field1"}) max(100) order(-count()) each(output(count()))) )'
         self.assertEqual(result, expected)
 
     def test_array_facet(self):
@@ -35,7 +35,7 @@ class TestFacetsTerm(unittest.TestCase):
             }
         )
         result = self.index._get_facets_term(facets)
-        expected = 'all( all(group(marqo__string_array_field1) order(-count()) each(output(count()))) )'
+        expected = 'all( all(group(marqo__string_array_field1) max(100) order(-count()) each(output(count()))) )'
         self.assertEqual(result, expected)
 
     def test_number_facet_without_ranges(self):
@@ -46,10 +46,10 @@ class TestFacetsTerm(unittest.TestCase):
             }
         )
         result = self.index._get_facets_term(facets)
-        expected = ('all( all(group(0) order(-count()) '
+        expected = ('all( all(group(0) max(100) order(-count()) '
                    'each(output(sum(marqo__int_fields{"field1"}), avg(marqo__int_fields{"field1"}), '
                    'min(marqo__int_fields{"field1"}), max(marqo__int_fields{"field1"}), count()))) '
-                   'all(group(-0) order(-count()) '
+                   'all(group(-0) max(100) order(-count()) '
                    'each(output(sum(marqo__float_fields{"field1"}), avg(marqo__float_fields{"field1"}), '
                    'min(marqo__float_fields{"field1"}), max(marqo__float_fields{"field1"}), count()))) )')
         self.assertEqual(result, expected)
@@ -69,10 +69,10 @@ class TestFacetsTerm(unittest.TestCase):
         )
         result = self.index._get_facets_term(facets)
         expected = ('all( all(group(predefined(marqo__int_fields{"field1"}, bucket(0.0, 10.0), bucket(10.0, 20.0))) '
-                   'order(-count()) each(output(sum(marqo__int_fields{"field1"}), avg(marqo__int_fields{"field1"}), '
+                   'max(100) order(-count()) each(output(sum(marqo__int_fields{"field1"}), avg(marqo__int_fields{"field1"}), '
                    'min(marqo__int_fields{"field1"}), max(marqo__int_fields{"field1"}), count()))) '
                    'all(group(predefined(marqo__float_fields{"field1"}, bucket(0.0, 10.0), bucket(10.0, 20.0))) '
-                   'order(-count()) each(output(sum(marqo__float_fields{"field1"}), avg(marqo__float_fields{"field1"}), '
+                   'max(100) order(-count()) each(output(sum(marqo__float_fields{"field1"}), avg(marqo__float_fields{"field1"}), '
                    'min(marqo__float_fields{"field1"}), max(marqo__float_fields{"field1"}), count()))) )')
         self.assertEqual(result, expected)
 
@@ -91,10 +91,10 @@ class TestFacetsTerm(unittest.TestCase):
         )
         result = self.index._get_facets_term(facets)
         expected = ('all( all(group(predefined(marqo__int_fields{"field1"}, bucket(-inf, 0.0), bucket(0.0, inf))) '
-                   'order(-count()) each(output(sum(marqo__int_fields{"field1"}), avg(marqo__int_fields{"field1"}), '
+                   'max(100) order(-count()) each(output(sum(marqo__int_fields{"field1"}), avg(marqo__int_fields{"field1"}), '
                    'min(marqo__int_fields{"field1"}), max(marqo__int_fields{"field1"}), count()))) '
                    'all(group(predefined(marqo__float_fields{"field1"}, bucket(-inf, 0.0), bucket(0.0, inf))) '
-                   'order(-count()) each(output(sum(marqo__float_fields{"field1"}), avg(marqo__float_fields{"field1"}), '
+                   'max(100) order(-count()) each(output(sum(marqo__float_fields{"field1"}), avg(marqo__float_fields{"field1"}), '
                    'min(marqo__float_fields{"field1"}), max(marqo__float_fields{"field1"}), count()))) )')
         self.assertEqual(result, expected)
 
@@ -135,7 +135,7 @@ class TestFacetsTerm(unittest.TestCase):
             }
         )
         result = self.index._get_facets_term(facets)
-        expected = 'all( all(group(marqo__short_string_fields{"field1"}) order(count()) each(output(count()))) )'
+        expected = 'all( all(group(marqo__short_string_fields{"field1"}) max(100) order(count()) each(output(count()))) )'
         self.assertEqual(result, expected)
 
     def test_order_global_level(self):
@@ -147,7 +147,7 @@ class TestFacetsTerm(unittest.TestCase):
             order="asc"
         )
         result = self.index._get_facets_term(facets)
-        expected = 'all( all(group(marqo__short_string_fields{"field1"}) order(count()) each(output(count()))) )'
+        expected = 'all( all(group(marqo__short_string_fields{"field1"}) max(100) order(count()) each(output(count()))) )'
         self.assertEqual(result, expected)
 
     def test_maxDepth(self):
@@ -159,7 +159,7 @@ class TestFacetsTerm(unittest.TestCase):
             maxDepth=3
         )
         result = self.index._get_facets_term(facets)
-        expected = 'all( max(3) all(group(marqo__short_string_fields{"field1"}) order(-count()) each(output(count()))) )'
+        expected = 'all( max(3) all(group(marqo__short_string_fields{"field1"}) max(100) order(-count()) each(output(count()))) )'
         self.assertEqual(result, expected)
 
     def test_multiple_fields_mixed_types(self):

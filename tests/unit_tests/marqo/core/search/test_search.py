@@ -154,6 +154,11 @@ class SearchTest(unittest.TestCase):
     def get_expected_lexical_yql2(self, query):
         return f'select * from {self.current_index.schema_name} where (weakAnd(default contains "{query}"))'
 
+    def get_expected_lexical_yql_with_or(self, query, include_select=True):
+        query_strings = query.split(" ")
+        query_string = " OR ".join([f"default contains \"{q}\"" for q in query_strings])
+        return f'select * from {self.current_index.schema_name} where {query_string}' if include_select else query_string
+
     def set_index_to_return(self, index):
         self.get_index_patcher.stop()
         self.get_index_patcher = patch(
@@ -348,7 +353,7 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.facets'].split('|')[0].strip(" "),
-            self.get_expected_lexical_yql("query") + " limit 0"
+            self.get_expected_lexical_yql_with_or("query") + " limit 0"
         )
 
     def test_hybrid_search_with_facets_tensor(self):
@@ -380,7 +385,11 @@ class SearchTest(unittest.TestCase):
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
             call_args['marqo__yql.facets'].split('|')[0].strip(" "),
-            self.get_expected_lexical_yql2("query")[:-1] + " OR " + f"({self.get_expected_tensor_yql_unstructured(include_select=False)})" + " limit 0"
+            f"select * from {self.current_index.schema_name} where (" +
+            self.get_expected_lexical_yql_with_or("query", include_select=False) +
+            " OR " +
+            f"({self.get_expected_tensor_yql_unstructured(include_select=False)})" +
+            " limit 0"
         )
 
     def test_hybrid_search_with_facets_and_filter(self):
