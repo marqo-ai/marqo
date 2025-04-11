@@ -4,7 +4,7 @@ from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, Ma
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
-
+from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 
 class VespaIndex(ABC):
     """
@@ -212,6 +212,20 @@ class VespaIndex(ABC):
             }
 
         return result
+
+    def escape(self, s: str) -> str:
+        """
+        Used for filter string construction.
+        Add backslash character in front of any special character (backslash or double quote)
+        in one pass.
+        """
+        escaped = []
+        for char in s:
+            if char in CHARACTERS_TO_BE_ESCAPED_IN_VESPA:
+                escaped.append('\\' + char)
+            else:
+                escaped.append(char)
+        return ''.join(escaped)
 
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:

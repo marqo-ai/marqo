@@ -99,15 +99,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
-        def escape(s: str) -> str:
-            return s.replace('\\', '\\\\').replace('"', '\\"')
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
 
+            # Escape special characters in field name and value
+            node.field = self.escape(node.field)
+            node.value = self.escape(node.value)
+
             # Filter on `_id`
             if node.field == MARQO_DOC_ID:
-                return f'({VESPA_FIELD_ID} contains "{escape(node.value)}")'
+                return f'({VESPA_FIELD_ID} contains "{node.value}")'
 
             # Bool Filter
             if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
@@ -119,7 +121,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Short String Filter
             short_string_filter_string = (f'({SHORT_STRINGS_FIELDS} '
                                           f'contains sameElement(key contains "{node.field}", '
-                                          f'value contains "{escape(node.value)}"))')
+                                          f'value contains "{node.value}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
@@ -127,11 +129,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 if node.field in self.get_marqo_index().name_to_string_array_field_map:
                     string_array_field_name = f'{STRING_ARRAY}_{node.field}'
                     string_array_filter_string = (f'({string_array_field_name} contains '
-                                                  f'"{escape(node.value)}")')
+                                                  f'"{node.value}")')
                     filter_parts.append(string_array_filter_string)
             else:
                 string_array_filter_string = (f'({STRING_ARRAY} contains '
-                                              f'"{node.field}::{escape(node.value)}")')
+                                              f'"{node.field}::{node.value}")')
                 filter_parts.append(string_array_filter_string)
 
             # Numeric Filter
@@ -156,6 +158,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return final_filter_string
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
+            # Escape special characters in field name
+            node.field = self.escape(node.field)
+
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
             bound = f'{lower}, {higher}' if lower and higher else f'{lower}{higher}'
