@@ -1046,12 +1046,12 @@ class TestSearch(MarqoTestCase):
     def test_search_invalid_image_url_image_return_proper_error(self):
         """A test to ensure that InvalidArgumentError is raised when searching for an invalid image url."""
         test_queries_list = [
-            ("https://a-dummy-image-url.jpg", "A invalid image"),
-            ({"https://a-dummy-image-url.jpg": 1, "test": 1},
+            ("https://a-dummy-image-url.com/image1.jpg", "A invalid image"),
+            ({"https://a-dummy-image-url.com/image2.jpg": 1, "test": 1},
              "A invalid image in the dictionary")
         ]
 
-        for index_name in [self.structured_default_image_index, self.unstructured_default_image_index]:
+        for index_name in [self.unstructured_default_image_index, self.structured_default_image_index]:
             for query, msg in test_queries_list:
                 with self.subTest(f"{index_name} - {query}"):
                     with self.assertRaises(api_exceptions.InvalidArgError) as e:

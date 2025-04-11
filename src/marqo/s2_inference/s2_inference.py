@@ -26,7 +26,7 @@ from marqo.s2_inference.errors import (
 from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
-from marqo.s2_inference.multimodal_model_load import *
+from marqo.core.inference.modality_utils import *
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
