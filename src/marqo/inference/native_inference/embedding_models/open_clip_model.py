@@ -35,12 +35,6 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
         super().__init__(tokenizer, image_preprocessor)
         self.device = device
 
-    def preprocess(self, inputs: Union[list[Image], list[str]], modality: Modality):
-        if modality == Modality.TEXT:
-            return self._tokenize_text(inputs)
-        elif modality == Modality.IMAGE:
-            return self._preprocess_image(inputs)
-
     def _tokenize_text(self, inputs: list[str]) -> List[Tensor]:
         """
         Preprocess the text using the tokenizer.

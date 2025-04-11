@@ -23,11 +23,13 @@ class AbstractCLIPPreprocessor(AbstractPreprocessor):
         self.tokenizer = tokenizer
         self.image_preprocessor = image_preprocessor
 
-    def preprocess(self, inputs: Union[list[Image], list[str]], modality: Modality):
+    def preprocess(self, inputs: Union[List[str], List[Image]], modality: Modality):
         if modality == Modality.TEXT:
             return self._tokenize_text(inputs)
         elif modality == Modality.IMAGE:
             return self._preprocess_image(inputs)
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
 
     @abstractmethod
     def _tokenize_text(self, inputs: list[str]) -> List[Tensor]:
