@@ -59,6 +59,8 @@ class StructuredVespaIndex(VespaIndex):
     _MAX_LONG = 9223372036854775807
     _MIN_LONG = -9223372036854775808
 
+    _TOTAL_HITS_GROUP_CONST = "1.1"
+
     _HYBRID_SEARCH_MINIMUM_VERSION = constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
 
     def get_vespa_id_field(self) -> str:
@@ -556,47 +558,52 @@ class StructuredVespaIndex(VespaIndex):
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
-        tensor_yql_no_filter = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
-        lexical_yql_no_filter = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}'
-        tensor_yql = f'{tensor_yql_no_filter}{filter_term}'
-        lexical_yql = f'{lexical_yql_no_filter}{filter_term}'
+        tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
+        lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}'
         facet_queries = None
 
-        if marqo_query.facets:
+        if marqo_query.facets or marqo_query.track_total_hits:
             facets_query_skeleton = '%s limit 0 | %s'
+            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
             unique_exclusions = []
             facet_queries = []
-            base_yql = lexical_yql_no_filter
+            facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
             if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
-                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term} OR {tensor_term})'
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
             elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
-                base_yql = tensor_yql_no_filter
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
 
-            facets_term = self._get_facets_term(marqo_query.facets)
+            if marqo_query.track_total_hits is not None:
+                # 0 is byte representation of letter "t"
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
 
-            if facets_term is not None:
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
+            if marqo_query.facets is not None:
+                facets_term = self._get_facets_term(marqo_query.facets)
 
-            # Using a unique delimiter that's unlikely to appear in YQL
-            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
+                if facets_term is not None:
+                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
 
-            for facet_field in marqo_query.facets.fields.items():
-                facet_name, facet_parameters = facet_field
-                if facet_parameters.exclude_terms is not None:
-                    if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
-                        continue
-                    unique_exclusions.append(set(facet_parameters.exclude_terms))
-                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
-                    if new_filter_term:
-                        new_filter_term = f' AND {new_filter_term}'
-                    else:
-                        new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
+                # Using a unique delimiter that's unlikely to appear in YQL
 
-                    query_yql = f'{base_yql}{new_filter_term}'
+                for facet_field in marqo_query.facets.fields.items():
+                    facet_name, facet_parameters = facet_field
+                    if facet_parameters.exclude_terms is not None:
+                        if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
+                            continue
+                        unique_exclusions.append(set(facet_parameters.exclude_terms))
+                        new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
+                        if new_filter_term:
+                            new_filter_term = f' AND {new_filter_term}'
+                        else:
+                            new_filter_term = ''
+                        new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
 
-                    facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+                        query_yql = f'{base_yql}{new_filter_term}'
+
+                        facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
             facet_queries = QUERY_DELIMITER.join(facet_queries)
+
         query = {
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
@@ -859,7 +866,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
+    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery, is_facets_term=False) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
         else:
@@ -872,7 +879,7 @@ class StructuredVespaIndex(VespaIndex):
             return 'true'
 
         # Optional tokens
-        if marqo_query.or_phrases and score_modifiers:
+        if marqo_query.or_phrases and score_modifiers or is_facets_term:
             or_terms = ' OR '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
             ])

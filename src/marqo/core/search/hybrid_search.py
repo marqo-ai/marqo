@@ -41,6 +41,7 @@ class HybridSearch:
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
+            track_total_hits: Optional[bool] = None,
     ) -> Dict:
         """
 
@@ -249,6 +250,7 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters,
             facets=facets,
+            track_total_hits=track_total_hits
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -285,7 +287,7 @@ class HybridSearch:
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
         gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
         total_results = len(gathered_results["hits"])
-        if facets is not None:
+        if facets is not None or track_total_hits is not None:
             if isinstance(vespa_index, SemiStructuredVespaIndex):
                 gathered_results.update(vespa_index.gather_facets_from_response(responses, facets))
 

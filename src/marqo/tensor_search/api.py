@@ -360,6 +360,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters,
             facets=search_query.facets,
+            track_total_hits=search_query.trackTotalHits
         )
         return ORJSONResponse(result)
 

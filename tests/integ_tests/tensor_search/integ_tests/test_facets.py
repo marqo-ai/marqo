@@ -325,7 +325,10 @@ class TestFacets(MarqoTestCase):
                         retrievalMethod=retrieval_method, rankingMethod=ranking_method
                     )
                 )
-                self.assertDictEqual(res_string_facets["facets"], res_array_facets["facets"]["tags"])
+                for facet, value in res_array_facets["facets"]["tags"].items():
+                    splitted_name = facet.split(":")
+                    self.assertDictEqual(res_string_facets["facets"][splitted_name[0]][splitted_name[1]], value)
+
 
     def test_facets_filter_term_exclusions(self):
         """
@@ -413,3 +416,23 @@ class TestFacets(MarqoTestCase):
                         expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets,
                         filter_string="color:red AND NOT color:green"
                     )
+
+    def test_get_total_hits(self):
+        self.add_fashion_docs()
+        for retrieval_method, ranking_method in (
+                (RetrievalMethod.Tensor, RankingMethod.Tensor),
+                (RetrievalMethod.Lexical, RankingMethod.Lexical),
+                (RetrievalMethod.Disjunction, RankingMethod.RRF),
+        ):
+            res = tensor_search.search(
+                config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                    retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                ),
+                track_total_hits=True
+            )
+            if retrieval_method == RetrievalMethod.Lexical:
+                self.assertEqual(res["totalHits"], 1)
+            else:
+                self.assertEqual(res["totalHits"], 4)
+

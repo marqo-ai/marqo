@@ -317,6 +317,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
            facets: Optional[FacetsParameters] = None,
+           track_total_hits: Optional[bool] = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -444,7 +445,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, facets=facets
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:

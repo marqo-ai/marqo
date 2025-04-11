@@ -105,7 +105,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             "array": STRING_ARRAY,
         }
 
-        global_max_results = facets_parameters.max_results or ""
+        global_max_results = facets_parameters.max_results or 100
         global_sort_order = facets_parameters.order or ""
 
         def build_group_parameters(field_config) -> str:
@@ -824,8 +824,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             ...
         }
         """
-        facet_field_map = self._build_field_map(facets)
+        if facets is not None:
+            facet_field_map = self._build_field_map(facets)
         facets_response = {}
+        total_hits = None
 
         # Process root groups only
         root_groups = (group for group in response.facets if group.id.startswith("group:facet:"))
@@ -833,50 +835,52 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if group.children is None:
                 continue
             for field in group.children:
-                field_name = self._extract_facet_field_name(field.id, facets)
-                facets_response.setdefault(field_name, {})
+                field_name = self._extract_facet_field_name(field.label, facets)
+                if not field_name == self._TOTAL_HITS_GROUP_CONST:
+                    facets_response.setdefault(field_name, {})
 
                 for value in field.children:
                     group_type, value_key = self._parse_value_id(value.id)
                     processed_stats = self._process_value_stats(value.fields)
 
-                    if facets.fields[field_name].type in ["string", "array"]:
+                    if field_name == self._TOTAL_HITS_GROUP_CONST:
+                        total_hits = processed_stats["count"]
+
+                    elif facets.fields[field_name].type in ["string", "array"]:
                         if value.id == "group:string:":
                             # Vespa's value for not found
                             continue
                         # values might be nested deeply if user data is stored as a.b.c
-                        current_level = facets_response[field_name]
-                        for key in value_key:
-                            if key not in current_level:
-                                current_level[key] = {}
-                            current_level = current_level[key]
-                        current_level.update(processed_stats)
+                        facets_response[field_name][value_key] = processed_stats
                     elif facets.fields[field_name].type in ["number"]:
-                        if any(value in [-9223372036854775808, 'NaN'] for value in processed_stats.values()):
+                        if any(value in [self._MIN_LONG, 'NaN'] for value in processed_stats.values()):
                             # Vespa's value for null for int and float
                             continue
                         if facets.fields[field_name].ranges is None:
-                            if any(value in [-9223372036854775808, 'NaN'] for value in processed_stats.values()):
-                                # Vespa's value for null
-                                continue
                             # aggregate statistic between int and float
                             facets_response[field_name] = self._combine_number_stats(
                                 facets_response.get(field_name, {}), processed_stats
                             )
                         elif group_type != "null": # the case when there is no values in range
                             self._process_range_facets(
-                                field_name, value_key[1], processed_stats,
+                                field_name, value_key, processed_stats,
                                 facet_field_map, facets_response
                             )
                     else:
                         raise InternalError(f"Failed to parse facet {field_name} with type {facets.fields[field_name].type}")
 
         # Sort range facets by upper bound
-        for field_name, field_data in facets_response.items():
-            if facet_field_map.get(field_name).ranges is not None:
-                facets_response[field_name] = self._sort_range_facets(field_data)
+        if facets is not None:
+            for field_name, field_data in facets_response.items():
+                if facet_field_map.get(field_name).ranges is not None:
+                    facets_response[field_name] = self._sort_range_facets(field_data)
 
-        return {'facets': facets_response}
+        response = {}
+        if total_hits is not None:
+            response["totalHits"] = total_hits
+        if facets is not None:
+            response["facets"] = facets_response
+        return response
 
     def _build_field_map(self, facets: FacetsParameters) -> Dict[str, Any]:
         """Build a mapping from field names to their facet parameters."""
@@ -885,25 +889,29 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             for facet_field in facets.fields.items()
         }
 
-    def _extract_facet_field_name(self, field_id: str, facets: FacetsParameters) -> str:
+    def _extract_facet_field_name(self, field_label: str, facets: FacetsParameters) -> str:
         """Extract the facet field name from a Vespa field ID."""
-        if SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX in field_id:
+        if field_label.startswith(SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX):
             # strip group:marqo__string_array_ part of name
-            return field_id[30:]
+            return field_label[len(SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX):]
         # this is only possible if field query was a number without ranges. So group name is n for float and negative n for int
-        if "marqo" not in field_id:
-            if "neg" in field_id:  # :neg(n) - when combining
-                group_index = int(field_id.split(':')[1][4:-1])
+        if not field_label.startswith("marqo__") and not field_label.startswith("predefined(marqo__"):
+            if "neg" in field_label:  # :neg(n) - when combining
+                group_index = field_label[4:-1]
             else:
-                group_index = int(field_id.split(':')[1])
+                group_index = field_label
+            if group_index == self._TOTAL_HITS_GROUP_CONST:
+                return self._TOTAL_HITS_GROUP_CONST
+            group_index = int(group_index)
             return next(iter(facet_field_name for i, facet_field_name in enumerate(facets.fields.keys()) if i == group_index))
             # return facets.fields.items()[group_index][0]
-        return field_id.split('{')[1].split('}')[0].strip('"')
+        return field_label.split('{')[1].split('}')[0].strip('"')
 
     def _parse_value_id(self, value_id: str) -> Tuple[str, str]:
         """Parse a Vespa value ID into group type and value key."""
-        parts = value_id.split(':')
-        return parts[1], parts[2:]
+        parts = value_id.split(':', 2)
+        # if null returned by Vespa, only 2 parts from split
+        return parts[1], parts[2] if len(parts) == 3 else None
 
     def _process_value_stats(self, fields: Dict) -> Dict:
         """Process field statistics, removing Vespa-specific suffixes."""
@@ -915,7 +923,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         aggregated_stats = {}
         aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
         aggregated_stats["count"] = current_stats["count"] + stats["count"]
-        aggregated_stats["avg"] = (current_stats["avg"] + stats["avg"]) / 2
+        aggregated_stats["avg"] = (current_stats["avg"] * current_stats["count"] + stats["avg"] * stats["count"]) / (current_stats["count"] + stats["count"])
         aggregated_stats["min"] = min(current_stats["min"], stats["min"])
         aggregated_stats["max"] = max(current_stats["max"], stats["max"])
         return aggregated_stats
@@ -935,8 +943,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return
 
         for facet_range in params.ranges:
-            if (value_key == "Infinity" and facet_range.to_ is None) or float(value_key) == facet_range.to_:
-                range_name = self._get_range_name(facet_range, value_key)
+            value_to = value_key.split(":")[1]
+            if (value_to == "Infinity" and facet_range.to_ is None) or float(value_to) == facet_range.to_:
+                range_name = self._get_range_name(facet_range, value_to)
                 if range_name:
                     aggregated_stats = self._combine_number_stats(response.get(field_name, {}).get(range_name, ({}, None))[0], stats)
                     # store ranges as stats, to_value to then sort and return from lower to higher.

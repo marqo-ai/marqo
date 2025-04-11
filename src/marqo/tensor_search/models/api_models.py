@@ -58,6 +58,7 @@ class SearchQuery(BaseMarqoModel):
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
+    trackTotalHits: Optional[bool] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -220,6 +221,16 @@ class SearchQuery(BaseMarqoModel):
                                        if not any(ex in term for term in filter_str_terms)]
                     if missing_exclusions:
                         raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_get_total_hits_only_for_hybrid_search(cls, values):
+        """Validate that trackTotalHits is only provided for hybrid search"""
+        track_total_hits = values.get('trackTotalHits')
+        search_method = values.get('searchMethod')
+        if track_total_hits and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"trackTotalHits can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
         return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
