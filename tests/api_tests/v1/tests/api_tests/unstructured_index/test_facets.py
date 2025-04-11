@@ -233,3 +233,53 @@ class TestFacets(MarqoTestCase):
                     facets=facets
                 )
             self.assertIn("extra fields not permitted", str(e.exception).lower())
+
+    def test_track_total_hits_default(self):
+        """Test track_total_hits parameter defaults to False"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID"
+        )
+        self.assertNotIn("totalHits", res)
+
+    def test_track_total_hits_enabled(self):
+        """Test track_total_hits parameter returns total hits count"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            track_total_hits=True
+        )
+        self.assertIn("totalHits", res)
+        self.assertIsInstance(res["totalHits"], int)
+        self.assertGreater(res["totalHits"], 0)
+
+    def test_track_total_hits_with_filter(self):
+        """Test track_total_hits with filter returns correct count"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            track_total_hits=True,
+            filter_string="price:[100 TO 200]"
+        )
+        self.assertIn("totalHits", res)
+        filtered_res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            filter_string="price:[100 TO 200]"
+        )
+        self.assertEqual(res["totalHits"], len(filtered_res["hits"]))
+
+    def test_track_total_hits_no_results(self):
+        """Test track_total_hits when there are no matching documents"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "nonexistentquery123456",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "lexical",
+                "rankingMethod": "lexical"
+            },
+            track_total_hits=True
+        )
+        self.assertIn("totalHits", res)
+        self.assertEqual(res["totalHits"], 0)
+        self.assertEqual(len(res["hits"]), 0)

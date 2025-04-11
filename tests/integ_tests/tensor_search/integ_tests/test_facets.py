@@ -418,21 +418,61 @@ class TestFacets(MarqoTestCase):
                     )
 
     def test_get_total_hits(self):
+        """Test getting total hits for different retrieval methods"""
         self.add_fashion_docs()
         for retrieval_method, ranking_method in (
                 (RetrievalMethod.Tensor, RankingMethod.Tensor),
                 (RetrievalMethod.Lexical, RankingMethod.Lexical),
                 (RetrievalMethod.Disjunction, RankingMethod.RRF),
         ):
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                res = tensor_search.search(
+                    config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                    search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                    ),
+                    track_total_hits=True
+                )
+                if retrieval_method == RetrievalMethod.Lexical:
+                    self.assertEqual(res["totalHits"], 1)
+                else:
+                    self.assertEqual(res["totalHits"], 4)
+
+    def test_get_total_hits_with_facets(self):
+        """Test getting total hits with facets returns consistent counts"""
+        self.add_fashion_docs()
+        facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(type="string")})
+        for retrieval_method, ranking_method in (
+                (RetrievalMethod.Tensor, RankingMethod.Tensor),
+                (RetrievalMethod.Lexical, RankingMethod.Lexical),
+                (RetrievalMethod.Disjunction, RankingMethod.RRF),
+        ):
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                res = tensor_search.search(
+                    config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                    search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                    ),
+                    track_total_hits=True,
+                    facets=facets
+                )
+                # Verify totalHits matches sum of facet counts
+                facet_total = sum(v["count"] for v in res["facets"]["color"].values())
+                self.assertEqual(res["totalHits"], facet_total)
+
+    def test_get_total_hits_no_matches(self):
+        """Test getting total hits when there are no matching documents"""
+        self.add_fashion_docs()
+        for retrieval_method, ranking_method in (
+                (RetrievalMethod.Lexical, RankingMethod.Lexical),
+        ):
             res = tensor_search.search(
-                config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+                config=self.config, index_name=self.semi_structured_default_text_index.name, text="nonexistent",
                 search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
                     retrievalMethod=retrieval_method, rankingMethod=ranking_method
                 ),
                 track_total_hits=True
             )
-            if retrieval_method == RetrievalMethod.Lexical:
-                self.assertEqual(res["totalHits"], 1)
-            else:
-                self.assertEqual(res["totalHits"], 4)
+            self.assertEqual(res["totalHits"], 0)
+            self.assertEqual(len(res["hits"]), 0)
 

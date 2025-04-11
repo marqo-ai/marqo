@@ -876,6 +876,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     facets_response[field_name] = self._sort_range_facets(field_data)
 
         response = {}
+        print(total_hits, response)
         if total_hits is not None:
             response["totalHits"] = total_hits
         if facets is not None:
@@ -896,7 +897,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return field_label[len(SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX):]
         # this is only possible if field query was a number without ranges. So group name is n for float and negative n for int
         if not field_label.startswith("marqo__") and not field_label.startswith("predefined(marqo__"):
-            if "neg" in field_label:  # :neg(n) - when combining
+            if field_label.startswith('neg(') and field_label.endswith(')'):  # neg(n) - when combining
                 group_index = field_label[4:-1]
             else:
                 group_index = field_label

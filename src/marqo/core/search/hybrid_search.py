@@ -134,6 +134,10 @@ class HybridSearch:
             raise core_exceptions.UnsupportedFeatureError(
                 f"Facets are only supported for unstructured indexes"
             )
+        if track_total_hits is not None and not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"trackTotalHits is only supported for unstructured indexes"
+            )
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
             raise ValueError(
@@ -290,6 +294,8 @@ class HybridSearch:
         if facets is not None or track_total_hits is not None:
             if isinstance(vespa_index, SemiStructuredVespaIndex):
                 gathered_results.update(vespa_index.gather_facets_from_response(responses, facets))
+            if track_total_hits is not None and "totalHits" not in gathered_results:
+                gathered_results["totalHits"] = 0
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(

@@ -618,7 +618,11 @@ class StructuredVespaIndex(VespaIndex):
             'presentation.summary': summary,
 
             # Custom searcher parameters
-            'marqo__yql.tensor': tensor_yql,
+            'marqo__yql.tensor': None if (
+                    marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
+                    and
+                    marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
+            ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
             'marqo__yql.facets': facet_queries,
 
