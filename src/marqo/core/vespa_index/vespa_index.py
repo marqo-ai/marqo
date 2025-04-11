@@ -215,6 +215,7 @@ class VespaIndex(ABC):
 
     def escape(self, s: str) -> str:
         """
+        Used for filter string construction.
         Add backslash character in front of any special character (backslash or double quote)
         in one pass.
         """
