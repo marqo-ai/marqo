@@ -1,32 +1,42 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
     download_and_preprocess_image
-from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
 
-OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
+MultilingualCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]], List[Tuple[str, str]]]
 
 
-class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
+class MultilingualCLIPModelInferencePipeline(AbstractInferencePipeline):
+    """
+    A class to represent the inference pipeline for the Multilingual CLIP model.
 
-    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor,)
+    Attributes:
+        VALID_CONTENT_TO_ENCODE_TYPE (tuple): A tuple of valid content types to encode. For images, we
+        expect a tensor. For text, we expect a string.
+
+        MAX_BATCH_SIZE (int): The maximum batch size for encoding.
+    """
+
+    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor, str)
     MAX_BATCH_SIZE = 16
 
-    def __init__(self, model: OpenCLIPModel, inference_request: InferenceRequest):
+    def __init__(self, model: MultilingualCLIPModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
+
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
+        preprocessed_content_list: List[MultilingualCLIPPreprocessedContent] = self._content_preprocessing()
 
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _content_preprocessing(self) -> List[OpenCLIPPreprocessedContent]:
+    def _content_preprocessing(self) -> List[MultilingualCLIPPreprocessedContent]:
         """
         Preprocess the content based on the modality.
-        
+
         Returns:
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
@@ -44,10 +54,10 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
                 self.inference_request.return_individual_error
             )
         else:
-            raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
+            raise ValueError(f"Unsupported modality: {modality}")
         return results
 
-    def _encode_processed_content(self, preprocessed_content_list: List[OpenCLIPPreprocessedContent]) -> List[
+    def _encode_processed_content(self, preprocessed_content_list: List[MultilingualCLIPPreprocessedContent]) -> List[
         ndarray]:
         """
         Encode the preprocessed content into embeddings.
@@ -77,7 +87,8 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
         return embeddings
 
-    def _collect_valid_content_to_encode(self, preprocessed_content: list[OpenCLIPPreprocessedContent]) -> list[Tensor]:
+    def _collect_valid_content_to_encode(self, preprocessed_content: list[MultilingualCLIPPreprocessedContent]) \
+            -> list[Tensor]:
         """
         Collect the valid content to encode from the preprocessed content. Each individual content can be
         an InferenceError, or a list of tuples with the original text and the preprocessed content. The

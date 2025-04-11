@@ -510,6 +510,9 @@ class StructuredMarqoIndex(MarqoIndex):
 
 
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
+
+    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
+
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
@@ -612,6 +615,13 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             return the_map
 
         return self._cache_or_get('tensor_subfield_map', generate)
+
+    @property
+    def index_supports_partial_updates(self) -> bool:
+        """
+        Check if the index supports partial updates.
+        """
+        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
