@@ -1051,7 +1051,7 @@ class TestSearch(MarqoTestCase):
              "A invalid image in the dictionary")
         ]
 
-        for index_name in [self.unstructured_default_image_index]:
+        for index_name in [self.unstructured_default_image_index, self.structured_default_image_index]:
             for query, msg in test_queries_list:
                 with self.subTest(f"{index_name} - {query}"):
                     with self.assertRaises(api_exceptions.InvalidArgError) as e:
