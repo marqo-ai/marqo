@@ -16,7 +16,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
-from marqo.s2_inference.multimodal_model_load import infer_modality
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
