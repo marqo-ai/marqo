@@ -2463,37 +2463,6 @@ class TestHybridSearch(MarqoTestCase):
         self.assertIn("does not support `searchableAttributesTensor` or `searchableAttributesLexical`",
                       str(e.exception))
 
-    def test_lexical_error_raises_correct_hybrid_error(self):
-        """
-        Ensure that the proper error is raised when a lexical search fails in a hybrid search.
-        The double backslash error is a known 500 in lexical search (400 in vespa), so using
-        the same query in hybrid search should give the same error code and message.
-        """
-
-        # TODO: remove when double backslash error is fixed
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
-            with self.subTest(index=index.type):
-
-                # Adding documents
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=[
-                            {"_id": "doc1", "text_field_1": "some text"}
-                        ],
-                        tensor_fields=["text_field_1"] if \
-                            isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                with self.assertRaises(vespa_exceptions.VespaStatusError) as e:
-                    tensor_search.search(
-                        text='\\\\"hi\\\\"', config=self.config, index_name=index.name,
-                        search_method=SearchMethod.HYBRID
-                    )
-                self.assertIn("Could not create query from YQL", str(e.exception))
-
     def test_hybrid_with_two_errors_returns_both(self):
         """
         If vespa query to the hybrid searcher returns a result with 2 errors, both should be in the error message.

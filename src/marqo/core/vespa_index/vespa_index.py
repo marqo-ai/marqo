@@ -4,7 +4,7 @@ from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, Ma
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
-
+from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 
 class VespaIndex(ABC):
     """
@@ -213,7 +213,6 @@ class VespaIndex(ABC):
 
         return result
 
-    @staticmethod
     def _get_rerank_depth_and_additional_hits_from_query(query: Union[MarqoTensorQuery, MarqoHybridQuery]) -> Tuple[int, int]:
         if query.ef_search is not None:
             base_rerank_depth = min(query.limit + query.offset, query.ef_search)
@@ -223,6 +222,20 @@ class VespaIndex(ABC):
             additional_hits = 0
 
         return query.rerank_depth_tensor if query.rerank_depth_tensor else base_rerank_depth, additional_hits
+ 
+    def escape(self, s: str) -> str:
+        """
+        Used for filter string construction.
+        Add backslash character in front of any special character (backslash or double quote)
+        in one pass.
+        """
+        escaped = []
+        for char in s:
+            if char in CHARACTERS_TO_BE_ESCAPED_IN_VESPA:
+                escaped.append('\\' + char)
+            else:
+                escaped.append(char)
+        return ''.join(escaped)
 
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:

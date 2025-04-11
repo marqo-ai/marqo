@@ -759,9 +759,6 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
-        def escape(s: str) -> str:
-            return s.replace('\\', '\\\\').replace('"', '\\"')
-
         def _convert_to_in_list_str(value_list: list, marqo_field_name: str, marqo_field_type: FieldType) -> str:
             """
             Change list into its string representation, replacing [] with ().
@@ -780,7 +777,7 @@ class StructuredVespaIndex(VespaIndex):
             for i in range(len(value_list)):
                 # str type fields
                 if marqo_field_type in STR_FIELD_TYPES:
-                    in_list += f'"{value_list[i]}"'
+                    in_list += f'"{self.escape(value_list[i])}"'
                 # int type fields
                 elif marqo_field_type in INT_FIELD_TYPES:
                     try:
@@ -835,6 +832,10 @@ class StructuredVespaIndex(VespaIndex):
                     marqo_field_name = marqo_field.filter_field_name
                     marqo_field_type = marqo_field.type
 
+                # Escape special chars in field name
+                if marqo_field_name:
+                    marqo_field_name = self.escape(marqo_field_name)
+
                 if isinstance(node, search_filter.EqualityTerm):
                     node_value = node.value
                     if marqo_field_type == FieldType.Bool:
@@ -843,7 +844,7 @@ class StructuredVespaIndex(VespaIndex):
                         elif node_value.lower() == 'false':
                             node_value = '0'
 
-                    return f'{marqo_field_name} contains "{escape(node_value)}"'
+                    return f'{marqo_field_name} contains "{self.escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
                     lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
                     upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
