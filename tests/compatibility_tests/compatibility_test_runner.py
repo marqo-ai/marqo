@@ -10,7 +10,7 @@ import pytest
 import requests
 import semver
 
-from compatibility_test_logger import get_logger
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 from tests.compatibility_tests.docker_manager import DockerManager
 
@@ -111,15 +111,15 @@ def run_prepare_mode(version_to_test_against: str):
         logger.info(f"Detected marqo_version '{marqo_version}' for testcase: {test_class.__name__}")
         try:
             if semver.VersionInfo.parse(marqo_version).compare(version_to_test_against) <= 0:
-                logger.info(f"Running prepare mode on testcase: {test_class.__name__} with version: {marqo_version}")
+                logger.info(f"Running prepare mode on testcase: {test_class.__name__}")
                 test_class.setUpClass() #setUpClass will be used to create Marqo client
                 test_instance = test_class()
                 test_instance.prepare() #Prepare method will be used to create index and add documents
             else: # Skip the test if the version_to_test_against is greater than the version the test is marked
-                logger.info(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
+                logger.info(f"Skipping testcase {test_class.__name__} as {marqo_version} > {version_to_test_against}")
         except Exception as e:
-            logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
-            errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
+            logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
+            errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
 
     if errors:
