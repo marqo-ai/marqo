@@ -1,15 +1,15 @@
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.native_inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
-from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
-    get_multilingual_clip_properties
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
-from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
-from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.inference.native_inference.embedding_models.random_model import RandomModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
+from marqo.s2_inference.clip_utils import CLIP, FP16_CLIP
+from marqo.s2_inference.no_model_utils import NO_MODEL
+from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.types import Dict
-from marqo.s2_inference.no_model_utils import NO_MODEL
 
 
 # we need to keep track of the embed dim and model load functions/classes
@@ -2284,6 +2284,57 @@ def _get_random_properties() -> Dict:
     }
     return RANDOM_MODEL_PROPERTIES
 
+def _get_multilingual_clip_properties() -> Dict:
+    """This is moved here from the model registry to avoid a circular import"""
+    # Models are from github repo
+    # https://github.com/FreddeFrallan/Multilingual-CLIP
+    MULTILINGUAL_CLIP_PROPERTIES = {
+        "multilingual-clip/XLM-Roberta-Large-Vit-L-14":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-L-14",
+                "visual_model": "open_clip/ViT-L-14/openai",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            },
+        "multilingual-clip/XLM-R Large Vit-B/16+":
+            # Deprecated model name
+            {
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
+            },
+        "multilingual-clip/XLM-Roberta-Large-Vit-B-16Plus":
+            # This model is exactly the same as the one above, but with a different name to avoid
+            # spaces and '+' in the name.
+            {
+                "name": "multilingual-clip/XLM-R Large Vit-B/16+",
+                "visual_model": "open_clip/ViT-B-16-plus-240/laion400m_e32",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-16Plus',
+                "dimensions": 640,
+                "type": "multilingual_clip",
+            },
+        "multilingual-clip/XLM-Roberta-Large-Vit-B-32":
+            {
+                "name": "multilingual-clip/XLM-Roberta-Large-Vit-B-32",
+                "visual_model": "open_clip/ViT-B-32/openai",
+                "textual_model": 'M-CLIP/XLM-Roberta-Large-Vit-B-32',
+                "dimensions": 512,
+                "type": "multilingual_clip",
+            },
+
+        "multilingual-clip/LABSE-Vit-L-14":
+            {
+                "name": "multilingual-clip/LABSE-Vit-L-14",
+                "visual_model": "open_clip/ViT-L-14/openai",
+                "textual_model": 'M-CLIP/LABSE-Vit-L-14',
+                "dimensions": 768,
+                "type": "multilingual_clip",
+            }
+    }
+    return MULTILINGUAL_CLIP_PROPERTIES
 
 def _get_no_model_properties() -> Dict:
     return {
@@ -2301,7 +2352,7 @@ def _get_model_load_mappings() -> Dict:
         'test': TEST,
         'sbert_onnx': SBERT_ONNX,
         'clip_onnx': CLIP_ONNX,
-        "multilingual_clip": MULTILINGUAL_CLIP,
+        "multilingual_clip": MultilingualCLIPModel,
         "fp16_clip": FP16_CLIP,
         'random': RandomModel,
         'hf': HuggingFaceModel,
@@ -2323,7 +2374,7 @@ def load_model_properties() -> Dict:
     hf_model_properties = _get_hf_properties()
     open_clip_model_properties = _get_open_clip_properties()
     onnx_clip_model_properties = _get_onnx_clip_properties()
-    multilingual_clip_model_properties = get_multilingual_clip_properties()
+    multilingual_clip_model_properties = _get_multilingual_clip_properties()
     fp16_clip_model_properties = _get_fp16_clip_properties()
     no_model_properties = _get_no_model_properties()
     languagebind_model_properties = _get_languagebind_properties()

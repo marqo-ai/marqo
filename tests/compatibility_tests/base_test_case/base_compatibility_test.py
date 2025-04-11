@@ -2,6 +2,7 @@ import json
 import logging
 from abc import abstractmethod, ABC
 from pathlib import Path
+
 from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
 
 
