@@ -68,7 +68,7 @@ class TestFacets(MarqoTestCase):
                 self.assertEqual(d1[key], d2[key],
                                  f"Values differ for key {key}: {d1[key]} != {d2[key]}")
 
-    def test_facet_query(self, retrieval_method, ranking_method, facets, expected_lexical_facets, expected_other_facets):
+    def _test_facet_query(self, retrieval_method, ranking_method, facets, expected_lexical_facets, expected_other_facets):
         res = tensor_search.search(
             config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
             facets=facets,
@@ -106,7 +106,7 @@ class TestFacets(MarqoTestCase):
                 facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(type="string")})
                 expected_lexical_facets = {'color': {'red': {'count': 1}}}
                 expected_other_facets = {'color': {'red': {'count': 2}, 'coral': {'count': 1}, 'green': {'count': 1}}}
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -126,7 +126,7 @@ class TestFacets(MarqoTestCase):
                 facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(type="string")}, maxResults=1)
                 expected_lexical_facets = {'color': {'red': {'count': 1}}}
                 expected_other_facets = {'color': {'red': {'count': 2}}}
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -145,7 +145,7 @@ class TestFacets(MarqoTestCase):
                 facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(type="string", maxResults=2)}, maxResults=1)
                 expected_lexical_facets = {'color': {'red': {'count': 1}}}
                 expected_other_facets = {'color': {'red': {'count': 2}, 'coral': {'count': 1}}}
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -165,7 +165,7 @@ class TestFacets(MarqoTestCase):
                 facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(type="string")}, maxResults=1, order="asc")
                 expected_lexical_facets = {'color': {'red': {'count': 1}}}
                 expected_other_facets = {'color': {'coral': {'count': 1}}}
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -185,7 +185,7 @@ class TestFacets(MarqoTestCase):
                 facets = FacetsParameters(fields={"price": FieldFacetsConfiguration(type="number")})
                 expected_lexical_facets = {'price': {'avg': 49.03, 'count': 1, 'max': 49.03, 'min': 49.03, 'sum': 49.03}}
                 expected_other_facets = {'price': {'sum': 224.55, 'avg': 56.1375, 'min': 1.2, 'max': 92.99, 'count': 4}}
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -205,14 +205,14 @@ class TestFacets(MarqoTestCase):
                     "price": FieldFacetsConfiguration(type="number", ranges=[{"to": 50}, {"from": 50}]),
                 })
                 expected_lexical_facets = {'price': {
-                    '-Infinity:50.0': {'avg': 49.03,'count': 1,'max': 49.03,'min': 49.03, 'sum': 49.03}
+                    '-Inf:50.0': {'avg': 49.03,'count': 1,'max': 49.03,'min': 49.03, 'sum': 49.03}
                 }
                 }
                 expected_other_facets = {'price': {
-                    '-Infinity:50.0': {'avg': 25.115,'count': 2,'max': 49.03,'min': 1.2, 'sum': 50.23},
-                    '50.0:Infinity': {'avg': 87.16, 'count': 2, 'max': 92.99, 'min': 81.33, 'sum': 174.32}}
+                    '-Inf:50.0': {'avg': 25.115,'count': 2,'max': 49.03,'min': 1.2, 'sum': 50.23},
+                    '50.0:Inf': {'avg': 87.16, 'count': 2, 'max': 92.99, 'min': 81.33, 'sum': 174.32}}
                 }
-                self.test_facet_query(
+                self._test_facet_query(
                     retrieval_method=retrieval_method, ranking_method=ranking_method,
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
@@ -384,7 +384,7 @@ class TestFacets(MarqoTestCase):
                     self.assertEqual(res["hits"], [])
                 with self.subTest("excludeTerms can get rid of part of the term"):
                     facets = FacetsParameters(fields={"color": FieldFacetsConfiguration(
-                        type="string", excludeTerms=["NOT color:red"]
+                        type="string", excludeTerms=["color:red"]
                     )})
                     expected_lexical_facets = {'color': {'red': {'count': 1}}}
                     expected_other_facets = {'color': {'red': {'count': 1}}}
@@ -396,7 +396,7 @@ class TestFacets(MarqoTestCase):
                     )
                 with self.subTest("excludeTerms work per field"):
                     facets = FacetsParameters(fields={
-                        "color": FieldFacetsConfiguration(type="string", excludeTerms=["NOT color:red"]),
+                        "color": FieldFacetsConfiguration(type="string", excludeTerms=["color:green"]),
                         "brand": FieldFacetsConfiguration(type="string", excludeTerms=["color:red"]),
                     })
                     expected_lexical_facets = {
@@ -405,11 +405,11 @@ class TestFacets(MarqoTestCase):
                     }
                     expected_other_facets = {
                         'color': {'red': {'count': 2}},
-                        'brand': {'PulseWear': {'count': 1}, 'RetroHue': {'count': 1}, 'SnugNest': {'count': 1}, 'SprintX': {'count': 1}}
+                        'brand': {'PulseWear': {'count': 1}, 'SnugNest': {'count': 1}, 'SprintX': {'count': 1}}
                     }
                     res = test_facet_query(
                         retrieval_method=retrieval_method, ranking_method=ranking_method,
                         facets=facets,
                         expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets,
-                        filter_string="color:red AND NOT color:red"
+                        filter_string="color:red AND NOT color:green"
                     )
