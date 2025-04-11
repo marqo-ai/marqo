@@ -188,39 +188,72 @@ class SearchQuery(BaseMarqoModel):
 
     @root_validator(pre=False)
     def validate_facet_exclude_terms_in_filter(cls, values):
-        """Validate that excluded facet fields appear in filter"""
+        """Validate that excluded facet fields appear in filter string.
+        
+        This validator ensures that:
+        1. Exclude terms can only be used when a filter string is present
+        2. All exclude terms must appear in the filter string
+        3. The filter string has valid parentheses structure
+        
+        Args:
+            values: Dictionary containing the model's values
+            
+        Returns:
+            The validated values dictionary
+            
+        Raises:
+            ValueError: If validation fails for any of the above conditions
+        """
         facets = values.get('facets')
         filter_str = values.get('filter')
 
-        if facets and facets.fields:
-            if not filter_str:
-                if any(facet_field.exclude_terms for facet_field in facets.fields.values()):
-                    raise ValueError("Exclude terms can only be used with a filter string.")
-                return values
+        if not facets or not facets.fields:
+            return values
 
-            # Remove nested parentheses and clean up the filter string
-            filter_str = filter_str.replace("NOT", "")
-            # Split by AND/OR operators and clean up terms
-            filter_str_terms = []
-            raw_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)
+        # Check if exclude terms are used without a filter
+        if not filter_str:
+            if any(field.exclude_terms for field in facets.fields.values()):
+                raise ValueError("Exclude terms can only be used when a filter string is provided.")
+            return values
+
+        # Extract clean terms from filter string
+        def extract_clean_terms(filter_string: str) -> List[str]:
+            # Remove NOT operators as they don't affect term matching
+            filter_string = filter_string.replace("NOT", "")
+            
+            # Split by AND/OR operators
+            raw_terms = re.split(r'\s*(?:AND|OR)\s*', filter_string)
+            
+            # Clean each term
+            clean_terms = []
             for term in raw_terms:
-                # Handle range queries and clean up any remaining spaces
-                term = term.strip()
-                while term.startswith('(') or term.count('(') != term.count(')'):
-                    if term.count('(') > term.count(')') or term.startswith('('):
-                        term = term[1:]
-                    elif term.count(')') > term.count('('):
-                        term = term[:-1]
-                # Append actual value
-                filter_str_terms.append(term.strip())
+                # Remove all parentheses and whitespace
+                term = re.sub(r'[()]', '', term).strip()
+                if term:  # Only add non-empty terms
+                    clean_terms.append(term)
+            
+            return clean_terms
 
-            for facet_field in facets.fields.items():
-                field_name, field_parameters = facet_field
-                if field_parameters.exclude_terms:
-                    missing_exclusions = [ex for ex in field_parameters.exclude_terms
-                                       if not any(ex in term for term in filter_str_terms)]
-                    if missing_exclusions:
-                        raise ValueError(f"Facet field '{field_name}' has exclusions {missing_exclusions} that do not appear in the filter string.")
+        filter_terms = extract_clean_terms(filter_str)
+
+        # Validate each facet field's exclude terms
+        for field_name, field_params in facets.fields.items():
+            if not field_params.exclude_terms:
+                continue
+
+            # Check if all exclude terms appear in filter
+            missing_terms = [
+                term for term in field_params.exclude_terms
+                if not any(term in filter_term for filter_term in filter_terms)
+            ]
+
+            if missing_terms:
+                raise ValueError(
+                    f"Facet field '{field_name}' has exclude terms {missing_terms} "
+                    f"that do not appear in the filter string. All exclude terms must "
+                    f"be present in the filter for proper filtering."
+                )
+
         return values
 
     @root_validator(pre=False)

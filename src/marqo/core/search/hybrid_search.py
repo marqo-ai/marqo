@@ -137,10 +137,9 @@ class HybridSearch:
             raise core_exceptions.UnsupportedFeatureError(
                 f"trackTotalHits is only supported for unstructured indexes"
             )
-        if isinstance(marqo_index, SemiStructuredMarqoIndex):
-            string_array_field_names = [string_array_field.name for string_array_field in marqo_index.string_array_fields]
+        if isinstance(marqo_index, SemiStructuredMarqoIndex) and marqo_index.name_to_string_array_field_map and facets is not None:
             for facet_field_name, facet_field_params in facets.fields.items():
-                if facet_field_params.type == "array" and facet_field_name not in string_array_field_names:
+                if facet_field_params.type == "array" and facet_field_name not in marqo_index.name_to_string_array_field_map:
                     raise core_exceptions.InvalidArgumentError(
                         f"Facet field '{facet_field_name}' is of type 'array', but is not present in any index documents."
                     )
