@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 from marqo.api.exceptions import ConfigurationError, InternalError
 from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.core.inference.modality_utils import Modality
+from marqo.core.inference.api.modality import Modality
 import datetime
 
 

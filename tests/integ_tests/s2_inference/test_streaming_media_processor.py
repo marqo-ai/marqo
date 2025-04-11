@@ -6,7 +6,7 @@ from pytest import mark
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from marqo.core.inference.modality_utils import Modality
+from marqo.core.inference.api.modality import Modality
 from marqo.core.exceptions import InternalError
 from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls
 from unittest.mock import patch

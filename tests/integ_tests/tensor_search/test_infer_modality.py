@@ -1,8 +1,11 @@
 import unittest
 from unittest.mock import patch, MagicMock
+
 import requests
-import io
-from marqo.core.inference.modality_utils import Modality, infer_modality, fetch_content_sample
+
+from marqo.core.inference.api.modality import Modality
+from marqo.core.inference.modality_utils import infer_modality, fetch_content_sample
+
 
 class TestMultimodalUtils(unittest.TestCase):
 

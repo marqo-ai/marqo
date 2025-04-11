@@ -45,6 +45,11 @@ def _infer_modality_based_on_extension(extension: str) -> Optional[Modality]:
     Returns:
         Modality: The inferred modality (IMAGE, VIDEO, AUDIO, or None if unknown)
     """
+    if not extension or not isinstance(extension, str):
+        return None
+
+    extension = extension.lower()
+
     if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
         return Modality.IMAGE
     elif extension in ['mp4', 'avi', 'mov']:
@@ -160,7 +165,7 @@ def validate_url(url: str) -> bool:
 def get_url_file_extension(url: str) -> Optional[str]:
     """Get the file extension from a URL.
 
-    Note that we should clean the url before passing it to this function, e.g., remove query parameters.
+    This function removes the query parameters and fragments from the URL and then extracts the file extension.
     """
     parsed_url = urlparse(url)
     path = parsed_url.path  # This excludes query parameters and fragments

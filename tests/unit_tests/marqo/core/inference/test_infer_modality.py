@@ -4,7 +4,8 @@ from unittest.mock import patch, MagicMock
 import requests
 
 from marqo.core.inference.api import Modality
-from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, _infer_modality_based_on_extension, \
+from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
+    _infer_modality_based_on_extension, \
     get_url_file_extension
 
 
@@ -115,3 +116,44 @@ class TestMultimodalUtils(unittest.TestCase):
             with self.subTest(msg=message, url=url):
                 inferred_modality = _infer_modality_based_on_extension(get_url_file_extension(url))
                 self.assertEqual(expected_modality, inferred_modality)
+
+    def test_infer_modality_no_extension_found(self):
+        """A test to ensure if the extension is not found, we go to the mime type"""
+        url = "https://example.com/file.unknown"
+
+        with patch('marqo.core.inference.modality_utils.fetch_content_sample') as mock_fetch, \
+                patch('marqo.core.inference.modality_utils.magic.from_buffer', return_value="audio/mpeg"), \
+                patch('marqo.core.inference.modality_utils._infer_modality_based_on_mime_type') as mock_infer_on_mime:
+            mock_fetch.return_value = MagicMock()
+            _ = infer_modality(url)
+            mock_infer_on_mime.assert_called_once_with("audio/mpeg")
+
+    def test_infer_modality_proper_extension_found(self):
+        """A test to ensure if the extension is found, we do not go to the mime type."""
+        url = "https://example.com/file.mp3"
+
+        with patch('marqo.core.inference.modality_utils._infer_modality_based_on_extension') as mock_infer_on_extension, \
+                patch('marqo.core.inference.modality_utils.fetch_content_sample') as mock_fetch, \
+                patch('marqo.core.inference.modality_utils.magic.from_buffer') as mock_magic, \
+                patch('marqo.core.inference.modality_utils._infer_modality_based_on_mime_type') as mock_infer_on_mime:
+
+            _ = infer_modality(url)
+            mock_infer_on_extension.assert_called_once_with("mp3")
+            mock_fetch.assert_not_called()
+            mock_magic.assert_not_called()
+            mock_infer_on_mime.assert_not_called()
+
+    def test_infer_modality_receive_bytes_code_path(self):
+        """A test to ensure if bytes is received, we skip extension and mime download, but mime check on the bytes."""
+        bytes = b"test"
+
+        with patch('marqo.core.inference.modality_utils._infer_modality_based_on_extension') as mock_infer_on_extension, \
+                patch('marqo.core.inference.modality_utils.fetch_content_sample') as mock_fetch, \
+                patch('marqo.core.inference.modality_utils.magic.from_buffer', return_value="image/jpeg") as mock_magic, \
+                patch('marqo.core.inference.modality_utils._infer_modality_based_on_mime_type') as mock_infer_on_mime:
+
+            _ = infer_modality(bytes)
+            mock_infer_on_extension.assert_not_called()
+            mock_fetch.assert_not_called()
+            mock_magic.assert_called_once_with(bytes, mime=True)
+            mock_infer_on_mime.assert_called_once_with("image/jpeg")
