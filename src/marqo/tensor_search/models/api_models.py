@@ -199,7 +199,6 @@ class SearchQuery(BaseMarqoModel):
 
             # Remove nested parentheses and clean up the filter string
             filter_str = filter_str.replace("NOT", "")
-            print(filter_str)
             # Split by AND/OR operators and clean up terms
             filter_str_terms = []
             raw_terms = re.split(r'\s*(?:AND|OR)\s*', filter_str)

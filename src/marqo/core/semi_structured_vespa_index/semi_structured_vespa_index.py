@@ -322,7 +322,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:
-            print(tree_to_filter_string(marqo_query.filter.root))
             return tree_to_filter_string(marqo_query.filter.root)
 
     def _extract_document_id(self, document: Dict[str, Any]) -> str:
