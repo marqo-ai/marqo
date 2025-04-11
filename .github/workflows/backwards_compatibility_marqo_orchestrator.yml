@@ -6,7 +6,6 @@ on:
     branches:
       - mainline
       - releases/*
-      - farshid/fix-backwards-comp-tests  
     paths-ignore:
       - '**.md'
   workflow_dispatch:
