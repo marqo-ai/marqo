@@ -188,6 +188,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 grouping_query += build_field_group(field_parameters, field_name, field_id, field_type_overwrite="int")
                 grouping_query += build_field_group(field_parameters, field_name, f"-{field_id}", field_type_overwrite="float")
             else:
+                if field_parameters.type == "array":
+                    if self.get_marqo_index().name_to_string_array_field_map.get(field_id) is None:
+                        # Skip array field if it is not in the string array field map
+                        continue
                 grouping_query += build_field_group(field_parameters, field_name, field_id)
 
         grouping_query += ")"

@@ -137,12 +137,6 @@ class HybridSearch:
             raise core_exceptions.UnsupportedFeatureError(
                 f"trackTotalHits is only supported for unstructured indexes"
             )
-        if isinstance(marqo_index, SemiStructuredMarqoIndex) and marqo_index.name_to_string_array_field_map and facets is not None:
-            for facet_field_name, facet_field_params in facets.fields.items():
-                if facet_field_params.type == "array" and facet_field_name not in marqo_index.name_to_string_array_field_map:
-                    raise core_exceptions.InvalidArgumentError(
-                        f"Facet field '{facet_field_name}' is of type 'array', but is not present in any index documents."
-                    )
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
             raise ValueError(
@@ -299,6 +293,11 @@ class HybridSearch:
         if facets is not None or track_total_hits is not None:
             if isinstance(vespa_index, SemiStructuredVespaIndex):
                 gathered_results.update(vespa_index.gather_facets_from_response(responses, facets))
+            if facets is not None:
+                for facet_field_name, facet_field_parameters in facets.fields.items():
+                    # Set empty dict for array facets if not present (we skipped them in request)
+                    if facet_field_name not in gathered_results and facet_field_parameters.type == "array":
+                        gathered_results.get("facets", {}).update({facet_field_name: {}})
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
 

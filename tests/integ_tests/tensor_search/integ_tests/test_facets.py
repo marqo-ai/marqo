@@ -524,19 +524,18 @@ class TestFacets(MarqoTestCase):
             self.assertEqual(res["totalHits"], 0)
             self.assertEqual(len(res["hits"]), 0)
 
-    def test_get_non_existent_array_field_raises_an_error(self):
+    def test_get_non_existent_array_field_returns_empty_facet_value(self):
         """
         Test that a non-existent array field in facets raises an error
         """
         self.add_fashion_docs()
         facets = FacetsParameters(fields={"non_existent_field": FieldFacetsConfiguration(type="array")})
-        with self.assertRaises(core_exceptions.InvalidArgumentError) as context:
-            tensor_search.search(
-                config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
-                search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Tensor
-                ),
-                facets=facets
-            )
-        self.assertIn("is not present in any index document", str(context.exception))
+        res = tensor_search.search(
+            config=self.config, index_name=self.semi_structured_default_text_index.name, text="shirt",
+            search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Tensor
+            ),
+            facets=facets
+        )
+        self.assertEqual(res["facets"]["non_existent_field"], {})
 

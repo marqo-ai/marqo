@@ -197,7 +197,7 @@ class TestFacets(MarqoTestCase):
                     }
                 }
             )
-        self.assertIn("Exclude terms can only be used with a filter string.", str(e.exception))
+        self.assertIn("Exclude terms can only be used when a filter string is provided", str(e.exception))
 
     def test_invalid_filter_exclusions_fails(self):
         """Test that exclude terms must be present in filter string"""
@@ -322,18 +322,17 @@ class TestFacets(MarqoTestCase):
                 self.assertIn("facets", res)
                 self.assertIn("color", res["facets"])
 
-    def test_non_existing_array_field_raises_error(self):
+    def test_non_existing_array_field_returns_empty_value(self):
         """Test that searching a non-existing array field raises an error"""
-        with self.assertRaises(MarqoWebError) as e:
-            self.client.index(self.unstructured_text_index_name).search(
-                "shirt",
-                search_method="HYBRID",
-                facets={
-                    "fields": {
-                        "non_existing_field": {
-                            "type": "array"
-                        }
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            facets={
+                "fields": {
+                    "non_existing_field": {
+                        "type": "array"
                     }
                 }
-            )
-        self.assertIn("is not present in any index document", str(e.exception))
+            }
+        )
+        self.assertEqual(res["facets"]["non_existing_field"], {})
