@@ -244,15 +244,12 @@ class SearchQuery(BaseMarqoModel):
                     else:
                         term = term[:parens_difference]
 
-                print(parens_difference, term)
-
                 if term:  # Only add non-empty terms
                     clean_terms.append(term)
 
             return clean_terms
 
         filter_terms = extract_clean_terms(filter_str)
-        print(filter_terms)
 
         # Validate each facet field's exclude terms
         for field_name, field_params in facets.fields.items():
