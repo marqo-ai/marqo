@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import unittest
@@ -6,7 +7,7 @@ from unittest import mock
 import httpx
 import numpy as np
 from fastapi.responses import ORJSONResponse
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
 
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
@@ -19,6 +20,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
 import pytest
 
 import unittest

@@ -66,3 +66,7 @@ class QueryResult(BaseModel):
     @property
     def total_count(self) -> int:
         return self.root.fields.total_count
+
+    @property
+    def facets(self) -> List[Child]:
+        return self.root.children or []

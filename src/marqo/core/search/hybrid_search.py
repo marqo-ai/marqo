@@ -7,9 +7,11 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.tensor_search import index_meta_cache
@@ -37,7 +39,9 @@ class HybridSearch:
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
-            hybrid_parameters: HybridParameters = None
+            hybrid_parameters: HybridParameters = None,
+            facets: Optional[FacetsParameters] = None,
+            track_total_hits: Optional[bool] = None,
     ) -> Dict:
         """
 
@@ -62,6 +66,7 @@ class HybridSearch:
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
+                facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
             Returns:
 
             Output format:
@@ -110,7 +115,6 @@ class HybridSearch:
                 f"This index was created with Marqo {marqo_index_version}."
             )
 
-
         # Use default hybrid settings if not provided
         if hybrid_parameters is None:
             hybrid_parameters = HybridParameters()
@@ -123,6 +127,15 @@ class HybridSearch:
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search for unstructured indexes currently does not support `searchableAttributesTensor` or "
                 f"`searchableAttributesLexical`. Please set these attributes to None."
+            )
+
+        if facets is not None and not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"Facets are only supported for unstructured indexes"
+            )
+        if track_total_hits is not None and not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"trackTotalHits is only supported for unstructured indexes"
             )
 
         if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
@@ -238,7 +251,9 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersLexical is not None else None,
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
-            hybrid_parameters=hybrid_parameters
+            hybrid_parameters=hybrid_parameters,
+            facets=facets,
+            track_total_hits=track_total_hits
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -273,12 +288,23 @@ class HybridSearch:
 
         # SEARCH TIMER-LOGGER (post-processing)
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
-        gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+        gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+        total_results = len(gathered_results["hits"])
+        if facets is not None or track_total_hits is not None:
+            if isinstance(vespa_index, SemiStructuredVespaIndex):
+                gathered_results.update(vespa_index.gather_facets_from_response(responses, facets))
+            if facets is not None:
+                for facet_field_name, facet_field_parameters in facets.fields.items():
+                    # Set empty dict for array facets if not present (we skipped them in request)
+                    if facet_field_name not in gathered_results and facet_field_parameters.type == "array":
+                        gathered_results.get("facets", {}).update({facet_field_name: {}})
+            if track_total_hits is not None and "totalHits" not in gathered_results:
+                gathered_results["totalHits"] = 0
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
-            f"{len(gathered_docs)} results from Vespa."
+            f"{total_results} results from Vespa."
         )
 
-        return gathered_docs
+        return gathered_results

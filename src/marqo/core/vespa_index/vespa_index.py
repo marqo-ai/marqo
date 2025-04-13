@@ -213,6 +213,16 @@ class VespaIndex(ABC):
 
         return result
 
+    def _get_rerank_depth_and_additional_hits_from_query(query: Union[MarqoTensorQuery, MarqoHybridQuery]) -> Tuple[int, int]:
+        if query.ef_search is not None:
+            base_rerank_depth = min(query.limit + query.offset, query.ef_search)
+            additional_hits = max(query.ef_search - (query.limit + query.offset), 0)
+        else:
+            base_rerank_depth = query.limit + query.offset
+            additional_hits = 0
+
+        return query.rerank_depth_tensor if query.rerank_depth_tensor else base_rerank_depth, additional_hits
+ 
     def escape(self, s: str) -> str:
         """
         Used for filter string construction.
