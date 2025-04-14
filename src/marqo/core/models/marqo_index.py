@@ -1,6 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
+from functools import cached_property
 from typing import List, Optional, Dict, Any, Set, Union
 
 import pydantic
@@ -12,6 +13,7 @@ from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
+from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 
@@ -516,7 +518,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
-    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    string_array_fields: Optional[List[StringArrayField]]
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -524,6 +526,11 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     @classmethod
     def _valid_type(cls) -> IndexType:
         return IndexType.SemiStructured
+
+    @property
+    def supports_partial_update(self) -> bool:
+        return self._cache_or_get('supports_partial_update',
+                                  lambda: self.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
 
     @property
     def field_map(self) -> Dict[str, Field]:
@@ -555,7 +562,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         Returns an empty dict if string_array_fields is None.
         """
         return self._cache_or_get('string_array_field_map',
-                                  lambda : {} if self.string_array_fields is None 
+                                  lambda: {} if self.string_array_fields is None
                                   else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property

@@ -101,8 +101,9 @@ if __name__ == '__main__':
         ],  # : Optional[List[StringArrayField]]
     )
 
-    iterations = 1_000
+    iterations = 10_000
     start = time.perf_counter()
+
     for _ in range(iterations):
         query_result = QueryResult(**result_dict)
         gathered_docs = gather_documents_from_response(query_result, marqo_index, highlights=False,
