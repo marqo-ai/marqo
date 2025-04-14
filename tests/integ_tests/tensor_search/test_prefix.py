@@ -216,7 +216,7 @@ class TestPrefix(MarqoTestCase):
 
                 embed_res_no_prefix = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request_dict={"content": ["custom_prefix: hello"]},
+                    embedding_request_dict={"content": ["custom_prefix: hello"], "content_type": None},
                     device="cpu"
                 )
 
