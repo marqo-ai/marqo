@@ -1,8 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
-from functools import cached_property
-from typing import List, Optional, Dict, Any, Set, Union
+from typing import List, Optional, Dict, Any, Set
 
 import pydantic
 import semver
@@ -13,10 +12,8 @@ from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
-from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
-
 # TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
@@ -530,7 +527,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     @property
     def supports_partial_update(self) -> bool:
         return self._cache_or_get('supports_partial_update',
-                                  lambda: self.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
+                                  lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
     @property
     def field_map(self) -> Dict[str, Field]:
