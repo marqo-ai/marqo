@@ -90,20 +90,13 @@ jobs:
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
+          echo "::group::Marqo Logs"
+          bash scripts/display_marqo_log.sh &
+          echo "::endgroup::"
+          
+          echo "::group::Pytest Logs"
           pytest tests/
-
-  Display-Marqo-log:
-    name: Display Marqo logs
-    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-    defaults:
-      run:
-        working-directory: tests/api_tests/v1
-
-    steps:
-        - name: Display Marqo log
-          run: |
-            bash scripts/display_marqo_log.sh
+          echo "::endgroup::"
 
   Stop-Runner:
     needs:
