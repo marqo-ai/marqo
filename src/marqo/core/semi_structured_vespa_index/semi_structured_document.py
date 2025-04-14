@@ -101,7 +101,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                     string_array_field_value = fields[field_name]
                     string_arrays_dict[string_array_field_key] = string_array_field_value
 
-            fixed_fields = SemiStructuredVespaDocumentFields.model_construct(
+            fixed_fields = SemiStructuredVespaDocumentFields(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
                 version_uuid=cls.extract_field(fields, common.VESPA_DOC_VERSION_UUID, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
@@ -114,7 +114,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls.model_construct(
+            return cls(
                 id=document[_VESPA_DOC_ID],
                 fixed_fields=fixed_fields,
                 tensor_fields=tensor_fields,

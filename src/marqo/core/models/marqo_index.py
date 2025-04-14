@@ -343,8 +343,6 @@ class MarqoIndex(ImmutableBaseModel, ABC):
             self._cache[key] = func()
         return self._cache[key]
 
-    
-
 
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
