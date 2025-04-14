@@ -87,11 +87,15 @@ jobs:
           export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           
           bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
+          
+          bash scripts/run_marqo.sh $MARQO_IMAGE_NAME
 
           echo "::group::Marqo Logs"
-          bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
+          docker logs -f marqo 2>&1 | sed 's/^/[MARQO] /' &
+          MARQO_LOG_PID=$!
           echo "::endgroup::"
           
+          # Run tests
           echo "::group::Pytest Logs"
           pytest tests/
           echo "::endgroup::"
