@@ -24,6 +24,7 @@ on:
     branches:
       - mainline
       - releases/*
+      - li/marqo-logs-api-tests
     paths-ignore:
       - '**.md'
   pull_request:
