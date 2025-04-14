@@ -91,8 +91,8 @@ jobs:
           
           pytest tests/
 
-  Show-Marqo-log:
-    name: Run CPU Local Marqo API Tests
+  Display-Marqo-log:
+    name: Display Marqo logs
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     defaults:
@@ -100,12 +100,9 @@ jobs:
         working-directory: tests/api_tests/v1
 
     steps:
-        - name: Show Marqo log
+        - name: Display Marqo log
           run: |
-            echo "Marqo log:"
-            docker logs marqo
-            echo "Vespa log:"
-            docker logs vespa
+            bash scripts/display_marqo_log.sh
 
   Stop-Runner:
     needs:
