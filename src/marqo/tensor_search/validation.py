@@ -1,5 +1,5 @@
 import json
-from typing import Type, Sequence
+from typing import Type, Sequence, Union
 
 import jsonschema
 
