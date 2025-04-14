@@ -1,6 +1,7 @@
 from typing import List, Optional, Literal, Dict
 from marqo.base_model import StrictBaseModel
-from pydantic import Field, validator
+from pydantic.v1 import Field, validator
+
 
 class RangeConfiguration(StrictBaseModel):
     class Config:
@@ -16,6 +17,7 @@ class RangeConfiguration(StrictBaseModel):
             if to_value <= values['from_']:
                 raise ValueError("'to' value must be greater than 'from' value")
         return to_value
+
 
 class FieldFacetsConfiguration(StrictBaseModel):
     class Config:
@@ -62,6 +64,7 @@ class FieldFacetsConfiguration(StrictBaseModel):
         if ranges and values.get('type') != "number":
             raise ValueError("Ranges can only be used for 'number' facets")
         return ranges
+
 
 class FacetsParameters(StrictBaseModel):
     class Config:
