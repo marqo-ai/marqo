@@ -56,8 +56,6 @@ jobs:
     defaults:
       run:
         working-directory: tests/api_tests/v1
-
-
     steps:
 
       - name: Checkout Marqo repo
@@ -92,6 +90,22 @@ jobs:
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
           pytest tests/
+
+  Show-Marqo-log:
+    name: Run CPU Local Marqo API Tests
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    defaults:
+      run:
+        working-directory: tests/api_tests/v1
+
+    steps:
+        - name: Show Marqo log
+          run: |
+            echo "Marqo log:"
+            docker logs marqo
+            echo "Vespa log:"
+            docker logs vespa
 
   Stop-Runner:
     needs:
