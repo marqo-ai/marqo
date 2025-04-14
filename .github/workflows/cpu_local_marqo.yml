@@ -88,10 +88,8 @@ jobs:
           
           bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
 
-          bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
-          
           echo "::group::Marqo Logs"
-          bash scripts/display_marqo_log.sh &
+          bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           echo "::endgroup::"
           
           echo "::group::Pytest Logs"

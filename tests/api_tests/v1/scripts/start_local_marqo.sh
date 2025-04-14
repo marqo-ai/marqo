@@ -42,4 +42,4 @@ until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) 
 done;
 
 # Kill the `docker logs` command (so subprocess does not wait for it)
-kill $LOGS_PID
+# kill $LOGS_PID
