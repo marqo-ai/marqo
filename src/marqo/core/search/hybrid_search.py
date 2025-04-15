@@ -296,7 +296,7 @@ class HybridSearch:
             if facets is not None:
                 for facet_field_name, facet_field_parameters in facets.fields.items():
                     # Set empty dict for array facets if not present (we skipped them in request)
-                    if facet_field_name not in gathered_results and facet_field_parameters.type == "array":
+                    if facet_field_name not in gathered_results["facets"] and facet_field_parameters.type == "array":
                         gathered_results.get("facets", {}).update({facet_field_name: {}})
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
