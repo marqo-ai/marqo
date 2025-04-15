@@ -35,6 +35,19 @@ class TestFacets(MarqoTestCase):
         ])
         cls.indexes_to_delete = [cls.text_index_name, cls.unstructured_text_index_name]
 
+    def assert_dict_almost_equal(self, d1, d2, places=1):
+        """Compare two dictionaries with numeric values allowing for small differences."""
+        self.assertEqual(d1.keys(), d2.keys(), "Dictionaries have different keys")
+        for key in d1:
+            if isinstance(d1[key], dict):
+                self.assert_dict_almost_equal(d1[key], d2[key], places)
+            elif isinstance(d1[key], (int, float)) and isinstance(d2[key], (int, float)):
+                self.assertAlmostEqual(d1[key], d2[key], places=places,
+                                       msg=f"Values differ for key {key}: {d1[key]} != {d2[key]}")
+            else:
+                self.assertEqual(d1[key], d2[key],
+                                 f"Values differ for key {key}: {d1[key]} != {d2[key]}")
+
     def setUp(self):
         if self.indexes_to_delete:
             self.clear_indexes(self.indexes_to_delete)
@@ -350,6 +363,9 @@ class TestFacets(MarqoTestCase):
             "description": existing_doc["description"],
             "size": existing_doc["size"],
             "price": existing_doc["price"],
+            "color": existing_doc["color"],
+            "brand": existing_doc["brand"],
+            "style": existing_doc["style"],
             "tags": [f'color:{existing_doc["color"]}', f'brand:{existing_doc["brand"]}', f'style:{existing_doc["style"]}']
         } for existing_doc in EXAMPLE_FASHION_DOCUMENTS]
         self.client.index(self.unstructured_text_index_name).add_documents(
@@ -363,60 +379,33 @@ class TestFacets(MarqoTestCase):
             facets={
                 "fields": {
                     "tags": {
-                        "type": "array"
-                    }
-                }
-            }
-        )
-        self.assertIn("facets", res)
-        self.assertIn("tags", res["facets"])
-        self.assertDictEqual(
-            res['facets']['tags'],
-            {'brand:SnugNest': {'count': 4}, 'style:streetwear': {'count': 4}, 'brand:PulseWear': {'count': 3}, 'color:green': {'count': 3}, 'color:red': {'count': 2}, 'style:partywear': {'count': 2}, 'color:charcoal': {'count': 2}, 'style:loungewear': {'count': 2}, 'brand:CozyCore': {'count': 1}, 'brand:RetroHue': {'count': 1}, 'brand:SprintX': {'count': 1}, 'color:coral': {'count': 1}, 'color:gray': {'count': 1}, 'color:yellow': {'count': 1}, 'style:biker': {'count': 1}, 'style:casual': {'count': 1}}
-        )
-
-    def test_string_facet_returns_exact_value(self):
-        """ Test that searching string field facet returns exact expected value """
-        res = self.client.index(self.unstructured_text_index_name).search(
-            "shirt",
-            search_method="HYBRID",
-            facets={
-                "fields": {
+                        "type": "array",
+                    },
                     "color": {
                         "type": "string"
-                    }
-                }
-            }
-        )
-
-        self.assertIn("facets", res)
-        self.assertIn("color", res["facets"])
-        self.assertDictEqual(
-            res['facets']['color'],
-            {'red': {'count': 2}, 'green': {'count': 3}, 'charcoal': {'count': 2}, 'yellow': {'count': 1}, 'coral': {'count': 1}, 'gray': {'count': 1}}
-        )
-
-    def test_numeric_facet_returns_exact_value(self):
-        """ Test that searching numeric field facet returns exact expected value """
-        res = self.client.index(self.unstructured_text_index_name).search(
-            "shirt",
-            search_method="HYBRID",
-            facets={
-                "fields": {
+                    },
                     "price": {
                         "type": "number"
                     }
                 }
             }
         )
-
         self.assertIn("facets", res)
-        self.assertIn("price", res["facets"])
-        self.assertAlmostEqual(res["facets"]["price"]["min"], 1.2, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["max"], 92.99, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["avg"], 60.354, places=3)
-        self.assertEqual(res["facets"]["price"]["count"], 10)
-        self.assertAlmostEqual(res["facets"]["price"]["sum"], 603.54, places=2)
+        self.assertIn("tags", res["facets"])
+        self.assertEqual(len(res["facets"]), 3)
+        self.assertDictEqual(
+            res['facets']['tags'],
+            {'brand:SnugNest': {'count': 4}, 'style:streetwear': {'count': 4}, 'brand:PulseWear': {'count': 3}, 'color:green': {'count': 3}, 'color:red': {'count': 2}, 'style:partywear': {'count': 2}, 'color:charcoal': {'count': 2}, 'style:loungewear': {'count': 2}, 'brand:CozyCore': {'count': 1}, 'brand:RetroHue': {'count': 1}, 'brand:SprintX': {'count': 1}, 'color:coral': {'count': 1}, 'color:gray': {'count': 1}, 'color:yellow': {'count': 1}, 'style:biker': {'count': 1}, 'style:casual': {'count': 1}}
+        )
+        self.assertDictEqual(
+            res['facets']['color'],
+            {'red': {'count': 2}, 'green': {'count': 3}, 'charcoal': {'count': 2}, 'yellow': {'count': 1}, 'coral': {'count': 1}, 'gray': {'count': 1}}
+        )
+        self.assert_dict_almost_equal(
+            res["facets"]["price"],
+            {"min": 1.2, "max": 92.99, "avg": 60.354, "count": 10, "sum": 603.54},
+            places=2
+        )
 
     def test_numeric_facet_with_ranges_returns_exact_value(self):
         """ Test that searching numeric field facet with ranges returns exact expected value """
@@ -438,15 +427,20 @@ class TestFacets(MarqoTestCase):
 
         self.assertIn("facets", res)
         self.assertIn("price", res["facets"])
-        # -Inf:50.0
-        self.assertAlmostEqual(res["facets"]["price"]["-Inf:50.0"]["min"], 1.2, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["-Inf:50.0"]["max"], 49.3, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["-Inf:50.0"]["avg"], 32.06, places=3)
-        self.assertEqual(res["facets"]["price"]["-Inf:50.0"]["count"], 4)
-        self.assertAlmostEqual(res["facets"]["price"]["-Inf:50.0"]["sum"], 128.239, places=2)
-        # 50.0:Inf
-        self.assertAlmostEqual(res["facets"]["price"]["50.0:Inf"]["min"], 55.54, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["50.0:Inf"]["max"], 92.99, places=2)
-        self.assertAlmostEqual(res["facets"]["price"]["50.0:Inf"]["avg"], 79.217, places=3)
-        self.assertEqual(res["facets"]["price"]["50.0:Inf"]["count"], 6)
-        self.assertAlmostEqual(res["facets"]["price"]["50.0:Inf"]["sum"], 475.3, places=2)
+        self.assertEqual(len(res["facets"]), 1)
+        self.assert_dict_almost_equal(res["facets"]["price"], {
+            "-Inf:50.0": {
+                "min": 1.2,
+                "max": 49.3,
+                "avg": 32.06,
+                "count": 4,
+                "sum": 128.239
+            },
+            "50.0:Inf": {
+                "min": 55.54,
+                "max": 92.99,
+                "avg": 79.217,
+                "count": 6,
+                "sum": 475.3
+            }
+        }, places=2)
