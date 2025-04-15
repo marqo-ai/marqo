@@ -397,17 +397,45 @@ class TestFacets(MarqoTestCase):
         self.assertIn("facets", res)
         self.assertIn("tags", res["facets"])
         self.assertEqual(len(res["facets"]), 3)
-        self.assertDictEqual(
-            res['facets']['tags'],
-            {'brand:SnugNest': {'count': 4}, 'style:streetwear': {'count': 4}, 'brand:PulseWear': {'count': 3}, 'color:green': {'count': 3}, 'color:red': {'count': 2}, 'style:partywear': {'count': 2}, 'color:charcoal': {'count': 2}, 'style:loungewear': {'count': 2}, 'brand:CozyCore': {'count': 1}, 'brand:RetroHue': {'count': 1}, 'brand:SprintX': {'count': 1}, 'color:coral': {'count': 1}, 'color:gray': {'count': 1}, 'color:yellow': {'count': 1}, 'style:biker': {'count': 1}, 'style:casual': {'count': 1}}
-        )
-        self.assertDictEqual(
-            res['facets']['color'],
-            {'red': {'count': 2}, 'green': {'count': 3}, 'charcoal': {'count': 2}, 'yellow': {'count': 1}, 'coral': {'count': 1}, 'gray': {'count': 1}}
-        )
         self.assert_dict_almost_equal(
-            res["facets"]["price"],
-            {"min": 1.2, "max": 92.99, "avg": 60.354, "count": 10, "sum": 603.54},
+            res["facets"],
+            {
+                "tags": {
+                    "brand:SnugNest": {"count": 4},
+                    "style:streetwear": {"count": 4},
+                    "brand:PulseWear": {"count": 3},
+                    "color:green": {"count": 3},
+                    "color:red": {"count": 2},
+                    "style:partywear": {"count": 2},
+                    "color:charcoal": {"count": 2},
+                    "style:loungewear": {"count": 2},
+                    "brand:CozyCore": {"count": 1},
+                    "brand:RetroHue": {"count": 1},
+                    "brand:SprintX": {"count": 1},
+                    "color:coral": {"count": 1},
+                    "color:gray": {"count": 1},
+                    "color:yellow": {"count": 1},
+                    "style:biker": {"count": 1},
+                    "style:casual": {"count": 1}
+                },
+                "color": {
+                    'red': {'count': 2},
+                    'green': {'count': 3},
+                    'charcoal': {'count': 2},
+                    'yellow': {'count': 1},
+                    'coral': {'count': 1},
+                    'gray': {'count': 1}
+                }
+,
+                "price":
+                {
+                    'min': 1.2,
+                    'max': 92.99,
+                    'avg': 60.354,
+                    'count': 10,
+                    'sum': 603.54
+                }
+            },
             places=2
         )
 
