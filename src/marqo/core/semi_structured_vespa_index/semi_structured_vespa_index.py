@@ -19,8 +19,10 @@ from marqo.core.unstructured_vespa_index.unstructured_validation import validate
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.logging import get_logger
 from marqo.vespa.models import QueryResult
 
+logger = get_logger(__name__)
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     """
@@ -44,7 +46,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
         vespa_doc = SemiStructuredVespaDocument.from_vespa_document(vespa_document, marqo_index=self.get_marqo_index())
-        marqo_doc = vespa_doc.to_marqo_document(marqo_index=self.get_marqo_index())
+        try:
+            marqo_doc = vespa_doc.to_marqo_document(marqo_index=self.get_marqo_index())
+        except Exception as e:
+            logger.info(f'Failed to convert vespa document to marqo document:')
+            logger.info(str(vespa_document))
+            raise e
 
         if return_highlights and vespa_doc.match_features:
             # Since tensor fields are stored in each individual field, we need to use same logic in structured
