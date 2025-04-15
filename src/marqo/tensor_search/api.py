@@ -337,7 +337,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
-
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
