@@ -323,7 +323,7 @@ class TestFacets(MarqoTestCase):
                 self.assertIn("color", res["facets"])
 
     def test_non_existing_array_field_returns_empty_value(self):
-        """Test that searching a non-existing array field raises an error"""
+        """Test that searching a non-existing array field returns an empty array"""
         res = self.client.index(self.unstructured_text_index_name).search(
             "shirt",
             search_method="HYBRID",
@@ -336,3 +336,40 @@ class TestFacets(MarqoTestCase):
             }
         )
         self.assertEqual(res["facets"]["non_existing_field"], {})
+
+    def test_array_facet_returns_non_empty_value(self):
+        """Test that searching an existing array field returns a non-empty value"""
+        # Forcefully remove documents from index post setup
+        self.client.index(self.unstructured_text_index_name).delete_documents(
+            [doc["_id"] for doc in EXAMPLE_FASHION_DOCUMENTS]
+        )
+        # Add documents with color, brand, style as tags
+        docs_to_add = [{
+            "_id": existing_doc["_id"],
+            "title": existing_doc["title"],
+            "description": existing_doc["description"],
+            "size": existing_doc["size"],
+            "price": existing_doc["price"],
+            "tags": [f'color:{existing_doc["color"]}', f'brand:{existing_doc["brand"]}', f'style:{existing_doc["style"]}']
+        } for existing_doc in EXAMPLE_FASHION_DOCUMENTS]
+        self.client.index(self.unstructured_text_index_name).add_documents(
+            docs_to_add,
+            tensor_fields=["title", "description"]
+        )
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            facets={
+                "fields": {
+                    "tags": {
+                        "type": "array"
+                    }
+                }
+            }
+        )
+        self.assertIn("facets", res)
+        self.assertIn("tags", res["facets"])
+        self.assertIn("color:red", res["facets"]["tags"])
+        self.assertIn("brand:SnugNest", res["facets"]["tags"])
+        self.assertIn("style:casual", res["facets"]["tags"])
