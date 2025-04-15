@@ -139,7 +139,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 # to a dictionary by splitting the list element by '::', making the prefix before '::' as the key and suffix after '::' as the value.
                 if field_name == common.STRING_ARRAY:
                     string_arrays_list = fields[field_name]
-            fixed_fields = SemiStructuredVespaDocumentFields.model_construct(
+            fixed_fields = SemiStructuredVespaDocumentFields(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
                 string_arrays=string_arrays_list,
@@ -151,7 +151,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls.model_construct(
+            return cls(
                 id=document[_VESPA_DOC_ID],
                 fixed_fields=fixed_fields,
                 tensor_fields=tensor_fields,
