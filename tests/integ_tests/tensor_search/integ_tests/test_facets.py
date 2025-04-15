@@ -325,6 +325,7 @@ class TestFacets(MarqoTestCase):
                         retrievalMethod=retrieval_method, rankingMethod=ranking_method
                     )
                 )
+                self.assertNotEqual(res_array_facets, {})
                 for facet, value in res_array_facets["facets"]["tags"].items():
                     splitted_name = facet.split(":")
                     self.assertDictEqual(res_string_facets["facets"][splitted_name[0]][splitted_name[1]], value)
