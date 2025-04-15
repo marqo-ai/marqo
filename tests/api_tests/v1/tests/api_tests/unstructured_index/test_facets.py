@@ -387,7 +387,11 @@ class TestFacets(MarqoTestCase):
                     "price": {
                         "type": "number"
                     }
-                }
+                },
+                # Those parameters do not affect results, but validating that api accepts them
+                "maxResults": 100,
+                "maxDepth": 600,
+                "order": "desc"
             }
         )
         self.assertIn("facets", res)
