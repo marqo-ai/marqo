@@ -13,7 +13,7 @@ from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 
 
 @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")

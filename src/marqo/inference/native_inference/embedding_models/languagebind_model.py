@@ -3,6 +3,7 @@ import tempfile
 from contextlib import contextmanager
 
 import torch
+from PIL.Image import Image
 from pydantic import ValidationError
 
 from marqo.base_model import MarqoBaseModel
@@ -13,6 +14,7 @@ from marqo.inference.media_download_and_preprocess.image_download import format_
 from marqo.inference.model_download.model_download import (download_model_from_hf, download_pretrained_from_url,
                                                            download_pretrained_from_s3, extract_zip_file)
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.native_inference.embedding_models.languagebind_model_properties import LanguagebindModelProperties, \
     ModalityLocation
 from marqo.s2_inference.configs import ModelCache
@@ -20,17 +22,42 @@ from marqo.s2_inference.errors import InvalidModelPropertiesError, MediaMismatch
 from marqo.s2_inference.languagebind import LanguageBindImageTokenizer, LanguageBind, transform_dict, to_device
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 
 
 class LanguagebindPreprocessor(AbstractPreprocessor):
 
-    def __init__(self, preprocessor):
+    def __init__(self, raw_preprocessor, device):
         super().__init__()
-        self.preprocessor = preprocessor
+        self.preprocessor = raw_preprocessor
+        self.device = device
 
-    def preprocess(self, inputs, modality: Modality):
-        return self.preprocessor(inputs)
+    def preprocess(self, inputs: Union[List[str], List[Image]], modality: Modality):
+        if modality == Modality.TEXT:
+            return self._preprocess_text(inputs)
+        elif modality == Modality.IMAGE:
+            return self._preprocess_image(inputs)
+        elif modality == Modality.VIDEO:
+            return self._preprocess_video(inputs)
+        elif modality == Modality.AUDIO:
+            return self._preprocess_audio(inputs)
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
+
+    def _preprocess_text(self, inputs: List[str]) -> List[str]:
+        return inputs # No preprocessing needed for text
+
+    def _preprocess_image(self, inputs: List[Image]) -> List[Tensor]:
+        return [
+            self.preprocessor["image"](images, return_tensors='pt')["pixel_values"].
+            to(self.device) for images in inputs
+        ]
+
+    def _preprocess_video(self, inputs):
+        pass
+
+    def _preprocess_audio(self, inputs):
+        pass
+
 
 
 
@@ -95,6 +122,8 @@ class LanguagebindModel(AbstractEmbeddingModel):
         self._load_model()
         self._load_tokenizer()
         self._load_preprocessor()
+
+        self._preprocessor = LanguagebindPreprocessor(self._preprocessors, self.device)
 
         self._model = self._model.to(self.device)
         self._model.eval()
@@ -221,24 +250,28 @@ class LanguagebindModel(AbstractEmbeddingModel):
         self._preprocessors = {c: transform_dict[c](self._model.modality_config[c]) for c in
                                self._clip_type.dict(exclude_none=True).keys()}
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict] = None, normalize=True, **kwargs):
-        if media_download_headers is None:
-            media_download_headers = dict()
-
+    def encode(self, inputs: Union[List[str], List[Tensor]], modality: Modality, normalize=True) -> List[ndarray]:
         if modality not in self.model_properties.supportedModalities:
-            raise MediaMismatchError(f"The provided modality {modality} is not supported by the model. This model "
-                                     f"supports the following modalities: {self.model_properties.supportedModalities}")
+            raise MediaMismatchError(
+                f"The provided modality {modality} is not supported by the model. This model "
+                f"supports the following modalities: {self.model_properties.supportedModalities}"
+            )
 
         if modality == Modality.TEXT:
-            return self._encode_text(content, normalize)
+            return self._encode_text(inputs, normalize)
         elif modality == Modality.IMAGE:
-            return self._encode_image(content, normalize, media_download_headers)
-        elif modality == Modality.VIDEO:
-            return self._encode_video(content, normalize, media_download_headers)
-        elif modality == Modality.AUDIO:
-            return self._encode_audio(content, normalize, media_download_headers)
+            return self._encode_image(inputs, normalize)
+        # elif modality == Modality.VIDEO:
+        #     return self._encode_video(content, normalize, media_download_headers)
+        # elif modality == Modality.AUDIO:
+        #     return self._encode_audio(content, normalize, media_download_headers)
 
-    def _encode_text(self, text: Union[str, list[str]], normalize=True):
+        else:
+            raise NotImplementedError(
+                f"Encoding for modality {modality} is not implemented yet. "
+            )
+
+    def _encode_text(self, text: list[str], normalize=True) -> List[ndarray]:
         formated_input = dict()
         processed_text = to_device(
             self._tokenizer(text, max_length=77, padding='max_length',
@@ -254,73 +287,25 @@ class LanguagebindModel(AbstractEmbeddingModel):
             outputs /= self.normalize(outputs)
             if outputs.shape != _shape_before:
                 raise InternalError("Normalization changed the shape of the output tensor.")
+
         return self._convert_output(outputs)
 
-    def _preprocess_image(self, content: Union[str, list[str], dict[str, Tensor]],
-                          media_download_headers: dict) -> dict:
-        """
-        Preprocess the image content to be encoded. It can be represented in the following ways:
-            - A str: URL of the image from a search query.
-            - A list of str: URLs of images for batch inference.
-            - A dictionary of str and Tensor: Key should be "pixel_values", and the value should be the preprocessed image tensors.
-
-        Args:
-            content: The image content to be preprocessed.
-            media_download_headers: Headers for downloading private image content.
-
-        Returns:
-            A dictionary containing the preprocessed image tensors in the format:
-            > {"pixel_values": torch.Tensor}, where the tensor is of shape [N, 3, 224, 224] and N is the number of images.
-        """
-
-        def process_image_dict(image):
-            if "pixel_values" not in image:
-                raise InternalError(f"Invalid image input format: {image}")
-            return image["pixel_values"]
-
-        # Normalize content to a list
-        content = [content] if isinstance(content, str) else content
-        if not isinstance(content, list):
-            raise InternalError(f"Invalid image input format: {content}")
-
-        if len(content) == 0:
-            raise InternalError(f"Invalid image input format: {content}. The input list is empty.")
-
-        # Process content based on its type
-        if isinstance(content[0], str):
-            images = format_and_load_CLIP_images(content, media_download_headers=media_download_headers)
-            processed_images = self._preprocessors["image"](images, return_tensors='pt')["pixel_values"]
-        elif isinstance(content[0], dict):
-            processed_images = torch.stack([process_image_dict(image).squeeze(0) for image in content], dim=0)
-        else:
-            raise InternalError(f"Invalid image input format: {content}")
-
-        return {"pixel_values": processed_images}
-
-    def _encode_image(self, content: Union[str, list[str], dict[str, Tensor]], normalize: bool,
-                      media_download_headers: dict):
+    def _encode_image(self, inputs: List[Tensor], normalize: bool = True):
         """
         Args:
-            content: The image content to be encoded. It can be represented in the following ways:
-                - A str: URL of the image from a search query.
-                - A list of str: URLs of images for batch inference.
-                - A dictionary of str and Tensor: Key should be "pixel_values", and the value should be the preprocessed image tensors.
+            inputs: A list of processed image tensors.
             normalize: Whether to normalize the output.
-            media_download_headers: Headers for downloading private image content.
         """
-        processed_images = self._preprocess_image(content, media_download_headers)
-        formated_input = {"image": to_device(processed_images, self.device)}
+        # Format the inputs to the required data structure for the model
+        formated_input = {"image":{"pixel_values": torch.cat(inputs, dim=0)}}
 
-        # Perform inference
         with torch.no_grad():
             outputs = self._model(formated_input)["image"]
 
-        # Normalize outputs if required
         if normalize:
             outputs /= self.normalize(outputs)
             if outputs.shape != outputs.shape:  # Check if normalization changed the shape
                 raise InternalError("Normalization changed the shape of the output tensor.")
-
         return self._convert_output(outputs)
 
     def _preprocess_video(self, content, media_download_headers) -> dict:
@@ -502,11 +487,11 @@ class LanguagebindModel(AbstractEmbeddingModel):
         else:
             raise InternalError("Invalid modality location object provided.")
 
-    def _convert_output(self, output):
+    def _convert_output(self, output: Tensor) -> List[ndarray]:
         if self.device == 'cpu':
-            return output.numpy()
+            return [single_ndarray for single_ndarray in output.numpy()]
         elif self.device.startswith('cuda'):
-            return output.cpu().numpy()
+            return [single_ndarray for single_ndarray in output.cpu().numpy()]
 
     def normalize(self, outputs):
         return outputs.norm(dim=-1, keepdim=True)
@@ -522,4 +507,4 @@ class LanguagebindModel(AbstractEmbeddingModel):
                 os.unlink(temp_file.name)
 
     def get_preprocessor(self):
-        raise NotImplementedError
+        return self._preprocessor

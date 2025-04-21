@@ -11,10 +11,12 @@ import ffmpeg
 import torch
 
 from marqo.core.exceptions import InternalError
+from marqo.core.inference.api.modality import Modality
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.errors import MediaDownloadError
-from marqo.core.inference.api.modality import Modality
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.core.inference.api import *
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
 class StreamingMediaProcessor:
@@ -24,42 +26,25 @@ class StreamingMediaProcessor:
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
-            self, url: str, device: str, modality: Modality,
-            preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-            video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str]] = None,
+            self, url:
+            str, device: str,
+            modality: Modality,
+            preprocessors: LanguagebindPreprocessor,
+            preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
     ):
         self.url = url
         self.device = device
         self.modality = modality
-        self.audio_preprocessing = audio_preprocessing
-        self.video_preprocessing = video_preprocessing
-        self.preprocessor = preprocessors.get_preprocessor(modality)
-        self.media_download_headers = self._convert_headers_to_cli_format(media_download_headers)
+        
+        self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
         self.total_size, self.duration = self._fetch_file_metadata()
+        self.split_length = preprocessing_config.chunk_config.split_length
+        self.split_overlap = preprocessing_config.chunk_config.split_overlap
+        
+        self.preprocessors = preprocessors
+        
         self.enable_video_gpu_acceleration = enable_video_gpu_acceleration
-        self._set_split_parameters(modality)
-        self._log_initialization_details()
-
-    def _set_split_parameters(self, modality):
-        preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
-
-        if preprocessing is not None:
-            self.split_length = preprocessing.split_length
-            self.split_overlap = preprocessing.split_overlap
-        else:
-            self.split_length = 20
-            self.split_overlap = 3
-
-        if modality not in [Modality.VIDEO, Modality.AUDIO]:
-            raise ValueError(f"Unsupported modality: {modality}")
-
-    def _log_initialization_details(self):
-        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
-        pass
 
     def _convert_headers_to_cli_format(self, raw_media_download_headers: Optional[Dict] = None) -> str:
         """
@@ -88,8 +73,8 @@ class StreamingMediaProcessor:
                 'probesize': '256K',  # Probe only the first 256KB
             }
 
-            if self.media_download_headers:
-                probe_options['headers'] = self.media_download_headers
+            if self.media_download_header:
+                probe_options['headers'] = self.media_download_header
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
@@ -144,7 +129,7 @@ class StreamingMediaProcessor:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
 
-                processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
+                processed_chunk_tensor = self.preprocessors.preprocess([output_file], modality=self.modality)
                 processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
 
                 processed_chunk = {
@@ -181,9 +166,9 @@ class StreamingMediaProcessor:
             '-v', 'error',  # Suppress warnings and other output
         ]
 
-        if self.media_download_headers:
+        if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         if self.enable_video_gpu_acceleration:
             ffmpeg_command.extend([
@@ -237,9 +222,9 @@ class StreamingMediaProcessor:
             '-y', # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
         ]
-        if self.media_download_headers:
+        if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         ffmpeg_command.extend(
             [

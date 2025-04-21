@@ -146,6 +146,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # Inference exceptions
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
         (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
+        (inference_exceptions.UnsupportedModalityError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
