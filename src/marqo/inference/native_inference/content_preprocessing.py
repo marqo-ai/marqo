@@ -109,14 +109,13 @@ def download_and_preprocess_media(
         content: list[str],
         preprocessor: AbstractPreprocessor,
         preprocessing_config: Union[ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig],
-        modality: Modality,
         return_individual_error: bool = True
 ) -> list[PreprocessedContent]:
 
     results = process_batch(
         content=content,
         preprocessor=preprocessor,
-        modality=modality,
+        modality=preprocessing_config.modality,
         preprocessing_config=preprocessing_config,
         return_individual_error=return_individual_error
     )

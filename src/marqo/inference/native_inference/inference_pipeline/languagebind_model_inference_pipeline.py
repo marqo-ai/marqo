@@ -48,15 +48,12 @@ class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config
             )
-        elif modality == Modality.IMAGE:
+        elif modality in [Modality.IMAGE, Modality.AUDIO, Modality.VIDEO]:
             results = download_and_preprocess_media(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
-                                                    self.inference_request.preprocessing_config,
-                                                    self.inference_request.return_individual_error)
-        elif modality == Modality.VIDEO or modality == Modality.AUDIO:
-            raise NotImplementedError(
-                "Not implemented yet for video/audio. "
+                self.inference_request.preprocessing_config,
+                self.inference_request.return_individual_error
             )
         else:
             raise ValueError(f"Unsupported modality: {self.inference_request.modality}")

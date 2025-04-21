@@ -5,18 +5,15 @@ import os
 import subprocess
 # for multimodal processing
 import tempfile
-from typing import Tuple
 
 import ffmpeg
-import torch
+from torch import Tensor
 
 from marqo.core.exceptions import InternalError
-from marqo.core.inference.api.modality import Modality
-from marqo.core.models.marqo_index import *
-from marqo.s2_inference.errors import MediaDownloadError
-from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.core.inference.api import *
+from marqo.core.models.marqo_index import *
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
+from marqo.s2_inference.errors import MediaDownloadError
 
 
 class StreamingMediaProcessor:
@@ -26,15 +23,13 @@ class StreamingMediaProcessor:
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
-            self, url:
-            str, device: str,
+            self, url: str,
             modality: Modality,
             preprocessors: LanguagebindPreprocessor,
             preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
     ):
         self.url = url
-        self.device = device
         self.modality = modality
         
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
@@ -90,8 +85,18 @@ class StreamingMediaProcessor:
         extension = 'mp4' if self.modality == Modality.VIDEO else 'wav'
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
-    def process_media(self) -> List[Dict[str, torch.Tensor]]:
-        processed_chunks: List[Dict[str, torch.Tensor]] = []
+    def process_media(self) -> Union[InferenceErrorModel, list[Tuple[str, Tensor]]]:
+        """
+        Process the media file by splitting it into chunks and downloading each chunk, and apply the languagebind
+        preprocessor to each chunk.
+
+        Returns:
+            An InferenceErrorModel if there is an error, otherwise a list of tuples containing the chunk content, and
+            the corresponding tensor.
+            The chunk content is formated as f"[{chunk_start_time}, {chunk_end_time}]".
+
+        """
+        processed_chunks: list[Tuple[str, Tensor]] = []
         chunk_duration = self.split_length
         overlap_duration = self.split_overlap
 
@@ -129,16 +134,18 @@ class StreamingMediaProcessor:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
 
-                processed_chunk_tensor = self.preprocessors.preprocess([output_file], modality=self.modality)
-                processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
+                # We expect no error in the preprocessing step
+                processed_chunk_tensor: Tensor = self.preprocessors.preprocess(
+                    [output_file], modality=self.modality)[0]
 
-                processed_chunk = {
-                    'tensor': processed_chunk_tensor,
-                    'start_time': chunk_start,
-                    'end_time': chunk_end
-                }
+                processed_chunks.append(
+                    (f"[{chunk_start}, {chunk_end}]", processed_chunk_tensor)
+                )
 
-                processed_chunks.append(processed_chunk)
+            if not processed_chunks:
+                raise MediaDownloadError(
+                    f"No chunks were processed successfully for the given media file {self.modality}"
+                )
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):

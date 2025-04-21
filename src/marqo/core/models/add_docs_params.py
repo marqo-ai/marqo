@@ -41,7 +41,10 @@ class AddDocsParams(BaseModel):
     tensor_fields: Optional[List] = Field(default_factory=None)
     image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-    media_download_thread_count: Optional[int]
+    media_download_thread_count: int = Field(
+        default_factory=lambda: read_env_vars_and_defaults_ints(
+            EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+    )
     media_download_headers: Optional[dict] = None
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
