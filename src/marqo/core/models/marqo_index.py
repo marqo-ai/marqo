@@ -624,7 +624,9 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         Check if the index supports partial updates.
         """
-        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

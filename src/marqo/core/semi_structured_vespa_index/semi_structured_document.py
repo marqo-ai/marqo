@@ -67,15 +67,19 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         string_arrays_dict = {}
         string_arrays_list = []
 
+        tensor_subfield_map = marqo_index.tensor_subfield_map
+        lexical_field_map = marqo_index.lexical_field_map
+        field_map = marqo_index.field_map
+
         def process_field(field_name: str, fields: Dict) -> None:
             """Helper function to process individual tensor fields, lexical fields and populate the appropriate dictionaries"""
-            if field_name in marqo_index.tensor_subfield_map:
+            if field_name in tensor_subfield_map:
                 tensor_fields[field_name] = fields[field_name]
-            elif field_name in marqo_index.lexical_field_map:
+            elif field_name in lexical_field_map:
                 # Lexical fields are returned with prefixed name from get_by_ids
-                text_field_name = marqo_index.lexical_field_map[field_name].name
+                text_field_name = lexical_field_map[field_name].name
                 text_fields[text_field_name] = fields[field_name]
-            elif field_name in marqo_index.field_map:
+            elif field_name in field_map:
                 # Lexical fields are returned with original name from search
                 text_fields[field_name] = fields[field_name]
 
