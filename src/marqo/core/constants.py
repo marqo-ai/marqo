@@ -1,11 +1,15 @@
 import semver
 
+# These special characters are defined in vespa docu here: https://docs.vespa.ai/en/reference/query-language-reference.html?mode=cloud
+CHARACTERS_TO_BE_ESCAPED_IN_VESPA = ('"', '\\')
+
 MARQO_RESERVED_PREFIX = 'marqo__'
 MARQO_DOC_TENSORS = 'marqo__tensors'  # doc-level so must not clash with index field names
 MARQO_DOC_HIGHLIGHTS = '_highlights'  # doc-level so must not clash with index field names
 MARQO_DOC_CHUNKS = 'chunks'
 MARQO_DOC_EMBEDDINGS = 'embeddings'
 MARQO_DOC_ID = '_id'
+MARQO_FIELD_TYPES = "field_types"
 
 MARQO_SEARCH_METHOD_TENSOR = 'tensor'
 MARQO_SEARCH_METHOD_LEXICAL = 'lexical'

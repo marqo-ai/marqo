@@ -29,6 +29,20 @@
 - Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
 - Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1079)).
 
+# Release 2.13.6
+
+## Bug fixes and minor changes
+
+- Improved error messages for hybrid search ([#1108](https://github.com/marqo-ai/marqo/pull/1108)). Errors that occur in the tensor or lexical search portion of hybrid search are now correctly raised instead of becoming generic 500 errors.
+- Add missing support for legacy OpenAI CLIP models ([#1107](https://github.com/marqo-ai/marqo/pull/1107)). This fix allows old OpenAI CLIP models (eg. ViT-B/32) to be loaded properly.
+- Bug fix for searches using `CustomVectorQuery`. Searches of this query type will no longer fail due to result not being JSON-serializable ([#1109](https://github.com/marqo-ai/marqo/pull/1109)).
+  
+# Release 2.13.5
+
+## Bug fixes and minor changes
+
+- Improve performance of processing large search responses ([#1091](https://github.com/marqo-ai/marqo/pull/1091)). Optimizations include: removing unnecessary validation, utilizing orjson for faster JSON serialization, and optimizing post-search field selection (for unstructured indexes).
+
 # Release 2.13.4
 
 ## Bug fixes and minor changes
@@ -67,6 +81,22 @@ Upgrade the Marqo Docker image to use Python 3.9. With Python 3.8 reaching its E
 - Shoutouts to our valuable 4.7k stargazers!
 - Thanks a lot for the heated discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
 - Special thanks to community contributor [@gabauer](https://github.com/gabauer) for their impactful PR, helping improve Marqo for everyone!
+
+# Release 2.13.2
+
+## Bug fixes and minor changes
+
+- Fix a bug where adding documents with numeric lists to an unstructured index results in a 500 error. Now, Marqo successfully processes the document batch, and returns a 400 error only for individual documents that contain numeric lists([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Fix validation of custom vector fields. Custom vector fields were silently ignored when not specified as tensor fields for an unstructured index. This will now trigger a 400 error. This helps guide users to properly define the field as a tensor field([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Improve the bootstrapping process to prevent Marqo from crashing during startup when the vector store takes longer to converge, especially with multiple indexes. This ensures a smoother startup process even if the vector store takes time to fully initialize([1036](https://github.com/marqo-ai/marqo/pull/1036)).
+
+# Release 2.13.1
+
+## Bug fixes and minor changes
+
+- Fix a bug where Marqo returns a 500 error if an inaccessible private image is encountered in the query or embed endpoint. Marqo now correctly returns a 400 error with a helpful error message ([1027](https://github.com/marqo-ai/marqo/pull/1027)).
+- Fix a bug preventing Marqo from warming up Languagebind models. Marqo now successfully warms up Languagebind models as expected ([1031](https://github.com/marqo-ai/marqo/pull/1031)).
+- Fix a bug where Languagebind models always generate normalized embeddings for non-text content. These models now correctly produce unnormalized embeddings for video, audio, and image content ([1032](https://github.com/marqo-ai/marqo/pull/1032)).
 
 # Release 2.13.2
 

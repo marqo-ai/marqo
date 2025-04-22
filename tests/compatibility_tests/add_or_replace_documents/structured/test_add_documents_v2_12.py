@@ -83,7 +83,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
         all_results = {}
 
         for index in self.indexes_to_test_on:
-            self.logger.debug(f'Feeding documents to {index.get("indexName")}')
+            self.logger.debug(f'Getting documents from {index.get("indexName")}')
             index_name = index['indexName']
             all_results[index_name] = {}
 
@@ -115,7 +115,6 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
                 try:
                     with self.subTest(index=index_name, doc_id=doc_id):
                         expected_doc = stored_results[index_name][doc_id]
-                        self.logger.debug(f"Printing expected doc {expected_doc}")
                         actual_doc = self.client.index(index_name).get_document(doc_id)
                         self.assertEqual(expected_doc, actual_doc)
 

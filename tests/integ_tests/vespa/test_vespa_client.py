@@ -428,7 +428,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             self.assertIn("Network Error", r.message)
 
     def test_get_vespa_version(self):
-        expected_vespa_version = '8.431.32'
+        expected_vespa_version = '8.472.109'
         version = self.client.get_vespa_version()
         self.assertEqual(expected_vespa_version, version)
 
@@ -436,11 +436,11 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         test_cases = [
             (200, 200, None),
             (404, 404, "Document does not exist in the index"),
-            (412, 404, "Document does not exist in the index"),
-            (429, 429, "Marqo vector store receives too many requests. Please try again later"),
+            (412, 400, "Marqo vector store couldn't update the document"),
+            (429, 429, "Marqo vector store received too many requests. Please try again later"),
             (507, 400, "Marqo vector store is out of memory or disk space"),
-            (123, 500, "Marqo vector store returns an unexpected error with this document"),
-            (400, 500, "Marqo vector store returns an unexpected error with this document"),
+            (123, 500, "Marqo vector store returned an unexpected error with this document"),
+            (400, 500, "Marqo vector store returned an unexpected error with this document"),
             # generic 400 error without specific message
             (400, 400, "The document contains invalid characters in the fields. Original error: could not parse field"),
             # specific 400 error

@@ -1,25 +1,18 @@
 import os
-import uuid
+import unittest
 from unittest import mock
 
-import marqo.core.exceptions as core_exceptions
+import numpy as np
+import pytest
+
+from integ_tests.marqo_test import MarqoTestCase
+from integ_tests.tensor_search.backwards_compat.resources import results_2_9
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
-from marqo.core.structured_vespa_index import common
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase
-from marqo import exceptions as base_exceptions
-import unittest
-from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.tensor_search.models.api_models import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext
-from marqo.tensor_search import api
-import numpy as np
-from marqo.tensor_search.models.api_models import CustomVectorQuery
-from integ_tests.tensor_search.backwards_compat.resources import results_2_9
+
 
 
 class TestSearchRegression(MarqoTestCase):
@@ -32,7 +25,7 @@ class TestSearchRegression(MarqoTestCase):
         super().setUpClass()
         # STRUCTURED indexes
         structured_text_index_score_modifiers = cls.structured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -53,7 +46,7 @@ class TestSearchRegression(MarqoTestCase):
         )
 
         unstructured_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name="sentence-transformers/all-MiniLM-L6-v2")
+            model=Model(name="hf/all-MiniLM-L6-v2")
         )
 
         cls.indexes = cls.create_indexes([
@@ -96,6 +89,7 @@ class TestSearchRegression(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
+    @pytest.mark.skip_for_multinode
     def test_search_result_scores_match_2_9(self):
         """
         Tests that both lexical and tensor search results and scores match those

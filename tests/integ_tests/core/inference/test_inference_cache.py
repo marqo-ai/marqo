@@ -10,6 +10,7 @@ from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
+
 class TestInferenceCache(unittest.TestCase):
     """A test suite for the InferenceCache class outside marqo.s2_inference.s2_inference.vectorise function"""
 

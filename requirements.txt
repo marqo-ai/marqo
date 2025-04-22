@@ -1,1 +1,5 @@
 # Marqo's requirements files are stored in marqo-base repo: https://github.com/marqo-ai/marqo-base/tree/main/requirements
+
+msgpack==1.1.0
+msgpack_numpy==0.4.8
+python-json-logger==3.3.0

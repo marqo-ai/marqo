@@ -6,7 +6,7 @@ from pytest import mark
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.core.inference.api.modality import Modality
 from marqo.core.exceptions import InternalError
 from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls
 from unittest.mock import patch
@@ -68,6 +68,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             streaming_media_processor_object.fetch_video_chunk(start_time, duration, self.output_file)
         self.assertFalse(os.path.exists(self.output_file))
 
+    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @mark.largemodel
     def test_video_decode_cuda_works(self):
         """Both CPU and GPU decoding should work on a GPU-enabled machine."""

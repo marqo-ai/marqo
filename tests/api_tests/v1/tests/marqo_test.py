@@ -78,6 +78,7 @@ class MarqoTestCase(unittest.TestCase):
         # A function that can be called to remove loaded models in Marqo.
         # Use it whenever you think there is a risk of OOM problem.
         # E.g., add it into the `tearDown` function to remove models between test cases.
+
         client = Client(**cls.client_settings)
         index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
         for index_name in index_names_list:
@@ -88,3 +89,106 @@ class MarqoTestCase(unittest.TestCase):
                 except MarqoWebError:
                     pass
 
+
+EXAMPLE_FASHION_DOCUMENTS = [
+  {
+    "_id": "1",
+    "title": "Slim Fit Denim Jacket",
+    "brand": "SnugNest",
+    "description": "A timeless piece with a modern slim-fit design, perfect for casual layering.",
+    "color": "yellow",
+    "size": "S",
+    "style": "casual",
+    "price": 83.42
+  },
+  {
+    "_id": "2",
+    "title": "Classic Cotton Shirt",
+    "brand": "SnugNest",
+    "description": "Comfortable and breathable cotton shirt suitable for everyday wear.",
+    "color": "red",
+    "size": "M",
+    "style": "partywear",
+    "price": 49.03
+  },
+  {
+    "_id": "3",
+    "title": "High-Waisted Skirt",
+    "brand": "PulseWear",
+    "description": "Elegant skirt with a high waistline and flattering silhouette.",
+    "color": "coral",
+    "size": "L",
+    "style": "streetwear",
+    "price": 1.2
+  },
+  {
+    "_id": "4",
+    "title": "Knitted Winter Sweater",
+    "brand": "SprintX",
+    "description": "Chunky knit sweater designed for warmth and comfort in cold seasons.",
+    "color": "red",
+    "size": "Free",
+    "style": "loungewear",
+    "price": 92.99
+  },
+  {
+    "_id": "5",
+    "title": "Casual Linen Trousers",
+    "brand": "PulseWear",
+    "description": "Relaxed-fit trousers crafted from lightweight linen for maximum comfort.",
+    "color": "charcoal",
+    "size": "M",
+    "style": "partywear",
+    "price": 88.14
+  },
+  {
+    "_id": "6",
+    "title": "Embroidered Kurta",
+    "brand": "RetroHue",
+    "description": "Traditional kurta with intricate embroidery for festive occasions.",
+    "color": "green",
+    "size": "S",
+    "style": "streetwear",
+    "price": 81.33
+  },
+  {
+    "_id": "7",
+    "title": "Floral Summer Dress",
+    "brand": "SnugNest",
+    "description": "Breezy and lightweight dress ideal for sunny summer days.",
+    "color": "green",
+    "size": "XS",
+    "style": "streetwear",
+    "price": 28.71
+  },
+  {
+    "_id": "8",
+    "title": "Athletic Running Shorts",
+    "brand": "PulseWear",
+    "description": "Performance shorts made from moisture-wicking fabric for workouts.",
+    "color": "green",
+    "size": "Free",
+    "style": "biker",
+    "price": 73.88
+  },
+  {
+    "_id": "9",
+    "title": "Hooded Windbreaker",
+    "brand": "CozyCore",
+    "description": "Windproof and waterproof jacket with adjustable hood.",
+    "color": "charcoal",
+    "size": "S",
+    "style": "streetwear",
+    "price": 55.54
+  },
+  {
+    "_id": "10",
+    "title": "Fleece Zip-Up Hoodie",
+    "brand": "SnugNest",
+    "description": "Super soft fleece hoodie for a relaxed and cozy look.",
+    "color": "gray",
+    "size": "M",
+    "style": "loungewear",
+    "price": 49.3
+  }
+]

@@ -2,7 +2,9 @@ import json
 import logging
 from abc import abstractmethod, ABC
 from pathlib import Path
+
 from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 
 
 class BaseCompatibilityTestCase(MarqoTestCase, ABC):
@@ -11,19 +13,12 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     add documents / prepare marqo state. Also contains methods to save and load results to/from a file so that
     test results can be compared across versions.
     """
-    indexes_to_delete = []
 
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
         if not hasattr(cls, 'logger'):
-            cls.logger = logging.getLogger(cls.__name__)
-            if not cls.logger.hasHandlers():
-                handler = logging.StreamHandler()
-                formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s')
-                handler.setFormatter(formatter)
-                cls.logger.addHandler(handler)
-            cls.logger.setLevel(logging.INFO)
+            cls.logger = get_logger(f"tests.compatibility_tests.{cls.__module__}.{cls.__name__}")
 
     @classmethod
     def get_results_file_path(cls):
@@ -35,11 +30,9 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         # A function that will be automatically called after each test call
         # This removes all the loaded models. It will also remove all the indexes inside a marqo instance.
         # Be sure to set the indexes_to_delete list with the indexes you want to delete, in the test class.
-        cls.removeAllModels()
         if cls.indexes_to_delete:
-            cls.delete_indexes(cls.indexes_to_delete)
-            cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
-
+            cls.logger.debug(f"Deleting indexes: {cls.indexes_to_delete}")
+        super().tearDownClass()
         cls.delete_file()
 
     @classmethod
@@ -76,10 +69,9 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
 
     @classmethod
     def set_logging_level(cls, level: str):
+        """Set the logging level for this class's logger"""
         log_level = getattr(logging, level.upper(), None)
         if log_level is None:
             raise ValueError(f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
         cls.logger.setLevel(log_level)
-        for handler in cls.logger.handlers:
-            handler.setLevel(log_level)
-        cls.logger.info(f"Logging level changed to. {level.upper()}")
+        cls.logger.info(f"Logging level changed to {level.upper()}")

@@ -24,7 +24,7 @@ jobs:
   Test-Marqo:
     name: Run unit tests
     runs-on: ubuntu-latest
-    environment: marqo-test-suite
+    
     steps:
       - name: Check out marqo repo
         uses: actions/checkout@v3
@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0  # Needed for diff coverage
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.9"
           cache: "pip"
@@ -48,7 +48,9 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
+          python -m nltk.downloader punkt_tab
 
       - name: Run unit tests
         id: run_unit_tests

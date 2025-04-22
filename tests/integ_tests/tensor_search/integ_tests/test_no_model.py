@@ -130,7 +130,7 @@ class TestNoModel(MarqoTestCase):
                 self.assertEqual(r["errors"], True)
                 self.assertIn("Cannot vectorise anything with 'no_model'", r["items"][0]["error"])
                 self.assertEqual(400, r["items"][0]["status"])
-                self.assertEqual("invalid_argument", r["items"][0]["code"])
+                self.assertEqual("inference_error", r["items"][0]["code"])
                 self.assertEqual("1", r["items"][0]["_id"])
 
                 self.assertEqual("2", r["items"][1]["_id"])

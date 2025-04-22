@@ -14,6 +14,8 @@ from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, Stric
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
+
+# TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
@@ -97,6 +99,12 @@ class Field(ImmutableStrictBaseModel):
         validate_structured_field(values, marqo_index=True)
 
         return values
+
+class StringArrayField(ImmutableStrictBaseModel):
+    name: str
+    type: FieldType
+    string_array_field_name: Optional[str]
+    features: List[FieldFeature] = []
 
 
 class TensorField(ImmutableStrictBaseModel):
@@ -502,9 +510,13 @@ class StructuredMarqoIndex(MarqoIndex):
 
 
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
+
+    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
+
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
+    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -519,8 +531,32 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         A map from field name to the field.
         """
         return self._cache_or_get('field_map',
-                                  lambda: {field.name: field for field in self.lexical_fields}
-                                  )
+                                  lambda: {field.name: field for field in self.lexical_fields})
+
+    @property
+    def name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's " "name" property to corresponding StringArrayField object.
+        "Name" is the name of the StringArrayField object, which is passed by the user. It does not start with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+
+        return self._cache_or_get('name_to_string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.name: field for field in self.string_array_fields})
+
+    @property
+    def string_array_field_name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's "string_array_field_name" property to corresponding StringArrayField object.
+        A "string_array_field_name" is that name of a StringArrayField object, which is used in the index schema, and it starts with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+        return self._cache_or_get('string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
@@ -579,6 +615,13 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             return the_map
 
         return self._cache_or_get('tensor_subfield_map', generate)
+
+    @property
+    def index_supports_partial_updates(self) -> bool:
+        """
+        Check if the index supports partial updates.
+        """
+        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

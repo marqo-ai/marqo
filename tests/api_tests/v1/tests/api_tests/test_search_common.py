@@ -28,7 +28,7 @@ class TestSearchCommon(MarqoTestCase):
             {
                 "indexName": cls.structured_text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},
@@ -38,7 +38,7 @@ class TestSearchCommon(MarqoTestCase):
             {
                 "indexName": cls.structured_filter_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "field_a", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "field_b", "type": "text", "features": ["filter"]},
@@ -70,7 +70,7 @@ class TestSearchCommon(MarqoTestCase):
             {
                 "indexName": cls.unstructured_text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
             },
             {
                 "indexName": cls.unstructured_image_index_name,
@@ -166,3 +166,217 @@ class TestSearchCommon(MarqoTestCase):
                 )
                 self.assertIn("Cannot set both imageDownloadHeaders and mediaDownloadHeaders.",
                               str(cm.exception.message))
+
+    def test_rerank_depth(self):
+        """Test rerank_depth behavior in TENSOR search."""
+        for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+            with self.subTest(index=index_name):
+                docs = [{
+                            "title": f"Doc {i}",
+                            "content": "some extra info",
+                            "_id": str(i)
+                        } for i in range(10)]
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
+
+                add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                if add_res["errors"]:
+                    raise Exception(f"Failed to add docs to index {index_name}")
+
+                # Case 1: rerank_depth < result_count → limit overrides rerank_depth
+                with self.subTest(case="rerank_depth_smaller_than_limit"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", rerank_depth=5, limit=10, search_method="TENSOR"
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
+
+                # Case 2: rerank_depth is negative → error expected
+                with self.subTest(case="invalid_negative_rerank_depth"):
+                    with self.assertRaises(MarqoWebError):
+                        self.client.index(index_name).search(
+                            q="Doc", rerank_depth=-1, limit=10, search_method="TENSOR"
+                        )
+
+                # Case 3: no rerank_depth → should return full limit
+                with self.subTest(case="no_rerank_depth"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="TENSOR"
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
+
+    def test_rerank_depth_hybrid(self):
+        """Test rerankDepthTensor behavior in HYBRID search."""
+        for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
+            with self.subTest(index=index_name):
+                docs = [{
+                            "title": f"Doc {i}",
+                            "content": "some extra info",
+                            "_id": str(i)
+                        } for i in range(10)]
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
+
+                add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                if add_res["errors"]:
+                    raise Exception(f"Failed to add docs to index {index_name}")
+
+                # Case 1: rerankDepthTensor < result_count → rerank_depth is overridden
+                with self.subTest(case="rerank_depth_tensor_less_than_limit"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor",
+                            "rerankDepthTensor": 5
+                        }
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
+
+                # Case 2: rerankDepthTensor is negative → raises error
+                with self.subTest(case="invalid_negative_rerank_depth_tensor"):
+                    with self.assertRaises(MarqoWebError):
+                        self.client.index(index_name).search(
+                            q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                                "retrievalMethod": "tensor",
+                                "rankingMethod": "tensor",
+                                "rerankDepthTensor": -1
+                            }
+                        )
+
+                # Case 3: No rerankDepthTensor → should return full limit
+                with self.subTest(case="no_rerank_depth_tensor"):
+                    res = self.client.index(index_name).search(
+                        q="Doc", limit=10, search_method="HYBRID", hybrid_parameters={
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor"
+                        }
+                    )
+                    self.assertEqual(len(res["hits"]), 10)
+    
+    def test_hybrid_search_validations(self):
+        # Add docs
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            }
+        ]
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with no query or context should raise an error
+                with self.subTest("Hybrid search with no query or context"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID"
+                        )
+                    assert e.exception.status_code == 422
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+
+                with self.subTest("Hybrid search with no query or context should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={}
+                        )
+                    assert e.exception.status_code == 422
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+
+                with self.subTest("Hybrid search with query and queryTensor/queryLexical should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            q="Cool",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                            }
+                        )
+                    assert e.exception.status_code == 422
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            q="Cool",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                            }
+                        )
+                    assert e.exception.status_code == 422
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+
+                with self.subTest("Hybrid search with only one queryTensor/queryLexical and retrievalMethod=disjunction raises an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+
+
+                with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryTensor": {"Cool": 1},
+                            "retrievalMethod": "tensor",
+                            "rankingMethod": "tensor"
+                        }
+                    )
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryLexical": "Cool",
+                            "retrievalMethod": "lexical",
+                            "rankingMethod": "lexical"
+                        }
+                    )
+                    self.client.index(index_name).search(
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "queryTensor": {"Cool": 1},
+                            "queryLexical": "Cool",
+                        }
+                    )
+
+                with self.subTest("Hybrid search with lexicalQuery and retrieval/ranking methods 'Tensor' should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryLexical": "Cool",
+                                "retrievalMethod": "tensor",
+                                "rankingMethod": "tensor"
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "'hybridParameters.queryLexical' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'tensor'." in str(e.exception)
+
+                with self.subTest("Hybrid search with tensorQuery and retrieval/ranking methods 'Lexical' should raise an error"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "queryTensor": {"Cool": 1},
+                                "retrievalMethod": "lexical",
+                                "rankingMethod": "lexical"
+                            }
+                        )
+                    assert e.exception.status_code == 400
+                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)
