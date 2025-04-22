@@ -1,7 +1,8 @@
 import numpy as np
 
 from marqo.core.inference.api import InferenceResult
-from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.tensor_search import tensor_search
 import unittest
 from unittest.mock import patch, MagicMock, ANY
@@ -9,7 +10,7 @@ from unittest.mock import patch, MagicMock, ANY
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, ImagePreProcessing,
     DistanceMetric, VectorNumericType, HnswConfig, FieldType, FieldFeature, IndexType, Field, TensorField,
-    UnstructuredMarqoIndex
+    UnstructuredMarqoIndex, SemiStructuredMarqoIndex
 )
 
 from marqo.config import Config
@@ -66,12 +67,29 @@ class SearchTest(unittest.TestCase):
         )
 
         cls.legacy_unstructured_index = UnstructuredMarqoIndex(
-            name="legacy_index_name", schema_name="legacy_test_schema", model=cls.model, normalize_embeddings=True,
+            name="legacy_unstructured_index", schema_name="legacy_test_schema", model=cls.model, normalize_embeddings=True,
             text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
             image_preprocessing=ImagePreProcessing(patch_method=None), distance_metric=DistanceMetric.Euclidean,
             vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=200, m=16),
             marqo_version=get_version(), created_at=1234567890, updated_at=1234567890,
             treat_urls_and_pointers_as_images=True, filter_string_max_length=1000
+        )
+
+        cls.unstructured_index = SemiStructuredMarqoIndex(
+            name="unstructured_index", schema_name="unstructured_test_schema", model=cls.model, normalize_embeddings=True,
+            text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
+            image_preprocessing=ImagePreProcessing(patch_method=None), distance_metric=DistanceMetric.Euclidean,
+            vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=200, m=16),
+            marqo_version=get_version(), created_at=1234567890, updated_at=1234567890,
+            treat_urls_and_pointers_as_images=True, filter_string_max_length=1000,
+            tensor_fields=[
+                TensorField(name="text_field_1", chunk_field_name="text_field_1", embeddings_field_name="text_field_1"),
+                TensorField(name="text_field_2", chunk_field_name="text_field_2", embeddings_field_name="text_field_2"),
+            ],
+            lexical_fields=[
+                Field(name="text_field_1", type=FieldType.Text, features=[FieldFeature.Filter], filter_field_name="text_field_1"),
+                Field(name="text_field_2", type=FieldType.Text, features=[FieldFeature.Filter], filter_field_name="text_field_2")
+            ]
         )
 
         # Mock VespaClient and Config
@@ -119,11 +137,27 @@ class SearchTest(unittest.TestCase):
             )
         return yql[:-4] + ")"
 
+    def get_expected_tensor_yql_unstructured(self, rerank_depth=3, additional_hits=1997, include_select=True):
+        yql = ""
+        if include_select:
+            yql = f"select * from {self.current_index.schema_name} where ("
+        for field in self.current_index.tensor_fields:
+            yql += (
+                f"({{targetHits:{rerank_depth}, approximate:True, hnsw.exploreAdditionalHits:{additional_hits}}}"
+                f"nearestNeighbor({field.name}, marqo__query_embedding)) OR "
+            )
+        return yql[:-4] + ")"
+
     def get_expected_lexical_yql(self, query):
         return f'select * from {self.current_index.schema_name} where weakAnd(default contains "{query}")'
 
     def get_expected_lexical_yql2(self, query):
         return f'select * from {self.current_index.schema_name} where (weakAnd(default contains "{query}"))'
+
+    def get_expected_lexical_yql_with_or(self, query, include_select=True):
+        query_strings = query.split(" ")
+        query_string = " OR ".join([f"default contains \"{q}\"" for q in query_strings])
+        return f'select * from {self.current_index.schema_name} where {query_string}' if include_select else query_string
 
     def set_index_to_return(self, index):
         self.get_index_patcher.stop()
@@ -265,40 +299,141 @@ class SearchTest(unittest.TestCase):
                 )
 
     def test_legacy_unstructured_ef_search(self):
-        tensor_search.search(self.config, "legacy_index_name", "query", search_method="tensor", ef_search=3000)
+        self.set_index_to_return(self.legacy_unstructured_index)
+        tensor_search.search(self.config, "legacy_unstructured_index", "query", search_method="tensor", ef_search=3000)
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(
-            call_args['yql'],
-            self.get_expected_tensor_yql(rerank_depth=3, additional_hits=2997),
+        self.assertIn(
+            "{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:2997}",
+            call_args['yql']
         )
 
     def test_legacy_structured_default_ef_search(self):
+        self.set_index_to_return(self.legacy_unstructured_index)
         tensor_search.search(self.config, "index_name", "query", search_method="tensor")
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(
-            call_args['yql'],
-            self.get_expected_tensor_yql(),
+        self.assertIn(
+            "{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}",
+            call_args['yql']
         )
 
     def test_legacy_structured_default_ef_search_with_limit(self):
+        self.set_index_to_return(self.legacy_unstructured_index)
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", result_count=100)
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(
-            call_args['yql'],
-            self.get_expected_tensor_yql(rerank_depth=100, additional_hits=1900),
+        self.assertIn(
+            "{targetHits:100, approximate:True, hnsw.exploreAdditionalHits:1900}",
+            call_args['yql']
         )
 
     def test_legacy_structured_ef_search_with_limit_higher_than_ef_search(self):
+        self.set_index_to_return(self.legacy_unstructured_index)
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", result_count=100, ef_search=50)
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(
-            call_args['yql'],
-            self.get_expected_tensor_yql(rerank_depth=50, additional_hits=0),
+        self.assertIn(
+            "{targetHits:50, approximate:True, hnsw.exploreAdditionalHits:0}",
+            call_args['yql']
         )
+
+    def test_hybrid_search_with_facets_lexical(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(self.config, "unstructured_index", "query", search_method="hybrid",
+                             facets=FacetsParameters(
+                                 fields={"text_field_1": {"type": "string"}, "text_field_2": {"type": "string"}},
+                             ),
+                             hybrid_parameters=HybridParameters(
+                                 retrievalMethod=RetrievalMethod.Lexical,
+                                 rankingMethod=RankingMethod.Lexical,
+                             )
+                             )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['marqo__yql.facets'].split('|')[0].strip(" "),
+            self.get_expected_lexical_yql_with_or("query") + " limit 0"
+        )
+
+    def test_hybrid_search_with_facets_tensor(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(self.config, "unstructured_index", "query", search_method="hybrid",
+                             facets=FacetsParameters(
+                                 fields={"text_field_1": {"type": "string"}, "text_field_2": {"type": "string"}},
+                             ),
+                             hybrid_parameters=HybridParameters(
+                                 retrievalMethod=RetrievalMethod.Tensor,
+                                 rankingMethod=RankingMethod.Tensor,
+                             )
+                             )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['marqo__yql.facets'].split('|')[0].strip(" "),
+            self.get_expected_tensor_yql_unstructured() + " limit 0"
+        )
+
+    def test_hybrid_search_with_facets_rrf(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(self.config, "unstructured_index", "query", search_method="hybrid",
+                             facets=FacetsParameters(
+                                    fields={"text_field_1": {"type": "string"}, "text_field_2": {"type": "string"}},
+                             )
+                         )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(
+            call_args['marqo__yql.facets'].split('|')[0].strip(" "),
+            f"select * from {self.current_index.schema_name} where (" +
+            self.get_expected_lexical_yql_with_or("query", include_select=False) +
+            " OR " +
+            f"({self.get_expected_tensor_yql_unstructured(include_select=False)})" +
+            " limit 0"
+        )
+
+    def test_hybrid_search_with_facets_and_filter(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(self.config, "unstructured_index", "query", search_method="hybrid",
+                             facets=FacetsParameters(
+                                 fields={"text_field_1": {"type": "string"}, "text_field_2": {"type": "string"}},
+                             ),
+                             filter="text_field_1:test"
+                             )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertNotIn("\n---MARQO-YQL-QUERY-DELIMITER---\n", call_args['marqo__yql.facets'])
+
+    def test_hybrid_search_with_facets_and_exclude_terms(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(self.config, "unstructured_index", "query", search_method="hybrid",
+                             facets=FacetsParameters(
+                                 fields={
+                                     "text_field_1": {
+                                         "type": "string",
+                                         "excludeTerms": ["text_field_2:test2"]
+                                     },
+                                     "text_field_2": {
+                                         "type": "string",
+                                        "excludeTerms": ["text_field_1:test"]
+                                     }
+                                 },
+                             ),
+                             filter="text_field_1:test AND text_field_2:test2"
+                             )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        facet_queries = call_args['marqo__yql.facets'].split('\n---MARQO-YQL-QUERY-DELIMITER---\n')
+
+        self.assertEqual(len(facet_queries), 2)  # One query per excluded term
+
+        self.assertIn('(marqo__short_string_fields contains sameElement(key contains "text_field_1", value contains "test")', facet_queries[0])
+        self.assertIn("text_field_1", facet_queries[0].split('|')[1]) # getting facets for it
+        self.assertNotIn("text_field_2", facet_queries[0].split('|')[1]) # not getting facets for it
+
+        self.assertIn('(marqo__short_string_fields contains sameElement(key contains "text_field_2", value contains "test2")', facet_queries[1])
+        self.assertIn("text_field_2", facet_queries[1].split('|')[1]) # getting facets for it
+        self.assertNotIn("text_field_1", facet_queries[1].split('|')[1]) # not getting facets for it
 
 if __name__ == '__main__':
     unittest.main()

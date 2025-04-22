@@ -8,7 +8,7 @@ import semver
 from botocore.exceptions import BotoCoreError, ClientError
 from docker.errors import NotFound, APIError, ContainerError, ImageNotFound
 
-from compatibility_test_logger import get_logger
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 
 
 class DockerManager:

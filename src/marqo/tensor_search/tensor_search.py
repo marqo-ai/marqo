@@ -49,12 +49,14 @@ from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePre
     AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
 from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
@@ -314,6 +316,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
+           facets: Optional[FacetsParameters] = None,
+           track_total_hits: Optional[bool] = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -343,6 +347,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
+        facets: Parameters for facets
     Returns:
 
     """
@@ -440,7 +445,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -621,6 +626,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
+        if doc.id.startswith("group:facet:"): # Not an actual document id but group's id returned by vespa
+            continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 

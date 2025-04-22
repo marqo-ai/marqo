@@ -59,6 +59,8 @@ class StructuredVespaIndex(VespaIndex):
     _MAX_LONG = 9223372036854775807
     _MIN_LONG = -9223372036854775808
 
+    _TOTAL_HITS_GROUP_CONST = "1.1"
+
     _HYBRID_SEARCH_MINIMUM_VERSION = constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
 
     def get_vespa_id_field(self) -> str:
@@ -558,6 +560,49 @@ class StructuredVespaIndex(VespaIndex):
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}'
+        facet_queries = None
+
+        if marqo_query.facets or marqo_query.track_total_hits:
+            facets_query_skeleton = '%s limit 0 | %s'
+            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
+            unique_exclusions = []
+            facet_queries = []
+            facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
+            if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
+            elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
+
+            if marqo_query.track_total_hits is not None:
+                # 0 is byte representation of letter "t"
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
+
+            if marqo_query.facets is not None:
+                facets_term = self._get_facets_term(marqo_query.facets)
+
+                if facets_term is not None:
+                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
+
+                # Using a unique delimiter that's unlikely to appear in YQL
+
+                for facet_field in marqo_query.facets.fields.items():
+                    facet_name, facet_parameters = facet_field
+                    if facet_parameters.exclude_terms is not None:
+                        if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
+                            continue
+                        unique_exclusions.append(set(facet_parameters.exclude_terms))
+                        new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
+                        if new_filter_term:
+                            new_filter_term = f' AND {new_filter_term}'
+                        else:
+                            new_filter_term = ''
+                        new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
+
+                        query_yql = f'{base_yql}{new_filter_term}'
+
+                        facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+            facet_queries = QUERY_DELIMITER.join(facet_queries)
 
         query = {
             'searchChain': 'marqo',
@@ -579,6 +624,7 @@ class StructuredVespaIndex(VespaIndex):
                     marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
             ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
+            'marqo__yql.facets': facet_queries,
 
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
@@ -713,9 +759,6 @@ class StructuredVespaIndex(VespaIndex):
             return ''
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
-        def escape(s: str) -> str:
-            return s.replace('\\', '\\\\').replace('"', '\\"')
-
         def _convert_to_in_list_str(value_list: list, marqo_field_name: str, marqo_field_type: FieldType) -> str:
             """
             Change list into its string representation, replacing [] with ().
@@ -734,7 +777,7 @@ class StructuredVespaIndex(VespaIndex):
             for i in range(len(value_list)):
                 # str type fields
                 if marqo_field_type in STR_FIELD_TYPES:
-                    in_list += f'"{value_list[i]}"'
+                    in_list += f'"{self.escape(value_list[i])}"'
                 # int type fields
                 elif marqo_field_type in INT_FIELD_TYPES:
                     try:
@@ -789,6 +832,10 @@ class StructuredVespaIndex(VespaIndex):
                     marqo_field_name = marqo_field.filter_field_name
                     marqo_field_type = marqo_field.type
 
+                # Escape special chars in field name
+                if marqo_field_name:
+                    marqo_field_name = self.escape(marqo_field_name)
+
                 if isinstance(node, search_filter.EqualityTerm):
                     node_value = node.value
                     if marqo_field_type == FieldType.Bool:
@@ -797,7 +844,7 @@ class StructuredVespaIndex(VespaIndex):
                         elif node_value.lower() == 'false':
                             node_value = '0'
 
-                    return f'{marqo_field_name} contains "{escape(node_value)}"'
+                    return f'{marqo_field_name} contains "{self.escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
                     lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
                     upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
@@ -824,7 +871,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
+    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery, is_facets_term=False) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
         else:
@@ -837,7 +884,7 @@ class StructuredVespaIndex(VespaIndex):
             return 'true'
 
         # Optional tokens
-        if marqo_query.or_phrases and score_modifiers:
+        if marqo_query.or_phrases and score_modifiers or is_facets_term:
             or_terms = ' OR '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
             ])

@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
@@ -64,6 +65,8 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
     global_rerank_depth: Optional[int] = None
+    facets: Optional[FacetsParameters] = None
+    track_total_hits: Optional[bool] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
