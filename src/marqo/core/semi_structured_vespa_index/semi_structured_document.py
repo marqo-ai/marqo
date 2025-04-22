@@ -2,9 +2,9 @@ import json
 import uuid
 from typing import List, Dict, Any, Union, Optional
 
-from pydantic.v1 import Field
+from pydantic import Field
 
-from marqo.base_model import MarqoBaseModel
+from marqo.base_model import MarqoBaseModelV2
 from marqo.core import constants as index_constants, constants
 from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
     InvalidTensorFieldError
@@ -14,15 +14,18 @@ from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES,
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS, MARQO_DOC_MULTIMODAL_PARAMS_WEIGHTS
 
+_VESPA_DOC_FIELDS = "fields"
+_VESPA_DOC_ID = "id"
+
 
 def generate_uuid_str() -> str:
     return str(uuid.uuid4()).replace('-', '')
 
 
-class SemiStructuredVespaDocumentFields(MarqoBaseModel):
+class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
-    version_uuid: Optional[str] = Field(default_factory=None, alias=common.VESPA_DOC_VERSION_UUID)
+    version_uuid: Optional[str] = Field(default=None, alias=common.VESPA_DOC_VERSION_UUID)
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY) # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
@@ -34,7 +37,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPES)
 
 
-class SemiStructuredVespaDocument(MarqoBaseModel):
+class SemiStructuredVespaDocument(MarqoBaseModelV2):
     """A helper class to handle the conversion between Vespa and Marqo documents for a semi-structured index.
     The object can be instantiated from a Marqo document using the from_marqo_document method,
     or can be instantiated from a Vespa document using the from_vespa_document method.
@@ -49,11 +52,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     index_supports_partial_updates: bool = False
 
     # For hybrid search
-    raw_tensor_score: float = None
-    raw_lexical_score: float = None
-
-    _VESPA_DOC_FIELDS = "fields"
-    _VESPA_DOC_ID = "id"
+    raw_tensor_score: Optional[float] = None
+    raw_lexical_score: Optional[float] = None
 
     @classmethod
     def from_vespa_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
@@ -61,7 +61,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         Instantiate an SemiStructuredVespaDocument from a Vespa document.
         Used in get_document_by_id or get_documents_by_ids
         """
-        fields = document.get(cls._VESPA_DOC_FIELDS, {})
+        fields = document.get(_VESPA_DOC_FIELDS, {})
         tensor_fields = {}
         text_fields = {}
         string_arrays_dict = {}
@@ -94,7 +94,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                     string_array_field_value = fields[field_name]
                     string_arrays_dict[string_array_field_key] = string_array_field_value
 
-            fixed_fields = SemiStructuredVespaDocumentFields.construct(
+            fixed_fields = SemiStructuredVespaDocumentFields(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
                 version_uuid=cls.extract_field(fields, common.VESPA_DOC_VERSION_UUID, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
@@ -107,16 +107,17 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls(id=document[cls._VESPA_DOC_ID],
-                    fixed_fields=fixed_fields,
-                    tensor_fields=tensor_fields,
-                    text_fields=text_fields,
-                    string_array_fields = string_arrays_dict,
-                    raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
-                    raw_lexical_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE, None),
-                    match_features=cls.extract_field(fields, common.VESPA_DOC_MATCH_FEATURES, dict()),
-                    vector_counts=cls.extract_field(fields, common.FIELD_VECTOR_COUNT, 0),
-                    index_supports_partial_updates=True)
+            return cls(
+                id=document[_VESPA_DOC_ID],
+                fixed_fields=fixed_fields,
+                tensor_fields=tensor_fields,
+                text_fields=text_fields,
+                string_array_fields = string_arrays_dict,
+                raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
+                raw_lexical_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE, None),
+                match_features=cls.extract_field(fields, common.VESPA_DOC_MATCH_FEATURES, dict()),
+                vector_counts=cls.extract_field(fields, common.FIELD_VECTOR_COUNT, 0),
+                index_supports_partial_updates=True)
         else:
             # For older versions, just process tensor and text fields
             for field_name in fields:
@@ -131,7 +132,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 # to a dictionary by splitting the list element by '::', making the prefix before '::' as the key and suffix after '::' as the value.
                 if field_name == common.STRING_ARRAY:
                     string_arrays_list = fields[field_name]
-            fixed_fields = SemiStructuredVespaDocumentFields.construct(
+            fixed_fields = SemiStructuredVespaDocumentFields(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
                 string_arrays=string_arrays_list,
@@ -143,15 +144,16 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
-            return cls(id=document[cls._VESPA_DOC_ID],
-                    fixed_fields=fixed_fields,
-                    tensor_fields=tensor_fields,
-                    text_fields=text_fields,
-                    raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
-                    raw_lexical_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE, None),
-                    match_features=cls.extract_field(fields, common.VESPA_DOC_MATCH_FEATURES, dict()),
-                    vector_counts=cls.extract_field(fields, common.FIELD_VECTOR_COUNT, 0),
-                    index_supports_partial_updates=False)
+            return cls(
+                id=document[_VESPA_DOC_ID],
+                fixed_fields=fixed_fields,
+                tensor_fields=tensor_fields,
+                text_fields=text_fields,
+                raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
+                raw_lexical_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE, None),
+                match_features=cls.extract_field(fields, common.VESPA_DOC_MATCH_FEATURES, dict()),
+                vector_counts=cls.extract_field(fields, common.FIELD_VECTOR_COUNT, 0),
+                index_supports_partial_updates=False)
 
     @classmethod
     def extract_field(cls, fields, name: str, default: Any):
@@ -347,7 +349,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         - String arrays (handled differently based on partial update support)
         """
         vespa_fields = {
-            **{k: v for k, v in self.fixed_fields.dict(exclude_none=True, by_alias=True).items() if v or v == 0},
+            **{k: v for k, v in self.fixed_fields.model_dump(exclude_none=True, by_alias=True).items() if v or v == 0},
             **self.text_fields,
             **self.tensor_fields,
             common.FIELD_VECTOR_COUNT: self.vector_counts,
@@ -361,7 +363,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         else:
             vespa_fields[common.STRING_ARRAY] = self.fixed_fields.string_arrays
 
-        return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
+        return {_VESPA_DOC_ID: self.id, _VESPA_DOC_FIELDS: vespa_fields}
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """
