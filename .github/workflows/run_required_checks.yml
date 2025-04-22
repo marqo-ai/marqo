@@ -24,10 +24,17 @@ jobs:
       - name: Check for Non-Markdown Changes
         id: check_changes
         run: |
-          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -vE '\.md$'; then
-            echo "non_documentation_changes_found=true" >> $GITHUB_OUTPUT
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          
+          if [ -z "$BEFORE" ] || \
+             git diff --name-only "$BEFORE" "$AFTER" | grep -qvE '\.md$'
+          then
+            # either BEFORE was empty, or we found at least one non‑.md change
+            echo "non_documentation_changes_found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "non_documentation_changes_found=false" >> $GITHUB_OUTPUT
+            # BEFORE was set and all changed files end in .md
+            echo "non_documentation_changes_found=false" >> "$GITHUB_OUTPUT"
           fi
 
   Run-integration-tests:
