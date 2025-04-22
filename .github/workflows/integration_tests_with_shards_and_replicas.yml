@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   Unit-Tests-1-Shard-0-Replica:
