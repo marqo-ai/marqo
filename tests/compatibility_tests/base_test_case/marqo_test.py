@@ -50,8 +50,8 @@ class MarqoTestCase(unittest.TestCase):
         # Attempt to delete all existing indexes first
         existing_indexes = [index["indexName"] for index in cls.client.get_indexes()["results"]]
         try:
-            cls.delete_indexes(existing_indexes)
-        except MarqoWebError:
+            requests.post(f"{cls._MARQO_URL}/batch/indexes/delete", data=json.dumps(existing_indexes))
+        except requests.exceptions.HTTPError as e:
             pass  # Ignore errors if indexes don't exists
 
         r = requests.post(f"{cls._MARQO_URL}/batch/indexes/create", data=json.dumps(index_settings_with_name))
