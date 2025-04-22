@@ -47,6 +47,12 @@ class MarqoTestCase(unittest.TestCase):
         """A function to call the internal Marqo API to create a batch of indexes.
          Use camelCase for the keys.
         """
+        # Attempt to delete all existing indexes first
+        existing_indexes = [index["indexName"] for index in cls.client.get_indexes()["results"]]
+        try:
+            cls.delete_indexes(existing_indexes)
+        except MarqoWebError:
+            pass  # Ignore errors if indexes don't exists
 
         r = requests.post(f"{cls._MARQO_URL}/batch/indexes/create", data=json.dumps(index_settings_with_name))
 
