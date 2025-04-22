@@ -84,6 +84,8 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 text_fields[field_name] = fields[field_name]
 
         if marqo_index.index_supports_partial_updates:
+            string_array_field_map = marqo_index.string_array_field_name_to_string_array_field_map
+            string_array_prefix_length = len(STRING_ARRAY + '_')
             for field_name in fields:
                 # Process tensor and text fields
                 process_field(field_name, fields)
@@ -93,8 +95,8 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 # 'marqo__string_array_field_name_1': ['element1', 'element2', ...]
                 # 'marqo__string_array_field_name_2': ['element3', 'element4', ...]
                 # Here we will collect all such string array fields and put them in string_arrays_dict, which will later be used  to construct the SemiStructuredVespaDocument object.
-                if field_name.startswith(common.STRING_ARRAY+'_'):
-                    string_array_field_key = field_name.replace(common.STRING_ARRAY+'_', '')
+                if field_name in string_array_field_map:
+                    string_array_field_key = field_name[string_array_prefix_length:]
                     string_array_field_value = fields[field_name]
                     string_arrays_dict[string_array_field_key] = string_array_field_value
 
