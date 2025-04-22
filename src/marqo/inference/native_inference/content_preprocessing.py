@@ -115,7 +115,6 @@ def download_and_preprocess_media(
     results = process_batch(
         content=content,
         preprocessor=preprocessor,
-        modality=preprocessing_config.modality,
         preprocessing_config=preprocessing_config,
         return_individual_error=return_individual_error
     )

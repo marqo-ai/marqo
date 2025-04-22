@@ -24,7 +24,7 @@ class StreamingMediaProcessor:
 
     def __init__(
             self, url: str,
-            modality: Modality,
+            modality: Literal[Modality.AUDIO, Modality.VIDEO],
             preprocessors: LanguagebindPreprocessor,
             preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
