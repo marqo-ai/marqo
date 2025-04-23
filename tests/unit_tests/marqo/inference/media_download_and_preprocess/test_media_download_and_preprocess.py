@@ -44,7 +44,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
             threaded_download_and_preprocess_content(
                 allocated_content=["url"],
                 preprocessor=MagicMock(),
-                preprocessin_config=config,
+                preprocessing_config=config,
                 metric_obj=None,
                 return_individual_error=True
             )
