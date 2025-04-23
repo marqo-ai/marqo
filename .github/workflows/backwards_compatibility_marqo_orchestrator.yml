@@ -169,7 +169,7 @@ jobs:
       to_image: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
                                   || needs.build-and-push-image.outputs.image_identifier }}
       mode: "backwards_compatibility"
-      path_to_test: ${{ default(github.event.inputs.path_to_test, '') }}
+      path_to_test: ${{ github.event.inputs.path_to_test || '' }}
 
 
   run-rollback-tests-execution-workflow:
