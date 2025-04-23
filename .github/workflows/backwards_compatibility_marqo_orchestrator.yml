@@ -97,7 +97,7 @@ jobs:
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
     needs: [check-if-image-exists, build-and-push-image]
-    if: (needs.check-if-image-exists.result == 'success') && (needs.check-if-image-exists.outputs.image_exists == 'true' || needs.build-and-push-image.result == 'success')
+    if: always() && (needs.check-if-image-exists.result == 'success') && (needs.check-if-image-exists.outputs.image_exists == 'true' || needs.build-and-push-image.result == 'success')
     outputs:
       list: ${{ steps.generate-versions.outputs.list }}
       to_version: ${{ steps.get-to-version.outputs.to_version }}
