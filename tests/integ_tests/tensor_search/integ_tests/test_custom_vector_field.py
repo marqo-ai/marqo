@@ -183,7 +183,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Test the structured index cannot be created with a custom vector field not in tensor fields
         """
-        with self.assertRaises(pydantic.v1.error_wrappers.ValidationError) as err:
+        with self.assertRaises(pydantic.error_wrappers.ValidationError) as err:
             self.create_indexes([self.structured_marqo_index_request(
                 model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
                 normalize_embeddings=False,
@@ -211,7 +211,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         for index in [self.unstructured_custom_index, self.semi_structured_custom_index]:
             with self.subTest(msg=f'{index.name}: {index.type}'):
-                with self.assertRaisesStrict(pydantic.v1.error_wrappers.ValidationError) as err:
+                with self.assertRaisesStrict(pydantic.error_wrappers.ValidationError) as err:
                     self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=index.name,
@@ -586,7 +586,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 for case in test_cases:
                     with self.subTest(f"Case: {case}"):
-                        with self.assertRaises(pydantic.v1.ValidationError):
+                        with self.assertRaises(pydantic.ValidationError):
                             res = self.add_documents(
                                 config=self.config, add_docs_params=AddDocsParams(
                                     index_name=index.name,
