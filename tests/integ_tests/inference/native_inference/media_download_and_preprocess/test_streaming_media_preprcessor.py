@@ -10,7 +10,6 @@ from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls
 from marqo.core.inference.api import *
 from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
-from marqo.s2_inference.errors import MediaDownloadError
 
 
 class DummyPreprocessor(LanguagebindPreprocessor):
@@ -179,7 +178,6 @@ class TestStreamingMediaProcessor(unittest.TestCase):
                 url=invalid_url, preprocessors=self.test_preprocessor,
                 preprocessing_config=self.test_video_preprocessing_config
             )
-            streaming_media_processor_object._fetch_file_metadata()
 
     def test_video_decoding_timeout(self):
         """Test that a timeout error is raised for slow video decoding."""
