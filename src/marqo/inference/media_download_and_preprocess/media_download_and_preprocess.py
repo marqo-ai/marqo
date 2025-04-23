@@ -108,7 +108,7 @@ def _threaded_download_and_preprocess_image(
                 continue
             if isinstance(image, Image):
                 try:
-                    preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
+                    preprocessed_image: List[Tensor] = preprocessor.preprocess([image], preprocessing_config.modality)
                 except OSError as e:
                     if "image file is truncated" in str(e):
                         if return_individual_error:
@@ -167,7 +167,6 @@ def _threaded_download_and_preprocess_audio_and_video(
             audio_downloader= StreamingMediaProcessor(
                 url = url,
                 preprocessors = preprocessor,
-                modality = preprocessing_config.modality,
                 preprocessing_config = preprocessing_config,
                 enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
             )
