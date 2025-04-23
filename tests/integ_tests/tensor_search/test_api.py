@@ -6,6 +6,8 @@ import uuid
 from unittest import mock
 from unittest.mock import patch
 
+import pydantic
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
@@ -571,5 +573,40 @@ class TestApiErrors(MarqoTestCase):
                 response = self.client.get(f"/indexes/test_index/documents/1")
             mock_logger_error.assert_called_once()
             self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
+
+    def test_parse_request_object_should_parse_pydantic_v1_model(self):
+        """Ensures parse_request_object parses pydantic v1 model"""
+        class PydanticV1Model(pydantic.v1.BaseModel):
+            field1: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        model = api.parse_request_object(PydanticV1Model, request_obj_dict)
+
+        self.assertEqual(model.field1, "hello")
+
+    def test_parse_request_object_should_not_parse_pydantic_v2_model(self):
+        """Ensures parse_request_object does not parse pydantic v2 model"""
+        class PydanticV2Model(pydantic.BaseModel):
+            field1: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        with self.assertRaises(RuntimeError) as context:
+            api.parse_request_object(PydanticV2Model, request_obj_dict)
+
+        self.assertIn('no validator found for', str(context.exception))
+
+    def test_parse_request_object_should_raise_request_validation_exception(self):
+        """Ensures parse_request_object raises RequestValidationError on pydantic v1 validation error"""
+        class PydanticV1Model(pydantic.v1.BaseModel):
+            field2: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        with self.assertRaises(RequestValidationError) as context:
+            api.parse_request_object(PydanticV1Model, request_obj_dict)
+
+        self.assertIn('field required', str(context.exception.errors()))
 
     # TODO: Test how marqo handles generic exceptions, including Exception, RunTimeError, ValueError, etc.
