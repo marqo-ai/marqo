@@ -202,14 +202,14 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
         try:
-            run_test_mode(from_version)
+            run_test_mode(from_version, path_to_test)
         except Exception as e:
             raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
         logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
         # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
         try:
             run_prepare_mode(to_version)
-            run_test_mode(to_version)
+            run_test_mode(to_version, path_to_test)
         except Exception as e:
             raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
     except Exception as e:
@@ -222,7 +222,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         docker_manager.cleanup_containers()
         docker_manager.cleanup_volumes()
 
-def rollback_test(to_version: str, from_version: str, to_version_image: str):
+def rollback_test(to_version: str, from_version: str, to_version_image: str, path_to_test: str):
     """
     Perform a rollback test between two versions of Marqo.
     This function first runs test cases in prepare mode on from_version Marqo container, then upgrades it to to_version Marqo container,
@@ -275,12 +275,12 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
 
         # Step 7: Run test mode
         logger.info(f"Step 7: Running tests in test mode on from_version: {from_version}")
-        run_test_mode(from_version) # This will validate results from the older indexes added as part of the PREPARE mode above.
+        run_test_mode(from_version, path_to_test) # This will validate results from the older indexes added as part of the PREPARE mode above.
 
         # Step 8: Run prepare and test mode again, on the from_version container.
         logger.info(f"Step 8: Running prepare and test mode on the same from_version: {from_version} container")
         run_prepare_mode(from_version)
-        run_test_mode(from_version) # This will validate results by creating newer indexes and adding documents to them. This is required just so that we know that even after transferring state from an older version, we are able to create new indexes in the older state seamlessly.
+        run_test_mode(from_version, path_to_test) # This will validate results by creating newer indexes and adding documents to them. This is required just so that we know that even after transferring state from an older version, we are able to create new indexes in the older state seamlessly.
 
         # Only execute the following if Marqo version >= 2.13.0. This is because the rollback endpoint is only
         # available in these versions.
@@ -293,7 +293,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
             try:
                 logger.info(f"Running full test suite with from_version: {from_version}")
                 run_prepare_mode(from_version)
-                run_test_mode(from_version)
+                run_test_mode(from_version, path_to_test)
             except Exception as e:
                 raise RuntimeError(
                     f"Error when running full test suite in rollback tests after rolling back vespa application, "
@@ -369,7 +369,7 @@ if __name__ == "__main__":
         if args.mode == "backwards_compatibility":
             backwards_compatibility_test(args.from_version, args.to_version, args.to_image, args.path_to_test)
         elif args.mode == "rollback":
-            rollback_test(args.to_version, args.from_version, args.to_image)
+            rollback_test(args.to_version, args.from_version, args.to_image, args.path_to_test)
 
     except Exception as e:
         logger.exception(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting", exc_info=True)
