@@ -254,7 +254,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch("marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
-    def test_return_inference_error_model(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+    def test_media_download_error_is_raised(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
 
         mock_fetch_file_metadata.return_value = (1000000, 10.0)
         mock_fetch_audio_chunk.side_effect = MediaDownloadError("Failed downloading audio")
@@ -264,8 +264,20 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             preprocessors=self.test_preprocessor,
             preprocessing_config=self.test_audio_preprocessing_config
         )
+        with self.assertRaises(MediaDownloadError) as context:
+            result = processor.process_media()
 
-        result = processor.process_media()
-        # Ensure result is an instance of InferenceErrorModel
-        self.assertIsInstance(result, InferenceErrorModel)
-        self.assertIn("No chunks were processed successfully", result.error_message)
+    @patch("marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_media_exceeds_max_size_error_is_raised(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+
+        mock_fetch_file_metadata.return_value = (1e10, 10.0)
+        mock_fetch_audio_chunk.side_effect = MediaDownloadError("Failed downloading audio")
+
+        with self.assertRaises(MediaExceedsMaxSizeError) as context:
+            processor = StreamingMediaProcessor(
+                url=TestAudioUrls.AUDIO1.value,
+                preprocessors=self.test_preprocessor,
+                preprocessing_config=self.test_audio_preprocessing_config
+            )

@@ -13,6 +13,10 @@ from marqo.core.exceptions import InternalError
 from marqo.core.inference.api import *
 from marqo.core.models.marqo_index import *
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
+
+MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
 
 
 class StreamingMediaProcessor:
@@ -28,11 +32,29 @@ class StreamingMediaProcessor:
             preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
     ):
+        """
+        Instantiate the StreamingMediaProcessor class.
+
+        Args:
+            url: The URL of the media file to be processed.
+            preprocessors: The LanguagebindPreprocessor instance to be used for preprocessing the media.
+            preprocessing_config: The configuration for preprocessing the media, which includes the modality (audio or video),
+            enable_video_gpu_acceleration: Whether to enable GPU acceleration for video processing.
+        Raises:
+            MediaExceedsMaxSizeError: If the media file size exceeds the maximum allowed size.
+            MediaDownloadError: If there is an error downloading the media file.
+        """
         self.url = url
         self.modality = preprocessing_config.modality
         
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
         self.total_size, self.duration = self._fetch_file_metadata()
+
+        if self.total_size > MAX_FILE_SIZE:
+            raise MediaExceedsMaxSizeError(
+                f"File size ({self.total_size / 1024 / 1024:.2f} MB) "
+                f"exceeds the maximum allowed size of {MAX_FILE_SIZE / 1024 / 1024:.2f} MB"
+            )
 
         if preprocessing_config.should_chunk:
             self.split_length = preprocessing_config.chunk_config.split_length
@@ -89,16 +111,16 @@ class StreamingMediaProcessor:
         extension = 'mp4' if self.modality == Modality.VIDEO else 'wav'
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
-    def process_media(self) -> Union[InferenceErrorModel, list[Tuple[str, Tensor]]]:
+    def process_media(self) -> list[Tuple[str, Tensor]]:
         """
         Process the media file by splitting it into chunks and downloading each chunk, and apply the languagebind
         preprocessor to each chunk.
 
         Returns:
-            An InferenceErrorModel if there is an error, otherwise a list of tuples containing the chunk content, and
-            the corresponding tensor.
-            The chunk content is formated as f"[{chunk_start_time}, {chunk_end_time}]".
+            list[Tuple[str, Tensor]]: A list of tuples, where each tuple contains the chunk content and the
 
+        Raise:
+            MediaDownloadError: If there is an error downloading or processing the media file.
         """
         processed_chunks: list[Tuple[str, Tensor]] = []
         chunk_duration = self.split_length
@@ -146,8 +168,8 @@ class StreamingMediaProcessor:
                     (f"[{chunk_start:.1f}, {chunk_end:.1f}]", processed_chunk_tensor)
                 )
         if not processed_chunks:
-            return InferenceErrorModel(
-                error_message=f"No chunks were processed successfully for the given media file '{self.url}'"
+            raise MediaDownloadError(
+                f"Error processing media file {self.url}: No chunks were successfully processed"
             )
         return processed_chunks
 

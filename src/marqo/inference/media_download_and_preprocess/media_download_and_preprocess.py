@@ -5,6 +5,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import PIL
+from tornado.gen import Runner
 
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
@@ -131,7 +132,7 @@ def _threaded_download_and_preprocess_image(
 def _threaded_download_and_preprocess_audio_and_video(
         allocated_content: list[str],
         preprocessor,
-        preprocessing_config: AudioPreprocessingConfig,
+        preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
         metric_obj: Optional[RequestMetrics] = None,
         return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
@@ -140,46 +141,43 @@ def _threaded_download_and_preprocess_audio_and_video(
     This should be called only if treat URLs as images is True.
 
     Args:
-        allocated_docs: docs with images to be downloaded by this thread,
-        media_repo: dictionary that will be mutated by this thread. It will add media
-            as values and the URLs as keys
-        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
-        media_download_headers: A dict of headers for image download. Can be used
-            to authenticate image downloads
+        allocated_content: The content to be downloaded and preprocessed by this thread.
+        preprocessor: The preprocessor to be used for preprocessing the content. E.g., LanguagebindModelPreprocessor
+        preprocessing_config: The preprocessing configuration to be used for preprocessing the content.
         return_individual_error: If True, collect individual errors in the thread_results, otherwise, raise an error.
-    Side Effects:
-        Adds members to the image_repo dict. Each key is a string which is identified as a URL.
-        Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
-        the image.
-        For example:
-        {
-            'https://google.com/my_dog.png': InferenceErrorModel, # error because such an image doesn't exist
-            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png': <PIL image>
-        }
-    Returns:
-        None
+        metric_obj: The telemetry object to be used for measuring the time taken for each thread.
 
+    Return:
+        A list of tuples, where each tuple contains the chunk and the preprocessed content.
+
+    Raise:
+        InferenceError: If there is an error in downloading or preprocessing the content and
+        return_individual_error is False.
+        RuntimeError: If the number of results does not match the number of allocated content.
     """
     _id = f'image_download.{threading.get_ident()}'
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
-            audio_downloader= StreamingMediaProcessor(
-                url = url,
-                preprocessors = preprocessor,
-                preprocessing_config = preprocessing_config,
-                enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
-            )
-            results: Union[InferenceErrorModel, list[Tuple[str, Tensor]]] = audio_downloader.process_media()
-            if isinstance(results, list):
-                thread_results.append(results)
-            elif isinstance(results, InferenceErrorModel):
+            try:
+                audio_downloader= StreamingMediaProcessor(
+                    url = url,
+                    preprocessors = preprocessor,
+                    preprocessing_config = preprocessing_config,
+                    enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
+                )
+                results: list[Tuple[str, Tensor]] = audio_downloader.process_media()
+            except InferenceError as e:
                 if return_individual_error:
-                    thread_results.append(results)
+                    thread_results.append(InferenceErrorModel(error_message=str(e)))
                 else:
-                    raise MediaDownloadError(str(results))
-            else:
-                raise ValueError(f"Unexpected result type: {type(results)} for audio: {url}")
+                    raise e
+            thread_results.append(results)
+        if not len(thread_results) == len(allocated_content):
+            raise RuntimeError(
+                f"Thread {threading.get_ident()} had a problem when processing the content. "
+                f"Expected {len(allocated_content)} results, but got {len(thread_results)} results"
+            )
     return thread_results
 
 
