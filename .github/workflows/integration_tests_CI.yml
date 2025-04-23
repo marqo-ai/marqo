@@ -31,13 +31,6 @@ on:
         required: true
         default: 0
 
-  push:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
-
 concurrency:
   group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
   cancel-in-progress: true

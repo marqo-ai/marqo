@@ -3,17 +3,6 @@ name: unit_test_200gb_CI
 
 on:
   workflow_call:
-  workflow_dispatch:
-  push:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
 
 concurrency:
   group: integ-tests-${{ github.ref }}
