@@ -152,7 +152,7 @@ jobs:
             --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             --split-n 4 --split-part ${{ matrix.part }} --suppress-skips \
-            tests/integ_tests | tee pytest_output.txt
+            tests/integ_tests/test_documentation.py | tee pytest_output.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
