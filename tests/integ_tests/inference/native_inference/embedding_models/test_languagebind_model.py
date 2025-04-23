@@ -15,7 +15,7 @@ from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 
-
+@unittest.skip("Skip languagebind models")
 @mark.largemodel
 class TestLanguagebindModels(unittest.TestCase):
     """

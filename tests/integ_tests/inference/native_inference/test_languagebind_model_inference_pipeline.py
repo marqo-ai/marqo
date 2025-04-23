@@ -98,7 +98,7 @@ class TestLanguagebindModelInferencePipeline(InferenceTestCase):
                 model_properties=self.model_properties,
                 normalize_embeddings=True
             ),
-            preprocessing_config=TextPreprocessingConfig(
+            preprocessing_config=ImagePreprocessingConfig(
                 should_chunk=False
             )
         )
