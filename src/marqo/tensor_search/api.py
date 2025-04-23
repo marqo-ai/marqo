@@ -17,6 +17,7 @@ from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
+from marqo.api.models.get_batch_documents_request import GetBatchDocumentsRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
 from marqo.api.models.rollback_request import RollbackRequest
@@ -467,16 +468,34 @@ def get_document_by_id(index_name: str, document_id: str,
 
 
 @app.get("/indexes/{index_name}/documents")
-def get_documents_by_ids(
+def get_documents_by_ids_via_get(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
     """
-    Gets a selection of documents based on their IDs. Please refer to
+    Gets a selection of documents based on their IDs via a GET request. Please refer to
     [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
     """
     res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
+        show_vectors=expose_facets
+    )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+
+
+@app.post("/indexes/{index_name}/documents/get-batch")
+def get_documents_by_ids_via_post(
+        index_name: str,
+        get_batch_documents_request: GetBatchDocumentsRequest,
+        marqo_config: config.Config = Depends(get_config),
+        expose_facets: bool = False
+):
+    """
+    Gets a selection of documents based on their IDs via a POST request. Please refer to
+    [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
+    """
+    res = tensor_search.get_documents_by_ids(
+        config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
         show_vectors=expose_facets
     )
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
