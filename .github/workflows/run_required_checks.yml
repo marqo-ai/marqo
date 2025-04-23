@@ -73,19 +73,19 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Download integration test coverage
+      - name: Download integration tests coverage
         uses: actions/download-artifact@v4
         with:
           name: marqo-integ-tests-report
           path: integration-tests-coverage
           
-      - name: Download large model test reports
+      - name: Download large model tests coverage
         uses: actions/download-artifact@v4
         with:
           name: marqo-largemodel-tests-report
           path: largemodel-tests-coverage
           
-      - name: Download unit test reports
+      - name: Download unit tests coverage
         uses: actions/download-artifact@v4
         with:
           name: marqo-unit-tests-report
