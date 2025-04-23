@@ -71,7 +71,7 @@ def run_prepare_mode(version_to_test_against: str):
             continue
 
         # Log to confirm no duplicates
-        logger.info(f"{test_class.__name__} has NOT been processed yet. Processed classes: {seen_classes}. Processing now.")
+        logger.info(f"{test_class.__name__} has NOT been processed yet. Processing now.")
         seen_classes.add(test_class.__name__)
         
         logger.info(f"========================================================================================")

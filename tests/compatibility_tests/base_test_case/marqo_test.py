@@ -10,6 +10,7 @@ from marqo.utils import construct_authorized_url
 from marqo import Client
 from marqo.errors import MarqoWebError
 import requests
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -30,6 +31,9 @@ class MarqoTestCase(unittest.TestCase):
         cls.indexes_to_delete: List[str] = []
         cls.client = Client(**cls.client_settings)
 
+        if not hasattr(cls, 'logger'):
+            cls.logger = get_logger(f"tests.compatibility_tests.{cls.__module__}.{cls.__name__}")
+
     @classmethod
     def tearDownClass(cls) -> None:
         # A function that will be automatically called after each test call
@@ -47,19 +51,31 @@ class MarqoTestCase(unittest.TestCase):
         """A function to call the internal Marqo API to create a batch of indexes.
          Use camelCase for the keys.
         """
+        cls.logger.debug(f"Starting index creation method.")
+
         # Attempt to delete all existing indexes first
         existing_indexes = [index["indexName"] for index in cls.client.get_indexes()["results"]]
         try:
-            requests.post(f"{cls._MARQO_URL}/batch/indexes/delete", data=json.dumps(existing_indexes))
+            cls.logger.debug(f"First attempting to run batch delete on {existing_indexes}.")
+            r = requests.post(f"{cls._MARQO_URL}/batch/indexes/delete", data=json.dumps(existing_indexes))
+            cls.logger.debug(r)
+            cls.logger.debug(f"Attempted to delete indexes {existing_indexes}.")
         except requests.exceptions.HTTPError as e:
+            cls.logger.debug(f"Initial error deleting indexes: {e}")
             pass  # Ignore errors if indexes don't exists
 
+        # Now create the indexes
+        cls.logger.debug(f"Creating indexes {index_settings_with_name}")
         r = requests.post(f"{cls._MARQO_URL}/batch/indexes/create", data=json.dumps(index_settings_with_name))
+        cls.logger.debug(r)
 
         try:
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
             raise MarqoWebError(e)
+
+        cls.logger.debug(f"Succeeded creating indexes {index_settings_with_name}")
+
 
     @classmethod
     def delete_indexes(cls, index_names: List[str]):
