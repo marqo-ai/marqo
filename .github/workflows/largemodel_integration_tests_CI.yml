@@ -128,7 +128,6 @@ jobs:
 
       - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
         id: run_tests
-        continue-on-error: true
         run: |
           # Define these for use by Marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -147,7 +146,7 @@ jobs:
           cd marqo
           export PYTHONPATH="./tests/integ_tests:./src"
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest --largemodel \
+          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
@@ -156,7 +155,6 @@ jobs:
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: marqo-largemodel-tests-report-${{ matrix.part }}
           path: marqo/.coverage.${{ matrix.part }}

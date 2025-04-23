@@ -54,7 +54,6 @@ jobs:
 
       - name: Run unit tests
         id: run_unit_tests
-        continue-on-error: true
         run: |
           cd marqo
           export PYTHONPATH="./src"
