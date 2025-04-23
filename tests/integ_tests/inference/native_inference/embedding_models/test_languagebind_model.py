@@ -7,17 +7,15 @@ from pytest import mark
 from integ_tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
 from marqo.core.inference.api.modality import Modality
 from marqo.inference.media_download_and_preprocess.image_download import format_and_load_CLIP_images
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 
 
-@unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
-@mark.unittest
 @mark.largemodel
 class TestLanguagebindModels(unittest.TestCase):
     """

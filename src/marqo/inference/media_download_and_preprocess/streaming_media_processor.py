@@ -33,8 +33,13 @@ class StreamingMediaProcessor:
         
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
         self.total_size, self.duration = self._fetch_file_metadata()
-        self.split_length = preprocessing_config.chunk_config.split_length
-        self.split_overlap = preprocessing_config.chunk_config.split_overlap
+
+        if preprocessing_config.should_chunk:
+            self.split_length = preprocessing_config.chunk_config.split_length
+            self.split_overlap = preprocessing_config.chunk_config.split_overlap
+        else:
+            self.split_length = self.duration
+            self.split_overlap = 0
         
         self.preprocessors = preprocessors
         
@@ -138,7 +143,7 @@ class StreamingMediaProcessor:
                     [output_file], modality=self.modality)[0]
 
                 processed_chunks.append(
-                    (f"[{chunk_start}, {chunk_end}]", processed_chunk_tensor)
+                    (f"[{chunk_start:.1f}, {chunk_end:.1f}]", processed_chunk_tensor)
                 )
         if not processed_chunks:
             return InferenceErrorModel(
