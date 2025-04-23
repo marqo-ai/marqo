@@ -2,9 +2,9 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
+
+import pydantic.v1 as pydantic
 from pydantic.v1 import PrivateAttr, root_validator
 from pydantic.v1 import ValidationError, validator
 from pydantic.v1.error_wrappers import ErrorWrapper
@@ -119,25 +119,28 @@ class TensorField(ImmutableStrictBaseModel):
 
 
 class HnswConfig(ImmutableStrictBaseModel):
-    ef_construction: int = pydantic.v1.Field(gt=0, alias='efConstruction')
-    m: int = pydantic.v1.Field(gt=0)
+    ef_construction: int = pydantic.Field(gt=0, alias='efConstruction')
+    m: int = pydantic.Field(gt=0)
 
 
 class TextPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.v1.Field(gt=0, alias='splitLength')
-    split_overlap: int = pydantic.v1.Field(ge=0, alias='splitOverlap')
-    split_method: TextSplitMethod = pydantic.v1.Field(alias='splitMethod')
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+    split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
+
 
 class VideoPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.v1.Field(gt=0, alias='splitLength')
-    split_overlap: int = pydantic.v1.Field(ge=0, alias='splitOverlap')
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class AudioPreProcessing(ImmutableStrictBaseModel):
-    split_length: int = pydantic.v1.Field(gt=0, alias='splitLength')
-    split_overlap: int = pydantic.v1.Field(ge=0, alias='splitOverlap')
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
-    patch_method: Optional[PatchMethod] = pydantic.v1.Field(alias='patchMethod')
+    patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
 
 
 class Model(StrictBaseModel):
@@ -274,10 +277,10 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
-    created_at: int = pydantic.v1.Field(gt=0)
-    updated_at: int = pydantic.v1.Field(gt=0)
+    created_at: int = pydantic.Field(gt=0)
+    updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()
-    version: Optional[int] = pydantic.v1.Field(default=None)
+    version: Optional[int] = pydantic.Field(default=None)
 
     class Config(ImmutableBaseModel.Config):
         extra = "allow"
