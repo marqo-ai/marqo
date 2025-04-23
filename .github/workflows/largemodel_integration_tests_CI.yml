@@ -186,8 +186,22 @@ jobs:
 
       - name: Move Coverage Files
         run: |
+          echo "Current working directory: $(pwd)"
+          echo "Initial directory structure:"
+          find . -type d -maxdepth 3 | sort
+          
           mkdir -p marqo-coverage
-          find coverage-parts -name ".coverage.*" -type f -exec mv {} marqo-coverage/ \;
+          # Check if directory exists first
+          if [ -d "coverage-parts" ]; then
+            echo "Directory structure of coverage-parts:"
+            find coverage-parts -type f | sort
+            find coverage-parts -name ".coverage.*" -type f -exec mv {} marqo-coverage/ \;
+          else
+            echo "No coverage-parts directory found. Checking artifact structure."
+            find . -name ".coverage.*" -type f | sort
+            find . -name ".coverage.*" -type f -exec mv {} marqo-coverage/ \;
+          fi
+          echo "Contents of marqo-coverage directory:"
           ls -la marqo-coverage/
 
       - name: Install coverage
