@@ -1,5 +1,4 @@
 import os
-import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -12,13 +11,13 @@ import torch
 from torch import Tensor
 
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference import types
-from marqo.core.inference.modality_utils import infer_modality
-from marqo.tensor_search import add_docs
 from marqo.inference.media_download_and_preprocess import streaming_media_processor
+from marqo.s2_inference import types
+from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
@@ -1003,60 +1002,58 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
+    @patch('marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.MAX_FILE_SIZE', 2097152)
     def test_video_size_limit_in_batch(self):
         """Tests that adding documents with videos respects the file size limit per document"""
-        with mock.patch.dict('os.environ', {'MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE': '2097152',
-                                            'MARQO_MAX_CPU_MODEL_MEMORY': '15',
-                                            'MARQO_MAX_CUDA_MODEL_MEMORY': '15'}):  # 2MB limit
-            # Test documents - one under limit (2.5MB), one over limit
-            test_docs = [
-                {
-                    "_id": "1",
-                    "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
-                    "text_field_1": "This video should work"
-                },
-                {
-                    "_id": "2", 
-                    "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
-                    "text_field_1": "This video should fail"
-                }
-            ]
+        # Test documents - one under limit (2.5MB), one over limit
+        test_docs = [
+            {
+                "_id": "1",
+                "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
+                "text_field_1": "This video should work"
+            },
+            {
+                "_id": "2",
+                "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
+                "text_field_1": "This video should fail"
+            }
+        ]
 
-            for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
-                with self.subTest(f"Testing video size limit for index {index}"):
-                    tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
-                    
-                    # Add documents
-                    result = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index,
-                            docs=test_docs,
-                            tensor_fields=tensor_fields
-                        )
-                    ).dict(exclude_none=True, by_alias=True)
+        for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            with self.subTest(f"Testing video size limit for index {index}"):
+                tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
 
-                    # Verify results
-                    self.assertTrue(result["errors"])  # Should have errors due to second document
-                    self.assertEqual(2, len(result["items"]))
-                    
-                    # First document should succeed
-                    self.assertEqual(200, result["items"][0]["status"])
-                    self.assertNotIn("error", result["items"][0])
-                    
-                    # Second document should fail with size limit error
-                    self.assertEqual(400, result["items"][1]["status"])
-                    self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
-
-                    # Verify the first document was actually added
-                    get_result = tensor_search.get_documents_by_ids(
-                        config=self.config,
+                # Add documents
+                result = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
                         index_name=index,
-                        document_ids=["1"]
-                    ).dict(exclude_none=True, by_alias=True)
-                    
-                    self.assertEqual(1, len(get_result["results"]))
-                    self.assertEqual("1", get_result["results"][0]["_id"])
+                        docs=test_docs,
+                        tensor_fields=tensor_fields
+                    )
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Verify results
+                self.assertTrue(result["errors"])  # Should have errors due to second document
+                self.assertEqual(2, len(result["items"]))
+
+                # First document should succeed
+                self.assertEqual(200, result["items"][0]["status"])
+                self.assertNotIn("error", result["items"][0])
+
+                # Second document should fail with size limit error
+                self.assertEqual(400, result["items"][1]["status"])
+                self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
+
+                # Verify the first document was actually added
+                get_result = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index,
+                    document_ids=["1"]
+                ).dict(exclude_none=True, by_alias=True)
+
+                self.assertEqual(1, len(get_result["results"]))
+                self.assertEqual("1", get_result["results"][0]["_id"])
 
     def test_supported_audio_format(self):
         """Test the supported audio format for the LanguageBind model in add_documents and search."""
