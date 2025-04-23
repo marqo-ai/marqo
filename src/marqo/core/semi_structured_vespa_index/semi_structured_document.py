@@ -394,8 +394,22 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         # Add int and float fields back
         # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
         # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
-        marqo_document.update(self.fixed_fields.int_fields)
-        marqo_document.update(self.fixed_fields.float_fields)
+        # Due to a race condition, the int_fields and float_fields can be a list of dicts, we want to format them
+        # and exclude fields with empty values
+        if isinstance(self.fixed_fields.int_fields, list):
+            marqo_document.update({
+                field_dict['key']: field_dict['value'] for field_dict in self.fixed_fields.int_fields
+                if field_dict.get('value') is not None
+            })
+        else:
+            marqo_document.update(self.fixed_fields.int_fields)
+        if isinstance(self.fixed_fields.float_fields, list):
+            marqo_document.update({
+                field_dict['key']: field_dict['value'] for field_dict in self.fixed_fields.float_fields
+                if field_dict.get('value') is not None
+            })
+        else:
+            marqo_document.update(self.fixed_fields.float_fields)
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
