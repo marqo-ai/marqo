@@ -521,7 +521,7 @@ def get_documents_by_ids_via_get(
 @app.post("/indexes/{index_name}/documents/get-batch")
 def get_documents_by_ids_via_post(
         index_name: str,
-        get_batch_documents_request: GetBatchDocumentsRequest,
+        get_batch_documents_request_dict: dict,
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False
 ):
@@ -529,6 +529,10 @@ def get_documents_by_ids_via_post(
     Gets a selection of documents based on their IDs via a POST request. Please refer to
     [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  GetBatchDocumentsRequest can be injected after migrated to v2
+    get_batch_documents_request = parse_request_object(GetBatchDocumentsRequest, get_batch_documents_request_dict)
+
     res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
         show_vectors=expose_facets
