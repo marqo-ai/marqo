@@ -44,7 +44,7 @@ class AddDocsParams(BaseModel):
     media_download_thread_count: int = Field(
         default_factory=lambda: read_env_vars_and_defaults_ints(
             EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
-    )
+    ) # Specifically for audio and video, not image
     media_download_headers: Optional[dict] = None
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
@@ -53,14 +53,6 @@ class AddDocsParams(BaseModel):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-
-    @root_validator
-    def validate_thread_counts(cls, values):
-        image_count = values.get('image_download_thread_count')
-        media_count = values.get('media_download_thread_count')
-        if media_count is not None and image_count != read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST):
-            raise ValueError("Cannot set both image_download_thread_count and media_download_thread_count")
-        return values
 
     @validator('docs')
     def validate_docs(cls, docs):
