@@ -227,7 +227,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 self.assertEqual(400, r["items"][1]["status"])
                 self.assertIn("Image file is truncated", r["items"][1]["error"])
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_single_documents(self):
@@ -291,7 +290,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_field_document(self):
@@ -863,7 +861,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
-@unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
 @pytest.mark.largemodel
 class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
     """A class to test the add_documents with the LanguageBind model."""
