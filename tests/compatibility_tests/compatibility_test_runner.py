@@ -125,18 +125,22 @@ def run_prepare_mode(version_to_test_against: str):
     if errors:
         raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
-def construct_pytest_arguments(version_to_test_against):
+def construct_pytest_arguments(version_to_test_against, path_to_test):
+    # Default to all compatibility rests
+    if not path_to_test:
+        path_to_test = "tests/compatibility_tests"
+
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
         "-s",
-        "tests/compatibility_tests/search/test_search_with_global_score_modifiers.py"    # temporarily adjust test names manually
+        path_to_test   # temporarily adjust test names manually
     ]
     return pytest_args
 
-def run_test_mode(version_to_test_against):
+def run_test_mode(version_to_test_against, path_to_test):
     logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
-    pytest_args = construct_pytest_arguments(version_to_test_against)
+    pytest_args = construct_pytest_arguments(version_to_test_against, path_to_test)
     pytest_result = pytest.main(pytest_args)
 
     if pytest_result == 0:
@@ -151,7 +155,7 @@ def trigger_rollback_endpoint():
     if response.status_code == 200:
         logger.info("Rollback endpoint triggered successfully")
 
-def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str):
+def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str, path_to_test: str):
     """
     Perform a backwards compatibility test between two versions of Marqo.
 
@@ -165,6 +169,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
                                 (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
                                 or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
                                 This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
+        path_to_test (str): The path to the test file/dir to be executed with pytest.
 
     Raises:
         ValueError: If the major versions of from_version and to_version are incompatible.
@@ -336,6 +341,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
     parser.add_argument("--to_image", required=True)
+    parser.add_argument("--path_to_test", required=True)
     args = parser.parse_args()
     try:
         from_version = semver.VersionInfo.parse(args.from_version)
@@ -361,7 +367,7 @@ if __name__ == "__main__":
 
     try:
         if args.mode == "backwards_compatibility":
-            backwards_compatibility_test(args.from_version, args.to_version, args.to_image)
+            backwards_compatibility_test(args.from_version, args.to_version, args.to_image, args.path_to_test)
         elif args.mode == "rollback":
             rollback_test(args.to_version, args.from_version, args.to_image)
 

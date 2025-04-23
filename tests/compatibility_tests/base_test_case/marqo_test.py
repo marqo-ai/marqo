@@ -54,12 +54,11 @@ class MarqoTestCase(unittest.TestCase):
         cls.logger.debug(f"Starting index creation method.")
 
         # Attempt to delete all existing indexes first
-        existing_indexes = [index["indexName"] for index in cls.client.get_indexes()["results"]]
+        index_names = [index["indexName"] for index in index_settings_with_name]
         try:
-            cls.logger.debug(f"First attempting to run batch delete on {existing_indexes}.")
-            r = requests.post(f"{cls._MARQO_URL}/batch/indexes/delete", data=json.dumps(existing_indexes))
-            cls.logger.debug(r)
-            cls.logger.debug(f"Attempted to delete indexes {existing_indexes}.")
+            cls.logger.debug(f"First attempting to run batch delete on {index_names}.")
+            r = requests.post(f"{cls._MARQO_URL}/batch/indexes/delete", data=json.dumps(index_names))
+            cls.logger.debug(r.text)
         except requests.exceptions.HTTPError as e:
             cls.logger.debug(f"Initial error deleting indexes: {e}")
             pass  # Ignore errors if indexes don't exists
@@ -67,7 +66,7 @@ class MarqoTestCase(unittest.TestCase):
         # Now create the indexes
         cls.logger.debug(f"Creating indexes {index_settings_with_name}")
         r = requests.post(f"{cls._MARQO_URL}/batch/indexes/create", data=json.dumps(index_settings_with_name))
-        cls.logger.debug(r)
+        cls.logger.debug(r.text)
 
         try:
             r.raise_for_status()
