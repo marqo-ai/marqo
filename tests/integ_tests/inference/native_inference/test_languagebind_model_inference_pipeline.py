@@ -99,7 +99,8 @@ class TestLanguagebindModelInferencePipeline(InferenceTestCase):
                 normalize_embeddings=True
             ),
             preprocessing_config=ImagePreprocessingConfig(
-                should_chunk=False
+                should_chunk=False,
+                download_thread_count=1,
             )
         )
 
