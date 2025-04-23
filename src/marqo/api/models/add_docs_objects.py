@@ -4,9 +4,7 @@ from typing import Optional, Any, Sequence
 from pydantic import BaseModel, root_validator
 from pydantic import Field
 
-from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class AddDocsBodyParams(BaseModel):
@@ -24,17 +22,9 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Sequence[Dict[str, Any]]
-    imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-    mediaDownloadThreadCount: Optional[int]
+    imageDownloadThreadCount: Optional[int] = None
+    mediaDownloadThreadCount: Optional[int] = None
     textChunkPrefix: Optional[str] = None
-
-    @root_validator
-    def validate_thread_counts(cls, values):
-        image_count = values.get('imageDownloadThreadCount')
-        media_count = values.get('mediaDownloadThreadCount')
-        if media_count is not None and image_count != read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST):
-            raise ValueError("Cannot set both imageDownloadThreadCount and mediaDownloadThreadCount")
-        return values
 
     @root_validator(skip_on_failure=True)
     def _validate_image_download_headers_and_media_download_headers(cls, values):

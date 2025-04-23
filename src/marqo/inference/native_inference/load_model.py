@@ -343,13 +343,13 @@ def _load_model(
 
     if model_type not in (
             ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind,
-            ModelType.Random, ModelType.MultilingualClip
+            ModelType.Random, ModelType.MultilingualClip, ModelType.NO_MODEL
     ):
         raise ModelError(
             f"The provided model properties does not contain a valid model type. We only support "
             f"{ModelType.OpenCLIP}, {ModelType.HF_MODEL}, {ModelType.HF_STELLA}, "
-            f"{ModelType.LanguageBind}, {ModelType.Random}, {ModelType.MultilingualClip} at the moment, but"
-            f"received {model_type}."
+            f"{ModelType.LanguageBind}, {ModelType.Random}, {ModelType.MultilingualClip}, "
+            f"{ModelType.NO_MODEL} at the moment, but received {model_type}."
         )
 
     model = loader(
