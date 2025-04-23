@@ -4,6 +4,10 @@ on:
     branches:
       - mainline
       - releases/*
+  push:
+    branches:
+      - mainline
+      - releases/*
 
 permissions:
   contents: read
@@ -39,4 +43,208 @@ jobs:
       number_of_replicas: 0
     secrets: inherit
 
-  # TODO: Add more jobs here as needed
+  Run-largemodel-integration-tests:
+    needs: Determine-changes
+    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/largemodel_integration_tests_CI.yml
+    secrets: inherit
+
+  Run-unit-tests:
+    needs: Determine-changes
+    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/unit_tests.yml
+    secrets: inherit
+
+  Combine-Coverage-Reports:
+    needs:
+      - Run-integration-tests
+      - Run-largemodel-integration-tests
+      - Run-unit-tests
+    if: ${{ always() && needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Download integration test coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: marqo-integ-tests-report
+          path: integration-tests-coverage
+          
+      - name: Download large model test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report
+          path: largemodel-tests-coverage
+          
+      - name: Download unit test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: marqo-unit-tests-report
+          path: unit-tests-coverage
+          
+      - name: Install coverage package
+        run: |
+          pip install coverage
+          pip install diff-cover
+
+      - name: Move coverage files
+        run: |
+          # Create a directory to store all coverage data
+          mkdir -p coverage_data
+          
+          # Move all coverage files to a single directory
+          find integration-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/integration.coverage \; || true
+          find largemodel-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/largemodel.coverage \; || true
+          find unit-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/unit.coverage \; || true
+          
+          # Create combined reports directory
+          mkdir -p combined-reports
+          
+          # Store individual HTML reports
+          mkdir -p combined-reports/integration
+          mkdir -p combined-reports/largemodel
+          mkdir -p combined-reports/unit
+          
+          # Copy HTML reports
+          [ -d "integration-tests-coverage/marqo/htmlcov" ] && cp -r integration-tests-coverage/marqo/htmlcov/* combined-reports/integration/ || true
+          [ -d "largemodel-tests-coverage/marqo/htmlcov" ] && cp -r largemodel-tests-coverage/marqo/htmlcov/* combined-reports/largemodel/ || true
+          [ -d "unit-tests-coverage/marqo/htmlcov" ] && cp -r unit-tests-coverage/marqo/htmlcov/* combined-reports/unit/ || true
+          
+          # Combine coverage data if available
+          cd coverage_data
+          if ls .coverage* >/dev/null 2>&1; then
+            coverage combine
+            coverage xml -o coverage.xml
+            coverage html --directory=htmlcov
+            cp -r htmlcov ../combined-reports/combined/
+          else
+            echo "No .coverage files found to combine"
+            mkdir -p ../combined-reports/combined
+          fi
+
+      - name: Check overall coverage (70% threshold)
+        id: overall_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          cd coverage_data
+          
+          # Create a start of the summary report
+          echo "# Coverage Reports" > ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          echo "## Overall Coverage" >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Run coverage report and check the threshold
+          COVERAGE_REPORT=$(coverage report --fail-under=70)
+          COVERAGE_STATUS=$?
+          
+          # Capture the summary line
+          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
+          OVERALL_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
+          
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Set status message based on the exit code
+          if [ $COVERAGE_STATUS -ne 0 ]; then
+            echo "::error::Overall coverage is below 70% threshold ($OVERALL_COVERAGE%)"
+            echo "❌ Overall coverage threshold not met: $OVERALL_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Overall coverage threshold met: $OVERALL_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage for other steps
+          echo "percentage=$OVERALL_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
+
+      - name: Check diff coverage (90% threshold)
+        id: diff_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          # Fetch the base branch for comparison
+          git fetch origin ${{ github.base_ref }} --depth=1
+          
+          echo "## Diff Coverage" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          
+          # Run diff-cover with threshold check
+          cd coverage_data
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90 \
+            --markdown-report=../diff_cov.md --html-report=../diff_cov.html
+          DIFF_COVERAGE_STATUS=$?
+          
+          # Append the diff-cover markdown output to our summary
+          cat ../diff_cov.md >> ../combined-reports/coverage_summary.md
+          cp ../diff_cov.html ../combined-reports/diff_coverage.html
+          
+          # Try to extract the diff coverage percentage
+          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../diff_cov.md | head -1 | tr -d '%' || echo "unknown")
+          
+          # Report status based on exit code
+          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
+            if [ "$DIFF_COVERAGE" != "unknown" ]; then
+              echo "::error::Diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
+            else
+              echo "::error::Diff coverage check failed"
+            fi
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage
+          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
+
+      - name: Upload combined coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-test-coverage
+          path: |
+            combined-reports/
+            coverage_data/coverage.xml
+            coverage_data/htmlcov/
+            diff_cov.html
+            
+      - name: Coverage Report Summary
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          if [ -f "combined-reports/coverage_summary.md" ]; then
+            cat combined-reports/coverage_summary.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No coverage summary available" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: Fail if coverage thresholds not met
+        if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.diff_coverage.outputs.status == 'failure')
+        run: |
+          echo "Coverage threshold check failed"
+          if [ "${{ steps.overall_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Overall coverage: ${{ steps.overall_coverage.outputs.percentage }}% (required: 70%)"
+          fi
+          if [ "${{ steps.diff_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Diff coverage: ${{ steps.diff_coverage.outputs.percentage }}% (required: 90%)"
+          fi
+          exit 1

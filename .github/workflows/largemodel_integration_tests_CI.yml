@@ -162,7 +162,7 @@ jobs:
           set -o pipefail
           pytest --largemodel \
             --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
+            --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             --split-n 4 --split-part ${{ matrix.part }} --suppress-skips \
             tests/integ_tests | tee pytest_output.txt
@@ -171,9 +171,12 @@ jobs:
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: marqo-test-report
+          name: marqo-largemodel-tests-report
           path: |
-            marqo/cov_html/
+            marqo/htmlcov/
+            marqo/coverage.xml
+            marqo/.coverage
+          include-hidden-files: true
 
   Stop-Runner:
     needs:

@@ -60,7 +60,7 @@ jobs:
           export PYTHONPATH="./src"
           set -o pipefail
           pytest --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
+            --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/unit_tests/ | tee pytest_output.txt
 
@@ -69,16 +69,19 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           cd marqo
-          diff-cover cov.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=95 \
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=95 \
             --html-report diff_cov.html --markdown-report diff_cov.md
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report
+          name: marqo-unit-tests-report
           path: |
-            marqo/cov_html/
+            marqo/htmlcov/
             marqo/diff_cov.html
+            marqo/coverage.xml
+            marqo/.coverage
+          include-hidden-files: true
 
       - name: Test and coverage report summary
         run: |

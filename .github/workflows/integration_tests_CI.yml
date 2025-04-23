@@ -212,7 +212,7 @@ jobs:
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report-${{ matrix.part }}
+          name: marqo-integ-tests-report-${{ matrix.part }}
           path: marqo/.coverage.${{ matrix.part }}
           include-hidden-files: true
 
@@ -231,7 +231,7 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Move Coverage Files
-        run: mv marqo-test-report-*/.* marqo/
+        run: mv marqo-integ-tests-report-*/.* marqo/
 
       - name: DEBUG coverages
         run: |
@@ -252,14 +252,18 @@ jobs:
           cd marqo
           export PYTHONPATH="./src:."
           coverage report -i
-          coverage xml -i
-          coverage html -i
+          coverage xml -i -o coverage.xml
+          coverage html -i --directory=htmlcov
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: merged-coverage
-          path: marqo/htmlcov/
+          name: marqo-integ-tests-report
+          path: |
+            marqo/htmlcov/
+            marqo/coverage.xml
+            marqo/.coverage
+          include-hidden-files: true
 
   Stop-Runner:
     needs:
