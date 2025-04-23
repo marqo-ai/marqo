@@ -5,7 +5,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import PIL
-from tornado.gen import Runner
 
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
@@ -167,12 +166,13 @@ def _threaded_download_and_preprocess_audio_and_video(
                     enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
                 )
                 results: list[Tuple[str, Tensor]] = audio_downloader.process_media()
+                thread_results.append(results)
             except InferenceError as e:
                 if return_individual_error:
                     thread_results.append(InferenceErrorModel(error_message=str(e)))
+                    continue
                 else:
                     raise e
-            thread_results.append(results)
         if not len(thread_results) == len(allocated_content):
             raise RuntimeError(
                 f"Thread {threading.get_ident()} had a problem when processing the content. "
