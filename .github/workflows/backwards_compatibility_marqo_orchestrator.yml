@@ -154,7 +154,7 @@ jobs:
     # Job to trigger execution workflows for backwards compatibility test for each version combination
     name: ${{ matrix.from_version }} Run all backwards compatibility tests execution workflows
     needs: [orchestrate, check-if-image-exists, build-and-push-image]
-    if: needs.orchestrate.result == 'success'
+    if: always() && needs.orchestrate.result == 'success'
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
@@ -184,7 +184,7 @@ jobs:
     # Job to trigger execution workflows for rollback test for each version combination
     name: ${{ matrix.from_version }} Run all rollback tests execution workflows
     needs: [ orchestrate, check-if-image-exists, build-and-push-image ]
-    if: needs.orchestrate.result == 'success'
+    if: always() && needs.orchestrate.result == 'success'
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
