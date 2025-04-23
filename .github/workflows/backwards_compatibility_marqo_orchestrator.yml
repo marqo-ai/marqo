@@ -20,11 +20,18 @@ on:
         description: 'Path sent to pytest for running test mode'
         required: false
         default: 'tests/compatibility_tests'
+      existing_marqo_image_github_sha:
+        description: 'Github SHA of an existing Marqo image (pushed to ECR) to be used for testing.'
+        required: false
       #TODO: Add input for specifying py_marqo branch (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841556872)
 
 # Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
 env:
   MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 5 }}
+  # Set this to existing marqo version SHA if provided, otherwise, use the current commit SHA
+  # This way we can use existing marqo images in ECR even on a different commit. This is useful when the commit
+  # we're testing only changes test code.
+  TO_VERSION_MARQO_IMAGE_GITHUB_SHA: ${{ github.event.inputs.existing_marqo_image_github_sha || github.sha }}
 
 jobs:
   check-if-image-exists:
@@ -54,7 +61,7 @@ jobs:
         id: check-image
         run: |
           echo "Checking for image existence"
-          if IMAGE_DETAILS=$(aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }} 2>/dev/null); then
+          if IMAGE_DETAILS=$(aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ env.TO_VERSION_MARQO_IMAGE_GITHUB_SHA }} 2>/dev/null); then
             echo "image_exists=true" >> $GITHUB_OUTPUT
             echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
             
@@ -75,6 +82,7 @@ jobs:
     uses: ./.github/workflows/build_push_img.yml
     secrets: inherit
     with:
+      # Always use github.sha here, since input sha must be wrong if we got to this step.
       marqo_ref: "${{ github.sha }}"
       push_to: "ECR"
       image_repo: "marqo-compatibility-tests"
@@ -120,7 +128,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.to_version }}" ]; then
             VERSION="${{ github.event.inputs.to_version }}"
           else
-            VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+            VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ env.TO_VERSION_MARQO_IMAGE_GITHUB_SHA }})
           fi
           echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
       # Step to generate the list of versions to test
