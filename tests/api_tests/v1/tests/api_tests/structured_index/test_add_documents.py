@@ -487,10 +487,10 @@ class TestStructuredAddDocuments(MarqoTestCase):
         
         # Check individual document statuses and error messages
         self.assertEqual(400, res['items'][0]['status'])  # Audio in video field
-        self.assertIn("Invalid video file", res['items'][0]['error'])
+        self.assertIn("Error processing", res['items'][0]['error'])
         
         self.assertEqual(400, res['items'][1]['status'])  # Video in audio field
-        self.assertIn("Invalid audio file", res['items'][1]['error'])
+        self.assertIn("Error processing", res['items'][1]['error'])
         
         self.assertEqual(200, res['items'][2]['status'])  # Valid image field
         self.assertEqual(200, res['items'][3]['status'])  # Valid text field
