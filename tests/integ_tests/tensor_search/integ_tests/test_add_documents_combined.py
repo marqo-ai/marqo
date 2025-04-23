@@ -1002,7 +1002,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
-    @patch('marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.MAX_FILE_SIZE', 2097152)
+    @patch.dict("os.environ", {"MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE": "2097152", })
     def test_video_size_limit_in_batch(self):
         """Tests that adding documents with videos respects the file size limit per document"""
         # Test documents - one under limit (2.5MB), one over limit

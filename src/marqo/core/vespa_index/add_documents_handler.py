@@ -15,7 +15,9 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.logging import get_logger
 from marqo.tensor_search import validation
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
 from marqo.vespa.vespa_client import VespaClient
@@ -392,7 +394,7 @@ class AddDocumentsHandler(ABC):
                 # TODO - We should use media_download_thread_count instead of image_download_thread_count when media_download_thread_count is specified
                 download_thread_count=self.add_docs_params.image_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
-                patch_method=None if not for_top_level_field or not patch_method else patch_method.value
+                patch_method=None if not for_top_level_field or not patch_method else patch_method.value,
             )
         elif modality == Modality.AUDIO:
             return AudioPreprocessingConfig(
@@ -402,7 +404,8 @@ class AddDocumentsHandler(ABC):
                 chunk_config=ChunkConfig(
                     split_length=self.marqo_index.audio_preprocessing.split_length,
                     split_overlap=self.marqo_index.audio_preprocessing.split_overlap,
-                )
+                ),
+                max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
             )
         elif modality == Modality.VIDEO:
             return VideoPreprocessingConfig(
@@ -412,7 +415,8 @@ class AddDocumentsHandler(ABC):
                 chunk_config=ChunkConfig(
                     split_length=self.marqo_index.video_preprocessing.split_length,
                     split_overlap=self.marqo_index.video_preprocessing.split_overlap,
-                )
+                ),
+                max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
             )
         else:
             raise InternalError(f'The modality {modality} is not supported.')

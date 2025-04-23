@@ -82,6 +82,7 @@ class AudioPreprocessingConfig(PreprocessingConfig):
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
     chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+    max_media_size_bytes: int = pydantic.Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @root_validator
     def validate_chunk_config(cls, values):
@@ -100,6 +101,7 @@ class VideoPreprocessingConfig(PreprocessingConfig):
     download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
     chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+    max_media_size_bytes: int = pydantic.Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @root_validator
     def validate_chunk_config(cls, values):

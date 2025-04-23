@@ -56,10 +56,10 @@ from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocume
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
+from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.reranking import rerank
@@ -78,7 +78,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.logging import get_logger
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 
@@ -735,14 +735,23 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
 
 
 def _get_preprocessing_config(modality: Modality, media_download_headers: Optional[Dict[str, str]]):
+    """
+    Get the preprocessing config for the given modality used for searching.
+    """
     if modality == Modality.TEXT:
         return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
         return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.AUDIO:
-        return AudioPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return AudioPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     elif modality == Modality.VIDEO:
-        return VideoPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return VideoPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     else:
         raise InferenceError(f'Unsupported modality: {modality}')
 
