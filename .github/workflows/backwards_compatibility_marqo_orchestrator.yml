@@ -19,6 +19,7 @@ on:
       path_to_test:
         description: 'Path sent to pytest for running test mode'
         required: false
+        default: 'tests/compatibility_tests'
       #TODO: Add input for specifying py_marqo branch (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841556872)
 
 # Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
@@ -168,7 +169,7 @@ jobs:
       to_image: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
                                   || needs.build-and-push-image.outputs.image_identifier }}
       mode: "backwards_compatibility"
-      path_to_test: ${{ github.event.inputs.path_to_test || "" }}
+      path_to_test: ${{ default(github.event.inputs.path_to_test, '') }}
 
 
   run-rollback-tests-execution-workflow:
