@@ -16,14 +16,13 @@ from marqo.inference.native_inference.embedding_models.languagebind_model import
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
-MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
-
 
 class StreamingMediaProcessor:
 
     VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 10
     AUDIO_CPU_TIMOUT_OUT_MULTIPLIER = 10
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
+    MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
 
     def __init__(
             self,
@@ -50,10 +49,10 @@ class StreamingMediaProcessor:
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
         self.total_size, self.duration = self._fetch_file_metadata()
 
-        if self.total_size > MAX_FILE_SIZE:
+        if self.total_size > self.MAX_FILE_SIZE:
             raise MediaExceedsMaxSizeError(
                 f"File size ({self.total_size / 1024 / 1024:.2f} MB) "
-                f"exceeds the maximum allowed size of {MAX_FILE_SIZE / 1024 / 1024:.2f} MB"
+                f"exceeds the maximum allowed size of {self.MAX_FILE_SIZE / 1024 / 1024:.2f} MB"
             )
 
         if preprocessing_config.should_chunk:
