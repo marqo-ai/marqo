@@ -13,7 +13,6 @@ from marqo.core.exceptions import InternalError
 from marqo.core.inference.api import *
 from marqo.core.models.marqo_index import *
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
-from marqo.s2_inference.errors import MediaDownloadError
 
 
 class StreamingMediaProcessor:
@@ -23,14 +22,14 @@ class StreamingMediaProcessor:
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
-            self, url: str,
-            modality: Literal[Modality.AUDIO, Modality.VIDEO],
+            self,
+            url: str,
             preprocessors: LanguagebindPreprocessor,
             preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
     ):
         self.url = url
-        self.modality = modality
+        self.modality = preprocessing_config.modality
         
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
         self.total_size, self.duration = self._fetch_file_metadata()
@@ -141,11 +140,10 @@ class StreamingMediaProcessor:
                 processed_chunks.append(
                     (f"[{chunk_start}, {chunk_end}]", processed_chunk_tensor)
                 )
-
-            if not processed_chunks:
-                raise MediaDownloadError(
-                    f"No chunks were processed successfully for the given media file {self.modality}"
-                )
+        if not processed_chunks:
+            return InferenceErrorModel(
+                error_message=f"No chunks were processed successfully for the given media file '{self.url}'"
+            )
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):

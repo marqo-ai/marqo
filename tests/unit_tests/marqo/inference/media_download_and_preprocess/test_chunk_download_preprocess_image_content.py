@@ -1,14 +1,13 @@
-from unittest import TestCase
 from unittest.mock import patch
 
 import PIL.Image
-import torch
 import numpy as np
+import torch
 
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from marqo.inference.type import *
 from integ_tests.marqo_test import TestImageUrls
 from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_media
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from marqo.inference.type import *
 from unit_tests.marqo_test import MarqoTestCase
 
 

@@ -1,0 +1,271 @@
+import math
+import os.path
+import unittest
+from unittest.mock import patch
+
+import ffmpeg
+import torch
+
+from integ_tests.marqo_test import TestAudioUrls
+from marqo.core.inference.api import *
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
+
+
+class DummyPreprocessor(LanguagebindPreprocessor):
+    def __init__(self, raw_preprocessor=None, device=None):
+        super().__init__(raw_preprocessor, device)
+
+    def preprocess(self, inputs, modality: Modality):
+        if modality == Modality.TEXT:
+            return inputs
+        elif modality in (Modality.AUDIO, Modality.VIDEO, Modality.IMAGE):
+            return [torch.rand(1, 10, 10) for _ in inputs]
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
+
+
+class TestStreamingMediaProcessor(unittest.TestCase):
+    """The unit test class for StreamingMediaProcessor.
+
+    We should avoid real video/audio downloading and decoding in unit tests. You can do the long-time tests in
+    the integration tests.
+    """
+
+    test_audio_preprocessing_config = AudioPreprocessingConfig(
+        modality=Modality.AUDIO,
+        download_thread_count=1,
+        download_header=None,
+        should_chunk=True,
+        chunk_config=ChunkConfig(
+            split_length=10,
+            split_overlap=0
+        )
+    )
+
+    test_video_preprocessing_config = VideoPreprocessingConfig(
+        modality=Modality.VIDEO,
+        download_thread_count=1,
+        download_header=None,
+        should_chunk=True,
+        chunk_config=ChunkConfig(
+            split_length=10,
+            split_overlap=0
+        )
+    )
+    
+    test_preprocessor = DummyPreprocessor()
+    
+    def setUp(self):
+        self.output_file = "./test.mp4"
+        if os.path.exists(self.output_file):
+            os.remove(self.output_file)
+
+    def tearDown(self):
+        if os.path.exists(self.output_file):
+            os.remove(self.output_file)
+
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_process_audio_media_chunks(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        mock_fetch_file_metadata.return_value = (1000000, 30.0)  # size, duration
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        processed_chunks = processor.process_media()
+        self.assertEqual(len(processed_chunks), 3)  # 30 seconds / 10 seconds per chunk
+        self.assertTrue(all(isinstance(tensor, torch.Tensor) for _, tensor in processed_chunks))
+
+    @patch("ffmpeg.probe")
+    def test_fetch_file_metadata_failure(self, mock_ffmpeg_probe):
+        mock_ffmpeg_probe.side_effect = ffmpeg.Error('ffmpeg', b'', b'error')
+        with self.assertRaises(MediaDownloadError) as context:
+            processor = StreamingMediaProcessor(
+                url=TestAudioUrls.AUDIO1.value,
+                preprocessors=self.test_preprocessor,
+                preprocessing_config=self.test_audio_preprocessing_config
+            )
+
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_chunk_time_format_and_tensor_output(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        mock_fetch_file_metadata.return_value = (1000000, 25.0)  # size, duration
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        processed_chunks = processor.process_media()
+
+        for (chunk_time, tensor), i in zip(processed_chunks, range(len(processed_chunks))):
+            # Ensure correct time format
+            self.assertTrue(chunk_time.startswith('[') and chunk_time.endswith(']'))
+            times = chunk_time.strip('[]').split(',')
+            start_time, end_time = float(times[0]), float(times[1])
+            # Check time range correctness
+            self.assertTrue(0 <= start_time <= end_time <= 25.0)
+            # Check tensor validity
+            self.assertIsInstance(tensor, torch.Tensor)
+            self.assertEqual(tensor.shape, torch.Size([1, 10, 10]))
+
+        # Ensure number of chunks is as expected
+        expected_chunks = math.ceil(25 / self.test_audio_preprocessing_config.chunk_config.split_length)
+        self.assertEqual(len(processed_chunks), expected_chunks)
+
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_last_chunk_alignment(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        mock_fetch_file_metadata.return_value = (1000000, 23.5)  # Non-divisible duration
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        processed_chunks = processor.process_media()
+        last_chunk_time, _ = processed_chunks[-1]
+        start_time, end_time = map(float, last_chunk_time.strip('[]').split(','))
+
+        # Check that the last chunk ends at the media duration
+        self.assertAlmostEqual(end_time, 23.5, places=2)
+        # Check that the last chunk starts at max(duration - split_length, 0)
+        self.assertAlmostEqual(start_time,
+                               max(23.5 - self.test_audio_preprocessing_config.chunk_config.split_length, 0), places=2)
+
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_explicit_chunk_times(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        # Set up media duration exactly 30s
+        mock_fetch_file_metadata.return_value = (1000000, 30.0)
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        overlap_config = AudioPreprocessingConfig(
+            modality=Modality.AUDIO,
+            download_thread_count=1,
+            download_header=None,
+            should_chunk=True,
+            chunk_config=ChunkConfig(
+                split_length=10,
+                split_overlap=2
+            )
+        )
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=overlap_config
+        )
+
+        processed_chunks = processor.process_media()
+
+        # Define the exact expected chunk times
+        expected_chunk_times = [
+            (0.0, 10.0), # First chunk
+            (8.0, 18.0), # Second chunk overlaps with the first
+            (16.0, 26.0), # Third chunk overlaps with the second
+            (20.0, 30.0) # Last chunk, note that it ends at 30.0 but starts at 20.0
+        ]
+
+        self.assertEqual(len(processed_chunks), len(expected_chunk_times))
+
+        for (chunk_time_str, tensor), (expected_start, expected_end) in zip(processed_chunks, expected_chunk_times):
+            # Validate chunk time format and values
+            self.assertTrue(chunk_time_str.startswith('[') and chunk_time_str.endswith(']'))
+            start_time, end_time = map(float, chunk_time_str.strip('[]').split(','))
+
+            self.assertAlmostEqual(start_time, expected_start, places=2)
+            self.assertAlmostEqual(end_time, expected_end, places=2)
+
+            # Validate tensor correctness
+            self.assertIsInstance(tensor, torch.Tensor)
+            self.assertEqual(tensor.shape, torch.Size([1, 10, 10]))
+
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_short_media_duration(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        mock_fetch_file_metadata.return_value = (1000000, 5.0)  # Shorter than split_length
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        processed_chunks = processor.process_media()
+        self.assertEqual(len(processed_chunks), 1)
+
+        chunk_time, tensor = processed_chunks[0]
+        start_time, end_time = map(float, chunk_time.strip('[]').split(','))
+        self.assertAlmostEqual(start_time, 0.0, places=2)
+        self.assertAlmostEqual(end_time, 5.0, places=2)
+
+    @patch("marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch("marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_output_format_is_list_of_tuples(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+        mock_fetch_file_metadata.return_value = (1000000, 20.0)
+        mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        result = processor.process_media()
+
+        # Ensure the result is a list
+        self.assertIsInstance(result, list)
+
+        for item in result:
+            # Each item should be a tuple
+            self.assertIsInstance(item, tuple)
+            self.assertEqual(len(item), 2)
+
+            chunk_time, tensor = item
+            # First element is a string "[start, end]"
+            self.assertIsInstance(chunk_time, str)
+            self.assertTrue(chunk_time.startswith('[') and chunk_time.endswith(']'))
+
+            # Second element is a torch.Tensor
+            self.assertIsInstance(tensor, torch.Tensor)
+            self.assertEqual(tensor.shape, torch.Size([1, 10, 10]))
+
+    @patch("marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata")
+    @patch(
+        "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
+    def test_return_inference_error_model(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
+
+        mock_fetch_file_metadata.return_value = (1000000, 10.0)
+        mock_fetch_audio_chunk.side_effect = MediaDownloadError("Failed downloading audio")
+
+        processor = StreamingMediaProcessor(
+            url=TestAudioUrls.AUDIO1.value,
+            preprocessors=self.test_preprocessor,
+            preprocessing_config=self.test_audio_preprocessing_config
+        )
+
+        result = processor.process_media()
+        # Ensure result is an instance of InferenceErrorModel
+        self.assertIsInstance(result, InferenceErrorModel)
+        self.assertIn("No chunks were processed successfully", result.error_message)
