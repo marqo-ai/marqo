@@ -1569,7 +1569,6 @@ class TestSearchUnstructured(MarqoTestCase):
         """ This test validates that incomplete response for float/int fields is processed correctly.
             This is an edge case that happens during race condition when adding and updating document at the same time.
         """
-        from marqo.vespa.vespa_client import VespaClient
         real_query = self.config.vespa_client.query
 
         docs = [{
