@@ -98,7 +98,6 @@ jobs:
           # Override base requirements with marqo requirements if needed: 
           pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
 
       - name: Download nltk data
         run: |
@@ -141,8 +140,6 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
-          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
-
           cd marqo
           export PYTHONPATH="./tests/integ_tests:./src"
           set -o pipefail
@@ -150,8 +147,7 @@ jobs:
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            --split-n 4 --split-part ${{ matrix.part }} --suppress-skips \
-            tests/integ_tests/test_documentation.py | tee pytest_output.txt
+            tests/integ_tests/test_documentation.py --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
