@@ -200,7 +200,7 @@ jobs:
           COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
-            tests/integ_tests/test_documentation.py --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
+            tests/integ_tests/test_documentation* --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
