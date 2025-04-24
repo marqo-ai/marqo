@@ -19,6 +19,7 @@ class MarqoCustomRoute(APIRoute):
             try:
                 return await original_route_handler(request)
             except Exception as exc:
+                logger.error(str(exc), exc_info=True)
                 raise exc
 
         return marqo_custom_route_handler
