@@ -1,4 +1,4 @@
-from pydantic import Field, conlist
+from pydantic.v1 import Field, conlist
 
 from marqo.base_model import MarqoBaseModel
 

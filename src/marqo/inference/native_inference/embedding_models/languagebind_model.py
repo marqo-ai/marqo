@@ -1,6 +1,6 @@
 import torch
+from pydantic.v1 import ValidationError
 from PIL.Image import Image
-from pydantic import ValidationError
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.exceptions import InternalError

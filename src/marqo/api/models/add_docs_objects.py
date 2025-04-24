@@ -1,8 +1,8 @@
 from typing import List, Dict
 from typing import Optional, Any, Sequence
 
-from pydantic import BaseModel, root_validator
-from pydantic import Field
+from pydantic.v1 import BaseModel, root_validator
+from pydantic.v1 import Field
 
 from marqo.tensor_search.models.private_models import ModelAuth
 

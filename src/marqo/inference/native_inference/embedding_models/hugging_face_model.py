@@ -6,7 +6,7 @@ from typing import Tuple, Callable, Optional
 import torch
 import torch.nn.functional as F
 from numpy import ndarray
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 from torch import Tensor
 from transformers import (AutoModel, AutoTokenizer)
 

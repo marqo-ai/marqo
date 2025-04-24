@@ -716,15 +716,17 @@ class TestStructuredUpdateDocuments(MarqoTestCase):
         update_doc_url = f"{base_url}/indexes/{self.update_doc_index_name}/documents"
 
         cases = [
-            ({"documents": {"_id": "1", "text_field": "updated text field"}}, "Documents is not a list"),
-            ([{"_id": "1", "text_field": "updated text field"}], "Body is missing the 'documents' key")
+            ({"documents": {"_id": "1", "text_field": "updated text field"}},
+             "value is not a valid list", "Documents is not a list"),
+            ([{"_id": "1", "text_field": "updated text field"}],
+             "Input should be a valid dictionary", "Body is missing the 'documents' key")
         ]
 
-        for bad_body, msg in cases:
+        for bad_body, expected_error, msg in cases:
             with self.subTest(f"{bad_body} - {msg}"):
                 r = requests.patch(update_doc_url, json=bad_body)
                 self.assertEqual(422, r.status_code)
-                self.assertIn("'body', 'documents'", str(r.json()))
+                self.assertIn(expected_error, str(r.json()))
 
     def test_too_many_documents_exceeds_max_batch_size(self):
         """Test that the update_documents method throws an error when the number of documents

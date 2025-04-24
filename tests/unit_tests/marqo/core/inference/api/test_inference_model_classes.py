@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.core.inference.api import ModelConfig, InferenceRequest, Modality, TextPreprocessingConfig, \
     AudioPreprocessingConfig, VideoPreprocessingConfig, ImagePreprocessingConfig, InferenceResult, \

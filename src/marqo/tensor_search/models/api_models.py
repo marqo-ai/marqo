@@ -4,21 +4,20 @@ Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 
+import re
 from typing import Union, List, Dict, Optional
 
-import pydantic
-from pydantic import BaseModel, root_validator, validator, Field
+from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
-import re
 
 
 class BaseMarqoModel(BaseModel):
@@ -169,7 +168,7 @@ class SearchQuery(BaseMarqoModel):
 
         return values
 
-    @pydantic.validator('searchMethod')
+    @validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(
             value=value, enum_class=SearchMethod,

@@ -1,4 +1,4 @@
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from typing import Optional
 from marqo.tensor_search.models.external_apis.abstract_classes import (
     ObjectLocation, ExternalAuth

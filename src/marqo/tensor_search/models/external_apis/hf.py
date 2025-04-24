@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import Field
+from pydantic.v1 import Field
 
 from marqo.tensor_search.models.external_apis.abstract_classes import (
     ObjectLocation, ExternalAuth
