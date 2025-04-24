@@ -70,6 +70,13 @@ def run_prepare_mode(version_to_test_against: str):
             logger.info(f"Skipping duplicate test class {test_class.__name__} as it has already been processed")
             continue
 
+        # TODO: remove this
+        # Manually remove test classes that are not in a predefined list.
+        test_classes_to_prepare = ['TestSearchWithGlobalScoreModifiers']
+        if test_class.__name__ not in test_classes_to_prepare:
+            logger.info(f"Skipping test class {test_class.__name__} as it is not in the predefined list")
+            continue
+
         # Log to confirm no duplicates
         logger.info(f"{test_class.__name__} has NOT been processed yet. Processing now.")
         seen_classes.add(test_class.__name__)
