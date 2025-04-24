@@ -188,6 +188,10 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
 
+            telemetry = RequestMetricsStore.for_request(request).json()
+            get_logger(__name__).info(
+                f"Telemetry data={json.dumps(telemetry, indent=2)}")
+
             # Early exit if opentelemetry is not to be injected into response.
             if not self.telemetry_enabled_for_request(request):
                 return response
@@ -196,7 +200,6 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
 
             # Inject telemetry and fix content-length header
             if isinstance(data, dict):
-                telemetry = RequestMetricsStore.for_request(request).json()
                 if len(telemetry["timesMs"]) == 0:
                     telemetry.pop("timesMs")
                 if len(telemetry["counter"]) == 0:
@@ -207,7 +210,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                     f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
                 )
                 get_logger(__name__).info(
-                    f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
+                    f"Telemetry data={json.dumps(telemetry, indent=2)}")
 
         finally:
             logger.debug('Clearing metrics for request')
