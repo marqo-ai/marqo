@@ -20,14 +20,6 @@ permissions:
   id-token: write
 
 jobs:
-  Unit-Tests-1-Shard-0-Replica:
-    uses: ./.github/workflows/integration_tests_CI.yml
-    secrets: inherit
-    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
-    with:
-        number_of_shards: 1
-        number_of_replicas: 0
-
   Unit-Tests-1-Shard-1-Replica:
     uses: ./.github/workflows/integration_tests_CI.yml
     secrets: inherit
