@@ -33,13 +33,6 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
             HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            BASE_COMMIT=${{ github.event.before }}
-            HEAD_COMMIT=${{ github.sha }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            # For manual dispatch, we always run the tests
-            echo "non_documentation_changes_found=true" >> "$GITHUB_OUTPUT"
-            exit 0
           else
             echo "Unsupported event: ${GITHUB_EVENT_NAME}"
             exit 1
