@@ -6,7 +6,7 @@ from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Model, TextP
     TextSplitMethod, ImagePreProcessing, VideoPreProcessing, AudioPreProcessing, DistanceMetric, VectorNumericType, \
     HnswConfig, Field, FieldType, FieldFeature, StringArrayField, TensorField
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-from marqo.tensor_search.tensor_search import gather_documents_from_response #, gather_documents_from_raw_response
+from marqo.tensor_search.tensor_search import gather_documents_from_response, gather_documents_from_raw_response
 from marqo.version import get_version
 from marqo.vespa.models import QueryResult
 
@@ -134,12 +134,12 @@ if __name__ == '__main__':
     start = time.perf_counter()
 
     for _ in range(iterations):
-        query_result = QueryResult(**result_dict)
-        gather_documents_from_response(query_result, marqo_index, highlights=False,
-                                       attributes_to_retrieve=attributes_to_retrieve)
+        # query_result = QueryResult(**result_dict)
+        # gather_documents_from_response(query_result, marqo_index, highlights=False,
+        #                                attributes_to_retrieve=attributes_to_retrieve)
 
-        # gather_documents_from_raw_response(result_dict, marqo_index, highlights=False,
-        #                                    attributes_to_retrieve=attributes_to_retrieve)
+        gather_documents_from_raw_response(result_dict, marqo_index, highlights=False,
+                                           attributes_to_retrieve=attributes_to_retrieve)
 
     end = time.perf_counter()
     total_time = end - start
