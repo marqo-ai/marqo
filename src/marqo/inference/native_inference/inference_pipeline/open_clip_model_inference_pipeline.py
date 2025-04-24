@@ -2,6 +2,7 @@ from marqo.inference.native_inference.content_preprocessing import split_prefix_
     download_and_preprocess_image
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.inference.type import *
 
 OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
@@ -16,9 +17,11 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
         super().__init__(model = model, inference_request = inference_request)
 
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
+        with RequestMetricsStore.for_request().time("inference.preprocessed_content_list"):
+            preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
 
-        embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
+        with RequestMetricsStore.for_request().time(f"inference.embeddings.{len(preprocessed_content_list)}"):
+            embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result

@@ -166,7 +166,8 @@ class AddDocumentsHandler(ABC):
                 self._populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
-            self._vectorise_tensor_fields()
+            with RequestMetricsStore.for_request().time("add_documents._vectorise_tensor_fields"):
+                self._vectorise_tensor_fields()
 
         with RequestMetricsStore.for_request().time("add_documents.vespa.to_vespa_docs"):
             vespa_docs = self._convert_to_vespa_docs()
@@ -288,8 +289,10 @@ class AddDocumentsHandler(ABC):
         modalities = self._infer_modalities()
 
         for modality in modalities:
-            self._vectorise_fields(modality, for_top_level_field=True)
-            self._vectorise_fields(modality, for_top_level_field=False)
+            with RequestMetricsStore.for_request().time(f"add_documents._vectorise_fields.{modality.value}.for_top_level_field=True"):
+                self._vectorise_fields(modality, for_top_level_field=True)
+            with RequestMetricsStore.for_request().time(f"add_documents._vectorise_fields.{modality.value}.for_top_level_field=False"):
+                self._vectorise_fields(modality, for_top_level_field=False)
 
     def _infer_modalities(self) -> Set[Modality]:
         all_modalities = set()
