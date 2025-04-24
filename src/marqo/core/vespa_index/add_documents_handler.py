@@ -286,7 +286,8 @@ class AddDocumentsHandler(ABC):
         3. The result will be then populated to the tensor field. Individual errors happened during preprocessing
             and vectorisation will also be returned and collected by the `add_docs_response_collector`
         """
-        modalities = self._infer_modalities()
+        with RequestMetricsStore.for_request().time("add_documents._vectorise_fields._infer_modalities"):
+            modalities = self._infer_modalities()
 
         for modality in modalities:
             with RequestMetricsStore.for_request().time(f"add_documents._vectorise_fields.{modality.value}.for_top_level_field=True"):

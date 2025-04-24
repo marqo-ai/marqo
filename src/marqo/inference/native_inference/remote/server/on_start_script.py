@@ -185,13 +185,16 @@ class CacheModels:
                     f"See the examples defined in {marqo_docs.configuring_preloaded_models()}"
                 ) from e
 
-        _ = self.config.local_inference.vectorise(InferenceRequest(
-            modality=Modality.TEXT,
-            contents=[content],
-            model_config=model_config,
-            preprocessing_config=TextPreprocessingConfig(),
-            device=device
-        ))
+        try:
+            _ = self.config.local_inference.vectorise(InferenceRequest(
+                modality=Modality.TEXT,
+                contents=[content],
+                model_config=model_config,
+                preprocessing_config=TextPreprocessingConfig(),
+                device=device
+            ))
+        except Exception:
+            pass
 
     def _load_model_properties_from_model_registry(self, model_name: str) -> Dict[str, str]:
         try:
