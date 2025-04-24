@@ -181,7 +181,7 @@ class SearchTest(unittest.TestCase):
 
         # Reset the mocks
         self.logger_mock.reset_mock()
-        self.vespa_client_mock.reset_mock()
+        self.vespa_client_mock.reset_mock(return_value=True)
 
     def test_tensor_search(self):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor")
