@@ -642,43 +642,6 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     return {'hits': hits}
 
 
-def gather_documents_from_raw_response(response: dict, marqo_index: MarqoIndex, highlights: bool,
-                                       attributes_to_retrieve: List[str] = None) -> Dict[str, Any]:
-    """
-    Convert a VespaQueryResponse to a Marqo search response
-    """
-
-    if (marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured] and
-            attributes_to_retrieve is not None):
-        # Unstructured index and Semi-structured index stores fixed fields (numeric, boolean, string arrays, etc.) in
-        # combined field. It needs to select attributes after converting vespa doc to marqo doc if
-        # attributes_to_retrieve is specified
-        metadata_fields_to_retrieve = {"_id", "_score", "_highlights"}
-        attributes_to_retrieve_set = set(attributes_to_retrieve).union(metadata_fields_to_retrieve)
-    else:
-        # If this set is None, we will return the marqo_doc as is.
-        attributes_to_retrieve_set = None
-
-    from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index_no_pydantic import SemiStructuredVespaIndexNoPydantic
-    vespa_index = SemiStructuredVespaIndexNoPydantic(marqo_index)
-    hits = []
-    for doc in response["root"]["children"]:
-        if doc["id"].startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
-            continue
-        marqo_doc = vespa_index.to_marqo_document(doc, return_highlights=highlights)
-        marqo_doc['_score'] = doc["relevance"]
-
-        if attributes_to_retrieve_set is not None:
-            marqo_doc = select_attributes(marqo_doc, attributes_to_retrieve_set)
-
-        # Delete chunk data
-        if constants.MARQO_DOC_TENSORS in marqo_doc:
-            del marqo_doc[constants.MARQO_DOC_TENSORS]
-        hits.append(marqo_doc)
-
-    return {'hits': hits}
-
-
 def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set[str]) -> Dict[str, Any]:
     """
     Unstructured index and Semi-structured index retrieve all fixed fields (numeric, boolean, string arrays, etc.)
