@@ -2,13 +2,13 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
+
+import pydantic.v1 as pydantic
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
@@ -128,13 +128,16 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
+
 class VideoPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+
 class AudioPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')

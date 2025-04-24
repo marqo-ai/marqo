@@ -1,8 +1,8 @@
 from typing import List, Dict
 from typing import Optional, Any, Sequence
 
-from pydantic import BaseModel, root_validator
-from pydantic import Field
+from pydantic.v1 import BaseModel, root_validator
+from pydantic.v1 import Field
 
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -25,7 +25,7 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Sequence[Dict[str, Any]]
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-    mediaDownloadThreadCount: Optional[int]
+    mediaDownloadThreadCount: Optional[int] = None
     textChunkPrefix: Optional[str] = None
 
     @root_validator
