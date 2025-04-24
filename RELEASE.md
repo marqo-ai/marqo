@@ -1,3 +1,98 @@
+# Release 2.18.1
+
+# Bug Fixes and Minor Changes
+
+- Fix `array` facets always returning empty value (#1187).
+
+# Release 2.18.0
+
+## New Features
+
+- Implement facets for search (#1168). Facets allow you to aggregate data from your documents based on specific fields.
+  This can be useful for creating filters, showing data distributions, or implementing drill-down search functionality.
+
+## Bug Fixes and Minor Changes
+
+- Sanitize lexical query and filter string (#1157). Certain characters in lexical query and filter string could
+  previously cause a 500 error. Marqo now sanitizes these values.
+- Fix modality inference bug (#1179). Address an issue where query parameters in media URL would interfere with
+  extension-based modality inference.
+
+# Release 2.17.2
+
+## Bug Fixes and Minor Changes
+
+- Add back the support for `multilingual-clip` models (https://github.com/marqo-ai/marqo/pull/1177). These models were
+  not supported in 2.17.0, and now we add them back.
+
+# Release 2.16.2
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug preventing Marqo from migrating an index created before 2.16 to
+  2.16 ([#1174](https://github.com/marqo-ai/marqo/pull/1174)).
+
+# Release 2.17.1
+
+## Bug Fixes and Minor Changes
+
+- Add support for Stella models and sentence-transformers models (https://github.com/marqo-ai/marqo/pull/1167). Add back
+  the support for `Stella` models, and the support for `sentence-transformers/all-MiniLM-L12-v2` and
+  `sentence-transformers/all-MiniLM-L6-v2` models. These models were not supported in `2.7.0`.
+- Consolidate Marqo logging (https://github.com/marqo-ai/marqo/pull/1165). Introduce a new logging configuration in
+  `src/marqo/logging.py` with support for JSON and plain formats, and other small improvements.
+
+# Release 2.17.0
+
+## New Features
+
+- Add `Inference`, `API`, and `Combined` modes when running Marqo (https://github.com/marqo-ai/marqo/pull/1159). Marqo
+  now supports 3 modes, `Combined`, `API`, and `Inference`. This enables Marqo API and Inference running in separate
+  processes or containers, offering better performance.
+- Add parameters `rerankDepth` for tensor search and `rerankDepthTensor` for hybrid
+  search (https://github.com/marqo-ai/marqo/pull/1138). Users can set these parameters to get a consistent number of
+  results in some edge cases.
+- Introduce `queryTensor` and `queryLexical` parameters for hybrid search (https://github.com/marqo-ai/marqo/pull/1152).
+  Users can provide weighted tensor queries in hybrid search.
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug where Marqo unnecessarily generated embeddings for hybrid search even when both the retrieval and rerank
+  methods were set to "lexical" causing slower search
+  performance ([#1152](https://github.com/marqo-ai/marqo/pull/1152)).
+
+# Release 2.16.1
+
+## Bug Fixes and Minor Changes
+
+- Fix an issue when performing a partial update on an unstructured index for map
+  fields (https://github.com/marqo-ai/marqo/pull/1146).
+
+# Release 2.16.0
+
+## New Features
+
+- Update documents for unstructured indexes ([#1030](https://github.com/marqo-ai/marqo/pull/1030)). The
+  `update_documents` endpoint is now supported for unstructured indexes created after version 2.16. This allows you to
+  update documents by modifying existing non-tensor fields or adding new fields without re-indexing the entire document.
+  Check [here](https://docs.marqo.ai/2.16/reference/api/documents/update-documents/) for more details.
+- Configurable max Vespa disk utility (https://github.com/marqo-ai/marqo/pull/1124). Users can set the
+  `VESPA_DISK_USAGE_LIMIT` environment variable (ranging from 0 to 1) to adjust the disk usage limit for Vespa when
+  using Marqo.
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug where Marqo can not load the OpenCLIP model tokenizer when the model name has a `hf-hub:`
+  prefix (https://github.com/marqo-ai/marqo/pull/1126).
+- Clean up the logs when starting Marqo (https://github.com/marqo-ai/marqo/pull/1137).
+
+## Contributor Shout-Outs
+
+- A huge thanks to our 4.8k stargazers for your continued support!
+- Thanks a lot for the discussion and suggestions in our community. Join us
+  on [Slack](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and
+  our [forum](https://community.marqo.ai/) today!
+
 # Release 2.15.0
 
 ## New Features
