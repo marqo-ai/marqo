@@ -4,14 +4,6 @@ name: Run unit tests
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - mainline
-      - releases/*
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
 
 # concurrency:
 #   group: unit-tests-${{ github.ref }}
