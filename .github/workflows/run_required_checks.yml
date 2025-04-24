@@ -64,7 +64,8 @@ jobs:
       number_of_replicas: 0
     secrets: inherit
 
-  Report-integration-test-status:
+  # GitHub status will rely on the result of this step to determine if the PR is ready for merge
+  Report-required-test-status:
     needs: [Determine-changes, Run-integration-tests]
     runs-on: ubuntu-latest
     if: always()
