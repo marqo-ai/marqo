@@ -2,7 +2,7 @@ import unittest
 from unittest import mock
 
 import pytest
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.inference.native_inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
     PoolingMethod

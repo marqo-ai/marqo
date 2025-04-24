@@ -1,25 +1,21 @@
 import os
 import random
-import unittest
-import uuid
 import threading
+import uuid
 from unittest import mock
 
 import numpy as np
-import pytest
 
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import BadRequestError
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.core.exceptions import UnsupportedFeatureError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
-
 
 
 class TestUpdate(MarqoTestCase):
@@ -181,7 +177,7 @@ class TestUpdate(MarqoTestCase):
             "text_field": "updated text field",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -194,7 +190,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_filter": "updated text field filter",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -214,7 +210,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_lexical": "search me please",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -248,7 +244,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_add": "I am a new field",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual("I am a new field", updated_doc["text_field_add"])
@@ -269,7 +265,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(11, updated_doc["int_field"])
@@ -281,7 +277,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(22, updated_doc["int_field_filter"])
@@ -305,7 +301,7 @@ class TestUpdate(MarqoTestCase):
             "add_to_score": [{"field_name": "int_field_score_modifier", "weight": 1}]
         })
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(33, updated_doc["int_field_score_modifier"])
@@ -321,7 +317,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(11.1, updated_doc["float_field"])
@@ -333,7 +329,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(22.2, updated_doc["float_field_filter"])
@@ -357,7 +353,7 @@ class TestUpdate(MarqoTestCase):
             "add_to_score": [{"field_name": "float_field_score_modifier", "weight": 1.0}]
         })
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(33.3, updated_doc["float_field_score_modifier"])
@@ -382,7 +378,7 @@ class TestUpdate(MarqoTestCase):
             "bool_field_filter": False,
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -415,7 +411,7 @@ class TestUpdate(MarqoTestCase):
             "image_pointer_field": TestImageUrls.IMAGE2.value,
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -543,7 +539,7 @@ class TestUpdate(MarqoTestCase):
             "array_text_field": ["text3", "text4"],
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -592,7 +588,7 @@ class TestUpdate(MarqoTestCase):
             "float_field_score_modifier": 33.33,
             "bool_field_filter": True
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+        r = update_documents(body_dict={"documents": [updated_doc]},
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
@@ -691,7 +687,7 @@ class TestUpdate(MarqoTestCase):
                     else:
                         raise ValueError(f"Invalid field name {picked_field}")
 
-                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                r = update_documents(body_dict={"documents": [updated_doc]},
                                      index_name=self.structured_index_name, marqo_config=self.config)
 
         number_of_threads = 10
@@ -756,7 +752,7 @@ class TestUpdate(MarqoTestCase):
                 for picked_field in picked_fields:
                     updated_doc[picked_field] = np.random.uniform(1, 100)
 
-                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                r = update_documents(body_dict={"documents": [updated_doc]},
                                      index_name=self.large_score_modifier_index_name, marqo_config=self.config)
 
         number_of_threads = 10
@@ -781,7 +777,7 @@ class TestUpdate(MarqoTestCase):
         # Let do a final update and do a score modifier search to ensure the document is not broken
         final_doc = {f"float_field_{i}": 1.0 for i in range(100)}
         final_doc["_id"] = "1"
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[final_doc]),
+        r = update_documents(body_dict={"documents": [final_doc]},
                              index_name=self.large_score_modifier_index_name,
                              marqo_config=self.config)
 
@@ -800,12 +796,12 @@ class TestUpdate(MarqoTestCase):
 
     def test_proper_error_raised_if_received_too_many_documents(self):
         with self.assertRaises(BadRequestError) as cm:
-            r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
+            r = update_documents(body_dict={"documents": [{"_id": "1"}] * 129},
                                  index_name=self.structured_index_name, marqo_config=self.config)
 
         # The same request (size) should work if the max batch size is increased
         with mock.patch.dict(os.environ, {"MARQO_MAX_DOCUMENTS_BATCH_SIZE": "129"}):
-            r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
+            r = update_documents(body_dict={"documents": [{"_id": "1"}] * 129},
                                  index_name=self.structured_index_name, marqo_config=self.config)
 
     def test_duplicate_ids_in_one_batch(self):

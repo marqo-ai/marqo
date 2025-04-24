@@ -1,7 +1,7 @@
 import json
 from typing import Any, Union, List, Dict, Optional, NewType
 
-from pydantic import BaseModel, validator, ValidationError
+from pydantic.v1 import BaseModel, validator, ValidationError
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.inference.api import Modality

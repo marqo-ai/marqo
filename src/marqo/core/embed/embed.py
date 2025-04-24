@@ -2,26 +2,23 @@ from enum import Enum
 from timeit import default_timer as timer
 from typing import List, Optional, Union, Dict
 
-import pydantic
-
-import marqo.api.exceptions as api_exceptions
-import marqo.s2_inference.errors as s2_inference_errors
 from marqo import exceptions as base_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import Inference
-from marqo.tensor_search import utils
+from marqo.logging import get_logger
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.logging import get_logger
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
+
 class EmbedContentType(str, Enum):
     Query = "query"
     Document = "document"
+
 
 class Embed:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):

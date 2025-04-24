@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Literal, List, Set, Union
+from abc import ABC
+from typing import Optional, Dict, Literal, Union
 
-import pydantic
-from pydantic import root_validator
+from pydantic.v1 import root_validator, Field
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api.modality import Modality
@@ -11,12 +10,12 @@ from marqo.core.inference.api.modality import Modality
 class PreprocessingConfig(ImmutableBaseModel, ABC):
     """Parent class of preprocessing config for all modality types"""
     modality: str
-    should_chunk: bool = pydantic.Field(default=False, alias='shouldChunk')
+    should_chunk: bool = Field(default=False, alias='shouldChunk')
 
 
 class ChunkConfig(ImmutableBaseModel):
-    split_length: int = pydantic.Field(gt=0, alias='splitLength')
-    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+    split_length: int = Field(gt=0, alias='splitLength')
+    split_overlap: int = Field(ge=0, alias='splitOverlap')
 
     @root_validator
     def check_split_length_greater_than_overlap(cls, values):
@@ -29,14 +28,14 @@ class ChunkConfig(ImmutableBaseModel):
 
 
 class TextChunkConfig(ChunkConfig):
-    split_method: Literal['character', 'word', 'sentence', 'passage'] = pydantic.Field(alias='splitMethod')
+    split_method: Literal['character', 'word', 'sentence', 'passage'] = Field(alias='splitMethod')
 
 
 class TextPreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for text modality"""
     modality: Literal[Modality.TEXT] = Modality.TEXT
-    text_prefix: Optional[str] = pydantic.Field(default=None, alias='textPrefix')
-    chunk_config: Optional[TextChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+    text_prefix: Optional[str] = Field(default=None, alias='textPrefix')
+    chunk_config: Optional[TextChunkConfig] = Field(default=None, alias='chunkConfig')
 
     @root_validator
     def validate_chunk_config(cls, values):
@@ -52,15 +51,15 @@ class TextPreprocessingConfig(PreprocessingConfig):
 class ImagePreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for image modality"""
     modality: Literal[Modality.IMAGE] = Modality.IMAGE
-    download_timeout_ms: int = pydantic.Field(default=3000, alias='downloadTimeoutMs')  # default to 3000ms
-    download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
-    download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
+    download_timeout_ms: int = Field(default=3000, alias='downloadTimeoutMs')  # default to 3000ms
+    download_thread_count: Optional[int] = Field(default=None, alias='downloadThreadCount')
+    download_header: Optional[Dict[str, str]] = Field(default=None, alias='downloadHeader')
 
     # image chunking TODO this is going away in future versions
     patch_method: Optional[
         # TODO check if we need to support all methods in image_processor.chunk_image method
         Literal['simple', 'frcnn', 'dino-v1', 'dino-v2', 'marqo-yolo']
-    ] = pydantic.Field(
+    ] = Field(
         default=None,
         alias='patchMethod'
     )
@@ -79,9 +78,9 @@ class ImagePreprocessingConfig(PreprocessingConfig):
 class AudioPreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for audio modality"""
     modality: Literal[Modality.AUDIO] = Modality.AUDIO
-    download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
-    download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
-    chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+    download_thread_count: Optional[int] = Field(default=None, alias='downloadThreadCount')
+    download_header: Optional[Dict[str, str]] = Field(default=None, alias='downloadHeader')
+    chunk_config: Optional[ChunkConfig] = Field(default=None, alias='chunkConfig')
 
     @root_validator
     def validate_chunk_config(cls, values):
@@ -97,9 +96,9 @@ class AudioPreprocessingConfig(PreprocessingConfig):
 class VideoPreprocessingConfig(PreprocessingConfig):
     """Preprocessing config for video modality"""
     modality: Literal[Modality.VIDEO] = Modality.VIDEO
-    download_thread_count: Optional[int] = pydantic.Field(default=None, alias='downloadThreadCount')
-    download_header: Optional[Dict[str, str]] = pydantic.Field(default=None, alias='downloadHeader')
-    chunk_config: Optional[ChunkConfig] = pydantic.Field(default=None, alias='chunkConfig')
+    download_thread_count: Optional[int] = Field(default=None, alias='downloadThreadCount')
+    download_header: Optional[Dict[str, str]] = Field(default=None, alias='downloadHeader')
+    chunk_config: Optional[ChunkConfig] = Field(default=None, alias='chunkConfig')
 
     @root_validator
     def validate_chunk_config(cls, values):

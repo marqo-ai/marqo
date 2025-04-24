@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Dict, Optional, Union, Any
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 
 class Status(BaseModel):
