@@ -22,8 +22,8 @@ class LanguagebindPreprocessor(AbstractPreprocessor):
 
     def __init__(self, raw_preprocessor, device):
         super().__init__()
-        self.preprocessor = raw_preprocessor
-        self.device = device
+        self._preprocessor = raw_preprocessor
+        self._device = device
 
     def preprocess(self, inputs: Union[List[str], List[Image]], modality: Modality):
         if modality == Modality.TEXT:
@@ -42,20 +42,20 @@ class LanguagebindPreprocessor(AbstractPreprocessor):
 
     def _preprocess_image(self, inputs: List[Image]) -> List[Tensor]:
         return [
-            self.preprocessor["image"](images, return_tensors='pt')["pixel_values"].
-            to(self.device) for images in inputs
+            self._preprocessor["image"](images, return_tensors='pt')["pixel_values"].
+            to(self._device) for images in inputs
         ]
 
     def _preprocess_video(self, inputs) -> List[Tensor]:
         return [
-            self.preprocessor["video"](audio, return_tensors='pt')["pixel_values"].
-            to(self.device) for audio in inputs
+            self._preprocessor["video"](audio, return_tensors='pt')["pixel_values"].
+            to(self._device) for audio in inputs
         ]
 
     def _preprocess_audio(self, inputs):
         return [
-            self.preprocessor["audio"](audio, return_tensors='pt')["pixel_values"].
-            to(self.device) for audio in inputs
+            self._preprocessor["audio"](audio, return_tensors='pt')["pixel_values"].
+            to(self._device) for audio in inputs
         ]
 
 

@@ -126,7 +126,7 @@ def _threaded_download_and_preprocess_audio_and_video(
         metric_obj: Optional[RequestMetrics] = None,
         return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
-    """A thread calls this function to download images for its allocated documents
+    """A thread calls this function to download audio and video for its allocated contents.
 
     This should be called only if treat URLs as images is True.
 
