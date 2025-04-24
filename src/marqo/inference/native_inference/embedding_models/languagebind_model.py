@@ -3,7 +3,7 @@ import tempfile
 from contextlib import contextmanager
 
 import torch
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.exceptions import InternalError

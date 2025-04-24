@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-import pydantic
+import pydantic.v1 as pydantic
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants

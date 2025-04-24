@@ -2,7 +2,7 @@ from marqo.tensor_search.enums import MappingsObjectType
 from marqo.tensor_search.constants import ALLOWED_CUSTOM_VECTOR_CONTENT_TYPES
 from marqo.base_model import StrictBaseModel
 from typing import List, Union, Optional
-from pydantic import root_validator, validator
+from pydantic.v1 import root_validator, validator
 
 
 class CustomVector(StrictBaseModel):

@@ -13,7 +13,7 @@ from marqo.tensor_search import validation
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 
 class TestValidation(unittest.TestCase):
