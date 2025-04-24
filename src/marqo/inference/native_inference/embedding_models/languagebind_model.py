@@ -42,14 +42,14 @@ class LanguagebindPreprocessor(AbstractPreprocessor):
 
     def _preprocess_image(self, inputs: List[Image]) -> List[Tensor]:
         return [
-            self._preprocessor["image"](images, return_tensors='pt')["pixel_values"].
-            to(self._device) for images in inputs
+            self._preprocessor["image"](image, return_tensors='pt')["pixel_values"].
+            to(self._device) for image in inputs
         ]
 
     def _preprocess_video(self, inputs) -> List[Tensor]:
         return [
-            self._preprocessor["video"](audio, return_tensors='pt')["pixel_values"].
-            to(self._device) for audio in inputs
+            self._preprocessor["video"](video, return_tensors='pt')["pixel_values"].
+            to(self._device) for video in inputs
         ]
 
     def _preprocess_audio(self, inputs):
