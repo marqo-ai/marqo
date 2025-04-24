@@ -339,7 +339,6 @@ def _load_model(
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
-    loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     if model_type not in (
             ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind,
@@ -351,6 +350,8 @@ def _load_model(
             f"{ModelType.LanguageBind}, {ModelType.Random}, {ModelType.MultilingualClip}, "
             f"{ModelType.NO_MODEL} at the moment, but received {model_type}."
         )
+
+    loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     model = loader(
         device=device,

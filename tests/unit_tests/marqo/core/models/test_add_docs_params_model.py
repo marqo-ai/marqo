@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.enums import EnvVars
