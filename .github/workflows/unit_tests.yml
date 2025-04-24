@@ -48,7 +48,7 @@ jobs:
         id: run_unit_tests
         run: |
           cd marqo
-          export PYTHONPATH="./src"
+          export PYTHONPATH="./src:."
           set -o pipefail
           pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-report term:skip-covered \
