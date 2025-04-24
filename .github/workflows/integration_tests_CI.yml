@@ -39,7 +39,7 @@ on:
       - '**.md'
 
 concurrency:
-  group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
+  group: integration-tests-pr-${{ github.event.pull_request.number }}-${{ github.sha }}
   cancel-in-progress: true
 
 permissions:
