@@ -104,10 +104,6 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             index_supports_partial_updates=marqo_index.index_supports_partial_updates)
 
     @classmethod
-    def extract_field(cls, fields, name: str, default: Any):
-        return fields[name] if name in fields else default
-
-    @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
         """
         Creates a SemiStructuredVespaDocument object from a Marqo document.
