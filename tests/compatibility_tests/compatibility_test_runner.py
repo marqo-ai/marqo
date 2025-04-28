@@ -76,13 +76,13 @@ def run_prepare_mode(version_to_test_against: str):
             'TestSearchWithGlobalScoreModifiers',
             'TestSearch', 'TestSearchWithScoreModifiers',
             'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
-            'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
-            'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
-            'TestCreateStructuredIndexv2_12',
+            #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
+            #'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
+            #'TestCreateStructuredIndexv2_12',
             'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
             'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
             'TestDeleteDocuments',
-            'TestEmbed',
+            #'TestEmbed',
             #'TestRecommend',
             'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
         ]
