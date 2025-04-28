@@ -81,7 +81,9 @@ def run_prepare_mode(version_to_test_against: str):
             'TestCreateStructuredIndexv2_12',
             'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
             'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
-            #'TestDeleteDocuments', 'TestEmbed', 'TestRecommend',
+            'TestDeleteDocuments',
+            #'TestEmbed',
+            #'TestRecommend',
             'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
         ]
         if test_class.__name__ not in test_classes_to_prepare:
