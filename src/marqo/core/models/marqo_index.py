@@ -279,6 +279,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)
 
