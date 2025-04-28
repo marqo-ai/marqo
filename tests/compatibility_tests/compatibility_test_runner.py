@@ -152,12 +152,8 @@ def construct_pytest_arguments(version_to_test_against, path_to_test):
 def run_test_mode(version_to_test_against, path_to_test):
     logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
     pytest_args = construct_pytest_arguments(version_to_test_against, path_to_test)
-    pytest_result = pytest.main(pytest_args)
-
-    if pytest_result == 0:
-        logger.info(f"Successfully ran test mode on all test cases")
-    elif pytest_result == 1:
-        raise RuntimeError(f"Failed to run test mode on some test cases. Check pyTest output for exactly which test cases failed")
+    cmd = [sys.executable, "-m", "pytest", *pytest_args]
+    subprocess.run(cmd, check=True)
 
 def trigger_rollback_endpoint():
     logger.info(f"Triggering rollback endpoint.")
