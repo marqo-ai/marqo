@@ -81,7 +81,7 @@ def _threaded_download_and_preprocess_image(
 
     Ret
     """
-    _id = f'image_download.{threading.get_ident()}'
+    _id = f'media_download.{preprocessing_config.modality}.{threading.get_ident()}'
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
@@ -128,8 +128,6 @@ def _threaded_download_and_preprocess_audio_and_video(
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download audio and video for its allocated contents.
 
-    This should be called only if treat URLs as images is True.
-
     Args:
         allocated_content: The content to be downloaded and preprocessed by this thread.
         preprocessor: The preprocessor to be used for preprocessing the content. E.g., LanguagebindModelPreprocessor
@@ -145,7 +143,7 @@ def _threaded_download_and_preprocess_audio_and_video(
         return_individual_error is False.
         RuntimeError: If the number of results does not match the number of allocated content.
     """
-    _id = f'image_download.{threading.get_ident()}'
+    _id = f'media_download.{preprocessing_config.modality}.{threading.get_ident()}'
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:

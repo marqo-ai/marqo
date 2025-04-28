@@ -391,7 +391,6 @@ class AddDocumentsHandler(ABC):
             patch_method = self.marqo_index.image_preprocessing.patch_method
             return ImagePreprocessingConfig(
                 should_chunk=for_top_level_field and patch_method is not None,
-                # TODO - We should use media_download_thread_count instead of image_download_thread_count when media_download_thread_count is specified
                 download_thread_count=self.add_docs_params.image_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
                 patch_method=None if not for_top_level_field or not patch_method else patch_method.value,

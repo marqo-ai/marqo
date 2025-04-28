@@ -146,6 +146,8 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
 
         # Inference exceptions
+        # TODO - This error catch is only in the combined model, and it may have different behaviour compared with
+        # TODO - the remote inference client. We need to unify the error handling in the future.
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
         (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
         (inference_exceptions.UnsupportedModalityError, api_exceptions.InvalidArgError, None, None),

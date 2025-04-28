@@ -21,36 +21,52 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
         cls.unstructured_languagebind_index_name = "api_test_unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', '')
         cls.text_index_with_normalize_embeddings_true = "api_test_unstructured_index_with_normalize_embeddings_true" + str(
             uuid.uuid4()).replace('-', '')
+        cls.unstructured_languagebind_index_name_with_limited_supported_modalities = (
+                "api_test_unstructured_languagebind_index_with_limited_supported_modalities"
+                + str(uuid.uuid4()).replace('-', '')
+        )
 
-        cls.create_indexes([
-            {
-                "indexName": cls.text_index_name,
-                "type": "unstructured",
-                "model": "hf/all-MiniLM-L6-v2",
-                "normalizeEmbeddings": False,
-            },
-            {
-                "indexName": cls.image_index_name,
-                "type": "unstructured",
-                "model": "open_clip/ViT-B-32/openai",
-                "treatUrlsAndPointersAsImages": True,
-            },
-            {
-                "indexName": cls.unstructured_languagebind_index_name,
-                "type": "unstructured",
-                "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-                "treatUrlsAndPointersAsMedia": True,
-                "treatUrlsAndPointersAsImages": True
-            },
-            {
-                "indexName": cls.text_index_with_normalize_embeddings_true,
-                "type": "unstructured",
-                "model": "hf/all-MiniLM-L6-v2",
-                "normalizeEmbeddings": True,
-            }
-            ])
-        
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.unstructured_languagebind_index_name, cls.text_index_with_normalize_embeddings_true]
+        cls.create_indexes(
+            [
+                {
+                    "indexName": cls.text_index_name,
+                    "type": "unstructured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "normalizeEmbeddings": False,
+                },
+                {
+                    "indexName": cls.image_index_name,
+                    "type": "unstructured",
+                    "model": "open_clip/ViT-B-32/openai",
+                    "treatUrlsAndPointersAsImages": True,
+                },
+                {
+                    "indexName": cls.unstructured_languagebind_index_name,
+                    "type": "unstructured",
+                    "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
+                    "treatUrlsAndPointersAsMedia": True,
+                    "treatUrlsAndPointersAsImages": True
+                },
+                {
+                    "indexName": cls.text_index_with_normalize_embeddings_true,
+                    "type": "unstructured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "normalizeEmbeddings": True,
+                },
+                {
+                    "indexName": cls.unstructured_languagebind_index_name_with_limited_supported_modalities,
+                    "type": "unstructured",
+                    "model": 'LanguageBind/Audio_FT',
+                    "treatUrlsAndPointersAsMedia": True,
+                }
+            ]
+        )
+
+        cls.indexes_to_delete = [
+            cls.text_index_name, cls.image_index_name, cls.unstructured_languagebind_index_name,
+            cls.text_index_with_normalize_embeddings_true,
+            cls.unstructured_languagebind_index_name_with_limited_supported_modalities
+        ]
         
         
     def tearDown(self):
@@ -356,3 +372,32 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
 
         self.assertEqual(add_docs_res_normalized["items"][1]["status"], 200)
         self.assertEqual(add_docs_res_normalized["items"][1]["_id"], "doc2")
+
+    def test_add_documents_with_unsupported_modalities(self):
+        """
+        Test that add documents with unsupported modalities will fail the whole batch.
+        """
+        documents = [
+            {
+                "text_field_1": "A private image with a png extension",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/"
+                                 "mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },
+            {
+                "text_field_1": "A private video with a png extension",
+            }
+        ]
+
+        with self.assertRaises(MarqoWebError) as e:
+            self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).add_documents(
+                documents=documents,
+                tensor_fields=["text_field_1", "image_field_1"]
+            )
+        self.assertIn("The model does not support the requested modality", str(e.exception.message))
+
+        with self.assetRaises(MarqoWebError) as e:
+            self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).search(
+                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+            )
+
+        self.assertIn("The model does not support the requested modality", str(e.exception.message))

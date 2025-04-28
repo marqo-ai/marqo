@@ -51,6 +51,7 @@ class MultilingualCLIPModelInferencePipeline(AbstractInferencePipeline):
                                                     self.inference_request.preprocessing_config,
                                                     self.inference_request.return_individual_error)
         else:
+            # TODO - Raise an unsupported modality error
             raise ValueError(f"Unsupported modality: {modality}")
         return results
 
