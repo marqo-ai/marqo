@@ -11,6 +11,7 @@ import torch
 from torch import Tensor
 
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.core.inference.api import Inference, InferenceError
 from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
@@ -930,12 +931,29 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             treat_urls_and_pointers_as_media = True
         )
 
-        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index,
-                                          unstructured_custom_language_bind_index])
+        unstructured_languagebind_index_with_limited_supported_modalities = cls.unstructured_marqo_index_request(
+            name="unstructured_languagebind_index_with_limited_supported_modalities"
+                 + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='LanguageBind/Audio_FT'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
+        )
+
+        cls.indexes = cls.create_indexes(
+            [
+                structured_language_bind_index,
+                unstructured_language_bind_index,
+                unstructured_custom_language_bind_index,
+                unstructured_languagebind_index_with_limited_supported_modalities
+            ]
+        )
 
         cls.structured_language_bind_index_name = structured_language_bind_index.name
         cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
         cls.unstructured_custom_language_bind_index_name= unstructured_custom_language_bind_index.name
+        cls.unstructured_languagebind_index_with_limited_supported_modalities_name = \
+            unstructured_languagebind_index_with_limited_supported_modalities.name
+
 
         s2_inference.clear_loaded_models()
 
@@ -1186,3 +1204,36 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     text=query,
                     search_method = "TENSOR"
                 )
+
+    def test_proper_error_is_raised_when_adding_documents_with_unsupported(self):
+        """Test to ensure that the proper error is raised when adding documents with invalid media"""
+
+        test_docs = [
+            {
+                "_id": "1",
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "text_field_1": "This is a valid image",
+            },
+        ]
+
+        with self.assertRaises(InferenceError) as cm:
+            _ = self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                    docs=test_docs,
+                    tensor_fields=["image_field_1"]
+                )
+            )
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))
+
+
+        with self.assertRaises(InferenceError) as cm:
+            _ = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                text=TestVideoUrls.VIDEO1.value,
+                search_method = "TENSOR"
+            )
+
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))
