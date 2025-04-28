@@ -90,7 +90,7 @@ jobs:
 
           bash scripts/start_cuda_docker_marqo_split.sh $MARQO_IMAGE_NAME
           df -k
-          pytest tests/api_tests/cuda/test_cuda_add_documents_common.py
+          pytest tests/
 
   Stop-Runner:
     needs:

@@ -404,7 +404,7 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
             self.assertEqual(e.exception.status_code, 400)
 
         with self.subTest("Unsupported modality in search"):
-            with self.assetRaises(MarqoWebError) as e:
+            with self.assertRaises(MarqoWebError) as e:
                 self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).search(
                     "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
                 )
