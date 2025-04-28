@@ -82,7 +82,7 @@ def run_prepare_mode(version_to_test_against: str):
             'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
             'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
             'TestDeleteDocuments',
-            #'TestEmbed',
+            'TestEmbed',
             #'TestRecommend',
             'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
         ]
