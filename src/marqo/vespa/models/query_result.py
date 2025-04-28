@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 # See https://docs.vespa.ai/en/reference/default-result-format.html
