@@ -45,9 +45,9 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
         )
 
         cls.indexes_to_delete = [
-            cls.text_index_name, cls.image_index_name, cls.unstructured_languagebind_index_name,
+            cls.text_index_name,
+            cls.image_index_name,
             cls.text_index_with_normalize_embeddings_true,
-            cls.unstructured_languagebind_index_name_with_limited_supported_modalities
         ]
         
         

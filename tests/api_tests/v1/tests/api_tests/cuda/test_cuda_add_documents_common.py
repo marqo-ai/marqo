@@ -44,8 +44,7 @@ class TestCudaStructuredAddDocuments(MarqoTestCase):
         )
 
         cls.indexes_to_delete = [
-            cls.text_index_name, cls.image_index_name,
-            cls.unstructured_languagebind_index_name_with_limited_supported_modalities
+            cls.text_index_name, cls.image_index_name
         ]
 
     def tearDown(self):
