@@ -401,7 +401,7 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
                     tensor_fields=["text_field_1", "image_field_1"]
                 )
             self.assertIn("The model does not support the requested modality", str(e.exception.message))
-            self.assertEqual(e.status_code, 400)
+            self.assertEqual(e.exception.status_code, 400)
 
         with self.subTest("Unsupported modality in search"):
             with self.assetRaises(MarqoWebError) as e:
@@ -410,4 +410,4 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
                 )
 
             self.assertIn("The model does not support the requested modality", str(e.exception.message))
-            self.assertEqual(e.status_code, 400)
+            self.assertEqual(e.exception.status_code, 400)
