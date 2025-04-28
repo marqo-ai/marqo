@@ -144,9 +144,13 @@ def construct_pytest_arguments(version_to_test_against, path_to_test):
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
-        "-s",
-        path_to_test   # temporarily adjust test names manually
+        "-s"
     ]
+
+    # If path has multiple arguments, split them by space
+    list_paths = path_to_test.split()
+    pytest_args += list_paths
+
     return pytest_args
 
 def run_test_mode(version_to_test_against, path_to_test):
