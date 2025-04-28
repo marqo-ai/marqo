@@ -150,7 +150,7 @@ def construct_pytest_arguments(version_to_test_against, path_to_test):
     return pytest_args
 
 def run_test_mode(version_to_test_against, path_to_test):
-    logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
+    logger.info(f"TEST MODE START all test cases for version: {version_to_test_against}")
     pytest_args = construct_pytest_arguments(version_to_test_against, path_to_test)
     cmd = [sys.executable, "-m", "pytest", *pytest_args]
     subprocess.run(cmd, check=True)

@@ -117,6 +117,7 @@ jobs:
           PATH_TO_TEST: ${{ inputs.path_to_test || github.event.inputs.path_to_test }}
         run: |
             export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
+            set -x
             python tests/compatibility_tests/compatibility_test_runner.py \
             --mode "$MODE" \
             --from_version "$FROM_VERSION" \
