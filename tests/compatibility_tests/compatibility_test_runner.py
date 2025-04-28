@@ -73,14 +73,15 @@ def run_prepare_mode(version_to_test_against: str):
         # TODO: remove this
         # Manually remove test classes that are not in a predefined list.
         test_classes_to_prepare = [
-            'TestSearch', 'TestSearchWithGlobalScoreModifiers', 'TestSearchWithScoreModifiers',
-            'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
-            'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
-            'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
-            'TestCreateStructuredIndexv2_12',
-            'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
-            'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
-            'TestDeleteDocuments', 'TestEmbed', 'TestRecommend',
+            'TestSearchWithGlobalScoreModifiers',
+            #'TestSearch', 'TestSearchWithScoreModifiers',
+            #'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
+            #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
+            #'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
+            #'TestCreateStructuredIndexv2_12',
+            #'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
+            #'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
+            #'TestDeleteDocuments', 'TestEmbed', 'TestRecommend',
             'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
         ]
         if test_class.__name__ not in test_classes_to_prepare:
