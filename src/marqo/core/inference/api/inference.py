@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, Tuple, Union
 
-import pydantic
 from numpy import ndarray
-from pydantic import StrictStr, root_validator
+from pydantic.v1 import StrictStr, root_validator, Field
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType
@@ -12,21 +11,21 @@ from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class ModelConfig(ImmutableBaseModel):
-    model_name: StrictStr = pydantic.Field(alias='modelName')
-    model_properties: Optional[Dict[str, Any]] = pydantic.Field(default=None, alias='modelProperties')
-    model_auth: Optional[ModelAuth] = pydantic.Field(default=None, alias='modelAuth')
-    normalize_embeddings: bool = pydantic.Field(default=True, alias='normalizeEmbeddings')
+    model_name: StrictStr = Field(alias='modelName')
+    model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
+    model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
+    normalize_embeddings: bool = Field(default=True, alias='normalizeEmbeddings')
 
 
 class InferenceRequest(ImmutableBaseModel):
     modality: Modality
-    contents: List[str] = pydantic.Field(min_items=1)
-    device: Optional[str] = pydantic.Field(default=None)
-    model_config: ModelConfig = pydantic.Field(alias='modelConfig')
-    preprocessing_config: PreprocessingConfigType = pydantic.Field(alias='preprocessingConfig')
-    use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
+    contents: List[str] = Field(min_items=1)
+    device: Optional[str] = Field(default=None)
+    model_config: ModelConfig = Field(alias='modelConfig')
+    preprocessing_config: PreprocessingConfigType = Field(alias='preprocessingConfig')
+    use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
-    return_individual_error: bool = pydantic.Field(default=True, alias='returnIndividualError')
+    return_individual_error: bool = Field(default=True, alias='returnIndividualError')
 
     @root_validator(pre=False)
     def check_preprocessing_config_matches_modality(cls, values):
@@ -47,8 +46,8 @@ class InferenceErrorModel(ImmutableBaseModel):
     """
     A model class to store error information for each individual content
     """
-    status_code: int = pydantic.Field(default=400)
-    error_code: str = pydantic.Field(default='inference_error')
+    status_code: int = Field(default=400)
+    error_code: str = Field(default='inference_error')
     error_message: str
 
 

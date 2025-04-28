@@ -1,6 +1,6 @@
 from abc import ABC
 
-from pydantic import Field
+from pydantic.v1 import Field
 
 from marqo.base_model import ImmutableBaseModel
 

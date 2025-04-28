@@ -1,6 +1,6 @@
 import unittest
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.core.inference.api import ChunkConfig, TextChunkConfig, TextPreprocessingConfig, ImagePreprocessingConfig, \
     AudioPreprocessingConfig, VideoPreprocessingConfig
