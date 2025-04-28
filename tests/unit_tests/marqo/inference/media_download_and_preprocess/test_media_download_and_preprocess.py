@@ -52,17 +52,17 @@ class TestMediaDownloadAndPreprocess(TestCase):
 
     def test_reduce_thread_metrics(self):
         raw_data = {
-            "image_download.100.thread_time": 10,
-            "image_download.100.url1": 20,
-            "image_download.101.thread_time": 15,
-            "image_download.101.url1": 25
+            "media_download.image.100.thread_time": 10,
+            "media_download.image.100.url1": 20,
+            "media_download.image.101.thread_time": 15,
+            "media_download.image.101.url1": 25
         }
 
         reduced = reduce_thread_metrics(raw_data)
 
-        self.assertIn("image_download.thread_time", reduced)
-        self.assertEqual(reduced["image_download.thread_time"], [10, 15])
-        self.assertEqual(reduced["image_download.url1"], [20, 25])
+        self.assertIn("media_download.image.thread_time", reduced)
+        self.assertEqual([10, 15], reduced["media_download.image.thread_time"])
+        self.assertEqual([20, 25], reduced["media_download.image.url1"],)
 
     def test_enable_video_gpu_acceleration_true(self):
         with patch("marqo.tensor_search.utils.read_env_vars_and_defaults", return_value="TRUE"):

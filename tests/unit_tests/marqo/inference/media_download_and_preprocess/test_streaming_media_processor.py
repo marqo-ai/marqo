@@ -98,7 +98,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_chunk_time_format_and_tensor_output(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 25.0)  # size, duration
+        mock_fetch_file_metadata.return_value = (1000000, )  # size, duration
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         processor = StreamingMediaProcessor(

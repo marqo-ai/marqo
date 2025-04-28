@@ -157,6 +157,7 @@ def _threaded_download_and_preprocess_audio_and_video(
                 results: list[Tuple[str, Tensor]] = media_downloader.process_media()
                 thread_results.append(results)
             except InferenceError as e:
+                metric_obj.increment_counter(f"{url}.InferenceError")
                 if return_individual_error:
                     thread_results.append(InferenceErrorModel(error_message=str(e)))
                     continue
@@ -225,26 +226,28 @@ def reduce_thread_metrics(data):
     e.g.
     ```
     {
-        "image_download.700.thread_time": 1373.271582997404,
-        "image_download.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
-        "image_download.729.thread_time": 53.297404,
-        "image_download.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
+        "media_download.image.700.thread_time": 1373.271582997404,
+        "media_download.image.700.https://www.ai-nc.com/images/pages/heat-map.png": 52.985392,
+        "media_download.image.729.thread_time": 53.297404,
+        "media_download.image.729.https://www.ai-nc.com/images/pages/heat-map.png": 2052.617332985392,
     }
     ```
     Becomes
     ```
     {
-        "image_download.thread_time": [1373.271582997404, 53.297404],
-        "image_download.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
+        "media_download.image.thread_time": [1373.271582997404, 53.297404],
+        "media_download.image.https://www.ai-nc.com/images/pages/heat-map.png": [2052.617332985392, 52.985392],
     }
     ```
-    Only applies to times that start with `image_download`.
+    Only applies to times that start with `media_download`.
     """
     result = {}
     for key, value in data.items():
-        if key.startswith("image_download."):
+        if key.startswith("media_download."):
             parts = key.split('.')
-            new_key = '.'.join(parts[0:1] + parts[2:]) if parts[1] != 'full_time' else key
+            if len(parts) < 4:
+                continue
+            new_key = '.'.join(parts[0:2] + parts[3:])
             if new_key in result:
                 if isinstance(result[new_key], list):
                     result[new_key].append(value)

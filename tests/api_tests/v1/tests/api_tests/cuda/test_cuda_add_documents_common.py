@@ -394,16 +394,20 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
             }
         ]
 
-        with self.assertRaises(MarqoWebError) as e:
-            self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).add_documents(
-                documents=documents,
-                tensor_fields=["text_field_1", "image_field_1"]
-            )
-        self.assertIn("The model does not support the requested modality", str(e.exception.message))
+        with self.subTest("Unsupported modality in add_documents"):
+            with self.assertRaises(MarqoWebError) as e:
+                self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).add_documents(
+                    documents=documents,
+                    tensor_fields=["text_field_1", "image_field_1"]
+                )
+            self.assertIn("The model does not support the requested modality", str(e.exception.message))
+            self.assertEqual(e.status_code, 400)
 
-        with self.assetRaises(MarqoWebError) as e:
-            self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).search(
-                "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
-            )
+        with self.subTest("Unsupported modality in search"):
+            with self.assetRaises(MarqoWebError) as e:
+                self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).search(
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+                )
 
-        self.assertIn("The model does not support the requested modality", str(e.exception.message))
+            self.assertIn("The model does not support the requested modality", str(e.exception.message))
+            self.assertEqual(e.status_code, 400)
