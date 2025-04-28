@@ -10,8 +10,9 @@ import requests
 import torch
 from torch import Tensor
 
+import marqo.api.exceptions as api_exceptions
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
-from marqo.core.inference.api import Inference, InferenceError
+from marqo.core.inference.api import InferenceError
 from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
@@ -1228,7 +1229,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         self.assertIn("The model does not support the requested modality.", str(cm.exception))
 
 
-        with self.assertRaises(InferenceError) as cm:
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             _ = tensor_search.search(
                 config=self.config,
                 index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
