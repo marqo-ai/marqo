@@ -75,7 +75,7 @@ def run_prepare_mode(version_to_test_against: str):
         test_classes_to_prepare = [
             'TestSearchWithGlobalScoreModifiers',
             'TestSearch', 'TestSearchWithScoreModifiers',
-            #'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
+            'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
             #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
             #'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
             #'TestCreateStructuredIndexv2_12',
