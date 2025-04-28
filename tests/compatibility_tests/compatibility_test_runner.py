@@ -75,7 +75,9 @@ def run_prepare_mode(version_to_test_against: str):
         test_classes_to_prepare = [
             'TestSearch', 'TestSearchWithGlobalScoreModifiers', 'TestSearchWithScoreModifiers',
             'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
-            'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel'
+            'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
+            'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
+            'TestCreateStructuredIndexv2_12',
         ]
         if test_class.__name__ not in test_classes_to_prepare:
             logger.info(f"Skipping test class {test_class.__name__} as it is not in the predefined list")
