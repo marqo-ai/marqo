@@ -148,13 +148,13 @@ def _threaded_download_and_preprocess_audio_and_video(
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
             try:
-                audio_downloader= StreamingMediaProcessor(
+                media_downloader= StreamingMediaProcessor(
                     url = url,
                     preprocessors = preprocessor,
                     preprocessing_config = preprocessing_config,
                     enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
                 )
-                results: list[Tuple[str, Tensor]] = audio_downloader.process_media()
+                results: list[Tuple[str, Tensor]] = media_downloader.process_media()
                 thread_results.append(results)
             except InferenceError as e:
                 if return_individual_error:
