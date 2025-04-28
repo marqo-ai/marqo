@@ -74,7 +74,7 @@ def run_prepare_mode(version_to_test_against: str):
         # Manually remove test classes that are not in a predefined list.
         test_classes_to_prepare = [
             'TestSearchWithGlobalScoreModifiers',
-            #'TestSearch', 'TestSearchWithScoreModifiers',
+            'TestSearch', 'TestSearchWithScoreModifiers',
             #'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
             #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
             #'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
