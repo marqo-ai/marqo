@@ -73,7 +73,7 @@ class TestCreateStructuredIndexv2_12(BaseCompatibilityTestCase):
         for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             # TODO: remove this deletion
             try:
-                self.client.delete_index_by_name(index_name=index_name)
+                self.client.delete_index(index_name=index_name)
             except Exception as e:
                 self.logger.debug(f"Exception when deleting index with name {index_name}: {e}")
 

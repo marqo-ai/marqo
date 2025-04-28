@@ -31,7 +31,7 @@ class TestCreateIndexWithNoModel(BaseCompatibilityTestCase):
         all_results = {}
         # TODO: remove this deletion
         try:
-            self.client.delete_index_by_name(index_name=self.index_name)
+            self.client.delete_index(index_name=self.index_name)
         except Exception as e:
             self.logger.debug(f"Exception when deleting index with name {self.index_name}: {e}")
 
