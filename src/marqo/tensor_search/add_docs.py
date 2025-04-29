@@ -27,11 +27,10 @@ from marqo.s2_inference.s2_inference import is_preprocessor_preload, load_multim
     infer_modality, Modality
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search import enums
-from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 logger = logging.getLogger(__name__)
