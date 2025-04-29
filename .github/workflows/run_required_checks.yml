@@ -98,19 +98,19 @@ jobs:
         with:
           name: marqo-integ-tests-report
           path: integration-tests-coverage
-          
+
       - name: Download large model tests coverage
         uses: actions/download-artifact@v4
         with:
           name: marqo-largemodel-tests-report
           path: largemodel-tests-coverage
-          
+
       - name: Download unit tests coverage
         uses: actions/download-artifact@v4
         with:
           name: marqo-unit-tests-report
           path: unit-tests-coverage
-          
+
       - name: List downloaded artifacts
         run: |
           echo "Listing all downloaded artifacts:"
@@ -120,7 +120,7 @@ jobs:
           ls -la largemodel-tests-coverage/
           echo "Unit tests coverage:"
           ls -la unit-tests-coverage/
-          
+
       - name: Install coverage package
         run: |
           pip install coverage
@@ -143,20 +143,6 @@ jobs:
           cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage || true
           cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage || true
           
-          # Create combined reports directory
-#          mkdir -p combined-reports
-
-          # Store individual HTML reports
-#          mkdir -p combined-reports/integration
-#          mkdir -p combined-reports/largemodel
-#          mkdir -p combined-reports/unit
-#          mkdir -p combined-reports/combined
-          
-          # Copy HTML reports
-#          [ -d "integration-tests-coverage/htmlcov" ] && cp -r integration-tests-coverage/htmlcov/* combined-reports/integration/ || true
-#          [ -d "largemodel-tests-coverage/htmlcov" ] && cp -r largemodel-tests-coverage/htmlcov/* combined-reports/largemodel/ || true
-#          [ -d "unit-tests-coverage/htmlcov" ] && cp -r unit-tests-coverage/htmlcov/* combined-reports/unit/ || true
-
           export PYTHONPATH="../marqo"
 
           # Combine coverage data if available
@@ -189,9 +175,9 @@ jobs:
         continue-on-error: true
         run: |
           cd unit_coverage_data
-          
+
           EXPORT PYTHONPATH="../marqo"
-          
+
           export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
@@ -204,9 +190,9 @@ jobs:
         continue-on-error: true
         run: |
           cd integ_coverage_data
-          
+
           EXPORT PYTHONPATH="../marqo"
-          
+
           export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
@@ -219,9 +205,9 @@ jobs:
         continue-on-error: true
         run: |
           cd coverage_data
-          
+
           EXPORT PYTHONPATH="../marqo"
-          
+
           export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
@@ -236,7 +222,7 @@ jobs:
             coverage_data/coverage.xml
             coverage_data/htmlcov/
 #            diff_cov.html
-            
+
 #      - name: Coverage Report Summary
 #        if: always() && github.event_name == 'pull_request'
 #        run: |
@@ -245,7 +231,7 @@ jobs:
 #          else
 #            echo "No coverage summary available" >> $GITHUB_STEP_SUMMARY
 #          fi
-          
+
       - name: Fail if coverage thresholds not met
         if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.diff_coverage.outputs.status == 'failure' || steps.unit_coverage.outputs.status == 'failure' || steps.integ_coverage.outputs.status == 'failure' || steps.unit_diff_coverage.outputs.status == 'failure' || steps.integ_diff_coverage.outputs.status == 'failure')
         run: |

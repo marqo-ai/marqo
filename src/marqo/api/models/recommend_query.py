@@ -31,4 +31,6 @@ class RecommendQuery(BaseMarqoModel):
         if rerank_depth and rerank_depth < 0:
             raise ValueError(f"rerankDepth cannot be negative.")
 
+        pass
+
         return values
