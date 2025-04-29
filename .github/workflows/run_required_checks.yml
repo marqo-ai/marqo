@@ -125,11 +125,18 @@ jobs:
         run: |
           # Create a directory to store all coverage data
           mkdir -p coverage_data
+          mkdir -p unit_coverage_data
+          mkdir -p integ_coverage_data
           
           # Move all coverage files to a single directory
           find integration-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/integration.coverage \; || true
           find largemodel-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/largemodel.coverage \; || true
           find unit-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/unit.coverage \; || true
+          
+          # Copy to separate directories for individual analysis
+          find integration-tests-coverage -name ".coverage" -type f -exec cp {} integ_coverage_data/integration.coverage \; || true
+          find largemodel-tests-coverage -name ".coverage" -type f -exec cp {} integ_coverage_data/largemodel.coverage \; || true
+          find unit-tests-coverage -name ".coverage" -type f -exec cp {} unit_coverage_data/unit.coverage \; || true
           
           # Create combined reports directory
           mkdir -p combined-reports
@@ -155,6 +162,104 @@ jobs:
             echo "No .coverage files found to combine"
             mkdir -p ../combined-reports/combined
           fi
+          
+          # Generate unit test coverage data
+          cd ../unit_coverage_data
+          if ls .coverage* >/dev/null 2>&1; then
+            coverage combine
+            coverage xml -o coverage.xml
+            coverage html --directory=htmlcov
+          else
+            echo "No unit test .coverage files found"
+          fi
+          
+          # Generate integration test coverage data (including largemodel)
+          cd ../integ_coverage_data
+          if ls .coverage* >/dev/null 2>&1; then
+            coverage combine
+            coverage xml -o coverage.xml
+            coverage html --directory=htmlcov
+          else
+            echo "No integration test .coverage files found"
+          fi
+
+      - name: Check unit test coverage (20% threshold)
+        id: unit_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          cd unit_coverage_data
+          
+          echo "## Unit Test Coverage" >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Run coverage report and check the threshold
+          COVERAGE_REPORT=$(coverage report --fail-under=20)
+          COVERAGE_STATUS=$?
+          
+          # Capture the summary line
+          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
+          UNIT_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
+          
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Set status message based on the exit code
+          if [ $COVERAGE_STATUS -ne 0 ]; then
+            echo "::error::Unit test coverage is below 20% threshold ($UNIT_COVERAGE%)"
+            echo "❌ Unit test coverage threshold not met: $UNIT_COVERAGE% (required: 20%)" >> ../combined-reports/coverage_summary.md
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Unit test coverage threshold met: $UNIT_COVERAGE% (required: 20%)" >> ../combined-reports/coverage_summary.md
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage for other steps
+          echo "percentage=$UNIT_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
+
+      - name: Check integration test coverage (70% threshold)
+        id: integ_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          cd integ_coverage_data
+          
+          echo "## Integration Test Coverage" >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Run coverage report and check the threshold
+          COVERAGE_REPORT=$(coverage report --fail-under=70)
+          COVERAGE_STATUS=$?
+          
+          # Capture the summary line
+          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
+          INTEG_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
+          
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
+          echo '```' >> ../combined-reports/coverage_summary.md
+          echo "" >> ../combined-reports/coverage_summary.md
+          
+          # Set status message based on the exit code
+          if [ $COVERAGE_STATUS -ne 0 ]; then
+            echo "::error::Integration test coverage is below 70% threshold ($INTEG_COVERAGE%)"
+            echo "❌ Integration test coverage threshold not met: $INTEG_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Integration test coverage threshold met: $INTEG_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage for other steps
+          echo "percentage=$INTEG_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
 
       - name: Check overall coverage (70% threshold)
         id: overall_coverage
@@ -199,7 +304,95 @@ jobs:
           # Always exit with code 0 to allow continuation
           exit 0
 
-      - name: Check diff coverage (90% threshold)
+      - name: Check unit test diff coverage (90% threshold)
+        id: unit_diff_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          # Fetch the base branch for comparison
+          git fetch origin ${{ github.base_ref }} --depth=1
+          
+          echo "## Unit Test Diff Coverage" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          
+          # Run diff-cover with threshold check
+          cd unit_coverage_data
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90 \
+            --markdown-report=../unit_diff_cov.md --html-report=../unit_diff_cov.html
+          DIFF_COVERAGE_STATUS=$?
+          
+          # Append the diff-cover markdown output to our summary
+          cat ../unit_diff_cov.md >> ../combined-reports/coverage_summary.md
+          cp ../unit_diff_cov.html ../combined-reports/unit_diff_coverage.html
+          
+          # Try to extract the diff coverage percentage
+          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../unit_diff_cov.md | head -1 | tr -d '%' || echo "unknown")
+          
+          # Report status based on exit code
+          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
+            if [ "$DIFF_COVERAGE" != "unknown" ]; then
+              echo "::error::Unit test diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
+            else
+              echo "::error::Unit test diff coverage check failed"
+            fi
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage
+          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
+
+      - name: Check integration test diff coverage (80% threshold)
+        id: integ_diff_coverage
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          # Fetch the base branch for comparison
+          git fetch origin ${{ github.base_ref }} --depth=1
+          
+          echo "## Integration Test Diff Coverage" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
+          echo "" >> combined-reports/coverage_summary.md
+          
+          # Run diff-cover with threshold check
+          cd integ_coverage_data
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=80 \
+            --markdown-report=../integ_diff_cov.md --html-report=../integ_diff_cov.html
+          DIFF_COVERAGE_STATUS=$?
+          
+          # Append the diff-cover markdown output to our summary
+          cat ../integ_diff_cov.md >> ../combined-reports/coverage_summary.md
+          cp ../integ_diff_cov.html ../combined-reports/integ_diff_coverage.html
+          
+          # Try to extract the diff coverage percentage
+          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../integ_diff_cov.md | head -1 | tr -d '%' || echo "unknown")
+          
+          # Report status based on exit code
+          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
+            if [ "$DIFF_COVERAGE" != "unknown" ]; then
+              echo "::error::Integration test diff coverage is below 80% threshold ($DIFF_COVERAGE%)"
+            else
+              echo "::error::Integration test diff coverage check failed"
+            fi
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Capture the actual coverage percentage
+          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
+          
+          # Always exit with code 0 to allow continuation
+          exit 0
+
+      - name: Check combined diff coverage (90% threshold)
         id: diff_coverage
         if: github.event_name == 'pull_request'
         continue-on-error: true
@@ -207,7 +400,7 @@ jobs:
           # Fetch the base branch for comparison
           git fetch origin ${{ github.base_ref }} --depth=1
           
-          echo "## Diff Coverage" >> combined-reports/coverage_summary.md
+          echo "## Combined Diff Coverage" >> combined-reports/coverage_summary.md
           echo "" >> combined-reports/coverage_summary.md
           echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
           echo "" >> combined-reports/coverage_summary.md
@@ -228,9 +421,9 @@ jobs:
           # Report status based on exit code
           if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
             if [ "$DIFF_COVERAGE" != "unknown" ]; then
-              echo "::error::Diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
+              echo "::error::Combined diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
             else
-              echo "::error::Diff coverage check failed"
+              echo "::error::Combined diff coverage check failed"
             fi
             echo "status=failure" >> $GITHUB_OUTPUT
           else
@@ -263,14 +456,26 @@ jobs:
           fi
           
       - name: Fail if coverage thresholds not met
-        if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.diff_coverage.outputs.status == 'failure')
+        if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.diff_coverage.outputs.status == 'failure' || steps.unit_coverage.outputs.status == 'failure' || steps.integ_coverage.outputs.status == 'failure' || steps.unit_diff_coverage.outputs.status == 'failure' || steps.integ_diff_coverage.outputs.status == 'failure')
         run: |
           echo "Coverage threshold check failed"
+          if [ "${{ steps.unit_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Unit test coverage: ${{ steps.unit_coverage.outputs.percentage }}% (required: 20%)"
+          fi
+          if [ "${{ steps.integ_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Integration test coverage: ${{ steps.integ_coverage.outputs.percentage }}% (required: 70%)"
+          fi
           if [ "${{ steps.overall_coverage.outputs.status }}" == "failure" ]; then
             echo "❌ Overall coverage: ${{ steps.overall_coverage.outputs.percentage }}% (required: 70%)"
           fi
+          if [ "${{ steps.unit_diff_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Unit test diff coverage: ${{ steps.unit_diff_coverage.outputs.percentage }}% (required: 90%)"
+          fi
+          if [ "${{ steps.integ_diff_coverage.outputs.status }}" == "failure" ]; then
+            echo "❌ Integration test diff coverage: ${{ steps.integ_diff_coverage.outputs.percentage }}% (required: 80%)"
+          fi
           if [ "${{ steps.diff_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Diff coverage: ${{ steps.diff_coverage.outputs.percentage }}% (required: 90%)"
+            echo "❌ Combined diff coverage: ${{ steps.diff_coverage.outputs.percentage }}% (required: 90%)"
           fi
           exit 1
 
