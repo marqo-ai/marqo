@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import List, Dict, Any, Union, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from marqo.base_model import MarqoBaseModelV2
 from marqo.core import constants as index_constants, constants
@@ -29,8 +29,8 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=common.BOOL_FIELDS)
-    int_fields: Dict[str, int] = Field(default_factory=dict, alias=common.INT_FIELDS)
-    float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
+    int_fields: Union[Dict[str, int], List[Dict]] = Field(default_factory=dict, alias=common.INT_FIELDS)
+    float_fields: Union[Dict[str, float], List[Dict]] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
 
@@ -43,6 +43,16 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=common.VESPA_DOC_MATCH_FEATURES)
     raw_tensor_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE)
     raw_lexical_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE)
+
+    @field_validator('int_fields', 'float_fields')
+    def check_numeric_fields(cls, v):
+        if isinstance(v, list):
+            fields_dict = {}
+            for field_dict in v:
+                if 'value' in field_dict:
+                    fields_dict[field_dict['key']] = field_dict['value']
+            return fields_dict
+        return v
 
 
 class SemiStructuredVespaDocument(MarqoBaseModelV2):
@@ -340,22 +350,8 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         # Add int and float fields back
         # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
         # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
-        # Due to a race condition, the int_fields and float_fields can be a list of dicts, we want to format them
-        # and exclude fields with empty values
-        if isinstance(self.fixed_fields.int_fields, list):
-            marqo_document.update({
-                field_dict['key']: field_dict['value'] for field_dict in self.fixed_fields.int_fields
-                if field_dict.get('value') is not None
-            })
-        else:
-            marqo_document.update(self.fixed_fields.int_fields)
-        if isinstance(self.fixed_fields.float_fields, list):
-            marqo_document.update({
-                field_dict['key']: field_dict['value'] for field_dict in self.fixed_fields.float_fields
-                if field_dict.get('value') is not None
-            })
-        else:
-            marqo_document.update(self.fixed_fields.float_fields)
+        marqo_document.update(self.fixed_fields.int_fields)
+        marqo_document.update(self.fixed_fields.float_fields)
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
