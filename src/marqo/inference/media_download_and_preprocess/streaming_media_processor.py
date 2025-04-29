@@ -127,8 +127,8 @@ class StreamingMediaProcessor:
 
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
-            format_name = probe['format'].get('format_name', None)
-            modality_list = [codec_type.get('codec_type', None) for codec_type in probe['streams']]
+            format_name = probe['format'].get('format_name', "")
+            modality_list = [codec_type.get('codec_type', "") for codec_type in probe['streams']]
             modality = self._infer_modality_from_probe(modality_list, format_name)
 
             return size, duration, modality
