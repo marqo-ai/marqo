@@ -125,7 +125,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field', 'image_field_2'],
-            model=Model(name='ViT-B/16')
+            model=Model(name='open_clip/ViT-B-16/openai')
         )
         index_request_img_chunking = cls.structured_marqo_index_request(
             fields=[
@@ -141,7 +141,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field'],
-            model=Model(name='ViT-B/16'),
+            model=Model(name='open_clip/ViT-B-16/openai'),
             normalize_embeddings=True,
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn)
         )
