@@ -93,11 +93,6 @@ jobs:
         with:
           path: marqo
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
       - name: Download integration tests coverage
         uses: actions/download-artifact@v4
         with:
@@ -116,6 +111,16 @@ jobs:
           name: marqo-unit-tests-report
           path: unit-tests-coverage
           
+      - name: List downloaded artifacts
+        run: |
+          echo "Listing all downloaded artifacts:"
+          echo "Integration tests coverage:"
+          ls -la integration-tests-coverage/
+          echo "Large model tests coverage:"
+          ls -la largemodel-tests-coverage/
+          echo "Unit tests coverage:"
+          ls -la unit-tests-coverage/
+          
       - name: Install coverage package
         run: |
           pip install coverage
@@ -129,331 +134,117 @@ jobs:
           mkdir -p integ_coverage_data
           
           # Move all coverage files to a single directory
-          find integration-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/integration.coverage \; || true
-          find largemodel-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/largemodel.coverage \; || true
-          find unit-tests-coverage -name ".coverage" -type f -exec mv {} coverage_data/unit.coverage \; || true
+          cp integration-tests-coverage/.coverage coverage_data/integration.coverage || true
+          cp largemodel-tests-coverage/.coverage coverage_data/largemodel.coverage || true
+          cp unit-tests-coverage/.coverage coverage_data/unit.coverage || true
           
           # Copy to separate directories for individual analysis
-          find integration-tests-coverage -name ".coverage" -type f -exec cp {} integ_coverage_data/integration.coverage \; || true
-          find largemodel-tests-coverage -name ".coverage" -type f -exec cp {} integ_coverage_data/largemodel.coverage \; || true
-          find unit-tests-coverage -name ".coverage" -type f -exec cp {} unit_coverage_data/unit.coverage \; || true
+          cp integration-tests-coverage/.coverage integ_coverage_data/integration.coverage || true
+          cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage || true
+          cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage || true
           
           # Create combined reports directory
-          mkdir -p combined-reports
-          
+#          mkdir -p combined-reports
+
           # Store individual HTML reports
-          mkdir -p combined-reports/integration
-          mkdir -p combined-reports/largemodel
-          mkdir -p combined-reports/unit
+#          mkdir -p combined-reports/integration
+#          mkdir -p combined-reports/largemodel
+#          mkdir -p combined-reports/unit
+#          mkdir -p combined-reports/combined
           
           # Copy HTML reports
-          [ -d "integration-tests-coverage/marqo/htmlcov" ] && cp -r integration-tests-coverage/marqo/htmlcov/* combined-reports/integration/ || true
-          [ -d "largemodel-tests-coverage/marqo/htmlcov" ] && cp -r largemodel-tests-coverage/marqo/htmlcov/* combined-reports/largemodel/ || true
-          [ -d "unit-tests-coverage/marqo/htmlcov" ] && cp -r unit-tests-coverage/marqo/htmlcov/* combined-reports/unit/ || true
-          
+#          [ -d "integration-tests-coverage/htmlcov" ] && cp -r integration-tests-coverage/htmlcov/* combined-reports/integration/ || true
+#          [ -d "largemodel-tests-coverage/htmlcov" ] && cp -r largemodel-tests-coverage/htmlcov/* combined-reports/largemodel/ || true
+#          [ -d "unit-tests-coverage/htmlcov" ] && cp -r unit-tests-coverage/htmlcov/* combined-reports/unit/ || true
+
+          export PYTHONPATH="../marqo"
+
           # Combine coverage data if available
           cd coverage_data
-          if ls .coverage* >/dev/null 2>&1; then
-            coverage combine
-            coverage xml -o coverage.xml
-            coverage html --directory=htmlcov
-            cp -r htmlcov ../combined-reports/combined/
-          else
-            echo "No .coverage files found to combine"
-            mkdir -p ../combined-reports/combined
-          fi
+          ls -la
+          echo "Combining coverage files..."
+          coverage combine integration.coverage largemodel.coverage unit.coverage
+          coverage xml -o coverage.xml
+          coverage html --directory=htmlcov
           
           # Generate unit test coverage data
           cd ../unit_coverage_data
-          if ls .coverage* >/dev/null 2>&1; then
-            coverage combine
-            coverage xml -o coverage.xml
-            coverage html --directory=htmlcov
-          else
-            echo "No unit test .coverage files found"
-          fi
+          coverage combine unit.coverage
+          coverage xml -o coverage.xml
+          coverage html --directory=htmlcov
           
           # Generate integration test coverage data (including largemodel)
           cd ../integ_coverage_data
-          if ls .coverage* >/dev/null 2>&1; then
-            coverage combine
-            coverage xml -o coverage.xml
-            coverage html --directory=htmlcov
-          else
-            echo "No integration test .coverage files found"
-          fi
+          coverage combine integration.coverage largemodel.coverage
+          coverage xml -o coverage.xml
+          coverage html --directory=htmlcov
 
-      - name: Check unit test coverage (20% threshold)
-        id: unit_coverage
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
+      - name: Install diff-cover
         run: |
-          cd unit_coverage_data
-          
-          echo "## Unit Test Coverage" >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Run coverage report and check the threshold
-          COVERAGE_REPORT=$(coverage report --fail-under=20)
-          COVERAGE_STATUS=$?
-          
-          # Capture the summary line
-          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
-          UNIT_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
-          
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Set status message based on the exit code
-          if [ $COVERAGE_STATUS -ne 0 ]; then
-            echo "::error::Unit test coverage is below 20% threshold ($UNIT_COVERAGE%)"
-            echo "❌ Unit test coverage threshold not met: $UNIT_COVERAGE% (required: 20%)" >> ../combined-reports/coverage_summary.md
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Unit test coverage threshold met: $UNIT_COVERAGE% (required: 20%)" >> ../combined-reports/coverage_summary.md
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage for other steps
-          echo "percentage=$UNIT_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
+          pip install diff-cover
 
-      - name: Check integration test coverage (70% threshold)
-        id: integ_coverage
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        run: |
-          cd integ_coverage_data
-          
-          echo "## Integration Test Coverage" >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Run coverage report and check the threshold
-          COVERAGE_REPORT=$(coverage report --fail-under=70)
-          COVERAGE_STATUS=$?
-          
-          # Capture the summary line
-          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
-          INTEG_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
-          
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Set status message based on the exit code
-          if [ $COVERAGE_STATUS -ne 0 ]; then
-            echo "::error::Integration test coverage is below 70% threshold ($INTEG_COVERAGE%)"
-            echo "❌ Integration test coverage threshold not met: $INTEG_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Integration test coverage threshold met: $INTEG_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage for other steps
-          echo "percentage=$INTEG_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
-
-      - name: Check overall coverage (70% threshold)
-        id: overall_coverage
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        run: |
-          cd coverage_data
-          
-          # Create a start of the summary report
-          echo "# Coverage Reports" > ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          echo "## Overall Coverage" >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Run coverage report and check the threshold
-          COVERAGE_REPORT=$(coverage report --fail-under=70)
-          COVERAGE_STATUS=$?
-          
-          # Capture the summary line
-          COVERAGE_SUMMARY=$(echo "$COVERAGE_REPORT" | tail -n 1)
-          OVERALL_COVERAGE=$(echo "$COVERAGE_SUMMARY" | awk '{print $NF}' | tr -d '%')
-          
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "$COVERAGE_SUMMARY" >> ../combined-reports/coverage_summary.md
-          echo '```' >> ../combined-reports/coverage_summary.md
-          echo "" >> ../combined-reports/coverage_summary.md
-          
-          # Set status message based on the exit code
-          if [ $COVERAGE_STATUS -ne 0 ]; then
-            echo "::error::Overall coverage is below 70% threshold ($OVERALL_COVERAGE%)"
-            echo "❌ Overall coverage threshold not met: $OVERALL_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Overall coverage threshold met: $OVERALL_COVERAGE% (required: 70%)" >> ../combined-reports/coverage_summary.md
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage for other steps
-          echo "percentage=$OVERALL_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
-
-      - name: Check unit test diff coverage (90% threshold)
+      - name: Check diff unit test coverage (95% threshold)
         id: unit_diff_coverage
         if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
-          # Fetch the base branch for comparison
-          git fetch origin ${{ github.base_ref }} --depth=1
-          
-          echo "## Unit Test Diff Coverage" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          
-          # Run diff-cover with threshold check
           cd unit_coverage_data
-          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90 \
-            --markdown-report=../unit_diff_cov.md --html-report=../unit_diff_cov.html
-          DIFF_COVERAGE_STATUS=$?
           
-          # Append the diff-cover markdown output to our summary
-          cat ../unit_diff_cov.md >> ../combined-reports/coverage_summary.md
-          cp ../unit_diff_cov.html ../combined-reports/unit_diff_coverage.html
+          EXPORT PYTHONPATH="../marqo"
           
-          # Try to extract the diff coverage percentage
-          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../unit_diff_cov.md | head -1 | tr -d '%' || echo "unknown")
-          
-          # Report status based on exit code
-          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
-            if [ "$DIFF_COVERAGE" != "unknown" ]; then
-              echo "::error::Unit test diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
-            else
-              echo "::error::Unit test diff coverage check failed"
-            fi
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage
-          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
+          export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Running diff-cover against branch $BASE_BRANCH"
+          git fetch origin $BASE_BRANCH:$BASE_BRANCH
+          diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+            --compare-branch $BASE_BRANCH --fail-under=95
 
-      - name: Check integration test diff coverage (80% threshold)
+      - name: Check diff integ test coverage (80% threshold)
         id: integ_diff_coverage
         if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
-          # Fetch the base branch for comparison
-          git fetch origin ${{ github.base_ref }} --depth=1
-          
-          echo "## Integration Test Diff Coverage" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          
-          # Run diff-cover with threshold check
           cd integ_coverage_data
-          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=80 \
-            --markdown-report=../integ_diff_cov.md --html-report=../integ_diff_cov.html
-          DIFF_COVERAGE_STATUS=$?
           
-          # Append the diff-cover markdown output to our summary
-          cat ../integ_diff_cov.md >> ../combined-reports/coverage_summary.md
-          cp ../integ_diff_cov.html ../combined-reports/integ_diff_coverage.html
+          EXPORT PYTHONPATH="../marqo"
           
-          # Try to extract the diff coverage percentage
-          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../integ_diff_cov.md | head -1 | tr -d '%' || echo "unknown")
-          
-          # Report status based on exit code
-          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
-            if [ "$DIFF_COVERAGE" != "unknown" ]; then
-              echo "::error::Integration test diff coverage is below 80% threshold ($DIFF_COVERAGE%)"
-            else
-              echo "::error::Integration test diff coverage check failed"
-            fi
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage
-          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
+          export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Running diff-cover against branch $BASE_BRANCH"
+          git fetch origin $BASE_BRANCH:$BASE_BRANCH
+          diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+            --compare-branch $BASE_BRANCH --fail-under=80
 
-      - name: Check combined diff coverage (90% threshold)
-        id: diff_coverage
+      - name: Check diff combined test coverage (90% threshold)
+        id: integ_diff_coverage
         if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
-          # Fetch the base branch for comparison
-          git fetch origin ${{ github.base_ref }} --depth=1
-          
-          echo "## Combined Diff Coverage" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          echo "Comparing against base branch: ${{ github.base_ref }}" >> combined-reports/coverage_summary.md
-          echo "" >> combined-reports/coverage_summary.md
-          
-          # Run diff-cover with threshold check
           cd coverage_data
-          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90 \
-            --markdown-report=../diff_cov.md --html-report=../diff_cov.html
-          DIFF_COVERAGE_STATUS=$?
           
-          # Append the diff-cover markdown output to our summary
-          cat ../diff_cov.md >> ../combined-reports/coverage_summary.md
-          cp ../diff_cov.html ../combined-reports/diff_coverage.html
+          EXPORT PYTHONPATH="../marqo"
           
-          # Try to extract the diff coverage percentage
-          DIFF_COVERAGE=$(grep -o '[0-9]*\.[0-9]*%' ../diff_cov.md | head -1 | tr -d '%' || echo "unknown")
-          
-          # Report status based on exit code
-          if [ $DIFF_COVERAGE_STATUS -ne 0 ]; then
-            if [ "$DIFF_COVERAGE" != "unknown" ]; then
-              echo "::error::Combined diff coverage is below 90% threshold ($DIFF_COVERAGE%)"
-            else
-              echo "::error::Combined diff coverage check failed"
-            fi
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          # Capture the actual coverage percentage
-          echo "percentage=$DIFF_COVERAGE" >> $GITHUB_OUTPUT
-          
-          # Always exit with code 0 to allow continuation
-          exit 0
+          export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Running diff-cover against branch $BASE_BRANCH"
+          git fetch origin $BASE_BRANCH:$BASE_BRANCH
+          diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+            --compare-branch $BASE_BRANCH --fail-under=90
 
       - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
           name: combined-test-coverage
           path: |
-            combined-reports/
             coverage_data/coverage.xml
             coverage_data/htmlcov/
-            diff_cov.html
+#            diff_cov.html
             
-      - name: Coverage Report Summary
-        if: always() && github.event_name == 'pull_request'
-        run: |
-          if [ -f "combined-reports/coverage_summary.md" ]; then
-            cat combined-reports/coverage_summary.md >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No coverage summary available" >> $GITHUB_STEP_SUMMARY
-          fi
+#      - name: Coverage Report Summary
+#        if: always() && github.event_name == 'pull_request'
+#        run: |
+#          if [ -f "combined-reports/coverage_summary.md" ]; then
+#            cat combined-reports/coverage_summary.md >> $GITHUB_STEP_SUMMARY
+#          else
+#            echo "No coverage summary available" >> $GITHUB_STEP_SUMMARY
+#          fi
           
       - name: Fail if coverage thresholds not met
         if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.diff_coverage.outputs.status == 'failure' || steps.unit_coverage.outputs.status == 'failure' || steps.integ_coverage.outputs.status == 'failure' || steps.unit_diff_coverage.outputs.status == 'failure' || steps.integ_diff_coverage.outputs.status == 'failure')
