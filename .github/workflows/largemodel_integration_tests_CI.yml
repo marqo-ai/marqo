@@ -169,6 +169,8 @@ jobs:
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report-*
 
       - name: Move Coverage Files
         run: mv marqo-largemodel-tests-report-*/.* marqo/

@@ -222,9 +222,18 @@ jobs:
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
-
+        with:
+          name: marqo-integ-tests-report-*
+          
       - name: Move Coverage Files
         run: mv marqo-integ-tests-report-*/.* marqo/
+
+      - name: List working directories
+        run: |
+          echo "Content of current working directory:"
+          ls -la
+          echo "Content of marqo/ directory:"
+          ls -la marqo/
 
       - name: DEBUG coverages
         run: |
