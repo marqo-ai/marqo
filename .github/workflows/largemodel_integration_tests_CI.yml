@@ -146,7 +146,6 @@ jobs:
           COVERAGE_FILE=.coverage.${{ matrix.part }} pytest \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report term:skip-covered \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integ_tests/test_documentation* --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
 
       - name: Upload Test Result
@@ -169,18 +168,9 @@ jobs:
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
-        with:
-          name: marqo-largemodel-tests-report-*
 
       - name: Move Coverage Files
         run: mv marqo-largemodel-tests-report-*/.* marqo/
-
-      - name: List working directories
-        run: |
-          echo "Content of current working directory:"
-          ls -la
-          echo "Content of marqo/ directory:"
-          ls -la marqo/
 
       - name: DEBUG coverages
         run: |
