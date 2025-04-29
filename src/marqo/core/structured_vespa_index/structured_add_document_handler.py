@@ -27,6 +27,13 @@ MODALITY_FIELD_TYPE_MAP = {
     Modality.AUDIO: FieldType.AudioPointer,
 }
 
+FIELD_TYPE_MODALITY_MAP = {
+    FieldType.Text: Modality.TEXT,
+    FieldType.ImagePointer: Modality.IMAGE,
+    FieldType.VideoPointer: Modality.VIDEO,
+    FieldType.AudioPointer: Modality.AUDIO
+}
+
 
 class StructuredAddDocumentsHandler(AddDocumentsHandler):
     def __init__(self, marqo_index: StructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient,
@@ -74,20 +81,22 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         marqo_doc[field_name] = content
 
     def _infer_modality(self, tensor_field: TensorField) -> Modality:
+        """
+        Infer modality based on tensor field type specified in the definition of structured index. Please note we
+        do not infer the modality from the content of the field here, any modality mismatch is detected later when
+        we download and preprocess the media content.
+        """
         if tensor_field.field_type == FieldType.Text:
             return Modality.TEXT
-
-        url = tensor_field.field_content
-        try:
-            modality = infer_modality(url, self.add_docs_params.media_download_headers)
-        except MediaDownloadError as err:
-            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
-
-        if MODALITY_FIELD_TYPE_MAP[modality] != tensor_field.field_type:
-            raise AddDocumentsError(f"Error processing {tensor_field.field_name}, detected as {modality.value}, "
-                                    f"but expected field type is {tensor_field.field_type}")
-
-        return modality
+        elif tensor_field.field_type == FieldType.ImagePointer:
+            return Modality.IMAGE
+        elif tensor_field.field_type == FieldType.VideoPointer:
+            return Modality.VIDEO
+        elif tensor_field.field_type == FieldType.AudioPointer:
+            return Modality.AUDIO
+        else:
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}, tensor field type "
+                                    f"{tensor_field.field_type} is not supported")
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:

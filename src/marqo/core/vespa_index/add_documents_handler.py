@@ -166,7 +166,8 @@ class AddDocumentsHandler(ABC):
                 self._populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
-            self._vectorise_tensor_fields()
+            with RequestMetricsStore.for_request().time("add_documents.inference.all"):
+                self._vectorise_tensor_fields()
 
         with RequestMetricsStore.for_request().time("add_documents.vespa.to_vespa_docs"):
             vespa_docs = self._convert_to_vespa_docs()
@@ -285,7 +286,8 @@ class AddDocumentsHandler(ABC):
         3. The result will be then populated to the tensor field. Individual errors happened during preprocessing
             and vectorisation will also be returned and collected by the `add_docs_response_collector`
         """
-        modalities = self._infer_modalities()
+        with RequestMetricsStore.for_request().time("add_documents.inference.infer_modality"):
+            modalities = self._infer_modalities()
 
         for modality in modalities:
             self._vectorise_fields(modality, for_top_level_field=True)
@@ -340,7 +342,9 @@ class AddDocumentsHandler(ABC):
 
         # This method could raise InferenceError, we'll allow it propagate to the API layer and convert to proper
         # error response to return to users
-        inference_result = self.inference.vectorise(request)
+        with RequestMetricsStore.for_request().time(f"add_documents.inference.{modality}."
+                                                    f"is_subfield_{not for_top_level_field}.size_{len(tensor_fields)}"):
+            inference_result = self.inference.vectorise(request)
 
         if len(tensor_fields) != len(inference_result.result):
             raise InternalError(f'Inference result contains chunks and embeddings for {len(inference_result.result)} '
