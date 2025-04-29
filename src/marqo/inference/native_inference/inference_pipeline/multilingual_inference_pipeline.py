@@ -1,5 +1,5 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
-    download_and_preprocess_image
+    download_and_preprocess_media
 from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
@@ -47,13 +47,11 @@ class MultilingualCLIPModelInferencePipeline(AbstractInferencePipeline):
                 self.inference_request.preprocessing_config
             )
         elif self.inference_request.modality == Modality.IMAGE:
-            results = download_and_preprocess_image(
-                self.inference_request.contents,
-                self.model.get_preprocessor(),
-                self.inference_request.preprocessing_config,
-                self.inference_request.return_individual_error
-            )
+            results = download_and_preprocess_media(self.inference_request.contents, self.model.get_preprocessor(),
+                                                    self.inference_request.preprocessing_config,
+                                                    self.inference_request.return_individual_error)
         else:
+            # TODO - Raise an unsupported modality error
             raise ValueError(f"Unsupported modality: {modality}")
         return results
 
