@@ -443,35 +443,35 @@ class SearchTest(unittest.TestCase):
             It checks that the search function handles this case correctly and does not include the field in the response.
         """
         self.set_index_to_return(self.unstructured_index)
-        type(self.unstructured_index).tensor_subfield_map = PropertyMock(return_value={})
-        self.vespa_client_mock.query.return_value = QueryResult(
-            root=Root(
-                id='toplevel',
-                relevance=1.0,
-                source=None,
-                label=None,
-                value=None,
-                children=[
-                    Child(
-                        id='index:content_default/0/c4ca42388b50b740bb16762b',
-                        relevance=0.28768207245178085,
-                        source='content_default',
-                        label=None,
-                        fields={'marqo__field_types': {'available_sizes': 'string_array', 'popularity': 'float', 'title': 'tensor'}, 'marqo__float_fields': {'popularity': 0.010630001972235736}, 'marqo__int_fields': [{'key': 'age'}], 'marqo__id': '1', 'matchfeatures': {'global_add_modifier': 0.0, 'global_mult_modifier': 1.0}, 'sddocname': 'marqo__my_01index', 'title': 'Red dress'},
-                        value=None,
-                        coverage=None,
-                        errors=None,
-                        children=None
-                    )
-                ],
-                coverage=Coverage(coverage=100, degraded=None, documents=1, full=True, nodes=1, results=1, resultsFull=1),
-                fields=RootFields(totalCount=1),
-                errors=None
-            ), timing=None, trace=None)
+        with patch.object(type(self.unstructured_index), 'tensor_subfield_map', new_callable=PropertyMock, return_value={}):
+            self.vespa_client_mock.query.return_value = QueryResult(
+                root=Root(
+                    id='toplevel',
+                    relevance=1.0,
+                    source=None,
+                    label=None,
+                    value=None,
+                    children=[
+                        Child(
+                            id='index:content_default/0/c4ca42388b50b740bb16762b',
+                            relevance=0.28768207245178085,
+                            source='content_default',
+                            label=None,
+                            fields={'marqo__field_types': {'available_sizes': 'string_array', 'popularity': 'float', 'title': 'tensor'}, 'marqo__float_fields': {'popularity': 0.010630001972235736}, 'marqo__int_fields': [{'key': 'age'}], 'marqo__id': '1', 'matchfeatures': {'global_add_modifier': 0.0, 'global_mult_modifier': 1.0}, 'sddocname': 'marqo__my_01index', 'title': 'Red dress'},
+                            value=None,
+                            coverage=None,
+                            errors=None,
+                            children=None
+                        )
+                    ],
+                    coverage=Coverage(coverage=100, degraded=None, documents=1, full=True, nodes=1, results=1, resultsFull=1),
+                    fields=RootFields(totalCount=1),
+                    errors=None
+                ), timing=None, trace=None)
 
-        # Run search and validate age is not present in response
-        resp = tensor_search.search(self.config, "index_name", "query", search_method="lexical")
-        self.assertNotIn("age", resp['hits'][0])
+            # Run search and validate age is not present in response
+            resp = tensor_search.search(self.config, "index_name", "query", search_method="lexical")
+            self.assertNotIn("age", resp['hits'][0])
 
 if __name__ == '__main__':
     unittest.main()
