@@ -93,6 +93,20 @@ jobs:
           
           pytest tests/
 
+      - name: Capture Marqo Container Logs and Display
+        if: always()
+        run: |
+          docker logs $(docker ps -aqf "ancestor=${MARQO_IMAGE_NAME}") > marqo_container_logs.txt || true
+          echo "====== Marqo Container Logs ======"
+          cat marqo_container_logs.txt
+
+      - name: Upload Marqo Logs as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-container-logs
+          path: marqo_container_logs.txt
+
   Stop-Runner:
     needs:
       - Start-Runner # required to get output from the start-runner job
