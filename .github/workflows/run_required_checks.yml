@@ -273,3 +273,20 @@ jobs:
             echo "❌ Diff coverage: ${{ steps.diff_coverage.outputs.percentage }}% (required: 90%)"
           fi
           exit 1
+
+  # GitHub status will rely on the result of this step to determine if the PR is ready for merge
+  Report-required-test-status:
+    needs: [ Determine-changes, Run-integration-tests ]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Set integration test status
+        run: |
+          if [[ "${{ needs.Determine-changes.outputs.non_documentation_changes_found }}" == "false" ]]; then
+            echo "Integration tests skipped due to markdown-only changes."
+          elif [[ "${{ needs.Run-integration-tests.result }}" == "success" ]]; then
+            echo "Integration tests completed successfully."
+          else
+            echo "Integration tests failed or did not run."
+            exit 1
+          fi
