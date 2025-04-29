@@ -5,7 +5,7 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.18.0')
+@pytest.mark.marqo_version('2.18.1')
 class TestFacets(BaseCompatibilityTestCase):
     image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
     tensor_fields = ["title", "description"]
