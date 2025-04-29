@@ -1502,3 +1502,47 @@ class TestSearchSemiStructured(MarqoTestCase):
         # Assert that no characters fail
         self.assertEqual(failed_characters, [],
                          f"Expected no characters to fail, but got: {failed_characters}")
+
+    def test_search_incomplete_response_processed_correctly(self):
+        """ This test validates that incomplete response for float/int fields is processed correctly.
+            This is an edge case that happens during race condition when adding and updating document at the same time.
+        """
+        real_query = self.config.vespa_client.query
+
+        docs = [{
+            "_id": f"doc_{i}",
+            "text_field_1": f"sample text {i}",
+            "int_field_1": i,
+            "int_field_2": i + 1,
+            "float_field_1": float(i),
+            "float_field_2": float(i + 1),
+        } for i in range(10)]
+
+        self.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name, docs=docs, tensor_fields=["text_field_1"]
+            )
+        )
+        with mock.patch.object(self.config.vespa_client, "query") as mock_query:
+        # mock the VespaClient.query method to return real response and modify the response
+            def wrapper(*args, **kwargs):
+                # Call the real method
+                response = real_query(*args, **kwargs)
+                # Modify the response — e.g., remove a field
+                response.hits[0].fields['marqo__int_fields'] = [
+                    {"key": "int_field_1"},
+                    {"key": "int_field_2", "value": 1},
+                ]
+                response.hits[0].fields['marqo__float_fields'] = [
+                    {"key": "float_field_1", "value": 1.0},
+                    {"key": "float_field_2"}
+                ]
+                return response
+
+            mock_query.side_effect = wrapper
+            result = tensor_search.search(config=self.config, text="sample text", index_name=self.default_text_index.name, search_method=SearchMethod.LEXICAL)
+            self.assertNotIn("int_field_1", result["hits"][0])
+            self.assertIn("int_field_2", result["hits"][0])
+
+            self.assertIn("float_field_1", result["hits"][0])
+            self.assertNotIn("float_field_2", result["hits"][0])
