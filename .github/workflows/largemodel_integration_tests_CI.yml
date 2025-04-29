@@ -157,7 +157,7 @@ jobs:
           include-hidden-files: true
 
   Merge-Coverage:
-    name: Merge Large Model Coverage And Generate Reports
+    name: Merge Coverage And Generate Reports
     needs:
       - Test-Marqo
     runs-on: ubuntu-latest
@@ -167,50 +167,37 @@ jobs:
         with:
           path: marqo
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
       - name: Download all coverage files
         uses: actions/download-artifact@v4
-        with:
-          pattern: marqo-largemodel-tests-report-*
-          path: coverage-parts
 
       - name: Move Coverage Files
-        run: |
-          echo "Current working directory: $(pwd)"
-          echo "Initial directory structure:"
-          find . -type d -maxdepth 3 | sort
-          
-          mkdir -p marqo-coverage
-          # Check if directory exists first
-          if [ -d "coverage-parts" ]; then
-            echo "Directory structure of coverage-parts:"
-            find coverage-parts -type f | sort
-            find coverage-parts -name ".coverage.*" -type f -exec mv {} marqo-coverage/ \;
-          else
-            echo "No coverage-parts directory found. Checking artifact structure."
-            find . -name ".coverage.*" -type f | sort
-            find . -name ".coverage.*" -type f -exec mv {} marqo-coverage/ \;
-          fi
-          echo "Contents of marqo-coverage directory:"
-          ls -la marqo-coverage/
+        run: mv marqo-largemodel-tests-report-*/.* marqo/
 
-      - name: Install coverage
-        run: pip install coverage
+      - name: List working directories
+        run: |
+          echo "Content of current working directory:"
+          ls -la
+          echo "Content of marqo/ directory:"
+          ls -la marqo/
+
+      - name: DEBUG coverages
+        run: |
+          cd marqo
+          export PYTHONPATH="./src:."
+          pip install coverage
+          coverage debug data
 
       - name: Merge Coverage Results
         run: |
-          cd marqo-coverage
-          export PYTHONPATH="../marqo/src:."
+          cd marqo
+          export PYTHONPATH="./src:."
+          pip install coverage
           coverage combine
-          
+
       - name: Generate Coverage Reports
         run: |
-          cd marqo-coverage
-          export PYTHONPATH="../marqo/src:."
+          cd marqo
+          export PYTHONPATH="./src:."
           coverage report -i
           coverage xml -i -o coverage.xml
           coverage html -i --directory=htmlcov
@@ -220,9 +207,9 @@ jobs:
         with:
           name: marqo-largemodel-tests-report
           path: |
-            marqo-coverage/htmlcov/
-            marqo-coverage/coverage.xml
-            marqo-coverage/.coverage
+            marqo/htmlcov/
+            marqo/coverage.xml
+            marqo/.coverage
           include-hidden-files: true
 
   Stop-Runner:
