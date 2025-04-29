@@ -6,7 +6,7 @@ import transformers
 from PIL.Image import Image
 from multilingual_clip import pt_multilingual_clip
 from numpy import ndarray
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from marqo.exceptions import InternalError
 from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPModel

@@ -146,8 +146,12 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
 
         # Inference exceptions
+        # TODO - Inference Server currently only raises InferenceError in the remote model, so these two catches
+        # TODO - are not used in the remote mode. But they will be used in the combined mode.
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
         (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
+        # TODO - Distinguish recoverable vs unrecoverable errors for InferenceError
+        (inference_exceptions.InferenceError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
