@@ -22,6 +22,7 @@ from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.inference.native_inference.load_model import clear_loaded_models
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -961,7 +962,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
-        s2_inference.clear_loaded_models()
+        clear_loaded_models()
 
     def test_language_bind_model_can_add_all_media_modalities(self):
         """Test to ensure that the LanguageBind model can add all media types to the index"""
