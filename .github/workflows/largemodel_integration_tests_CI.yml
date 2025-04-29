@@ -103,27 +103,27 @@ jobs:
         run: |
           python -m nltk.downloader punkt_tab
 
-      - name: Build Vespa
-        run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
-          
-          echo "Updating package list"
-          apt-get update -y
-          
-          # Build Vespa components
-          echo "Installing jdk 17"
-          sudo apt-get install openjdk-17-jdk -y
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH=$JAVA_HOME/bin:$PATH
-          echo "Installing maven"
-          sudo apt-get install maven -y
-          echo "Building Vespa components"
-          cd marqo/vespa
-          mvn clean package
-
-      - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+#      - name: Build Vespa
+#        run: |
+#          systemctl stop unattended-upgrades
+#          apt-get remove -y unattended-upgrades
+#
+#          echo "Updating package list"
+#          apt-get update -y
+#
+#          # Build Vespa components
+#          echo "Installing jdk 17"
+#          sudo apt-get install openjdk-17-jdk -y
+#          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+#          export PATH=$JAVA_HOME/bin:$PATH
+#          echo "Installing maven"
+#          sudo apt-get install maven -y
+#          echo "Building Vespa components"
+#          cd marqo/vespa
+#          mvn clean package
+#
+#      - name: Start Vespa
+#        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
         id: run_tests
