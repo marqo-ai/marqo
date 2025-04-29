@@ -81,6 +81,7 @@ class AudioPreprocessingConfig(PreprocessingConfig):
     download_thread_count: Optional[int] = Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = Field(default=None, alias='downloadHeader')
     chunk_config: Optional[ChunkConfig] = Field(default=None, alias='chunkConfig')
+    max_media_size_bytes: int = Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @root_validator
     def validate_chunk_config(cls, values):
@@ -99,6 +100,7 @@ class VideoPreprocessingConfig(PreprocessingConfig):
     download_thread_count: Optional[int] = Field(default=None, alias='downloadThreadCount')
     download_header: Optional[Dict[str, str]] = Field(default=None, alias='downloadHeader')
     chunk_config: Optional[ChunkConfig] = Field(default=None, alias='chunkConfig')
+    max_media_size_bytes: int = Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @root_validator
     def validate_chunk_config(cls, values):

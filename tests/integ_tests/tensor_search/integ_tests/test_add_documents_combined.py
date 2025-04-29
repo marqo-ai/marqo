@@ -1,5 +1,4 @@
 import os
-import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -11,14 +10,17 @@ import requests
 import torch
 from torch import Tensor
 
+import marqo.api.exceptions as api_exceptions
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.core.inference.api import InferenceError
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.inference.media_download_and_preprocess import streaming_media_processor
+from marqo.inference.native_inference.load_model import clear_loaded_models
 from marqo.s2_inference import types
-from marqo.core.inference.modality_utils import infer_modality
 from marqo.tensor_search import add_docs
-from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
@@ -227,7 +229,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 self.assertEqual(400, r["items"][1]["status"])
                 self.assertIn("Image file is truncated", r["items"][1]["error"])
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_single_documents(self):
@@ -291,7 +292,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_field_document(self):
@@ -863,7 +863,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
-@unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
 @pytest.mark.largemodel
 class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
     """A class to test the add_documents with the LanguageBind model."""
@@ -934,19 +933,36 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             treat_urls_and_pointers_as_media = True
         )
 
-        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index,
-                                          unstructured_custom_language_bind_index])
+        unstructured_languagebind_index_with_limited_supported_modalities = cls.unstructured_marqo_index_request(
+            name="unstructured_languagebind_index_with_limited_supported_modalities"
+                 + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='LanguageBind/Audio_FT'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
+        )
+
+        cls.indexes = cls.create_indexes(
+            [
+                structured_language_bind_index,
+                unstructured_language_bind_index,
+                unstructured_custom_language_bind_index,
+                unstructured_languagebind_index_with_limited_supported_modalities
+            ]
+        )
 
         cls.structured_language_bind_index_name = structured_language_bind_index.name
         cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
         cls.unstructured_custom_language_bind_index_name= unstructured_custom_language_bind_index.name
+        cls.unstructured_languagebind_index_with_limited_supported_modalities_name = \
+            unstructured_languagebind_index_with_limited_supported_modalities.name
 
-        s2_inference.clear_loaded_models()
+
+        clear_loaded_models()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
-        s2_inference.clear_loaded_models()
+        clear_loaded_models()
 
     def test_language_bind_model_can_add_all_media_modalities(self):
         """Test to ensure that the LanguageBind model can add all media types to the index"""
@@ -1006,60 +1022,58 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
+    @patch.dict("os.environ", {"MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE": "2097152", })
     def test_video_size_limit_in_batch(self):
         """Tests that adding documents with videos respects the file size limit per document"""
-        with mock.patch.dict('os.environ', {'MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE': '2097152',
-                                            'MARQO_MAX_CPU_MODEL_MEMORY': '15',
-                                            'MARQO_MAX_CUDA_MODEL_MEMORY': '15'}):  # 2MB limit
-            # Test documents - one under limit (2.5MB), one over limit
-            test_docs = [
-                {
-                    "_id": "1",
-                    "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
-                    "text_field_1": "This video should work"
-                },
-                {
-                    "_id": "2", 
-                    "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
-                    "text_field_1": "This video should fail"
-                }
-            ]
+        # Test documents - one under limit (2.5MB), one over limit
+        test_docs = [
+            {
+                "_id": "1",
+                "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
+                "text_field_1": "This video should work"
+            },
+            {
+                "_id": "2",
+                "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
+                "text_field_1": "This video should fail"
+            }
+        ]
 
-            for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
-                with self.subTest(f"Testing video size limit for index {index}"):
-                    tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
-                    
-                    # Add documents
-                    result = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index,
-                            docs=test_docs,
-                            tensor_fields=tensor_fields
-                        )
-                    ).dict(exclude_none=True, by_alias=True)
+        for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            with self.subTest(f"Testing video size limit for index {index}"):
+                tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
 
-                    # Verify results
-                    self.assertTrue(result["errors"])  # Should have errors due to second document
-                    self.assertEqual(2, len(result["items"]))
-                    
-                    # First document should succeed
-                    self.assertEqual(200, result["items"][0]["status"])
-                    self.assertNotIn("error", result["items"][0])
-                    
-                    # Second document should fail with size limit error
-                    self.assertEqual(400, result["items"][1]["status"])
-                    self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
-
-                    # Verify the first document was actually added
-                    get_result = tensor_search.get_documents_by_ids(
-                        config=self.config,
+                # Add documents
+                result = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
                         index_name=index,
-                        document_ids=["1"]
-                    ).dict(exclude_none=True, by_alias=True)
-                    
-                    self.assertEqual(1, len(get_result["results"]))
-                    self.assertEqual("1", get_result["results"][0]["_id"])
+                        docs=test_docs,
+                        tensor_fields=tensor_fields
+                    )
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Verify results
+                self.assertTrue(result["errors"])  # Should have errors due to second document
+                self.assertEqual(2, len(result["items"]))
+
+                # First document should succeed
+                self.assertEqual(200, result["items"][0]["status"])
+                self.assertNotIn("error", result["items"][0])
+
+                # Second document should fail with size limit error
+                self.assertEqual(400, result["items"][1]["status"])
+                self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
+
+                # Verify the first document was actually added
+                get_result = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index,
+                    document_ids=["1"]
+                ).dict(exclude_none=True, by_alias=True)
+
+                self.assertEqual(1, len(get_result["results"]))
+                self.assertEqual("1", get_result["results"][0]["_id"])
 
     def test_supported_audio_format(self):
         """Test the supported audio format for the LanguageBind model in add_documents and search."""
@@ -1192,3 +1206,36 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     text=query,
                     search_method = "TENSOR"
                 )
+
+    def test_proper_error_is_raised_when_adding_documents_with_unsupported(self):
+        """Test to ensure that the proper error is raised when adding documents with invalid media"""
+
+        test_docs = [
+            {
+                "_id": "1",
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "text_field_1": "This is a valid image",
+            },
+        ]
+
+        with self.assertRaises(InferenceError) as cm:
+            _ = self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                    docs=test_docs,
+                    tensor_fields=["image_field_1"]
+                )
+            )
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))
+
+
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            _ = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                text=TestVideoUrls.VIDEO1.value,
+                search_method = "TENSOR"
+            )
+
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))

@@ -265,7 +265,6 @@ class TestEmbed(MarqoTestCase):
                     self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
                                         msg=f"Mismatch at index {i} for {index.type}")
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_embed_languagebind(self):
