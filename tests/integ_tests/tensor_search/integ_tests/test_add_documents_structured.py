@@ -938,5 +938,4 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for item in r.items:
             self.assertEqual(400, item.status)
             # modality mismatch
-            self.assertIn("Error processing image_field, detected as language, "
-                          "but expected field type is image_pointer", item.message)
+            self.assertIn("is not a local file or a valid url", item.message)
