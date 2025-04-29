@@ -96,6 +96,7 @@ jobs:
       - name: Capture Marqo Container Logs and Display
         if: always()
         run: |
+          export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           docker logs $(docker ps -aqf "ancestor=${MARQO_IMAGE_NAME}") > marqo_container_logs.txt || true
           echo "====== Marqo Container Logs ======"
           cat marqo_container_logs.txt
