@@ -29,3 +29,8 @@ class UnsupportedModalityError(InferenceError):
 class MediaExceedsMaxSizeError(InferenceError):
     """Raised when the media exceeds the maximum size limit"""
     pass
+
+
+class MediaMisMatchError(InferenceError):
+    """Raised when the media does not match the expected type"""
+    pass
