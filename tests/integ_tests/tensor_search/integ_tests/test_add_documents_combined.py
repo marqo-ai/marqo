@@ -18,11 +18,11 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.inference.media_download_and_preprocess import streaming_media_processor
+from marqo.inference.native_inference.load_model import clear_loaded_models
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from marqo.inference.native_inference.load_model import clear_loaded_models
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -957,7 +957,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             unstructured_languagebind_index_with_limited_supported_modalities.name
 
 
-        s2_inference.clear_loaded_models()
+        clear_loaded_models()
 
     @classmethod
     def tearDownClass(cls) -> None:
