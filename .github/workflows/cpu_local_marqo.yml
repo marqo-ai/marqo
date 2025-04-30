@@ -90,13 +90,13 @@ jobs:
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
-          pytest tests/api_tests/test_health.py
+          pytest tests/
 
       - name: Capture Marqo Container Logs and Display
         if: always()
         run: |
           export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          docker logs $(docker ps -aqf "ancestor=${MARQO_IMAGE_NAME}") > marqo_container_logs.txt || true
+          docker logs marqo > marqo_container_logs.txt || true
           echo "====== Marqo Container Logs ======"
           cat marqo_container_logs.txt
 
@@ -105,7 +105,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marqo-container-logs
-          path: marqo_container_logs.txt
+          path: tests/api_tests/v1/marqo_container_logs.txt
 
   Stop-Runner:
     needs:
