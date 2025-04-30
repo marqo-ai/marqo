@@ -11,7 +11,7 @@ class TestFacets(BaseCompatibilityTestCase):
     tensor_fields = ["title", "description"]
 
     unstructured_index_metadata = {
-        "indexName": "test_search_api_unstructured_index",
+        "indexName": "test_search_facets_api_unstructured_index",
         "model": image_model,
         "treatUrlsAndPointersAsImages": True,
     }
