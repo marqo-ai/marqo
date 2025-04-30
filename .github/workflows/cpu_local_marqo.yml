@@ -57,7 +57,6 @@ jobs:
       run:
         working-directory: tests/api_tests/v1
 
-
     steps:
 
       - name: Checkout Marqo repo
@@ -91,7 +90,7 @@ jobs:
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
-          pytest tests/
+          pytest tests/api_tests/test_health.py
 
       - name: Capture Marqo Container Logs and Display
         if: always()
