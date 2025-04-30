@@ -49,7 +49,7 @@ class StreamingMediaProcessor:
         if self.modality != self.probed_modality:
             raise MediaMismatchError(
                 f"Error processing media file {self.url}. The provided modality {self.modality} does not match the "
-                f"detected modality {self.probed_modality}. Please check your media file and try again. If you are using"
+                f"detected modality {self.probed_modality}. Please check your media file and try again. If you are using "
                 f"a structured index, check if your media file matches the field type"
             )
 
@@ -93,7 +93,7 @@ class StreamingMediaProcessor:
         Infer the modality from the probed media file. This is used to determine whether the media is audio or video.
         """
         if Modality.VIDEO in modality_list:
-            if "image" in format_name:
+            if "image" in format_name or "png" in format_name:
                 return Modality.IMAGE
             else:
                 return Modality.VIDEO
