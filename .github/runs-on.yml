@@ -1,7 +1,5 @@
 images:
   marqo-cpu-image:
-    platform: "linux"
-    arch: "x64"
     ami: ami-0b4a181b6b24152d5
 
 runners:
