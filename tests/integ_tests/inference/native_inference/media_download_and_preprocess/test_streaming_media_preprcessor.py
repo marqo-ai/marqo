@@ -257,7 +257,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             TestImageUrls.COCO.value
         ]:
             with self.subTest(url=url):
-                with self.assertRaises(MediaMisMatchError) as e:
+                with self.assertRaises(MediaMismatchError) as e:
                     _ = StreamingMediaProcessor(
                         url=url, preprocessors=self.test_preprocessor,
                         preprocessing_config=self.test_video_preprocessing_config
@@ -274,7 +274,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         ]
         for url, processing_config, msg in test_cases:
             with self.subTest(msg):
-                with self.assertRaises(MediaMisMatchError) as e:
+                with self.assertRaises(MediaMismatchError) as e:
                     _ = StreamingMediaProcessor(
                         url=url, preprocessors=self.test_preprocessor,
                         preprocessing_config=processing_config

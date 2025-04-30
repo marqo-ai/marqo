@@ -47,7 +47,7 @@ class StreamingMediaProcessor:
         self.total_size, self.duration, self.probed_modality = self._fetch_file_metadata()
 
         if self.modality != self.probed_modality:
-            raise MediaMisMatchError(
+            raise MediaMismatchError(
                 f"Error processing media file {self.url}. The provided modality {self.modality} does not match the "
                 f"detected modality {self.probed_modality}. Please check your media file and try again. If you are using"
                 f"a structured index, check if your media file matches the field type"

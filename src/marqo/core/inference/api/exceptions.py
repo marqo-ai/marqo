@@ -31,6 +31,6 @@ class MediaExceedsMaxSizeError(InferenceError):
     pass
 
 
-class MediaMisMatchError(InferenceError):
+class MediaMismatchError(InferenceError):
     """Raised when the media does not match the expected type"""
     pass
