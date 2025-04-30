@@ -1,0 +1,10 @@
+images:
+  marqo-cpu-image:
+    platform: "linux"
+    arch: "x64"
+    ami: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+
+runners:
+  marqo-cpu-runner:
+    family: ["m6i.xlarge"]
+    image: marqo-cpu-image
