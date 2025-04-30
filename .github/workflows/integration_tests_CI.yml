@@ -141,14 +141,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
+          pip install httpx
+#          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # override base requirements with marqo requirements, if needed:
+#          pip install -r marqo/requirements.txt
 
-      - name: Download nltk data
-        run: |
-            python -m nltk.downloader punkt_tab
+#      - name: Download nltk data
+#        run: |
+#            python -m nltk.downloader punkt_tab
 
 #      - name: Build Vespa
 #        run: |
