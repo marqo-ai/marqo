@@ -6,7 +6,7 @@ from unittest.mock import patch
 import torch
 from pytest import mark
 
-from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls
+from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls, TestImageUrls
 from marqo.core.inference.api import *
 from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
@@ -163,7 +163,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             url=valid_url, preprocessors=self.test_preprocessor,
             preprocessing_config=self.test_video_preprocessing_config
         )
-        size, duration = streaming_media_processor_object._fetch_file_metadata()
+        size, duration, _ = streaming_media_processor_object._fetch_file_metadata()
 
         self.assertEqual(2971504, size) # Hardcoded value
         self.assertEqual(10.01, duration) # Hardcoded value
@@ -215,11 +215,72 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         with patch("marqo.inference.media_download_and_preprocess"
                    ".streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata") \
                 as mock_fetch_file_metadata:
-            mock_fetch_file_metadata.return_value = (2971504, 10.01)
+            mock_fetch_file_metadata.return_value = (2971504, 10.01, Modality.VIDEO)
             streaming_media_processor_object = StreamingMediaProcessor(
-                url=TestAudioUrls.AUDIO1.value, preprocessors=self.test_preprocessor,
+                url=TestVideoUrls.VIDEO1.value, preprocessors=self.test_preprocessor,
                 preprocessing_config=test_video_preprocessing_config
             )
 
         expected = "Authorization: Bearer token\r\nUser-Agent: Test"
         self.assertEqual(streaming_media_processor_object.media_download_header, expected)
+
+    def test_prob_modality_correct_video(self):
+        for url in [
+            TestVideoUrls.VIDEO1.value, TestVideoUrls.VIDEO2.value, TestVideoUrls.VIDEO3.value,
+            TestVideoUrls.MKV_VIDEO1.value, TestVideoUrls.WEBM_VIDEO1.value, TestVideoUrls.AVI_VIDEO1.value
+        ]:
+            with self.subTest(url=url):
+                streaming_media_processor_object = StreamingMediaProcessor(
+                    url=url, preprocessors=self.test_preprocessor,
+                    preprocessing_config=self.test_video_preprocessing_config
+                )
+                self.assertEqual(Modality.VIDEO, streaming_media_processor_object.probed_modality)
+
+    def test_prob_modality_correct_audio(self):
+        for url in [
+            TestAudioUrls.AUDIO1.value, TestAudioUrls.AUDIO2.value, TestAudioUrls.AUDIO3.value,
+            TestAudioUrls.MP3_AUDIO1.value, TestAudioUrls.MP3_AUDIO1.value, TestAudioUrls.ACC_AUDIO1.value,
+            TestAudioUrls.OGG_AUDIO1.value, TestAudioUrls.FLAC_AUDIO1.value
+        ]:
+            with self.subTest(url=url):
+                streaming_media_processor_object = StreamingMediaProcessor(
+                    url=url, preprocessors=self.test_preprocessor,
+                    preprocessing_config=self.test_audio_preprocessing_config
+                )
+                self.assertEqual(Modality.AUDIO, streaming_media_processor_object.probed_modality)
+
+    def test_prob_modality_correct_image(self):
+        """Ensure that the probed modality is correct for various image formats. Note that
+        an error is raised as StreamingMediaProcessor is not designed to handle images."""
+        for url in [
+            TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value, TestImageUrls.IMAGE3.value,
+            TestImageUrls.COCO.value
+        ]:
+            with self.subTest(url=url):
+                with self.assertRaises(MediaMismatchError) as e:
+                    _ = StreamingMediaProcessor(
+                        url=url, preprocessors=self.test_preprocessor,
+                        preprocessing_config=self.test_video_preprocessing_config
+                    )
+                self.assertIn('the detected modality image', str(e.exception))
+
+
+    def test_incorrect_modality_between_audio_and_video_will_raise_an_error(self):
+        test_cases = [
+            (TestVideoUrls.VIDEO1.value, self.test_audio_preprocessing_config,
+             "The url is video, but the preprocessing config is audio"),
+            (TestAudioUrls.AUDIO1.value, self.test_video_preprocessing_config,
+             "The url is audio, but the preprocessing config is video")
+        ]
+        for url, processing_config, msg in test_cases:
+            with self.subTest(msg):
+                with self.assertRaises(MediaMismatchError) as e:
+                    _ = StreamingMediaProcessor(
+                        url=url, preprocessors=self.test_preprocessor,
+                        preprocessing_config=processing_config
+                    )
+                self.assertIn("Please check your media file and try again", str(e.exception))
+
+
+
+

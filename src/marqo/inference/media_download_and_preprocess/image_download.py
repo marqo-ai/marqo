@@ -162,7 +162,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
         img = Image.open(image_path)
     elif validators.url(image_path):
         if metrics_obj is not None:
-            metrics_obj.start(f"image_download.{image_path}")
+            metrics_obj.start(f"media_download.image.{image_path}")
         try:
             img_io: BytesIO = download_image_from_url(image_path, media_download_headers, timeout_ms)
             img = Image.open(img_io)
@@ -178,7 +178,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
                 raise e
         finally:
             if metrics_obj is not None:
-                metrics_obj.stop(f"image_download.{image_path}")
+                metrics_obj.stop(f"media_download.image.{image_path}")
     else:
         raise UnidentifiedImageError(f"Input str of {image_path} is not a local file or a valid url. "
                                      f"If you are using Marqo Cloud, please note that images can only be downloaded "
