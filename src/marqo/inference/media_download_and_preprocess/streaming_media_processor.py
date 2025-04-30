@@ -93,7 +93,9 @@ class StreamingMediaProcessor:
         Infer the modality from the probed media file. This is used to determine whether the media is audio or video.
         """
         if Modality.VIDEO in modality_list:
-            if "image" in format_name or "png" in format_name:
+            # Images are also considered as video in ffmpeg, so we need to check the format name to
+            # differentiate between video and image
+            if "image" in format_name or "_pipe" in format_name:
                 return Modality.IMAGE
             else:
                 return Modality.VIDEO
