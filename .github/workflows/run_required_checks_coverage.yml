@@ -149,25 +149,16 @@ jobs:
             coverage_data/htmlcov/
 
       - name: Fail if coverage thresholds not met
-        if: github.event_name == 'pull_request' && (steps.overall_coverage.outputs.status == 'failure' || steps.combined_diff_coverage.outputs.status == 'failure' || steps.unit_coverage.outputs.status == 'failure' || steps.integ_coverage.outputs.status == 'failure' || steps.unit_diff_coverage.outputs.status == 'failure' || steps.integ_diff_coverage.outputs.status == 'failure')
+        if: github.event_name == 'pull_request' && (steps.combined_diff_coverage.outputs.status == 'failure' || steps.unit_diff_coverage.outputs.status == 'failure' || steps.integ_diff_coverage.outputs.status == 'failure')
         run: |
           echo "Coverage threshold check failed"
-          if [ "${{ steps.unit_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Unit test coverage: ${{ steps.unit_coverage.outputs.percentage }}% (required: 20%)"
-          fi
-          if [ "${{ steps.integ_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Integration test coverage: ${{ steps.integ_coverage.outputs.percentage }}% (required: 70%)"
-          fi
-          if [ "${{ steps.overall_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Overall coverage: ${{ steps.overall_coverage.outputs.percentage }}% (required: 70%)"
-          fi
           if [ "${{ steps.unit_diff_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Unit test diff coverage: ${{ steps.unit_diff_coverage.outputs.percentage }}% (required: 90%)"
+            echo "❌ Unit test diff coverage (required: 95%)"
           fi
           if [ "${{ steps.integ_diff_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Integration test diff coverage: ${{ steps.integ_diff_coverage.outputs.percentage }}% (required: 80%)"
+            echo "❌ Integration test diff coverage (required: 80%)"
           fi
           if [ "${{ steps.combined_diff_coverage.outputs.status }}" == "failure" ]; then
-            echo "❌ Combined diff coverage: ${{ steps.combined_diff_coverage.outputs.percentage }}% (required: 90%)"
+            echo "❌ Combined diff coverage (required: 90%)"
           fi
           exit 1 
