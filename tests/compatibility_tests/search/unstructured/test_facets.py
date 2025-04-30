@@ -181,8 +181,8 @@ class TestFacets(BaseCompatibilityTestCase):
         for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
             try:
                 result = self.client.index(index_name).search(q=query, search_method="HYBRID", hybrid_parameters={
-                    "searchMethod": search_method[0],
-                    "retrievalMethod": search_method[1],
+                    "retrievalMethod": search_method[0],
+                    "rankingMethod": search_method[1],
                 },
                 facets={
                     "fields": {
