@@ -52,7 +52,7 @@ jobs:
   Test-Marqo:
     name: Run CPU Local Marqo API Tests
 #    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: [runs-on,runner=marqo-cpu-runner]
+    runs-on: "runs-on=${{ github.run_id }}/runner=marqo-cpu-runner"
     defaults:
       run:
         working-directory: tests/api_tests/v1
