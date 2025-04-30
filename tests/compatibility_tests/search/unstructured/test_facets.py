@@ -127,7 +127,7 @@ class TestFacets(BaseCompatibilityTestCase):
         ]
     queries = ["travel", "horse light", "travel with plane"]
     search_methods = [("tensor", "tensor"), ("lexical", "lexical"), ("disjunction", "rrf"), ("tensor", "lexical"), ("lexical", "tensor")]
-    result_keys = search_methods # Set the result keys to be the same as search methods for easy comparison
+    result_keys = [f"{search_method[0]}-{search_method[1]}" for search_method in search_methods]
 
     # We need to set indexes_to_delete variable in an overriden tearDownClass() method
     # So that when the test method has finished running, pytest is able to delete the indexes added in
