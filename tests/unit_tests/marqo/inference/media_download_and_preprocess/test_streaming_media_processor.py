@@ -69,7 +69,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_process_audio_media_chunks(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 30.0)  # size, duration
+        mock_fetch_file_metadata.return_value = (1000000, 30.0, Modality.AUDIO)  # size, duration
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         processor = StreamingMediaProcessor(
@@ -97,7 +97,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_last_chunk_alignment(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 23.5)  # Non-divisible duration
+        mock_fetch_file_metadata.return_value = (1000000, 23.5, Modality.AUDIO)  # Non-divisible duration
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         processor = StreamingMediaProcessor(
@@ -122,7 +122,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_explicit_audio_chunk_times(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
         # Set up media duration exactly 30s
-        mock_fetch_file_metadata.return_value = (1000000, 30.0)
+        mock_fetch_file_metadata.return_value = (1000000, 30.0, Modality.AUDIO)
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         overlap_config = AudioPreprocessingConfig(
@@ -171,7 +171,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_short_media_duration(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 5.0)  # Shorter than split_length
+        mock_fetch_file_metadata.return_value = (1000000, 5.0, Modality.AUDIO)  # Shorter than split_length
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         processor = StreamingMediaProcessor(
@@ -193,7 +193,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_media_download_error_is_raised(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
 
-        mock_fetch_file_metadata.return_value = (1000000, 10.0)
+        mock_fetch_file_metadata.return_value = (1000000, 10.0, Modality.AUDIO)
         mock_fetch_audio_chunk.side_effect = MediaDownloadError("Failed downloading audio")
 
         processor = StreamingMediaProcessor(
@@ -209,7 +209,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_audio_chunk")
     def test_media_exceeds_max_size_error_is_raised(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
 
-        mock_fetch_file_metadata.return_value = (1e10, 10.0)
+        mock_fetch_file_metadata.return_value = (1e10, 10.0, Modality.AUDIO)
         mock_fetch_audio_chunk.side_effect = MediaDownloadError("Failed downloading audio")
 
         with self.assertRaises(MediaExceedsMaxSizeError) as context:
@@ -224,7 +224,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_video_chunk")
     def test_explicit_video_chunk_times_with_overlaps(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 41.0)
+        mock_fetch_file_metadata.return_value = (1000000, 41.0, Modality.VIDEO)
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         overlap_config = VideoPreprocessingConfig(
@@ -272,7 +272,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
     @patch(
         "marqo.inference.media_download_and_preprocess.streaming_media_processor.StreamingMediaProcessor.fetch_video_chunk")
     def test_explicit_video_chunk_times_without_chunk(self, mock_fetch_audio_chunk, mock_fetch_file_metadata):
-        mock_fetch_file_metadata.return_value = (1000000, 41.0)
+        mock_fetch_file_metadata.return_value = (1000000, 41.0, Modality.VIDEO)
         mock_fetch_audio_chunk.side_effect = lambda start_time, duration, output_file: output_file
 
         overlap_config = VideoPreprocessingConfig(

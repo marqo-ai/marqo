@@ -44,7 +44,14 @@ class StreamingMediaProcessor:
         self.modality = preprocessing_config.modality
         
         self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
-        self.total_size, self.duration = self._fetch_file_metadata()
+        self.total_size, self.duration, self.probed_modality = self._fetch_file_metadata()
+
+        if self.modality != self.probed_modality:
+            raise MediaMismatchError(
+                f"Error processing media file {self.url}. The provided modality {self.modality} does not match the "
+                f"detected modality {self.probed_modality}. Please check your media file and try again. If you are using "
+                f"a structured index, check if your media file matches the field type"
+            )
 
         if self.total_size > preprocessing_config.max_media_size_bytes:
             raise MediaExceedsMaxSizeError(
@@ -81,11 +88,34 @@ class StreamingMediaProcessor:
             raise InternalError("media_download_headers should be a dictionary")
         return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
 
-    def _fetch_file_metadata(self) -> Tuple[float, float]:
+    def _infer_modality_from_probe(self, modality_list: list[str], format_name: Optional[str]) -> Optional[Modality]:
+        """
+        Infer the modality from the probed media file. This is used to determine whether the media is audio or video.
+        """
+        if Modality.VIDEO in modality_list:
+            if "image" in format_name or "png" in format_name:
+                return Modality.IMAGE
+            else:
+                return Modality.VIDEO
+        elif Modality.AUDIO in modality_list:
+            return Modality.AUDIO
+        else:
+            return None
+
+    def _fetch_file_metadata(self) -> Tuple[float, float, Optional[Modality]]:
+        """
+        Fetch the metadata of the media file using ffmpeg. This includes the size, duration, and modality of the
+        media file.
+
+        Returns:
+            Tuple[float, float, str]: A tuple containing the size (in bytes), duration (in seconds), and modality of the
+            media file.
+
+        """
         try:
             probe_options = {
                 'v': 'error',
-                'show_entries': 'format=size,duration',
+                'show_entries': 'stream=codec_type,format=size,duration,format_name',
                 'of': 'json',
                 'probesize': '256K',  # Probe only the first 256KB
             }
@@ -97,8 +127,11 @@ class StreamingMediaProcessor:
 
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
+            format_name = probe['format'].get('format_name', "")
+            modality_list = [codec_type.get('codec_type', "") for codec_type in probe['streams']]
+            modality = self._infer_modality_from_probe(modality_list, format_name)
 
-            return size, duration
+            return size, duration, modality
 
         except ffmpeg.Error as e:
             raise MediaDownloadError(f"Error fetching metadata: {e.stderr.decode()}") from e
