@@ -3,29 +3,18 @@ from typing import Dict, Any, List
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.inference.api import Modality, MediaDownloadError, Inference
-from marqo.core.inference.modality_utils import infer_modality
-from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
-from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.inference.api import Modality, Inference
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.exceptions import InvalidArgumentError
-
-from marqo.vespa.models import VespaDocument
-from marqo.vespa.models.get_document_response import Document
-
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search import validation
+from marqo.vespa.models import VespaDocument
+from marqo.vespa.models.get_document_response import Document
 from marqo.vespa.vespa_client import VespaClient
-
-
-MODALITY_FIELD_TYPE_MAP = {
-    Modality.TEXT: FieldType.Text,
-    Modality.IMAGE: FieldType.ImagePointer,
-    Modality.VIDEO: FieldType.VideoPointer,
-    Modality.AUDIO: FieldType.AudioPointer,
-}
 
 
 class StructuredAddDocumentsHandler(AddDocumentsHandler):
@@ -74,20 +63,22 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         marqo_doc[field_name] = content
 
     def _infer_modality(self, tensor_field: TensorField) -> Modality:
+        """
+        Infer modality based on tensor field type specified in the definition of structured index. Please note we
+        do not infer the modality from the content of the field here, any modality mismatch is detected later when
+        we download and preprocess the media content.
+        """
         if tensor_field.field_type == FieldType.Text:
             return Modality.TEXT
-
-        url = tensor_field.field_content
-        try:
-            modality = infer_modality(url, self.add_docs_params.media_download_headers)
-        except MediaDownloadError as err:
-            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
-
-        if MODALITY_FIELD_TYPE_MAP[modality] != tensor_field.field_type:
-            raise AddDocumentsError(f"Error processing {tensor_field.field_name}, detected as {modality.value}, "
-                                    f"but expected field type is {tensor_field.field_type}")
-
-        return modality
+        elif tensor_field.field_type == FieldType.ImagePointer:
+            return Modality.IMAGE
+        elif tensor_field.field_type == FieldType.VideoPointer:
+            return Modality.VIDEO
+        elif tensor_field.field_type == FieldType.AudioPointer:
+            return Modality.AUDIO
+        else:
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}, tensor field type "
+                                    f"{tensor_field.field_type} is not supported")
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
