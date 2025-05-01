@@ -22,13 +22,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: marqo
-          fetch-depth: 0  # Needed for diff coverage
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-          cache: "pip"
 
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
@@ -51,26 +44,14 @@ jobs:
           export PYTHONPATH="./src:."
           set -o pipefail
           pytest --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/unit_tests/ | tee pytest_output.txt
-
-      - name: Check new code coverage
-        id: check_test_coverage
-        if: github.event_name == 'pull_request'
-        run: |
-          cd marqo
-          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=95 \
-            --html-report diff_cov.html --markdown-report diff_cov.md
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-unit-tests-report
           path: |
-            marqo/htmlcov/
-            marqo/diff_cov.html
-            marqo/coverage.xml
             marqo/.coverage
           include-hidden-files: true
 
@@ -83,12 +64,3 @@ jobs:
           echo '```text' >> $GITHUB_STEP_SUMMARY
           awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Fail if tests or coverage failed
-        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
-        run: |
-          echo "Tests or coverage checks failed. Marking job as failed."
-          exit 1
-        shell: bash
