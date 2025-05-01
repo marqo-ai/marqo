@@ -26,63 +26,13 @@ permissions:
   id-token: write
 
 jobs:
-  Start-Runner1:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: g4dn.2xlarge
-    secrets: inherit
-
-  Start-Runner2:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: g4dn.2xlarge
-    secrets: inherit
-
-  Start-Runner3:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: g4dn.2xlarge
-    secrets: inherit
-
-  Start-Runner4:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: g4dn.2xlarge
-    secrets: inherit
-
-  Create-Matrix:
-    needs:
-      - Start-Runner1
-      - Start-Runner2
-      - Start-Runner3
-      - Start-Runner4
-    if: ${{ always() }} # Ensures the matrix is created even if some runners fail to start
-    runs-on: ubuntu-latest
-    outputs:
-      labels: ${{ steps.create-matrix.outputs.labels }}
-      ec2-instance-ids: ${{ steps.create-matrix.outputs.ec2-instance-ids }}
-    steps:
-      - name: Create matrix
-        id: create-matrix
-        run: |
-          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}", "${{ needs.Start-Runner3.outputs.label }}", "${{ needs.Start-Runner4.outputs.label }}"]'
-          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}", "${{ needs.Start-Runner3.outputs.ec2-instance-id }}", "${{ needs.Start-Runner4.outputs.ec2-instance-id }}"]'
-          
-          echo "labels=$LABELS" >> $GITHUB_OUTPUT
-          echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
-
   Test-Marqo:
     name: Run Large Model Integration Tests (Part ${{ matrix.part }}/3)
-    needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
       fail-fast: false
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
-    runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}/part=${{ matrix.part }}/PoloRole=testing"
     
     timeout-minutes: 60
 
@@ -157,17 +107,3 @@ jobs:
 
           # Run only the assigned test partition
           pytest marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }} --suppress-skips
-
-  Stop-Runner:
-    needs:
-      - Create-Matrix
-      - Test-Marqo # Ensures the runners are stopped after tests complete
-    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
-    strategy:
-      matrix:
-        instance: [0, 1, 2, 3]  # Zero-based index for JSON list access
-    uses: ./.github/workflows/stop_ec2_runner.yml
-    with:
-      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
-      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
-    secrets: inherit

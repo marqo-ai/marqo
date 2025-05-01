@@ -42,17 +42,9 @@ concurrency:
  cancel-in-progress: true
 
 jobs:
-#  Start-Runner:
-#    uses: ./.github/workflows/start_ec2_runner.yml
-#    with:
-#      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-#      ec2-instance-type: m6i.xlarge
-#    secrets: inherit
-
   Test-Marqo:
     name: Run CPU Local Marqo API Tests
-#    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=ami-0b4a181b6b24152d5"
+    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/PoloRole=testing"
     defaults:
       run:
         working-directory: tests/api_tests/v1
@@ -89,15 +81,3 @@ jobs:
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
           pytest tests/
-
-#  Stop-Runner:
-#    needs:
-#      - Start-Runner # required to get output from the start-runner job
-#      - Test-Marqo # required to wait when the main job is done
-#    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-#    uses: ./.github/workflows/stop_ec2_runner.yml
-#    with:
-#      label: ${{ needs.start-runner.outputs.label }}
-#      ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
-#    secrets: inherit
-
