@@ -173,6 +173,25 @@ jobs:
           path: |
             coverage_data/coverage.xml
             coverage_data/htmlcov/
+            coverage_data/diff_cov.html
+
+      - name: Upload unit test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: |
+            unit_coverage_data/coverage.xml
+            unit_coverage_data/htmlcov/
+            unit_coverage_data/diff_cov.html
+
+      - name: Upload integration test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-coverage
+          path: |
+            integ_coverage_data/coverage.xml
+            integ_coverage_data/htmlcov/
+            integ_coverage_data/diff_cov.html
 
       - name: Fail if coverage thresholds not met
         if: github.event_name == 'pull_request' && (steps.combined_diff_coverage.outcome == 'failure' || steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure')
