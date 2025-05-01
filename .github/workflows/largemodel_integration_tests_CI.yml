@@ -77,14 +77,7 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           path: marqo
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-          cache: "pip"
 
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
@@ -174,13 +167,6 @@ jobs:
       - name: Move Coverage Files
         run: mv marqo-largemodel-tests-report-*/.* marqo/
 
-      - name: DEBUG coverages
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          pip install coverage
-          coverage debug data
-
       - name: Merge Coverage Results
         run: |
           cd marqo
@@ -188,22 +174,11 @@ jobs:
           pip install coverage
           coverage combine
 
-      - name: Generate Coverage Reports
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          coverage report -i
-          coverage xml -i -o coverage.xml
-          coverage html -i --directory=htmlcov
-
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-largemodel-tests-report
-          path: |
-            marqo/htmlcov/
-            marqo/coverage.xml
-            marqo/.coverage
+          path: marqo/.coverage
           include-hidden-files: true
 
   Stop-Runner:
