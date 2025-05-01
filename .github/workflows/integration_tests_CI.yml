@@ -200,7 +200,7 @@ jobs:
           set -o pipefail
           COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
-            --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
+            --cov=src --cov-branch --cov-context=test \
             tests/integ_tests/test_documentation* --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
 
       - name: Upload Test Result
@@ -227,36 +227,18 @@ jobs:
       - name: Move Coverage Files
         run: mv marqo-integ-tests-report-*/.* marqo/
 
-      - name: DEBUG coverages
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          pip install coverage
-          coverage debug data
-
       - name: Merge Coverage Results
         run: |
           cd marqo
           export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
-          
-      - name: Generate Coverage Reports
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          coverage report -i
-          coverage xml -i -o coverage.xml
-          coverage html -i --directory=htmlcov
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-integ-tests-report
-          path: |
-            marqo/htmlcov/
-            marqo/coverage.xml
-            marqo/.coverage
+          path: marqo/.coverage
           include-hidden-files: true
 
   Stop-Runner:
