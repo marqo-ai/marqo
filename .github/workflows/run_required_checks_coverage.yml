@@ -178,15 +178,6 @@ jobs:
             coverage_data/htmlcov/
             coverage_data/diff_cov.html
 
-      - name: Upload unit test coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-coverage
-          path: |
-            unit_coverage_data/coverage.xml
-            unit_coverage_data/htmlcov/
-            unit_coverage_data/diff_cov.html
-
       - name: Upload integration test coverage report
         uses: actions/upload-artifact@v4
         with:
@@ -196,8 +187,26 @@ jobs:
             integ_coverage_data/htmlcov/
             integ_coverage_data/diff_cov.html
 
+      - name: Upload unit test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: |
+            unit_coverage_data/coverage.xml
+            unit_coverage_data/htmlcov/
+            unit_coverage_data/diff_cov.html
+
       - name: Print coverage reports
         run: |
+          {
+            echo "# 📦 Artifact Guide"
+            echo ""
+            echo "The following artifacts are of interest:"
+            echo ""
+            echo "- \`combined-test-coverage\`, \`integration-test-coverage\`, \`unit-test-coverage\`: Coverage and diff coverage reports."
+            echo "- \`marqo-integ-tests-report-*\`, \`marqo-largemodel-tests-report-*\`, \`marqo-unit-tests-report\`: pytest output and reports."
+          } >> $GITHUB_STEP_SUMMARY
+    
           echo "# Combined coverage summary" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
           cat coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
@@ -242,3 +251,5 @@ jobs:
             echo "❌ Combined test coverage: ${{ steps.combined_overall_coverage.outputs.percentage }}% (required: 75%)"
           fi
           exit 1
+
+
