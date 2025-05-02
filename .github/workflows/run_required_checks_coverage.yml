@@ -75,18 +75,21 @@ jobs:
           coverage combine integration.coverage largemodel.coverage unit.coverage
           coverage xml -o coverage.xml
           coverage html --directory=htmlcov
+          coverage report -m > coverage.txt
           
           # Generate unit test coverage data
           cd ../unit_coverage_data
           coverage combine unit.coverage
           coverage xml -o coverage.xml
           coverage html --directory=htmlcov
+          coverage report -m > coverage.txt
           
           # Generate integration test coverage data (including largemodel)
           cd ../integ_coverage_data
           coverage combine integration.coverage largemodel.coverage
           coverage xml -o coverage.xml
           coverage html --directory=htmlcov
+          coverage report -m > coverage.txt
 
       - name: Install diff-cover
         run: |
@@ -195,6 +198,21 @@ jobs:
 
       - name: Print coverage reports
         run: |
+          echo "# Combined coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "# Integ coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat integ_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "# Unit coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat unit_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
           echo "# Combined diff coverage summary" >> $GITHUB_STEP_SUMMARY
           cat coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
