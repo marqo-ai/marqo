@@ -96,7 +96,7 @@ jobs:
           
           # Application tests will restart the container and delete the logs
           # so we need to run the tests in a separate step
-          pytest tests/api_tests/application_tests
+          pytest tests/application_tests
 
       - name: Capture Marqo Container Logs and Display
         if: always()
