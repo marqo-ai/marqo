@@ -139,7 +139,7 @@ jobs:
           diff-cover ../coverage_data/coverage.xml --html-report ../coverage_data/diff_cov.html \
             --markdown-report ../coverage_data/diff_cov.md \
             --compare-branch $BASE_BRANCH --fail-under=90
-            
+
       - name: Check overall integration test coverage (70% threshold)
         id: integ_overall_coverage
         continue-on-error: true
@@ -152,7 +152,7 @@ jobs:
             echo "::error::Integration test coverage is below 70%"
             exit 1
           fi
-          
+
       - name: Check overall combined test coverage (75% threshold)
         id: combined_overall_coverage
         continue-on-error: true
@@ -192,6 +192,17 @@ jobs:
             integ_coverage_data/coverage.xml
             integ_coverage_data/htmlcov/
             integ_coverage_data/diff_cov.html
+
+      - name: Print coverage reports
+        run: |
+          echo "# Combined diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+          echo "# Integ diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat integ_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+          echo "# Unit diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat unit_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if coverage thresholds not met
         if: github.event_name == 'pull_request' && (steps.combined_diff_coverage.outcome == 'failure' || steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure')
