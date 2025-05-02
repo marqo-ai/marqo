@@ -92,8 +92,8 @@ jobs:
           
           pytest tests/api_tests
           
-          docker logs marqo > marqo_container_logs.txt || true
-          
+          docker logs marqo > marqo_container_logs.txt 2>&1 || true
+
           # Application tests will restart the container and delete the logs
           # so we need to run the tests in a separate step
           pytest tests/application_tests
