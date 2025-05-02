@@ -59,14 +59,6 @@ jobs:
           name: marqo-unit-tests-report
           path: |
             marqo/.coverage
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
           include-hidden-files: true
-
-      - name: Test and coverage report summary
-        run: |
-          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
-          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
-          
-          echo "# Coverage summary, slow tests and failed tests" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
