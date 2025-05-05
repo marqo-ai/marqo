@@ -142,45 +142,44 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r marqo/requirements.dev.txt
-          pip install httpx
-#          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed:
-#          pip install -r marqo/requirements.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # Override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.txt
 
-#      - name: Download nltk data
-#        run: |
-#            python -m nltk.downloader punkt_tab
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
 
-#      - name: Build Vespa
-#        run: |
-#          systemctl stop unattended-upgrades
-#          apt-get remove -y unattended-upgrades
-#
-#          # Function to wait for the dpkg lock to be released
-#          function wait_for_dpkg_lock() {
-#            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-#              echo "Waiting for the dpkg lock to be released..."
-#              sleep 5
-#            done
-#          }
-#
-#          # Wait for the dpkg lock before updating and installing
-#          wait_for_dpkg_lock
-#
-#          echo "Updating package list"
-#          apt-get update -y
-#
-#          # Build Vespa components
-#          echo "Installing jdk 17"
-#          sudo apt-get install openjdk-17-jdk -y
-#          echo "Installing maven"
-#          sudo apt-get install maven -y
-#          echo "Building Vespa components"
-#          cd marqo/vespa
-#          mvn clean package
-#
-#      - name: Start Vespa
-#        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+      - name: Build Vespa
+        run: |
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
+
+          # Function to wait for the dpkg lock to be released
+          function wait_for_dpkg_lock() {
+            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+              echo "Waiting for the dpkg lock to be released..."
+              sleep 5
+            done
+          }
+
+          # Wait for the dpkg lock before updating and installing
+          wait_for_dpkg_lock
+
+          echo "Updating package list"
+          apt-get update -y
+
+          # Build Vespa components
+          echo "Installing jdk 17"
+          sudo apt-get install openjdk-17-jdk -y
+          echo "Installing maven"
+          sudo apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
+
+      - name: Start Vespa
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Integration Tests
         run: |
@@ -202,7 +201,7 @@ jobs:
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/integ_tests/test_documentation* --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
+            tests/integ_tests --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4

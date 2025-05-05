@@ -85,40 +85,45 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
       - name: Install dependencies
         run: |
           pip install -r marqo/requirements.dev.txt
-          pip install httpx
-#          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # Override base requirements with marqo requirements if needed: 
-#          pip install -r marqo/requirements.txt
+          pip install -r marqo/requirements.txt
 
 
-#      - name: Download nltk data
-#        run: |
-#          python -m nltk.downloader punkt_tab
+      - name: Download nltk data
+        run: |
+          python -m nltk.downloader punkt_tab
 
-#      - name: Build Vespa
-#        run: |
-#          systemctl stop unattended-upgrades
-#          apt-get remove -y unattended-upgrades
-#
-#          echo "Updating package list"
-#          apt-get update -y
-#
-#          # Build Vespa components
-#          echo "Installing jdk 17"
-#          sudo apt-get install openjdk-17-jdk -y
-#          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-#          export PATH=$JAVA_HOME/bin:$PATH
-#          echo "Installing maven"
-#          sudo apt-get install maven -y
-#          echo "Building Vespa components"
-#          cd marqo/vespa
-#          mvn clean package
-#
-#      - name: Start Vespa
-#        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+      - name: Build Vespa
+        run: |
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
+
+          echo "Updating package list"
+          apt-get update -y
+
+          # Build Vespa components
+          echo "Installing jdk 17"
+          sudo apt-get install openjdk-17-jdk -y
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          echo "Installing maven"
+          sudo apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
+
+      - name: Start Vespa
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
         id: run_tests
@@ -142,7 +147,7 @@ jobs:
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/integ_tests/test_documentation* --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
+            tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
