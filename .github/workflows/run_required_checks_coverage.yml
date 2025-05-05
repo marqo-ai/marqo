@@ -57,39 +57,39 @@ jobs:
           mkdir -p integ_coverage_data
           
           # Move all coverage files to a single directory
-          cp integration-tests-coverage/.coverage coverage_data/integration.coverage || true
-          cp largemodel-tests-coverage/.coverage coverage_data/largemodel.coverage || true
-          cp unit-tests-coverage/.coverage coverage_data/unit.coverage || true
+          cp integration-tests-coverage/.coverage coverage_data/integration.coverage
+          cp largemodel-tests-coverage/.coverage coverage_data/largemodel.coverage
+          cp unit-tests-coverage/.coverage coverage_data/unit.coverage
           
           # Copy to separate directories for individual analysis
-          cp integration-tests-coverage/.coverage integ_coverage_data/integration.coverage || true
-          cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage || true
-          cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage || true
-          
-          export PYTHONPATH="../marqo"
+          cp integration-tests-coverage/.coverage integ_coverage_data/integration.coverage
+          cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage
+          cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage
 
-          # Combine coverage data if available
-          cd coverage_data
+          # List all files for debug          
           ls -la
+          
+          # Use the same working directory as pytest in original workflows
+          cd marqo
+          
+          # Combine coverage data if available          
           echo "Combining coverage files..."
-          coverage combine integration.coverage largemodel.coverage unit.coverage
-          coverage xml -o coverage.xml
-          coverage html --directory=htmlcov
-          coverage report -m > coverage.txt
+          coverage combine ../coverage_data/integration.coverage ../coverage_data/largemodel.coverage ../coverage_data/unit.coverage
+          coverage xml -o ../coverage_data/coverage.xml
+          coverage html --directory=../coverage_data/htmlcov
+          coverage report -m > ../coverage_data/coverage.txt
           
           # Generate unit test coverage data
-          cd ../unit_coverage_data
-          coverage combine unit.coverage
-          coverage xml -o coverage.xml
-          coverage html --directory=htmlcov
-          coverage report -m > coverage.txt
+          coverage combine ../unit_coverage_data/unit.coverage
+          coverage xml -o ../unit_coverage_data/coverage.xml
+          coverage html --directory=../unit_coverage_data/htmlcov
+          coverage report -m > ../unit_coverage_data/coverage.txt
           
           # Generate integration test coverage data (including largemodel)
-          cd ../integ_coverage_data
-          coverage combine integration.coverage largemodel.coverage
-          coverage xml -o coverage.xml
-          coverage html --directory=htmlcov
-          coverage report -m > coverage.txt
+          coverage combine ../integ_coverage_data/integration.coverage ../integ_coverage_data/largemodel.coverage
+          coverage xml -o ../integ_coverage_data/coverage.xml
+          coverage html --directory=../integ_coverage_data/htmlcov
+          coverage report -m > ../integ_coverage_data/coverage.txt
 
       - name: Install diff-cover
         run: |

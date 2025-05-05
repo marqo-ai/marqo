@@ -234,7 +234,6 @@ jobs:
       - name: Merge Coverage Results
         run: |
           cd marqo
-          export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
 
