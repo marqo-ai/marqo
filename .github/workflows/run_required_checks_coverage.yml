@@ -143,7 +143,7 @@ jobs:
             --markdown-report ../coverage_data/diff_cov.md \
             --compare-branch $BASE_BRANCH --fail-under=90
 
-      - name: Check overall integration test coverage (70% threshold)
+      - name: Check overall integration test coverage (78% threshold)
         id: integ_overall_coverage
         continue-on-error: true
         run: |
@@ -151,12 +151,12 @@ jobs:
           COVERAGE_PERCENT=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
           echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
           echo "Integration test coverage: $COVERAGE_PERCENT%"
-          if (( $(echo "$COVERAGE_PERCENT < 70" | bc -l) )); then
-            echo "::error::Integration test coverage is below 70%"
+          if (( $(echo "$COVERAGE_PERCENT < 78" | bc -l) )); then
+            echo "::error::Integration test coverage is below 78%"
             exit 1
           fi
 
-      - name: Check overall combined test coverage (75% threshold)
+      - name: Check overall combined test coverage (80% threshold)
         id: combined_overall_coverage
         continue-on-error: true
         run: |
@@ -164,8 +164,8 @@ jobs:
           COVERAGE_PERCENT=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
           echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
           echo "Combined test coverage: $COVERAGE_PERCENT%"
-          if (( $(echo "$COVERAGE_PERCENT < 75" | bc -l) )); then
-            echo "::error::Combined test coverage is below 75%"
+          if (( $(echo "$COVERAGE_PERCENT < 80" | bc -l) )); then
+            echo "::error::Combined test coverage is below 80%"
             exit 1
           fi
 
