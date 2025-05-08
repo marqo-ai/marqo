@@ -146,8 +146,12 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
 
         # Inference exceptions
+        # TODO - Inference Server currently only raises InferenceError in the remote model, so these two catches
+        # TODO - are not used in the remote mode. But they will be used in the combined mode.
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
         (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
+        # TODO - Distinguish recoverable vs unrecoverable errors for InferenceError
+        (inference_exceptions.InferenceError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
@@ -207,8 +211,28 @@ async def api_validation_exception_handler(request: Request, exc: RequestValidat
     )
 
 
+# For validation error raised from PydanticV1 model classes
 @app.exception_handler(pydantic.v1.ValidationError)
 async def validation_exception_handler(request, exc: pydantic.v1.ValidationError) -> JSONResponse:
+    """Catch pydantic v1 validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
+
+    body = {
+        "message": json.dumps(error_messages),
+        "code": InvalidArgError.code,
+        "type": InvalidArgError.error_type,
+        "link": InvalidArgError.link
+    }
+    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
+
+
+# For validation error raised from PydanticV2 model classes
+@app.exception_handler(pydantic.ValidationError)
+async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
     error_messages = [{
         'loc': error.get('loc', ''),

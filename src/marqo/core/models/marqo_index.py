@@ -279,6 +279,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)
 
@@ -624,7 +625,9 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         Check if the index supports partial updates.
         """
-        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

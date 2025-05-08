@@ -3,19 +3,6 @@ name: Large Model Integration Tests CI
 
 on:
   workflow_call:
-  workflow_dispatch:
-  push:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
 
 concurrency:
   group: large-model-integration-tests-${{ github.ref }}
@@ -90,14 +77,7 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           path: marqo
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-          cache: "pip"
 
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
@@ -105,13 +85,19 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
       - name: Install dependencies
         run: |
+          pip install -r marqo/requirements.dev.txt
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # Override base requirements with marqo requirements if needed: 
           pip install -r marqo/requirements.txt
-          pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
+
 
       - name: Download nltk data
         run: |
@@ -121,10 +107,10 @@ jobs:
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
-          
+
           echo "Updating package list"
           apt-get update -y
-          
+
           # Build Vespa components
           echo "Installing jdk 17"
           sudo apt-get install openjdk-17-jdk -y
@@ -140,6 +126,7 @@ jobs:
         run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
+        id: run_tests
         run: |
           # Define these for use by Marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -153,10 +140,54 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
-          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
+          cd marqo
+          export PYTHONPATH="./tests/integ_tests:./src"
+          set -o pipefail
+          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report term:skip-covered \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/integ_tests --retries 3 --largemodel --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
 
-          # Run only the assigned test partition
-          pytest marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }} --suppress-skips
+      - name: Upload Test Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report-${{ matrix.part }}
+          path: |
+            marqo/.coverage.${{ matrix.part }}
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
+          include-hidden-files: true
+
+  Merge-Coverage:
+    name: Merge Coverage And Generate Reports
+    needs:
+      - Test-Marqo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Download all coverage files
+        uses: actions/download-artifact@v4
+
+      - name: Move Coverage Files
+        run: mv marqo-largemodel-tests-report-*/.* marqo/
+
+      - name: Merge Coverage Results
+        run: |
+          cd marqo
+          pip install coverage
+          coverage combine
+
+      - name: Upload Merged Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report
+          path: marqo/.coverage
+          include-hidden-files: true
 
   Stop-Runner:
     needs:

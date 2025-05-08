@@ -5,16 +5,14 @@ import os
 import subprocess
 # for multimodal processing
 import tempfile
-from typing import Tuple
 
 import ffmpeg
-import torch
+from torch import Tensor
 
 from marqo.core.exceptions import InternalError
+from marqo.core.inference.api import *
 from marqo.core.models.marqo_index import *
-from marqo.s2_inference.errors import MediaDownloadError
-from marqo.core.inference.api.modality import Modality
-from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
 class StreamingMediaProcessor:
@@ -24,42 +22,53 @@ class StreamingMediaProcessor:
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
-            self, url: str, device: str, modality: Modality,
-            preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-            video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str]] = None,
+            self,
+            url: str,
+            preprocessors: LanguagebindPreprocessor,
+            preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
             enable_video_gpu_acceleration: bool = False
     ):
+        """
+        Instantiate the StreamingMediaProcessor class.
+
+        Args:
+            url: The URL of the media file to be processed.
+            preprocessors: The LanguagebindPreprocessor instance to be used for preprocessing the media.
+            preprocessing_config: The configuration for preprocessing the media, which includes the modality (audio or video),
+            enable_video_gpu_acceleration: Whether to enable GPU acceleration for video processing.
+        Raises:
+            MediaExceedsMaxSizeError: If the media file size exceeds the maximum allowed size.
+            MediaDownloadError: If there is an error downloading the media file.
+        """
         self.url = url
-        self.device = device
-        self.modality = modality
-        self.audio_preprocessing = audio_preprocessing
-        self.video_preprocessing = video_preprocessing
-        self.preprocessor = preprocessors.get_preprocessor(modality)
-        self.media_download_headers = self._convert_headers_to_cli_format(media_download_headers)
-        self.total_size, self.duration = self._fetch_file_metadata()
-        self.enable_video_gpu_acceleration = enable_video_gpu_acceleration
-        self._set_split_parameters(modality)
-        self._log_initialization_details()
+        self.modality = preprocessing_config.modality
+        
+        self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
+        self.total_size, self.duration, self.probed_modality = self._fetch_file_metadata()
 
-    def _set_split_parameters(self, modality):
-        preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
+        if self.modality != self.probed_modality:
+            raise MediaMismatchError(
+                f"Error processing media file {self.url}. The provided modality {self.modality} does not match the "
+                f"detected modality {self.probed_modality}. Please check your media file and try again. If you are using "
+                f"a structured index, check if your media file matches the field type"
+            )
 
-        if preprocessing is not None:
-            self.split_length = preprocessing.split_length
-            self.split_overlap = preprocessing.split_overlap
+        if self.total_size > preprocessing_config.max_media_size_bytes:
+            raise MediaExceedsMaxSizeError(
+                f"File size ({self.total_size / 1024 / 1024:.2f} MB) "
+                f"exceeds the maximum allowed size of {preprocessing_config.max_media_size_bytes / 1024 / 1024:.2f} MB"
+            )
+
+        if preprocessing_config.should_chunk:
+            self.split_length = preprocessing_config.chunk_config.split_length
+            self.split_overlap = preprocessing_config.chunk_config.split_overlap
         else:
-            self.split_length = 20
-            self.split_overlap = 3
-
-        if modality not in [Modality.VIDEO, Modality.AUDIO]:
-            raise ValueError(f"Unsupported modality: {modality}")
-
-    def _log_initialization_details(self):
-        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
-        pass
+            self.split_length = self.duration
+            self.split_overlap = 0
+        
+        self.preprocessors = preprocessors
+        
+        self.enable_video_gpu_acceleration = enable_video_gpu_acceleration
 
     def _convert_headers_to_cli_format(self, raw_media_download_headers: Optional[Dict] = None) -> str:
         """
@@ -79,24 +88,52 @@ class StreamingMediaProcessor:
             raise InternalError("media_download_headers should be a dictionary")
         return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
 
-    def _fetch_file_metadata(self) -> Tuple[float, float]:
+    def _infer_modality_from_probe(self, modality_list: list[str], format_name: Optional[str]) -> Optional[Modality]:
+        """
+        Infer the modality from the probed media file. This is used to determine whether the media is audio or video.
+        """
+        if Modality.VIDEO in modality_list:
+            # Images are also considered as video in ffmpeg, so we need to check the format name to
+            # differentiate between video and image
+            if "image" in format_name or "_pipe" in format_name:
+                return Modality.IMAGE
+            else:
+                return Modality.VIDEO
+        elif Modality.AUDIO in modality_list:
+            return Modality.AUDIO
+        else:
+            return None
+
+    def _fetch_file_metadata(self) -> Tuple[float, float, Optional[Modality]]:
+        """
+        Fetch the metadata of the media file using ffmpeg. This includes the size, duration, and modality of the
+        media file.
+
+        Returns:
+            Tuple[float, float, str]: A tuple containing the size (in bytes), duration (in seconds), and modality of the
+            media file.
+
+        """
         try:
             probe_options = {
                 'v': 'error',
-                'show_entries': 'format=size,duration',
+                'show_entries': 'stream=codec_type,format=size,duration,format_name',
                 'of': 'json',
                 'probesize': '256K',  # Probe only the first 256KB
             }
 
-            if self.media_download_headers:
-                probe_options['headers'] = self.media_download_headers
+            if self.media_download_header:
+                probe_options['headers'] = self.media_download_header
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
+            format_name = probe['format'].get('format_name', "")
+            modality_list = [codec_type.get('codec_type', "") for codec_type in probe['streams']]
+            modality = self._infer_modality_from_probe(modality_list, format_name)
 
-            return size, duration
+            return size, duration, modality
 
         except ffmpeg.Error as e:
             raise MediaDownloadError(f"Error fetching metadata: {e.stderr.decode()}") from e
@@ -105,8 +142,18 @@ class StreamingMediaProcessor:
         extension = 'mp4' if self.modality == Modality.VIDEO else 'wav'
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
-    def process_media(self) -> List[Dict[str, torch.Tensor]]:
-        processed_chunks: List[Dict[str, torch.Tensor]] = []
+    def process_media(self) -> list[Tuple[str, Tensor]]:
+        """
+        Process the media file by splitting it into chunks and downloading each chunk, and apply the languagebind
+        preprocessor to each chunk.
+
+        Returns:
+            list[Tuple[str, Tensor]]: A list of tuples, where each tuple contains the chunk content and the
+
+        Raise:
+            MediaDownloadError: If there is an error downloading or processing the media file.
+        """
+        processed_chunks: list[Tuple[str, Tensor]] = []
         chunk_duration = self.split_length
         overlap_duration = self.split_overlap
 
@@ -144,16 +191,17 @@ class StreamingMediaProcessor:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
 
-                processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
-                processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
+                # We expect no error in the preprocessing step
+                processed_chunk_tensor: Tensor = self.preprocessors.preprocess(
+                    [output_file], modality=self.modality)[0]
 
-                processed_chunk = {
-                    'tensor': processed_chunk_tensor,
-                    'start_time': chunk_start,
-                    'end_time': chunk_end
-                }
-
-                processed_chunks.append(processed_chunk)
+                processed_chunks.append(
+                    (f"[{chunk_start:.1f}, {chunk_end:.1f}]", processed_chunk_tensor)
+                )
+        if not processed_chunks:
+            raise MediaDownloadError(
+                f"Error processing media file {self.url}: No chunks were successfully processed"
+            )
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
@@ -181,9 +229,9 @@ class StreamingMediaProcessor:
             '-v', 'error',  # Suppress warnings and other output
         ]
 
-        if self.media_download_headers:
+        if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         if self.enable_video_gpu_acceleration:
             ffmpeg_command.extend([
@@ -237,9 +285,9 @@ class StreamingMediaProcessor:
             '-y', # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
         ]
-        if self.media_download_headers:
+        if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         ffmpeg_command.extend(
             [

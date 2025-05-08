@@ -15,7 +15,9 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.logging import get_logger
 from marqo.tensor_search import validation
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
 from marqo.vespa.vespa_client import VespaClient
@@ -166,7 +168,8 @@ class AddDocumentsHandler(ABC):
                 self._populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
-            self._vectorise_tensor_fields()
+            with RequestMetricsStore.for_request().time("add_documents.inference.all"):
+                self._vectorise_tensor_fields()
 
         with RequestMetricsStore.for_request().time("add_documents.vespa.to_vespa_docs"):
             vespa_docs = self._convert_to_vespa_docs()
@@ -285,7 +288,8 @@ class AddDocumentsHandler(ABC):
         3. The result will be then populated to the tensor field. Individual errors happened during preprocessing
             and vectorisation will also be returned and collected by the `add_docs_response_collector`
         """
-        modalities = self._infer_modalities()
+        with RequestMetricsStore.for_request().time("add_documents.inference.infer_modality"):
+            modalities = self._infer_modalities()
 
         for modality in modalities:
             self._vectorise_fields(modality, for_top_level_field=True)
@@ -340,7 +344,9 @@ class AddDocumentsHandler(ABC):
 
         # This method could raise InferenceError, we'll allow it propagate to the API layer and convert to proper
         # error response to return to users
-        inference_result = self.inference.vectorise(request)
+        with RequestMetricsStore.for_request().time(f"add_documents.inference.{modality}."
+                                                    f"is_subfield_{not for_top_level_field}.size_{len(tensor_fields)}"):
+            inference_result = self.inference.vectorise(request)
 
         if len(tensor_fields) != len(inference_result.result):
             raise InternalError(f'Inference result contains chunks and embeddings for {len(inference_result.result)} '
@@ -391,7 +397,7 @@ class AddDocumentsHandler(ABC):
                 should_chunk=for_top_level_field and patch_method is not None,
                 download_thread_count=self.add_docs_params.image_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
-                patch_method=None if not for_top_level_field or not patch_method else patch_method.value
+                patch_method=None if not for_top_level_field or not patch_method else patch_method.value,
             )
         elif modality == Modality.AUDIO:
             return AudioPreprocessingConfig(
@@ -401,7 +407,8 @@ class AddDocumentsHandler(ABC):
                 chunk_config=ChunkConfig(
                     split_length=self.marqo_index.audio_preprocessing.split_length,
                     split_overlap=self.marqo_index.audio_preprocessing.split_overlap,
-                )
+                ),
+                max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
             )
         elif modality == Modality.VIDEO:
             return VideoPreprocessingConfig(
@@ -411,7 +418,8 @@ class AddDocumentsHandler(ABC):
                 chunk_config=ChunkConfig(
                     split_length=self.marqo_index.video_preprocessing.split_length,
                     split_overlap=self.marqo_index.video_preprocessing.split_overlap,
-                )
+                ),
+                max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
             )
         else:
             raise InternalError(f'The modality {modality} is not supported.')
