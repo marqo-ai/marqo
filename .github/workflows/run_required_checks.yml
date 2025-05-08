@@ -88,3 +88,20 @@ jobs:
       - Run-unit-tests
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/run_required_checks_coverage.yml
+
+  # GitHub status will rely on the result of this step to determine if the PR is ready for merge
+  Report-required-test-status:
+    needs: [Determine-changes, Run-coverage-checks]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Set integration test status
+        run: |
+          if [[ "${{ needs.Determine-changes.outputs.non_documentation_changes_found }}" == "false" ]]; then
+            echo "Tests skipped due to markdown-only changes"
+          elif [[ "${{ needs.Run-coverage-checks.result }}" == "success" ]]; then
+            echo "Tests completed successfully"
+          else
+            echo "Tests failed or did not run"
+            exit 1
+          fi
