@@ -21,7 +21,6 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_GET_POOL_SIZE: 10,
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
-        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: 1,
 
         # Marqo index management
         EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED: 100,
@@ -34,7 +33,6 @@ def default_env_vars() -> dict:
         # Document (CRUD) limit
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128,
-        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,
 
         # Search Limit
