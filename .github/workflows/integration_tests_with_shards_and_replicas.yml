@@ -5,7 +5,7 @@
 # 4. multinode vespa: 2 shards, 1 replicas
 # Runs only once on PR approval
 
-name: Unit Tests with Shards and Replicas
+name: Integration Tests with Shards and Replicas
 
 on:
   workflow_dispatch:

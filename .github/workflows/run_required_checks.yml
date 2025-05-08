@@ -4,6 +4,10 @@ on:
     branches:
       - mainline
       - releases/*
+  push:
+    branches:
+      - mainline
+      - releases/*
 
 permissions:
   contents: read
@@ -63,6 +67,27 @@ jobs:
       number_of_shards: 1
       number_of_replicas: 0
     secrets: inherit
+
+  Run-largemodel-integration-tests:
+    needs: Determine-changes
+    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/largemodel_integration_tests_CI.yml
+    secrets: inherit
+
+  Run-unit-tests:
+    needs: Determine-changes
+    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/unit_tests.yml
+    secrets: inherit
+
+  Run-coverage-checks:
+    needs:
+      - Determine-changes
+      - Run-integration-tests
+      - Run-largemodel-integration-tests
+      - Run-unit-tests
+    if: ${{ always() && needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/run_required_checks_coverage.yml
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
   Report-required-test-status:
