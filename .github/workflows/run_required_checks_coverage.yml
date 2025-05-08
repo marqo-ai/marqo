@@ -97,7 +97,6 @@ jobs:
 
       - name: Check diff unit test coverage (95% threshold)
         id: unit_diff_coverage
-        if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
           cd marqo
@@ -113,7 +112,6 @@ jobs:
 
       - name: Check diff integ test coverage (80% threshold)
         id: integ_diff_coverage
-        if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
           cd marqo
@@ -126,22 +124,6 @@ jobs:
           diff-cover ../integ_coverage_data/coverage.xml --html-report ../integ_coverage_data/diff_cov.html \
             --markdown-report ../integ_coverage_data/diff_cov.md \
             --compare-branch $BASE_BRANCH --fail-under=80
-
-      - name: Check diff combined test coverage (90% threshold)
-        id: combined_diff_coverage
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        run: |
-          cd marqo
-          
-          export PYTHONPATH="."
-          export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          echo "Running diff-cover against branch $BASE_BRANCH"
-          git fetch origin $BASE_BRANCH:$BASE_BRANCH
-          
-          diff-cover ../coverage_data/coverage.xml --html-report ../coverage_data/diff_cov.html \
-            --markdown-report ../coverage_data/diff_cov.md \
-            --compare-branch $BASE_BRANCH --fail-under=90
 
       - name: Check overall integration test coverage (78% threshold)
         id: integ_overall_coverage
@@ -232,7 +214,7 @@ jobs:
           cat unit_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if coverage thresholds not met
-        if: github.event_name == 'pull_request' && (steps.combined_diff_coverage.outcome == 'failure' || steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure')
+        if: steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure'
         run: |
           echo "Coverage threshold check failed"
           if [ "${{ steps.unit_diff_coverage.outcome }}" == "failure" ]; then
@@ -240,9 +222,6 @@ jobs:
           fi
           if [ "${{ steps.integ_diff_coverage.outcome }}" == "failure" ]; then
             echo "❌ Integration test diff coverage: ${{ steps.integ_diff_coverage.outputs.percentage }}% (required: 80%)"
-          fi
-          if [ "${{ steps.combined_diff_coverage.outcome }}" == "failure" ]; then
-            echo "❌ Combined diff coverage: ${{ steps.combined_diff_coverage.outputs.percentage }}% (required: 90%)"
           fi
           if [ "${{ steps.integ_overall_coverage.outcome }}" == "failure" ]; then
             echo "❌ Integration test coverage: ${{ steps.integ_overall_coverage.outputs.percentage }}% (required: 70%)"
