@@ -196,7 +196,7 @@ jobs:
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
-        instance: [ 0, 1, 2, 3 ]  # Zero-based index for JSON list access
+        instance: [0, 1, 2, 3]  # Zero-based index for JSON list access
     uses: ./.github/workflows/stop_ec2_runner.yml
     with:
       label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
