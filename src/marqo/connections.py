@@ -3,7 +3,7 @@ import time
 
 import redis
 
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 
 """
 Drivers for connecting to other applications should be put here.
@@ -57,7 +57,7 @@ class RedisDriver:
             logger.info(f"Took {((t1 - t0) * 1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warn(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
+            logger.warning(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
             self.faulty = True
 
     def connect(self) -> redis.Redis:

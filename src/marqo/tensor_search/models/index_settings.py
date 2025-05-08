@@ -1,7 +1,7 @@
 import time
 from typing import Dict, Any, Optional, List, Union
 
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
@@ -17,10 +17,11 @@ class AnnParameters(StrictBaseModel):
 
 
 class IndexSettings(StrictBaseModel):
-    type: core.IndexType = core.IndexType.Unstructured
+    type: core.IndexType = core.IndexType.SemiStructured
     allFields: Optional[List[FieldRequest]]
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
+    treatUrlsAndPointersAsMedia: Optional[bool]
     filterStringMaxLength: Optional[int]
     model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
@@ -35,6 +36,14 @@ class IndexSettings(StrictBaseModel):
     imagePreprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
         patchMethod=None
     )
+    videoPreprocessing: Optional[core.VideoPreProcessing] = core.VideoPreProcessing(
+        splitLength=20,
+        splitOverlap=3,
+    )
+    audioPreprocessing: Optional[core.AudioPreProcessing] = core.AudioPreProcessing(
+        splitLength=10,
+        splitOverlap=3,
+    )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
     annParameters: AnnParameters = AnnParameters(
         spaceType=core.DistanceMetric.PrenormalizedAngular,
@@ -44,6 +53,26 @@ class IndexSettings(StrictBaseModel):
         )
     )
     
+    @root_validator
+    def validate_url_pointer_treatment(cls, values):
+        treat_as_images = values.get('treatUrlsAndPointersAsImages')
+        treat_as_media = values.get('treatUrlsAndPointersAsMedia')
+
+        if treat_as_images and not treat_as_media:
+            # Deprecation warning
+            import warnings
+            warnings.warn("'treatUrlsAndPointersAsImages' is deprecated. Use 'treatUrlsAndPointersAsMedia' instead.", DeprecationWarning)
+
+        if treat_as_images == False and treat_as_media:
+            raise api_exceptions.InvalidArgError(
+                "Invalid combination: 'treatUrlsAndPointersAsImages' cannot be False when 'treatUrlsAndPointersAsMedia' is True."
+            )
+
+        # If treatUrlsAndPointersAsMedia is True, ensure treatUrlsAndPointersAsImages is also True
+        if treat_as_media:
+            values['treatUrlsAndPointersAsImages'] = True
+
+        return values
 
     @root_validator(pre=True)
     def validate_field_names(cls, values):
@@ -72,6 +101,10 @@ class IndexSettings(StrictBaseModel):
                 raise api_exceptions.InvalidArgError(
                     "treatUrlsAndPointersAsImages is not a valid parameter for structured indexes"
                 )
+            if self.treatUrlsAndPointersAsMedia is not None:
+                raise api_exceptions.InvalidArgError(
+                    "treatUrlsAndPointersAsMedia is not a valid parameter for structured indexes"
+                )
             if self.filterStringMaxLength is not None:
                 raise api_exceptions.InvalidArgError(
                     "filterStringMaxLength is not a valid parameter for structured indexes"
@@ -99,6 +132,8 @@ class IndexSettings(StrictBaseModel):
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
+                video_preprocessing=self.videoPreprocessing,
+                audio_preprocessing=self.audioPreprocessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
@@ -108,7 +143,7 @@ class IndexSettings(StrictBaseModel):
                 created_at=time.time(),
                 updated_at=time.time(),
             )
-        elif self.type == core.IndexType.Unstructured:
+        elif self.type in [core.IndexType.Unstructured, core.IndexType.SemiStructured]:
             if self.allFields is not None:
                 raise api_exceptions.InvalidArgError(
                     "allFields is not a valid parameter for unstructured indexes"
@@ -121,13 +156,21 @@ class IndexSettings(StrictBaseModel):
             if self.treatUrlsAndPointersAsImages is None:
                 # Default value for treat_urls_and_pointers_as_images is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                self.treatUrlsAndPointersAsImages = False
+                if self.treatUrlsAndPointersAsMedia is True:
+                    self.treatUrlsAndPointersAsImages = True
+                else:
+                    self.treatUrlsAndPointersAsImages = False
+            
+            if self.treatUrlsAndPointersAsMedia is None:
+                # Default value for treat_urls_and_pointers_as_media is False, but we can't set it in the model
+                # as it is not a valid parameter for structured indexes
+                self.treatUrlsAndPointersAsMedia = False
 
             if self.filterStringMaxLength is None:
                 # Default value for filter_string_max_length is 20, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
                 self.filterStringMaxLength = 50
-
+    
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
                 model=core.Model(
@@ -140,10 +183,13 @@ class IndexSettings(StrictBaseModel):
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
+                video_preprocessing=self.videoPreprocessing,
+                audio_preprocessing=self.audioPreprocessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
+                treat_urls_and_pointers_as_media=self.treatUrlsAndPointersAsMedia,
                 filter_string_max_length=self.filterStringMaxLength,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
@@ -154,7 +200,29 @@ class IndexSettings(StrictBaseModel):
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
-        if isinstance(marqo_index, core.StructuredMarqoIndex):
+        if isinstance(marqo_index, core.UnstructuredMarqoIndex):
+            # This covers both UnstructuredMarqoIndex and SemiStructuredMarqoIndex
+            # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
+            # this information and the SemiStructured concept are internal implementation details only.
+            return cls(
+                type=core.IndexType.Unstructured,
+                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
+                treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
+                filterStringMaxLength=marqo_index.filter_string_max_length,
+                model=marqo_index.model.name,
+                modelProperties=IndexSettings.get_model_properties(marqo_index),
+                normalizeEmbeddings=marqo_index.normalize_embeddings,
+                textPreprocessing=marqo_index.text_preprocessing,
+                imagePreprocessing=marqo_index.image_preprocessing,
+                videoPreprocessing=marqo_index.video_preprocessing,
+                audioPreprocessing=marqo_index.audio_preprocessing,
+                vectorNumericType=marqo_index.vector_numeric_type,
+                annParameters=AnnParameters(
+                    spaceType=marqo_index.distance_metric,
+                    parameters=marqo_index.hnsw_config
+                )
+            )
+        elif isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
                 type=marqo_index.type,
                 allFields=[
@@ -167,26 +235,12 @@ class IndexSettings(StrictBaseModel):
                 ],
                 tensorFields=[field.name for field in marqo_index.tensor_fields],
                 model=marqo_index.model.name,
-                modelProperties=marqo_index.model.properties,
+                modelProperties=IndexSettings.get_model_properties(marqo_index),
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
                 textPreprocessing=marqo_index.text_preprocessing,
                 imagePreprocessing=marqo_index.image_preprocessing,
-                vectorNumericType=marqo_index.vector_numeric_type,
-                annParameters=AnnParameters(
-                    spaceType=marqo_index.distance_metric,
-                    parameters=marqo_index.hnsw_config
-                )
-            )
-        elif isinstance(marqo_index, core.UnstructuredMarqoIndex):
-            return cls(
-                type=marqo_index.type,
-                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
-                filterStringMaxLength=marqo_index.filter_string_max_length,
-                model=marqo_index.model.name,
-                modelProperties=marqo_index.model.properties,
-                normalizeEmbeddings=marqo_index.normalize_embeddings,
-                textPreprocessing=marqo_index.text_preprocessing,
-                imagePreprocessing=marqo_index.image_preprocessing,
+                videoPreprocessing=marqo_index.video_preprocessing,
+                audioPreprocessing=marqo_index.audio_preprocessing,
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
@@ -195,6 +249,20 @@ class IndexSettings(StrictBaseModel):
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
+
+    @classmethod
+    def get_model_properties(cls, marqo_index):
+        if marqo_index.model.properties is None:
+            return None
+
+        if marqo_index.model.properties.get('isMarqtuneModel', False):
+            # Hide all properties except for isMarqtuneModel
+            marqo_index.model.properties.pop('name', None)
+            marqo_index.model.properties.pop('dimensions')
+            marqo_index.model.properties.pop('model_location')
+            marqo_index.model.properties.pop('type')
+            marqo_index.model.properties.pop('trustRemoteCode', None)
+        return marqo_index.model.properties
 
 
 class IndexSettingsWithName(IndexSettings):

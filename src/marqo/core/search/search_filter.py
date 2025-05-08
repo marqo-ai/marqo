@@ -282,6 +282,11 @@ class MarqoFilterStringParser:
             return ''.join(term_value)
 
     def parse(self, filter_string: str) -> SearchFilter:
+        """
+        Parse a filter string into a SearchFilter object.
+        The escape character: \\ will not be encoded into the SearchFilter.value or SearchFilter.value_list
+        (unless it is escaped itself).
+        """
         self._reset_state()
 
         if filter_string == '':
@@ -316,6 +321,7 @@ class MarqoFilterStringParser:
                     self._append_to_term_value(c)
                     escape = False
                 elif c == '\\':
+                    # Not added to current token or term value
                     self._current_raw_token.append(c)
                     escape = True
                 elif c == ',' and self._term_type == MarqoFilterStringParser._TermType.In:

@@ -1,0 +1,6 @@
+pillow
+numpy
+pytest
+flake8
+PyYAML
+docker

@@ -1,78 +1,74 @@
+from enum import Enum
 from timeit import default_timer as timer
 from typing import List, Optional, Union, Dict
-from enum import Enum
-
-import pydantic
 
 from marqo import exceptions as base_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
+from marqo.logging import get_logger
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
+
 
 class EmbedContentType(str, Enum):
     Query = "query"
     Document = "document"
 
+
 class Embed:
-    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
         self.index_management = index_management
-        self.default_device = default_device
-
-    @pydantic.validator('default_device')
-    def validate_default_device(cls, value):
-        if not value:
-            raise ValueError("Default Device cannot be 'None'. Marqo default device must have been declared upon startup.")
-        return value
+        self.inference = inference
 
     def embed_content(
-                    self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
-                    index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
-                    model_auth: Optional[ModelAuth] = None,
-                    content_type: Optional[EmbedContentType] = EmbedContentType.Query
-                    ) -> Dict:
+            self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
+            index_name: str, device: str = None,
+            media_download_headers: Optional[Dict] = None,
+            model_auth: Optional[ModelAuth] = None,
+            content_type: Optional[EmbedContentType] = EmbedContentType.Query
+    ) -> Dict:
         """
         Use the index's model to embed the content
 
+        Args:
+            content: content to vectorise (str, dict or list of str/dict)
+            index_name: name of the index
+            device: Device used to carry out the document update
+            media_download_headers: headers for download requests
+            model_auth: auth for the model
+            content_type: Type of content to embed. Must be one of "query" or "document"
         Returns:
                 List of embeddings corresponding to the content. If content is a list, the return list will be in the same order.
                 If content is a string, the return list will only have 1 item.
         """
         """
         NOTE: PARAMETER: content_type
-        3 Options: ‘query’, ‘document’, None. Defaults to ‘query’.
-        1. If the user wants to use the default text_query_prefix, leave it as ‘query’.
-        2. If the user wants to use the default text_chunk_prefix, leave it as ‘document’.
+        3 Options: 'query', 'document', None. Defaults to 'query'.
+        1. If the user wants to use the default text_query_prefix, leave it as 'query'.
+        2. If the user wants to use the default text_chunk_prefix, leave it as 'document'.
         3. If the user wants a custom prefix, they must put it in the content itself.
         """
 
-
-        # TODO: Remove this config constructor once vectorise pipeline doesn't need it. Just pass the vespa client
-        # and index management objects.
+        # Create a temporary config for embedding
         from marqo import config
         from marqo.tensor_search import tensor_search, index_meta_cache
         temp_config = config.Config(
             vespa_client=self.vespa_client,
+            inference=self.inference
         )
-
-        # Set default device if not provided
-        if device is None:
-            device = self.default_device
-
-
+        
         # Content validation is done in API model layer
         t0 = timer()
 
         # Generate input for the vectorise pipeline (Preprocessing)
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
-        marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=temp_config.index_management, index_name=index_name)
 
         # Transform content to list if it is not already
         if isinstance(content, List):
@@ -105,7 +101,7 @@ class Embed:
                 BulkSearchQueryEntity(
                     q=content_entry,
                     index=marqo_index,
-                    image_download_headers=image_download_headers,
+                    mediaDownloadHeaders=media_download_headers,
                     modelAuth=model_auth,
                     text_query_prefix=prefix
                     # TODO: Check if it's fine that we leave out the other parameters
@@ -115,7 +111,9 @@ class Embed:
 
         # Vectorise the queries
         with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(temp_config, queries, device)
+            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(
+                temp_config, queries, device
+            )
 
         embeddings: List[List[float]] = list(qidx_to_vectors.values())
 

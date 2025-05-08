@@ -2,18 +2,20 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
 
-from marqo.base_model import ImmutableStrictBaseModel, StrictBaseModel
+import pydantic.v1 as pydantic
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
+
+from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
+
+# TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
@@ -23,6 +25,7 @@ logger = get_logger(__name__)
 class IndexType(Enum):
     Structured = 'structured'
     Unstructured = 'unstructured'
+    SemiStructured = 'semi-structured'
 
 
 class FieldType(str, Enum):
@@ -38,6 +41,8 @@ class FieldType(str, Enum):
     ArrayFloat = 'array<float>'
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
+    VideoPointer = 'video_pointer'
+    AudioPointer = 'audio_pointer'
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
     MapInt = 'map<text, int>'
@@ -95,6 +100,12 @@ class Field(ImmutableStrictBaseModel):
 
         return values
 
+class StringArrayField(ImmutableStrictBaseModel):
+    name: str
+    type: FieldType
+    string_array_field_name: Optional[str]
+    features: List[FieldFeature] = []
+
 
 class TensorField(ImmutableStrictBaseModel):
     """
@@ -116,6 +127,16 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
+
+
+class VideoPreProcessing(ImmutableStrictBaseModel):
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
+
+class AudioPreProcessing(ImmutableStrictBaseModel):
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
@@ -200,7 +221,7 @@ class Model(StrictBaseModel):
             return request_level_prefix
 
         # For backwards compatibility. Since older versions of Marqo did not have a text_query_prefix field,
-        # we need to return an empty string if the model does not have a text_query_prefix. 
+        # we need to return an empty string if the model does not have a text_query_prefix.
         # We know that the value of text_query_prefix is None in old indexes since the model was not populated
         # from the registry.
         if self.text_query_prefix is None:
@@ -214,7 +235,7 @@ class Model(StrictBaseModel):
             return request_level_prefix
 
         # For backwards compatibility. Since older versions of Marqo did not have a text_chunk_prefix field,
-        # we need to return an empty string if the model does not have a text_chunk_prefix. 
+        # we need to return an empty string if the model does not have a text_chunk_prefix.
         # We know that the value of text_chunk_prefix is None in old indexes since the model was not populated
         # from the registry.
         if self.text_chunk_prefix is None:
@@ -235,9 +256,13 @@ class Model(StrictBaseModel):
         return default_prefix
 
 
-class MarqoIndex(ImmutableStrictBaseModel, ABC):
+class MarqoIndex(ImmutableBaseModel, ABC):
     """
     Base class for a Marqo index.
+    We inherit from ImmutableBaseModel and add the extra = "allow" config to allow extra fields during deserialization.
+    We will be adding multiple fields to this class in the future. This change will make MarqoIndex forward
+    compatible to these changes and allow us to rollback Marqo without breaking the Pydantic validation or dropping
+    the added fields.
     """
     name: str
     schema_name: str
@@ -246,16 +271,20 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
+    video_preprocessing: Optional[VideoPreProcessing] = None
+    audio_preprocessing: Optional[AudioPreProcessing] = None
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
+    version: Optional[int] = pydantic.Field(default=None)
 
-    class Config:
-        allow_mutation = False
+    class Config(ImmutableBaseModel.Config):
+        extra = "allow"
 
     def __init__(self, **data: Any):
         super().__init__(**data)
@@ -290,7 +319,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
         return name
 
     @classmethod
-    def parse_obj(cls, obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
+    def parse_obj(cls, obj: Any) -> 'MarqoIndex':
         obj = cls._enforce_dict_if_root(obj)
         if not isinstance(obj, dict):
             try:
@@ -304,10 +333,15 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
                 return StructuredMarqoIndex(**obj)
             elif obj['type'] == IndexType.Unstructured.value:
                 return UnstructuredMarqoIndex(**obj)
+            elif obj['type'] == IndexType.SemiStructured.value:
+                return SemiStructuredMarqoIndex(**obj)
             else:
                 raise ValidationError(f"Invalid index type {obj['type']}")
 
         raise ValidationError(f"Index type not found in {obj}")
+
+    def clear_cache(self):
+        self._cache.clear()
 
     def _cache_or_get(self, key: str, func):
         if key not in self._cache:
@@ -320,6 +354,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
+    treat_urls_and_pointers_as_media: Optional[bool] = None
     filter_string_max_length: int
 
     def __init__(self, **data):
@@ -476,6 +511,123 @@ class StructuredMarqoIndex(MarqoIndex):
                                   lambda: {dependent_field for field in self.fields if field.dependent_fields
                                            for dependent_field in field.dependent_fields.keys()}
                                   )
+
+
+class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
+
+    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
+
+    type: IndexType = IndexType.SemiStructured
+    lexical_fields: List[Field]
+    tensor_fields: List[TensorField]
+    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    @classmethod
+    def _valid_type(cls) -> IndexType:
+        return IndexType.SemiStructured
+
+    @property
+    def field_map(self) -> Dict[str, Field]:
+        """
+        A map from field name to the field.
+        """
+        return self._cache_or_get('field_map',
+                                  lambda: {field.name: field for field in self.lexical_fields})
+
+    @property
+    def name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's " "name" property to corresponding StringArrayField object.
+        "Name" is the name of the StringArrayField object, which is passed by the user. It does not start with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+
+        return self._cache_or_get('name_to_string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.name: field for field in self.string_array_fields})
+
+    @property
+    def string_array_field_name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's "string_array_field_name" property to corresponding StringArrayField object.
+        A "string_array_field_name" is that name of a StringArrayField object, which is used in the index schema, and it starts with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+        return self._cache_or_get('string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.string_array_field_name: field for field in self.string_array_fields})
+
+    @property
+    def lexical_field_map(self) -> Dict[str, Field]:
+        """Return a map from lexical field name to the field object.
+
+        The field.lexical_field_name is not the same as the field.name. It is the name of the field that is used in the
+        index schema with Marqo prefix."""
+        return self._cache_or_get('lexical_field_map',
+                                  lambda: {field.lexical_field_name: field for field in self.lexical_fields})
+
+    @property
+    def lexically_searchable_fields_names(self) -> Set[str]:
+        """Return a set of field names (str) that are lexically searchable.
+
+        These are the original field names without any Marqo prefix. You should use this to generate
+        the searchable fields in your lexical search query.
+
+        Note that field.name is not identical to field.lexical_field_name. The latter is the name of the field
+        that is used in the index schema"""
+        return self._cache_or_get('lexically_searchable_fields_names',
+                                  lambda: {field.name for field in self.lexical_fields}
+                                  )
+
+    @property
+    def tensor_field_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor field name to the TensorField object.
+        """
+        return self._cache_or_get('tensor_field_map',
+                                  lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
+                                  )
+
+    @property
+    def tensor_subfield_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor chunk and embeddings field name to the TensorField object.
+        """
+
+        def generate():
+            the_map = dict()
+            for tensor_field in self.tensor_fields:
+                if tensor_field.chunk_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate chunk field name {tensor_field.chunk_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.chunk_field_name] = tensor_field
+
+                if tensor_field.embeddings_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.embeddings_field_name] = tensor_field
+
+            return the_map
+
+        return self._cache_or_get('tensor_subfield_map', generate)
+
+    @property
+    def index_supports_partial_updates(self) -> bool:
+        """
+        Check if the index supports partial updates.
+        """
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

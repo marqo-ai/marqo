@@ -20,7 +20,7 @@ from marqo.s2_inference.s2_inference import (_create_model_cache_key, _float_ten
                                              _nd_array_to_list, get_available_models)
 from marqo.s2_inference.configs import ModelCache
 
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 logger = get_logger(__name__)
 
 def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float]]) -> List[float]:
@@ -142,7 +142,7 @@ class DummyModel:
         return np.random.rand(len(inputs))
 
 class HFClassificationOnnx:
-    """uses HF pipelines and optimum to load hf classification model 
+    """uses HF pipelines and optimum to load hf classification model
     (cross encoders) and uses it as onnx
     https://huggingface.co/docs/optimum/main/en/onnxruntime/modeling_ort
     
@@ -229,7 +229,7 @@ class HFClassificationOnnx:
             List[Dict]: _description_
         """
         self.inputs = self._prepare_inputs(inputs)
-        # couldn't find aaaaany documentation on passing tokenizer arguments through the pipeline
+        # couldn't find any documentation on passing tokenizer arguments through the pipeline
         # leaving these here for reference
         # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline

@@ -1,0 +1,143 @@
+schema marqo__test_00semi_00structured_00schema {
+    document {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__version_uuid type string {
+                indexing: attribute | summary
+        }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__int_fields type map<string, long> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__bool_fields type map<string, byte> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                                attribute: fast-search
+                                rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__float_fields type map<string, double> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__short_string_fields type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__score_modifiers type tensor<double>(p{}) {
+            indexing: attribute | summary
+        }
+
+        field marqo__multimodal_params type map<string, string> {
+            indexing: summary
+        }
+
+        field marqo__string_array_string_array_1 type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field marqo__vector_count type int {
+            indexing: attribute | summary
+        }
+    }
+
+    rank-profile base_rank_profile inherits default {
+        inputs {
+            query(marqo__bm25_aggregator): 0
+            query(marqo__query_embedding) tensor<float>(x[32])
+            query(marqo__mult_weights_lexical) tensor<double>(p{})
+            query(marqo__add_weights_lexical) tensor<double>(p{})
+            query(marqo__mult_weights_tensor) tensor<double>(p{})
+            query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
+        }
+
+        function mult_modifier(mult_weights) {
+            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod))
+        }
+        function add_modifier(add_weights) {
+            expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
+        }
+        function modify(score, mult_weights, add_weights) {
+            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+        }
+        function global_mult_modifier() {
+            expression: mult_modifier(query(marqo__mult_weights_global))
+        }
+        function global_add_modifier() {
+            expression: add_modifier(query(marqo__add_weights_global))
+        }
+
+        function embedding_score() {
+            expression: 0
+        }
+
+        match-features: global_mult_modifier global_add_modifier
+    }
+
+    rank-profile embedding_similarity inherits base_rank_profile {
+        first-phase {
+            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+        }
+
+    }
+
+
+
+    document-summary all-non-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary marqo__string_array_string_array_1 type array<string> {source: marqo__string_array_string_array_1}
+
+    }
+
+    document-summary all-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary marqo__string_array_string_array_1 type array<string> {source: marqo__string_array_string_array_1}
+
+    }
+}

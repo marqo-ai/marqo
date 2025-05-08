@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 
-from pydantic import validator
+from pydantic.v1 import validator
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.api.exceptions import BadRequestError

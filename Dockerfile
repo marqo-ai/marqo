@@ -2,11 +2,17 @@
 FROM maven:3.8.7-openjdk-18-slim as maven_build
 
 WORKDIR /app/vespa
-COPY vespa .
-RUN mvn clean package
+# Copy only the pom.xml and any other files required for dependency resolution
+COPY vespa/pom.xml /app/vespa/
+# Download dependencies (this layer will be cached if pom.xml hasn't changed)
+RUN mvn dependency:go-offline
+
+COPY vespa/src /app/vespa/src
+# Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
+RUN mvn clean package -T 1C
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:20 as base_image
+FROM marqoai/marqo-base:49 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
@@ -20,6 +26,7 @@ ARG TARGETPLATFORM
 ARG COMMITHASH
 WORKDIR /app
 
+# TODO This is temporary change to install the packages in requirements.txt file, will be moved to base image in the future
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 RUN rm requirements.txt

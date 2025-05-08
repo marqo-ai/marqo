@@ -1,13 +1,11 @@
 import json
-from copy import deepcopy
 from typing import List, Dict, Any
-import semver
 
-from pydantic import Field, BaseModel
+from pydantic.v1 import Field
+
 from marqo.base_model import MarqoBaseModel
-
 from marqo.core import constants as index_constants
-from marqo.core.exceptions import VespaDocumentParsingError
+from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 
@@ -34,13 +32,22 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     def extract_highlights(self) -> List[Dict[str, str]]:
         if not self.match_features:
             raise VespaDocumentParsingError("No match features found in the document")
-        try:
-            chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"] \
-                                            ["cells"].keys())[0])
-        except KeyError:
-            raise VespaDocumentParsingError("No match features found in the document")
-        field_name, content = self.vespa_chunks[chunk_index].split("::", 1)
-        return [{field_name: content}]
+
+        if self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]["cells"] == {}:
+            # No match feature found, return empty highlights
+            return []
+        else:
+            if not self.vespa_chunks:
+                raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
+                                                f"No highlights can be extracted.")
+
+            try:
+                chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"] \
+                                                ["cells"].keys())[0])
+            except KeyError:
+                raise VespaDocumentParsingError("No match features found in the document")
+            field_name, content = self.vespa_chunks[chunk_index].split("::", 1)
+            return [{field_name: content}]
 
 
 class UnstructuredVespaDocument(MarqoBaseModel):
@@ -52,6 +59,10 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     id: str
     fields: UnstructuredVespaDocumentFields = Field(default_factory=UnstructuredVespaDocumentFields)
 
+    # For hybrid search
+    raw_tensor_score: float = None
+    raw_lexical_score: float = None
+
     _VESPA_DOC_FIELDS = "fields"
     _VESPA_DOC_ID = "id"
 
@@ -59,7 +70,15 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_vespa_document(cls, document: Dict) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a Vespa document."""
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
+
+        raw_lexical_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE) \
+            if unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE in fields else None
+        raw_tensor_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE) \
+            if unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE in fields else None
+
         return cls(id=document[cls._VESPA_DOC_ID],
+                   raw_tensor_score=raw_tensor_score,
+                   raw_lexical_score=raw_lexical_score,
                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
@@ -68,8 +87,9 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         add_documents"""
 
         if index_constants.MARQO_DOC_ID not in document:
-            raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
-                             f"This should be assigned for a valid document")
+            raise MarqoDocumentParsingError(f"Unstructured Marqo document does not have a "
+                                            f"{index_constants.MARQO_DOC_ID} field. "
+                                            f"This should be assigned for a valid document")
 
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fields=UnstructuredVespaDocumentFields(marqo__id=doc_id))
@@ -103,8 +123,9 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                         instance.fields.float_fields[f"{key}.{k}"] = float(v)
                         instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             else:
-                raise VespaDocumentParsingError(f"In document {doc_id}, field {key} has an "
-                                 f"unsupported type {type(value)} which has not been validated in advance.")
+                raise MarqoDocumentParsingError(f"In document {doc_id}, field {key} has an "
+                                                f"unsupported type {type(value)} which has not been "
+                                                f"validated in advance.")
 
         instance.fields.vespa_multimodal_params = document.get(unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, {})
         instance.fields.vespa_embeddings = document.get(index_constants.MARQO_DOC_EMBEDDINGS, {})
@@ -133,8 +154,11 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             marqo_document[key].append(value)
 
         # Add int and float fields back
+        # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
+        # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
         marqo_document.update(self.fields.int_fields)
         marqo_document.update(self.fields.float_fields)
+
         marqo_document.update({k: bool(v) for k, v in self.fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fields.marqo__id
 
@@ -175,8 +199,11 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                     json.loads(serialized_multimodal_params)
 
         if return_highlights and self.fields.match_features:
-            if not self.fields.vespa_chunks:
-                raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
-                                                f"No highlights can be extracted.")
             marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.fields.extract_highlights()
+
+        # Hybrid search raw scores
+        if self.raw_tensor_score is not None:
+            marqo_document[index_constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = self.raw_tensor_score
+        if self.raw_lexical_score is not None:
+            marqo_document[index_constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = self.raw_lexical_score
         return marqo_document

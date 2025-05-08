@@ -1,3 +1,348 @@
+# Release 2.19.0
+
+## New features & Performance improvements
+- Re-introduced support for Languagebind Models. You can now create indexes that support audio and video using these models. Environment variables for video and audio file size limits (`MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE` and `MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE`) have been moved to the API layer ([#1188](https://github.com/marqo-ai/marqo/pull/1188)).
+- Significant performance improvements with upgrade to Pydantic V2. This change results in up to 6x increase in search result post-processing performance and 25% increase in end-to-end throughput. String array field handling and field map property evaluation have also been improved ([#1196](https://github.com/marqo-ai/marqo/pull/1196)).
+- Add new endpoint `POST indexes/{index_name}/documents/get-batch` to retrieve documents via POST call ([#1190](https://github.com/marqo-ai/marqo/pull/1190)).
+
+## Bug fixes and minor changes
+- Fix bug caused by race condition where concurrent `add_documents` and `update_documents` calls temporarily cause an error in `search` due to inconsistent return values ([#1194](https://github.com/marqo-ai/marqo/pull/1194)).
+- Update telemetry key of image downloading from `image_download` to `media_download.{modality}` ([#1206](https://github.com/marqo-ai/marqo/pull/1206)).
+- Fix bug where `ffmpeg` processes video files as audio files by adding modality check in streaming media preprocessor ([#1209](https://github.com/marqo-ai/marqo/pull/1209))
+- Improve differentiation between video and image in streaming media preprocessor by searching for `_pipe` in format name ([13a8228](https://github.com/marqo-ai/marqo/commit/13a82286ae7fecbbb54841b0c63169fc41f7874c))
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.8k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+# Release 2.18.2
+
+## Bug fixes and minor changes
+- Fix performance regression in `add_documents` for structured indexes introduced in 2.17 when content URLs do not have an extension. Field modality is now based on predefined field type to remove the need to download content samples to infer modality ([#1203](https://github.com/marqo-ai/marqo/pull/1203)).
+- Add new telemetry data points `add_documents.inference.{modality}` for each modality ([#1203](https://github.com/marqo-ai/marqo/pull/1203)).
+
+# Release 2.18.1
+
+# Bug Fixes and Minor Changes
+
+- Fix `array` facets always returning empty value (#1187).
+
+# Release 2.18.0
+
+## New Features
+
+- Implement facets for search (#1168). Facets allow you to aggregate data from your documents based on specific fields.
+  This can be useful for creating filters, showing data distributions, or implementing drill-down search functionality.
+
+## Bug Fixes and Minor Changes
+
+- Sanitize lexical query and filter string (#1157). Certain characters in lexical query and filter string could
+  previously cause a 500 error. Marqo now sanitizes these values.
+- Fix modality inference bug (#1179). Address an issue where query parameters in media URL would interfere with
+  extension-based modality inference.
+
+# Release 2.17.2
+
+## Bug Fixes and Minor Changes
+
+- Add back the support for `multilingual-clip` models (https://github.com/marqo-ai/marqo/pull/1177). These models were
+  not supported in 2.17.0, and now we add them back.
+
+# Release 2.16.2
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug preventing Marqo from migrating an index created before 2.16 to
+  2.16 ([#1174](https://github.com/marqo-ai/marqo/pull/1174)).
+
+# Release 2.17.1
+
+## Bug Fixes and Minor Changes
+
+- Add support for Stella models and sentence-transformers models (https://github.com/marqo-ai/marqo/pull/1167). Add back
+  the support for `Stella` models, and the support for `sentence-transformers/all-MiniLM-L12-v2` and
+  `sentence-transformers/all-MiniLM-L6-v2` models. These models were not supported in `2.7.0`.
+- Consolidate Marqo logging (https://github.com/marqo-ai/marqo/pull/1165). Introduce a new logging configuration in
+  `src/marqo/logging.py` with support for JSON and plain formats, and other small improvements.
+
+# Release 2.17.0
+
+## New Features
+
+- Add `Inference`, `API`, and `Combined` modes when running Marqo (https://github.com/marqo-ai/marqo/pull/1159). Marqo
+  now supports 3 modes, `Combined`, `API`, and `Inference`. This enables Marqo API and Inference running in separate
+  processes or containers, offering better performance.
+- Add parameters `rerankDepth` for tensor search and `rerankDepthTensor` for hybrid
+  search (https://github.com/marqo-ai/marqo/pull/1138). Users can set these parameters to get a consistent number of
+  results in some edge cases.
+- Introduce `queryTensor` and `queryLexical` parameters for hybrid search (https://github.com/marqo-ai/marqo/pull/1152).
+  Users can provide weighted tensor queries in hybrid search.
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug where Marqo unnecessarily generated embeddings for hybrid search even when both the retrieval and rerank
+  methods were set to "lexical" causing slower search
+  performance ([#1152](https://github.com/marqo-ai/marqo/pull/1152)).
+
+# Release 2.16.1
+
+## Bug Fixes and Minor Changes
+
+- Fix an issue when performing a partial update on an unstructured index for map
+  fields (https://github.com/marqo-ai/marqo/pull/1146).
+
+# Release 2.16.0
+
+## New Features
+
+- Update documents for unstructured indexes ([#1030](https://github.com/marqo-ai/marqo/pull/1030)). The
+  `update_documents` endpoint is now supported for unstructured indexes created after version 2.16. This allows you to
+  update documents by modifying existing non-tensor fields or adding new fields without re-indexing the entire document.
+  Check [here](https://docs.marqo.ai/2.16/reference/api/documents/update-documents/) for more details.
+- Configurable max Vespa disk utility (https://github.com/marqo-ai/marqo/pull/1124). Users can set the
+  `VESPA_DISK_USAGE_LIMIT` environment variable (ranging from 0 to 1) to adjust the disk usage limit for Vespa when
+  using Marqo.
+
+## Bug Fixes and Minor Changes
+
+- Fix a bug where Marqo can not load the OpenCLIP model tokenizer when the model name has a `hf-hub:`
+  prefix (https://github.com/marqo-ai/marqo/pull/1126).
+- Clean up the logs when starting Marqo (https://github.com/marqo-ai/marqo/pull/1137).
+
+## Contributor Shout-Outs
+
+- A huge thanks to our 4.8k stargazers for your continued support!
+- Thanks a lot for the discussion and suggestions in our community. Join us
+  on [Slack](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and
+  our [forum](https://community.marqo.ai/) today!
+
+# Release 2.15.0
+
+## New Features
+- Global Score Modifiers for Hybrid Search ([#1082](https://github.com/marqo-ai/marqo/pull/1082)). Introduce global score modifiers for hybrid search, allowing fine-tuned adjustments to RRF scores in combined result lists. This enhancement provides better control over returned results in hybrid search scenarios. Use the `rerankDepth` parameter to control the number of hits to rerank. For detailed usage, check [here](https://docs.marqo.ai/latest/reference/api/search/search/#rerank-depth).
+
+- Custom LanguageBind Model ([#1072](https://github.com/marqo-ai/marqo/pull/1072)). Marqo now supports loading custom LanguageBind models from S3 buckets, URLs, or HuggingFace model cards. Fine-tune your own LanguageBind model and integrate it with Marqo to achieve better in-domain results. For more details, see [here](https://docs.marqo.ai/2.15/models/marqo/bring-your-own-model/#bring-your-own-languagebind-models).
+ 
+- Add Marqtune models to the model registry ([#1063](https://github.com/marqo-ai/marqo/pull/1063)). Marqtune models have been added to the model registry, with some models renamed to align with the Marqtune naming convention. This update improves consistency and makes it easier to identify models Marqo and Marqtune. The changes are fully backwards compatible.
+
+## Bug Fixes and Minor Changes
+- Fix a bug where Marqo incorrectly inferred the modality of a field, even when the field is not a tensor field in an unstructured index ([#1086](https://github.com/marqo-ai/marqo/pull/1086)).
+- Resolve an issue where Languagebind models could only handle a single video or audio in a weighted search query. You can now provide multiple videos and audios in a weighted query seamlessly.([#1072](https://github.com/marqo-ai/marqo/pull/1072)).
+- Improve memory usage when indexing image documents with LanguageBind models, enabling more efficient handling of image data. ([#1072](https://github.com/marqo-ai/marqo/pull/1072)).
+
+## Contributor Shout-Outs
+- A huge thanks to our 4.7k stargazers for your continued support!  
+- Thanks a lot for the discussion and suggestions in our community. Join us on [Slack](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and our [forum](https://community.marqo.ai/) today!
+
+# Release 2.14.1
+
+## New features
+
+- Add support for [hf_transfer](https://github.com/huggingface/hf_transfer) to accelerate the downloading speed of HuggingFace models by 10 to 30 times. See [here](https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/#third-party-environment-variables) for details about how to enable it ([#1066](https://github.com/marqo-ai/marqo/pull/1066)).
+- Add `/healthz` endpoint for Marqo container liveness checks, which performs a status check for CUDA devices and returns a 500 error if any existing CUDA devices become unavailable or run out of memory ([#1068](https://github.com/marqo-ai/marqo/pull/1068)). 
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1079)).
+
+# Release 2.13.6
+
+## Bug fixes and minor changes
+
+- Improved error messages for hybrid search ([#1108](https://github.com/marqo-ai/marqo/pull/1108)). Errors that occur in the tensor or lexical search portion of hybrid search are now correctly raised instead of becoming generic 500 errors.
+- Add missing support for legacy OpenAI CLIP models ([#1107](https://github.com/marqo-ai/marqo/pull/1107)). This fix allows old OpenAI CLIP models (eg. ViT-B/32) to be loaded properly.
+- Bug fix for searches using `CustomVectorQuery`. Searches of this query type will no longer fail due to result not being JSON-serializable ([#1109](https://github.com/marqo-ai/marqo/pull/1109)).
+  
+# Release 2.13.5
+
+## Bug fixes and minor changes
+
+- Improve performance of processing large search responses ([#1091](https://github.com/marqo-ai/marqo/pull/1091)). Optimizations include: removing unnecessary validation, utilizing orjson for faster JSON serialization, and optimizing post-search field selection (for unstructured indexes).
+
+# Release 2.13.4
+
+## Bug fixes and minor changes
+
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1075)). 
+
+# Release 2.13.3
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+
+# Release 2.14.0 
+
+## New features
+
+- FFmpeg-CUDA Support ([#1030](https://github.com/marqo-ai/marqo/pull/1030)).   Add GPU acceleration for video decoding by integrating FFmpeg with CUDA support.
+This feature significantly improves video processing performance, making video handling up to 5 times faster. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#marqo-video-gpu-acceleration-configuration) for guidance and requirements.
+
+- Video and audio file size limits ([#1012](https://github.com/marqo-ai/marqo/pull/1012)). Introduce configurable size limits for video and audio files in the add_documents, search, and embed endpoints. This enhancement allows users to manage and optimize resource usage effectively, ensuring smoother processing of multimedia content. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#configuring-usage-limits) for more details. 
+
+- Upgrade to Python 3.9 ([#1006](https://github.com/marqo-ai/marqo/pull/1006)).
+Upgrade the Marqo Docker image to use Python 3.9. With Python 3.8 reaching its End of Life (EOL), we have upgraded our platform to Python 3.9 to maintain security, compatibility, and access to ongoing support.
+
+
+## Bug fixes and minor changes
+
+- Move NLTK resource downloads to Marqo's startup process and remove the unsafe punkt package. This avoids potential code start issues and enhances security ([#1040](https://github.com/marqo-ai/marqo/pull/1040)).
+
+- Fix model serialization in OpenAPI specifications. This community-contributed PR resolves issues with OpenAPI spec generation and SwaggerUI by fixing incorrect type hints in the API definition, ensuring accurate model serialization and improving API documentation accessibility ([#986](https://github.com/marqo-ai/marqo/pull/986)). 
+
+- Add brief description for each endpoint in the OpenAPI specifications. This improves API documentation clarity for users ([#1042](https://github.com/marqo-ai/marqo/pull/1042)).
+
+## Contributor shout-out
+- Shoutouts to our valuable 4.7k stargazers!
+- Thanks a lot for the heated discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+- Special thanks to community contributor [@gabauer](https://github.com/gabauer) for their impactful PR, helping improve Marqo for everyone!
+
+# Release 2.13.2
+
+## Bug fixes and minor changes
+
+- Fix a bug where adding documents with numeric lists to an unstructured index results in a 500 error. Now, Marqo successfully processes the document batch, and returns a 400 error only for individual documents that contain numeric lists([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Fix validation of custom vector fields. Custom vector fields were silently ignored when not specified as tensor fields for an unstructured index. This will now trigger a 400 error. This helps guide users to properly define the field as a tensor field([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Improve the bootstrapping process to prevent Marqo from crashing during startup when the vector store takes longer to converge, especially with multiple indexes. This ensures a smoother startup process even if the vector store takes time to fully initialize([1036](https://github.com/marqo-ai/marqo/pull/1036)).
+
+# Release 2.13.1
+
+## Bug fixes and minor changes
+
+- Fix a bug where Marqo returns a 500 error if an inaccessible private image is encountered in the query or embed endpoint. Marqo now correctly returns a 400 error with a helpful error message ([1027](https://github.com/marqo-ai/marqo/pull/1027)).
+- Fix a bug preventing Marqo from warming up Languagebind models. Marqo now successfully warms up Languagebind models as expected ([1031](https://github.com/marqo-ai/marqo/pull/1031)).
+- Fix a bug where Languagebind models always generate normalized embeddings for non-text content. These models now correctly produce unnormalized embeddings for video, audio, and image content ([1032](https://github.com/marqo-ai/marqo/pull/1032)).
+
+# Release 2.13.2
+
+## Bug fixes and minor changes
+
+- Fix a bug where adding documents with numeric lists to an unstructured index results in a 500 error. Now, Marqo successfully processes the document batch, and returns a 400 error only for individual documents that contain numeric lists([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Fix validation of custom vector fields. Custom vector fields were silently ignored when not specified as tensor fields for an unstructured index. This will now trigger a 400 error. This helps guide users to properly define the field as a tensor field([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Improve the bootstrapping process to prevent Marqo from crashing during startup when the vector store takes longer to converge, especially with multiple indexes. This ensures a smoother startup process even if the vector store takes time to fully initialize([1036](https://github.com/marqo-ai/marqo/pull/1036)).
+
+# Release 2.13.1
+
+## Bug fixes and minor changes
+
+- Fix a bug where Marqo returns a 500 error if an inaccessible private image is encountered in the query or embed endpoint. Marqo now correctly returns a 400 error with a helpful error message ([1027](https://github.com/marqo-ai/marqo/pull/1027)).
+- Fix a bug preventing Marqo from warming up Languagebind models. Marqo now successfully warms up Languagebind models as expected ([1031](https://github.com/marqo-ai/marqo/pull/1031)).
+- Fix a bug where Languagebind models always generate normalized embeddings for non-text content. These models now correctly produce unnormalized embeddings for video, audio, and image content ([1032](https://github.com/marqo-ai/marqo/pull/1032)).
+
+# Release 2.13.0
+
+## New features
+- Searchable attributes for unstructured indexes ([#968](https://github.com/marqo-ai/marqo/pull/968)). This new feature allows you to specify which lexical or tensor fields to include in your search queries, providing greater control over the search process. By customizing your search parameters, you can enhance the precision of your results across all search types: tensor, lexical, and hybrid. This feature is available for unstructured indexes created with Marqo 2.13 or later. For detailed guidance, please refer to [the API reference](https://docs.marqo.ai/latest/reference/api/search/search/#searchable-attributes) and [comparison of unstructured and structured indexes](https://docs.marqo.ai/latest/other-resources/cookbook/indexes/unstructured-vs-structured-indexes/)
+- Support for `stella_en_400M_v5` embedding models ([#1021](https://github.com/marqo-ai/marqo/pull/1021)). This feature adds compatibility for the Stella 400M text embedding models, enhancing the versatility of Marqo in handling diverse model types. Users can now use the `hf_stella` model type in their custom models. Please refer to [stella model guide](https://docs.marqo.ai/2.13/models/marqo/bring-your-own-model/#stella-models) for details.
+- Allow specifying pooling method for Hugging Face models ([#954](https://github.com/marqo-ai/marqo/pull/954)). Marqo can now infer the pooling method and accept user provided pooling method in model properties. For detailed examples, please refer to [this document about bringing your own Hugging Face model](https://docs.marqo.ai/2.13/models/marqo/bring-your-own-model/#bring-your-own-hugging-face-sentence-transformers-models).
+
+## Bug fixes and minor changes
+- Normalize custom vectors during indexing when `normalizeEmbeddings` is set to True for indexes created with Marqo 2.13 or later ([#970](https://github.com/marqo-ai/marqo/pull/970)). This fix ensures that custom vector fields align with other tensor fields in terms of normalization, resulting in more accurate search results and improved overall performance.
+- Enhanced query parser for double quotes ([#979](https://github.com/marqo-ai/marqo/pull/979)). This feature introduces improved parsing logic for handling double quotes in search queries, allowing for greater flexibility and resilience against syntax errors. Badly formatted and escaped quotes no longer lead to 500 status errors. Please refer to the [lexical search guide](https://docs.marqo.ai/latest/reference/api/search/search/#lexical-search-exact-matches) for more details and examples.
+- Bug fix for score modifiers handling ([#1008](https://github.com/marqo-ai/marqo/pull/1008)). This update resolves an issue related to the handling of score modifiers in queries, specifically those involving the period `.` character. Users will now experience smoother query operations without encountering internal errors, ensuring that score modifiers are correctly applied. 
+- Bug fixes for media download and query handling ([#1022](https://github.com/marqo-ai/marqo/pull/1022)). Users can now successfully download private media files by using the new `mediaDownloadHeaders` parameter, which will replace the deprecated `imageDownloadHeaders`. Additionally, the fix resolves issues preventing the inclusion of more than two modalities in weighted queries, along with support for indexing `.png` images in Languagebind models.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.6k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+# Release 2.12.5
+
+## Bug fixes and minor changes
+- Fix a bug where authentication is not correctly passed when loading a private model. Marqo can now load custom models from private repositories correctly ([#1010](https://github.com/marqo-ai/marqo/pull/1010)).
+
+# Release 2.12.4
+
+## Bug fixes and minor changes
+- Fix inference time regression from 2.11 to 2.12 where inference time increased unexpectedly ([#1005](https://github.com/marqo-ai/marqo/pull/1005)).
+
+# Release 2.12.3
+
+## Bug fixes and minor changes
+- Fix bug where users upgrading from indexes created with Marqo 2.11 to 2.12 would encounter an error when using the `get_settings` API endpoint ([#1003](https://github.com/marqo-ai/marqo/pull/1003)).
+
+# Release 2.12.2
+
+## Bug fixes and minor changes
+- Upgrade the `Pillow` and `nltk` packages ([#989](https://github.com/marqo-ai/marqo/pull/989)).
+- Fix a bug where `normalizeEmbeddings=False` is not honored for some indexes ([#994](https://github.com/marqo-ai/marqo/pull/994)).
+
+# Release 2.12.1
+
+## Bug fixes and minor changes
+- Fix a bug where when `treatUrlsAndPointersAsImages` is unset and `treatUrlsAndPointersAsMedia` is set, Marqo returns an error where `treatUrlsAndPointersAsImages` cannot be `False` when `treatUrlsAndPointersAsMedia` is `True` ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)) 
+- Add new video-audio model `LanguageBind/Video_V1.5_FT_Audio_FT` to the model registry ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)).
+
+# Release 2.12.0
+
+## New features
+- Add support for video and audio modalities using LanguageBind models ([#931](https://github.com/marqo-ai/marqo/pull/931)). You can now index, embed, and search with video and audio files using Marqo, extending your search capabilities beyond text and images. 
+- Load OpenCLIP models from HuggingFace Hub ([#939](https://github.com/marqo-ai/marqo/pull/939)). Support loading OpenCLIP models directly from HuggingFace by providing a model name with the hf-hub: prefix. This simplifies model integration and expands your options.
+- Load custom OpenCLIP checkpoints with different image preprocessors ([#939](https://github.com/marqo-ai/marqo/pull/939)). Allow loading a custom OpenCLIP checkpoint with a different image preprocessor by providing imagePreprocessor in the model properties. This offers greater flexibility in model selection and customization.
+
+## Bug fixes and minor changes
+- Fix tokenizer loading for custom OpenCLIP checkpoints ([#939](https://github.com/marqo-ai/marqo/pull/939)). The correct tokenizer is now applied when custom OpenCLIP model checkpoints are loaded.
+- Improve error handling for image_pointer fields in structured indexes ([#944](https://github.com/marqo-ai/marqo/pull/944)). Structured indexes now have targeted error reporting for non-image content in image_pointer fields. This improvement prevents batch failures and provides clearer feedback to users.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.5k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+# Release 2.11.4
+
+## Bug fixes and minor changes
+- Fix duplication of results in RRF hybrid search ([#957](https://github.com/marqo-ai/marqo/pull/957)). Resolved an issue where some results in Reciprocal Rank Fusion (RRF) hybrid search were duplicated, ensuring more accurate and unique search results.
+
+# Release 2.11.3
+
+## Bug fixes and minor changes
+- Support S3 custom model without explicit credentials ([#948](https://github.com/marqo-ai/marqo/pull/948)).
+
+# Release 2.11.2
+
+## Bug fixes and minor changes
+- Fix an issue where CUDA was not automatically selected as the default device for the `embed` endpoint, even when available [#941](https://github.com/marqo-ai/marqo/pull/941).
+
+# Release 2.11.1
+
+## Bug fixes and minor changes
+- Added a default User-Agent header (`Marqobot/1.0`) and enabled automatic redirection handling when downloading images ([#932](https://github.com/marqo-ai/marqo/pull/932)). This enhancement allows Marqo to correctly process image URLs that require a `User-Agent` header or redirection.
+
+# Release 2.11.0
+
+## New features
+
+- Hybrid Search for unstructured indexes (`"searchMethod": "HYBRID”`) ([#912](https://github.com/marqo-ai/marqo/pull/912)). Marqo now supports hybrid search for unstructured indexes, combining lexical and tensor search (e.g., using reciprocal rank fusion - RRF) to provide the best relevance possible. See usage [here](https://docs.marqo.ai/2.11/API-Reference/Search/search/#example-2-creating-and-searching-an-unstructured-index-hybrid-search-with-model-deployed-within-marqo). Please note that hybrid search only works on a fresh Marqo 2.11.0 instance without state transfer for now. This is a limitation that we will address in the next release.
+- [Marqo Terraform provider](https://github.com/marqo-ai/terraform-provider-marqo) is now available on both [OpenTofu Registry](https://github.com/opentofu/registry/blob/main/providers/m/marqo-ai/marqo.json) and [Terraform Registry](https://registry.terraform.io/providers/marqo-ai/marqo/latest). See usage [here](https://docs.marqo.ai/2.11/Cloud-Reference/opentofu_provider/)
+
+## Bug fixes and minor changes
+
+- Improve the error handling of batch add/update/get documents API ([#911](https://github.com/marqo-ai/marqo/pull/911)). Now each document in a batch request has its individual response status with detailed error message. See details [here](https://docs.marqo.ai/2.11/API-Reference/Documents/add_or_replace_documents/#response)
+- Fix incorrect or missing prefixes for some models in the registry ([#917](https://github.com/marqo-ai/marqo/pull/917)). This change improves all BGE models, all Snowflake models, and multilingual-e5-large-instruct. For example, `snowflake-arctic-embed-l` model has 34% improvement in NDCG@10 on the Arguana benchmark and 153% improvement in NDCG@10 on the FIQA benchmark.
+- Increase the maxHits and maxOffset limit to 1,000,000 in the default query profile. ([#914](https://github.com/marqo-ai/marqo/pull/914)). This allows user to override `MARQO_MAX_SEARCH_LIMIT` and `MARQO_MAX_SEARCH_OFFSET` environment variables to large values up to one million. Please note that this is an advanced setting and very large values aren’t normally recommended.
+- Fix a bug that causes 400 error when using hybrid search with LEXICAL retrieval method and TENSOR ranking method and `scoreModifiersLexical` ([#922](https://github.com/marqo-ai/marqo/pull/922)).
+
+## Contributor shout-outs
+
+- Huge shoutout to all our 4.4k stargazers! We’ve come a long way as a team and as a community, so a huge thanks to everyone who continues to support Marqo.
+- Feel free to keep on sharing questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
+# Release 2.10.2
+
+## Bug fixes and minor changes
+- Fix an issue where CUDA was not automatically selected as the default device for the `embed` endpoint, even when available [#941](https://github.com/marqo-ai/marqo/pull/941).
+
+# Release 2.10.1
+
+## Bug fixes and minor changes
+- Improve the clarity of the error message when Marqo can not download the provided image ([#905](https://github.com/marqo-ai/marqo/pull/905)).
+- Improve the error message in hybrid search to avoid confusion ([#900](https://github.com/marqo-ai/marqo/pull/900)).
+- Fix a bug where a `500` error is returned when an unsupported search method is provided. Marqo now correctly returns a `400` error ([#899](https://github.com/marqo-ai/marqo/pull/899)).
+- Fix a bug where a `500` error is returned when an invalid image URL with non-ASCII characters is provided. Marqo now encodes the image URL correctly ([#908](https://github.com/marqo-ai/marqo/pull/908)).
+
 # Release 2.10.0
 
 ## New features

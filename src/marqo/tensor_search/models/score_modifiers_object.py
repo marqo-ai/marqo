@@ -1,11 +1,11 @@
 import json
 from typing import List, Dict, Any, Optional
 
-from pydantic import BaseModel, validator, ValidationError
+from pydantic.v1 import BaseModel, validator, ValidationError
 
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.api.exceptions import InvalidArgError
-
+from marqo import marqo_docs
 
 class ScoreModifierValidationError(InvalidArgError):
     def __init__(self, modifier: Dict[str, Any], message: str, link: str = None):
@@ -13,7 +13,7 @@ class ScoreModifierValidationError(InvalidArgError):
             link=link,
             message=f"Error validating score_modifiers = `{modifier}`. Reason: \n{message} "
                     f"Please revise your score_modifiers based on the provided error."
-                    f"\n Check `https://docs.marqo.ai/0.0.17/API-Reference/search/#score-modifiers` for more info."
+                    f"\n Check {marqo_docs.search_api_score_modifiers_parameter()} for more info."
         )
 
 
