@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-   group: unit-tests-${{ github.ref }}
-   cancel-in-progress: true
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
