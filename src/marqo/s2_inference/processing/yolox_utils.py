@@ -3,7 +3,7 @@ import numpy as np
 import onnxruntime
 import huggingface_hub
 
-from marqo.s2_inference.s2_inference import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, FloatTensor, ndarray, Callable
 from marqo.s2_inference.processing.image_utils import _get_onnx_provider
 
@@ -89,7 +89,7 @@ def demo_postprocess(outputs: ndarray, img_size: Tuple[int, int], p6: bool = Fal
     Args:
         outputs (ndarray): the outputs from the yolox model inference
         img_size (Tuple[int, int]): the size of the input image
-        p6 (bool, optional): model architecture parameter. marqo-yolo v1 and v2 should be False. 
+        p6 (bool, optional): model architecture parameter. marqo-yolo v1 and v2 should be False.
                             check the model architecture for anything else. Defaults to False.
 
     Returns:

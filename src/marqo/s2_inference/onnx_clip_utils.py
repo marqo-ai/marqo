@@ -11,7 +11,7 @@ from PIL import Image
 import open_clip
 from huggingface_hub import hf_hub_download
 from marqo.s2_inference.types import *
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 import onnxruntime as ort
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 import marqo.s2_inference.model_registry as model_registry

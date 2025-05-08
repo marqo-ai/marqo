@@ -1,0 +1,258 @@
+name: Integration Tests
+run-name: Integration tests with ${{ inputs.number_of_shards || 1 }} shards and ${{ inputs.number_of_replicas || 0 }} replicas
+# runs integration tests on AMD64 machine
+
+on:
+  workflow_call:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa minus 1). Minimum of 0.'
+        required: true
+        default: 0
+
+  workflow_dispatch:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa - 1)'
+        required: true
+        default: 0
+
+concurrency:
+  group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Determine-Vespa-Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ steps.set_var.outputs.MULTINODE_TEST_ARGS }}
+    steps:
+      - name: Determine VESPA_MULTINODE_SETUP
+        id: set_var
+        run: |
+          # For single node, initialize as false
+          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          echo "First assuming single node Vespa setup."
+
+          # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
+          NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
+          NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
+
+          # Convert inputs to integers
+          NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
+          NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
+
+          # Evaluate the conditions
+          if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
+            echo "Now using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
+            echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+            # If multinode vespa, ignore unrelated tests to save time and prevent errors
+            echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
+          fi
+
+  Start-Runner1:
+    needs:
+      - Determine-Vespa-Setup
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
+    secrets: inherit
+
+  Start-Runner2:
+    needs:
+      - Determine-Vespa-Setup
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
+    secrets: inherit
+
+  Create-Matrix:
+    needs:
+      - Start-Runner1
+      - Start-Runner2
+    if: ${{ always() }} # Ensure the matrix is created even if one of the runners fails to start
+    runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.create-matrix.outputs.labels }}
+      ec2-instance-ids: ${{ steps.create-matrix.outputs.ec2-instance-ids }}
+    steps:
+      - name: Create matrix
+        id: create-matrix
+        run: |
+          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}"]'
+          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}"]'
+
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
+          echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
+
+  Test-Marqo:
+    name: Run Integration Tests (Part ${{ matrix.part }}/1)
+    needs:
+      - Create-Matrix # Ensures it starts only after the runners are ready
+      - Determine-Vespa-Setup
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [ 0, 1 ] # Zero-based index for JSON list access
+    runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
+    
+    timeout-minutes: 60
+    env:
+      VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ needs.Determine-Vespa-Setup.outputs.MULTINODE_TEST_ARGS }}
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-base
+          path: marqo-base
+
+      - name: Install dependencies
+        run: |
+          pip install -r marqo/requirements.dev.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # Override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.txt
+
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
+
+      - name: Build Vespa
+        run: |
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
+
+          # Function to wait for the dpkg lock to be released
+          function wait_for_dpkg_lock() {
+            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+              echo "Waiting for the dpkg lock to be released..."
+              sleep 5
+            done
+          }
+
+          # Wait for the dpkg lock before updating and installing
+          wait_for_dpkg_lock
+
+          echo "Updating package list"
+          apt-get update -y
+
+          # Build Vespa components
+          echo "Installing jdk 17"
+          sudo apt-get install openjdk-17-jdk -y
+          echo "Installing maven"
+          sudo apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
+
+      - name: Start Vespa
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+
+      - name: Run Integration Tests
+        run: |
+          # Define these for use by marqo
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
+          export HF_HUB_ENABLE_HF_TRANSFER=1
+
+          export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
+          export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
+          export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
+
+          cd marqo
+
+          export PYTHONPATH="./src:."
+          set -o pipefail
+          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
+            --ignore=tests/integ_tests/test_documentation.py --durations=100 \
+            --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
+
+      - name: Upload Test Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-integ-tests-report-${{ matrix.part }}
+          path: |
+            marqo/.coverage.${{ matrix.part }}
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
+          include-hidden-files: true
+
+  Merge-Coverage:
+    name: Merge Coverage And Generate Reports
+    needs:
+      - Test-Marqo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Download all coverage files
+        uses: actions/download-artifact@v4
+
+      - name: Move Coverage Files
+        run: mv marqo-integ-tests-report-*/.* marqo/
+
+      - name: Merge Coverage Results
+        run: |
+          cd marqo
+          pip install coverage
+          coverage combine
+
+      - name: Upload Merged Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-integ-tests-report
+          path: marqo/.coverage
+          include-hidden-files: true
+
+  Stop-Runner:
+    needs:
+      - Create-Matrix # Ensures it starts only after the runners are ready
+      - Test-Marqo # required to wait when the main job is done
+    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
+    strategy:
+      matrix:
+        instance: [0, 1] # Zero-based index for JSON list access
+    uses: ./.github/workflows/stop_ec2_runner.yml
+    with:
+      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
+      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
+    secrets: inherit

@@ -2,7 +2,7 @@
 from PIL import UnidentifiedImageError
 
 from marqo.s2_inference.errors import RerankerError, RerankerNameError
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
 from marqo.s2_inference.reranking.enums import ResultsFields
 from marqo.s2_inference.types import Dict, List, Optional

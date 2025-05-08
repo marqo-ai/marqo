@@ -28,6 +28,13 @@ class EnvVarError(MarqoError):
         self.message = message
 
 
+class StartupSanityCheckError(MarqoError):
+    code = "startup_sanity_check_error"
+
+    def __init__(self, message: str):
+        self.message = message
+
+
 # TODO: DELETE
 class MarqoApiError(MarqoError):
     """Error sent by Marqo API"""
@@ -205,6 +212,11 @@ class OperationConflictError(__InvalidRequestError):
     status_code = HTTPStatus.CONFLICT
 
 
+class ApplicationRollbackError(__InvalidRequestError):
+    code = "application_rollback_error"
+    status_code = HTTPStatus.CONFLICT
+
+
 # ---MARQO INTERNAL ERROR---
 
 
@@ -212,6 +224,12 @@ class InternalError(MarqoWebError):
     error_type = "internal"
     code = "internal"
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class ServiceUnavailableError(MarqoWebError):
+    error_type = "service_unavailable"
+    code = "service_unavailable"
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
 
 
 class BackendCommunicationError(InternalError):

@@ -39,4 +39,8 @@ class InvalidVespaApplicationError(VespaError):
     pass
 
 
+class VespaActivationConflictError(VespaError):
+    pass
+
+
 

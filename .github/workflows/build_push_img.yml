@@ -1,0 +1,175 @@
+name: Build and Push Marqo Docker Image
+
+permissions:
+  contents: read
+  id-token: write
+
+# TODO: Add concurrency for these tasks (https://s2search.atlassian.net/browse/MQ-274) (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841652402)
+on:
+  workflow_call:
+    inputs:
+      marqo_ref:
+        description: 'Marqo branch-name, commit SHA or tag'
+        required: false
+        type: string
+        default: 'mainline'
+      push_to:
+        description: 'image destination. Options: "ECR" or "DockerHub" (Can be added in the future)'
+        required: true
+        type: string
+        default: 'ECR'
+      image_repo:
+        description: 'Image repository'
+        required: true
+        type: string
+        default: 'marqo'
+      image_tag:
+        description: 'Image tag'
+        required: true
+        type: string
+    outputs:
+      image_identifier:
+        # By image_identifier, we refer to the
+        # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
+        description: "The image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.image_identifier }}
+
+  workflow_dispatch: #for manual triggers
+    inputs:
+      marqo_ref:
+        description: 'Marqo branch-name, commit SHA or tag'
+        required: false
+        default: 'mainline'
+      push_to:
+        description: 'image destination. Options: "ECR", "DockerHub"'
+        required: true
+        options:
+          - ECR
+          - DockerHub
+      image_repo:
+        description: 'Image repository'
+        required: true
+        default: 'marqo'
+      image_tag:
+        description: 'Image tag'
+        required: true
+
+jobs:
+  Start-Runner:
+    # on US-WEST-2, open source account
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          #TODO: create a runner in us-east-1 and use it for the build https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841644166
+          aws-region: us-west-2
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          # 200 GB amd64 image
+          ec2-image-id:  ami-01accacd51bdde263
+          ec2-instance-type: t3.xlarge
+          subnet-id: subnet-038b1447ac3c97e7a
+          security-group-id: sg-094be521399e0d5ba
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "marqo-build-push-img-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
+
+  Docker-Build:
+    name: Build docker image
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    outputs:
+      image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
+
+
+    steps:
+      - name: Set input variables
+        id: set-inputs
+        run: |
+          echo "MARQO_REF=${{ inputs.marqo_ref || github.event.inputs.marqo_ref }}" >> $GITHUB_ENV
+          echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
+          echo "IMAGE_REPO=${{ inputs.image_repo || github.event.inputs.image_repo }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
+
+      - name: Checkout Marqo
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo
+          ref: ${{ env.MARQO_REF }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        if: env.PUSH_TO == 'ECR'
+        with:
+          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com
+          username: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+
+      - name: Set registry and image repo
+        id: prepare
+        run: |
+          if [[ "${{ env.PUSH_TO }}" == "ECR" ]]; then
+            echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
+          else
+            echo "registry=marqoai" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push
+        id: build-and-push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Output image_identifier
+        # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
+        id: set-image-identifier-in-output
+        run: |
+          echo "image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}@${{ steps.build-and-push.outputs.digest }}" >> $GITHUB_OUTPUT
+
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Docker-Build # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
