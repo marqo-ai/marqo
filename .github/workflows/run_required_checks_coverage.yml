@@ -91,10 +91,6 @@ jobs:
           coverage html --directory=../integ_coverage_data/htmlcov
           coverage report -m > ../integ_coverage_data/coverage.txt
 
-      - name: Install diff-cover
-        run: |
-          pip install diff-cover
-
       - name: Check diff unit test coverage (95% threshold)
         id: unit_diff_coverage
         continue-on-error: true
