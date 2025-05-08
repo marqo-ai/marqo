@@ -199,9 +199,6 @@ jobs:
           echo '```text' >> $GITHUB_STEP_SUMMARY
           cat unit_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          echo "# Combined diff coverage summary" >> $GITHUB_STEP_SUMMARY
-          cat coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
           echo "# Integ diff coverage summary" >> $GITHUB_STEP_SUMMARY
           cat integ_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
