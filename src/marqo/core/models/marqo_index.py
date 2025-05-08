@@ -2,18 +2,20 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
+
+import pydantic.v1 as pydantic
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
+
+# TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
@@ -98,6 +100,12 @@ class Field(ImmutableStrictBaseModel):
 
         return values
 
+class StringArrayField(ImmutableStrictBaseModel):
+    name: str
+    type: FieldType
+    string_array_field_name: Optional[str]
+    features: List[FieldFeature] = []
+
 
 class TensorField(ImmutableStrictBaseModel):
     """
@@ -120,13 +128,16 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
+
 class VideoPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+
 class AudioPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
@@ -268,6 +279,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)
 
@@ -502,9 +514,13 @@ class StructuredMarqoIndex(MarqoIndex):
 
 
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
+
+    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
+
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
+    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -519,8 +535,32 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         A map from field name to the field.
         """
         return self._cache_or_get('field_map',
-                                  lambda: {field.name: field for field in self.lexical_fields}
-                                  )
+                                  lambda: {field.name: field for field in self.lexical_fields})
+
+    @property
+    def name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's " "name" property to corresponding StringArrayField object.
+        "Name" is the name of the StringArrayField object, which is passed by the user. It does not start with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+
+        return self._cache_or_get('name_to_string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.name: field for field in self.string_array_fields})
+
+    @property
+    def string_array_field_name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's "string_array_field_name" property to corresponding StringArrayField object.
+        A "string_array_field_name" is that name of a StringArrayField object, which is used in the index schema, and it starts with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+        return self._cache_or_get('string_array_field_map',
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
@@ -579,6 +619,15 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             return the_map
 
         return self._cache_or_get('tensor_subfield_map', generate)
+
+    @property
+    def index_supports_partial_updates(self) -> bool:
+        """
+        Check if the index supports partial updates.
+        """
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

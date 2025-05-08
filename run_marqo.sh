@@ -35,9 +35,14 @@ function wait_for_process () {
 }
 
 
+# Set the default Marqo mode to COMBINED
+export MARQO_MODE=${MARQO_MODE:-COMBINED}
+
 VESPA_IS_INTERNAL=False
 # Vespa local run
-if ([ -n "$VESPA_QUERY_URL" ] || [ -n "$VESPA_DOCUMENT_URL" ] || [ -n "$VESPA_CONFIG_URL" ]) && \
+if [ "$MARQO_MODE" = "INFERENCE" ]; then
+  echo "Running Marqo in inference mode, skipping vector store initialisation"
+elif ([ -n "$VESPA_QUERY_URL" ] || [ -n "$VESPA_DOCUMENT_URL" ] || [ -n "$VESPA_CONFIG_URL" ]) && \
    ([ -z "$VESPA_QUERY_URL" ] || [ -z "$VESPA_DOCUMENT_URL" ] || [ -z "$VESPA_CONFIG_URL" ]); then
   echo "Error: Partial external vector store configuration detected. \
 Please provide all or none of the VESPA_QUERY_URL, VESPA_DOCUMENT_URL, VESPA_CONFIG_URL. \
@@ -74,8 +79,9 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo did not find an existing vector store. Setting up vector store..."
 
-      # Deploy a dummy application package
-      vespa deploy /app/scripts/vespa_local --wait 300 >/dev/null 2>&1
+      # Generate and deploy the application package
+      # Set log level to WARNING to skip logging
+      python3 /app/scripts/vespa_local/vespa_local.py generate-and-deploy --LogLevel WARNING
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
         echo "  Waiting for vector store to be available..."
@@ -134,7 +140,7 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
             break
         fi
         sleep 0.1
-        
+
     done
     echo "Marqo throttling is now running"
 
@@ -146,12 +152,36 @@ fi
 export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
-# Start the tensor search web app in the background
-cd /app/src/marqo/tensor_search || exit
-uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
+case "$MARQO_MODE" in
+  COMBINED)
+    # Start the combined Marqo API and Inference in the background
+    cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
+    uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    ;;
+  API)
+    # set default number of workers to 1
+    if [ -z "${MARQO_API_WORKERS}" ]; then
+      export MARQO_API_WORKERS=1
+    fi
+
+    # Start the Marqo API in the background
+    cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
+    uvicorn api:app --host 0.0.0.0 --port 8882 --workers $MARQO_API_WORKERS --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    ;;
+  INFERENCE)
+    # Start the native Inference server app in the background
+    cd /app/src/marqo/inference/native_inference/remote/server || { echo "Failed to navigate to inference server directory"; exit 1; }
+    uvicorn inference_api:app --host 0.0.0.0 --port 8881 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    ;;
+  *)
+    echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'COMBINED', 'API' and 'INFERENCE'"
+    exit 1
+    ;;
+esac
+
+# Capture the PID of the last background process
 export api_pid=$!
+# Wait for the Uvicorn process to terminate
 wait "$api_pid"
-
-
 # Exit with status of process that exited first
 exit $?

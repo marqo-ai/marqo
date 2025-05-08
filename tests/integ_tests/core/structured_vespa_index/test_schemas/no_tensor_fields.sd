@@ -1,0 +1,82 @@
+schema marqo__my_00index {
+document {
+field marqo__id type string {
+indexing: attribute | summary
+attribute: fast-search
+rank: filter
+}
+field marqo__lexical_title type string {
+indexing: index | summary
+index: enable-bm25
+}
+field description type string {
+indexing: summary
+}
+field price type float {
+indexing: summary
+}
+field marqo__score_modifiers_double_long type tensor<double>(p{}) { indexing: attribute | summary }
+field marqo__score_modifiers_float type tensor<float>(p{}) { indexing: attribute | summary }
+field marqo__vector_count type int { indexing: attribute | summary }
+}
+rank-profile base_rank_profile inherits default {
+inputs {
+query(marqo__lexical_title): 0
+query(marqo__query_embedding) tensor<float>(x[512])
+query(marqo__bm25_aggregator): 0
+query(marqo__mult_weights_lexical) tensor<double>(p{})
+query(marqo__add_weights_lexical) tensor<double>(p{})
+query(marqo__mult_weights_tensor) tensor<double>(p{})
+query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
+}
+function mult_modifier(mult_weights) {
+   expression: if (count(mult_weights * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_double_long), prod)) * if (count(mult_weights * attribute(marqo__score_modifiers_float)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_float), prod))
+}
+function add_modifier(add_weights) {
+   expression: reduce(add_weights * attribute(marqo__score_modifiers_double_long), sum) + reduce(add_weights * attribute(marqo__score_modifiers_float), sum)
+}
+function modify(score, mult_weights, add_weights) {
+   expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+}
+function global_mult_modifier() {
+   expression: mult_modifier(query(marqo__mult_weights_global))
+}
+function global_add_modifier() {
+   expression: add_modifier(query(marqo__add_weights_global))
+}
+function lexical_score_sum() {
+expression: if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)
+}
+function lexical_score_avg() {
+expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)) / max(1, if (query(marqo__lexical_title) > 0, 1, 0))
+}
+function lexical_score_max() {
+expression: if(query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)
+}
+function lexical_score() {
+expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (query(marqo__bm25_aggregator) == 1, lexical_score_avg(), lexical_score_max()))
+}
+match-features: global_mult_modifier global_add_modifier
+}
+rank-profile bm25 inherits base_rank_profile {
+first-phase {
+expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+}}
+fieldset default {
+fields: marqo__lexical_title
+}
+document-summary all-non-vector-summary {
+summary marqo__id type string { }
+summary title type string { source: marqo__lexical_title }
+summary description type string { source: description }
+summary price type float { source: price }
+}
+document-summary all-vector-summary {
+summary marqo__id type string { }
+summary title type string { source: marqo__lexical_title }
+summary description type string { source: description }
+summary price type float { source: price }
+}
+}

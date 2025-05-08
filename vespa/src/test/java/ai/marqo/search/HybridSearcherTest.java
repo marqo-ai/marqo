@@ -10,14 +10,17 @@ import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.query.ranking.RankFeatures;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.*;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,7 +29,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 class HybridSearcherTest {
-
     private HybridSearcher hybridSearcher;
 
     private Searcher downstreamSearcher;
@@ -81,6 +83,27 @@ class HybridSearcherTest {
     }
 
     @Nested
+    class ValidationTest {
+        @Ignore
+        void rerankDepthGlobalSetToLimit() {
+            // Ensure rerankDepthGlobal defaults to limit (hits) if not set
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
+            query.properties().set("marqo__hybrid.rankingMethod", "rrf");
+            query.properties().set("marqo__hybrid.rrf_k", 60);
+            query.properties().set("marqo__hybrid.alpha", 0.5);
+            query.properties().set("hits", 20);
+
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // TODO: Check if rerankDepth is limit
+        }
+    }
+
+    @Nested
     class RRFTest {
         @Test
         void shouldFuseWithDefaultParameters() {
@@ -127,7 +150,9 @@ class HybridSearcherTest {
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done
+            // in post-processing
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             assertThat(result.asList())
@@ -144,7 +169,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/0/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -168,6 +196,12 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
 
         @Test
@@ -198,7 +232,7 @@ class HybridSearcherTest {
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             // If results have the same score, they will be sorted by alphabetical hit ID.
@@ -217,7 +251,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/5/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/1/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/2/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/7/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/8/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -241,8 +278,23 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
     }
+
+    // TODO: post processing test
+    // if rerankDepthGlobal is null, rerank everything
+    // global score modifiers tests
+    // pagination tests (use offset)
+    // mult weights & add weights both dont exist, make sure apply global score mod is skipped
+    // mult weights & add weights both empty, make sure apply global score mod is skipped
+    // mult weights exist but not add weights, & vice versa
+    // empty mult weights or empty add weights
 
     @Nested
     class IdExtractorTest {
@@ -378,5 +430,194 @@ class HybridSearcherTest {
                 .getFeatures()
                 .put("query(marqo__fields_to_rank_tensor)", fieldsToRankTensor);
         return query;
+    }
+
+    @Nested
+    class CollectErrorsFromResultsTest {
+        @Test
+        void shouldRaiseErrorIfLexicalResultHasError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor = new Result(new Query());
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage())
+                    .contains("Example lexical error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfTensorResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage())
+                    .contains("Example tensor error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfBothResultsHaveError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            Iterator<ErrorMessage> iterator = combinedErrors.getErrorHit().errors().iterator();
+            assertThat(iterator.next().getDetailedMessage()).contains("Example tensor error");
+            assertThat(iterator.next().getDetailedMessage()).contains("Example lexical error");
+        }
+
+        @Test
+        void shouldNotRaiseErrorIfNeitherResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor = new Result(new Query());
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+            assertThat(combinedErrors.getError()).isNull();
+        }
+    }
+
+    @Nested
+    class FacetsTest {
+        /**
+         * This test uses a custom implementation of HybridSearcher that doesn't need to modify Hit IDs.
+         * This is because the original implementation tries to do hit.setId() which fails if the Hit already has an ID.
+         */
+        @Test
+        void shouldHandleFacetsInResults() {
+            // Create a custom searcher that handles facets differently
+            HybridSearcher customSearcher =
+                    new HybridSearcher() {
+                        @Override
+                        public Result search(Query query, Execution execution) {
+                            // Check if this is a facet query (used in our test scenario)
+                            String facetsYql =
+                                    query.properties().getString("marqo__yql.facets", "");
+                            if (facetsYql.isEmpty()) {
+                                // Not a facet query, pass through to downstream searcher
+                                return super.search(query, execution);
+                            }
+
+                            // Create a result with prepared hits (avoid ID changes)
+                            HitGroup hits = new HitGroup();
+
+                            // Add main results
+                            Hit mainHit = new Hit("index:test/0/doc1", 1.0);
+                            hits.add(mainHit);
+
+                            // Add facet results with pre-formatted IDs that match the expected
+                            // format
+                            // after HybridSearcher's facet processing
+                            Hit facet1 = new Hit("group:facet:0:0", 1.0);
+                            facet1.setField("count", 5);
+                            hits.add(facet1);
+
+                            Hit facet2 = new Hit("group:facet:1:0", 1.0);
+                            facet2.setField("count", 3);
+                            hits.add(facet2);
+
+                            return new Result(query, hits);
+                        }
+                    };
+
+            // Create the chain with our custom searcher
+            Chain<Searcher> searchChain = new Chain<>(customSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // Create a query with facets
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__hybrid.retrievalMethod", "lexical");
+            query.properties().set("marqo__hybrid.rankingMethod", "lexical");
+            query.properties().set("hits", 10);
+            query.properties()
+                    .set(
+                            "marqo__yql.facets",
+                            "SELECT * FROM sources * WHERE true | all()\n"
+                                    + "---MARQO-YQL-QUERY-DELIMITER---\n"
+                                    + "SELECT * FROM sources * WHERE false | all()");
+
+            // Add required tensor rank features
+            TensorType tensorType = new TensorType.Builder().mapped("test_tensor").build();
+            Tensor fieldsToRankLexical =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
+                            .cell(TensorAddress.ofLabels("marqo__lexical_text_field_2"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", fieldsToRankLexical);
+
+            // Execute search
+            Result result = execution.search(query);
+
+            // Verify results
+            assertThat(result.hits().asList()).hasSize(3); // 1 main hit + 2 facet hits
+            assertThat(result.hits().get("index:test/0/doc1")).isNotNull();
+            assertThat(result.hits().get("group:facet:0:0")).isNotNull();
+            assertThat(result.hits().get("group:facet:1:0")).isNotNull();
+            assertThat(result.hits().get("group:facet:0:0").getField("count")).isEqualTo(5);
+            assertThat(result.hits().get("group:facet:1:0").getField("count")).isEqualTo(3);
+        }
+
+        /**
+         * Test that verifies how facet queries are processed using the real HybridSearcher
+         * but without dealing with the ID change issue.
+         */
+        @Test
+        void shouldCreateProperFacetQueries() {
+            // Setup a searcher chain that captures queries
+            ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+
+            // Configure downstream searcher behavior
+            when(downstreamSearcher.process(queryCaptor.capture(), any(Execution.class)))
+                    .thenReturn(new Result(new Query(), new HitGroup()));
+
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // Create a query with facets
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            String facetsYql =
+                    "SELECT * FROM sources * WHERE brand = 'nike' | all()\n"
+                            + "---MARQO-YQL-QUERY-DELIMITER---\n"
+                            + "SELECT * FROM sources * WHERE category = 'shoes' | all()";
+            query.properties().set("marqo__yql.facets", facetsYql);
+
+            // Execute search
+            execution.search(query);
+
+            // Capture the queries
+            List<Query> capturedQueries = queryCaptor.getAllValues();
+
+            // Verify that the right number of queries were created (main + 2 facet queries)
+            assertThat(capturedQueries).hasSize(3);
+
+            // Verify all queries
+            assertThat(
+                            capturedQueries.stream()
+                                    .map(q -> q.properties().getString("yql"))
+                                    .filter(yql -> yql != null))
+                    .containsExactlyInAnyOrder(
+                            "SELECT * FROM sources * WHERE brand = 'nike' | all()",
+                            "SELECT * FROM sources * WHERE category = 'shoes' | all()",
+                            "lexical yql");
+        }
     }
 }

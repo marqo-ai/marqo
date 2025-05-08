@@ -28,7 +28,7 @@ def load_index(number_data):
             
         settings = {
             "treatUrlsAndPointersAsImages":True,   # allows us to find an image file and index it
-            "model":"ViT-B/16"
+            "model": "open_clip/ViT-B-16/openai"
         }
          
         mq.create_index("demo-search-index", settings_dict=settings)

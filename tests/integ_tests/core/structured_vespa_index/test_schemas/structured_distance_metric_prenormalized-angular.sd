@@ -1,0 +1,98 @@
+schema marqo__test_00structured_00schema_00distance_00metric {
+document {
+field marqo__id type string {
+indexing: attribute | summary
+attribute: fast-search
+rank: filter
+}
+field title type string {
+indexing: summary
+}
+field description type string {
+indexing: summary
+}
+field marqo__chunks_title type array<string> {
+indexing: attribute | summary
+}
+field marqo__embeddings_title type tensor<float>(p{}, x[512]) {
+indexing: attribute | index | summary
+attribute { distance-metric: prenormalized-angular }
+index { hnsw {
+max-links-per-node: 16
+neighbors-to-explore-at-insert: 100
+}}
+}
+field marqo__chunks_description type array<string> {
+indexing: attribute | summary
+}
+field marqo__embeddings_description type tensor<float>(p{}, x[512]) {
+indexing: attribute | index | summary
+attribute { distance-metric: prenormalized-angular }
+index { hnsw {
+max-links-per-node: 16
+neighbors-to-explore-at-insert: 100
+}}
+}
+field marqo__vector_count type int { indexing: attribute | summary }
+}
+rank-profile base_rank_profile inherits default {
+inputs {
+query(marqo__embeddings_title): 0
+query(marqo__embeddings_description): 0
+query(marqo__query_embedding) tensor<float>(x[512])
+query(marqo__bm25_aggregator): 0
+query(marqo__mult_weights_lexical) tensor<double>(p{})
+query(marqo__add_weights_lexical) tensor<double>(p{})
+query(marqo__mult_weights_tensor) tensor<double>(p{})
+query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
+}
+function mult_modifier(mult_weights) {
+   expression: 1
+}
+function add_modifier(add_weights) {
+   expression: 0
+}
+function modify(score, mult_weights, add_weights) {
+   expression: score
+}
+function global_mult_modifier() {
+   expression: mult_modifier(query(marqo__mult_weights_global))
+}
+function global_add_modifier() {
+   expression: add_modifier(query(marqo__add_weights_global))
+}
+function embedding_score() {
+expression: max(if(query(marqo__embeddings_title) > 0, closeness(field, marqo__embeddings_title), 0), if(query(marqo__embeddings_description) > 0, closeness(field, marqo__embeddings_description), 0))
+}
+match-features: global_mult_modifier global_add_modifier
+}
+rank-profile embedding_similarity inherits base_rank_profile {
+first-phase {
+expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+}
+match-features inherits base_rank_profile {
+closest(marqo__embeddings_title)
+distance(field, marqo__embeddings_title)
+closest(marqo__embeddings_description)
+distance(field, marqo__embeddings_description)
+}
+}
+document-summary all-non-vector-summary {
+summary marqo__id type string { }
+summary title type string { source: title }
+summary description type string { source: description }
+summary marqo__chunks_title type array<string> { }
+summary marqo__chunks_description type array<string> { }
+}
+document-summary all-vector-summary {
+summary marqo__id type string { }
+summary title type string { source: title }
+summary description type string { source: description }
+summary marqo__chunks_title type array<string> { }
+summary marqo__chunks_description type array<string> { }
+summary marqo__embeddings_title type tensor<float>(p{}, x[512]) { }
+summary marqo__embeddings_description type tensor<float>(p{}, x[512]) { }
+}
+}

@@ -13,6 +13,8 @@ class MediaMismatchError(S2InferenceError):
 class ChunkerError(S2InferenceError):
     pass
 
+class MediaExceedsMaxSizeError(S2InferenceError):
+    pass
 
 class ChunkerMethodProcessError(S2InferenceError):
     pass

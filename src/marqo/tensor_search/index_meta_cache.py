@@ -13,7 +13,7 @@ from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.logging import get_logger
 from marqo.vespa.exceptions import VespaError, VespaStatusError
 
 logger = get_logger(__name__)
@@ -93,7 +93,7 @@ def _check_refresh_thread(index_management: IndexManagement):
         if refresh_thread is None or not refresh_thread.is_alive():
             if refresh_thread is not None:
                 # If not None, then it has died
-                logger.warn('Dead index cache refresh thread detected. Will start a new one')
+                logger.warning('Dead index cache refresh thread detected. Will start a new one')
 
             logger.info('Starting index cache refresh thread')
 
@@ -110,7 +110,7 @@ def _check_refresh_thread(index_management: IndexManagement):
                     except VespaError as e:
                         if isinstance(e, VespaStatusError) and e.status_code == 400:
                             # This can happen when settings schema doesn't exist
-                            logger.warn(
+                            logger.warning(
                                 'Failed to populate index cache due to 400 error from vector store. This can happen '
                                 f'if Marqo settings schema does not exist. Error: {e}'
                             )

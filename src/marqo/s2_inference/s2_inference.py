@@ -2,33 +2,34 @@
 The functions defined here would have endpoints, later on.
 """
 import datetime
+import random
 import threading
+import time
+from typing import List, Dict, Optional
+from urllib3.exceptions import ReadTimeoutError
 
 import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 from PIL.Image import Image
-from torch import Tensor
 from torchvision.transforms import Compose
-from typing import List, Dict, Any, Optional
 
 from marqo import marqo_docs
+from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 from marqo.s2_inference import constants
-from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
-from marqo.s2_inference.clip_utils import CLIP
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
-from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
+from marqo.core.inference.modality_utils import *
 from marqo.s2_inference.types import *
-from marqo.s2_inference.multimodal_model_load import *
-from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
 
@@ -140,14 +141,13 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                           **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
-        encoder = get_encoder(model)
 
         if isinstance(content, str):
             vectorised = model.encode(
                 content, normalize=normalize_embeddings, modality=modality,
                 media_download_headers=media_download_headers, **kwargs
             )
-        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+        elif isinstance(content, Tensor):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
@@ -159,10 +159,10 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 
                 # TODO maybe the infer parameter can be replaced by modality
                 infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
-                encoded_batch = encoder.encode(
+                encoded_batch = model.encode(
                     batch, modality=modality, normalize=normalize_embeddings,
                     media_download_headers=media_download_headers, infer = infer, **kwargs)
-                
+
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
 
             if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
@@ -188,33 +188,19 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 
-def get_encoder(model):
-    if isinstance(model, MultimodalModel):
-        if model.properties.loader == "languagebind":
-            return LanguageBindEncoder(model)
-        else:
-            raise NotImplementedError(f"Model {model.name} is not supported")
-    return DefaultEncoder(model)
-
-
-def is_preprocess_image_model(model_properties: dict = None) -> bool:
+def is_preprocessor_preload(model_properties: dict = None) -> bool:
     """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
         model_properties: Validated model properties. The model properties should have been validated in marqo_index
     """
     model_type = model_properties.get("type", None)
-    return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
-
-
-def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
-    model = MultimodalModel(model_name, model_properties, device)
-    return model
+    return model_type in constants.PREPROCESS_PRELOAD_MODELS
 
 
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
                                                 device: Optional[str] = None,
                                                 model_auth: Optional[ModelAuth] = None,
                                                 normalize_embeddings: bool = get_default_normalization()) \
-        -> Tuple[Any, Dict[str, Optional[Compose]]]:
+        -> Tuple[Any, Preprocessors]:
     """Load the model and return preprocessors for different modalities.
 
     Args:
@@ -245,14 +231,14 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
-    preprocessors = {
-        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-        "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
-        "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
-        "text": None  # Future preprocessor
-    }
-
-    return model, preprocessors
+    if model_properties.get("type") in ['languagebind']:
+        preprocessors = model.get_preprocessors()
+    elif model_properties.get("type") in [ModelType.OpenCLIP, ModelType.CLIP]:
+        preprocessors = {"image": getattr(model, "preprocess", None)}
+    else:
+        raise InternalError(f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
+                            f"add_document ")
+    return model, Preprocessors(**preprocessors)
 
 
 def _get_max_vectorise_batch_size() -> int:
@@ -396,10 +382,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                   f"and 'type = no_model', but received 'model = {model_name}' and "
                                                   f"'type = {model_type}'.")
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
-                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX, ModelType.LanguageBind):
             pass
-        elif model_type in [ModelType.LanguageBind]:
-            MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
@@ -538,63 +522,69 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 def _load_model(
         model_name: str, model_properties: dict, device: str,
-        calling_func: str = None, model_auth: Optional[ModelAuth] = None
+        calling_func: str = None, model_auth: Optional[ModelAuth] = None,
+        max_retries: int = 3, retry_delay: int = 5
 ) -> Any:
-    """_summary_
+    """Load a model with retry mechanism in case of transient failures.
 
     Args:
-        model_name (str): Actual model_name to be fetched from external library
-                        prefer passing it in the form of model_properties['name']
-        device (str): Required. Should always be passed when loading model
-        model_auth: Authorisation details for downloading a model (if required)
+        model_name (str): Model name to fetch from external library.
+        model_properties (dict): Model properties (e.g., dimensions, type).
+        device (str): Target device (e.g., "cuda:0", "cpu").
+        model_auth (Optional[ModelAuth]): Authorization for downloading models.
+        max_retries (int): Number of retry attempts before failing.
+        retry_delay (int): Delay (seconds) between retries.
 
     Returns:
-        Any: _description_
+        Any: Loaded model.
+
+    Raises:
+        ModelLoadError: If loading fails after all retries.
     """
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
-                           f"`unit_test` or `_update_available_models` for threading safeness.")
-
-    if model_properties.get('type') in [ModelType.LanguageBind]:
-        model = MultimodalModel(model_name, model_properties, device)
-        model.model = model._load_multimodal_model()
-        model.encoder = get_encoder(model)
-        return model
-
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
+                           f"`unit_test` or `_update_available_models` for threading safety.")
 
     model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    # TODO For each refactored model class, add a new elif block here and remove the if block
-    #  once we have all models refactored
-    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA):
-        model = loader(
-            device=device,
-            model_properties=model_properties,
-            model_auth=model_auth,
-        )
-    else:
-        model = loader(
-            model_properties.get('name', None),
-            device=device,
-            embedding_dim=model_properties['dimensions'],
-            model_properties=model_properties,
-            model_auth=model_auth,
-            max_seq_length=model_properties.get('tokens', get_default_seq_length())
-        )
-    model.load()
-    return model
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            print(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
 
+            # Load the model
+            if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
+                model = loader(
+                    device=device,
+                    model_properties=model_properties,
+                    model_auth=model_auth,
+                )
+            else:
+                model = loader(
+                    model_properties.get('name', None),
+                    device=device,
+                    embedding_dim=model_properties['dimensions'],
+                    model_properties=model_properties,
+                    model_auth=model_auth,
+                    max_seq_length=model_properties.get('tokens', get_default_seq_length())
+                )
 
-def chunk_video(video_path: str, chunk_length: int, frames_per_chunk: int) -> List[List[Image]]:
-    # Implement video chunking and frame extraction
-    pass
+            model.load()  # Load the model
+            print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
+            return model  # ✅ Success, return the model
 
+        except (ReadTimeoutError, requests.exceptions.Timeout, OSError, RuntimeError) as e:
+            print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
+            attempt += 1
 
-def chunk_audio(audio_path: str, chunk_length: int) -> List[np.ndarray]:
-    # Implement audio chunking
-    pass
+            if attempt >= max_retries:
+                raise e
+
+            # Wait before retrying (randomized to avoid collisions)
+            sleep_time = retry_delay + random.uniform(1, 3)
+            print(f"🔄 Retrying in {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
 
 
 def clear_loaded_models() -> None:

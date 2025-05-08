@@ -60,9 +60,9 @@ class Monitoring:
 
         # Occasionally Vespa returns empty metrics, often for the first call after a restart
         if memory_utilization is None:
-            logger.warn(f'Vespa did not return a value for memory utilization metrics')
+            logger.warning(f'Vespa did not return a value for memory utilization metrics')
         if disk_utilization is None:
-            logger.warn(f'Vespa did not return a value for disk utilization metrics')
+            logger.warning(f'Vespa did not return a value for disk utilization metrics')
 
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
@@ -140,7 +140,7 @@ class Monitoring:
         disk_utilization = metrics.clusterController_resourceUsage_maxDiskUtilization_max
 
         if nodes_above_limit is None:
-            logger.warn(f'Vespa did not return a value for nodes_above_limit metric')
+            logger.warning(f'Vespa did not return a value for nodes_above_limit metric')
             feed_status = HealthStatus.Yellow
         elif nodes_above_limit > 0:
             feed_status = HealthStatus.Yellow
@@ -154,6 +154,8 @@ class Monitoring:
         )
 
     def get_cuda_info(self) -> MarqoCudaInfoResponse:
+        # TODO move this to Inference
+        # TODO [Refactoring device logic] move this logic to device manager
         """A function to get information about the CUDA devices on the machine
 
         Returns:

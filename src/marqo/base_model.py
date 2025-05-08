@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import pydantic
+from pydantic import ConfigDict
+from pydantic.v1 import BaseModel
 
 
 class MarqoBaseModel(BaseModel):
@@ -20,3 +22,7 @@ class ImmutableBaseModel(MarqoBaseModel):
 class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):
     class Config(StrictBaseModel.Config, ImmutableBaseModel.Config):
         pass
+
+
+class MarqoBaseModelV2(pydantic.BaseModel):
+    model_config = ConfigDict(validate_by_name=True, validate_assignment=True)

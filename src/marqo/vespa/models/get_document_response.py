@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, root_validator, Field
+from pydantic.v1 import BaseModel, root_validator, Field
 
 
 class Document(BaseModel):

@@ -20,18 +20,25 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v3
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
         with:
-          python-version: "3.8"
+          repository: marqo-ai/marqo-base
+          path: marqo-base
+          fetch-depth: 0
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
           cache: "pip"
 
       - name: Install dependencies
         run: |
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
 
       - name: Run Documentation Tests
         run: |
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests/test_documentation.py
+          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src:./marqo"
+          pytest marqo/tests/integ_tests/test_documentation.py
