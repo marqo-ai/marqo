@@ -14,6 +14,7 @@ from marqo.tensor_search.api import api_validation_exception_handler
 from marqo.tensor_search.api import marqo_base_exception_handler
 from marqo.vespa import exceptions as vespa_exceptions
 from integ_tests.marqo_test import MarqoTestCase
+import marqo.core.inference.api.exceptions as inference_exceptions
 
 
 class TestBaseExceptionHandler(MarqoTestCase):
@@ -135,3 +136,16 @@ class TestBaseExceptionHandler(MarqoTestCase):
             },
             response.body
         )
+
+    @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
+    def test_base_exception_handler_inference_errors(self, mock_api_exception_handler):
+        """A generic inference error should be converted to an InvalidArgError.
+        Currently, we only raise generic inference errors if we receive an error from the inference server.
+        """
+        with self.subTest("Inference error: Generic Inference Error"):
+            marqo_base_exception_handler(
+                self.normal_request,
+                inference_exceptions.InferenceError(self.generic_error_message)
+            )
+            assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1],
+                              api_exceptions.InvalidArgError)  # 400

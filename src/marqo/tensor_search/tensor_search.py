@@ -49,6 +49,7 @@ from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePre
     AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
 from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
@@ -58,6 +59,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
+from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.reranking import rerank
@@ -76,7 +78,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
 
@@ -313,7 +315,10 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
-           hybrid_parameters: Optional[HybridParameters] = None) -> Dict:
+           hybrid_parameters: Optional[HybridParameters] = None,
+           facets: Optional[FacetsParameters] = None,
+           track_total_hits: Optional[bool] = None,
+           ) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -342,6 +347,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
+        facets: Parameters for facets
     Returns:
 
     """
@@ -416,12 +422,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
-        if ef_search is None:
-            # efSearch must be min result_count + offset
-            ef_search = max(
-                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
-                result_count + offset
-            )
         if approximate is None:
             approximate = True
 
@@ -432,7 +432,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -445,7 +445,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -626,6 +626,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
+        if doc.id.startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
+            continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 
@@ -733,14 +735,23 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
 
 
 def _get_preprocessing_config(modality: Modality, media_download_headers: Optional[Dict[str, str]]):
+    """
+    Get the preprocessing config for the given modality used for searching.
+    """
     if modality == Modality.TEXT:
         return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
         return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.AUDIO:
-        return AudioPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return AudioPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     elif modality == Modality.VIDEO:
-        return VideoPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return VideoPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     else:
         raise InferenceError(f'Unsupported modality: {modality}')
 
@@ -992,7 +1003,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+) -> Dict:
     """
     
     Args:
@@ -1012,6 +1024,8 @@ def _vector_text_search(
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
         highlights: if True, highlights will be returned
+        text_query_prefix: prefix to add to text queries
+        rerank_depth: the number of hits per shard during retrieval
     Returns:
 
     Note:
@@ -1054,7 +1068,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
@@ -1071,7 +1085,8 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        rerank_depth_tensor=rerank_depth
     )
 
     vespa_index = vespa_index_factory(marqo_index)

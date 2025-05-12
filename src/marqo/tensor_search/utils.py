@@ -11,11 +11,14 @@ from typing import (
 
 from fastapi import HTTPException
 
+from marqo import logging
 from marqo.api import exceptions, configs
-from marqo.marqo_logging import logger
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
+from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 
+
+logger = logging.get_logger(__name__)
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
     """Turns a list of dicts into a JSONL string"""
@@ -165,6 +168,10 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
     All other terms go into blob, split by whitespace. blob starts as a string then splits into
     a list by space.
 
+    Backslash will be used to escape " or \, but if it is not followed by " or \,
+    it should be IGNORED. This is to prevent hanging backslashes accidentally escaping query quotes or inserting bad
+    characters into query (for example \a causes a Vespa 400).
+
     Syntax:
         Required strings must be enclosed by quotes. These quotes must be enclosed by spaces or the start
         or end of the text. Quotes always come in pairs.
@@ -176,43 +183,54 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
     Notes:
         - Correct double quote can be either opening, closing, or escaped.
         - Escaped double quotes are interpreted literally.
+        - Escaped backslashes are interpreted literally
 
-    Users need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+    PYTHON NOTE:
+    Users using python need to escape the backslash itself. (Single \ get ignored) -> q='dwayne \\"the rock\\" johnson'
+    Unneeded if using CLI or raw string.
 
     Return:
         2-tuple of <required terms> (for "must" clause) <optional terms> (for "should" clause)
     """
+
     required_terms = []
     blob = ""
     opening_quote_idx = None
     current_quote_pair_is_faulty = False
+    escape = False
 
     if not isinstance(text, str):
         raise TypeError("parse_lexical_query must have string as input")
 
     for i in range(len(text)):
-        # Add every character to blob initially
-        blob += text[i]
-
-        if text[i] == '"':
-            # Check if ESCAPED
-            if i > 0 and text[i - 1] == '\\':
-                # Read quote literally. Backslash should be passed directly to Vespa.
-                pass
-
+        # Every character immediately after a \\ should be read literally
+        if escape:
+            escape = False
+            blob += text[i]
+        elif text[i] == "\\":
+            escape = True
+            # Stray backslashes should be ignored (not followed by special char, or is last char)
+            if not (i == len(text) - 1 or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA):
+                blob += text[i]
+        elif text[i] == '"':
             # OPENING QUOTE
-            elif (opening_quote_idx is None):
+            if (opening_quote_idx is None):
                 opening_quote_idx = i
-                blob_opening_quote_idx = len(blob) - 1 # Opening quote index in blob is different from text
+                blob_opening_quote_idx = len(blob) # Opening quote index in blob is different from text
 
                 # Bad syntax opening quote: flag it, replace quote with whitespace
                 if not (i == 0 or text[i - 1] == " "):
                     current_quote_pair_is_faulty = True
-                    blob = blob[:-1] + " "
+                    blob += " "
+                else:
+                    # Good syntax opening quote: add to blob
+                    blob += text[i]
             # CLOSING QUOTE
             else:
                 # Good syntax closing: must have space on the right (or is last character) while opening exists.
                 if (i == len(text) - 1 or text[i + 1] == " ") and not current_quote_pair_is_faulty:
+                    # Add this quote to the blob
+                    blob += text[i]
                     # Add everything in between the quotes as a required term
                     new_required_term = text[opening_quote_idx + 1:i]
                     if new_required_term:                           # Do not add empty strings as required terms
@@ -224,11 +242,14 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
                 else:
                     # Bad syntax closing: treat this and opening quote as whitespace
                     blob = blob[:blob_opening_quote_idx] + " " + \
-                                     blob[blob_opening_quote_idx + 1:-1] + " "
+                                     blob[blob_opening_quote_idx + 1:] + " "
 
                 # Clean up flags
                 opening_quote_idx = None
                 current_quote_pair_is_faulty = False
+        else:
+            # If not a special character, add to blob
+            blob += text[i]
 
     # Unpaired quote will be turned to whitespace
     if opening_quote_idx is not None:

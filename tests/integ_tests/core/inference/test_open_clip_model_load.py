@@ -66,7 +66,7 @@ class TestOpenCLIPModelLoad(TestCase):
                             cache_dir=ModelCache.clip_cache_path
                         )
                         mock_tokenizer.assert_called_once_with("ViT-B-108")
-                        preprocess_config = model.preprocess_config
+                        preprocess_config = model.image_preprocessor_config
                         self.assertEqual(224, preprocess_config.size)
                         self.assertEqual("RGB", preprocess_config.mode)
                         self.assertEqual((0.48145466, 0.4578275, 0.40821073), preprocess_config.mean)
@@ -102,7 +102,7 @@ class TestOpenCLIPModelLoad(TestCase):
                             cache_dir=ModelCache.clip_cache_path
                         )
                         mock_tokenizer.assert_called_once_with("test-siglip")
-                        preprocess_config = model.preprocess_config
+                        preprocess_config = model.image_preprocessor_config
                         self.assertEqual(322, preprocess_config.size)
                         self.assertEqual("RGB", preprocess_config.mode)
                         self.assertEqual((0.5, 0.5, 0.5), preprocess_config.mean)

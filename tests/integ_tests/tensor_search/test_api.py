@@ -1,24 +1,28 @@
+import importlib
+import os
+import sys
+import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
 
+import pydantic
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic_core import InitErrorDetails, PydanticCustomError
 
 import marqo.tensor_search.api as api
+from integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
+from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions
-from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.vespa import exceptions as vespa_exceptions
-from integ_tests.marqo_test import MarqoTestCase
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-import importlib
-import sys
-import os
-
-import unittest
 
 
 class ApiTests(MarqoTestCase):
@@ -573,5 +577,73 @@ class TestApiErrors(MarqoTestCase):
                 response = self.client.get(f"/indexes/test_index/documents/1")
             mock_logger_error.assert_called_once()
             self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
+
+    def test_parse_request_object_should_parse_pydantic_v1_model(self):
+        """Ensures parse_request_object parses pydantic v1 model"""
+        class PydanticV1Model(pydantic.v1.BaseModel):
+            field1: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        model = api.parse_request_object(PydanticV1Model, request_obj_dict)
+
+        self.assertEqual(model.field1, "hello")
+
+    def test_parse_request_object_should_not_parse_pydantic_v2_model(self):
+        """Ensures parse_request_object does not parse pydantic v2 model"""
+        class PydanticV2Model(pydantic.BaseModel):
+            field1: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        with self.assertRaises(RuntimeError) as context:
+            api.parse_request_object(PydanticV2Model, request_obj_dict)
+
+        self.assertIn('no validator found for', str(context.exception))
+
+    def test_parse_request_object_should_raise_request_validation_exception(self):
+        """Ensures parse_request_object raises RequestValidationError on pydantic v1 validation error"""
+        class PydanticV1Model(pydantic.v1.BaseModel):
+            field2: str
+
+        request_obj_dict = {"field1": "hello"}
+
+        with self.assertRaises(RequestValidationError) as context:
+            api.parse_request_object(PydanticV1Model, request_obj_dict)
+
+        self.assertIn('field required', str(context.exception.errors()))
+
+    def test_handle_pydantic_v1_validation_errors(self):
+        """Test pydantic v1 ValidationError is correctly handled and converted to error response"""
+        error = pydantic.v1.ValidationError(errors=[ErrorWrapper(ValueError("some message"), loc="doc")],
+                                            model=SearchQuery)
+        with patch("marqo.tensor_search.tensor_search.search", side_effect=error):
+            response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                "q": "test",
+                "filter": ""
+            })
+
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json()["code"], InvalidArgError.code)
+            self.assertEqual(response.json()["type"], InvalidArgError.error_type)
+            assert "some message" in response.json()["message"]
+
+    def test_handle_pydantic_v2_validation_errors(self):
+        """Test pydantic v2 ValidationError is correctly handled and converted to error response"""
+        error = pydantic.ValidationError.from_exception_data(
+            title='SearchQuery',
+            line_errors=[InitErrorDetails(
+                type=PydanticCustomError('type1', 'some message'), loc=('doc',), input=...)]
+        )
+        with patch("marqo.tensor_search.tensor_search.search", side_effect=error):
+            response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                "q": "test",
+                "filter": ""
+            })
+
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json()["code"], InvalidArgError.code)
+            self.assertEqual(response.json()["type"], InvalidArgError.error_type)
+            assert "some message" in response.json()["message"]
 
     # TODO: Test how marqo handles generic exceptions, including Exception, RunTimeError, ValueError, etc.

@@ -4,14 +4,6 @@ name: Run unit tests
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - mainline
-      - releases/*
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
 
 concurrency:
   group: unit-tests-${{ github.ref }}
@@ -22,17 +14,17 @@ permissions:
 
 jobs:
   Test-Marqo:
-    name: Run Unit Tests
+    name: Run unit tests
     runs-on: ubuntu-latest
-    environment: marqo-test-suite
+    
     steps:
-      - name: Checkout marqo repo
+      - name: Check out marqo repo
         uses: actions/checkout@v3
         with:
           path: marqo
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.9"
           cache: "pip"
@@ -51,14 +43,22 @@ jobs:
           pip install -r marqo/requirements.dev.txt
           python -m nltk.downloader punkt_tab
 
-      - name: Run Unit Tests
+      - name: Run unit tests
+        id: run_unit_tests
         run: |
           cd marqo
           export PYTHONPATH="./src:."
-          pytest tests/unit_tests/ --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info
+          set -o pipefail
+          pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/unit_tests/ | tee pytest_output.txt
 
-      - name: Upload Test Report
+      - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report
-          path: marqo/cov_html/
+          name: marqo-unit-tests-report
+          path: |
+            marqo/.coverage
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
+          include-hidden-files: true

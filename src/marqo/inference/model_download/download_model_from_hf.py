@@ -1,7 +1,7 @@
 from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from typing import Optional
 from huggingface_hub import hf_hub_download
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from huggingface_hub.utils import RepositoryNotFoundError
 from marqo.s2_inference.errors import ModelDownloadError
 

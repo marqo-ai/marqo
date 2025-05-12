@@ -105,19 +105,17 @@ def split_prefix_preprocess_text(
     return results
 
 
-def download_and_preprocess_image(
-        content: list[str], preprocessor: AbstractPreprocessor,
-        preprocessing_config: ImagePreprocessingConfig, return_individual_error: bool = True) \
-            -> list[PreprocessedContent]:
+def download_and_preprocess_media(
+        content: list[str],
+        preprocessor: AbstractPreprocessor,
+        preprocessing_config: Union[ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig],
+        return_individual_error: bool = True
+) -> list[PreprocessedContent]:
 
     results = process_batch(
         content=content,
         preprocessor=preprocessor,
-        modality=Modality.IMAGE,
-        thread_count=preprocessing_config.download_thread_count,
-        media_download_headers=preprocessing_config.download_header,
-        download_timeout_ms=preprocessing_config.download_timeout_ms,
-        audio_video_preprocessing_config=None,
+        preprocessing_config=preprocessing_config,
         return_individual_error=return_individual_error
     )
     return results

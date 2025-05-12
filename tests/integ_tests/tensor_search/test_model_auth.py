@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 from unittest import mock
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 from transformers import AutoModel, AutoTokenizer
 
 from marqo.api.exceptions import BadRequestError, ModelNotInCacheError

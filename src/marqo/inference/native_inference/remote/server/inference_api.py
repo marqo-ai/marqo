@@ -1,12 +1,12 @@
-import pydantic
 from orjson import orjson
+from pydantic.v1 import ValidationError
 from starlette import status
 from starlette.responses import JSONResponse
 
 from marqo import version, logging
-from marqo.inference.native_inference import load_model
 from marqo.inference.native_inference.remote.server.inference_config import Config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start
+from marqo.logging import LOGGING_CONFIG
 from marqo.tensor_search.telemetry import TelemetryMiddleware
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, Body
 from marqo.core.inference.api import InferenceRequest, InferenceError
@@ -91,7 +91,7 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid MessagePack format: {str(e)}"
         ) from e
-    except pydantic.ValidationError as e:
+    except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=e.errors()
@@ -156,4 +156,4 @@ def eject_model(model_name: str, model_device: str, config: Config = Depends(get
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8881)
+    uvicorn.run(app, host="localhost", port=8881, log_config=LOGGING_CONFIG)

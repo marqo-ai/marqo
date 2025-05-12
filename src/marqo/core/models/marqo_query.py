@@ -2,9 +2,10 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import validator, root_validator
+from pydantic.v1 import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
@@ -17,7 +18,6 @@ class MarqoQuery(StrictBaseModel, ABC):
     index_name: str
     limit: int
     offset: Optional[int] = None
-    rerank_depth: Optional[int] = None
     searchable_attributes: Optional[List[str]] = None
     attributes_to_retrieve: Optional[List[str]] = None
     filter: Optional[SearchFilter] = None
@@ -44,6 +44,7 @@ class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
     ef_search: Optional[int] = None
     approximate: bool = True
+    rerank_depth_tensor: Optional[int] = None
 
     # TODO - validate that ef_search >= offset+limit if provided
 
@@ -58,10 +59,14 @@ class MarqoLexicalQuery(MarqoQuery):
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     hybrid_parameters: HybridParameters
+    vector_query: Optional[List[float]] # overrides tensor parameter to allow None value.
 
     # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
+    global_rerank_depth: Optional[int] = None
+    facets: Optional[FacetsParameters] = None
+    track_total_hits: Optional[bool] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

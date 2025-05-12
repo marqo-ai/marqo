@@ -1,19 +1,17 @@
 import argparse
 import importlib
 import pkgutil
-import time
-
-import pytest
-from typing import Set
 import subprocess
 import sys
+from enum import Enum
+from typing import Set
+
+import pytest
 import requests
 import semver
-import requests
 
-from compatibility_test_logger import get_logger
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
-from enum import Enum
 from tests.compatibility_tests.docker_manager import DockerManager
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
@@ -87,27 +85,41 @@ def run_prepare_mode(version_to_test_against: str):
             (marker for marker in markers if marker.name == "skip"),
             None
         )
+        skip_marqo_version_marker = next( # Checks if a compatibility test is marked with @pytest.mark.skip
+            (marker for marker in markers if marker.name == "skip_marqo_version"),
+            None
+        )
         # To check for cases if a test case is not marked with marqo_version OR if it is marked with skip. In that case we skip running prepare mode on that test case.
-        if not marqo_version_marker or skip_marker:
-            if not marqo_version_marker:
-                logger.info(f"No marqo_version marker detected for class {test_class.__name__}, skipping prepare mode for this test class")
-            elif skip_marker:
-                logger.info(f"Detected 'skip' marker for class {test_class.__name__}, skipping prepare mode for this test class")
+        if not marqo_version_marker:
+            logger.info(f"No marqo_version marker detected for class {test_class.__name__}, skipping prepare mode for this test class")
             continue
 
+        if skip_marker:
+            logger.info(f"Detected 'skip' marker for class {test_class.__name__}, skipping prepare mode for this test class")
+            continue
+
+        if skip_marqo_version_marker and (str(version_to_test_against) in skip_marqo_version_marker.args):
+            logger.info(
+                f"Detected 'skip_marqo_version' marker for class {test_class.__name__}. "
+                f"These Marqo versions are skipped: {skip_marqo_version_marker.args}. "
+                f"Skipping prepare mode for this test class as we are running on version {version_to_test_against}"
+            )
+            continue
+
+        # TODO: Raname this to minimal version
         marqo_version = marqo_version_marker.args[0]
         logger.info(f"Detected marqo_version '{marqo_version}' for testcase: {test_class.__name__}")
         try:
             if semver.VersionInfo.parse(marqo_version).compare(version_to_test_against) <= 0:
-                logger.info(f"Running prepare mode on testcase: {test_class.__name__} with version: {marqo_version}")
+                logger.info(f"Running prepare mode on testcase: {test_class.__name__}")
                 test_class.setUpClass() #setUpClass will be used to create Marqo client
                 test_instance = test_class()
                 test_instance.prepare() #Prepare method will be used to create index and add documents
             else: # Skip the test if the version_to_test_against is greater than the version the test is marked
-                logger.info(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
+                logger.info(f"Skipping testcase {test_class.__name__} as {marqo_version} > {version_to_test_against}")
         except Exception as e:
-            logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
-            errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
+            logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
+            errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
 
     if errors:

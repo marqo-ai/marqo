@@ -1,5 +1,5 @@
 from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
-    download_and_preprocess_image
+    download_and_preprocess_media
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
 from marqo.inference.type import *
@@ -14,7 +14,6 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
     def __init__(self, model: OpenCLIPModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
-
 
     def run_pipeline(self) -> InferenceResult:
         preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
@@ -38,14 +37,12 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
                 self.inference_request.preprocessing_config
             )
         elif self.inference_request.modality == Modality.IMAGE:
-            results = download_and_preprocess_image(
-                self.inference_request.contents,
-                self.model.get_preprocessor(),
-                self.inference_request.preprocessing_config,
-                self.inference_request.return_individual_error
-            )
+            results = download_and_preprocess_media(self.inference_request.contents, self.model.get_preprocessor(),
+                                                    self.inference_request.preprocessing_config,
+                                                    self.inference_request.return_individual_error)
         else:
-            raise ValueError(f"Unsupported modality: {modality}")
+            # TODO - Raise an unsupported modality error
+            raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
         return results
 
     def _encode_processed_content(self, preprocessed_content_list: List[OpenCLIPPreprocessedContent]) -> List[

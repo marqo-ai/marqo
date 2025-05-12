@@ -8,16 +8,17 @@ from torchvision.transforms import Compose
 from marqo import marqo_docs
 from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
-from marqo.core.inference.api import ModelError, ModelManager
+from marqo.core.inference.api import ModelManager, ModelError
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.s2_inference import constants
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     InvalidModelPropertiesError, ModelLoadError,
     ModelNotInCacheError, ModelDownloadError)
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
+from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
@@ -338,28 +339,26 @@ def _load_model(
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
+
+    if model_type not in (
+            ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind,
+            ModelType.Random, ModelType.MultilingualClip, ModelType.NO_MODEL
+    ):
+        raise ModelError(
+            f"The provided model properties does not contain a valid model type. We only support "
+            f"{ModelType.OpenCLIP}, {ModelType.HF_MODEL}, {ModelType.HF_STELLA}, "
+            f"{ModelType.LanguageBind}, {ModelType.Random}, {ModelType.MultilingualClip}, "
+            f"{ModelType.NO_MODEL} at the moment, but received {model_type}."
+        )
+
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    # TODO For each refactored model class, add a new elif block here and remove the if block
-    #  once we have all models refactored
-    if model_type in (
-            ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind,
-            ModelType.Random
-    ):
-        model = loader(
-            device=device,
-            model_properties=model_properties,
-            model_auth=model_auth,
-        )
-    else:
-        model = loader(
-            model_properties.get('name', None),
-            device=device,
-            embedding_dim=model_properties['dimensions'],
-            model_properties=model_properties,
-            model_auth=model_auth,
-            max_seq_length=model_properties.get('tokens', get_default_seq_length())
-        )
+    model = loader(
+        device=device,
+        model_properties=model_properties,
+        model_auth=model_auth,
+    )
+
     model.load()
     return model
 

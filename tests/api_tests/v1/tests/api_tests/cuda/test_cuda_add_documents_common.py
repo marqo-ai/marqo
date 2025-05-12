@@ -39,11 +39,13 @@ class TestCudaStructuredAddDocuments(MarqoTestCase):
                     {"name": "image_content", "type": "image_pointer"},
                 ],
                 "tensorFields": ["title", "image_content"],
-            }
+            },
         ]
         )
 
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name]
+        cls.indexes_to_delete = [
+            cls.text_index_name, cls.image_index_name
+        ]
 
     def tearDown(self):
         if self.indexes_to_delete:
@@ -167,22 +169,37 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
 
         cls.text_index_name = "api_test_unstructured_index" + str(uuid.uuid4()).replace('-', '')
         cls.image_index_name = "api_test_unstructured_image_index" + str(uuid.uuid4()).replace('-', '')
+        cls.unstructured_languagebind_index_name_with_limited_supported_modalities = (
+                "api_test_unstructured_languagebind_index_with_limited_supported_modalities"
+                + str(uuid.uuid4()).replace('-', '')
+        )
 
-        cls.create_indexes([
-            {
-                "indexName": cls.text_index_name,
-                "type": "unstructured",
-                "model": "hf/all-MiniLM-L6-v2",
-            },
-            {
-                "indexName": cls.image_index_name,
-                "type": "unstructured",
-                "model": "open_clip/ViT-B-32/openai",
-                "treatUrlsAndPointersAsImages": True,
-            }
-        ])
+        cls.create_indexes(
+            [
+                {
+                    "indexName": cls.text_index_name,
+                    "type": "unstructured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                },
+                {
+                    "indexName": cls.image_index_name,
+                    "type": "unstructured",
+                    "model": "open_clip/ViT-B-32/openai",
+                    "treatUrlsAndPointersAsImages": True,
+                },
+                {
+                    "indexName": cls.unstructured_languagebind_index_name_with_limited_supported_modalities,
+                    "type": "unstructured",
+                    "model": 'LanguageBind/Audio_FT',
+                    "treatUrlsAndPointersAsMedia": True,
+                }
+            ]
+        )
 
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name]
+        cls.indexes_to_delete = [
+            cls.text_index_name, cls.image_index_name,
+            cls.unstructured_languagebind_index_name_with_limited_supported_modalities
+        ]
 
     def tearDown(self):
         if self.indexes_to_delete:
@@ -361,3 +378,36 @@ class TestCudaUnstructuredAddDocuments(MarqoTestCase):
                     self.client.index(self.text_index_name).add_documents(documents=[{"some": "data"}], device="cuda",
                                                                           **tensor_fields)
                 assert "bad_request" in str(e.exception.message)
+
+    def test_add_documents_with_unsupported_modalities(self):
+        """
+        Test that add documents with unsupported modalities will fail the whole batch.
+        """
+        documents = [
+            {
+                "text_field_1": "A private image with a png extension",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/"
+                                 "mainline/examples/ImageSearchGuide/data/image1.jpg",
+            },
+            {
+                "text_field_1": "A private video with a png extension",
+            }
+        ]
+
+        with self.subTest("Unsupported modality in add_documents"):
+            with self.assertRaises(MarqoWebError) as e:
+                self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).add_documents(
+                    documents=documents,
+                    tensor_fields=["text_field_1", "image_field_1"]
+                )
+            self.assertIn("The model does not support the requested modality", str(e.exception.message))
+            self.assertEqual(e.exception.status_code, 400)
+
+        with self.subTest("Unsupported modality in search"):
+            with self.assertRaises(MarqoWebError) as e:
+                self.client.index(self.unstructured_languagebind_index_name_with_limited_supported_modalities).search(
+                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+                )
+
+            self.assertIn("The model does not support the requested modality", str(e.exception.message))
+            self.assertEqual(e.exception.status_code, 400)

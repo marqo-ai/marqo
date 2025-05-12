@@ -18,6 +18,7 @@ LARGE_HF_TEST_MODELS = [
     "hf/multilingual-e5-base",
     "hf/multilingual-e5-large",
     "hf/multilingual-e5-large-instruct",
+    "Marqo/dunzhang-stella_en_400M_v5"
 ]
 
 @pytest.mark.largemodel
@@ -43,6 +44,7 @@ class TestLargeHFModelEncode(InferenceTestCase):
             target_dir / "embeddings_reference" / "embeddings_all_models_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_e5_python_3_8.json",
             target_dir / "embeddings_reference" / "embeddings_large_multilingual_e5_python_3_8.json",
+            target_dir / "embeddings_reference" / "embeddings_stella_python_3_8.json",
         ]
 
         cls.hf_embeddings_reference = {}
@@ -108,7 +110,7 @@ class TestLargeHFModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
@@ -133,6 +135,6 @@ class TestLargeHFModelEncode(InferenceTestCase):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertTrue(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)

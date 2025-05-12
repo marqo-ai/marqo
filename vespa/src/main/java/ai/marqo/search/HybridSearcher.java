@@ -86,10 +86,34 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("Base Query is: "), verbose);
         logIfVerbose(query.toDetailString(), verbose);
 
-        // Validation for limit and rerank count
+        // Validation for limit
         if (limit == null) {
             throw new RuntimeException("Query limit cannot be null.");
         }
+
+        // --- Begin facets subquery handling ---
+        // Check for custom facets YQL properties - expect array of strings
+        String[] facetsYqlQueries =
+                query.properties()
+                        .getString("marqo__yql.facets", "")
+                        .split("\n---MARQO-YQL-QUERY-DELIMITER---\n");
+        List<Future<Result>> futureFacets = new ArrayList<>();
+
+        for (String facetsYql : facetsYqlQueries) {
+            if (!facetsYql.isEmpty()) {
+                // Create a subquery for each facet query
+                Query queryFacets =
+                        createSubQuery(
+                                query,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                verbose,
+                                facetsYql);
+                AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
+                futureFacets.add(asyncExecutionFacets.search(queryFacets));
+            }
+        }
+        // --- End facets subquery handling ---
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -104,7 +128,7 @@ public class HybridSearcher extends Searcher {
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
 
-            // Execute both searches async
+            // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
             Future<Result> futureLexical = asyncExecutionLexical.search(queryLexical);
             AsyncExecution asyncExecutionTensor = new AsyncExecution(execution);
@@ -114,14 +138,13 @@ public class HybridSearcher extends Searcher {
                 resultTensor = futureTensor.get(timeout, TimeUnit.MILLISECONDS);
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 throw new RuntimeException(
-                        String.format(
-                                        "Hybrid search disjunction timeout error. Current timeout:"
-                                                + " %d. ",
-                                        timeout)
+                        "Hybrid search disjunction timeout error. Current timeout: "
+                                + timeout
+                                + ". "
                                 + e.toString());
             }
 
-            // Collect errors from both results and return if any.
+            // Collect errors from lexical and tensor results.
             HitGroup combinedErrors = collectErrorsFromResults(resultLexical, resultTensor);
             if (combinedErrors.getError() != null) {
                 return new Result(query, combinedErrors);
@@ -134,7 +157,7 @@ public class HybridSearcher extends Searcher {
                             + resultTensor.toString(),
                     verbose);
 
-            // Execute fusion ranking on 2 results.
+            // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
                         rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
@@ -154,17 +177,55 @@ public class HybridSearcher extends Searcher {
             } else {
                 throw new RuntimeException(
                         "If retrievalMethod is 'lexical' or 'tensor', rankingMethod can only be"
-                                + " 'lexical', or 'tensor'.");
+                                + " 'lexical' or 'tensor'.");
             }
         } else {
             throw new RuntimeException(
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
 
-        // Post-process result list
+        // Post-process the main hits result list.
         HitGroup processedHits =
                 postProcessResults(
                         hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
+
+        // --- Attach facets results if available ---
+        if (!futureFacets.isEmpty()) {
+            try {
+                long startTime = System.currentTimeMillis();
+                int facetCounter = 0;
+                for (Future<Result> futureFacet : futureFacets) {
+                    Result facetsResult = futureFacet.get(timeout, TimeUnit.MILLISECONDS);
+                    if (facetsResult != null && facetsResult.hits() != null) {
+                        // Ensure unique IDs for each facet group by adding counter
+                        int hitCounter = 0;
+                        for (Hit hit : facetsResult.hits().asList()) {
+                            String originalId = hit.getId().toString();
+                            if (originalId.startsWith("group:")) {
+                                hit.setId("group:facet:" + facetCounter + ":" + hitCounter);
+                                hitCounter++;
+                            }
+                        }
+                        // Add facets as children to the processed hits
+                        processedHits.addAll(facetsResult.hits().asList());
+                        facetCounter++;
+                    }
+                }
+                long facetsTime = System.currentTimeMillis() - startTime;
+                logIfVerbose(
+                        String.format(
+                                "Took %.3fms to process and attach %d facet queries",
+                                facetsTime / 1000.0, futureFacets.size()),
+                        verbose);
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                throw new RuntimeException(
+                        "Hybrid search facets timeout error. Current timeout: "
+                                + timeout
+                                + ". "
+                                + e.toString());
+            }
+        }
+        // --- End facets attachment ---
 
         return new Result(query, processedHits);
     }
@@ -432,6 +493,12 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    public Query createSubQuery(
+            Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
+        // Default exactQuery to an empty string (or any default value you prefer)
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "");
+    }
+
     /**
      * Creates custom sub-query from the original query.
      * Clone original query, Update the following:
@@ -446,7 +513,11 @@ public class HybridSearcher extends Searcher {
      * @param verbose
      */
     Query createSubQuery(
-            Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
+            Query query,
+            String retrievalMethod,
+            String rankingMethod,
+            boolean verbose,
+            String exactQuery) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -455,7 +526,12 @@ public class HybridSearcher extends Searcher {
 
         // Extract relevant properties
         // YQL uses RETRIEVAL method
-        String yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
+        String yqlNew;
+        if (!exactQuery.isEmpty()) {
+            yqlNew = exactQuery;
+        } else {
+            yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
+        }
         // Rank Profile uses RETRIEVAL + RANKING method
         String rankProfileNew =
                 query.properties()

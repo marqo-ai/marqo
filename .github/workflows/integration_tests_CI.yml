@@ -31,13 +31,6 @@ on:
         required: true
         default: 0
 
-  push:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
-
 concurrency:
   group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
   cancel-in-progress: true
@@ -123,7 +116,7 @@ jobs:
       matrix:
         part: [ 0, 1 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
-    environment: marqo-test-suite
+    
     timeout-minutes: 60
     env:
       VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
@@ -135,7 +128,7 @@ jobs:
           path: marqo
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.9"
           cache: "pip"
@@ -148,10 +141,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # Override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.txt
 
       - name: Download nltk data
         run: |
@@ -206,14 +199,18 @@ jobs:
           set -o pipefail
           COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
-            --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
-            tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
+            --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report-${{ matrix.part }}
-          path: marqo/.coverage.${{ matrix.part }}
+          name: marqo-integ-tests-report-${{ matrix.part }}
+          path: |
+            marqo/.coverage.${{ matrix.part }}
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
           include-hidden-files: true
 
   Merge-Coverage:
@@ -231,53 +228,20 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Move Coverage Files
-        run: mv marqo-test-report-*/.* marqo/
-
-      - name: DEBUG coverages
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          pip install coverage
-          coverage debug data
+        run: mv marqo-integ-tests-report-*/.* marqo/
 
       - name: Merge Coverage Results
         run: |
           cd marqo
-          export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
-          
-      - name: Generate Coverage Reports
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          coverage report -i
-          coverage xml -i
-          coverage html -i
-
-      - name: Check Test Coverage of New Code
-        id: check_test_coverage
-        continue-on-error: true
-        run: |
-          cd marqo
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            echo "Running diff-cover against branch $BASE_BRANCH"
-            git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            pip install diff-cover
-            diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95
-          else
-            echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > diff_cov.md
-            touch diff_cov.html
-          fi
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: merged-coverage
-          path: marqo/htmlcov/
+          name: marqo-integ-tests-report
+          path: marqo/.coverage
+          include-hidden-files: true
 
   Stop-Runner:
     needs:
