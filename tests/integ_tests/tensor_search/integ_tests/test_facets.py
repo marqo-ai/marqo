@@ -154,8 +154,9 @@ class TestFacets(MarqoTestCase):
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
-    
-    def test_single_facet_reverse_ordering_returns_lower_resulst(self):
+
+    @pytest.mark.skip_for_multinode
+    def test_single_facet_reverse_ordering_returns_lower_results(self):
         """
         Tests ascending order facet results return facets with lower counts first.
         """
