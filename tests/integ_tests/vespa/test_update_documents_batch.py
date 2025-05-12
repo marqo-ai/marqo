@@ -7,6 +7,7 @@ from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 from integ_tests.marqo_test import AsyncMarqoTestCase
+import pytest
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
