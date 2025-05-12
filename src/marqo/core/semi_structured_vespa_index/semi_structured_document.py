@@ -46,7 +46,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def from_vespa_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
         """
-        Instantiate an UnstructuredVespaDocument from a Vespa document.
+        Instantiate an SemiStructuredVespaDocument from a Vespa document.
         Used in get_document_by_id or get_documents_by_ids
         """
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
@@ -62,7 +62,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 text_fields[field_name] = fields[field_name]
 
         return cls(id=document[cls._VESPA_DOC_ID],
-                   fixed_fields=SemiStructuredVespaDocumentFields(**fields),
+                   fixed_fields=SemiStructuredVespaDocumentFields.construct(**fields),
                    tensor_fields=tensor_fields,
                    text_fields=text_fields,
                    raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
@@ -76,10 +76,11 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
-        """Instantiate an UnstructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
+        """Instantiate an SemiStructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
 
         if index_constants.MARQO_DOC_ID not in document:
-            raise VespaDocumentParsingError(
+            # Please note we still use unstructured in the error message since it will be exposed to user
+            raise MarqoDocumentParsingError(
                 f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                 f"This should be assigned for a valid document")
 
@@ -116,7 +117,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
             else:
-                raise VespaDocumentParsingError(
+                raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
                     f"unsupported type {type(field_content)} which has not been validated in advance.")
 
@@ -167,9 +168,12 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 marqo_document[key] = []
             marqo_document[key].append(value)
 
-        # marqo_document.update(self.fixed_fields.short_string_fields)
+        # Add int and float fields back
+        # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
+        # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
         marqo_document.update(self.fixed_fields.int_fields)
         marqo_document.update(self.fixed_fields.float_fields)
+
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
 

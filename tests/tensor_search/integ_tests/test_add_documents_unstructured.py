@@ -333,7 +333,10 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         self.tags_ = [
             [{"_id": "to_fail_123", "tags": ["wow", "this", False]}],
             [{"_id": "to_fail_124", "tags": [1, None, 3]}],
-            [{"_id": "to_fail_125", "tags": [{}]}]
+            [{"_id": "to_fail_125", "tags": [{}]}],
+            [{"_id": "to_fail_126", "tags": [1, 2, 3]}],
+            [{"_id": "to_fail_127", "tags": [1.0, 2.0, 3.0]}],
+            [{"_id": "to_fail_128", "tags": [1, 2.0, 3]}],
         ]
         bad_doc_args = self.tags_
         for bad_doc_arg in bad_doc_args:
@@ -347,7 +350,9 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     )
                 ).dict(exclude_none=True, by_alias=True)
                 assert add_res['errors'] is True
-                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['error' in item for item in add_res['items']])
+                assert all(['Unstructured Marqo index only supports string lists.' in item['message']
+                            for item in add_res['items']])
 
     def test_add_documents_set_device(self):
         """
@@ -761,3 +766,28 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 number_of_docs_in_index = self.config.monitoring.get_index_stats_by_name(
                     index_name=self.default_text_index).number_of_documents
                 self.assertEqual(number_of_docs, number_of_docs_in_index)
+
+    def test_a_text_index_will_treat_a_url_as_text(self):
+        """Test that a text index will treat a URL as text and not download the image"""
+        valid_url = TestImageUrls.HIPPO_REALISTIC.value
+        invalid_url = TestImageUrls.HIPPO_REALISTIC.value + "invalid"
+        self.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.default_text_index, docs=[
+                    {
+                        "_id": "1",
+                        "title": invalid_url,
+                        "non_tensor_field": valid_url
+                    }
+                ],
+                device="cpu", tensor_fields=["title"]
+            )
+        )
+        doc = tensor_search.get_document_by_id(
+            config=self.config, index_name=self.default_text_index, document_id="1", show_vectors=True
+        )
+
+        self.assertEqual(invalid_url, doc["title"])
+        self.assertEqual(valid_url, doc["non_tensor_field"])
+        self.assertEqual(1, len(doc[enums.TensorField.tensor_facets]))
+        self.assertIn("title", doc[enums.TensorField.tensor_facets][0])

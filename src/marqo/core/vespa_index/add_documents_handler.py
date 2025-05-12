@@ -10,7 +10,7 @@ from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationM
 from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
     TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
-    UnsupportedFeatureError
+    UnsupportedFeatureError, VespaDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
@@ -193,6 +193,13 @@ class AddDocumentsHandler(ABC):
         """
         This method handles each individual field in a marqo doc, validates it, collect tensor info into
         `tensor_fields_container`, and change the field content if necessary (e.g. custom vector fields)
+        """
+        pass
+
+    @abstractmethod
+    def _infer_field_type(self, field_name: str, field_content: Any) -> FieldType:
+        """
+        This method infers the field type of a field based on the field name and content.
         """
         pass
 

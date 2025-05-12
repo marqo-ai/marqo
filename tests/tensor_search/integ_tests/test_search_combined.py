@@ -16,9 +16,10 @@ from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from pydantic import ValidationError
 import marqo.api.exceptions as api_exceptions
+from fastapi.responses import JSONResponse, ORJSONResponse
 
 
 class TestSearch(MarqoTestCase):
@@ -1047,3 +1048,34 @@ class TestSearch(MarqoTestCase):
                             text=query, config=self.config, index_name=index_name.name,
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
+
+    def test_search_results_always_json_serializable(self):
+        """
+        The search() text parameter can either be str, dict, or CustomVectorQuery.
+        All queries are returned in the result. Ensure all types of queries end up with JSON serializable results.
+        """
+
+        test_cases = [
+            "hello",
+            {"hello": 1, "another one": 2},
+            {"hello": 1.5, "another one": 2.34},
+            CustomVectorQuery(
+                customVector=CustomVectorQuery.CustomVector(
+                    content="hello",
+                    vector=[0 for _ in range(384)]
+                )
+            )
+        ]
+
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            for query in test_cases:
+                with self.subTest(index=index.type, query=query):
+                    res = tensor_search.search(
+                        text=query, config=self.config, index_name=index.name,
+                    )
+
+                    # Result should be JSON serializable
+                    try:
+                        ORJSONResponse(res)
+                    except TypeError as e:
+                        self.fail(f"Result is not JSON serializable: {e}")
