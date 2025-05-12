@@ -1,8 +1,7 @@
-# Runs integration tests on 4 cases:
-# 1. single node vespa
-# 2. multinode vespa: 1 shard, 1 replica
-# 3. multinode vespa: 2 shard, 0 replicas
-# 4. multinode vespa: 2 shards, 1 replicas
+# Runs integration tests on 3 cases:
+# 1. multinode vespa: 1 shard, 1 replica
+# 2. multinode vespa: 2 shard, 0 replicas
+# 3. multinode vespa: 2 shards, 1 replicas
 # Runs every push to a feature branch and every push to mainline/release
 
 name: Integration Tests with Shards and Replicas
