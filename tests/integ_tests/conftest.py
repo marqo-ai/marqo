@@ -21,7 +21,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "largemodel: mark test as largemodels")
     config.addinivalue_line("markers", "cpu_only: mark test as cpu_only")
     config.addinivalue_line("markers", "unittest: mark test as unit test, it does not require vespa to run")
-    config.addinivalue_line("markers", "skip_for_multinode: mark test as multinode, it requires multiple Vespa nodes to run")
+    config.addinivalue_line("markers", "skip_for_multinode: mark test to be skipped if multinode")
 
 
 def pytest_collection_modifyitems(config, items):

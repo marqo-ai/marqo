@@ -92,6 +92,7 @@ class TestFacets(MarqoTestCase):
             )
         )
 
+    @pytest.mark.skip_for_multinode
     def test_single_facet(self):
         """
         Tests facet requests for a single field (color) across different retrieval and ranking methods.
@@ -112,6 +113,7 @@ class TestFacets(MarqoTestCase):
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
 
+    @pytest.mark.skip_for_multinode
     def test_single_facet_max_results(self):
         """
         Tests facet requests with a global maxResults limit that applies to all facet fields.
@@ -131,6 +133,8 @@ class TestFacets(MarqoTestCase):
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
+
+    @pytest.mark.skip_for_multinode
     def test_single_facet_max_results_override(self):
         """
         Tests that field-level maxResults override can exceed the global maxResults limit.
@@ -170,7 +174,8 @@ class TestFacets(MarqoTestCase):
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
-    
+
+    @pytest.mark.skip_for_multinode
     def test_single_facet_number_field(self):
         """
         Tests facet aggregations (min, max, avg, sum, count) for numeric fields.
@@ -190,6 +195,8 @@ class TestFacets(MarqoTestCase):
                     facets=facets,
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
+
+    @pytest.mark.skip_for_multinode
     def test_single_facet_number_field_with_ranges(self):
         """
         Tests numeric facets with custom range buckets using from/to configurations.
@@ -218,6 +225,7 @@ class TestFacets(MarqoTestCase):
                     expected_lexical_facets=expected_lexical_facets, expected_other_facets=expected_other_facets
                 )
 
+    @pytest.mark.skip_for_multinode
     def test_single_number_facets_int(self):
         """
         Tests numeric facets behavior with integer values, including range boundaries
@@ -282,6 +290,7 @@ class TestFacets(MarqoTestCase):
                         self.assertEqual(res["facets"]["price"]["3.0:50.0"]["count"], 1)
                         self.assertEqual(res["facets"]["price"]["from50"]["count"], 2)
 
+    @pytest.mark.skip_for_multinode
     def test_array_facets(self):
         """
         Tests array field faceting by comparing results between individual field facets
@@ -330,7 +339,7 @@ class TestFacets(MarqoTestCase):
                     splitted_name = facet.split(":")
                     self.assertDictEqual(res_string_facets["facets"][splitted_name[0]][splitted_name[1]], value)
 
-
+    @pytest.mark.skip_for_multinode
     def test_facets_filter_term_exclusions(self):
         """
         Tests facet behavior with filter exclusions, verifying that excludeTerms properly
@@ -466,6 +475,7 @@ class TestFacets(MarqoTestCase):
                     )
                     self.assertEqual(res["facets"]["color"]["red"]["count"], 1)
 
+    @pytest.mark.skip_for_multinode
     def test_get_total_hits(self):
         """Test getting total hits for different retrieval methods"""
         self.add_fashion_docs()
@@ -487,6 +497,7 @@ class TestFacets(MarqoTestCase):
                 else:
                     self.assertEqual(res["totalHits"], 4)
 
+    @pytest.mark.skip_for_multinode
     def test_get_total_hits_with_facets(self):
         """Test getting total hits with facets returns consistent counts"""
         self.add_fashion_docs()

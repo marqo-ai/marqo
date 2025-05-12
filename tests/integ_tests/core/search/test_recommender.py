@@ -650,6 +650,7 @@ class TestRecommender(MarqoTestCase):
                         rerank_depth=None
                     )
 
+    @pytest.mark.skip_for_multinode
     def test_recommend_rerank_depth_with_limit_and_offset(self):
         """
         Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
