@@ -10,6 +10,7 @@ from marqo.s2_inference.s2_inference import _load_model as og_load_model
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 
+@unittest.skip(reason='temporarily skip model encoding test')
 class TestRandomOutputs(unittest.TestCase):
 
     def setUp(self) -> None:

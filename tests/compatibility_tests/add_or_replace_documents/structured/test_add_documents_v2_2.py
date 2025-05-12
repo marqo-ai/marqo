@@ -142,7 +142,6 @@ class TestAddDocumentsv2_2(BaseCompatibilityTestCase):
                 try:
                     with self.subTest(index=index_name, doc_id=doc_id):
                         expected_doc = stored_results[index_name][doc_id]
-                        self.logger.debug(f"Printing expected doc {expected_doc}")
                         actual_doc = self.client.index(index_name).get_document(doc_id)
                         self.assertEqual(expected_doc, actual_doc)
 

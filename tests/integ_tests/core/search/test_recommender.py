@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest import mock
 
 from marqo.core.exceptions import InvalidFieldNameError
@@ -80,7 +81,7 @@ class TestRecommender(MarqoTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.recommender = Recommender(self.vespa_client, self.index_management)
+        self.recommender = Recommender(self.vespa_client, self.index_management, self.config.inference)
 
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
@@ -603,7 +604,8 @@ class TestRecommender(MarqoTestCase):
                         score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
-                        processing_start=mock.ANY
+                        processing_start=mock.ANY,
+                        rerank_depth=None
                     )
 
                 # Repeat with different values to ensure it didn't pass due to default values matching
@@ -644,5 +646,78 @@ class TestRecommender(MarqoTestCase):
                         score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
-                        processing_start=mock.ANY
+                        processing_start=mock.ANY,
+                        rerank_depth=None
                     )
+
+    def test_recommend_rerank_depth_with_limit_and_offset(self):
+        """
+        Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
+        """
+
+        docs = [
+            {"_id": "doc_0", "title": "Project Overview",
+             "content": "Summary of the project's goals and deliverables."},
+            {"_id": "doc_1", "title": "Team Roles", "content": "Descriptions of each team member's responsibilities."},
+            {"_id": "doc_2", "title": "Timeline", "content": "Key milestones and deadlines for the project."},
+            {"_id": "doc_3", "title": "Budget Estimate", "content": "Projected costs and resource allocation."},
+            {"_id": "doc_4", "title": "Tech Stack", "content": "Overview of technologies and tools being used."},
+            {"_id": "doc_5", "title": "Risk Assessment", "content": "Potential risks and mitigation strategies."},
+            {"_id": "doc_6", "title": "Client Feedback", "content": "Summary of feedback received from stakeholders."},
+            {"_id": "doc_7", "title": "Testing Plan", "content": "Details on testing strategies and coverage."},
+            {"_id": "doc_8", "title": "Deployment Guide",
+             "content": "Steps and procedures for deploying the application."},
+            {"_id": "doc_9", "title": "Post-Mortem",
+             "content": "Analysis of what went well and areas for improvement."},
+        ]
+
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                tensor_fields = ["title", "content"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                self.add_documents(
+                    self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=docs, tensor_fields=tensor_fields
+                    )
+                )
+
+                # Case 1: result_count < rerank_depth — should return result_count documents
+                with self.subTest(case="result_count_less_than_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=3, rerank_depth=5
+                    )
+                    self.assertEqual(len(res["hits"]), 3)
+
+                # Case 2: offset > rerank_depth — offset + limit is higher, result must be present
+                with self.subTest(case="offset_beyond_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=1, offset=3, rerank_depth=2
+                    )
+                    self.assertEqual(len(res["hits"]), 1)
+
+                # Case 3: result_count + offset < rerank_depth — enough reranked results to fulfill offset and count
+                with self.subTest(case="offset_within_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=2, offset=2, rerank_depth=5
+                    )
+                    self.assertEqual(len(res["hits"]), 2)
+
+                # Case 4: rerank_depth < result_count — offset + limit is higher so rerank_depth gets overwritten
+                with self.subTest(case="result_count_greater_than_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=5, rerank_depth=3
+                    )
+                    self.assertEqual(len(res["hits"]), 5)
+
+                # Case 5: ef_search < rerank_depth < result_count — ef_search overrides rerank_depth/limit
+                with self.subTest(case="ef_search_limits_rerank_depth"):
+                    res = self.recommender.recommend(
+                        index_name=index.name, documents=["doc_0", "doc_1"], result_count=10, rerank_depth=5,
+                        ef_search=3, searchable_attributes=['title']
+                    )
+                    # We only assert < 3 as the exact number of results varies across runs,
+                    # but for one searchable attribute and one shard is capped at ef_search
+                    self.assertTrue(len(res["hits"]) <= 3)
+
+if __name__ == '__main__':
+    unittest.main()

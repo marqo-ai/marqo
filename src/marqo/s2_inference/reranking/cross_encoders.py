@@ -28,7 +28,7 @@ from marqo.s2_inference.reranking.configs import get_default_text_processing_par
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.processing import image as image_processor
 
-from marqo.s2_inference.logger import get_logger
+from marqo.logging import get_logger
 logger = get_logger(__name__)
 
 

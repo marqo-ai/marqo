@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any
 
-from pydantic import Field
+from pydantic.v1 import Field
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants

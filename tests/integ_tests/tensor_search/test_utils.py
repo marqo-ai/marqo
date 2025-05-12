@@ -35,29 +35,6 @@ class TestUtils(unittest.TestCase):
             url_base="https://localhost:9200", username="", password=""
         )
 
-    def test_check_device_is_available(self):
-        mock_cuda_is_available = mock.MagicMock()
-        mock_cuda_device_count = mock.MagicMock()
-        for device_str, num_cuda_devices, expected in [
-            ("cpu", 0, True),
-            ("cpu", 3, True),
-            ("cuda", 1, True),
-            ("cuda", 0, False),
-            ("cuda:0", 1, True),
-            ("cuda:1", 2, True),
-            ("cuda:2", 2, False),
-        ]:
-            mock_cuda_is_available.return_value = True if num_cuda_devices > 0 else False
-            mock_cuda_device_count.return_value = num_cuda_devices
-
-            @mock.patch("torch.cuda.is_available", mock_cuda_is_available)
-            @mock.patch("torch.cuda.device_count", mock_cuda_device_count)
-            def run_test():
-                assert expected == utils.check_device_is_available(device_str)
-                return True
-
-            assert run_test()
-
     def test_merge_dicts(self):
         base = {
             'lvl_0_a': {
@@ -242,11 +219,6 @@ class TestUtils(unittest.TestCase):
             ('""" python docstring appeared"""', ([], ['python', 'docstring', 'appeared'])),
             ('""', ([], [])),
             ('what about backticks `?', ([], ['what', 'about', 'backticks', '`?'])),
-            (
-                '\\" escaped quotes\\"  what happens here?',
-                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
-            ),
-            ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
             ('double  spaces  get  removed', ([], ['double', 'spaces', 'get', 'removed'])),
             ('"go"od"', ([], ['go', 'od'])),
             ('"ter"m1" term2', ([], ['ter','m1', 'term2'])),
@@ -267,7 +239,43 @@ class TestUtils(unittest.TestCase):
             ('sa"ma" hello!', ([], ['sa', 'ma', 'hello!'])),    # Bad opening, good closing
             ('"sam"?', ([], ['sam', '?'])),
             ('"朋友"你好', ([], ['朋友', '你好'])),
+        ]
+        for input, expected_output in cases:
+            with self.subTest(input):
+                self.assertEqual(expected_output, utils.parse_lexical_query(input))
 
+    def test_parse_lexical_query_escaped_characters(self):
+        """
+        The \ and " must always be escaped in vespa with a \.
+        We must NEVER pass a raw one of these to vespa.
+
+        \\ is used to represent \ in these tests because \ is a special character in python strings.
+        """
+        # 2-tuples of input text, and expected parse_lexical_query() output
+        cases = [
+            (
+                '\\" escaped quotes\\"  what happens here?',
+                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
+            ),
+            ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
+            # escaped backslash
+            ('\\\\hello', ([], ['\\\\hello'])),
+            # escaped backslash before double quote (quote will be treated as whitespace)
+            ('\\\\"hello', ([], ['\\\\', 'hello'])),
+            # escaped backslash before double quote on both sides (quote will be treated as whitespace)
+            ('\\\\"hello\\\\"', ([], ['\\\\', 'hello\\\\'])),
+            # escaped backslash before escaped double quote
+            ('\\\\\\"hello', ([], ['\\\\\\"hello'])),
+            # backslash to escape a normal character (removed)
+            ('\\a', ([], ['a'])),
+            # stray unescaped backslash (removed)
+            ('\\\\"hello\\', ([], ['\\\\', 'hello'])),
+            # Combine all cases
+            ('single\\double\\\\triple\\\\\\quote"ba"d escaped\\" "proper double quote" stray\\',
+             (['proper double quote'],
+              ['singledouble\\\\triple\\\\quote', 'ba', 'd', 'escaped\\"', 'stray']
+              )
+             ),
         ]
         for input, expected_output in cases:
             with self.subTest(input):

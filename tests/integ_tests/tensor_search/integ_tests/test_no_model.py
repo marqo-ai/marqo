@@ -5,7 +5,7 @@ import numpy as np
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.exceptions import IndexNotFoundError
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -130,7 +130,7 @@ class TestNoModel(MarqoTestCase):
                 self.assertEqual(r["errors"], True)
                 self.assertIn("Cannot vectorise anything with 'no_model'", r["items"][0]["error"])
                 self.assertEqual(400, r["items"][0]["status"])
-                self.assertEqual("invalid_argument", r["items"][0]["code"])
+                self.assertEqual("inference_error", r["items"][0]["code"])
                 self.assertEqual("1", r["items"][0]["_id"])
 
                 self.assertEqual("2", r["items"][1]["_id"])

@@ -23,7 +23,7 @@ class TestEmbed(MarqoTestCase):
             {
                 "indexName": cls.structured_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "text_field_1", "type": "text"},
                     {"name": "text_field_2", "type": "text"}
@@ -54,7 +54,7 @@ class TestEmbed(MarqoTestCase):
             {
                 "indexName": cls.unstructured_index_non_e5,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2"
+                "model": "hf/all-MiniLM-L6-v2"
             }
         ])
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name, cls.unstructured_index_non_e5]

@@ -18,39 +18,37 @@ class TestUnstructuredAddDocuments(MarqoTestCase):
 
         cls.text_index_name = "api_test_unstructured_index" + str(uuid.uuid4()).replace('-', '')
         cls.image_index_name = "api_test_unstructured_image_index" + str(uuid.uuid4()).replace('-', '')
-        cls.unstructured_languagebind_index_name = "api_test_unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', '')
         cls.text_index_with_normalize_embeddings_true = "api_test_unstructured_index_with_normalize_embeddings_true" + str(
             uuid.uuid4()).replace('-', '')
 
-        cls.create_indexes([
-            {
-                "indexName": cls.text_index_name,
-                "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "normalizeEmbeddings": False,
-            },
-            {
-                "indexName": cls.image_index_name,
-                "type": "unstructured",
-                "model": "open_clip/ViT-B-32/openai",
-                "treatUrlsAndPointersAsImages": True,
-            },
-            {
-                "indexName": cls.unstructured_languagebind_index_name,
-                "type": "unstructured",
-                "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-                "treatUrlsAndPointersAsMedia": True,
-                "treatUrlsAndPointersAsImages": True
-            },
-            {
-                "indexName": cls.text_index_with_normalize_embeddings_true,
-                "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "normalizeEmbeddings": True,
-            }
-            ])
-        
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.unstructured_languagebind_index_name, cls.text_index_with_normalize_embeddings_true]
+        cls.create_indexes(
+            [
+                {
+                    "indexName": cls.text_index_name,
+                    "type": "unstructured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "normalizeEmbeddings": False,
+                },
+                {
+                    "indexName": cls.image_index_name,
+                    "type": "unstructured",
+                    "model": "open_clip/ViT-B-32/openai",
+                    "treatUrlsAndPointersAsImages": True,
+                },
+                {
+                    "indexName": cls.text_index_with_normalize_embeddings_true,
+                    "type": "unstructured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "normalizeEmbeddings": True,
+                },
+            ]
+        )
+
+        cls.indexes_to_delete = [
+            cls.text_index_name,
+            cls.image_index_name,
+            cls.text_index_with_normalize_embeddings_true,
+        ]
         
         
     def tearDown(self):

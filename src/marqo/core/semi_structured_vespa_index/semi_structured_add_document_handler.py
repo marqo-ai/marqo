@@ -1,16 +1,16 @@
 from typing import Dict, Any
 
-import pydantic
+import pydantic.v1 as pydantic
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import TooManyFieldsError
+from marqo.core.inference.api import Inference
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField, \
     StringArrayField
-from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
@@ -31,11 +31,12 @@ class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
     max_string_array_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED))
 
+
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
-                 vespa_client: VespaClient, index_management: IndexManagement,
+                 vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
                  field_count_config=SemiStructuredFieldCountConfig()):
-        super().__init__(marqo_index, add_docs_params, vespa_client)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.index_management = index_management
         self.marqo_index = marqo_index
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)
@@ -62,10 +63,10 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             isinstance(field_content, list) and 
             all(isinstance(elem, str) for elem in field_content)
         )
-        if (is_string_array and 
-            self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION): #This is required so that we can update schema on the fly
+        if (is_string_array and
+                # This is required so that we can update schema on the fly
+                self.marqo_index.index_supports_partial_updates):
             self._add_string_array_field_to_index(field_name)
-
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
@@ -128,7 +129,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 
         self.marqo_index.string_array_fields.append(
-            StringArrayField(name = field_name, type = FieldType.ArrayText, string_array_field_name = f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}', features=[FieldFeature.Filter])
+            StringArrayField(
+                name=field_name, type=FieldType.ArrayText, features=[FieldFeature.Filter],
+                string_array_field_name=f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}')
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

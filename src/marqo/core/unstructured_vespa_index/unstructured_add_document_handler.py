@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 import semver
 
@@ -7,7 +7,8 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, MODALITY_FIELD_TYPE_MAP
+from marqo.core.inference.api import Modality, MediaDownloadError, Inference
+from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType
@@ -16,8 +17,8 @@ from marqo.core.unstructured_vespa_index.unstructured_validation import validate
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
-from marqo.s2_inference.errors import MediaDownloadError
-from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
+
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
 from marqo.tensor_search.validation import validate_custom_vector, \
@@ -30,9 +31,10 @@ from marqo.vespa.vespa_client import VespaClient
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
     _MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS = semver.VersionInfo.parse("2.9.0")
 
-    def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
+    def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient,
+                 inference: Inference):
         self._validate_add_docs_params(add_docs_params)
-        super().__init__(marqo_index, add_docs_params, vespa_client)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.marqo_index = marqo_index
         self.vespa_index = UnstructuredVespaIndex(marqo_index)
 
@@ -65,52 +67,45 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        content = self.tensor_fields_container.collect(
-            marqo_doc[MARQO_DOC_ID], field_name, field_content,
-            self._infer_field_type
-        )
+        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content)
         marqo_doc[field_name] = content
 
-    def _infer_field_type(self, field_name:str, field_content: Any) -> FieldType:
-        """Infer the field type based on the field content. This is used for both unstructured and semi-structured
-        indexes.
+    def _infer_modality(self, tensor_field: TensorField) -> Modality:
+        """Infer the modality of a tensor field. This is used for both unstructured and semi-structured indexes.
 
-        We should only infer the field type if the field content is a string.
         We only infer the field type if the index is configured to treat URLs and pointers as images or media.
 
         treatUrlsAndPointersAsMedia is a new parameter introduced in Marqo 2.12 to support the new modalities
         of video and audio. Here is how it interacts with treatUrlsAndPointersAsImages:
-            Both False: All content is processed as text only.
-                treatUrlsAndPointersAsImages True, treatUrlsAndPointersAsMedia False:
-            Processes URLs and pointers as images
-                Does not process other media types (video, audio)
-            treatUrlsAndPointersAsImages False, treatUrlsAndPointersAsMedia True:
-                Invalid state since this is a conflict.
-            Both True:
-                Processes URLs and pointers as various media types (images, videos, audio)
+        - Both False: All content is processed as text only
+        - treatUrlsAndPointersAsImages True, treatUrlsAndPointersAsMedia False: Processes URLs and pointers as images.
+        Other media types (video, audio) are treated as text
+        - treatUrlsAndPointersAsImages False, treatUrlsAndPointersAsMedia True: Invalid state since this is a conflict
+        - Both True: Processes URLs and pointers as various media types (images, videos, audio)
 
-        The values of treatUrlsAndPointersAsMedia and treatUrlsAndPointersAsImages are validated in the MarqoIndex class
-        so we do not need to validate them here.
+        The values of treatUrlsAndPointersAsMedia and treatUrlsAndPointersAsImages are validated in the MarqoIndex
+        class, so we do not need to validate them here.
 
         Args:
-            field_content: The content of the field.
+            tensor_field: The tensor field to infer the modality.
         Returns:
-            The inferred field type.
+            The inferred modality
         Raises:
             AddDocumentsError: If the modality of the media content cannot be inferred.
         """
-        if (self.marqo_index.treat_urls_and_pointers_as_images is True or
-                self.marqo_index.treat_urls_and_pointers_as_media is True):
-            try:
-                modality = infer_modality(field_content, self.add_docs_params.media_download_headers)
-            except MediaDownloadError as err:
-                raise AddDocumentsError(err.message) from err
-            if ((self.marqo_index.treat_urls_and_pointers_as_media is False) and modality in
-                    [Modality.AUDIO, Modality.VIDEO]):
-                modality = Modality.TEXT
-            return MODALITY_FIELD_TYPE_MAP[modality]
-        else:
-            return FieldType.Text
+        if (not self.marqo_index.treat_urls_and_pointers_as_images and
+                not self.marqo_index.treat_urls_and_pointers_as_media):
+            return Modality.TEXT
+
+        try:
+            modality = infer_modality(tensor_field.field_content, self.add_docs_params.media_download_headers)
+        except MediaDownloadError as err:
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
+
+        if not self.marqo_index.treat_urls_and_pointers_as_media and modality in {Modality.AUDIO, Modality.VIDEO}:
+            return Modality.TEXT
+
+        return modality
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
@@ -139,7 +134,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 if self.tensor_fields_container.is_custom_tensor_field(field_name):
                     # TODO should is_non_tensor_field check be moved out to AddDocsParams validation?
                     # Please note that if one of the documents in the batch has a custom field which does not exist
-                    # in the tensor field, the whole batch will fail and user will get a 400 pydantic.ValidationError.
+                    # in the tensor field, the whole batch will fail and user will get a 400 pydantic.v1.ValidationError.
                     # We keep this behaviour unchanged to be compatible with the legacy unstructured index.
                     validate_custom_vector(field_content, not is_tensor_field, self.marqo_index.model.get_dimension())
                 elif self.marqo_index.parsed_marqo_version() < self._MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS:

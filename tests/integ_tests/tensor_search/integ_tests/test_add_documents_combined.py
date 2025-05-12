@@ -10,17 +10,19 @@ import requests
 import torch
 from torch import Tensor
 
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse
+import marqo.api.exceptions as api_exceptions
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.core.inference.api import InferenceError
+from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.inference.media_download_and_preprocess import streaming_media_processor
+from marqo.inference.native_inference.load_model import clear_loaded_models
 from marqo.s2_inference import types
-from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
-from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -225,35 +227,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 self.assertEqual(2, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
                 self.assertEqual(400, r["items"][1]["status"])
-                self.assertIn("image file is truncated", r["items"][1]["error"])
-
-    def test_add_document_callVectoriseWithoutPassingEnableCache(self):
-        """Ensure vectorise does not receive enable_cache when calling add_documents."""
-        documents = [
-            {
-                "text_field_1": "Test test",
-                "_id": "1"
-            }
-        ]
-        dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["text_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index_name,
-                            docs=documents,
-                            tensor_fields=tensor_fields)
-                    ).dict(exclude_none=True, by_alias=True)
-                    self.assertTrue(mock_vectorise.called)
-                    args, kwargs = mock_vectorise.call_args
-                    self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
-                                                               "vectorise for add_documents")
-                mock_vectorise.reset_mock()
+                self.assertIn("Image file is truncated", r["items"][1]["error"])
 
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
@@ -397,65 +371,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                 tensor_fields=tensor_fields)
                         ).dict(exclude_none=True, by_alias=True)
                         self.assertIn("Unexpected error during image download", str(e.exception))
-
-    def test_addDocumentsPassTensorToVectorise(self):
-        """Ensure vectorise receives tensor from add_documents when the model is OpenCLIP or CLIP."""
-        documents = [
-            {
-                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
-                "_id": "1"
-            }
-        ]
-        dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = self.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index_name,
-                            docs=documents,
-                            tensor_fields=tensor_fields)
-                    ).dict(exclude_none=True, by_alias=True)
-                    # Check that vectorise was called at least once
-                    self.assertTrue(mock_vectorise.called)
-                    args, kwargs = mock_vectorise.call_args
-                    self.assertIn("content", kwargs)
-                    content = kwargs["content"]
-                    self.assertEqual(1, len(content))
-                    self.assertEqual((3, 224, 224), content[0].shape)
-
-    def test_downloadImagesThreadCount(self):
-        """
-        Test that image download thread count is respected
-        """
-        docs = [
-            {"_id": str(i),
-             "image_field_1": TestImageUrls.IMAGE2.value
-             } for i in range(10)
-        ]
-        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with self.subTest(index_name):
-                for thread_count in [2, 5]:
-                    with patch.object(
-                            add_docs, 'threaded_download_and_preprocess_content',
-                            wraps=add_docs.threaded_download_and_preprocess_content
-                    ) as mock_download_images:
-                        self.add_documents(
-                            config=self.config, add_docs_params=AddDocsParams(
-                                index_name=index_name, docs=docs, device="cpu",
-                                image_download_thread_count=thread_count,
-                                tensor_fields=tensor_fields
-                            )
-                        ).dict(exclude_none=True, by_alias=True)
-
-                        self.assertEqual(thread_count, mock_download_images.call_count)
 
     def test_image_url_is_embedded_as_image_not_text(self):
         """
@@ -706,68 +621,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
             for k in expected_repo_structure:
                 assert isinstance(media_repo[k], expected_repo_structure[k])
 
-    def test_download_images_non_tensor_field(self):
-        """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = TestImageUrls.HIPPO_REALISTIC.value
-        bad_url = 'https://google.com/my_dog.png'
-        examples = [
-            ([{
-                'field_1': bad_url,
-                'field_2': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-                 good_url: Tensor
-             }),
-            ([{
-                'nt_1': bad_url,
-                'nt_2': good_url
-            }], {}),
-            ([{
-                'field_1': bad_url,
-                'nt_1': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-             }),
-            ([{
-                'nt_2': bad_url,
-                'field_2': good_url
-            }], {
-                 good_url: Tensor
-             }),
-        ]
-        model_properties = (
-            {
-                "name": "ViT-B/32",
-                "dimensions": 512,
-                "notes": "CLIP ViT-B/32",
-                "type": "clip",
-            }
-        )
-
-        for docs, expected_repo_structure in examples:
-            with mock.patch('PIL.Image.Image.close') as mock_close:
-                with add_docs.download_and_preprocess_content(
-                    docs=docs,
-                    thread_count=20,
-                    tensor_fields=['field_1', 'field_2'],
-                    media_download_headers={},
-                    model_name="ViT-B/32",
-                    normalize_embeddings=True,
-                    model_properties=model_properties,
-                    media_field_types_mapping=None,
-                    device="cpu",
-                    marqo_index_type=IndexType.Unstructured,
-                    marqo_index_model=Model(name="test", properties={}),
-                ) as media_repo:
-                    self.assertEqual(len(expected_repo_structure), len(media_repo))
-                    for k in expected_repo_structure:
-                        print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
-                        print(f"media_repo[k] = {media_repo[k]}")
-                        self.assertIsInstance(media_repo[k], expected_repo_structure[k])
-
-            # Images should not be closed as they are Tensor instead of ImageType
-            mock_close.assert_not_called()
-
     def test_idErrorWhenImageDownloading(self):
         """A test ensure image download is not raising 500 error when there is an invalid _id.
 
@@ -830,96 +683,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
         modality = infer_modality(image_url_no_extension)
         self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
 
-    def test_different_batching_strategy_adds_the_same_documents(self):
-        test_docs = [
-            {
-                "image_field_1": TestImageUrls.IMAGE1.value,
-                "text_field_1": "this is a valid image",
-                "text_field_2": "some dogs biting me",
-                "_id": "1"
-            },
-            {
-                "image_field_1": TestImageUrls.IMAGE2.value,
-                "text_field_1": "this is another image due to int id",
-                "text_field_2": "cats walking on the wall",
-                "_id": "2"
-            }
-        ]
-
-        def assert_get_documents_response_equals(result1: MarqoGetDocumentsByIdsResponse,
-                                                 result2: MarqoGetDocumentsByIdsResponse,
-                                                 msg: str):
-            def remove_tensor_facets(get_documents_results: list):
-                return [{key: value for key, value in doc.items() if key != '_tensor_facets'}
-                        for doc in get_documents_results]
-
-            def all_embeddings(get_documents_results: list) -> Dict[str, List[float]]:
-                """Extract embeddings from _tensor_facet in to a map {docid_field: embedding}"""
-                embeddings_map = {}
-                for doc in get_documents_results:
-                    for field in doc['_tensor_facets']:
-                        for key, value in field.items():
-                            if key != '_embedding':
-                                embeddings_map[f'{doc["_id"]}_{key}'] = field['_embedding']
-                return embeddings_map
-
-            self.assertListEqual(remove_tensor_facets(result1.results), remove_tensor_facets(result2.results),
-                                 msg=f'{msg}: documents differ')
-
-            result1_embeddings = all_embeddings(result1.results)
-            result2_embeddings = all_embeddings(result2.results)
-            self.assertSetEqual(set(result1_embeddings.keys()), set(result2_embeddings.keys()),
-                                msg=f'{msg}: tensor fields differ')
-            for key in result1_embeddings.keys():
-                # assert two embeddings are close enough: abs(a - b) < 1e-5 * abs(b) + 1e-6
-                self.assertTrue(np.allclose(result1_embeddings[key], result2_embeddings[key], atol=1e-6),
-                                msg=f'{msg}: embeddings for {key} differ, '
-                                    f'result1: {result1_embeddings[key]} '
-                                    f'result2: {result2_embeddings[key]}')
-
-        for index in self.image_indexes:
-            tensor_fields = ["image_field_1", "text_field_1", "text_field_2"] \
-                if isinstance(index, UnstructuredMarqoIndex) else None
-
-            def add_docs(batch_vectorisation_mode: BatchVectorisationMode):
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=test_docs,
-                        batch_vectorisation_mode=batch_vectorisation_mode,
-                        tensor_fields=tensor_fields)
-                )
-
-            def get_docs():
-                return tensor_search.get_documents_by_ids(
-                    config=self.config, index_name=index.name,
-                    document_ids=[doc['_id'] for doc in test_docs],
-                    show_vectors=True
-                )
-
-            self.maxDiff = None  # allow output all diffs
-            with self.subTest(f'{index.name} with type {index.type}'):
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_FIELD)
-                docs_added_using_per_field_strategy = get_docs()
-
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_doc_strategy = get_docs()
-
-                self.clear_index_by_schema_name(schema_name=index.schema_name)
-                add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_batch_strategy = get_docs()
-
-                assert_get_documents_response_equals(
-                    docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
-                    msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
-                assert_get_documents_response_equals(
-                    docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
-                    msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
-
-
     def test_imageIndexEmbeddingsUnnormalised(self):
         """Test to ensure that the image embeddings are unnormalised when the index is unnormalised"""
         documents = [
@@ -932,7 +695,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1"] if index_name == self.unstructured_image_index_unnormalized_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -966,7 +729,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -999,7 +762,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["text_field_1"] if index_name == self.unstructured_text_index_unnormalized_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1046,7 +809,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     }
             }
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1088,7 +851,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     }
             }
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1099,7 +862,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     )
                 )
                 self.assertFalse(res.errors)
-
 
 @pytest.mark.largemodel
 class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
@@ -1171,19 +933,36 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             treat_urls_and_pointers_as_media = True
         )
 
-        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index,
-                                          unstructured_custom_language_bind_index])
+        unstructured_languagebind_index_with_limited_supported_modalities = cls.unstructured_marqo_index_request(
+            name="unstructured_languagebind_index_with_limited_supported_modalities"
+                 + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='LanguageBind/Audio_FT'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
+        )
+
+        cls.indexes = cls.create_indexes(
+            [
+                structured_language_bind_index,
+                unstructured_language_bind_index,
+                unstructured_custom_language_bind_index,
+                unstructured_languagebind_index_with_limited_supported_modalities
+            ]
+        )
 
         cls.structured_language_bind_index_name = structured_language_bind_index.name
         cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
         cls.unstructured_custom_language_bind_index_name= unstructured_custom_language_bind_index.name
+        cls.unstructured_languagebind_index_with_limited_supported_modalities_name = \
+            unstructured_languagebind_index_with_limited_supported_modalities.name
 
-        s2_inference.clear_loaded_models()
+
+        clear_loaded_models()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
-        s2_inference.clear_loaded_models()
+        clear_loaded_models()
 
     def test_language_bind_model_can_add_all_media_modalities(self):
         """Test to ensure that the LanguageBind model can add all media types to the index"""
@@ -1200,7 +979,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
                 if index_name == self.unstructured_language_bind_index_name else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1232,7 +1011,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
                 if index_name == self.unstructured_language_bind_index_name else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1243,60 +1022,58 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                 )
                 self.assertFalse(res.errors)
 
+    @patch.dict("os.environ", {"MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE": "2097152", })
     def test_video_size_limit_in_batch(self):
         """Tests that adding documents with videos respects the file size limit per document"""
-        with mock.patch.dict('os.environ', {'MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE': '2097152',
-                                            'MARQO_MAX_CPU_MODEL_MEMORY': '15',
-                                            'MARQO_MAX_CUDA_MODEL_MEMORY': '15'}):  # 2MB limit
-            # Test documents - one under limit (2.5MB), one over limit
-            test_docs = [
-                {
-                    "_id": "1",
-                    "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
-                    "text_field_1": "This video should work"
-                },
-                {
-                    "_id": "2", 
-                    "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
-                    "text_field_1": "This video should fail"
-                }
-            ]
+        # Test documents - one under limit (2.5MB), one over limit
+        test_docs = [
+            {
+                "_id": "1",
+                "video_field_1": TestVideoUrls.VIDEO2.value, # 200KB
+                "text_field_1": "This video should work"
+            },
+            {
+                "_id": "2",
+                "video_field_1": TestVideoUrls.VIDEO1.value, # 2.5MB
+                "text_field_1": "This video should fail"
+            }
+        ]
 
-            for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
-                with self.subTest(f"Testing video size limit for index {index}"):
-                    tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
-                    
-                    # Add documents
-                    result = tensor_search.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index,
-                            docs=test_docs,
-                            tensor_fields=tensor_fields
-                        )
-                    ).dict(exclude_none=True, by_alias=True)
+        for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            with self.subTest(f"Testing video size limit for index {index}"):
+                tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
 
-                    # Verify results
-                    self.assertTrue(result["errors"])  # Should have errors due to second document
-                    self.assertEqual(2, len(result["items"]))
-                    
-                    # First document should succeed
-                    self.assertEqual(200, result["items"][0]["status"])
-                    self.assertNotIn("error", result["items"][0])
-                    
-                    # Second document should fail with size limit error
-                    self.assertEqual(400, result["items"][1]["status"])
-                    self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
-
-                    # Verify the first document was actually added
-                    get_result = tensor_search.get_documents_by_ids(
-                        config=self.config,
+                # Add documents
+                result = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
                         index_name=index,
-                        document_ids=["1"]
-                    ).dict(exclude_none=True, by_alias=True)
-                    
-                    self.assertEqual(1, len(get_result["results"]))
-                    self.assertEqual("1", get_result["results"][0]["_id"])
+                        docs=test_docs,
+                        tensor_fields=tensor_fields
+                    )
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Verify results
+                self.assertTrue(result["errors"])  # Should have errors due to second document
+                self.assertEqual(2, len(result["items"]))
+
+                # First document should succeed
+                self.assertEqual(200, result["items"][0]["status"])
+                self.assertNotIn("error", result["items"][0])
+
+                # Second document should fail with size limit error
+                self.assertEqual(400, result["items"][1]["status"])
+                self.assertIn("exceeds the maximum allowed size", result["items"][1]["error"])
+
+                # Verify the first document was actually added
+                get_result = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index,
+                    document_ids=["1"]
+                ).dict(exclude_none=True, by_alias=True)
+
+                self.assertEqual(1, len(get_result["results"]))
+                self.assertEqual("1", get_result["results"][0]["_id"])
 
     def test_supported_audio_format(self):
         """Test the supported audio format for the LanguageBind model in add_documents and search."""
@@ -1319,7 +1096,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         "_id": "1"
                     }
 
-                    res = tensor_search.add_documents(
+                    res = self.add_documents(
                         self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index,
@@ -1361,7 +1138,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         "_id": "1"
                     }
 
-                    res = tensor_search.add_documents(
+                    res = self.add_documents(
                         self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index,
@@ -1394,7 +1171,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             }
         ]
         with self.subTest("custom-languagebind-model-add-documents"):
-            res = tensor_search.add_documents(
+            res = self.add_documents(
                 self.config,
                 add_docs_params=AddDocsParams(
                     index_name=self.unstructured_custom_language_bind_index_name,
@@ -1429,3 +1206,36 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     text=query,
                     search_method = "TENSOR"
                 )
+
+    def test_proper_error_is_raised_when_adding_documents_with_unsupported(self):
+        """Test to ensure that the proper error is raised when adding documents with invalid media"""
+
+        test_docs = [
+            {
+                "_id": "1",
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "text_field_1": "This is a valid image",
+            },
+        ]
+
+        with self.assertRaises(InferenceError) as cm:
+            _ = self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                    docs=test_docs,
+                    tensor_fields=["image_field_1"]
+                )
+            )
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))
+
+
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            _ = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_languagebind_index_with_limited_supported_modalities_name,
+                text=TestVideoUrls.VIDEO1.value,
+                search_method = "TENSOR"
+            )
+
+        self.assertIn("The model does not support the requested modality.", str(cm.exception))

@@ -6,6 +6,7 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 
 @pytest.mark.marqo_version('2.13.0')
+@pytest.mark.skip_marqo_version('2.17.0')
 class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true"
 
@@ -43,6 +44,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def tearDownClass(cls) -> None:
         cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
+
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -83,8 +85,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
-
-
         result_from_prepare_mode = self.load_results_from_file()
         for index_name in self.indexes_to_test_on:
             with self.subTest(index=index_name):

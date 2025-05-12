@@ -8,14 +8,14 @@ import unittest
 from unittest import mock
 from unittest import mock
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 from transformers import AutoModel, AutoTokenizer
 
 from marqo.api.exceptions import BadRequestError, ModelNotInCacheError
 from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
-from marqo.core.inference.download_model_from_s3 import get_s3_model_absolute_cache_path
-from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
-from marqo.core.inference.model_download import download_pretrained_from_url
+from marqo.inference.model_download.download_model_from_s3 import get_s3_model_absolute_cache_path
+from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
+from marqo.inference.model_download.model_download import download_pretrained_from_url
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.random_utils import Random

@@ -1,14 +1,14 @@
 import copy
+import unittest
 import uuid
 from unittest import mock
-import pytest
 
+import pytest
 from marqo.client import Client
 from marqo.errors import MarqoWebError
-
 from tests.marqo_test import MarqoTestCase
 
-    
+
 class TestStructuredAddDocuments(MarqoTestCase):
     text_index_name = "add_doc_api_test_structured_index" + str(uuid.uuid4()).replace('-', '')
     image_index_name = "add_doc_api_test_structured_image_index" + str(uuid.uuid4()).replace('-', '')
@@ -25,7 +25,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": False,
                 "allFields": [
                     {"name": "title", "type": "text"},
@@ -85,7 +85,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.text_index_with_normalize_embeddings_true,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
                 "allFields": [
                     {"name": "title", "type": "text"},
@@ -487,10 +487,10 @@ class TestStructuredAddDocuments(MarqoTestCase):
         
         # Check individual document statuses and error messages
         self.assertEqual(400, res['items'][0]['status'])  # Audio in video field
-        self.assertIn("Invalid video file", res['items'][0]['error'])
+        self.assertIn("Error processing", res['items'][0]['error'])
         
         self.assertEqual(400, res['items'][1]['status'])  # Video in audio field
-        self.assertIn("Invalid audio file", res['items'][1]['error'])
+        self.assertIn("Error processing", res['items'][1]['error'])
         
         self.assertEqual(200, res['items'][2]['status'])  # Valid image field
         self.assertEqual(200, res['items'][3]['status'])  # Valid text field

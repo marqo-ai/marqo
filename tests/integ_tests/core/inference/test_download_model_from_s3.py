@@ -4,7 +4,7 @@ from unittest.mock import patch
 import botocore
 from botocore.exceptions import NoCredentialsError
 
-from marqo.core.inference.download_model_from_s3 import (
+from marqo.inference.model_download.download_model_from_s3 import (
     get_presigned_s3_url,
     get_s3_model_absolute_cache_path,
     check_s3_model_already_exists,

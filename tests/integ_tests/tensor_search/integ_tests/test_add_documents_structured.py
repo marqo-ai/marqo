@@ -1,21 +1,21 @@
 import functools
-import math
 import os
 import uuid
 from unittest import mock
 
-import PIL
+import math
 import pytest
 
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import BadRequestError
+from marqo.core.exceptions import IndexNotFoundError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference import types
-from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+
+import unittest
 
 
 class TestAddDocumentsStructured(MarqoTestCase):
@@ -125,7 +125,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field', 'image_field_2'],
-            model=Model(name='ViT-B/16')
+            model=Model(name='open_clip/ViT-B-16/openai')
         )
         index_request_img_chunking = cls.structured_marqo_index_request(
             fields=[
@@ -141,7 +141,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field'],
-            model=Model(name='ViT-B/16'),
+            model=Model(name='open_clip/ViT-B-16/openai'),
             normalize_embeddings=True,
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn)
         )
@@ -503,27 +503,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 assert all(['error' in item for item in add_res['items']])
                 assert all(['All list elements must be of the same type and that type must be int, float or string'
                             in item['message'] for item in add_res['items']])
-
-    def test_add_documents_set_device(self):
-        """
-        Device is set correctly
-        """
-        mock_vectorise = mock.MagicMock()
-        mock_vectorise.return_value = [[0, 0, 0, 0]]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            self.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1, device="cuda:22", docs=[{"title": "doc"}, {"title": "doc"}],
-
-                ),
-            )
-            return True
-
-        assert run()
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:22"
 
     def test_add_documents_empty(self):
         """
@@ -958,4 +937,5 @@ class TestAddDocumentsStructured(MarqoTestCase):
         self.assertEqual(3, len(r.items))
         for item in r.items:
             self.assertEqual(400, item.status)
-            self.assertIn("Could not process the media file found at", item.message)
+            # modality mismatch
+            self.assertIn("is not a local file or a valid url", item.message)

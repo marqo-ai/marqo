@@ -1,0 +1,204 @@
+name: Large Model Integration Tests CI
+# Runs integration tests on CUDA machine with large model tests.
+
+on:
+  workflow_call:
+
+concurrency:
+  group: large-model-integration-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Start-Runner1:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets: inherit
+
+  Start-Runner2:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets: inherit
+
+  Start-Runner3:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets: inherit
+
+  Start-Runner4:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets: inherit
+
+  Create-Matrix:
+    needs:
+      - Start-Runner1
+      - Start-Runner2
+      - Start-Runner3
+      - Start-Runner4
+    if: ${{ always() }} # Ensures the matrix is created even if some runners fail to start
+    runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.create-matrix.outputs.labels }}
+      ec2-instance-ids: ${{ steps.create-matrix.outputs.ec2-instance-ids }}
+    steps:
+      - name: Create matrix
+        id: create-matrix
+        run: |
+          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}", "${{ needs.Start-Runner3.outputs.label }}", "${{ needs.Start-Runner4.outputs.label }}"]'
+          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}", "${{ needs.Start-Runner3.outputs.ec2-instance-id }}", "${{ needs.Start-Runner4.outputs.ec2-instance-id }}"]'
+          
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
+          echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
+
+  Test-Marqo:
+    name: Run Large Model Integration Tests (Part ${{ matrix.part }}/3)
+    needs: Create-Matrix # Ensures it starts only after the runners are ready
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
+    runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
+    
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-base
+          path: marqo-base
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r marqo/requirements.dev.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # Override base requirements with marqo requirements if needed: 
+          pip install -r marqo/requirements.txt
+
+
+      - name: Download nltk data
+        run: |
+          python -m nltk.downloader punkt_tab
+
+      - name: Build Vespa
+        run: |
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
+
+          echo "Updating package list"
+          apt-get update -y
+
+          # Build Vespa components
+          echo "Installing jdk 17"
+          sudo apt-get install openjdk-17-jdk -y
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          echo "Installing maven"
+          sudo apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
+
+      - name: Start Vespa
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+
+      - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
+        id: run_tests
+        run: |
+          # Define these for use by Marqo
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
+          export MARQO_MAX_CPU_MODEL_MEMORY=15
+          export MARQO_MAX_CUDA_MODEL_MEMORY=15
+          export HF_HUB_ENABLE_HF_TRANSFER=1
+          
+          export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
+          export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
+          export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
+          
+          cd marqo
+          export PYTHONPATH="./tests/integ_tests:./src"
+          set -o pipefail
+          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report term:skip-covered \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/integ_tests --retries 3 --largemodel --split-n 4 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
+
+      - name: Upload Test Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report-${{ matrix.part }}
+          path: |
+            marqo/.coverage.${{ matrix.part }}
+            marqo/pytest_result_summary.md
+            marqo/pytest_output.txt
+          include-hidden-files: true
+
+  Merge-Coverage:
+    name: Merge Coverage And Generate Reports
+    needs:
+      - Test-Marqo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Download all coverage files
+        uses: actions/download-artifact@v4
+
+      - name: Move Coverage Files
+        run: mv marqo-largemodel-tests-report-*/.* marqo/
+
+      - name: Merge Coverage Results
+        run: |
+          cd marqo
+          pip install coverage
+          coverage combine
+
+      - name: Upload Merged Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-largemodel-tests-report
+          path: marqo/.coverage
+          include-hidden-files: true
+
+  Stop-Runner:
+    needs:
+      - Create-Matrix
+      - Test-Marqo # Ensures the runners are stopped after tests complete
+    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
+    strategy:
+      matrix:
+        instance: [0, 1, 2, 3]  # Zero-based index for JSON list access
+    uses: ./.github/workflows/stop_ec2_runner.yml
+    with:
+      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
+      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
+    secrets: inherit
