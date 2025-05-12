@@ -3,6 +3,10 @@ import importlib
 import pkgutil
 import subprocess
 import sys
+import os
+import glob
+import inspect
+import unittest
 from enum import Enum
 from typing import Set
 
@@ -20,6 +24,7 @@ marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 # Global set to track imported modules
 _imported_modules = set()
 
+_PREPARED_CLASSES = None
 
 class Mode(Enum):
     PREPARE = "prepare"
@@ -41,6 +46,7 @@ def load_all_subclasses(package_name):
     Args:
         package_name (str): The top-level package name to search for subclasses.
     """
+    # TODO: Delete if determine test classes to prepare works
     global _imported_modules
     package = importlib.import_module(package_name)
     for _, name, is_pkg in pkgutil.walk_packages(package.__path__, f"{package_name}."):
@@ -57,7 +63,7 @@ def load_all_subclasses(package_name):
         except ImportError as e:
             logger.error(f"Could not import module with {name}")
 
-def run_prepare_mode(version_to_test_against: str):
+def run_prepare_mode(version_to_test_against: str, test_classes_to_prepare: list):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
@@ -72,20 +78,20 @@ def run_prepare_mode(version_to_test_against: str):
 
         # TODO: remove this
         # Manually remove test classes that are not in a predefined list.
-        test_classes_to_prepare = [
-            'TestSearchWithGlobalScoreModifiers',
-            'TestSearch', 'TestSearchWithScoreModifiers',
-            'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
+        #test_classes_to_prepare = [
+        #    'TestSearchWithGlobalScoreModifiers',
+        #    'TestSearch', 'TestSearchWithScoreModifiers',
+        #    'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
             #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
-            'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
-            'TestCreateStructuredIndexv2_12',
-            'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
-            'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
-            'TestDeleteDocuments',
+        #    'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
+        #    'TestCreateStructuredIndexv2_12',
+        #    'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
+        #    'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
+        #    'TestDeleteDocuments',
             #'TestEmbed',
             #'TestRecommend',
-            'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
-        ]
+        #    'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
+        #]
         if test_class.__name__ not in test_classes_to_prepare:
             logger.info(f"Skipping test class {test_class.__name__} as it is not in the predefined list")
             continue
@@ -146,10 +152,6 @@ def run_prepare_mode(version_to_test_against: str):
         raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
 def construct_pytest_arguments(version_to_test_against, path_to_test):
-    # Default to all compatibility rests
-    if not path_to_test:
-        path_to_test = "tests/compatibility_tests"
-
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
@@ -175,6 +177,45 @@ def trigger_rollback_endpoint():
     if response.status_code == 200:
         logger.info("Rollback endpoint triggered successfully")
 
+def determine_test_classes_to_prepare(path_to_test: str = None) -> list:
+    global _PREPARED_CLASSES
+    if _PREPARED_CLASSES is not None:
+        return _PREPARED_CLASSES
+        
+    _PREPARED_CLASSES = []
+    search_paths = path_to_test.split()
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+
+    for raw_path in search_paths:
+        abs_path = os.path.normpath(os.path.join(project_root, raw_path))
+        
+        if os.path.isdir(abs_path):
+            py_files = glob.glob(os.path.join(abs_path, "**", "test_*.py"), recursive=True)
+        elif os.path.isfile(abs_path) and abs_path.endswith('.py'):
+            py_files = [abs_path]
+        else:
+            continue
+
+        for py_file in py_files:
+            rel_path = os.path.relpath(py_file, project_root)
+            module_name = rel_path.replace(os.path.sep, '.').replace('.py', '')
+            
+            try:
+                logger.info(f"Attempting to import module: {module_name}")
+                module = importlib.import_module(module_name)
+                test_classes = [
+                    cls for _, cls in inspect.getmembers(module,
+                        lambda obj: inspect.isclass(obj) and
+                                    issubclass(obj, unittest.TestCase) and
+                                    obj.__name__.startswith('Test')
+                    )
+                ]
+                _PREPARED_CLASSES.extend(test_classes)
+            except Exception as e:
+                logger.warning(f"Module import failed: {module_name} - {str(e)}")
+    
+    return _PREPARED_CLASSES
+
 def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str, path_to_test: str):
     """
     Perform a backwards compatibility test between two versions of Marqo.
@@ -196,7 +237,6 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         Exception: If there is an error during the test process.
     """
     try:
-        load_all_subclasses("tests.compatibility_tests")
         # Step 1: Start from_version container and run tests in prepare mode
         logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
 
@@ -208,7 +248,8 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info(f"Started Marqo container {from_version}")
 
         try:
-            run_prepare_mode(from_version)
+            test_classes_to_prepare = determine_test_classes_to_prepare(path_to_test)
+            run_prepare_mode(from_version, test_classes_to_prepare)
         except Exception as e:
             raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
         # Step 2: Stop from_version container (but don't remove it)
@@ -228,7 +269,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
         # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
         try:
-            run_prepare_mode(to_version)
+            run_prepare_mode(to_version, test_classes_to_prepare)
             run_test_mode(to_version, path_to_test)
         except Exception as e:
             raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
@@ -256,7 +297,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str, pat
     """
     logger.info(f"Starting Marqo rollback tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
     try:
-        load_all_subclasses("tests.compatibility_tests")
+        # load_all_subclasses("tests.compatibility_tests")
         # Step 0: Generate a volume name to be used with the "from_version" Marqo container for state transfer.
         from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
         logger.info(f"Generated volume name: {from_version_volume} for from_version: {from_version}")
@@ -267,7 +308,8 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str, pat
 
         # Step 2: Run prepare mode
         logger.info("Step 2: Running prepare mode on initial from_version container")
-        run_prepare_mode(from_version)
+        test_classes_to_prepare = determine_test_classes_to_prepare(path_to_test)
+        run_prepare_mode(from_version, test_classes_to_prepare)
 
         # Step 3: Stop Marqo from_version container started in Step #1.
         docker_manager.stop_marqo_container(from_version)
@@ -361,7 +403,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
     parser.add_argument("--to_image", required=True)
-    parser.add_argument("--path_to_test", required=True)
+    parser.add_argument("--path_to_test", required=True, default="tests/compatibility_tests")
     args = parser.parse_args()
     try:
         from_version = semver.VersionInfo.parse(args.from_version)
