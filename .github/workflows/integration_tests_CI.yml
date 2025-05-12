@@ -210,7 +210,7 @@ jobs:
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-integ-tests-report-${{ matrix.part }}-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
           path: |
             marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
             marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
@@ -228,23 +228,28 @@ jobs:
         with:
           path: marqo
 
-      - name: Download all coverage files
+      - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
-
-      - name: Move Coverage Files
-        run: mv marqo-integ-tests-report-*/.* marqo/
+        with:
+          pattern: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-*
+          path: coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Merge Coverage Results
         run: |
           cd marqo
           pip install coverage
+          mkdir -p coverage-reports
+          # Move coverage files to marqo directory for combining
+          find ../coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
           coverage combine
+          # Store the combined coverage in a directory specific to this configuration
+          cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
-          path: marqo/.coverage
+          name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           include-hidden-files: true
 
   Stop-Runner:
