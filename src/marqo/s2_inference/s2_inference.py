@@ -41,10 +41,10 @@ _available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
-_marqo_inference_cache = MarqoInferenceCache(
-    cache_size=read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE),
-    cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
+
+# TODO clean up unused code
+_marqo_inference_cache = MarqoInferenceCache(cache_size=0, cache_type="LRU")
 
 
 def vectorise(
