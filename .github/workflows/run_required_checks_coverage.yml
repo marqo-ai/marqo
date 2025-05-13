@@ -58,12 +58,12 @@ jobs:
           mkdir -p integ_coverage_data
           
           # Move all coverage files to a single directory
-          cp integration-tests-coverage/.coverage coverage_data/integration.coverage
+          cp integration-tests-coverage/.coverage.1shards-0replicas coverage_data/integration.coverage
           cp largemodel-tests-coverage/.coverage coverage_data/largemodel.coverage
           cp unit-tests-coverage/.coverage coverage_data/unit.coverage
           
           # Copy to separate directories for individual analysis
-          cp integration-tests-coverage/.coverage integ_coverage_data/integration.coverage
+          cp integration-tests-coverage/.coverage.1shards-0replicas integ_coverage_data/integration.coverage
           cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage
           cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage
 
