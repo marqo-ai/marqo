@@ -66,6 +66,7 @@ class SearchContextTensor(BaseModel):
 
 class SearchContext(BaseModel):
     tensor: List[SearchContextTensor]
+    documents: Dict[str, Union[int, float]]     # TODO: Check if these types are right
 
     def __init__(self, **data):
         try:

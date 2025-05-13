@@ -21,6 +21,91 @@ class Recommender:
         self.index_management = index_management
         self.inference = inference
 
+    def get_doc_vectors_from_ids(self,
+                  index_name: str,
+                  documents: Union[List[str], Dict[str, float]],
+                  tensor_fields: Optional[List[str]] = None) -> Dict[str, List[List[float]]]:
+        """
+        This method gets documents from Vespa using their IDs, removes any unnecessary data, checks for
+        lack of vectors, then returns a list of document vectors. Can be used internally (in recommend)
+        or externally (in the search module).
+
+        Args:
+            index_name: Name of the index to search
+            documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
+            tensor_fields: List of tensor fields to use for recommendation (can include text, image, audio, and video fields)
+
+        Returns:
+            A dictionary mapping document IDs to lists of vector embeddings
+        """
+
+        # TODO - Extract search and get_docs from tensor_search and refactor this
+        from marqo import config
+        from marqo.tensor_search import tensor_search, index_meta_cache
+
+        if documents is None or len(documents) == 0:
+            raise InvalidArgumentError('No document IDs provided')
+
+        # remove docs with zero weight
+        original_documents = documents
+        if isinstance(documents, dict):
+            documents = {k: v for k, v in documents.items() if v != 0}
+            document_ids = list(documents.keys())
+            all_document_ids = list(original_documents.keys())
+        else:
+            document_ids = documents
+            all_document_ids = original_documents
+
+        if len(documents) == 0:
+            raise InvalidArgumentError('No documents with non-zero weight provided')
+
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+
+        if marqo_index.type == IndexType.Structured:
+            # Validate tensor field names
+            if tensor_fields is not None:
+                valid_tensor_fields = marqo_index.tensor_field_map.keys()
+                for tensor_field in tensor_fields:
+                    if tensor_field not in valid_tensor_fields:
+                        raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
+                                                    f'Available tensor fields: {", ".join(valid_tensor_fields)}')
+
+        marqo_documents = tensor_search.get_documents_by_ids(
+            config.Config(self.vespa_client, inference=self.inference),
+            index_name, document_ids, show_vectors=True
+        ).dict(exclude_none=True, by_alias=True)
+
+        # Make sure all documents were found
+        not_found = []
+        for document in marqo_documents['results']:
+            if not document['_found']:
+                not_found.append(document['_id'])
+
+        if len(not_found) > 0:
+            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
+
+        doc_vectors: Dict[str, List[List[float]]] = {}
+        docs_without_vectors = []
+        for document in marqo_documents['results']:
+            vectors: List[List[float]] = []
+            for tensor_facet in document['_tensor_facets']:
+                field = list(tensor_facet.keys())[0]
+                if tensor_fields is None or field in tensor_fields:
+                    vectors.append(tensor_facet['_embedding'])
+
+            doc_vectors[document['_id']] = vectors
+
+            if len(vectors) == 0:
+                docs_without_vectors.append(document['_id'])
+
+        if len(docs_without_vectors) > 0:
+            raise InvalidArgumentError(
+                f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
+            )
+
+        return doc_vectors
+
+
     def recommend(self,
                   index_name: str,
                   documents: Union[List[str], Dict[str, float]],
@@ -62,27 +147,11 @@ class Recommender:
             score_modifiers: Score modifiers to apply
             rerank_depth: Rerank depth
         """
-        # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
         from marqo import config
-        from marqo.tensor_search import tensor_search
-        from marqo.tensor_search import index_meta_cache
+        from marqo.tensor_search import tensor_search, index_meta_cache
 
-        if documents is None or len(documents) == 0:
-            raise InvalidArgumentError('No document IDs provided')
-
-        # remove docs with zero weight
-        original_documents = documents
-        if isinstance(documents, dict):
-            documents = {k: v for k, v in documents.items() if v != 0}
-            document_ids = list(documents.keys())
-            all_document_ids = list(original_documents.keys())
-        else:
-            document_ids = documents
-            all_document_ids = original_documents
-
-        if len(documents) == 0:
-            raise InvalidArgumentError('No documents with non-zero weight provided')
+        t0 = timer()
 
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
@@ -91,49 +160,18 @@ class Recommender:
 
         vector_interpolation = from_interpolation_method(interpolation_method)
 
-        if marqo_index.type == IndexType.Structured:
-            # Validate tensor field names
-            if tensor_fields is not None:
-                valid_tensor_fields = marqo_index.tensor_field_map.keys()
-                for tensor_field in tensor_fields:
-                    if tensor_field not in valid_tensor_fields:
-                        raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
-                                                    f'Available tensor fields: {", ".join(valid_tensor_fields)}')
+        # Get document vectors using the helper method
+        doc_vectors = self.get_doc_vectors_from_ids(
+            index_name=index_name,
+            documents=documents,
+            tensor_fields=tensor_fields
+        )
 
-        t0 = timer()
-
-        marqo_documents = tensor_search.get_documents_by_ids(
-            config.Config(self.vespa_client, inference=self.inference),
-            index_name, document_ids, show_vectors=True
-        ).dict(exclude_none=True, by_alias=True)
-
-        # Make sure all documents were found
-        not_found = []
-        for document in marqo_documents['results']:
-            if not document['_found']:
-                not_found.append(document['_id'])
-
-        if len(not_found) > 0:
-            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
-
-        doc_vectors: Dict[str, List[List[float]]] = {}
-        docs_without_vectors = []
-        for document in marqo_documents['results']:
-            vectors: List[List[float]] = []
-            for tensor_facet in document['_tensor_facets']:
-                field = list(tensor_facet.keys())[0]
-                if tensor_fields is None or field in tensor_fields:
-                    vectors.append(tensor_facet['_embedding'])
-
-            doc_vectors[document['_id']] = vectors
-
-            if len(vectors) == 0:
-                docs_without_vectors.append(document['_id'])
-
-        if len(docs_without_vectors) > 0:
-            raise InvalidArgumentError(
-                f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
-            )
+        # Save original document IDs for filtering
+        if isinstance(documents, dict):
+            all_document_ids = list(documents.keys())
+        else:
+            all_document_ids = documents
 
         vectors: List[List[float]] = []
         weights: List[float] = []

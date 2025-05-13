@@ -855,6 +855,7 @@ def get_query_vectors_from_jobs(
                 # TODO how do we ensure order?
                 weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
+            # TODO: get context documents and use them here
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
                 weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]

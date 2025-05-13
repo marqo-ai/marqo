@@ -13,6 +13,7 @@ from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -58,6 +59,8 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
+    interpolationMethod: Optional[InterpolationMethod] = None
+    excludeInputDocuments: Optional[bool] = True
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -279,6 +282,19 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError(f"trackTotalHits can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
         return values
+
+    @root_validator(pre=False)
+    def validate_exclude_input_documents_only_set_if_context_documents_present(self):
+        """
+        Validate that the parameter excludeInputDocuments can only be set if context.documents is set.
+        This is specifically for personalization with context.
+        """
+        if self.excludeInputDocuments:
+            if not self.context:
+                raise ValueError("excludeInputDocuments can only be set if context.documents is set")
+            if not self.context.documents:
+                raise ValueError("excludeInputDocuments can only be set if context.documents is set")
+        return self
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
