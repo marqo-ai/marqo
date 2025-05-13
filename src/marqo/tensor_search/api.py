@@ -28,6 +28,7 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
+from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
@@ -84,6 +85,16 @@ def generate_config() -> config.Config:
         model_manager = ModelManagerClient(
             base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
         )
+
+        # initialise inference cache
+        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CLIENT_CACHE_SIZE)
+        if inference_cache_size > 0:
+            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CLIENT_CACHE_TYPE)
+            inference = CachingInference(
+                delegate=inference,
+                cache_size=inference_cache_size,
+                cache_type=inference_cache_type
+            )
 
     return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 

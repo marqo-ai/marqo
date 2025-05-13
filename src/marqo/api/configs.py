@@ -64,6 +64,9 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
         EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
 
+        EnvVars.MARQO_INFERENCE_CLIENT_CACHE_SIZE: 0,
+        EnvVars.MARQO_INFERENCE_CLIENT_CACHE_TYPE: "LRU",
+
         # 370 megabytes in bytes, read in API and passed to inference server
         EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,
         # 370 megabytes in bytes, read in API and passed to inference server
@@ -80,8 +83,8 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
 
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,  # static inference batching
-        EnvVars.MARQO_INFERENCE_CACHE_SIZE: 0,
-        EnvVars.MARQO_INFERENCE_CACHE_TYPE: "LRU",
+        EnvVars.MARQO_INFERENCE_SERVER_CACHE_SIZE: 0,
+        EnvVars.MARQO_INFERENCE_SERVER_CACHE_TYPE: "LRU",
 
         EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: None,  # on_start_script will determine this.
     }
