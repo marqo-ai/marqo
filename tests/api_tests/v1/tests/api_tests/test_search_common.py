@@ -380,3 +380,101 @@ class TestSearchCommon(MarqoTestCase):
                         )
                     assert e.exception.status_code == 400
                     assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)
+
+    def test_query_tensor_for_hybrid_search(self):
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            },
+            {
+                "title": "Another Document",
+                "content": "some other solid info",
+                "_id": "3"
+            },
+            {
+                "title": "Yet Another Document",
+                "content": "some more extra info",
+                "_id": "4"
+            },
+            {
+                "title": "Almost Last Document",
+                "content": "some last extra info",
+                "_id": "5"
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with queryTensor
+                res = self.client.index(index_name).search(
+                    search_method="HYBRID",
+                    hybrid_parameters={
+                        "queryTensor": {"Cool": 1},
+                        "retrievalMethod": "tensor",
+                        "rankingMethod": "tensor"
+                    }
+                )
+                assert res["hits"] == [
+                    {'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [{'title': 'Cool Document 1'}], '_score': 0.6075781331906965},
+                    {'_id': '4', 'title': 'Yet Another Document', 'content': 'some more extra info', '_highlights': [{'content': 'some more extra info'}], '_score': 0.5805831371579117},
+                    {'_id': '5', 'title': 'Almost Last Document', 'content': 'some last extra info', '_highlights': [{'content': 'some last extra info'}], '_score': 0.577429862724073},
+                    {'_id': '3', 'title': 'Another Document', 'content': 'some other solid info', '_highlights': [{'content': 'some other solid info'}], '_score': 0.5678644445785552},
+                    {'_id': '2', 'title': 'Just Your Average Doc', 'content': 'this is a solid doc', '_highlights': [{'title': 'Just Your Average Doc'}], '_score': 0.5385651690856017}
+                ]
+
+    def test_query_lexical_for_hybrid_search(self):
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            },
+            {
+                "title": "Another Document",
+                "content": "some other solid info",
+                "_id": "3"
+            },
+            {
+                "title": "Yet Another Document",
+                "content": "some more extra info",
+                "_id": "4"
+            },
+            {
+                "title": "Almost Last Document",
+                "content": "some last extra info",
+                "_id": "5"
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with queryTensor
+                res = self.client.index(index_name).search(
+                    search_method="HYBRID",
+                    hybrid_parameters={
+                        "queryLexical": "Cool",
+                        "retrievalMethod": "lexical",
+                        "rankingMethod": "lexical"
+                    }
+                )
+                assert res['hits'] == [{'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [], '_score': 1.3862943611198906}]
+
+

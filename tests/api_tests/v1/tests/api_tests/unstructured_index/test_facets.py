@@ -88,6 +88,54 @@ class TestFacets(MarqoTestCase):
         self.assertIn("color", res["facets"])
         self.assertGreater(len(res["facets"]["color"]), 0)
 
+    def test_single_string_facet_with_lexical_retrieval_and_ranking(self):
+        """Test getting a single string facet with lexical retrieval and ranking"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            hybrid_parameters={"retrievalMethod": "lexical", "rankingMethod": "lexical"},
+            facets={"fields": {"color": {"type": "string"}}}
+        )
+        self.assertIn("facets", res)
+        self.assertIn("color", res["facets"])
+        self.assertGreater(len(res["facets"]["color"]), 0)
+
+    def test_single_string_facet_with_tensor_retrieval_and_ranking(self):
+        """Test getting a single string facet with tensor retrieval and ranking"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            hybrid_parameters={"retrievalMethod": "tensor", "rankingMethod": "tensor"},
+            facets={"fields": {"color": {"type": "string"}}}
+        )
+        self.assertIn("facets", res)
+        self.assertIn("color", res["facets"])
+        self.assertGreater(len(res["facets"]["color"]), 0)
+
+    def test_single_string_facet_with_tensor_retrieval_and_lexical_ranking(self):
+        """Test getting a single string facet with tensor retrieval and lexical ranking"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            hybrid_parameters={"retrievalMethod": "tensor", "rankingMethod": "lexical"},
+            facets={"fields": {"color": {"type": "string"}}}
+        )
+        self.assertIn("facets", res)
+        self.assertIn("color", res["facets"])
+        self.assertGreater(len(res["facets"]["color"]), 0)
+
+    def test_single_string_facet_with_lexical_retrieval_and_tensor_ranking(self):
+        """Test getting a single string facet with lexical retrieval and tensor ranking"""
+        res = self.client.index(self.unstructured_text_index_name).search(
+            "shirt",
+            search_method="HYBRID",
+            hybrid_parameters={"retrievalMethod": "lexical", "rankingMethod": "tensor"},
+            facets={"fields": {"color": {"type": "string"}}}
+        )
+        self.assertIn("facets", res)
+        self.assertIn("color", res["facets"])
+        self.assertGreater(len(res["facets"]["color"]), 0)
+
     def test_multiple_facets(self):
         """Test getting multiple facets simultaneously"""
         res = self.client.index(self.unstructured_text_index_name).search(
