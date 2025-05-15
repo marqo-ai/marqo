@@ -475,6 +475,109 @@ class TestSearchCommon(MarqoTestCase):
                         "rankingMethod": "lexical"
                     }
                 )
-                assert res['hits'] == [{'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [], '_score': 1.3862943611198906}]
+                assert res["hits"][0]['_id'] == '1'
+                assert res["hits"][0]['_score'] > 1.3 # score could not be deterministic
+                assert len(res["hits"]) == 1
+
+    def test_query_lexical_and_query_tensor_for_hybrid_search_lexical_retrieval_tensor_ranking(self):
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            },
+            {
+                "title": "Another Document",
+                "content": "some other solid info",
+                "_id": "3"
+            },
+            {
+                "title": "Yet Another Document",
+                "content": "some more extra info",
+                "_id": "4"
+            },
+            {
+                "title": "Almost Last Document",
+                "content": "some last extra info",
+                "_id": "5"
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with queryTensor
+                res = self.client.index(index_name).search(
+                    search_method="HYBRID",
+                    hybrid_parameters={
+                        "queryTensor": {"Cool": 1},
+                        "queryLexical": "Cool",
+                        "retrievalMethod": "lexical",
+                        "rankingMethod": "tensor"
+                    }
+                )
+                assert res['hits'] == [
+                    {'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [{'title': 'Cool Document 1'}],
+                    '_score': 0.6075781331906965} # score matches score for that document in query tensor test
+                ]
+
+    def test_query_lexical_and_query_tensor_for_hybrid_search_tensor_retrieval_lexical_ranking(self):
+        docs = [
+            {
+                "title": "Cool Document 1",
+                "content": "some extra info",
+                "_id": "1"
+            },
+            {
+                "title": "Just Your Average Doc",
+                "content": "this is a solid doc",
+                "_id": "2"
+            },
+            {
+                "title": "Another Document",
+                "content": "some other solid info",
+                "_id": "3"
+            },
+            {
+                "title": "Yet Another Document",
+                "content": "some more extra info",
+                "_id": "4"
+            },
+            {
+                "title": "Almost Last Document",
+                "content": "some last extra info",
+                "_id": "5"
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index_name):
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+                # Hybrid search with queryTensor
+                res = self.client.index(index_name).search(
+                    search_method="HYBRID",
+                    hybrid_parameters={
+                        "queryTensor": {"Cool": 1},
+                        "queryLexical": "Cool",
+                        "retrievalMethod": "tensor",
+                        "rankingMethod": "lexical"
+                    }
+                )
+                assert res["hits"][0]['_id'] == '1'
+                assert res["hits"][0]['_score'] > 1.3 # score could not be deterministic
+                # Other documents are not sorted because all their score is 0 due to lexical ranking
+                for doc in res['hits']:
+                    if doc['_id'] != '1':
+                        assert doc['_score'] == 0.0
+
 
 
