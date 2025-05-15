@@ -14,6 +14,7 @@ from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from integ_tests.marqo_test import MarqoTestCase
+import pytest
 
 
 class TestRecommender(MarqoTestCase):
@@ -650,6 +651,7 @@ class TestRecommender(MarqoTestCase):
                         rerank_depth=None
                     )
 
+    @pytest.mark.skip_for_multinode
     def test_recommend_rerank_depth_with_limit_and_offset(self):
         """
         Test that recommender honors rerank_depth and behaves correctly with result_count and offset.
