@@ -69,11 +69,11 @@ jobs:
 
       - name: Build Vespa
         run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
+          sudo systemctl stop unattended-upgrades
+          sudo apt-get remove -y unattended-upgrades
           
           echo "Updating package list"
-          apt-get update -y
+          sudo apt-get update -y
           
           # Build Vespa components
           echo "Installing jdk 17"

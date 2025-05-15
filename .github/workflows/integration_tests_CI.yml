@@ -121,8 +121,8 @@ jobs:
 
       - name: Build Vespa
         run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
+          sudo systemctl stop unattended-upgrades
+          sudo apt-get remove -y unattended-upgrades
 
           # Function to wait for the dpkg lock to be released
           function wait_for_dpkg_lock() {
@@ -136,7 +136,7 @@ jobs:
           wait_for_dpkg_lock
 
           echo "Updating package list"
-          apt-get update -y
+          sudo apt-get update -y
 
           # Build Vespa components
           echo "Installing jdk 17"
