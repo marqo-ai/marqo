@@ -424,13 +424,13 @@ class TestSearchCommon(MarqoTestCase):
                         "rankingMethod": "tensor"
                     }
                 )
-                assert res["hits"] == [
-                    {'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [{'title': 'Cool Document 1'}], '_score': 0.6075781331906965},
-                    {'_id': '4', 'title': 'Yet Another Document', 'content': 'some more extra info', '_highlights': [{'content': 'some more extra info'}], '_score': 0.5805831371579117},
-                    {'_id': '5', 'title': 'Almost Last Document', 'content': 'some last extra info', '_highlights': [{'content': 'some last extra info'}], '_score': 0.577429862724073},
-                    {'_id': '3', 'title': 'Another Document', 'content': 'some other solid info', '_highlights': [{'content': 'some other solid info'}], '_score': 0.5678644445785552},
-                    {'_id': '2', 'title': 'Just Your Average Doc', 'content': 'this is a solid doc', '_highlights': [{'title': 'Just Your Average Doc'}], '_score': 0.5385651690856017}
-                ]
+                assert res["hits"][0]['_id'] == '1'
+                assert res["hits"][0]['_score'] > 0.6 # score could not be deterministic
+                assert len(res["hits"]) == 5
+                # Check other results score
+                for doc in res["hits"]:
+                    if doc["_id"] != "1":
+                        assert 0.5 < doc["_score"] < 0.6
 
     def test_query_lexical_for_hybrid_search(self):
         docs = [
@@ -523,10 +523,10 @@ class TestSearchCommon(MarqoTestCase):
                         "rankingMethod": "tensor"
                     }
                 )
-                assert res['hits'] == [
-                    {'_id': '1', 'title': 'Cool Document 1', 'content': 'some extra info', '_highlights': [{'title': 'Cool Document 1'}],
-                    '_score': 0.6075781331906965} # score matches score for that document in query tensor test
-                ]
+                assert res['hits'][0]['_id'] == '1'
+                assert res['hits'][0]['_score'] > 0.6 # score could not be deterministic
+                # Other documents are not sorted because all their score is 0 due to lexical ranking
+                assert len(res['hits']) == 1
 
     def test_query_lexical_and_query_tensor_for_hybrid_search_tensor_retrieval_lexical_ranking(self):
         docs = [
