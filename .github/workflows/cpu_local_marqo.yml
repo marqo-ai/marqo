@@ -44,7 +44,7 @@ concurrency:
 jobs:
   Test-Marqo:
     name: Run CPU Local Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/PoloRole=testing"
+    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/tags=['PoloRole:testing']"
     defaults:
       run:
         working-directory: tests/api_tests/v1
