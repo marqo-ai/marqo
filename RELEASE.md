@@ -1,3 +1,26 @@
+# Release 2.19.0
+
+## New features & Performance improvements
+- Re-introduced support for Languagebind Models. You can now create indexes that support audio and video using these models. Environment variables for video and audio file size limits (`MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE` and `MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE`) have been moved to the API layer ([#1188](https://github.com/marqo-ai/marqo/pull/1188)).
+- Significant performance improvements with upgrade to Pydantic V2. This change results in up to 6x increase in search result post-processing performance and 25% increase in end-to-end throughput. String array field handling and field map property evaluation have also been improved ([#1196](https://github.com/marqo-ai/marqo/pull/1196)).
+- Add new endpoint `POST indexes/{index_name}/documents/get-batch` to retrieve documents via POST call ([#1190](https://github.com/marqo-ai/marqo/pull/1190)).
+
+## Bug fixes and minor changes
+- Fix bug caused by race condition where concurrent `add_documents` and `update_documents` calls temporarily cause an error in `search` due to inconsistent return values ([#1194](https://github.com/marqo-ai/marqo/pull/1194)).
+- Update telemetry key of image downloading from `image_download` to `media_download.{modality}` ([#1206](https://github.com/marqo-ai/marqo/pull/1206)).
+- Fix bug where `ffmpeg` processes video files as audio files by adding modality check in streaming media preprocessor ([#1209](https://github.com/marqo-ai/marqo/pull/1209))
+- Improve differentiation between video and image in streaming media preprocessor by searching for `_pipe` in format name ([13a8228](https://github.com/marqo-ai/marqo/commit/13a82286ae7fecbbb54841b0c63169fc41f7874c))
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.8k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+# Release 2.18.2
+
+## Bug fixes and minor changes
+- Fix performance regression in `add_documents` for structured indexes introduced in 2.17 when content URLs do not have an extension. Field modality is now based on predefined field type to remove the need to download content samples to infer modality ([#1203](https://github.com/marqo-ai/marqo/pull/1203)).
+- Add new telemetry data points `add_documents.inference.{modality}` for each modality ([#1203](https://github.com/marqo-ai/marqo/pull/1203)).
+
 # Release 2.18.1
 
 # Bug Fixes and Minor Changes

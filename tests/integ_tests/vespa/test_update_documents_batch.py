@@ -7,6 +7,7 @@ from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 from integ_tests.marqo_test import AsyncMarqoTestCase
+import pytest
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
@@ -36,6 +37,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(ids, batch_ids)
         self.assertEqual(messages, [None] * len(batch))
 
+    @pytest.mark.skip_for_multinode
     def test_update_documents_batch_successful(self):
         original_documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1", "marqo__id": "doc1"}),
@@ -75,6 +77,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertIn("not exist", messages[0])
         self.assertIn("not exist", messages[1])
 
+    @pytest.mark.skip_for_multinode
     def test_feed_batch_documents_invalid_values(self):
         original_documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1", "marqo__id": "doc1"}),

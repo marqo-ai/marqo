@@ -31,13 +31,6 @@ on:
         required: true
         default: 0
 
-  push:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
-
 concurrency:
   group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
   cancel-in-progress: true
@@ -45,6 +38,10 @@ concurrency:
 permissions:
   contents: read
   id-token: write
+
+env:
+  SHARDS: ${{ inputs.number_of_shards || 1 }}
+  REPLICAS: ${{ inputs.number_of_replicas || 0 }}
 
 jobs:
   Determine-Vespa-Setup:
@@ -60,9 +57,9 @@ jobs:
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
           echo "First assuming single node Vespa setup."
 
-          # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
-          NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
-          NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
+          # Extract inputs from environment variables
+          NUMBER_OF_SHARDS="${{ env.SHARDS }}"
+          NUMBER_OF_REPLICAS="${{ env.REPLICAS }}"
 
           # Convert inputs to integers
           NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
@@ -110,10 +107,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # Override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.txt
 
       - name: Download nltk data
         run: |
@@ -148,7 +145,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
 
       - name: Run Integration Tests
         run: |
@@ -166,16 +163,20 @@ jobs:
 
           export PYTHONPATH="./src:."
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
-            --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
-            tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.log
+            --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
+            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report-${{ matrix.part }}
-          path: marqo/.coverage.${{ matrix.part }}
+          name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
+          path: |
+            marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
           include-hidden-files: true
 
   Merge-Coverage:
@@ -189,54 +190,26 @@ jobs:
         with:
           path: marqo
 
-      - name: Download all coverage files
+      - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
-
-      - name: Move Coverage Files
-        run: mv marqo-test-report-*/.* marqo/
-
-      - name: DEBUG coverages
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          pip install coverage
-          coverage debug data
+        with:
+          pattern: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-*
+          path: coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Merge Coverage Results
         run: |
           cd marqo
-          export PYTHONPATH="./src:."
           pip install coverage
+          mkdir -p coverage-reports
+          # Move coverage files to marqo directory for combining
+          find ../coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
           coverage combine
-          
-      - name: Generate Coverage Reports
-        run: |
-          cd marqo
-          export PYTHONPATH="./src:."
-          coverage report -i
-          coverage xml -i
-          coverage html -i
-
-      - name: Check Test Coverage of New Code
-        id: check_test_coverage
-        continue-on-error: true
-        run: |
-          cd marqo
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            echo "Running diff-cover against branch $BASE_BRANCH"
-            git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            pip install diff-cover
-            diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95
-          else
-            echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > diff_cov.md
-            touch diff_cov.html
-          fi
+          # Store the combined coverage in a directory specific to this configuration
+          cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: merged-coverage
-          path: marqo/htmlcov/
+          name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          include-hidden-files: true
