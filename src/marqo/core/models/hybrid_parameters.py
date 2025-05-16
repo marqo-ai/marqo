@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 
 from pydantic.v1 import validator, root_validator
 
-from marqo.base_model import StrictBaseModel
+from marqo.base_model import StrictBaseModel, MarqoBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
@@ -18,6 +18,25 @@ class RankingMethod(str, Enum):
     RRF = 'rrf'
     Tensor = 'tensor'
     Lexical = 'lexical'
+
+
+class RelevanceCutoffParameters(StrictBaseModel):
+    minResults: Optional[int] = None
+    dummyParameter: Optional[float] = 0
+
+class TensorSearchRelevanceCutoff(MarqoBaseModel):
+    method: str
+    parameters: RelevanceCutoffParameters
+
+
+class LexicalSearchRelevanceCutoff(MarqoBaseModel):
+    method: str
+    parameters: RelevanceCutoffParameters
+
+
+class RelevanceCutoff(MarqoBaseModel):
+    tensorSearch: Optional[TensorSearchRelevanceCutoff] = None
+    lexicalSearch: Optional[LexicalSearchRelevanceCutoff] = None
 
 
 class HybridParameters(StrictBaseModel):
@@ -36,6 +55,7 @@ class HybridParameters(StrictBaseModel):
     rerankDepthTensor: Optional[int] = None
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
+    relevanceCutoff: Optional[RelevanceCutoff] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):

@@ -538,7 +538,6 @@ class StructuredVespaIndex(VespaIndex):
                 f: 1 for f in fields_to_search_tensor
             }
         })
-
         """
         # TODO: implement this if no longer using custom searcher for lexical/tensor and tensor/lexical
         query_inputs.update({
@@ -645,6 +644,24 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
+        if marqo_query.hybrid_parameters.relevanceCutoff:
+            if marqo_query.hybrid_parameters.relevanceCutoff.lexicalSearch:
+                query["marqo__hybrid.lexical_relevance_cutoff.method"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.lexicalSearch.method)
+                query["marqo__hybrid.lexical_relevance_cutoff.parameters.minResults"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.lexicalSearch.parameters.minResults)
+                query["marqo__hybrid.lexical_relevance_cutoff.parameters.dummyParameter"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.lexicalSearch.parameters.dummyParameter
+                )
+
+            if marqo_query.hybrid_parameters.relevanceCutoff.tensorSearch:
+                query["marqo__hybrid.tensor_relevance_cutoff.method"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.tensorSearch.method)
+                query["marqo__hybrid.tensor_relevance_cutoff.parameters.minResults"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.tensorSearch.parameters.minResults)
+                query["marqo__hybrid.tensor_relevance_cutoff.parameters.dummyParameter"] = (
+                    marqo_query.hybrid_parameters.relevanceCutoff.tensorSearch.parameters.dummyParameter
+                )
         return query
 
     def _get_tensor_fields_to_search(
