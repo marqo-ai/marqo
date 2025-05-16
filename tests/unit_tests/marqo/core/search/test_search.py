@@ -14,6 +14,7 @@ from marqo.core.models.marqo_index import (
 )
 
 from marqo.config import Config
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.version import get_version
 from marqo.vespa.models import QueryResult
@@ -66,7 +67,8 @@ class SearchTest(unittest.TestCase):
                 ), TensorField(
                     name="custom_vector_field", chunk_field_name="custom_vector_field",
                     embeddings_field_name="custom_vector_field"
-                )]
+                ),
+            ]
         )
 
         cls.legacy_unstructured_index = UnstructuredMarqoIndex(
@@ -256,6 +258,41 @@ class SearchTest(unittest.TestCase):
             call_args['marqo__yql.lexical'], self.get_expected_lexical_yql("query")
         )
         self.assertEqual(call_args['marqo__hybrid.rerankDepthGlobal'], 15)
+
+    def test_hybrid_search_with_filter_and_score_modifiers(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(
+            config=self.config,
+            index_name="index_name",
+            text="test",
+            search_method="HYBRID",
+            filter="text_field_1:hadhsd",
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[{"field_name": "add_field_1", "weight": 2000}]
+            ),
+            highlights=False,
+            hybrid_parameters=HybridParameters(
+                scoreModifiersLexical=ScoreModifierLists(
+                    add_to_score=[{"field_name": "add_field_1", "weight": 1}]
+                ),
+                scoreModifiersTensor=ScoreModifierLists(
+                    add_to_score=[{"field_name": "add_field_1", "weight": 1}]
+                ),
+                searchableAttributesLexical=[
+                    "text_field_1",
+                    "text_field_2",
+                ]
+            )
+        )
+
+        call_args = self.vespa_client_mock.query.call_args[1]
+        print(call_args)
+        self.assertEqual(
+            call_args['marqo__yql.lexical'],
+            'select * from unstructured_test_schema where (None contains "test" OR None contains "test") AND (((marqo__short_string_fields contains sameElement(key contains "text_field_1", value contains "hadhsd"))))'
+        )
+
+
 
     def test_rerank_depth_higher_than_default_ef_search_overrides_it(self):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", rerank_depth=3000)
