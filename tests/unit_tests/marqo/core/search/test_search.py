@@ -286,7 +286,6 @@ class SearchTest(unittest.TestCase):
         )
 
         call_args = self.vespa_client_mock.query.call_args[1]
-        print(call_args)
         self.assertEqual(
             call_args['marqo__yql.lexical'],
             'select * from unstructured_test_schema where (None contains "test" OR None contains "test") AND (((marqo__short_string_fields contains sameElement(key contains "text_field_1", value contains "hadhsd"))))'
