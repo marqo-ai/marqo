@@ -152,9 +152,6 @@ class SearchTest(unittest.TestCase):
         return yql[:-4] + ")"
 
     def get_expected_lexical_yql(self, query):
-        return f'select * from {self.current_index.schema_name} where weakAnd(default contains "{query}")'
-
-    def get_expected_lexical_yql2(self, query):
         return f'select * from {self.current_index.schema_name} where (weakAnd(default contains "{query}"))'
 
     def get_expected_lexical_yql_with_or(self, query, include_select=True):
@@ -202,7 +199,7 @@ class SearchTest(unittest.TestCase):
         tensor_search.search(self.config, "index_name", "query", search_method="lexical")
         self.vespa_client_mock.query.assert_called_once()
         call_args = self.vespa_client_mock.query.call_args[1]
-        self.assertEqual(call_args['yql'], self.get_expected_lexical_yql2("query"))
+        self.assertEqual(call_args['yql'], self.get_expected_lexical_yql("query"))
         self.assertEqual(call_args['query_features'], {'text_field_2': 1, 'text_field_1': 1})
         self.assertEqual(call_args['ranking'], 'bm25')
         self.assertEqual(call_args['hits'], 3)
