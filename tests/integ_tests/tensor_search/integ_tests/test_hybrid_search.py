@@ -3304,44 +3304,37 @@ class TestHybridSearch(MarqoTestCase):
         """
         Test that lexical filtering with scoreModifiersLexical works.
         """
+        for index in [self.semi_structured_default_text_index, self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index):
+                doc = {
+                    "_id": "1",
+                    "text_field_1": "test",
+                    "text_field_2": "not",
+                    "add_field_1": 1.2,
+                    "text_field_3": "test",
+                }
 
-        doc = {
-            "_id": "1",
-            "text1": "test",
-            "text2": "not",
-            "score_mod": 1.2,
-            "title": "test",
-            "productname": "test",
-            "body_html_safe": "test",
-            "properties_concatenated": "test, not",
-            "mod_map": {
-                "test_mod": 1.4
-            },
-            "tags": ["t1", "t2"]
-        }
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=[doc],
+                        tensor_fields=["text_field_1"] if isinstance(index, SemiStructuredMarqoIndex) else None
+                    )
+                )
 
-        self.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.semi_structured_default_text_index.name, docs=[doc],
-                tensor_fields=["text1"]
-            )
-        )
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text="test",
+                    filter="text_field_1:hadhsd",
+                    score_modifiers=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 2000}]),
+                    highlights=False,
+                    hybrid_parameters=HybridParameters(
+                        scoreModifiersLexical=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        scoreModifiersTensor=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        searchableAttributesLexical=[
+                            "text_field_1",
+                            "text_field_2",
+                            "text_field_3",
+                        ]
+                    )
+                )
 
-        res = tensor_search.search(
-            config=self.config, index_name=self.semi_structured_default_text_index.name, search_method="HYBRID", text="test",
-            filter="tags:hadhsd",
-            score_modifiers=ScoreModifierLists(add_to_score=[{"field_name": "mod_map.test_mod", "weight": 2000}]),
-            highlights=False,
-            hybrid_parameters=HybridParameters(
-                scoreModifiersLexical=ScoreModifierLists(add_to_score=[{"field_name": "mod_map.test_mod", "weight": 1}]),
-                scoreModifiersTensor=ScoreModifierLists(add_to_score=[{"field_name": "mod_map.test_mod", "weight": 1}]),
-                searchableAttributesLexical=[
-                    "title",
-                    "productname",
-                    "body_html_safe",
-                    "properties_concatenated",
-                ]
-            )
-        )
-
-        self.assertEqual(res["hits"], [])
+                self.assertEqual(res["hits"], [])
