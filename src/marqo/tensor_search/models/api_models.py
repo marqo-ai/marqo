@@ -18,7 +18,7 @@ from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 
 
 class BaseMarqoModel(BaseModel):
@@ -60,7 +60,6 @@ class SearchQuery(BaseMarqoModel):
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
     interpolationMethod: Optional[InterpolationMethod] = None
-    excludeInputDocuments: Optional[bool] = True
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -299,6 +298,10 @@ class SearchQuery(BaseMarqoModel):
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
+
+    def get_context_documents(self) -> Optional[SearchContextDocuments]:
+        """Extract the documents from the context, if provided"""
+        return self.context.documents if self.context is not None else None
 
 
 class BulkSearchQueryEntity(SearchQuery):

@@ -63,10 +63,17 @@ class SearchContextTensor(BaseModel):
     vector: List[float]
     weight: float
 
+class SearchContextDocumentsParameters(BaseModel):
+    tensorFields: List[str]
+    excludeInputDocuments: bool
+
+class SearchContextDocuments(BaseModel):
+    ids: Dict[str, Union[int, float]]   # TODO: Check if the types are correct
+    parameters: SearchContextDocumentsParameters
 
 class SearchContext(BaseModel):
     tensor: List[SearchContextTensor]
-    documents: Dict[str, Union[int, float]]     # TODO: Check if these types are right
+    documents: SearchContextDocuments
 
     def __init__(self, **data):
         try:

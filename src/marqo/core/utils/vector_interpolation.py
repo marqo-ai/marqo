@@ -108,14 +108,14 @@ class Nlerp(Lerp):
             ZeroMagnitudeVectorError: If the interpolated vector has zero magnitude
         """
         lerp_result = super().interpolate(vectors, weights)
-        length = math.sqrt(sum(x ** 2 for x in lerp_result))
+        norm = math.sqrt(sum(x ** 2 for x in lerp_result))
 
-        if length == 0:
+        if norm == 0:
             raise ZeroMagnitudeVectorError(
                 'Interpolated vector has zero magnitude. Cannot normalize a vector with zero magnitude'
             )
 
-        return [x / length for x in lerp_result]
+        return [x / norm for x in lerp_result]
 
 
 class Slerp(VectorInterpolation):

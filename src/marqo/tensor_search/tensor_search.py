@@ -53,6 +53,7 @@ from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
@@ -838,7 +839,10 @@ def get_query_vectors_from_jobs(
 
         if isinstance(q.q, dict) or q.q is None:
             ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-            weighted_vectors = []
+            # Store weights and vectors separately for use in interpolation
+            collected_weights: List[List[float]] = []
+            collected_vectors: List[float] = []
+
             if ordered_queries:
                 # multiple queries. We have to weight and combine them:
                 vectorised_ordered_queries = [
@@ -853,14 +857,44 @@ def get_query_vectors_from_jobs(
                     ) for content, weight in ordered_queries
                 ]
                 # TODO how do we ensure order?
-                weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+                collected_weights = [weight for _, weight, _ in vectorised_ordered_queries]
+                collected_vectors = [vec for vec, _, _ in vectorised_ordered_queries]
 
-            # TODO: get context documents and use them here
+            # Add context tensors
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
+                collected_weights += [v.weight for v in context_tensors]
+                collected_vectors += [v.vector for v in context_tensors]
 
-            for vector in weighted_vectors:
+            # Add context document vectors
+            context_documents = q.get_context_documents()
+            if context_documents:
+                context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
+                    index_name=q.index.name,
+                    documents=context_documents.ids,
+                    tensor_fields=context_documents.parameters.tensorFields
+                )
+
+                # Update weights and vectors list
+                for document_id, vector_list in context_doc_vectors.items():
+                    weight = context_documents[document_id]
+                    # Per doc, add whole list of vectors, copy the doc weight for each
+                    collected_vectors.extend(vector_list)
+                    collected_weights.extend([weight] * len(vector_list))
+
+                # Save original doc ids for exclusion filtering
+                all_document_ids = list(documents.keys())
+
+                # Determine default interpolation method using normalize embeddings if documents provided
+                if interpolation_method is None:
+                    interpolation_method = config.recommender._get_default_interpolation_method(marqo_index)
+            else:
+                # If no documents, default interpolation method ALWAYS LERP (to preserve existing behavior)
+                if interpolation_method is None:
+                    interpolation_method = InterpolationMethod.LERP
+
+            # Make sure all vectors are the same size
+            for vector in collected_vectors:
                 if not q.index.model.get_dimension() == len(vector):
                     raise api_exceptions.InvalidArgError(
                         f"The dimension of the vectors returned by the model or given by the context vectors "
@@ -868,15 +902,24 @@ def get_query_vectors_from_jobs(
                         f"Expected dimension {q.index.model.get_dimension()} but got {len(vector)}"
                     )
 
-            merged_vector = np.mean(weighted_vectors, axis=0)
+            # Use interpolation to combine all vectors
+            vector_interpolation = from_interpolation_method(interpolation_method)
+            merged_vector = vector_interpolation.interpolate(
+                vectors=collected_vectors,
+                weights=collected_weights
+            )
 
+            # NOTE: this is redundant if interpolation method is NLERP
             if q.index.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
+
+            # TODO: We need to return exclusion filter to run during search
         elif isinstance(q.q, str):
-            # result[qidx] = vectors[0]
+            # TODO: Figure out how to handle this
+            # TODO: Does this mean context vectors do NOT do anything when q is a string?
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 job_to_vectors=job_to_vectors,
