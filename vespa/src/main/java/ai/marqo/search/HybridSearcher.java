@@ -86,6 +86,18 @@ public class HybridSearcher extends Searcher {
                                 "marqo__hybrid.tensor_relevance_cutoff.parameters.dummyParameter",
                                 -1.0);
 
+        String lexicalCutoffMethod =
+                query.properties().getString("marqo__hybrid.lexical_relevance_cutoff.method", "");
+        Integer lexicalCutoffMinResults =
+                query.properties()
+                        .getInteger(
+                                "marqo__hybrid.lexical_relevance_cutoff.parameters.minResults", -1);
+        Double lexicalCutoffDummyParameter =
+                query.properties()
+                        .getDouble(
+                                "marqo__hybrid.lexical_relevance_cutoff.parameters.dummyParameter",
+                                -1.0);
+
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
@@ -142,137 +154,217 @@ public class HybridSearcher extends Searcher {
             //            AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
             //            Future<Result> futureLexical = asyncExecutionLexical.search(queryLexical);
 
-            Result probeResultLexical = execution.search(queryLexical);
+            Result originalResultLexical = execution.search(queryLexical);
 
-            if (tensorCutoffMethod.equals("lexicalCutoff")) {
-                // Lexical cutoff method
-                int lexicalResultsCount = probeResultLexical.getHitCount();
+            // Lexical cutoff method
+            switch (lexicalCutoffMethod) {
+                case "gapDetection" -> {
+                    List<Hit> lexicalHits = new ArrayList<>(originalResultLexical.hits().asList());
 
-                if (tensorCutoffDummyParameter < 0) {
-                    // If there are no lexical results, return the original tensor result
-                    ;
-                } else {
-                    //
-                    lexicalResultsCount = (int) (lexicalResultsCount * tensorCutoffDummyParameter);
-                }
-
-                int minResults = Math.max(0, tensorCutoffMinResults);
-                query.setHits(Math.max(lexicalResultsCount, minResults));
-                Query newQueryTensor =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
-                resultTensor = execution.search(newQueryTensor);
-                resultLexical = probeResultLexical;
-            } else if (tensorCutoffMethod.equals("gapDetection")) {
-                resultLexical = probeResultLexical;
-                Query originalQuery =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
-
-                Result originalTensorResult = execution.search(originalQuery);
-                // List<Hit> tensorHits = originalTensorResult.hits().asList();
-
-                List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
-
-                if (tensorHits.isEmpty()) {
-                    resultTensor = originalTensorResult;
-                } else {
-                    // Find the elbow point in the tensor hits
-                    double maxDelta = -1.0;
-                    int bestIndex = tensorHits.size(); // default: keep all
-                    for (int i = 0; i < tensorHits.size() - 1; i++) {
-                        double score1 = tensorHits.get(i).getRelevance().getScore();
-                        double score2 = tensorHits.get(i + 1).getRelevance().getScore();
-                        double delta = score1 - score2;
-                        if (delta > maxDelta) {
-                            maxDelta = delta;
-                            bestIndex = i + 1;
+                    if (lexicalHits.isEmpty()) {
+                        resultLexical = originalResultLexical;
+                    } else {
+                        // Find the elbow point in the lexical hits
+                        double maxDelta = -1.0;
+                        int bestIndex = lexicalHits.size(); // default: keep all
+                        for (int i = 0; i < lexicalHits.size() - 1; i++) {
+                            double score1 = lexicalHits.get(i).getRelevance().getScore();
+                            double score2 = lexicalHits.get(i + 1).getRelevance().getScore();
+                            double delta = score1 - score2;
+                            if (delta > maxDelta) {
+                                maxDelta = delta;
+                                bestIndex = i + 1;
+                            }
                         }
+                        // Respect minimum result constraint
+                        int minResults = Math.max(0, lexicalCutoffMinResults);
+                        int cutoff = Math.max(bestIndex, minResults);
+                        // Trim result in-place
+                        originalResultLexical.hits().trim(0, cutoff);
+                        resultLexical = originalResultLexical;
                     }
-                    // Respect minimum result constraint
+                }
+                case "normalFit" ->
+                        // normalFit method
+                        throw new RuntimeException(
+                                "Not implemented yet. Please use lexicalCutoff or gapDetection.");
+                case "hardCodedScoreCut" -> {
+                    List<Hit> lexicalHits = new ArrayList<>(originalResultLexical.hits().asList());
+                    if (lexicalHits.isEmpty()) {
+                        resultLexical = originalResultLexical;
+                    } else {
+                        double hardThreshold = lexicalCutoffDummyParameter;
+                        HitGroup trimmedHits = new HitGroup();
+                        for (Hit hit : lexicalHits) {
+                            if (hit.getRelevance().getScore() >= hardThreshold) {
+                                trimmedHits.add(hit);
+                            }
+                        }
+                        resultLexical = new Result(query, trimmedHits);
+                    }
+                }
+                case "softCodedScoreCut" -> {
+                    // softCodedScoreCut method
+                    List<Hit> lexicalHits = new ArrayList<>(originalResultLexical.hits().asList());
+
+                    if (lexicalHits.isEmpty()) {
+                        resultLexical = originalResultLexical;
+                    } else {
+                        double topScore = lexicalHits.get(0).getRelevance().getScore();
+                        double cutoffFactor = lexicalCutoffDummyParameter;
+                        double dynamicThreshold = topScore * cutoffFactor;
+
+                        HitGroup trimmedHits = new HitGroup();
+                        for (Hit hit : lexicalHits) {
+                            if (hit.getRelevance().getScore() >= dynamicThreshold) {
+                                trimmedHits.add(hit);
+                            }
+                        }
+
+                        resultLexical = new Result(query, trimmedHits);
+                    }
+                }
+                case "" ->
+                        // No cutoff method specified, use the default lexical query
+                        // Do nothing
+                        resultLexical = originalResultLexical;
+                default ->
+                        throw new RuntimeException(
+                                "Invalid lexical relevance cutoff method: " + lexicalCutoffMethod);
+            }
+
+            // Tensor cutoff metho
+            switch (tensorCutoffMethod) {
+                case "lexicalCutoff" -> {
+                    // Lexical cutoff method
+                    int lexicalResultsCount = resultLexical.getHitCount();
+
+                    if (tensorCutoffDummyParameter < 0) {
+                        // If there are no lexical results, return the original tensor result
+                        ;
+                    } else {
+                        //
+                        lexicalResultsCount =
+                                (int) (lexicalResultsCount * tensorCutoffDummyParameter);
+                    }
+
                     int minResults = Math.max(0, tensorCutoffMinResults);
-                    int cutoff = Math.max(bestIndex, minResults);
-                    // Trim result in-place
-                    originalTensorResult.hits().trim(0, cutoff);
-                    resultTensor = originalTensorResult;
+                    query.setHits(Math.max(lexicalResultsCount, minResults));
+                    Query newQueryTensor =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
+                    resultTensor = execution.search(newQueryTensor);
                 }
-            } else if (tensorCutoffMethod.equals("normalFit")) {
-                // normalFit method
-                throw new RuntimeException(
-                        "Not implemented yet. Please use lexicalCutoff or gapDetection.");
-            } else if (tensorCutoffMethod.equals("hardCodedScoreCut")) {
-                resultLexical = probeResultLexical;
-                Query originalQuery =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
+                case "gapDetection" -> {
+                    Query originalQuery =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
 
-                Result originalTensorResult = execution.search(originalQuery);
-                List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
+                    Result originalTensorResult = execution.search(originalQuery);
+                    // List<Hit> tensorHits = originalTensorResult.hits().asList();
 
-                if (tensorHits.isEmpty()) {
-                    resultTensor = originalTensorResult;
-                } else {
-                    double hardThreshold = tensorCutoffDummyParameter;
-                    HitGroup trimmedHits = new HitGroup();
-                    for (Hit hit : tensorHits) {
-                        if (hit.getRelevance().getScore() >= hardThreshold) {
-                            trimmedHits.add(hit);
+                    List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
+
+                    if (tensorHits.isEmpty()) {
+                        resultTensor = originalTensorResult;
+                    } else {
+                        // Find the elbow point in the tensor hits
+                        double maxDelta = -1.0;
+                        int bestIndex = tensorHits.size(); // default: keep all
+                        for (int i = 0; i < tensorHits.size() - 1; i++) {
+                            double score1 = tensorHits.get(i).getRelevance().getScore();
+                            double score2 = tensorHits.get(i + 1).getRelevance().getScore();
+                            double delta = score1 - score2;
+                            if (delta > maxDelta) {
+                                maxDelta = delta;
+                                bestIndex = i + 1;
+                            }
                         }
+                        // Respect minimum result constraint
+                        int minResults = Math.max(0, tensorCutoffMinResults);
+                        int cutoff = Math.max(bestIndex, minResults);
+                        // Trim result in-place
+                        originalTensorResult.hits().trim(0, cutoff);
+                        resultTensor = originalTensorResult;
                     }
-                    resultTensor = new Result(query, trimmedHits);
                 }
-            } else if (tensorCutoffMethod.equals("softCodedScoreCut")) {
-                // softCodedScoreCut method
-                resultLexical = probeResultLexical;
-                Query originalQuery =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
+                case "normalFit" ->
+                        // normalFit method
+                        throw new RuntimeException(
+                                "Not implemented yet. Please use lexicalCutoff or gapDetection.");
+                case "hardCodedScoreCut" -> {
+                    Query originalQuery =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
 
-                Result originalTensorResult = execution.search(originalQuery);
-                List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
+                    Result originalTensorResult = execution.search(originalQuery);
+                    List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
 
-                if (tensorHits.isEmpty()) {
-                    resultTensor = originalTensorResult;
-                } else {
-                    double topScore = tensorHits.get(0).getRelevance().getScore();
-                    double cutoffFactor = tensorCutoffDummyParameter;
-                    double dynamicThreshold = topScore * cutoffFactor;
-
-                    HitGroup trimmedHits = new HitGroup();
-                    for (Hit hit : tensorHits) {
-                        if (hit.getRelevance().getScore() >= dynamicThreshold) {
-                            trimmedHits.add(hit);
+                    if (tensorHits.isEmpty()) {
+                        resultTensor = originalTensorResult;
+                    } else {
+                        double hardThreshold = tensorCutoffDummyParameter;
+                        HitGroup trimmedHits = new HitGroup();
+                        for (Hit hit : tensorHits) {
+                            if (hit.getRelevance().getScore() >= hardThreshold) {
+                                trimmedHits.add(hit);
+                            }
                         }
+                        resultTensor = new Result(query, trimmedHits);
                     }
-
-                    resultTensor = new Result(query, trimmedHits);
                 }
-            } else if (tensorCutoffMethod.isEmpty()) {
-                // No cutoff method specified, use the default tensor query
-                // Do nothing
-                Query newQueryTensor =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
-                resultTensor = execution.search(newQueryTensor);
-                resultLexical = probeResultLexical;
-            } else {
-                throw new RuntimeException(
-                        "Invalid tensor relevance cutoff method: " + tensorCutoffMethod);
+                case "softCodedScoreCut" -> {
+                    // softCodedScoreCut method
+                    Query originalQuery =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
+
+                    Result originalTensorResult = execution.search(originalQuery);
+                    List<Hit> tensorHits = new ArrayList<>(originalTensorResult.hits().asList());
+
+                    if (tensorHits.isEmpty()) {
+                        resultTensor = originalTensorResult;
+                    } else {
+                        double topScore = tensorHits.get(0).getRelevance().getScore();
+                        double cutoffFactor = tensorCutoffDummyParameter;
+                        double dynamicThreshold = topScore * cutoffFactor;
+
+                        HitGroup trimmedHits = new HitGroup();
+                        for (Hit hit : tensorHits) {
+                            if (hit.getRelevance().getScore() >= dynamicThreshold) {
+                                trimmedHits.add(hit);
+                            }
+                        }
+
+                        resultTensor = new Result(query, trimmedHits);
+                    }
+                }
+                case "" -> {
+                    // No cutoff method specified, use the default tensor query
+                    // Do nothing
+                    Query newQueryTensor =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
+                    resultTensor = execution.search(newQueryTensor);
+                }
+                default ->
+                        throw new RuntimeException(
+                                "Invalid tensor relevance cutoff method: " + tensorCutoffMethod);
             }
 
             // Collect errors from lexical and tensor results.
