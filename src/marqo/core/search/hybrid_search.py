@@ -14,6 +14,7 @@ from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
@@ -42,6 +43,7 @@ class HybridSearch:
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
+            interpolation_method: Optional[InterpolationMethod] = None,
     ) -> Dict:
         """
 
@@ -67,6 +69,8 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
+                track_total_hits: if True, total hits will be returned. If not provided, no total hits will be returned.
+                interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
             Returns:
 
             Output format:
@@ -220,7 +224,7 @@ class HybridSearch:
                 hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
         ):
             with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
-                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
             vectorised_text = list(qidx_to_vectors.values())[0]
         else:
             vectorised_text = None

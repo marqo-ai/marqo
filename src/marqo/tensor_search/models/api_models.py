@@ -282,19 +282,6 @@ class SearchQuery(BaseMarqoModel):
                              f"Search method is {search_method}.")
         return values
 
-    @root_validator(pre=False)
-    def validate_exclude_input_documents_only_set_if_context_documents_present(self):
-        """
-        Validate that the parameter excludeInputDocuments can only be set if context.documents is set.
-        This is specifically for personalization with context.
-        """
-        if self.excludeInputDocuments:
-            if not self.context:
-                raise ValueError("excludeInputDocuments can only be set if context.documents is set")
-            if not self.context.documents:
-                raise ValueError("excludeInputDocuments can only be set if context.documents is set")
-        return self
-
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None

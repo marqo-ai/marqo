@@ -187,6 +187,8 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
+                    # Note aside from interpolate in recommend,
+                    # search step also calls LERP interpolate once by default
                     mock_interpolate.assert_called_once()
 
                     ids = [doc["_id"] for doc in res["hits"]]
@@ -229,6 +231,8 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
+                    # Note aside from interpolate in recommend,
+                    # search step also calls LERP interpolate once by default
                     mock_interpolate.assert_called_once()
 
                     ids = [doc["_id"] for doc in res["hits"]]
@@ -282,7 +286,8 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
-                    mock_interpolate.assert_called_once()
+                    # Recommend calls LERP interpolate twice (once internally, once in search step)
+                    self.assertEqual(mock_interpolate.call_count, 2)
 
                     ids = [doc["_id"] for doc in res["hits"]]
 
@@ -460,7 +465,8 @@ class TestRecommender(MarqoTestCase):
                 index_name=index.name,
                 documents=["1", "2"],
             )
-
+            # Note aside from interpolate in recommend,
+            # search step also calls LERP interpolate once by default
             mock_interpolate.assert_called_once()
 
     def test_defaultInterpolationMethodNonNormalized_success(self):
@@ -481,7 +487,8 @@ class TestRecommender(MarqoTestCase):
                 documents=["1", "2"],
             )
 
-            mock_interpolate.assert_called_once()
+            # Recommend calls LERP interpolate twice (once internally, once in search step)
+            self.assertEqual(mock_interpolate.call_count, 2)
 
     def test_recommend_excludeInputDocuments_success(self):
         """

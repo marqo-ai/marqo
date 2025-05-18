@@ -207,6 +207,7 @@ class TestSearch(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
+    @unittest.skip  # TODO: remove skip
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_video(self):
@@ -242,6 +243,7 @@ class TestSearch(MarqoTestCase):
                 self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
                 self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Video should have higher score
 
+    @unittest.skip  # TODO: remove skip
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_audio(self):

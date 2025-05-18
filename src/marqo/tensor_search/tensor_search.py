@@ -54,6 +54,8 @@ from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
 from marqo.core.models.interpolation_method import InterpolationMethod
+from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
+    ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
@@ -319,6 +321,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            hybrid_parameters: Optional[HybridParameters] = None,
            facets: Optional[FacetsParameters] = None,
            track_total_hits: Optional[bool] = None,
+           interpolation_method: Optional[InterpolationMethod] = None
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -349,6 +352,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
         facets: Parameters for facets
+        track_total_hits: Whether to track total hits for the search
+        interpolation_method: The interpolation method to use for the combining of vectors
     Returns:
 
     """
@@ -433,7 +438,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth,
+                interpolation_method=interpolation_method
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -446,7 +452,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
+                interpolation_method=interpolation_method
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -816,7 +823,7 @@ def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHa
 def get_query_vectors_from_jobs(
         queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]],
         job_to_vectors: Dict[JHash, Dict[str, List[float]]], config: Config,
-        jobs: Dict[JHash, VectorisedJobs]
+        jobs: Dict[JHash, VectorisedJobs], interpolation_method: Optional[InterpolationMethod] = None,
 ) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
@@ -1005,7 +1012,8 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
     return prefixed_queries
 
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str],
+                           interpolation_method: InterpolationMethod) -> Dict[
     Qidx, List[float]]:
     """Run the query vectorisation process
 
@@ -1032,6 +1040,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
 
     # 3. For each query, get associated vectors
+    # Combination of context tensors & documents is also done here
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
         prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
@@ -1047,7 +1056,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None,
+        interpolation_method: Optional[InterpolationMethod] = None
 ) -> Dict:
     """
     
@@ -1070,6 +1080,7 @@ def _vector_text_search(
         highlights: if True, highlights will be returned
         text_query_prefix: prefix to add to text queries
         rerank_depth: the number of hits per shard during retrieval
+        interpolation_method: the method to use for combining vectors
     Returns:
 
     Note:
@@ -1116,7 +1127,7 @@ def _vector_text_search(
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     marqo_query = MarqoTensorQuery(
