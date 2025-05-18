@@ -346,7 +346,7 @@ public class HybridSearcher extends Searcher {
                     } else {
 
                         double topScore = tensorHits.get(0).getRelevance().getScore();
-                        double cutoffFactor = lexicalCutoffDummyParameter;
+                        double cutoffFactor = tensorCutoffDummyParameter;
                         double dynamicThreshold = topScore * cutoffFactor;
 
                         int matchedSize = 0;
