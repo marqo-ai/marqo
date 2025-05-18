@@ -3299,3 +3299,42 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod=RankingMethod.Tensor,
                         ), result_count=5
                     )
+
+    def test_lexical_filtering_with_scoreModifiersLexical_works(self):
+        """
+        Test that lexical filtering with scoreModifiersLexical works.
+        """
+        for index in [self.semi_structured_default_text_index, self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index):
+                doc = {
+                    "_id": "1",
+                    "text_field_1": "test",
+                    "text_field_2": "not",
+                    "add_field_1": 1.2,
+                    "text_field_3": "test",
+                }
+
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=[doc],
+                        tensor_fields=["text_field_1"] if isinstance(index, SemiStructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text="test",
+                    filter="text_field_1:hadhsd",
+                    score_modifiers=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 2000}]),
+                    highlights=False,
+                    hybrid_parameters=HybridParameters(
+                        scoreModifiersLexical=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        scoreModifiersTensor=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        searchableAttributesLexical=[
+                            "text_field_1",
+                            "text_field_2",
+                            "text_field_3",
+                        ]
+                    )
+                )
+
+                self.assertEqual(res["hits"], [])
