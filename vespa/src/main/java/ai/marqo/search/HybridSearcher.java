@@ -194,13 +194,15 @@ public class HybridSearcher extends Searcher {
                         resultLexical = originalResultLexical;
                     } else {
                         double hardThreshold = lexicalCutoffDummyParameter;
-                        HitGroup trimmedHits = new HitGroup();
+                        int matchedSize = 0;
                         for (Hit hit : lexicalHits) {
                             if (hit.getRelevance().getScore() >= hardThreshold) {
-                                trimmedHits.add(hit);
+                                matchedSize += 1;
                             }
                         }
-                        resultLexical = new Result(query, trimmedHits);
+                        int cutoff = Math.max(matchedSize, Math.max(0, lexicalCutoffMinResults));
+                        originalResultLexical.hits().trim(0, cutoff);
+                        resultLexical = originalResultLexical;
                     }
                 }
                 case "softCodedScoreCut" -> {
@@ -214,14 +216,15 @@ public class HybridSearcher extends Searcher {
                         double cutoffFactor = lexicalCutoffDummyParameter;
                         double dynamicThreshold = topScore * cutoffFactor;
 
-                        HitGroup trimmedHits = new HitGroup();
+                        int matchedSize = 0;
                         for (Hit hit : lexicalHits) {
                             if (hit.getRelevance().getScore() >= dynamicThreshold) {
-                                trimmedHits.add(hit);
+                                matchedSize += 1;
                             }
                         }
-
-                        resultLexical = new Result(query, trimmedHits);
+                        int cutoff = Math.max(matchedSize, Math.max(0, lexicalCutoffMinResults));
+                        originalResultLexical.hits().trim(0, cutoff);
+                        resultLexical = originalResultLexical;
                     }
                 }
                 case "" ->
@@ -312,14 +315,18 @@ public class HybridSearcher extends Searcher {
                     if (tensorHits.isEmpty()) {
                         resultTensor = originalTensorResult;
                     } else {
+
                         double hardThreshold = tensorCutoffDummyParameter;
-                        HitGroup trimmedHits = new HitGroup();
+
+                        int matchedSize = 0;
                         for (Hit hit : tensorHits) {
                             if (hit.getRelevance().getScore() >= hardThreshold) {
-                                trimmedHits.add(hit);
+                                matchedSize += 1;
                             }
                         }
-                        resultTensor = new Result(query, trimmedHits);
+                        int cutoff = Math.max(matchedSize, Math.max(0, tensorCutoffMinResults));
+                        originalTensorResult.hits().trim(0, cutoff);
+                        resultTensor = originalTensorResult;
                     }
                 }
                 case "softCodedScoreCut" -> {
@@ -337,18 +344,20 @@ public class HybridSearcher extends Searcher {
                     if (tensorHits.isEmpty()) {
                         resultTensor = originalTensorResult;
                     } else {
+
                         double topScore = tensorHits.get(0).getRelevance().getScore();
-                        double cutoffFactor = tensorCutoffDummyParameter;
+                        double cutoffFactor = lexicalCutoffDummyParameter;
                         double dynamicThreshold = topScore * cutoffFactor;
 
-                        HitGroup trimmedHits = new HitGroup();
+                        int matchedSize = 0;
                         for (Hit hit : tensorHits) {
                             if (hit.getRelevance().getScore() >= dynamicThreshold) {
-                                trimmedHits.add(hit);
+                                matchedSize += 1;
                             }
                         }
-
-                        resultTensor = new Result(query, trimmedHits);
+                        int cutoff = Math.max(matchedSize, Math.max(0, tensorCutoffMinResults));
+                        originalTensorResult.hits().trim(0, cutoff);
+                        resultTensor = originalTensorResult;
                     }
                 }
                 case "" -> {
