@@ -884,17 +884,17 @@ def get_query_vectors_from_jobs(
 
                 # Update weights and vectors list
                 for document_id, vector_list in context_doc_vectors.items():
-                    weight = context_documents[document_id]
+                    weight = context_documents.ids[document_id]
                     # Per doc, add whole list of vectors, copy the doc weight for each
                     collected_vectors.extend(vector_list)
                     collected_weights.extend([weight] * len(vector_list))
 
                 # Save original doc ids for exclusion filtering
-                all_document_ids = list(documents.keys())
+                all_document_ids = list(context_documents.ids.keys())
 
                 # Determine default interpolation method using normalize embeddings if documents provided
                 if interpolation_method is None:
-                    interpolation_method = config.recommender._get_default_interpolation_method(marqo_index)
+                    interpolation_method = config.recommender._get_default_interpolation_method(q.index)
             else:
                 # If no documents, default interpolation method ALWAYS LERP (to preserve existing behavior)
                 if interpolation_method is None:

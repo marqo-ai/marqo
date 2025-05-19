@@ -24,6 +24,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextDocumentsParameters
 
 
 class TestSearch(MarqoTestCase):
@@ -207,7 +208,6 @@ class TestSearch(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
-    @unittest.skip  # TODO: remove skip
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_video(self):
@@ -243,7 +243,6 @@ class TestSearch(MarqoTestCase):
                 self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
                 self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Video should have higher score
 
-    @unittest.skip  # TODO: remove skip
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_audio(self):
@@ -1310,6 +1309,64 @@ class TestSearch(MarqoTestCase):
                         ef_search=3
                     )
                     self.assertEqual(len(res["hits"]), 3)
+
+    def test_search_with_context_documents_only(self):
+        """Test that search works correctly when only context documents are provided (no query, no context tensor).
+        
+        This test verifies that when we search using only document IDs as context,
+        the search results match what we'd expect based on those documents.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents to the index
+                docs = [
+                    {"_id": "doc1", "text_field_1": "machine learning algorithms and artificial intelligence"},
+                    {"_id": "doc2", "text_field_1": "deep neural networks for computer vision tasks"},
+                    {"_id": "doc3", "text_field_1": "natural language processing and text generation"},
+                    {"_id": "doc4", "text_field_1": "reinforcement learning for game playing"},
+                    {"_id": "doc5", "text_field_1": "statistical models for data analysis"},
+                    {"_id": "doc6", "text_field_1": "clustering algorithms for unsupervised learning"},
+                ]
+                
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                
+                # Create search context with only documents
+                search_context = SearchContext(
+                    documents=SearchContextDocuments(
+                        ids={"doc1": 3.0, "doc3": 5.0},
+                        parameters=SearchContextDocumentsParameters(
+                            tensorFields=["text_field_1"],
+                            excludeInputDocuments=False
+                        )
+                    )
+                )
+                
+                # Perform search with only context documents
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text=None,
+                    context=search_context,
+                    result_count=5
+                )
+                
+                # Verify search results
+                self.assertIn("hits", results)
+                self.assertGreaterEqual(len(results["hits"]), 5)
+                
+                # The input documents should be the first results if excludeInputDocuments is False
+                result_ids = [hit["_id"] for hit in results["hits"]]
+                
+                # Verify that the first hit is doc1, then doc3
+                self.assertEqual(result_ids[0], "doc3")
+                self.assertEqual(result_ids[1], "doc1")
 
 
 # Set up text strategy to prioritize " and \\

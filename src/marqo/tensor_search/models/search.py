@@ -83,8 +83,9 @@ class SearchContext(BaseModel):
 
     @validator('tensor', pre=True, always=True)
     def check_vector_length(cls, v):
-        if not (1 <= len(v) <= 64):
-            raise InvalidArgError('The number of tensors must be between 1 and 64')
+        if v is not None:
+            if not (1 <= len(v) <= 64):
+                raise InvalidArgError('The number of tensors must be between 1 and 64')
         return v
 
     # Root validator to confirm either tensor or documents MUST exist
