@@ -897,16 +897,45 @@ class StructuredVespaIndex(VespaIndex):
 
         # Required tokens
         if marqo_query.and_phrases:
-            and_terms = ' AND '.join([
-                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.and_phrases
-            ])
+            if isinstance(marqo_query, MarqoHybridQuery):
+                searchable_attributes: Union[None, list[str]] = marqo_query.hybrid_parameters.searchableAttributesLexical
+            else:
+                searchable_attributes: Union[None, list[str]] = marqo_query.searchable_attributes
+
+            and_terms = self._get_and_terms_for_required_phrase(
+                marqo_query.and_phrases, searchable_attributes
+            )
+
             if or_terms:
                 or_terms = f'({or_terms})'
                 and_terms = f' AND ({and_terms})'
         else:
             and_terms = ''
-
         return f'{or_terms}{and_terms}'
+
+    def _get_and_terms_for_required_phrase(self, phrases: List[str], search_attributes: Union[None, List[str]]) -> str:
+        """
+        Generate required terms for the given phrases and search attributes. If search attributes are not provided,
+        we use 'default' as the search attribute.
+
+        Returns:
+            str: The generated and(required) terms for the phrases and search attributes.
+        """
+
+        if search_attributes is None:
+            return ' AND '.join([f'default contains "{phrase}"' for phrase in phrases])
+
+        if not isinstance(search_attributes, list):
+            raise InternalError(f'Expected list[str] of searchable attributes, but found {type(search_attributes)}')
+
+        per_field_terms = [
+            "(" + ' AND '.join([
+                f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for phrase in phrases
+            ]) + ")" for field in search_attributes
+        ]
+
+        return ' OR '.join(per_field_terms)
 
     def _get_lexical_contains_term(self, phrase, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):

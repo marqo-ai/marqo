@@ -1274,3 +1274,69 @@ class TestSearchStructured(MarqoTestCase):
         # Assert that no characters fail
         self.assertEqual(failed_characters, [],
                          f"Expected no characters to fail, but got: {failed_characters}")
+
+    def test_lexical_search_with_required_terms_results(self):
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "term1 term2 term3 word1 word2",
+                "text_field_2": "term3 term4 term5 word3 word4",
+                "text_field_3": "term5 term6 term7 word5 word6"
+            },
+            {
+                "_id": "2",
+                "text_field_4": "term1 term2",
+                "text_field_5": "term3 term4",
+            },
+            {
+                "_id": "3",
+                "text_field_1": "term5 term6",
+                "text_field_2": "word5",
+            },
+            {
+                "_id": "4",
+                "text_field_1": "term7 term8",
+                "text_field_2": "word7 word8",
+            }
+        ]
+
+        test_cases = [
+            # Original cases
+            ('"term1 term2"', None, ["1", "2"]),  # exact phrase match across fields
+            ('"term1" "term2"', ["text_field_1"], ["1"]),  # both in field_1
+            ('"term1" "term2" word5', None, ["1"]),  # word5 in field_3
+            ('"term5 term6 term7 word5"', None, ["1"]),  # full span across field_3
+            # All required terms in one doc across multiple fields
+            ('"term3" "term4" "term5"', None, ["1"]),  # term3/4/5 in field_2
+            # Phrase only in doc 2
+            ('"term1 term2"', ["text_field_4"], ["2"]),
+            # Field restriction excludes valid hits
+            ('"term5"', ["text_field_4"], []),  # term5 only in field_2/3
+            # Match across field_1 and field_2
+            ('"term5" "word5"', None, ["1", "3"]),  # both in 1 and 3
+            # Match only document 4
+            ('"term7" "word7"', None, ["4"]),  # both appear in doc 4
+            # Exact phrase no match
+            ('"term4 term3"', None, []),  # Wrong order — phrase not found
+            # Required tokens in non-overlapping fields
+            ('"term1" "term4"', None, ["1", "2"])  # spread across field_1 and field_5
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+            )
+        )
+
+        for query, searchable_attributes, expected_docs_ids in test_cases:
+            with self.subTest(f"{query}, {searchable_attributes}, {expected_docs_ids}"):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index,
+                    text=query,
+                    searchable_attributes=searchable_attributes,
+                    search_method=SearchMethod.LEXICAL
+                )
+                self.assertEqual(set(expected_docs_ids), {hit["_id"] for hit in res["hits"]})
