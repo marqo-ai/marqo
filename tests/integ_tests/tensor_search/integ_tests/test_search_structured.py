@@ -1319,7 +1319,10 @@ class TestSearchStructured(MarqoTestCase):
             # Exact phrase no match
             ('"term4 term3"', None, []),  # Wrong order — phrase not found
             # Required tokens in non-overlapping fields
-            ('"term1" "term4"', None, ["1", "2"])  # spread across field_1 and field_5
+            ('"term1" "term4"', None, ["1", "2"]),  # spread across field_1 and field_5
+            # Swap searchable attributes order
+            ('"term5"', ["text_field_1", "text_field_2"], ["1", "3"]),  # both in 1 and 3
+            ('"term5"', ["text_field_2", "text_field_1"], ["1", "3"]),  # both in 1 and 3
         ]
 
         self.add_documents(
