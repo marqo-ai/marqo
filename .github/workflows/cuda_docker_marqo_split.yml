@@ -44,7 +44,7 @@ permissions:
 jobs:
   Test-Marqo:
     name: Run CUDA Docker Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}/tags=['PoloRole:testing']"
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
         working-directory: tests/api_tests/v1

@@ -78,7 +78,7 @@ on:
 jobs:
   Test-Marqo:
     name: Run Locust Performance Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/tags=['PoloRole:testing']"
+    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     steps:
 
       - name: Checkout marqo repo
