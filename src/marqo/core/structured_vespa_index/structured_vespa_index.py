@@ -908,17 +908,17 @@ class StructuredVespaIndex(VespaIndex):
 
         return f'{or_terms}{and_terms}'
 
-    def _get_lexical_contains_term(self, phrase, query: MarqoQuery) -> str:
+    def _get_lexical_contains_term(self, phrase:str, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):
             searchable_attributes = query.hybrid_parameters.searchableAttributesLexical
         else:
             searchable_attributes = query.searchable_attributes
 
         if searchable_attributes is not None:
-            return ' OR '.join([
+            return "("+' OR '.join([
                 f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
                 for field in searchable_attributes
-            ])
+            ])+")"
         else:
             return f'default contains "{phrase}"'
 
