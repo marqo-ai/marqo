@@ -91,6 +91,16 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
                 ["term1", "term2"], None,
                 'default contains "term1" AND default contains "term2"',
                 "2 required terms, no fields"
+            ),
+            (
+                ["term1", "term2", "term3", "term4"], ['lexical_field_1', 'lexical_field_2', 'lexical_field_3'],
+                '(marqo__lexical_lexical_field_1 contains "term1" OR marqo__lexical_lexical_field_2 contains "term1" '
+                'OR marqo__lexical_lexical_field_3 contains "term1") AND (marqo__lexical_lexical_field_1 contains "term2" '
+                'OR marqo__lexical_lexical_field_2 contains "term2" OR marqo__lexical_lexical_field_3 contains "term2") AND '
+                '(marqo__lexical_lexical_field_1 contains "term3" OR marqo__lexical_lexical_field_2 contains "term3" OR '
+                'marqo__lexical_lexical_field_3 contains "term3") AND (marqo__lexical_lexical_field_1 contains "term4" '
+                'OR marqo__lexical_lexical_field_2 contains "term4" OR marqo__lexical_lexical_field_3 contains "term4")',
+                "4 required terms, 3 fields"
             )
         ]
         for required_phrases, searchable_attributes, expected_and_terms, msg in test_cases:

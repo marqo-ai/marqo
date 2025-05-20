@@ -287,11 +287,9 @@ class SearchTest(unittest.TestCase):
 
         call_args = self.vespa_client_mock.query.call_args[1]
         self.assertEqual(
-            call_args['marqo__yql.lexical'],
-            'select * from unstructured_test_schema where (None contains "test" OR None contains "test") AND (((marqo__short_string_fields contains sameElement(key contains "text_field_1", value contains "hadhsd"))))'
+            'select * from unstructured_test_schema where ((None contains "test" OR None contains "test")) AND (((marqo__short_string_fields contains sameElement(key contains "text_field_1", value contains "hadhsd"))))',
+            call_args['marqo__yql.lexical']
         )
-
-
 
     def test_rerank_depth_higher_than_default_ef_search_overrides_it(self):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", rerank_depth=3000)
