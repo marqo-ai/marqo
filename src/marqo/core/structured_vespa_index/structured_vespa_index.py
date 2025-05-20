@@ -918,6 +918,12 @@ class StructuredVespaIndex(VespaIndex):
         Generate required terms for the given phrases and search attributes. If search attributes are not provided,
         we use 'default' as the search attribute.
 
+        Examples:
+            if we have phrases = ["required 1", "required 2"] and search_attributes = ["field1", "field2"],
+            we should return '(field1 contains "required 1" OR field2 contains "required 1") AND
+            (field1 contains "required 2" OR field2 contains "required 2")'. The required phrases do not have to be
+            in the same field, but must be in the same document.
+
         Returns:
             str: The generated and(required) terms for the phrases and search attributes.
         """
@@ -925,17 +931,15 @@ class StructuredVespaIndex(VespaIndex):
         if search_attributes is None:
             return ' AND '.join([f'default contains "{phrase}"' for phrase in phrases])
 
-        if not isinstance(search_attributes, list):
-            raise InternalError(f'Expected list[str] of searchable attributes, but found {type(search_attributes)}')
-
-        per_field_terms = [
-            "(" + ' AND '.join([
+        # Each element in the list is a string of the form '(field1 contains "phrase" AND field2 contains "phrase")'
+        per_phrase_term_list = [
+            "(" + ' OR '.join([
                 f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
-                for phrase in phrases
-            ]) + ")" for field in search_attributes
+                for field in search_attributes
+            ]) + ")" for phrase in phrases
         ]
 
-        return ' OR '.join(per_field_terms)
+        return ' AND '.join(per_phrase_term_list)
 
     def _get_lexical_contains_term(self, phrase, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):

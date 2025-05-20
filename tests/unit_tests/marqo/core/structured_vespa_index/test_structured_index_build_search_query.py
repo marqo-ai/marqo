@@ -51,23 +51,23 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
             ),
             (
                 ["required_1", "required_2"], ['lexical_field_1'],
-                '(marqo__lexical_lexical_field_1 contains "required_1" '
-                'AND marqo__lexical_lexical_field_1 contains "required_2")',
+                '(marqo__lexical_lexical_field_1 contains "required_1") AND '
+                '(marqo__lexical_lexical_field_1 contains "required_2")',
                 "2 required terms, 1 field"
             ),
             (
                 ["required_1", "required_2"], ['lexical_field_1', 'lexical_field_2'],
                 '(marqo__lexical_lexical_field_1 contains "required_1" '
-                'AND marqo__lexical_lexical_field_1 contains "required_2") OR '
-                '(marqo__lexical_lexical_field_2 contains "required_1" '
-                'AND marqo__lexical_lexical_field_2 contains "required_2")',
+                'OR marqo__lexical_lexical_field_2 contains "required_1") AND '
+                '(marqo__lexical_lexical_field_1 contains "required_2" '
+                'OR marqo__lexical_lexical_field_2 contains "required_2")',
                 "2 required terms, 2 fields"
             ),
             (
                 ["long required phrase", "short required phrase"], ['lexical_field_1', 'lexical_field_4'],
                 '(marqo__lexical_lexical_field_1 contains "long required phrase" '
-                'AND marqo__lexical_lexical_field_1 contains "short required phrase") OR '
-                '(marqo__lexical_lexical_field_4 contains "long required phrase" AND '
+                'OR marqo__lexical_lexical_field_4 contains "long required phrase") AND '
+                '(marqo__lexical_lexical_field_1 contains "short required phrase" OR '
                 'marqo__lexical_lexical_field_4 contains "short required phrase")',
                 "2 multiple words required phrases, 2 fields"
             ),

@@ -1301,28 +1301,37 @@ class TestSearchStructured(MarqoTestCase):
         ]
 
         test_cases = [
-            # Original cases
-            ('"term1 term2"', None, ["1", "2"]),  # exact phrase match across fields
-            ('"term1" "term2"', ["text_field_1"], ["1"]),  # both in field_1
-            ('"term1" "term2" word5', None, ["1"]),  # word5 in field_3
-            ('"term5 term6 term7 word5"', None, ["1"]),  # full span across field_3
-            # All required terms in one doc across multiple fields
-            ('"term3" "term4" "term5"', None, ["1"]),  # term3/4/5 in field_2
-            # Phrase only in doc 2
-            ('"term1 term2"', ["text_field_4"], ["2"]),
-            # Field restriction excludes valid hits
-            ('"term5"', ["text_field_4"], []),  # term5 only in field_2/3
-            # Match across field_1 and field_2
-            ('"term5" "word5"', None, ["1", "3"]),  # both in 1 and 3
-            # Match only document 4
-            ('"term7" "word7"', None, ["4"]),  # both appear in doc 4
-            # Exact phrase no match
-            ('"term4 term3"', None, []),  # Wrong order — phrase not found
-            # Required tokens in non-overlapping fields
-            ('"term1" "term4"', None, ["1", "2"]),  # spread across field_1 and field_5
-            # Swap searchable attributes order
-            ('"term5"', ["text_field_1", "text_field_2"], ["1", "3"]),  # both in 1 and 3
-            ('"term5"', ["text_field_2", "text_field_1"], ["1", "3"]),  # both in 1 and 3
+            # ─── Phrase Matching ─────────────────────────────────────────────
+            ('"term1 term2"', None, ["1", "2"]),  # match phrase across fields
+            ('"term1 term2"', ["text_field_4"], ["2"]),  # phrase match restricted to field
+            ('"term7 term8"', ["text_field_1"], ["4"]),  # phrase match in single field
+            ('"term4 term3"', None, []),  # phrase order matters (should not match)
+
+            # ─── Token Matching ──────────────────────────────────────────────
+            ('"term1" "term2"', None, ["1", "2"]),  # terms in multiple fields
+            ('"term1" "term2"', ["text_field_1"], ["1"]),  # both in same field
+            ('"term1" "term4"', None, ["1", "2"]),  # terms spread across fields
+            ('"term5" "word5"', None, ["1", "3"]),  # match across or within fields
+            ('"word1" "word6"', None, ["1"]),  # span across different fields in one doc
+
+            # ─── Field Filtering ─────────────────────────────────────────────
+            ('"term5"', ["text_field_1", "text_field_2"], ["1", "3"]),
+            ('"term5"', ["text_field_4"], []),  # valid term excluded due to field filter
+            ('"term7"', ["text_field_2"], []),  # term exists but outside filtered field
+            ('"term7"', ["text_field_1"], ["4"]),  # valid in allowed field
+
+            # ─── Matching Logic ──────────────────────────────────────────────
+            ('"term5 term6 term7 word5"', None, ["1"]),  # all terms appear in one doc
+            ('"term5 term6"', ["text_field_1"], ["3"]),  # single field match
+            ('"term1 TERM2"', None, ["1", "2"]),  # mixed case — case-insensitive
+            ('"term5" "term5"', None, ["1", "3"]),  # duplicate terms
+            ('"term999"', None, []),  # nonexistent term
+            ('"the of and"', None, []),  # stopwords
+            ('', None, []),  # empty query
+
+            # ─── Control Cases ───────────────────────────────────────────────
+            ('"term1" "term2" word5', None, ["1"]),  # combo of phrase + token
+            ('"word5 term8"', None, []),  # required terms in diff docs
         ]
 
         self.add_documents(
