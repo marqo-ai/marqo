@@ -1,3 +1,4 @@
+from magic import Magic
 from unittest.mock import MagicMock
 
 from marqo.core.exceptions import AddDocumentsError
@@ -10,6 +11,7 @@ from marqo.vespa.vespa_client import VespaClient
 from unit_tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.models.marqo_query import MarqoLexicalQuery
 
 
 
@@ -38,6 +40,20 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
                 ],
                 tensor_fields=[]
             )
+        )
+
+    def _help_create_test_lexical_query_object(self, or_phrases: List[str], and_phrases: List[str],
+                                               searchable_attributes: List[str] = None) -> MarqoLexicalQuery:
+        """
+        Helper function to create a MarqoLexicalQuery object with the given parameters.
+        """
+        return MarqoLexicalQuery(
+            index_name='index1',
+            limit=10,
+            offset=0,
+            searchable_attributes=searchable_attributes,
+            or_phrases=or_phrases,
+            and_phrases=and_phrases
         )
 
     def test_generate_and_terms_for_lexical_search(self):
@@ -79,8 +95,12 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
         ]
         for required_phrases, searchable_attributes, expected_and_terms, msg in test_cases:
             with self.subTest(f"{msg}"):
-                generated_and_terms = self.structured_vespa_index._get_and_terms_for_required_phrase(
-                    required_phrases,
-                    searchable_attributes
+                test_marqo_query = self._help_create_test_lexical_query_object(
+                    or_phrases=[],
+                    and_phrases=required_phrases,
+                    searchable_attributes=searchable_attributes
+                )
+                generated_and_terms = self.structured_vespa_index._get_lexical_search_term(
+                    test_marqo_query
                 )
                 self.assertEqual(generated_and_terms, expected_and_terms)
