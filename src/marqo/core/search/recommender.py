@@ -156,7 +156,7 @@ class Recommender:
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
         if interpolation_method is None:
-            interpolation_method = self._get_default_interpolation_method(marqo_index)
+            interpolation_method = self.get_default_interpolation_method(marqo_index)
 
         vector_interpolation = from_interpolation_method(interpolation_method)
 
@@ -213,7 +213,7 @@ class Recommender:
 
         if exclude_input_documents:
             # Make sure to include zero-weight documents in this filter
-            recommend_filter = self._get_exclusion_filter(marqo_index, all_document_ids, filter)
+            recommend_filter = self.get_exclusion_filter(marqo_index, all_document_ids, filter)
         else:
             recommend_filter = filter
 
@@ -239,13 +239,13 @@ class Recommender:
 
         return results
 
-    def _get_default_interpolation_method(self, marqo_index: MarqoIndex) -> InterpolationMethod:
+    def get_default_interpolation_method(self, marqo_index: MarqoIndex) -> InterpolationMethod:
         if marqo_index.normalize_embeddings:
             return InterpolationMethod.SLERP
         else:
             return InterpolationMethod.LERP
 
-    def _get_exclusion_filter(self, marqo_index: MarqoIndex, documents: List[str], user_filter: Optional[str]) -> str:
+    def get_exclusion_filter(self, marqo_index: MarqoIndex, documents: List[str], user_filter: Optional[str]) -> str:
         if marqo_index.type == IndexType.Structured:
             not_in = 'NOT _id IN (' + ', '.join([f'{doc}' for doc in documents]) + ')'
         else:

@@ -1336,37 +1336,143 @@ class TestSearch(MarqoTestCase):
                         tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                
-                # Create search context with only documents
-                search_context = SearchContext(
-                    documents=SearchContextDocuments(
-                        ids={"doc1": 3.0, "doc3": 5.0},
-                        parameters=SearchContextDocumentsParameters(
-                            tensorFields=["text_field_1"],
-                            excludeInputDocuments=False
+
+                with self.subTest(exclude_input_documents=False):
+                    # Create search context with only documents
+                    search_context = SearchContext(
+                        documents=SearchContextDocuments(
+                            ids={"doc1": 3.0, "doc3": 5.0, "doc5": -5.0},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                excludeInputDocuments=False
+                            )
                         )
                     )
+
+                    # Perform search with only context documents
+                    results = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=search_context,
+                        result_count=5
+                    )
+
+                    # Verify search results
+                    self.assertIn("hits", results)
+                    self.assertGreaterEqual(len(results["hits"]), 5)
+
+                    # The input documents should be the first results if excludeInputDocuments is False
+                    result_ids = [hit["_id"] for hit in results["hits"]]
+
+                    # Verify that the first hit is doc1, then doc3
+                    self.assertEqual(result_ids[0], "doc3")
+                    self.assertEqual(result_ids[1], "doc1")
+
+                    # doc5 should fall out of the top 5 results
+                    self.assertNotIn("doc5", result_ids)
+
+                with self.subTest(exclude_input_documents=True):
+                    # Create search context with only documents
+                    search_context = SearchContext(
+                        documents=SearchContextDocuments(
+                            ids={"doc1": 3.0, "doc3": 5.0, "doc5": -5.0},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                excludeInputDocuments=True
+                            )
+                        )
+                    )
+
+                    # Perform search with only context documents
+                    results = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=search_context,
+                        result_count=5
+                    )
+
+                    # Verify search results
+                    self.assertIn("hits", results)
+                    self.assertGreaterEqual(len(results["hits"]), 4)
+
+                    # The input documents should not be in the results if excludeInputDocuments is True
+                    result_ids = [hit["_id"] for hit in results["hits"]]
+
+                    # Verify that doc1 and doc3 are not in the results
+                    self.assertNotIn("doc1", result_ids)
+                    self.assertNotIn("doc3", result_ids)
+
+
+    def test_search_with_context_documents_tensors_and_queries(self):
+        """Test that search works correctly when context documents, tensors, and queries are provided.
+        Use relevant data and sample searches
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents to the index
+                docs = [
+                    {"_id": "doc1", "text_field_1": "red shirt with collar unisex"},
+                    {"_id": "doc2", "text_field_1": "black long pants for men"},
+                    {"_id": "doc3", "text_field_1": "black shorts unisex"},
+                    {"_id": "doc4", "text_field_1": "black shirt for men"},
+                    {"_id": "doc5", "text_field_1": "grey pants for women"},
+                    {"_id": "doc6", "text_field_1": "green hat unisex"},
+                ]
+
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
                 )
-                
-                # Perform search with only context documents
-                results = tensor_search.search(
+
+                # Basic search (query)
+                basic_results = tensor_search.search(
                     config=self.config,
                     index_name=index.name,
-                    text=None,
-                    context=search_context,
-                    result_count=5
+                    text={"shirt": 1, "black": -0.5},
+                    result_count=6
                 )
-                
+
+                # Verify the 2 shirt documents are the top 2
+                self.assertIn("hits", basic_results)
+                result_ids = [hit["_id"] for hit in basic_results["hits"]]
+                self.assertEqual(result_ids[0], "doc1")
+                self.assertEqual(result_ids[1], "doc4")
+                # Last 2 docs have "black", thus pushing them to the bottom (negative weighted query)
+                self.assertEqual(result_ids[-2], "doc2")
+                self.assertEqual(result_ids[-1], "doc3")
+
+                # Use context documents to put doc1 at the bottom, bring doc6 to the top
+                results_with_context_docs = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text={"shirt": 1, "black": -0.5},
+                    context=SearchContext(
+                        documents=SearchContextDocuments(
+                            ids={"doc1": -10.0, "doc6": 3.0},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                excludeInputDocuments=False
+                            )
+                        )
+                    ),
+                    result_count=6
+                )
+
                 # Verify search results
-                self.assertIn("hits", results)
-                self.assertGreaterEqual(len(results["hits"]), 5)
-                
-                # The input documents should be the first results if excludeInputDocuments is False
-                result_ids = [hit["_id"] for hit in results["hits"]]
-                
-                # Verify that the first hit is doc1, then doc3
-                self.assertEqual(result_ids[0], "doc3")
-                self.assertEqual(result_ids[1], "doc1")
+                self.assertIn("hits", results_with_context_docs)
+                result_ids = [hit["_id"] for hit in results_with_context_docs["hits"]]
+                self.assertEqual(result_ids[0], "doc6")
+                self.assertEqual(result_ids[1], "doc4")
+                # doc1 should be at the bottom
+                self.assertEqual(result_ids[-1], "doc1")
+
+                pass
 
 
 # Set up text strategy to prioritize " and \\

@@ -65,7 +65,7 @@ class SearchContextTensor(BaseModel):
 
 class SearchContextDocumentsParameters(BaseModel):
     tensorFields: List[str]
-    excludeInputDocuments: bool
+    excludeInputDocuments: bool = True
 
 class SearchContextDocuments(BaseModel):
     ids: Dict[str, Union[int, float]]   # TODO: Check if the types are correct

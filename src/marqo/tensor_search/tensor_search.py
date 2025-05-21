@@ -431,6 +431,11 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         if approximate is None:
             approximate = True
 
+        # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
+        if context is not None and context.documents is not None:
+            if context.documents.parameters.excludeInputDocuments:
+                filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.keys()), filter)
+
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
@@ -894,11 +899,14 @@ def get_query_vectors_from_jobs(
 
                 # Determine default interpolation method using normalize embeddings if documents provided
                 if interpolation_method is None:
-                    interpolation_method = config.recommender._get_default_interpolation_method(q.index)
+                    interpolation_method = config.recommender.get_default_interpolation_method(q.index)
             else:
-                # If no documents, default interpolation method ALWAYS LERP (to preserve existing behavior)
+                # If no documents, default interpolation method ALWAYS NLERP or LERP (to preserve existing behavior)
                 if interpolation_method is None:
-                    interpolation_method = InterpolationMethod.LERP
+                    if q.index.normalize_embeddings:
+                        interpolation_method = InterpolationMethod.NLERP
+                    else:
+                        interpolation_method = InterpolationMethod.LERP
 
             # Make sure all vectors are the same size
             for vector in collected_vectors:
@@ -916,14 +924,8 @@ def get_query_vectors_from_jobs(
                 weights=collected_weights
             )
 
-            # NOTE: this is redundant if interpolation method is NLERP
-            if q.index.normalize_embeddings:
-                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-                if norm > 0:
-                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
 
-            # TODO: We need to return exclusion filter to run during search
         elif isinstance(q.q, str):
             # TODO: Figure out how to handle this
             # TODO: Does this mean context vectors do NOT do anything when q is a string?
@@ -1041,9 +1043,10 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # 3. For each query, get associated vectors
     # Combination of context tensors & documents is also done here
-    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
-    )
+    with RequestMetricsStore.for_request().time(f"search.vector.inference.get_and_combine_vectors"):
+        qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
+            prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+        )
     return qidx_to_vectors
 
 
@@ -1126,7 +1129,7 @@ def _vector_text_search(
         index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
-    with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
+    with RequestMetricsStore.for_request().time(f"search.vector.inference.full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
