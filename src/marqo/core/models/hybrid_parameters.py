@@ -20,23 +20,11 @@ class RankingMethod(str, Enum):
     Lexical = 'lexical'
 
 
-class RelevanceCutoffParameters(StrictBaseModel):
-    minResults: Optional[int] = None
-    dummyParameter: Optional[float] = 0
-
-class TensorSearchRelevanceCutoff(MarqoBaseModel):
-    method: str
-    parameters: RelevanceCutoffParameters
-
-
-class LexicalSearchRelevanceCutoff(MarqoBaseModel):
-    method: str
-    parameters: RelevanceCutoffParameters
-
-
 class RelevanceCutoff(MarqoBaseModel):
-    tensorSearch: Optional[TensorSearchRelevanceCutoff] = None
-    lexicalSearch: Optional[LexicalSearchRelevanceCutoff] = None
+    method: str
+    minResults: int = -1
+    dummyParameter: float = -1
+    probeDepth: int = 1000
 
 
 class HybridParameters(StrictBaseModel):
