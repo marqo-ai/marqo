@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
-    runs-on: "runs-on=${{ github.run_id }}/runner=marqo-gpu-runner/part=${{ matrix.part }}"
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}/part=${{ matrix.part }}"
     
     timeout-minutes: 60
 
