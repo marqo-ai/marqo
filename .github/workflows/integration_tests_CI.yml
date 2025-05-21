@@ -73,53 +73,15 @@ jobs:
             echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
           fi
 
-  Start-Runner1:
-    needs:
-      - Determine-Vespa-Setup
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
-    secrets: inherit
-
-  Start-Runner2:
-    needs:
-      - Determine-Vespa-Setup
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
-    secrets: inherit
-
-  Create-Matrix:
-    needs:
-      - Start-Runner1
-      - Start-Runner2
-    if: ${{ always() }} # Ensure the matrix is created even if one of the runners fails to start
-    runs-on: ubuntu-latest
-    outputs:
-      labels: ${{ steps.create-matrix.outputs.labels }}
-      ec2-instance-ids: ${{ steps.create-matrix.outputs.ec2-instance-ids }}
-    steps:
-      - name: Create matrix
-        id: create-matrix
-        run: |
-          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}"]'
-          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}"]'
-
-          echo "labels=$LABELS" >> $GITHUB_OUTPUT
-          echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
-
   Test-Marqo:
     name: Run Integration Tests (Part ${{ matrix.part }}/1)
     needs:
-      - Create-Matrix # Ensures it starts only after the runners are ready
       - Determine-Vespa-Setup
     strategy:
       fail-fast: false
       matrix:
         part: [ 0, 1 ] # Zero-based index for JSON list access
-    runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     
     timeout-minutes: 60
     env:
@@ -156,8 +118,8 @@ jobs:
 
       - name: Build Vespa
         run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
+          sudo systemctl stop unattended-upgrades
+          sudo apt-get remove -y unattended-upgrades
 
           # Function to wait for the dpkg lock to be released
           function wait_for_dpkg_lock() {
@@ -171,7 +133,7 @@ jobs:
           wait_for_dpkg_lock
 
           echo "Updating package list"
-          apt-get update -y
+          sudo apt-get update -y
 
           # Build Vespa components
           echo "Installing jdk 17"
@@ -251,17 +213,3 @@ jobs:
           name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           include-hidden-files: true
-
-  Stop-Runner:
-    needs:
-      - Create-Matrix # Ensures it starts only after the runners are ready
-      - Test-Marqo # required to wait when the main job is done
-    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
-    strategy:
-      matrix:
-        instance: [0, 1] # Zero-based index for JSON list access
-    uses: ./.github/workflows/stop_ec2_runner.yml
-    with:
-      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
-      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
-    secrets: inherit
