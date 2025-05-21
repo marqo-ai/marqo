@@ -34,6 +34,7 @@ runners:
     tags:
       - PoloRole: "testing"
     image: marqo-cpu-image
+    spot: false
 
   marqo-perf-tests-runner:
     family: ["t3.xlarge"]

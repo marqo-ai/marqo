@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   Test-Marqo:
-    name: Run ARM64 Docker Maqo API Tests
+    name: Run ARM64 Docker Marqo API Tests
     runs-on: "runs-on=${{ github.run_id }}/runner=marqo-cpu-arm-runner"
     defaults:
       run:
