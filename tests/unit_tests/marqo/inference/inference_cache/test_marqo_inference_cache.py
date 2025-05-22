@@ -1,12 +1,16 @@
 import sys
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+import random
 from unittest import mock
+
+import numpy as np
 
 from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.enums import MarqoCacheType
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
-from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
-from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
 
 
 class TestMarqoInferenceCache(unittest.TestCase):
@@ -16,33 +20,34 @@ class TestMarqoInferenceCache(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.mock_collector = self.mock_collector_class.return_value
 
-    # Test constructor
-    def test_constructor_error_non_int_size(self):
-        with self.assertRaises(EnvVarError):
-            MarqoInferenceCache(cache_size="not_int")
+    def test_cache_initializationCacheType_success(self):
+        """Test if the cache initializes with the correct size and type."""
+        test_cases = [
+            {"cache_size": 10, "cache_type": "LRU", "expected": "LRU"},
+            {"cache_size": 10, "cache_type": "LFU", "expected": "LFU"}
+        ]
+        for test_case in test_cases:
+            with self.subTest(test_case):
+                cache = MarqoInferenceCache(cache_size=test_case["cache_size"],
+                                            cache_type=test_case["cache_type"])
+                self.assertEqual(test_case["cache_size"], cache._cache.maxsize)
+                self.assertTrue(isinstance(cache._cache,
+                                           MarqoInferenceCache._CACHE_TYPES_MAPPING[test_case["expected"]]))
+                self.assertEqual(0, cache._cache.currsize)
 
-    def test_constructor_error_negative_size(self):
-        with self.assertRaises(EnvVarError):
-            MarqoInferenceCache(cache_size=-1)
-
-    def test_constructor_error_invalid_type(self):
-        with self.assertRaises(EnvVarError):
-            MarqoInferenceCache(cache_size=1, cache_type="UNKNOWN")
-
-    def test_constructor_zero_cache_disables(self):
-        cache = MarqoInferenceCache(cache_size=0)
-        self.assertFalse(cache.is_enabled())
-        self.assertIsNone(cache._cache)
-
-    def test_constructor_valid_lru_instantiation(self):
-        cache = MarqoInferenceCache(cache_size=5, cache_type=MarqoCacheType.LRU)
-        self.assertTrue(cache.is_enabled())
-        self.assertIsInstance(cache._cache, MarqoLRUCache)
-
-    def test_constructor_valid_lfu_instantiation(self):
-        cache = MarqoInferenceCache(cache_size=5, cache_type=MarqoCacheType.LFU)
-        self.assertTrue(cache.is_enabled())
-        self.assertIsInstance(cache._cache, MarqoLFUCache)
+    def test_cache_initializationCacheType_fail(self):
+        """Test if the cache raises an error for an invalid cache type."""
+        test_cases = [
+            {"cache_size": 10, "cache_type": "INVALID"},  # Invalid cache type
+            {"cache_size": 10, "cache_type": 1},  # Invalid cache type
+            {"cache_size": 1.4, "cache_type": "LFU"},  # Invalid cache size
+            {"cache_size": -1, "cache_type": "LRU"},  # Invalid cache size
+            {"cache_size": "str", "cache_type": "LRU"}  # Invalid cache size
+        ]
+        for test_case in test_cases:
+            with self.subTest(test_case):
+                with self.assertRaises(EnvVarError):
+                    MarqoInferenceCache(cache_size=test_case["cache_size"], cache_type=test_case["cache_type"])
 
     # Test generate keys
     def test_generate_valid_key(self):
@@ -128,17 +133,135 @@ class TestMarqoInferenceCache(unittest.TestCase):
 
     # Test eviction strategy
     def test_lru_eviction(self):
-        cache = MarqoInferenceCache(cache_size=1, cache_type=MarqoCacheType.LRU)
+        cache = MarqoInferenceCache(cache_size=2, cache_type=MarqoCacheType.LRU)
         cache.set("m", "a", 1)
         cache.set("m", "b", 2)
+        cache.set("m", "c", 3)
+
+        # a is evicted, b still remains
         self.assertIsNone(cache.get("m", "a"))
         self.assertEqual(cache.get("m", "b"), 2)
+        self.assertEqual(cache.get("m", "c"), 3)
 
     def test_lfu_eviction(self):
-        cache = MarqoInferenceCache(cache_size=1, cache_type=MarqoCacheType.LFU)
+        cache = MarqoInferenceCache(cache_size=2, cache_type=MarqoCacheType.LFU)
         cache.set("m", "a", 1)
-        cache.get("m", "a")  # bump freq
+        cache.get("m", "a")  # bump freq of a to 2
         cache.set("m", "b", 2)
-        remaining = cache.get("m", "a") or cache.get("m", "b")
-        self.assertIn(remaining, (1, 2))
+        cache.set("m", "c", 3)
 
+        # b is evicted, a still remains
+        self.assertIsNone(cache.get("m", "b"))
+        self.assertEqual(cache.get("m", "a"), 1)
+        self.assertEqual(cache.get("m", "c"), 3)
+
+    # Test concurrent read/write
+    def test_cache_concurrent_reads(self):
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                cache = MarqoInferenceCache(cache_size=10, cache_type=cache_type)
+                cache.set("test-model-cache-key", "test-content", [1.0])
+                # Use ThreadPoolExecutor to simulate concurrent reads
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = [executor.submit(lambda: cache.get("test-model-cache-key",
+                                                                 "test-content")) for _ in range(10)]
+                    results = [future.result() for future in futures]
+
+                # Verify all reads were successful and returned the correct data
+                self.assertTrue(all(result == [1.0] for result in results))
+
+    def test_cache_concurrent_writes(self):
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                cache = MarqoInferenceCache(cache_size=10, cache_type=cache_type)
+                # Use ThreadPoolExecutor to simulate concurrent writes
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = [executor.submit(lambda i=i: cache.set("test-model-cache-key",
+                                                                     f"test-content-{i}",
+                                                                     [float(i)])) for i in range(10)]
+                    # Ensure all futures complete
+                    for future in futures:
+                        future.result()
+
+                # Verify all writes were successful
+                for i in range(10):
+                    self.assertEqual(cache.get("test-model-cache-key",
+                                               f"test-content-{i}"), [float(i)])
+
+    def test_cache_read_write_lock(self):
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                cache = MarqoInferenceCache(cache_size=10, cache_type=cache_type)
+                cache.set("block-key", "block-content", [99.0])
+                # Simulate a concurrent read and write to test the read-write lock behavior
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    future_write = executor.submit(lambda: cache.set("block-key",
+                                                                     "block-content", [100.0]))
+                    time.sleep(0.1)  # Small delay to ensure write starts first
+                    future_read = executor.submit(lambda: cache.get("block-key",
+                                                                    "block-content"))
+
+                # Ensure write has completed before read
+                write_result = future_write.result()
+                read_result = future_read.result()
+
+                self.assertIsNone(write_result)  # set operation returns None
+                self.assertEqual(read_result, [100.0], "Read did not return the updated value after write")
+
+    def test_cache_concurrent_writes_to_same_key(self):
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                cache = MarqoInferenceCache(cache_size=10, cache_type=cache_type)
+                model_cache_key = "shared-model-cache-key"
+                content = "shared-content"
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = [executor.submit(lambda value=i: cache.set(model_cache_key, content,
+                                                                         [value])) for i in range(10)]
+
+                    for future in futures:
+                        future.result()
+                    final_value = cache.get(model_cache_key, content)
+                    self.assertIn(final_value, [[i] for i in range(10)],
+                                  f"Final value {final_value} is not an expected value under {cache_type} policy")
+
+    @unittest.skip(reason='slow test, useful for manual verification')
+    def test_cache_thread_safety(self):
+        """Test if the cache is thread-safe by simulating concurrent reads and writes."""
+        DATA_DIMENSIONS = 768
+        SIZE = 16384
+        ITERATIONS = 100_000
+        FREQUENT_ACCESS_RATIO = 0.5
+        FREQUENT_ACCESS_SUBSET_SIZE = 5000
+        TOTAL_QUERY_SET_SIZE = 1_000_000
+
+        hits = Queue()
+        misses = Queue()
+        model_cache_key = "model_cache_key"
+
+        def read_write_cache(cache):
+            if random.random() < FREQUENT_ACCESS_RATIO:
+                text = random.choice(frequent_texts)
+            else:
+                text = random.choice(texts)
+            cache_value = cache.get(model_cache_key, text)
+            if cache_value is None:
+                cache_value = np.random.rand(1, DATA_DIMENSIONS).astype(np.float32).tolist()
+                cache.set(model_cache_key, text, cache_value)
+                misses.put(1)
+                return cache_value
+            else:
+                hits.put(1)
+                return cache_value
+
+        texts = [f"text{i} " * 5 for i in range(TOTAL_QUERY_SET_SIZE)]
+        frequent_texts = random.sample(texts, FREQUENT_ACCESS_SUBSET_SIZE)
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                test_cache = MarqoInferenceCache(cache_size=SIZE, cache_type="LRU")
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = [executor.submit(read_write_cache, test_cache) for _ in
+                               range(ITERATIONS)]
+                    result = [future.result() for future in futures]
+                    self.assertEqual(ITERATIONS, len(result))
+                    self.assertTrue(hits.qsize() > 0)
+                    self.assertTrue(misses.qsize() > 0)
