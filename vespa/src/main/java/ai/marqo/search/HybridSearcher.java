@@ -271,12 +271,12 @@ public class HybridSearcher extends Searcher {
 
         int i = 0;
         for (Hit hit : hitList) {
-            hit.setRelevance(1.0 / (i + 1.0));  // enforce ordering
+            hit.setRelevance(1.0 / (i + 1.0)); // enforce ordering
             i++;
         }
         HitGroup sortedHits = new HitGroup();
         sortedHits.addAll(hitList);
-        sortedHits.trim(offset, offset + limit);
+        sortedHits.trim(offset, limit);
         return new Result(query, sortedHits);
     }
 
