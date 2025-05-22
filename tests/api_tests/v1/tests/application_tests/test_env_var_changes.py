@@ -94,7 +94,6 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
             env_vars=[
-                "-e", f"MARQO_EF_CONSTRUCTION_MAX_VALUE={max_ef}",
                 "-e", f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
                 "-e", f"MARQO_LOG_LEVEL=debug",
                 "-e", f"MARQO_INFERENCE_CACHE_SIZE=10"
