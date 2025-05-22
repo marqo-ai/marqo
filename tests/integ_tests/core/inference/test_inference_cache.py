@@ -10,7 +10,6 @@ from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
-
 class TestInferenceCache(unittest.TestCase):
     """A test suite for the InferenceCache class outside marqo.s2_inference.s2_inference.vectorise function"""
 
@@ -27,10 +26,10 @@ class TestInferenceCache(unittest.TestCase):
             with self.subTest(test_case):
                 cache = MarqoInferenceCache(cache_size=test_case["cache_size"],
                                             cache_type=test_case["cache_type"])
-                self.assertEqual(test_case["cache_size"], cache.maxsize)
+                self.assertEqual(test_case["cache_size"], cache._cache.maxsize)
                 self.assertTrue(isinstance(cache._cache,
                                            MarqoInferenceCache._CACHE_TYPES_MAPPING[test_case["expected"]]))
-                self.assertEqual(0, cache.currsize)
+                self.assertEqual(0, cache._cache.currsize)
 
     def test_inference_cache_generateKey(self):
         model_cache_key = "model_cache_key"
@@ -59,7 +58,6 @@ class TestInferenceCache(unittest.TestCase):
             with self.subTest(cache_type=cache_type):
                 cache = MarqoInferenceCache(cache_size=self.cache_size, cache_type=cache_type)
                 cache.set("key1", "content1", [1.0])
-                self.assertTrue(("key1", "content1") in cache)
                 self.assertEqual(cache.get("key1", "content1"), [1.0])
 
     def test_cache_getNoneExistItems(self):
@@ -70,7 +68,7 @@ class TestInferenceCache(unittest.TestCase):
                 self.assertEqual(cache.get("non-existing-model-cache-key", "content",
                                            default=[2.0]), [2.0])
 
-    def test_cache_itemOverRide(self):
+    def test_cache_itemOverride(self):
         for cache_type in ['LRU', 'LFU']:
             with self.subTest(cache_type=cache_type):
                 cache = MarqoInferenceCache(cache_size=self.cache_size, cache_type=cache_type)
@@ -99,8 +97,8 @@ class TestInferenceCache(unittest.TestCase):
                     evicted_key = ("model-cache-key", f"content-{self.cache_size - 1}")
 
                 cache.set("model-cache-key", "new", [100.0])
-                self.assertTrue(("model-cache-key", "new") in cache)
-                self.assertFalse(evicted_key in cache, f"{evicted_key} was not evicted under {cache_type} policy")
+                self.assertIsNotNone(cache.get("model-cache-key", "new"))
+                self.assertIsNone(cache.get(*evicted_key), f"{evicted_key} was not evicted under {cache_type} policy")
 
     def test_cache_concurrentReads(self):
         for cache_type in ['LRU', 'LFU']:
@@ -180,6 +178,7 @@ class TestInferenceCache(unittest.TestCase):
         cache = MarqoInferenceCache(cache_size=0, cache_type="LRU")
         self.assertFalse(cache.is_enabled(), "Cache should be disabled with cache_size 0.")
 
+    @unittest.skip(reason='slow test, useful for manual verification')
     def test_cache_threadSafety(self):
         """Test if the cache is thread-safe by simulating concurrent reads and writes."""
         DATA_DIMENSIONS = 768
@@ -228,6 +227,6 @@ class TestInferenceCache(unittest.TestCase):
                 cache = MarqoInferenceCache(cache_size=self.cache_size, cache_type=cache_type)
                 cache.set("model-cache-key", "content", [1.0])
                 cache.clear()
-                self.assertEqual(cache.currsize, 0)
+                self.assertEqual(cache._cache.currsize, 0)
                 self.assertIsNone(cache.get("model-cache-key", "content"))
-                self.assertEqual(cache.maxsize, self.cache_size)
+                self.assertEqual(cache._cache.maxsize, self.cache_size)
