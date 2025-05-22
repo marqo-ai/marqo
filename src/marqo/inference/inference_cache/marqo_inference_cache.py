@@ -30,7 +30,7 @@ class MarqoInferenceCache:
                  value_size_lambda: Callable[[T], int] = lambda v: sys.getsizeof(v)):
 
         self._cache = self._build_cache(cache_size, cache_type)
-        logger.info(f'Built inference cache with type {cache_type} and size {cache_size}')
+
         self._value_size_lambda = value_size_lambda
 
         if self.is_enabled():
@@ -56,12 +56,15 @@ class MarqoInferenceCache:
             raise EnvVarError(f"Invalid cache size: {cache_size}. "
                               f"Must be a non-negative integer. ")
         elif cache_size == 0:
+            logger.debug(f'Skip building inference cache since cache size is 0')
             return None
 
         if cache_type not in self._CACHE_TYPES_MAPPING:
             raise EnvVarError(f"Invalid cache type: {cache_type}. "
                               f"Must be one of {self._CACHE_TYPES_MAPPING.keys()}.")
-        return self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
+        cache = self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
+        logger.info(f'Built inference cache with type {cache_type} and size {cache_size}')
+        return cache
 
     def get(self, model_cache_key: str, content: str, default=None) -> Optional[T]:
         if not self.is_enabled():

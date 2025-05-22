@@ -1,10 +1,11 @@
+import hashlib
 from typing import Tuple, List
 
 import numpy as np
 import orjson
-import hashlib
 
-from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, InferenceError, Modality
+from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality, \
+    InferenceErrorModel
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
@@ -36,7 +37,7 @@ class CachingInference(Inference):
         inference_result = self.delegate.vectorise(new_request)
 
         for r in inference_result.result:
-            if not isinstance(r, InferenceError):
+            if not isinstance(r, InferenceErrorModel):
                 if len(r) > 1:
                     raise RuntimeError(f"Inference cache does not support chunking but got {len(r)} chunks. "
                                        f"Preprocessing config: "
@@ -73,5 +74,3 @@ class CachingInference(Inference):
             or request.modality != Modality.TEXT  # we only support text modality for now
             or request.preprocessing_config.should_chunk  # we do not support caching chunks
         )
-
-
