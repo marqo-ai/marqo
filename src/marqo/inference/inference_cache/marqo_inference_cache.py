@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Optional, Union, TypeVar, Callable
+from typing import Optional, Union, TypeVar
 
 from marqo import logging
 from marqo.api.exceptions import EnvVarError
@@ -8,7 +8,7 @@ from marqo.inference.inference_cache.abstract_cache import MarqoAbstractCache
 from marqo.inference.inference_cache.enums import MarqoCacheType
 from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
 from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
-from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector
+from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector, CacheStatsCollector
 
 T = TypeVar("T")
 logger = logging.get_logger(__name__)
@@ -26,15 +26,12 @@ class MarqoInferenceCache:
         MarqoCacheType.LFU: MarqoLFUCache,
     }
 
-    def __init__(self, cache_size: int = 0, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU,
-                 value_size_lambda: Callable[[T], int] = lambda v: sys.getsizeof(v)):
+    def __init__(self, cache_size: int = 0, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
 
         self._cache = self._build_cache(cache_size, cache_type)
 
-        self._value_size_lambda = value_size_lambda
-
         if self.is_enabled():
-            self._stats = OTELCacheStatsCollector(
+            self._stats: CacheStatsCollector = OTELCacheStatsCollector(
                 curr_size_fn=lambda: self._cache.currsize,
                 max_size_fn=lambda: self._cache.maxsize
             )
@@ -78,10 +75,10 @@ class MarqoInferenceCache:
         elapsed = time.perf_counter() - now
 
         if value is None:
-            self._stats.record_get(True, elapsed)
+            self._stats.record_get(False, elapsed)
             return default
         else:
-            self._stats.record_get(False, elapsed)
+            self._stats.record_get(True, elapsed)
             return value
 
     def set(self, model_cache_key: str, content: str, value: T) -> None:
@@ -94,8 +91,8 @@ class MarqoInferenceCache:
         self._cache[key] = value
         elapsed = time.perf_counter() - now
 
-        item_size = self._value_size_lambda(value) + sys.getsizeof(key)
-        self._stats.record_insert(item_size, elapsed)
+        item_size = sys.getsizeof(value) + sys.getsizeof(key)
+        self._stats.record_set(item_size, elapsed)
 
     def _generate_key(self, model_cache_key: str, content: str) -> str:
         if not isinstance(model_cache_key, str):

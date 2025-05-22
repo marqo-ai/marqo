@@ -14,8 +14,8 @@ class CacheStatsCollector(ABC):
         ...
 
     @abstractmethod
-    def record_insert(self, size_bytes, duration: float) -> None:
-        """Called when an item is inserted; `size_bytes` is optional."""
+    def record_set(self, size_bytes: int, duration: float) -> None:
+        """Called when an item is set"""
         ...
 
 
@@ -50,6 +50,6 @@ class OTELCacheStatsCollector(CacheStatsCollector):
 
         self.get_histogram.record(duration * 1_000_000)  # in microseconds
 
-    def record_insert(self, size_bytes, duration: float) -> None:
+    def record_set(self, size_bytes: int, duration: float) -> None:
         self.item_size_counter.add(size_bytes)
         self.insert_histogram.record(duration * 1_000_000)  # in microseconds
