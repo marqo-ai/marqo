@@ -1,7 +1,6 @@
 import importlib
 import os
 import sys
-import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -17,6 +16,7 @@ from integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -235,10 +235,18 @@ class TestApiCustomEnvVars(MarqoTestCase):
         cls.unstructured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
+        cls.add_documents(cls.config, AddDocsParams(
+            index_name=cls.unstructured_index.name,
+            docs=[{'field1': 'hello', 'field2': 'world'}],
+            tensor_fields=['field1'],
+        ))
+
     def test_search_timeout_short_timer_fails(self):
         # Set up the test API client with the correct env vars set
-        with mock.patch.dict(os.environ, {"VESPA_SEARCH_TIMEOUT_MS": "1"}):
+        with mock.patch.dict(os.environ, {
+            "VESPA_SEARCH_TIMEOUT_MS": "1",
+            "MARQO_MODE": "COMBINED"
+        }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
             # VespaClient will be created with default timeout of 1ms
             self.client = TestClient(api.app)
@@ -256,21 +264,16 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.json()["type"], "invalid_request")
 
             with self.subTest(search_method="HYBRID"):
-                for index in [self.structured_index]:   # TODO: add unstructured when supported
+                for index in [self.unstructured_index, self.structured_index]:
                     with self.subTest(index=index.name):
                         res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
                             "q": "irrelevant",
                             "searchMethod": "HYBRID"
                         })
                         # The search request must timeout, since the timeout is set to 1ms
-                        try:
-                            self.assertEqual(res.status_code, 504)
-                            self.assertEqual(res.json()["code"], "vector_store_timeout")
-                            self.assertEqual(res.json()["type"], "invalid_request")
-                        except AssertionError as e:
-                            # Allowing scenario where hybrid searcher returns 500
-                            # TODO: Remove this when hybrid searcher gives correct error code
-                            self.assertEqual(res.status_code, 500)
+                        self.assertEqual(res.status_code, 504)
+                        self.assertEqual(res.json()["code"], "vector_store_timeout")
+                        self.assertEqual(res.json()["type"], "invalid_request")
 
 
 class TestApiErrors(MarqoTestCase):
@@ -300,7 +303,10 @@ class TestApiErrors(MarqoTestCase):
         cls.structured_index = cls.indexes[1]
 
     def setUp(self):
-        self.client = TestClient(api.app)
+        with mock.patch.dict(os.environ, {"MARQO_MODE": "COMBINED"}):
+            # reload the api module to recreated config in combined mode
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+            self.client = TestClient(api.app)
 
     def test_index_not_found_error(self):
         index_name = self.random_index_name()
@@ -324,7 +330,6 @@ class TestApiErrors(MarqoTestCase):
         assert "already exists" in response.json()["message"] and self.structured_index.name in response.json()[
             "message"]
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_invalid_field_name(self):
         # use attributesToRetrieve on a non-existent field
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
@@ -351,7 +356,6 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["errors"], True)
         self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_filter_string_parsing_error(self):
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
