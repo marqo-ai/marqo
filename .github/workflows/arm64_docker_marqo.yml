@@ -45,9 +45,9 @@ jobs:
 
       - name: Set up Python 3.9
         run: |
-          apt-get -y update
-          apt-get -y install python3.9
-          apt-get -y install pip
+          sudo apt-get -y update
+          sudo apt-get -y install python3.9
+          sudo apt-get -y install pip
 
       - name: Install Dependencies
         run: pip install -r requirements.txt
