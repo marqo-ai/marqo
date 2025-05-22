@@ -5,10 +5,13 @@
 # Like that: runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
 images:
   marqo-cpu-image:
-    ami: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+    ami: "ami-0b4a181b6b24152d5"
 
   marqo-gpu-image:
-    ami: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+    ami: "ami-0be479c8e2b8dcc93"
+
+  marqo-cpu-arm-image:
+    ami: "ami-0a449659aae944a9d"
 
 runners:
   marqo-cpu-runner:
@@ -33,7 +36,8 @@ runners:
     family: ["r7g.large"]
     tags:
       - PoloRole: "testing"
-    image: marqo-cpu-image
+    image: marqo-cpu-arm-image
+    spot: false
 
   marqo-perf-tests-runner:
     family: ["t3.xlarge"]
