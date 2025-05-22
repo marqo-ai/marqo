@@ -23,4 +23,3 @@ class LoggingMetricExporter(ConsoleMetricExporter):
 exporter = LoggingMetricExporter()
 reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
 metrics.set_meter_provider(MeterProvider(metric_readers=[reader]))
-
