@@ -1,3 +1,4 @@
+import json
 import time
 
 from marqo import logging
@@ -74,6 +75,8 @@ class RandomInferenceStub(Inference):
         result = InferenceResult(result=[[(content, self.random_ndarray(
             content, dimension, request.model_config.normalize_embeddings))] for content in request.contents])
         elapsed_ms = (time.perf_counter() - now) * 1000
-        time.sleep((self.stub_latency_ms - elapsed_ms) / 1000)
+        sleep_ms = self.stub_latency_ms - elapsed_ms
+        if sleep_ms > 1000:
+            time.sleep((self.stub_latency_ms - elapsed_ms) / 1000)
 
         return result
