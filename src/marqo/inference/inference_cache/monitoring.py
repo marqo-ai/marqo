@@ -36,6 +36,7 @@ class OTELCacheStatsCollector(CacheStatsCollector):
 
         self.hit_counter = meter.create_counter("cache_hits_total", unit="1", description="Total cache hits")
         self.miss_counter = meter.create_counter("cache_miss_total", unit="1", description="Total cache misses")
+        self.item_size_counter = meter.create_counter("insert_items_size", unit="byte", description="Item size")
         self.get_histogram = meter.create_histogram("cache_get_latency", unit="us",
                                                     description="Get latency in microseconds")
         self.insert_histogram = meter.create_histogram("cache_insert_latency", unit="us",
@@ -50,4 +51,5 @@ class OTELCacheStatsCollector(CacheStatsCollector):
         self.get_histogram.record(duration * 1_000_000)  # in microseconds
 
     def record_insert(self, size_bytes, duration: float) -> None:
+        self.item_size_counter.add(size_bytes)
         self.insert_histogram.record(duration * 1_000_000)  # in microseconds

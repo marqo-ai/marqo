@@ -11,8 +11,7 @@ from marqo.inference.inference_cache.marqo_inference_cache import MarqoInference
 class CachingInference(Inference):
     def __init__(self, delegate: Inference, cache_size: int, cache_type: str):
         self.delegate = delegate
-        self.inference_cache = MarqoInferenceCache(cache_size=cache_size, cache_type=cache_type,
-                                                   value_size_lambda=lambda v: v.nbytes)
+        self.inference_cache = MarqoInferenceCache(cache_size=cache_size, cache_type=cache_type)
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         if self.should_skip_cache(request):
