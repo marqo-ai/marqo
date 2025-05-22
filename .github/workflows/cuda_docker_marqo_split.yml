@@ -44,7 +44,7 @@ permissions:
 jobs:
   Test-Marqo:
     name: Run CUDA Docker Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/runner=marqo-gpu-runner"
     defaults:
       run:
         working-directory: tests/api_tests/v1

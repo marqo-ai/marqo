@@ -33,7 +33,7 @@ permissions:
 jobs:
   Test-Marqo:
     name: Run ARM64 Docker Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=r7g.large/ami=${{ vars.MARQO_CPU_ARM64_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/runner=marqo-cpu-arm-runner"
     defaults:
       run:
         working-directory: tests/api_tests/v1
@@ -44,13 +44,15 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python 3.9
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install python3.9
-          sudo apt-get -y install pip
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
 
       - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
