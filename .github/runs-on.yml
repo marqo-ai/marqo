@@ -10,6 +10,9 @@ images:
   marqo-gpu-image:
     ami: "ami-0be479c8e2b8dcc93"
 
+  marqo-cpu-arm-image:
+    ami: "${{ vars.MARQO_CPU_ARM64_TESTS_INSTANCE_AMI }}"
+
 runners:
   marqo-cpu-runner:
     family: ["m6i.xlarge"]
@@ -33,7 +36,7 @@ runners:
     family: ["r7g.large"]
     tags:
       - PoloRole: "testing"
-    image: marqo-cpu-image
+    image: marqo-cpu-arm-image
     spot: false
 
   marqo-perf-tests-runner:
