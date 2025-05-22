@@ -16,6 +16,7 @@ import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -77,17 +78,11 @@ public class HybridSearcher extends Searcher {
         String cutoffMethod =
                 query.properties().getString("marqo__hybrid.relevance_cutoff.method", "");
         int cutoffMinResults =
-                query.properties()
-                        .getInteger(
-                                "marqo__hybrid.relevance_cutoff.parameters.minResults", -1);
+                query.properties().getInteger("marqo__hybrid.relevance_cutoff.minResults", -1);
         Double cutoffDummyParameter =
-                query.properties()
-                        .getDouble(
-                                "marqo__hybrid.relevance_cutoff.dummyParameter",
-                                -1.0);
-        int probeDepth = query.properties().getInteger("marqo__hybrid.relevance_cutoff." +
-                "probeDepth", 1000
-        );
+                query.properties().getDouble("marqo__hybrid.relevance_cutoff.dummyParameter", -1.0);
+        int probeDepth =
+                query.properties().getInteger("marqo__hybrid.relevance_cutoff.probeDepth", 1000);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -263,8 +258,33 @@ public class HybridSearcher extends Searcher {
             }
         }
         // --- End facets attachment ---
+        Result resultBeforeSort = new Result(query, processedHits);
+        execution.fill(resultBeforeSort);
 
-        return new Result(query, processedHits);
+        List<Hit> hitList = new ArrayList<>(resultBeforeSort.hits().asList()); // ✅ copy
+        hitList.sort(
+                Comparator.comparing(
+                        hit -> {
+                            String xml = hit.getField("marqo__float_fields").toString();
+                            return getFloatFromMapField(xml, "price");
+                        }));
+
+        int i = 0;
+        for (Hit hit : hitList) {
+            hit.setRelevance(1.0 / (i + 1.0));  // enforce ordering
+            i++;
+        }
+        HitGroup sortedHits = new HitGroup();
+        sortedHits.addAll(hitList);
+        sortedHits.trim(offset, offset + limit);
+        return new Result(query, sortedHits);
+    }
+
+    public static Double getFloatFromMapField(String xml, String key) {
+        if (xml == null) return Double.MAX_VALUE; // Put missing values last
+        String pattern = "<item>\\s*<key>" + key + "</key>\\s*<value>([^<]+)</value>";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(xml);
+        return matcher.find() ? Double.parseDouble(matcher.group(1)) : Double.MAX_VALUE;
     }
 
     int getRelevanceCutoffCount(
@@ -539,10 +559,6 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(
                 String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
                 verbose);
-        resultToRerank.trim(0, limit);
-
-        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
-        logHitGroup(resultToRerank, verbose);
 
         return resultToRerank;
     }
