@@ -57,7 +57,7 @@ on:
 jobs:
   Docker-Build:
     name: Build docker image
-    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=ami-01accacd51bdde263/region=us-west-2"
     outputs:
       image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
 
