@@ -5,7 +5,6 @@ from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import Metric
-from opentelemetry.test.globals_test import reset_metrics_globals
 
 from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector
 
@@ -13,10 +12,13 @@ from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector
 class TestOTELCacheStatsCollector(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        reset_metrics_globals()
         cls.reader = InMemoryMetricReader()
-        provider = MeterProvider(metric_readers=[cls.reader])
-        metrics.set_meter_provider(provider)
+        cls.provider = MeterProvider(metric_readers=[cls.reader])
+        metrics.set_meter_provider(cls.provider)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.provider.shutdown()
 
     def setUp(self):
         self.stats_collector = OTELCacheStatsCollector(
@@ -69,7 +71,3 @@ class TestOTELCacheStatsCollector(unittest.TestCase):
         for bucket in bucket_counts.keys():
             if bucket not in explicit_bounds:
                 self.fail(f'histogram {name} bucket {bucket} is not in metrics: {explicit_bounds}')
-
-
-
-

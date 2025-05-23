@@ -1,5 +1,6 @@
 """The API entrypoint for Tensor Search"""
 import json
+from contextlib import asynccontextmanager
 from typing import List, Type, Any, TypeVar
 
 import pydantic
@@ -9,7 +10,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -44,6 +48,7 @@ from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
+from marqo.otel import bootstrap_otel
 
 logger = get_logger(__name__)
 
@@ -104,9 +109,20 @@ _config = generate_config()
 if __name__ in ["__main__", "api"]:
     on_start(_config)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-api')
+
+    yield
+
+    otel_shutdown_hook()
+    get_config().stop_and_close_zookeeper_client()
+
 app = FastAPI(
     title="Marqo",
-    version=version.get_version()
+    version=version.get_version(),
+    lifespan=lifespan,
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
@@ -288,14 +304,6 @@ def parse_request_object(obj_type: Type[T], obj: Any) -> T:
         return parse_obj_as(obj_type, obj)
     except pydantic.v1.ValidationError as e:
         raise RequestValidationError(errors=e.errors()) from e
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """Close the Zookeeper client on shutdown."""
-    marqo_config = get_config()
-    marqo_config.stop_and_close_zookeeper_client()
-
 
 @app.get("/", summary="Basic information")
 def root():
