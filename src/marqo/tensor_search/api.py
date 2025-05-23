@@ -272,6 +272,8 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
 # manually converts it to an v1 model. It catches the v1.Validation error and converts it to FastAPI's
 # RequestValidationError to keep the behaviour consistent with the auto-injecting mechanism
 T = TypeVar('T')
+
+
 def parse_request_object(obj_type: Type[T], obj: Any) -> T:
     try:
         return parse_obj_as(obj_type, obj)
@@ -374,7 +376,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
-
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
@@ -396,10 +397,11 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             result_count=search_query.limit, offset=search_query.offset,
             rerank_depth=search_query.rerankDepth,
             ef_search=search_query.efSearch, approximate=search_query.approximate,
+            approximate_threshold=search_query.approximateThreshold,
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            media_download_headers = search_query.mediaDownloadHeaders,
+            media_download_headers=search_query.mediaDownloadHeaders,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
@@ -629,7 +631,8 @@ def batch_create_indexes(index_settings_with_name_list: List[dict],
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in
+                      index_settings_with_name_list]
 
     marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 

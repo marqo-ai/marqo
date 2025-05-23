@@ -22,12 +22,12 @@ Notes on search behaviour with caching and searchable attributes:
         - Searching an existing but uncached field will return the best result
             (the uncached field will be searched)
         - Searching all fields will return a poor result
-            (the uncached field won’t be searched)
+            (the uncached field won't be searched)
     Vector search:
         - Searching an existing but uncached field will return no results (the
-            uncached field won’t be searched)
+            uncached field won't be searched)
         - Searching all fields will return a poor result (the uncached field
-            won’t be searched)
+            won't be searched)
 
 """
 import typing
@@ -182,11 +182,11 @@ def get_documents_by_ids(
                 unsuccessful_docs.append(
                     (
                         loc, MarqoGetDocumentsByIdsItem(
-                            # Invalid IDs are not returned in the response
-                            id=doc_id,
-                            message=e.message,
-                            status=int(e.status_code)
-                        )
+                        # Invalid IDs are not returned in the response
+                        id=doc_id,
+                        message=e.message,
+                        status=int(e.status_code)
+                    )
                     )
                 )
             else:
@@ -303,7 +303,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
            result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
-           approximate: Optional[bool] = None,
+           approximate: Optional[bool] = None, approximate_threshold: Optional[float] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: Optional[str] = None,
@@ -401,7 +401,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
         if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
-            raise api_exceptions.InvalidArgError("attributes_to_retrieve must be a sequence!")
+            raise api_exceptions.InvalidArgError("attributes_to_retrieve must be a sequence")
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
@@ -432,7 +432,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
+                rerank_depth=rerank_depth
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -440,7 +441,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             search_result = HybridSearch().search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 rerank_depth=rerank_depth,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                ef_search=ef_search, approximate=approximate, approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
@@ -469,7 +471,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
-        search_result["query"] = text.dict()    # Make object JSON serializable
+        search_result["query"] = text.dict()  # Make object JSON serializable
     else:
         search_result["query"] = text
 
@@ -603,7 +605,7 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], media_down
         pass
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
-    return QueryContentCollector(queries = query_content_list)
+    return QueryContentCollector(queries=query_content_list)
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -654,6 +656,7 @@ def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set
     """
     return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve_set or
             '.' in k and k.split('.', maxsplit=1)[0] in attributes_to_retrieve_set}
+
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs],
@@ -739,7 +742,7 @@ def _get_preprocessing_config(modality: Modality, media_download_headers: Option
     Get the preprocessing config for the given modality used for searching.
     """
     if modality == Modality.TEXT:
-        return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
+        return TextPreprocessingConfig()  # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
         return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.AUDIO:
@@ -844,12 +847,12 @@ def get_query_vectors_from_jobs(
                 vectorised_ordered_queries = [
                     (
                         get_content_vector(
-                        possible_jobs=qidx_to_job[qidx],
-                        job_to_vectors=job_to_vectors,
-                        content=content
+                            possible_jobs=qidx_to_job[qidx],
+                            job_to_vectors=job_to_vectors,
+                            content=content
                         ),
-                     weight,
-                     content
+                        weight,
+                        content
                     ) for content, weight in ordered_queries
                 ]
                 # TODO how do we ensure order?
@@ -1006,7 +1009,7 @@ def _vector_text_search(
         highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
 ) -> Dict:
     """
-    
+
     Args:
         config:
         marqo_index: index object fetched by calling function
@@ -1182,5 +1185,3 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
-
-

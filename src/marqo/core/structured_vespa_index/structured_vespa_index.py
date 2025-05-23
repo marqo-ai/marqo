@@ -614,6 +614,7 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
             'query_features': query_inputs,
             'presentation.summary': summary,
 
