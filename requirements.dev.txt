@@ -11,4 +11,4 @@ open-clip-torch==2.32.0
 
 # For vespa_local setup
 docker==7.1.0
-PyYAML==6.0.
+PyYAML==6.0
