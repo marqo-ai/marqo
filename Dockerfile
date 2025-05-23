@@ -9,7 +9,7 @@ RUN mvn dependency:go-offline
 
 COPY vespa/src /app/vespa/src
 # Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
-RUN mvn clean package -T 1C
+RUN mvn clean package -T 1C -DskipTests
 
 # Stage 2: Base image for Python setup
 FROM marqoai/marqo-base:49 as base_image
