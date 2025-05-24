@@ -58,14 +58,8 @@ class CachingInference(Inference):
         properties as part of the key in the cache, we hash the dumped json to get a smaller value to save the memory
         space used by cache. In most use cases, there's only one model, md5 is good enough to avoid collision
         """
-        data = orjson.dumps(
-            model_properties,
-            option=orjson.OPT_SORT_KEYS
-        )
-
-        h = hashlib.new('md5')
-        h.update(data)
-        return h.hexdigest()
+        data = orjson.dumps(model_properties, option=orjson.OPT_SORT_KEYS)
+        return hashlib.md5(data).hexdigest()
 
     def should_skip_cache(self, request):
         return (

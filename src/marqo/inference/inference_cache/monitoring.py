@@ -24,10 +24,12 @@ class OTELCacheStatsCollector(CacheStatsCollector):
         meter = metrics.get_meter('inference_cache_stats')
 
         def get_current_size(options: CallbackOptions) -> Iterable[Observation]:
-            yield Observation(curr_size_fn())
+            curr_size = curr_size_fn()
+            yield Observation(curr_size)
 
         def get_max_size(options: CallbackOptions) -> Iterable[Observation]:
-            yield Observation(max_size_fn())
+            max_size = max_size_fn()
+            yield Observation(max_size)
 
         meter.create_observable_gauge("cache_size_curr", callbacks=[get_current_size],
                                       unit="1", description="Current cache size")
