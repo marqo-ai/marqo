@@ -6,6 +6,7 @@ from unittest import mock
 from unittest.mock import patch
 
 import pydantic
+import pytest
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from pydantic.v1.error_wrappers import ErrorWrapper
@@ -20,6 +21,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.vespa import exceptions as vespa_exceptions
@@ -236,10 +238,16 @@ class TestApiCustomEnvVars(MarqoTestCase):
         cls.structured_index = cls.indexes[1]
 
         cls.add_documents(cls.config, AddDocsParams(
+            index_name=cls.structured_index.name,
+            docs=[{'field1': 'hello', 'field2': 'world'}],
+        ))
+
+        cls.add_documents(cls.config, AddDocsParams(
             index_name=cls.unstructured_index.name,
             docs=[{'field1': 'hello', 'field2': 'world'}],
             tensor_fields=['field1'],
         ))
+
 
     def test_search_timeout_short_timer_fails(self):
         # Set up the test API client with the correct env vars set
@@ -274,6 +282,32 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.status_code, 504)
                         self.assertEqual(res.json()["code"], "vector_store_timeout")
                         self.assertEqual(res.json()["type"], "invalid_request")
+
+    def test_inference_cache_caches_query_string(self):
+        with mock.patch.dict(os.environ, {
+            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "10",
+            "MARQO_INFERENCE_SERVER_CACHE_TYPE": "LFU",
+            "MARQO_MODE": "COMBINED",
+            "MARQO_ENABLE_THROTTLING": "FALSE"
+        }):
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+
+            inference = api.get_config().inference
+            self.assertIsInstance(inference, CachingInference)
+            with patch.object(inference.delegate, "vectorise", wraps=inference.delegate.vectorise) as mock_vectorise:
+                with TestClient(api.app) as client:
+                    for index in [self.unstructured_index, self.structured_index]:
+                        with self.subTest(index=index.name):
+                            mock_vectorise.reset_mock()
+                            client.post("/indexes/" + index.name + "/search?telemetry=true",
+                                        json={"q": f"hello {index.name}"})
+                            mock_vectorise.assert_called_once()
+
+                            # the second request with the same query should hit cache
+                            mock_vectorise.reset_mock()
+                            client.post("/indexes/" + index.name + "/search?telemetry=true",
+                                        json={"q": f"hello {index.name}"})
+                            mock_vectorise.assert_not_called()
 
 
 class TestApiErrors(MarqoTestCase):
