@@ -7,6 +7,7 @@ from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import MetricsData
+from opentelemetry.test.globals_test import reset_metrics_globals
 from orjson import orjson
 
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
@@ -112,6 +113,7 @@ class TestInferenceCache(unittest.TestCase):
         self.assertNotEqual(cached_embedding_model_1, cached_embedding_model_2)
 
     def test_caching_inference_should_capture_key_metrics(self):
+        reset_metrics_globals()
         reader = InMemoryMetricReader()
         provider = MeterProvider(metric_readers=[reader])
         metrics.set_meter_provider(provider)
