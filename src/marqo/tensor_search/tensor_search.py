@@ -927,8 +927,6 @@ def get_query_vectors_from_jobs(
             result[qidx] = list(merged_vector)
 
         elif isinstance(q.q, str):
-            # TODO: Figure out how to handle this
-            # TODO: Does this mean context vectors do NOT do anything when q is a string?
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 job_to_vectors=job_to_vectors,

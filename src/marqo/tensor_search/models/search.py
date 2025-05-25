@@ -75,7 +75,7 @@ class SearchContextDocumentsParameters(BaseModel):
 
 
 class SearchContextDocuments(BaseModel):
-    ids: Optional[Dict[str, float]]   # TODO: Check if the types are correct
+    ids: Optional[Dict[str, float]]
     # If not provided, default parameters are created
     parameters: Optional[SearchContextDocumentsParameters] = SearchContextDocumentsParameters()
 
