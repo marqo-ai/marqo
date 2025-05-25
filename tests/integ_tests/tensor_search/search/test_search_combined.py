@@ -1292,6 +1292,7 @@ class TestSearch(MarqoTestCase):
                     except TypeError as e:
                         self.fail(f"Result is not JSON serializable: {e}")
 
+    @pytest.mark.skip_for_multinode
     def test_rerank_depth_tensor_search_with_limit_offset_and_ef_search(self):
         """Test rerank_depth interaction with result_count, offset, and ef_search."""
 
