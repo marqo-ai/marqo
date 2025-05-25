@@ -176,8 +176,8 @@ class HybridSearch:
         if (tensor_query is None) != (lexical_query is None):
             if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 raise core_exceptions.InvalidArgumentError(
-                    "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when "
-                    "'disjunction' retrieval method is used."
+                    "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or just 'q'"
+                    "must be present when 'disjunction' retrieval method is used."
                 )
 
         # Edge cases for q data type
@@ -197,8 +197,9 @@ class HybridSearch:
             if not (hybrid_parameters.retrievalMethod.upper() == SearchMethod.TENSOR and
                     hybrid_parameters.rankingMethod.upper() == SearchMethod.TENSOR):
                 raise core_exceptions.InvalidArgumentError(
-                    "Query cannot be 'None' for hybrid search unless retrieval_method and ranking_method "
-                    "are both 'tensor'.")
+                    "Query cannot be 'None' for hybrid search unless: (1) retrievalMethod and rankingMethod "
+                    "are both 'tensor' and 'context' is given or (2) One or both of queryLexical and queryTensor "
+                    "are provided (depending on retrievalMethod and rankingMethod) instead.")
             if context is None:
                 raise core_exceptions.InvalidArgumentError(
                     "Query cannot be 'None' for hybrid search unless 'context' is provided.")

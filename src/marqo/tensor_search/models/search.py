@@ -63,13 +63,29 @@ class SearchContextTensor(BaseModel):
     vector: List[float]
     weight: float
 
+    def __init__(self, **data):
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise InvalidArgError(message=e.json())
+
 class SearchContextDocumentsParameters(BaseModel):
-    tensorFields: List[str]
-    excludeInputDocuments: bool = True
+    tensorFields: Optional[List[str]] = None
+    excludeInputDocuments: Optional[bool] = True
+
 
 class SearchContextDocuments(BaseModel):
-    ids: Dict[str, Union[int, float]]   # TODO: Check if the types are correct
-    parameters: SearchContextDocumentsParameters    # TODO: Use default parameters if needed
+    ids: Optional[Dict[str, float]]   # TODO: Check if the types are correct
+    # If not provided, default parameters are created
+    parameters: Optional[SearchContextDocumentsParameters] = SearchContextDocumentsParameters()
+
+    @validator('ids', pre=True, always=True)
+    def check_ids_not_empty(cls, v):
+        # Manually raising error because pydantic gives confusing error message
+        if not v:
+            raise InvalidArgError('context["documents"]["ids"] must be present and a non-empty dict of '
+                                  'document id to weight pairs.')
+        return v
 
 class SearchContext(BaseModel):
     tensor: Optional[List[SearchContextTensor]]
@@ -89,7 +105,7 @@ class SearchContext(BaseModel):
         return v
 
     # Root validator to confirm either tensor or documents MUST exist
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def validate_at_least_one_context_exists(cls, values):
         tensor = values.get('tensor')
         documents = values.get('documents')

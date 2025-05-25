@@ -43,7 +43,7 @@ def validate_query(q: Optional[Union[dict, str, CustomVector]], search_method: U
 
         if search_method.upper() != SearchMethod.TENSOR:
             raise InvalidArgError(
-                'Multi-query search is only supported for search_method="TENSOR" or "HYBRID".'
+                'Multi-query search is only supported for search_method="TENSOR".'
                 f'\nReceived invalid search_method: `{search_method}`.'
                 '\nNote: For HYBRID search, use `hybrid_parameters.queryTensor` instead of `q` for multi-query input.'
                 f'\n{usage_ref}'

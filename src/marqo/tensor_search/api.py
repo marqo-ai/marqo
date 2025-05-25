@@ -407,7 +407,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             hybrid_parameters=search_query.hybridParameters,
             facets=search_query.facets,
             track_total_hits=search_query.trackTotalHits,
-            interpolationMethod=search_query.interpolationMethod
+            interpolation_method=search_query.interpolationMethod
         )
         return ORJSONResponse(result)
 

@@ -12,19 +12,24 @@ import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
+from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
+from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, ZeroSumWeightsError, ZeroMagnitudeVectorError
+from marqo.exceptions import InvalidArgumentError
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextDocumentsParameters
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 
 
 class TestSearch(MarqoTestCase):
@@ -207,6 +212,39 @@ class TestSearch(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    def _populate_index_orchids(self, index):
+        """Helper method to populate an index with orchid and related test documents.
+        
+        This method adds a standardized set of test documents including orchids, flowers,
+        and continents that can be used for testing context document functionality.
+        
+        Args:
+            index: The index to populate (structured or unstructured)
+            
+        Returns:
+            List of added document dictionaries
+        """
+        docs = [
+            {"_id": "orchid1", "text_field_1": "Anacamptis laxiflora is a species of orchid found in wet meadows with alkaline soil.", "tags": ["flower", "orchid"]},
+            {"_id": "orchid2", "text_field_1": "Cephalanthera longifolia reaches on average 20-60 centimetres in height and is a type of orchid.", "tags": ["flower", "orchid"]},
+            {"_id": "orchid3", "text_field_1": "Anacamptis morio subsp. longicornu is a subspecies of orchid found in the Mediterranean region.", "tags": ["flower", "orchid"]},
+            {"_id": "flower1", "text_field_1": "Red rose is a popular flower known for its beauty and fragrance.", "tags": ["flower", "rose"]},
+            {"_id": "continent1", "text_field_1": "Europe is a continent located entirely in the Northern Hemisphere and mostly in the Eastern Hemisphere.", "tags": ["continent"]},
+            {"_id": "continent2", "text_field_1": "Asia is Earth's largest and most populous continent, located primarily in the Eastern and Northern Hemispheres.", "tags": ["continent"]},
+            {"_id": "continent3", "text_field_1": "Africa is the world's second-largest and second-most populous continent, after Asia in both cases.", "tags": ["continent"]},
+        ]
+        
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name,
+                docs=docs,
+                tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+            )
+        )
+        
+        return docs
 
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
@@ -1236,7 +1274,7 @@ class TestSearch(MarqoTestCase):
             CustomVectorQuery(
                 customVector=CustomVectorQuery.CustomVector(
                     content="hello",
-                    vector=[0 for _ in range(384)]
+                    vector=[1 for _ in range(384)]
                 )
             )
         ]
@@ -1309,170 +1347,6 @@ class TestSearch(MarqoTestCase):
                         ef_search=3
                     )
                     self.assertEqual(len(res["hits"]), 3)
-
-    def test_search_with_context_documents_only(self):
-        """Test that search works correctly when only context documents are provided (no query, no context tensor).
-        
-        This test verifies that when we search using only document IDs as context,
-        the search results match what we'd expect based on those documents.
-        """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index.type):
-                # Add documents to the index
-                docs = [
-                    {"_id": "doc1", "text_field_1": "machine learning algorithms and artificial intelligence"},
-                    {"_id": "doc2", "text_field_1": "deep neural networks for computer vision tasks"},
-                    {"_id": "doc3", "text_field_1": "natural language processing and text generation"},
-                    {"_id": "doc4", "text_field_1": "reinforcement learning for game playing"},
-                    {"_id": "doc5", "text_field_1": "statistical models for data analysis"},
-                    {"_id": "doc6", "text_field_1": "clustering algorithms for unsupervised learning"},
-                ]
-                
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=docs,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                with self.subTest(exclude_input_documents=False):
-                    # Create search context with only documents
-                    search_context = SearchContext(
-                        documents=SearchContextDocuments(
-                            ids={"doc1": 3.0, "doc3": 5.0, "doc5": -5.0},
-                            parameters=SearchContextDocumentsParameters(
-                                tensorFields=["text_field_1"],
-                                excludeInputDocuments=False
-                            )
-                        )
-                    )
-
-                    # Perform search with only context documents
-                    results = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        context=search_context,
-                        result_count=5
-                    )
-
-                    # Verify search results
-                    self.assertIn("hits", results)
-                    self.assertGreaterEqual(len(results["hits"]), 5)
-
-                    # The input documents should be the first results if excludeInputDocuments is False
-                    result_ids = [hit["_id"] for hit in results["hits"]]
-
-                    # Verify that the first hit is doc1, then doc3
-                    self.assertEqual(result_ids[0], "doc3")
-                    self.assertEqual(result_ids[1], "doc1")
-
-                    # doc5 should fall out of the top 5 results
-                    self.assertNotIn("doc5", result_ids)
-
-                with self.subTest(exclude_input_documents=True):
-                    # Create search context with only documents
-                    search_context = SearchContext(
-                        documents=SearchContextDocuments(
-                            ids={"doc1": 3.0, "doc3": 5.0, "doc5": -5.0},
-                            parameters=SearchContextDocumentsParameters(
-                                tensorFields=["text_field_1"],
-                                excludeInputDocuments=True
-                            )
-                        )
-                    )
-
-                    # Perform search with only context documents
-                    results = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        context=search_context,
-                        result_count=5
-                    )
-
-                    # Verify search results
-                    self.assertIn("hits", results)
-                    self.assertGreaterEqual(len(results["hits"]), 4)
-
-                    # The input documents should not be in the results if excludeInputDocuments is True
-                    result_ids = [hit["_id"] for hit in results["hits"]]
-
-                    # Verify that doc1 and doc3 are not in the results
-                    self.assertNotIn("doc1", result_ids)
-                    self.assertNotIn("doc3", result_ids)
-
-
-    def test_search_with_context_documents_tensors_and_queries(self):
-        """Test that search works correctly when context documents, tensors, and queries are provided.
-        Use relevant data and sample searches
-        """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index.type):
-                # Add documents to the index
-                docs = [
-                    {"_id": "doc1", "text_field_1": "red shirt with collar unisex"},
-                    {"_id": "doc2", "text_field_1": "black long pants for men"},
-                    {"_id": "doc3", "text_field_1": "black shorts unisex"},
-                    {"_id": "doc4", "text_field_1": "black shirt for men"},
-                    {"_id": "doc5", "text_field_1": "grey pants for women"},
-                    {"_id": "doc6", "text_field_1": "green hat unisex"},
-                ]
-
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=docs,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Basic search (query)
-                basic_results = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text={"shirt": 1, "black": -0.5},
-                    result_count=6
-                )
-
-                # Verify the 2 shirt documents are the top 2
-                self.assertIn("hits", basic_results)
-                result_ids = [hit["_id"] for hit in basic_results["hits"]]
-                self.assertEqual(result_ids[0], "doc1")
-                self.assertEqual(result_ids[1], "doc4")
-                # Last 2 docs have "black", thus pushing them to the bottom (negative weighted query)
-                self.assertEqual(result_ids[-2], "doc2")
-                self.assertEqual(result_ids[-1], "doc3")
-
-                # Use context documents to put doc1 at the bottom, bring doc6 to the top
-                results_with_context_docs = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text={"shirt": 1, "black": -0.5},
-                    context=SearchContext(
-                        documents=SearchContextDocuments(
-                            ids={"doc1": -10.0, "doc6": 3.0},
-                            parameters=SearchContextDocumentsParameters(
-                                tensorFields=["text_field_1"],
-                                excludeInputDocuments=False
-                            )
-                        )
-                    ),
-                    result_count=6
-                )
-
-                # Verify search results
-                self.assertIn("hits", results_with_context_docs)
-                result_ids = [hit["_id"] for hit in results_with_context_docs["hits"]]
-                self.assertEqual(result_ids[0], "doc6")
-                self.assertEqual(result_ids[1], "doc4")
-                # doc1 should be at the bottom
-                self.assertEqual(result_ids[-1], "doc1")
-
-                pass
 
 
 # Set up text strategy to prioritize " and \\

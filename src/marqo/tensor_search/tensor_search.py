@@ -434,7 +434,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
         if context is not None and context.documents is not None:
             if context.documents.parameters.excludeInputDocuments:
-                filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.keys()), filter)
+                filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.ids.keys()), filter)
 
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
@@ -1045,7 +1045,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # Combination of context tensors & documents is also done here
     with RequestMetricsStore.for_request().time(f"search.vector.inference.get_and_combine_vectors"):
         qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-            prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+            prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs, interpolation_method
         )
     return qidx_to_vectors
 

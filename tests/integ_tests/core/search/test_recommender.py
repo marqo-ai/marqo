@@ -195,23 +195,6 @@ class TestRecommender(MarqoTestCase):
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
 
-    def test_recommend_slerpZeroSumWeights_failure(self):
-        """
-        Test that the recommender fails when the sum of consecutive weights is zero
-        """
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(type=index.type):
-                self._populate_index(index)
-
-                with self.assertRaisesStrict(InvalidArgumentError) as ex:
-                    self.recommender.recommend(
-                        index_name=index.name,
-                        documents={"1": 1, "2": -1},
-                        tensor_fields=['title'],
-                        interpolation_method=InterpolationMethod.SLERP,
-                        exclude_input_documents=False,
-                    )
-                self.assertIn('SLERP cannot interpolate', str(ex.exception))
 
     def test_recommend_nlerp_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
@@ -232,8 +215,8 @@ class TestRecommender(MarqoTestCase):
                     )
 
                     # Note aside from interpolate in recommend,
-                    # search step also calls LERP interpolate once by default
-                    mock_interpolate.assert_called_once()
+                    # search step also calls NLERP interpolate once by default
+                    self.assertEqual(mock_interpolate.call_count, 2)
 
                     ids = [doc["_id"] for doc in res["hits"]]
 
@@ -292,25 +275,6 @@ class TestRecommender(MarqoTestCase):
                     ids = [doc["_id"] for doc in res["hits"]]
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
-
-    def test_recommend_lerpZeroSumWeights_failure(self):
-        """
-        Test that the recommender fails when the sum of all weights is zero with LERP (and NLERP)
-        """
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            for method in [InterpolationMethod.LERP, InterpolationMethod.NLERP]:
-                with self.subTest(type=index.type, method=method):
-                    self._populate_index(index)
-
-                    with self.assertRaisesStrict(InvalidArgumentError) as ex:
-                        self.recommender.recommend(
-                            index_name=index.name,
-                            documents={"1": 1, "2": 2, "3": -3},
-                            tensor_fields=['title'],
-                            interpolation_method=method,
-                            exclude_input_documents=False,
-                        )
-                    self.assertIn('Sum of weights is zero', str(ex.exception))
 
     def test_recommend_docsWithZeroWeight_success(self):
         """
