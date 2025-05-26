@@ -124,9 +124,15 @@ public class HybridSearcher extends Searcher {
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             verbose);
+            // Set offset to 0 and limit to offset + limit
+            queryLexical.properties().set("offset", 0);
+            queryLexical.properties().set("hits", offset + limit);
             Query queryTensor =
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+            // Set offset to 0 and limit to offset + limit
+            queryTensor.properties().set("offset", 0);
+            queryTensor.properties().set("hits", offset + limit);
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -442,12 +448,19 @@ public class HybridSearcher extends Searcher {
             resultToRerank.addAll(excessHits.asList());
         }
 
-        // Paginate and/or trim
+        // Paginate and/or trim for rrf
         // Result list should always have limit length (if possible)
-        logIfVerbose(
-                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
-                verbose);
-        resultToRerank.trim(0, limit);
+        if (query.properties().getString("marqo__hybrid.retrievalMethod", "").equals("disjunction")) {
+            logIfVerbose(
+                    String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                    verbose);
+            resultToRerank.trim(offset, limit + offset);
+        }
+        else {
+            logIfVerbose(
+                    String.format("Trimming result list. " + "limit: %d", limit), verbose);
+            resultToRerank.trim(0, limit);
+        }
 
         logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
         logHitGroup(resultToRerank, verbose);
