@@ -450,15 +450,16 @@ public class HybridSearcher extends Searcher {
 
         // Paginate and/or trim for rrf
         // Result list should always have limit length (if possible)
-        if (query.properties().getString("marqo__hybrid.retrievalMethod", "").equals("disjunction")) {
+        if (query.properties()
+                .getString("marqo__hybrid.retrievalMethod", "")
+                .equals("disjunction")) {
             logIfVerbose(
-                    String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                    String.format(
+                            "Trimming result list. " + "limit: %d, offset: %d", limit, offset),
                     verbose);
             resultToRerank.trim(offset, limit + offset);
-        }
-        else {
-            logIfVerbose(
-                    String.format("Trimming result list. " + "limit: %d", limit), verbose);
+        } else {
+            logIfVerbose(String.format("Trimming result list. " + "limit: %d", limit), verbose);
             resultToRerank.trim(0, limit);
         }
 
