@@ -56,6 +56,10 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        # Authentication
+        EnvVars.SYS_ACC_ID: "gje7jbgi",
+        EnvVars.APPLICATION_AWS_REGION: "us-east-1",
+
         # Inference Client config (In API)
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config

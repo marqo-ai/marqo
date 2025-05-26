@@ -100,6 +100,9 @@ app = FastAPI(
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
 
+from marqo.rp.cloudwatch_middleware import CloudWatchMetricsMiddleware
+app.add_middleware(CloudWatchMetricsMiddleware)
+
 
 def get_config():
     return _config
@@ -286,6 +289,17 @@ def shutdown_event():
     marqo_config.stop_and_close_zookeeper_client()
 
 
+# POC: API key authentication
+from marqo.rp.user_api_key import start_api_key_refresh_thread
+from marqo.rp.user_api_key import user_api_key_auth
+from marqo.rp import cloudwatch_metrics
+
+@app.on_event("startup")
+def setup_auth():
+    start_api_key_refresh_thread()
+    cloudwatch_metrics.start_metrics_loop()
+
+
 @app.get("/", summary="Basic information")
 def root():
     return {"message": "Welcome to Marqo",
@@ -374,11 +388,10 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
-
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(get_config)):
+           marqo_config: config.Config = Depends(get_config), api_key: str = Depends(user_api_key_auth)):
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
@@ -399,7 +412,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            media_download_headers = search_query.mediaDownloadHeaders,
+            media_download_headers=search_query.mediaDownloadHeaders,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
@@ -475,7 +488,8 @@ def add_or_replace_documents(
         index_name: str,
         body_dict: dict,
         marqo_config: config.Config = Depends(get_config),
-        device: str = Depends(api_validation.validate_device)):
+        device: str = Depends(api_validation.validate_device),
+        api_key: str = Depends(user_api_key_auth)):
     """
     Add an array of documents or replace them if they already exist.
     Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
@@ -629,7 +643,8 @@ def batch_create_indexes(index_settings_with_name_list: List[dict],
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in
+                      index_settings_with_name_list]
 
     marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 

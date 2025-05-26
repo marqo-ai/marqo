@@ -181,6 +181,12 @@ esac
 
 # Capture the PID of the last background process
 export api_pid=$!
+
+# Start NGINX as reverse proxy on port 7000
+echo "Starting NGINX reverse proxy..."
+service nginx start
+
+
 # Wait for the Uvicorn process to terminate
 wait "$api_pid"
 # Exit with status of process that exited first

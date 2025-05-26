@@ -34,6 +34,16 @@ RUN rm requirements.txt
 # Stage 3: Final stage that builds on the base image
 FROM base_image
 
+USER root
+
+# Safely install NGINX with repo fallbacks
+RUN dnf config-manager --setopt=cuda-rhel8-x86_64.skip_if_unavailable=true --save && \
+    dnf config-manager --setopt=remi-modular.skip_if_unavailable=true --save && \
+    dnf install -y nginx && dnf clean all
+
+# Copy NGINX config (place your file in ./nginx/nginx.conf)
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+
 COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
