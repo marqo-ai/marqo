@@ -51,88 +51,110 @@ class TestInferenceCache(unittest.TestCase):
         )
 
     def test_caching_inference_should_return_same_result_as_its_delegate(self):
-        caching_inference = CachingInference(self.inference_local, 10, "LRU")
+        for cache_type in ["LRU", "LFU"]:
+            with self.subTest(cache_type=cache_type):
+                caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
-        req = self.base_request.copy(update={"contents": ["a", "b", "error:c"]})
+                req = self.base_request.copy(update={"contents": ["a", "b", "error:c"]})
 
-        result_from_local_inference = self.inference_local.vectorise(req)
-        result_from_caching_inference = caching_inference.vectorise(req)
+                result_from_local_inference = self.inference_local.vectorise(req)
+                result_from_caching_inference = caching_inference.vectorise(req)
 
-        model_key = caching_inference.model_cache_key(req.model_config.model_properties)
+                model_key = caching_inference.model_cache_key(req.model_config.model_properties)
 
-        self.assertEqual(len(result_from_local_inference.result), len(result_from_caching_inference.result))
-        for i in range(len(result_from_local_inference.result)):
-            # assert return the same inference error
-            if isinstance(result_from_local_inference.result[i], InferenceErrorModel):
-                self.assertEqual(result_from_local_inference.result[i], result_from_caching_inference.result[i])
-                continue
+                self.assertEqual(len(result_from_local_inference.result), len(result_from_caching_inference.result))
+                for i in range(len(result_from_local_inference.result)):
+                    # assert return the same inference error
+                    if isinstance(result_from_local_inference.result[i], InferenceErrorModel):
+                        self.assertEqual(result_from_local_inference.result[i], result_from_caching_inference.result[i])
+                        continue
 
-            # assert return the same embeddings
-            content1, embedding1 = result_from_local_inference.result[i][0]
-            content2, embedding2 = result_from_caching_inference.result[i][0]
-            self.assertEqual(content1, content2)
-            self.assertTrue(np.array_equal(embedding1, embedding2))
+                    # assert return the same embeddings
+                    content1, embedding1 = result_from_local_inference.result[i][0]
+                    content2, embedding2 = result_from_caching_inference.result[i][0]
+                    self.assertEqual(content1, content2)
+                    self.assertTrue(np.array_equal(embedding1, embedding2))
 
-            # assert that the embeddings are cached
-            cached_embedding = caching_inference.inference_cache.get(model_key, content1)
-            self.assertTrue(np.array_equal(embedding1, cached_embedding))
+                    # assert that the embeddings are cached
+                    cached_embedding = caching_inference.inference_cache.get(model_key, content1)
+                    self.assertTrue(np.array_equal(embedding1, cached_embedding))
 
     def test_caching_inference_should_not_exceed_max_cache_size(self):
-        caching_inference = CachingInference(self.inference_local, 2, "LRU")
+        with self.subTest(cache_type="LRU"):
+            caching_inference = CachingInference(self.inference_local, 2, "LRU")
 
-        result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
+            result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
 
-        model_key = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
-        self.assertEqual(len(result.result), 3)
-        self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
-        self.assertIsNone(caching_inference.inference_cache.get(model_key, "1"))
-        self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "2"))
-        self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "3"))
+            model_key = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+            self.assertEqual(len(result.result), 3)
+            self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
+            self.assertIsNone(caching_inference.inference_cache.get(model_key, "1"))
+            self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "2"))
+            self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "3"))
+
+        with self.subTest(cache_type="LFU"):
+            caching_inference = CachingInference(self.inference_local, 2, "LFU")
+
+            caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2"]}))
+            caching_inference.vectorise(self.base_request.copy(update={"contents": ["1"]}))
+            result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
+
+            model_key = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+            self.assertEqual(len(result.result), 3)
+            self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
+            self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "1"))
+            # 2 is evicted because it's less frequently accessed
+            self.assertIsNone(caching_inference.inference_cache.get(model_key, "2"))
+            self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "3"))
 
     def test_caching_inference_should_support_multiple_models(self):
-        caching_inference = CachingInference(self.inference_local, 10, "LRU")
+        for cache_type in ["LRU", "LFU"]:
+            with self.subTest(cache_type=cache_type):
+                caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
-        caching_inference.vectorise(self.base_request)
-        model_key1 = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+                caching_inference.vectorise(self.base_request)
+                model_key1 = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
 
-        req_with_new_model = self.base_request.copy(update={"model_config": ModelConfig(
-            model_name="hf/all-mpnet-base-v2",
-            model_properties={
-               "name": "sentence-transformers/all-mpnet-base-v2",
-               "dimensions": 768, "tokens": 128, "type": "hf"
-            }
-        )})
-        caching_inference.vectorise(req_with_new_model)
-        model_key2 = caching_inference.model_cache_key(req_with_new_model.model_config.model_properties)
+                req_with_new_model = self.base_request.copy(update={"model_config": ModelConfig(
+                    model_name="hf/all-mpnet-base-v2",
+                    model_properties={
+                       "name": "sentence-transformers/all-mpnet-base-v2",
+                       "dimensions": 768, "tokens": 128, "type": "hf"
+                    }
+                )})
+                caching_inference.vectorise(req_with_new_model)
+                model_key2 = caching_inference.model_cache_key(req_with_new_model.model_config.model_properties)
 
-        cached_embedding_model_1 = caching_inference.inference_cache.get(model_key1, "a")
-        cached_embedding_model_2 = caching_inference.inference_cache.get(model_key2, "a")
+                cached_embedding_model_1 = caching_inference.inference_cache.get(model_key1, "a")
+                cached_embedding_model_2 = caching_inference.inference_cache.get(model_key2, "a")
 
-        self.assertIsNotNone(cached_embedding_model_1)
-        self.assertIsNotNone(cached_embedding_model_2)
-        self.assertNotEqual(cached_embedding_model_1, cached_embedding_model_2)
+                self.assertIsNotNone(cached_embedding_model_1)
+                self.assertIsNotNone(cached_embedding_model_2)
+                self.assertNotEqual(cached_embedding_model_1, cached_embedding_model_2)
 
     def test_caching_inference_should_capture_key_metrics(self):
-        reset_metrics_globals()
-        reader = InMemoryMetricReader()
-        provider = MeterProvider(metric_readers=[reader])
-        metrics.set_meter_provider(provider)
+        for cache_type in ["LRU", "LFU"]:
+            with self.subTest(cache_type=cache_type):
+                reset_metrics_globals()
+                reader = InMemoryMetricReader()
+                provider = MeterProvider(metric_readers=[reader])
+                metrics.set_meter_provider(provider)
 
-        caching_inference = CachingInference(self.inference_local, 12, "LRU")
+                caching_inference = CachingInference(self.inference_local, 12, "LRU")
 
-        req1 = self.base_request.copy(update={"contents": ["1", "2", "3"]})  # misses: 3
-        caching_inference.vectorise(req1)
+                req1 = self.base_request.copy(update={"contents": ["1", "2", "3"]})  # misses: 3
+                caching_inference.vectorise(req1)
 
-        self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 3)
-        self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 3)
+                self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 3)
+                self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 3)
 
-        req2 = self.base_request.copy(update={"contents": ["1", "2", "4", "error:5"]})  # hits 2, misses: 2
-        caching_inference.vectorise(req2)
-        self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 5)
-        self._assert_metric_value(reader.get_metrics_data(), 'cache_hit_total', 2)
-        self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 4)  # error result not cached
+                req2 = self.base_request.copy(update={"contents": ["1", "2", "4", "error:5"]})  # hits 2, misses: 2
+                caching_inference.vectorise(req2)
+                self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 5)
+                self._assert_metric_value(reader.get_metrics_data(), 'cache_hit_total', 2)
+                self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 4)  # error result not cached
 
-        provider.shutdown()
+                provider.shutdown()
 
     def _assert_metric_value(self, metric_data: MetricsData, name: str, expected_value: Any):
         cache_metrics = metric_data.resource_metrics[0].scope_metrics[0].metrics
