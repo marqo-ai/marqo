@@ -55,46 +55,9 @@ on:
         required: true
 
 jobs:
-  Start-Runner:
-    # on US-WEST-2, open source account
-    name: Start self-hosted EC2 runner
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.start-ec2-runner.outputs.label }}
-      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          #TODO: create a runner in us-east-1 and use it for the build https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841644166
-          aws-region: us-west-2
-      - name: Start EC2 runner
-        id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          # 200 GB amd64 image
-          ec2-image-id:  ami-01accacd51bdde263
-          ec2-instance-type: t3.xlarge
-          subnet-id: subnet-038b1447ac3c97e7a
-          security-group-id: sg-094be521399e0d5ba
-          aws-resource-tags: > # optional, requires additional permissions
-            [
-              {"Key": "Name", "Value": "marqo-build-push-img-runner-${{ github.run_id }}"},
-              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
-              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
-              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
-              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
-              {"Key": "PoloRole", "Value": "testing"}
-            ]
-
   Docker-Build:
     name: Build docker image
-    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     outputs:
       image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
 
@@ -151,25 +114,3 @@ jobs:
         id: set-image-identifier-in-output
         run: |
           echo "image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}@${{ steps.build-and-push.outputs.digest }}" >> $GITHUB_OUTPUT
-
-  Stop-Runner:
-    name: Stop self-hosted EC2 runner
-    needs:
-      - Start-Runner # required to get output from the start-runner job
-      - Docker-Build # required to wait when the main job is done
-    runs-on: ubuntu-latest
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ needs.start-runner.outputs.label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
