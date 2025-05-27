@@ -1060,11 +1060,6 @@ class TestSearch(MarqoTestCase):
 
         for index, method_name in indexes_to_test:
             with self.subTest(index_type=type(index).__name__):
-                # Mock the _get_lexical_contains_term method for StructuredVespaIndex
-                if isinstance(index, StructuredVespaIndex):
-                    index._get_lexical_contains_term = mock.MagicMock(
-                        side_effect=lambda phrase, query: f'contains("{phrase}")')
-
                 # Test cases
                 test_cases = [
                     # Test with score modifiers (should use OR)
@@ -1076,7 +1071,7 @@ class TestSearch(MarqoTestCase):
                             and_phrases=[],
                             score_modifiers=[ScoreModifier(field="field1", weight=1.0, type=ScoreModifierType.Multiply)]
                         ),
-                        'contains("term1") OR contains("term2")' if isinstance(index, StructuredVespaIndex)
+                        'default contains "term1" OR default contains "term2"' if isinstance(index, StructuredVespaIndex)
                         else '(default contains "term1" OR default contains "term2")'
                     ),
                     # Test without score modifiers (should use weakAnd)
@@ -1087,7 +1082,7 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=[]
                         ),
-                        'weakAnd(contains("term1"), contains("term2"))' if isinstance(index, StructuredVespaIndex)
+                        'weakAnd(default contains "term1", default contains "term2")' if isinstance(index, StructuredVespaIndex)
                         else '(weakAnd(default contains "term1", default contains "term2"))'
                     ),
                     # Test with both OR and AND phrases
@@ -1098,7 +1093,8 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=["term3", "term4"]
                         ),
-                        '(weakAnd(contains("term1"), contains("term2"))) AND (contains("term3") AND contains("term4"))'
+                        '(weakAnd(default contains "term1", default contains "term2")) AND '
+                        '(default contains "term3" AND default contains "term4")'
                         if isinstance(index, StructuredVespaIndex)
                         else '((weakAnd(default contains "term1", default contains "term2")) '
                              'AND (default contains "term3" AND default contains "term4"))'
