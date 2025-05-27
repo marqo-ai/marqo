@@ -176,7 +176,7 @@ class HybridSearch:
         if (tensor_query is None) != (lexical_query is None):
             if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 raise core_exceptions.InvalidArgumentError(
-                    "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or just 'q'"
+                    "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor' or just 'q'"
                     "must be present when 'disjunction' retrieval method is used."
                 )
 

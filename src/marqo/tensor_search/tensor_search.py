@@ -1013,7 +1013,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
 
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str],
-                           interpolation_method: InterpolationMethod) -> Dict[
+                           interpolation_method: InterpolationMethod = None) -> Dict[
     Qidx, List[float]]:
     """Run the query vectorisation process
 

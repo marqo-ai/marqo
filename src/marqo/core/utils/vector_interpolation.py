@@ -36,6 +36,7 @@ class VectorInterpolation(abc.ABC):
 
 
 def from_interpolation_method(method: InterpolationMethod):
+    method = method.lower()
     if method == InterpolationMethod.SLERP:
         return Slerp()
     elif method == InterpolationMethod.NLERP:
@@ -163,21 +164,18 @@ class Slerp(VectorInterpolation):
         if len(vectors) != len(weights):
             raise ValueError('Vectors and weights must have the same length')
 
-        # Convert inputs to NumPy arrays for faster processing
-        np_vectors = np.array(vectors)
-        np_weights = np.array(weights)
-
         if self.method == self.Method.Sequential:
-            return self._interpolate_sequential(np_vectors, np_weights, prenormalized)
+            return self._interpolate_sequential(vectors, weights, prenormalized)
         elif self.method == self.Method.Hierarchical:
-            return self._interpolate_hierarchical(np_vectors, np_weights, prenormalized)
+            return self._interpolate_hierarchical(vectors, weights, prenormalized)
         else:
             raise InternalError(f'Unknown interpolation method: {self.method}')
 
-    def _slerp(self, v0: np.ndarray, v1: np.ndarray, t: float, prenormalized: bool = False) -> List[float]:
-        """Spherical linear interpolation between two vectors."""
-        if v0.shape != v1.shape:
-            raise ValueError(f'Vectors must have the same length. Got {v0.shape} and {v1.shape}')
+    def _slerp(self, v0: List[float], v1: List[float], t: float, prenormalized: bool = False) -> List[float]:
+        v0, v1 = np.array(v0), np.array(v1)
+
+        if len(v0) != len(v1):
+            raise ValueError('Vectors must have the same length. Got {} and {}'.format(len(v0), len(v1)))
 
         dot = np.dot(v0, v1)
 
@@ -188,7 +186,7 @@ class Slerp(VectorInterpolation):
             # Note we can only detect zero length if we calculate the norm
             if norm_v0 == 0 or norm_v1 == 0:
                 raise ValueError('One or more vectors had zero length. '
-                                'SLERP cannot interpolate vectors with zero length')
+                                 'SLERP cannot interpolate vectors with zero length')
 
             cos = dot / (norm_v0 * norm_v1)
         else:
@@ -198,81 +196,58 @@ class Slerp(VectorInterpolation):
         cos = np.clip(cos, -1.0, 1.0)
 
         theta = np.arccos(cos)
+
         sin_theta = np.sin(theta)
-        
         if sin_theta == 0:
             # Co-linear vectors, return linear interpolation
-            result = (1 - t) * v0 + t * v1
-        else:
-            # Use NumPy's vectorized operations for the calculation
-            s0 = np.sin((1 - t) * theta) / sin_theta
-            s1 = np.sin(t * theta) / sin_theta
-            result = s0 * v0 + s1 * v1
-            
+            return ((1 - t) * v0 + t * v1).tolist()
+
+        slerp_v0 = np.sin((1 - t) * theta) / sin_theta * v0
+        slerp_v1 = np.sin(t * theta) / sin_theta * v1
+
+        result = slerp_v0 + slerp_v1
         return result.tolist()
 
-    def _interpolate_sequential(self, vectors: np.ndarray, weights: np.ndarray, prenormalized: bool = False) -> List[float]:
-        """Sequential interpolation of vectors."""
+    def _interpolate_sequential(self, vectors: List[List[float]], weights: List[float], prenormalized: bool) -> List[float]:
         weights_copy = weights.copy()
-        result = vectors[0].copy()
-        
+        result = vectors[0]
         for i in range(1, len(vectors)):
             w0 = weights_copy[i - 1]
             w1 = weights_copy[i]
-            weight_sum = np.abs(w0) + np.abs(w1)
+            sum = np.abs(w0) + np.abs(w1)
 
-            if weight_sum == 0:
-                raise ZeroSumWeightsError(
-                    f'Sum of weights {w0} and {w1} is zero. SLERP cannot interpolate '
-                    'vectors with a sum weight of zero'
-                )
+            if sum == 0:
+                raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                          'vectors with a sum weight of zero'.format(w0, w1))
 
-            # Interpolate between current result and next vector
-            result = self._slerp(result, vectors[i], w1 / weight_sum, prenormalized)    # TODO: Check if abs is necessary here because it's not a sum
-            weights_copy[i] = weight_sum / 2
-            
+            result = self._slerp(result, vectors[i], w1 / sum, prenormalized)
+            weights_copy[i] = sum / 2
         return result
 
-    def _interpolate_hierarchical(self, vectors: np.ndarray, weights: np.ndarray, prenormalized: bool = False) -> List[float]:
-        """Hierarchical interpolation of vectors."""
-        # Work with copies to avoid modifying the originals
-        vecs = vectors.copy()
-        wts = weights.copy()
-        
-        while len(vecs) > 1:
-            n = len(vecs)
-            result_size = (n + 1) // 2  # Ceiling division for odd numbers
-            
-            # Pre-allocate arrays for results
-            result = np.zeros((result_size, vecs.shape[1]), dtype=vecs.dtype)
-            new_weights = np.zeros(result_size, dtype=wts.dtype)
-            
-            # Process pairs of vectors
-            pair_count = n // 2
-            
-            for i in range(pair_count):
-                w0 = wts[2*i]
-                w1 = wts[2*i + 1]
-                weight_sum = np.abs(w0) + np.abs(w1)
-                
-                if weight_sum == 0:
-                    raise ZeroSumWeightsError(
-                        f'Sum of weights {w0} and {w1} is zero. SLERP cannot interpolate '
-                        'vectors with a sum weight of zero'
-                    )
-                
-                # Calculate interpolation and store result
-                t = w1 / weight_sum         # TODO: Find out if abs is necessary here for weight 1
-                result[i] = self._slerp(vecs[2*i], vecs[2*i + 1], t, prenormalized)
-                new_weights[i] = weight_sum / 2
-            
-            # Handle odd number of vectors
-            if n % 2 == 1:
-                result[-1] = vecs[-1]
-                new_weights[-1] = wts[-1]
-            
-            # Update for next iteration
-            vecs = result
-            wts = new_weights
-        
-        return vecs[0].tolist()
+    def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float], prenormalized: bool) -> List[float]:
+        while len(vectors) > 1:
+            result = []
+            new_weights = []
+            for i in range(0, len(vectors), 2):
+                if i + 1 == len(vectors):
+                    # if there is an odd number of vectors, just append the last one
+                    result.append(vectors[i])
+                    new_weights.append(weights[i])
+                    continue
+
+                w0 = weights[i]
+                w1 = weights[i + 1]
+                sum = np.abs(w0) + np.abs(w1)
+
+                if sum == 0:
+                    raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                              'vectors with a sum weight of zero'.format(w0, w1))
+
+                result.append(
+                    self._slerp(vectors[i], vectors[i + 1], w1 / sum, prenormalized)
+                )
+                new_weights.append(sum / 2)
+            vectors = result
+            weights = new_weights
+
+        return vectors[0]

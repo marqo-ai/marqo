@@ -326,48 +326,49 @@ class TestSearchWithContext(MarqoTestCase):
                 )
 
                 # Basic search (query)
-                basic_results = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text={"shirt": 1, "black": -0.5},
-                    result_count=6
-                )
+                with self.subTest("Basic query"):
+                    basic_results = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text={"shirt": 1, "black": -0.5},
+                        result_count=6
+                    )
 
-                # Verify the 2 shirt documents are the top 2
-                self.assertIn("hits", basic_results)
-                result_ids = [hit["_id"] for hit in basic_results["hits"]]
-                self.assertEqual(result_ids[0], "doc1")
-                self.assertEqual(result_ids[1], "doc4")
-                # Last 2 docs have "black", thus pushing them to the bottom (negative weighted query)
-                self.assertEqual(result_ids[-2], "doc2")
-                self.assertEqual(result_ids[-1], "doc3")
+                    # Verify the 2 shirt documents are the top 2
+                    self.assertIn("hits", basic_results)
+                    result_ids = [hit["_id"] for hit in basic_results["hits"]]
+                    self.assertEqual(result_ids[0], "doc1")
+                    self.assertEqual(result_ids[1], "doc4")
+                    # Last 2 docs have "black", thus pushing them to the bottom (negative weighted query)
+                    self.assertEqual(result_ids[-2], "doc2")
+                    self.assertEqual(result_ids[-1], "doc3")
 
                 # Use context documents to put doc1 at the bottom, bring doc6 to the top
-                results_with_context_docs = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text={"shirt": 1, "black": -0.5},
-                    context=SearchContext(
-                        documents=SearchContextDocuments(
-                            ids={"doc1": -10.0, "doc6": 3.0},
-                            parameters=SearchContextDocumentsParameters(
-                                tensorFields=["text_field_1"],
-                                excludeInputDocuments=False
+                with self.subTest("With context documents"):
+                    results_with_context_docs = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text={"shirt": 1, "black": -0.5},
+                        context=SearchContext(
+                            documents=SearchContextDocuments(
+                                ids={"doc1": -10.0, "doc6": 10},
+                                parameters=SearchContextDocumentsParameters(
+                                    tensorFields=["text_field_1"],
+                                    excludeInputDocuments=False
+                                )
                             )
-                        )
-                    ),
-                    result_count=6
-                )
+                        ),
+                        interpolation_method="nlerp",
+                        result_count=6
+                    )
 
-                # Verify search results
-                self.assertIn("hits", results_with_context_docs)
-                result_ids = [hit["_id"] for hit in results_with_context_docs["hits"]]
-                self.assertEqual(result_ids[0], "doc6")
-                self.assertEqual(result_ids[1], "doc4")
-                # doc1 should be at the bottom
-                self.assertEqual(result_ids[-1], "doc1")
-                # TODO: Fix SLERP here, maybe don't have negative weights first.
-                pass
+                    # Verify search results
+                    self.assertIn("hits", results_with_context_docs)
+                    result_ids = [hit["_id"] for hit in results_with_context_docs["hits"]]
+                    self.assertEqual(result_ids[0], "doc6")
+                    # doc1 should be at the bottom
+                    self.assertEqual(result_ids[-1], "doc1")
+                    # TODO: Fix SLERP here, maybe don't have negative weights first.
 
     def test_search_with_context_documents_all_interpolation_methods_succeeds(self):
         """Test that search works correctly with context documents using different interpolation methods.

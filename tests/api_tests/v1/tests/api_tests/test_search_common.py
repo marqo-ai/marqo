@@ -318,7 +318,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -327,7 +327,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
 
 
                 with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
