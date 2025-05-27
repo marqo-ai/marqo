@@ -42,6 +42,7 @@ class TestMarqoInferenceCache(unittest.TestCase):
             {"cache_size": 10, "cache_type": 1},  # Invalid cache type
             {"cache_size": 1.4, "cache_type": "LFU"},  # Invalid cache size
             {"cache_size": -1, "cache_type": "LRU"},  # Invalid cache size
+            {"cache_size": 0, "cache_type": "LRU"},  # Invalid cache size
             {"cache_size": "str", "cache_type": "LRU"}  # Invalid cache size
         ]
         for test_case in test_cases:
@@ -65,23 +66,7 @@ class TestMarqoInferenceCache(unittest.TestCase):
         with self.assertRaises(TypeError):
             cache._generate_key("model", 456)
 
-    # Test is_enabled
-    def test_is_enabled_return_fase_when_disabled(self):
-        cache = MarqoInferenceCache(cache_size=0)
-        self.assertFalse(cache.is_enabled())
-
-    def test_is_enabled_return_true_when_enabled(self):
-        cache = MarqoInferenceCache(cache_size=1)
-        self.assertTrue(cache.is_enabled())
-
     # Test set
-    def test_set_does_noop_when_cache_is_disabled(self):
-        cache = MarqoInferenceCache(cache_size=0)
-        # Should not raise
-        cache.set("m", "c", 123)
-        self.assertIsNone(cache.get("m", "c"))
-        self.mock_collector.record_set.assert_not_called()
-
     def test_set_records_size_and_duration_when_cache_is_enabled(self):
         cache = MarqoInferenceCache(cache_size=10)
         value = [1, 2, 3]
@@ -95,11 +80,6 @@ class TestMarqoInferenceCache(unittest.TestCase):
         self.assertEqual(cache.get("m", "c"), value)
 
     # Test get
-    def test_get_returns_default_value_when_cache_is_disabled(self):
-        cache = MarqoInferenceCache(cache_size=0)
-        default = object()
-        self.assertIs(cache.get("m", "c", default=default), default)
-
     def test_get_records_miss_and_returns_default(self):
         cache = MarqoInferenceCache(cache_size=10)
         default = object()
@@ -125,11 +105,6 @@ class TestMarqoInferenceCache(unittest.TestCase):
         cache.set("m", "c", 789)
         cache.clear()
         self.assertIsNone(cache.get("m", "c"))
-
-    def test_clear_does_noop_when_cache_is_disabled(self):
-        cache = MarqoInferenceCache(cache_size=0)
-        # Should not raise
-        cache.clear()
 
     # Test eviction strategy
     def test_lru_eviction(self):

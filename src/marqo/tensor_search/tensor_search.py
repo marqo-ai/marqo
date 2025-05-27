@@ -1150,14 +1150,6 @@ def get_loaded_models() -> dict:
     return message
 
 
-def eject_model(model_name: str, device: str) -> dict:
-    try:
-        result = s2_inference.eject_model(model_name, device)
-    except s2_inference_errors.ModelNotInCacheError as e:
-        raise api_exceptions.ModelNotInCacheError(message=str(e))
-    return result
-
-
 # TODO [Refactoring device logic] move to device manager
 def get_cpu_info() -> dict:
     return {

@@ -26,15 +26,12 @@ class MarqoInferenceCache:
         MarqoCacheType.LFU: MarqoLFUCache,
     }
 
-    def __init__(self, cache_size: int = 0, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
-
+    def __init__(self, cache_size: int, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
         self._cache = self._build_cache(cache_size, cache_type)
-
-        if self.is_enabled():
-            self._stats: CacheStatsCollector = OTELCacheStatsCollector(
-                curr_size_fn=lambda: self._cache.currsize,
-                max_size_fn=lambda: self._cache.maxsize
-            )
+        self._stats: CacheStatsCollector = OTELCacheStatsCollector(
+            curr_size_fn=lambda: self._cache.currsize,
+            max_size_fn=lambda: self._cache.maxsize
+        )
 
     def _build_cache(self, cache_size: int, cache_type: MarqoCacheType) -> Optional[MarqoAbstractCache]:
         """Return a cache instance based on the cache type and size.
@@ -49,12 +46,8 @@ class MarqoInferenceCache:
         Raises:
             EnvVarError: If the cache size or type is invalid.
         """
-        if not isinstance(cache_size, int) or cache_size < 0:
-            raise EnvVarError(f"Invalid cache size: {cache_size}. "
-                              f"Must be a non-negative integer. ")
-        elif cache_size == 0:
-            logger.debug(f'Skip building inference cache since cache size is 0')
-            return None
+        if not isinstance(cache_size, int) or cache_size < 1:
+            raise EnvVarError(f"Invalid cache size: {cache_size}. Must be a positive integer.")
 
         if cache_type not in self._CACHE_TYPES_MAPPING:
             raise EnvVarError(f"Invalid cache type: {cache_type}. "
@@ -64,9 +57,6 @@ class MarqoInferenceCache:
         return cache
 
     def get(self, model_cache_key: str, content: str, default=None) -> Optional[T]:
-        if not self.is_enabled():
-            return default
-
         key = self._generate_key(model_cache_key, content)
         cache = self._cache
 
@@ -82,9 +72,6 @@ class MarqoInferenceCache:
             return value
 
     def set(self, model_cache_key: str, content: str, value: T) -> None:
-        if not self.is_enabled():
-            return
-
         key = self._generate_key(model_cache_key, content)
 
         now = time.perf_counter()
@@ -105,7 +92,3 @@ class MarqoInferenceCache:
         """Clear the cache."""
         if self._cache is not None:
             self._cache.clear()
-
-    def is_enabled(self) -> bool:
-        """Return True if the cache is enabled, else False."""
-        return self._cache is not None
