@@ -73,7 +73,6 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         res = self.client.index("test_index_for_preload_models").get_loaded_models()
         assert set([item["model_name"] for item in res["models"]]) == set(custom_models)
 
-    @unittest.skip(reason="Temproraliy skips this until inference caching is implemented")
     def test_multiple_env_vars(self):
         # TODO: Add log test
         """
@@ -117,8 +116,8 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Test inference cache
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
-        inference_time = 10
-        cache_reading_time = 5
+        inference_time = 20
+        cache_reading_time = 10
 
         # Single query
         # First search
@@ -143,6 +142,5 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         # Test to ensure inference cache is not working for add_documents:
         for _ in range(3):
-            r = telemetry_client.index(index_name).add_documents([{"test": "test"}],
-                                                                 tensor_fields=["test"])
+            r = telemetry_client.index(index_name).add_documents([{"test": "test"}], tensor_fields=["test"])
             self.assertTrue(r["telemetry"]["timesMs"]["add_documents.create_vectors"] > inference_time)
