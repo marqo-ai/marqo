@@ -22,6 +22,8 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional, List
 
+import math
+
 from tests import marqo_test
 from tests import utilities
 
@@ -109,7 +111,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
         min_inference_time_ms = 10     # inference usually takes at least 10ms
-        max_cache_reading_time_ms = 2  # if it hits cache, it's usually less than 2ms
+        cache_reading_time_ms = 2      # if it hits cache, it's usually less than 2ms
 
         # Test search query's embedding is cached when inference cache is enabled
         for query in ["test", {"random": 1, "query": 2}]:
@@ -121,13 +123,13 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 
                 # Run a few more times to make sure we populate it on API side cache as well as inference side cache
                 self._run_in_threads(lambda client: client.index(index_name).search(q=query),
-                                     max_workers=5, count=20)
+                                     max_workers=5, count=50)
                 
-                # Following search should hit cache, average latency should be low 
+                # Following searches should hit cache, average latency should be low
                 inference_latency = self._run_in_threads(
                     lambda client: client.index(index_name).search(q=query),
-                    max_workers=5, count=10, telemetry_name="search.vector_inference_full_pipeline")
-                self.assertTrue(sum(inference_latency) / 10 < max_cache_reading_time_ms, inference_latency)
+                    max_workers=1, count=10, telemetry_name="search.vector_inference_full_pipeline")
+                self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
 
         # Test to ensure inference cache is not working for add_documents:
         with self.subTest("Add document"):
@@ -145,7 +147,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         results = []
 
         # Using ThreadPoolExecutor to simulate concurrent access, we use a new client every time to avoid
-        # connection pooling, so we can hit as much worker as possible
+        # connection pooling, so we can hit most api workers in split mode
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(operation, Client(**self.client_settings, return_telemetry=True))
                        for _ in range(count)]
