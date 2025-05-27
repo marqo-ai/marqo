@@ -17,7 +17,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_combined_mode_with_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "COMBINED",
-            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "10",
+            "MARQO_INFERENCE_CACHE_SIZE": "10",
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
@@ -29,7 +29,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_combined_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "COMBINED",
-            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "0",
+            "MARQO_INFERENCE_CACHE_SIZE": "0",
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
@@ -39,7 +39,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_api_mode_with_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "API",
-            "MARQO_INFERENCE_CLIENT_CACHE_SIZE": "10",
+            "MARQO_API_INFERENCE_CACHE_SIZE": "10",
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
@@ -51,7 +51,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_api_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "API",
-            "MARQO_INFERENCE_CLIENT_CACHE_SIZE": "0",
+            "MARQO_API_INFERENCE_CACHE_SIZE": "0",
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
@@ -61,7 +61,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_inference_mode_with_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "INFERENCE",
-            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "10",
+            "MARQO_INFERENCE_CACHE_SIZE": "10",
         }):
             importlib.reload(sys.modules['marqo.inference.native_inference.remote.server.inference_api'])
 
@@ -73,7 +73,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
     def test_inference_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "INFERENCE",
-            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "0",
+            "MARQO_INFERENCE_CACHE_SIZE": "0",
         }):
             importlib.reload(sys.modules['marqo.inference.native_inference.remote.server.inference_api'])
 

@@ -285,8 +285,8 @@ class TestApiCustomEnvVars(MarqoTestCase):
 
     def test_inference_cache_caches_query_string(self):
         with mock.patch.dict(os.environ, {
-            "MARQO_INFERENCE_SERVER_CACHE_SIZE": "10",
-            "MARQO_INFERENCE_SERVER_CACHE_TYPE": "LFU",
+            "MARQO_INFERENCE_CACHE_SIZE": "10",
+            "MARQO_INFERENCE_CACHE_TYPE": "LFU",
             "MARQO_MODE": "COMBINED",
             "MARQO_ENABLE_THROTTLING": "FALSE"
         }):

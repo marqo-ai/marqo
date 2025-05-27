@@ -92,9 +92,9 @@ def generate_config() -> config.Config:
         )
 
         # initialise inference cache
-        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CLIENT_CACHE_SIZE)
+        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
         if inference_cache_size > 0:
-            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CLIENT_CACHE_TYPE)
+            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
             inference = CachingInference(
                 delegate=inference,
                 cache_size=inference_cache_size,
