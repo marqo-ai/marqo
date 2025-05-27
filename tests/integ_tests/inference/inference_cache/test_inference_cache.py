@@ -1,5 +1,7 @@
 import hashlib
+import random
 import unittest
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import numpy as np
@@ -131,6 +133,47 @@ class TestInferenceCache(unittest.TestCase):
                 self.assertIsNotNone(cached_embedding_model_1)
                 self.assertIsNotNone(cached_embedding_model_2)
                 self.assertNotEqual(cached_embedding_model_1, cached_embedding_model_2)
+
+    def test_inference_cache_is_thread_safe(self):
+        """Test if the cache is thread-safe by simulating concurrent reads and writes."""
+        ITERATIONS = 10_000
+        FREQUENT_ACCESS_RATIO = 0.5
+        FREQUENT_ACCESS_SUBSET_SIZE = 5000
+        TOTAL_QUERY_SET_SIZE = 100_000
+        CACHE_SIZE = 1_000
+
+        texts = [f"text{i}"for i in range(TOTAL_QUERY_SET_SIZE)]
+        frequent_texts = random.sample(texts, FREQUENT_ACCESS_SUBSET_SIZE)
+
+        def read_write_cache(caching_inference):
+            if random.random() < FREQUENT_ACCESS_RATIO:
+                text = random.choice(frequent_texts)
+            else:
+                text = random.choice(texts)
+            req = self.base_request.copy(update={"contents": [text]})
+            res = caching_inference.vectorise(req)
+            res_skipping_cache = self.inference_local.vectorise(req)
+            # test if the cached embedding is the same as the original
+            self.assertTrue(np.array_equal(res.result[0][0][1], res_skipping_cache.result[0][0][1]))
+
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                caching_inference = CachingInference(self.inference_local, CACHE_SIZE, cache_type)
+                errors = []
+
+                # Using ThreadPoolExecutor to simulate concurrent access to the cache
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = [executor.submit(read_write_cache, caching_inference) for _ in range(ITERATIONS)]
+
+                    # Collect results or errors from the futures
+                    for future in as_completed(futures):
+                        try:
+                            future.result()  # Raises exception if one occurred in the thread
+                        except Exception as e:
+                            errors.append(e)
+
+                # Assert no errors were encountered
+                self.assertEqual(len(errors), 0, f"Thread safety issues encountered: {errors}")
 
     def test_caching_inference_should_capture_key_metrics(self):
         for cache_type in ["LRU", "LFU"]:

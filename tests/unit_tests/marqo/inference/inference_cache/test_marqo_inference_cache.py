@@ -2,11 +2,7 @@ import sys
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
-import random
 from unittest import mock
-
-import numpy as np
 
 from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.enums import MarqoCacheType
@@ -199,44 +195,27 @@ class TestMarqoInferenceCache(unittest.TestCase):
                     self.assertIn(final_value, [[i] for i in range(10)],
                                   f"Final value {final_value} is not an expected value under {cache_type} policy")
 
-    @unittest.skip(reason='slow test, useful for manual verification')
-    def test_cache_thread_safety(self):
-        """Test if the cache is thread-safe by simulating concurrent reads and writes."""
-        DATA_DIMENSIONS = 768
-        SIZE = 16384
-        ITERATIONS = 100_000
-        FREQUENT_ACCESS_RATIO = 0.5
-        FREQUENT_ACCESS_SUBSET_SIZE = 5000
-        TOTAL_QUERY_SET_SIZE = 1_000_000
+    def test_cache_size_increases_linearly_with_items(self):
+        def get_cache_size(cache):
+            # please note this is just a rough estimation. other data structures in the cache might take extra spaces
+            return sum([sys.getsizeof(key) + sys.getsizeof(value) for key, value in cache.items()])
 
-        hits = Queue()
-        misses = Queue()
-        model_cache_key = "model_cache_key"
-
-        def read_write_cache(cache):
-            if random.random() < FREQUENT_ACCESS_RATIO:
-                text = random.choice(frequent_texts)
-            else:
-                text = random.choice(texts)
-            cache_value = cache.get(model_cache_key, text)
-            if cache_value is None:
-                cache_value = np.random.rand(1, DATA_DIMENSIONS).astype(np.float32).tolist()
-                cache.set(model_cache_key, text, cache_value)
-                misses.put(1)
-                return cache_value
-            else:
-                hits.put(1)
-                return cache_value
-
-        texts = [f"text{i} " * 5 for i in range(TOTAL_QUERY_SET_SIZE)]
-        frequent_texts = random.sample(texts, FREQUENT_ACCESS_SUBSET_SIZE)
         for cache_type in ['LRU', 'LFU']:
             with self.subTest(cache_type=cache_type):
-                test_cache = MarqoInferenceCache(cache_size=SIZE, cache_type="LRU")
-                with ThreadPoolExecutor(max_workers=8) as executor:
-                    futures = [executor.submit(read_write_cache, test_cache) for _ in
-                               range(ITERATIONS)]
-                    result = [future.result() for future in futures]
-                    self.assertEqual(ITERATIONS, len(result))
-                    self.assertTrue(hits.qsize() > 0)
-                    self.assertTrue(misses.qsize() > 0)
+                cache = MarqoInferenceCache(cache_size=100, cache_type=cache_type)
+                cache.set("test-model-cache-key", f"query 000", [100.0] * 768)
+
+                size = get_cache_size(cache._cache._cache)
+
+                # verify the cache size increases linearly with the item count
+                for i in range(1, 100):
+                    cache.set("test-model-cache-key", f"query {i:3d}", [100.0] * 768)
+                    self.assertEqual(get_cache_size(cache._cache._cache), size * (i + 1),
+                                     f"size does not increase linearly on item {i + 1}")
+
+                # Verify the cache size stops increasing after the cache is full
+                for i in range(100, 120):
+                    cache.set("test-model-cache-key", f"query {i:3d}", [100.0] * 768)
+                    self.assertEqual(get_cache_size(cache._cache._cache), size * 100,
+                                     f"size keeps increasing after cache is full on item {i + 1}")
+
