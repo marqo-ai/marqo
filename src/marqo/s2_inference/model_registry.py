@@ -613,7 +613,17 @@ def _get_open_clip_properties() -> Dict:
             "dimensions": 1152,
             "note": "A multilingual CLIP model",
             "type": "open_clip"
+        },
+        # 1. Confirm wih Pandu or Ishaq on our naming convention. Make it consistent with Marqtune
+        "timm/ViT-B-16-SigLIP2": {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP2",
+            "dimensions": 768,
+            "note": "A CLIP model trained on SigLIP2 dataset",
+            "type": "open_clip",
         }
+        # 2. Discuss the plan to support google's SigLIP2 models as they can't be loaded with open_clip
+        # 3. Discuss what models should be included into the model registry. Note this does not
+        # block the cloud usage/Marqtune if they load the model via custom loading.
     }
     return OPEN_CLIP_MODEL_PROPERTIES
 

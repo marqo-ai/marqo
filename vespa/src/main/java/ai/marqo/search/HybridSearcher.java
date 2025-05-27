@@ -291,6 +291,10 @@ public class HybridSearcher extends Searcher {
             Result probeLexialResult, String cutoffMethod, int minResults, double dummyParameter) {
         // Respect minimum result constraint
         // Lexical cutoff method
+
+        if (probeLexialResult.hits().asList().isEmpty()) {
+            return Math.max(minResults, 0);
+        }
         switch (cutoffMethod) {
             case "gapDetection" -> {
                 List<Hit> lexicalHits = new ArrayList<>(probeLexialResult.hits().asList());
