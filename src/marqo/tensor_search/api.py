@@ -81,6 +81,7 @@ def generate_config() -> config.Config:
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference
         model_manager = native_inference_local_config.model_manager
+        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
     else:
         inference = NativeInferenceClient(
             base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
@@ -93,15 +94,16 @@ def generate_config() -> config.Config:
 
         # initialise inference cache
         inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
-        if inference_cache_size > 0:
+        if inference_cache_size > 0:  # enable inference cache
             inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
-            inference = CachingInference(
+            caching_inference = CachingInference(
                 delegate=inference,
                 cache_size=inference_cache_size,
                 cache_type=inference_cache_type
             )
-
-    return config.Config(vespa_client, inference, model_manager, zookeeper_client)
+            return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
+        else:
+            return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()

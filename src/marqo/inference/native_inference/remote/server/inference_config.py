@@ -19,12 +19,14 @@ class Config:
 
         # initialise inference cache
         inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE)
-        if inference_cache_size > 0:
+        if inference_cache_size > 0:  # enable inference cache
             inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE)
-            inference = CachingInference(
+            self.local_inference = CachingInference(
                 delegate=inference,
                 cache_size=inference_cache_size,
                 cache_type=inference_cache_type
             )
+        else:
+            self.local_inference = inference
 
-        self.local_inference = inference
+
