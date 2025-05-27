@@ -42,6 +42,77 @@ _available_models = dict()
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
 
+
+def vectorise(
+        model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
+        model_properties: dict = None,
+        device: str = None, normalize_embeddings: bool = get_default_normalization(),
+        model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
+        media_download_headers: Optional[Dict] = None, **kwargs) -> List[List[float]]:
+    if not device:
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
+
+    validated_model_properties = validate_model_properties(model_name, model_properties)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
+
+    _update_available_models(
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_auth=model_auth
+    )
+
+    model = _available_models[model_cache_key][AvailableModelsKey.model]
+    return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                                    **kwargs)
+
+def _vectorise_without_cache(
+        model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+        normalize_embeddings: bool, modality: Modality, media_download_headers,
+        **kwargs) -> List[List[float]]:
+    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers, **kwargs)
+
+
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+                          normalize_embeddings: bool, modality: Modality, media_download_headers: Optional[Dict]=None,
+                          **kwargs) -> List[List[float]]:
+    try:
+        model = _available_models[model_cache_key][AvailableModelsKey.model]
+
+        if isinstance(content, str):
+            vectorised = model.encode(
+                content, normalize=normalize_embeddings, modality=modality,
+                media_download_headers=media_download_headers, **kwargs
+            )
+        elif isinstance(content, Tensor):
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
+        else:
+            vector_batches = []
+            batch_size = _get_max_vectorise_batch_size()
+
+            for batch in generate_batches(content, batch_size=batch_size):
+                if modality is None:
+                    modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
+
+                # TODO maybe the infer parameter can be replaced by modality
+                infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
+                encoded_batch = model.encode(
+                    batch, modality=modality, normalize=normalize_embeddings,
+                    media_download_headers=media_download_headers, infer = infer, **kwargs)
+
+                vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
+
+            if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
+                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
+            else:
+                vectorised = np.concatenate(vector_batches, axis=0)
+    except (UnidentifiedImageError, OSError) as e:
+        if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
+            raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
+        else:
+            raise e
+
+    return _convert_vectorized_output(vectorised)
+
+
 def get_available_models() -> Dict:
     """Returns the available models in the cache."""
     return _available_models
