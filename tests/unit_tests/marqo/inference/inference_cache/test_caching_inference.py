@@ -79,7 +79,7 @@ class TestCachingInferenceShouldSkip(TestCase):
 class TestCachingInferenceVectorise(TestCase):
     def setUp(self):
         self.mock_delegate = Mock(spec=Inference)
-        self.ci = CachingInference(delegate=self.mock_delegate, cache_size=0, cache_type='LRU')
+        self.ci = CachingInference(delegate=self.mock_delegate, cache_size=10, cache_type='LRU')
         # Replace cache with a mock
         self.ci.inference_cache = Mock()
         # Stub model_cache_key to a fixed key

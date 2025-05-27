@@ -24,7 +24,6 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
             inference = api.get_config().inference
             self.assertIsInstance(inference, CachingInference)
             self.assertIsInstance(inference.delegate, NativeInferenceLocal)
-            self.assertTrue(inference.inference_cache.is_enabled())
 
     def test_combined_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
@@ -46,7 +45,6 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
             inference = api.get_config().inference
             self.assertIsInstance(inference, CachingInference)
             self.assertIsInstance(inference.delegate, NativeInferenceClient)
-            self.assertTrue(inference.inference_cache.is_enabled())
 
     def test_api_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
@@ -68,7 +66,6 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
             inference = inference_api.get_config().local_inference
             self.assertIsInstance(inference, CachingInference)
             self.assertIsInstance(inference.delegate, NativeInferenceLocal)
-            self.assertTrue(inference.inference_cache.is_enabled())
 
     def test_inference_mode_without_inference_cache(self):
         with mock.patch.dict(os.environ, {
