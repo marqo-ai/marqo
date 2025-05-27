@@ -14,3 +14,4 @@ fastapi==0.115.12
 fastapi-utils==0.8.0
 uvicorn==0.34.0
 open-clip-torch==2.32.0
+tokenizers==0.21.1
