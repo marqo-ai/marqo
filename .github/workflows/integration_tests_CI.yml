@@ -39,6 +39,10 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  SHARDS: ${{ inputs.number_of_shards || 1 }}
+  REPLICAS: ${{ inputs.number_of_replicas || 0 }}
+
 jobs:
   Determine-Vespa-Setup:
     runs-on: ubuntu-latest
@@ -53,9 +57,9 @@ jobs:
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
           echo "First assuming single node Vespa setup."
 
-          # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
-          NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
-          NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
+          # Extract inputs from environment variables
+          NUMBER_OF_SHARDS="${{ env.SHARDS }}"
+          NUMBER_OF_REPLICAS="${{ env.REPLICAS }}"
 
           # Convert inputs to integers
           NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
@@ -69,53 +73,15 @@ jobs:
             echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
           fi
 
-  Start-Runner1:
-    needs:
-      - Determine-Vespa-Setup
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
-    secrets: inherit
-
-  Start-Runner2:
-    needs:
-      - Determine-Vespa-Setup
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
-    secrets: inherit
-
-  Create-Matrix:
-    needs:
-      - Start-Runner1
-      - Start-Runner2
-    if: ${{ always() }} # Ensure the matrix is created even if one of the runners fails to start
-    runs-on: ubuntu-latest
-    outputs:
-      labels: ${{ steps.create-matrix.outputs.labels }}
-      ec2-instance-ids: ${{ steps.create-matrix.outputs.ec2-instance-ids }}
-    steps:
-      - name: Create matrix
-        id: create-matrix
-        run: |
-          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}"]'
-          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}"]'
-
-          echo "labels=$LABELS" >> $GITHUB_OUTPUT
-          echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
-
   Test-Marqo:
     name: Run Integration Tests (Part ${{ matrix.part }}/1)
     needs:
-      - Create-Matrix # Ensures it starts only after the runners are ready
       - Determine-Vespa-Setup
     strategy:
       fail-fast: false
       matrix:
         part: [ 0, 1 ] # Zero-based index for JSON list access
-    runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     
     timeout-minutes: 60
     env:
@@ -152,8 +118,8 @@ jobs:
 
       - name: Build Vespa
         run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
+          sudo systemctl stop unattended-upgrades
+          sudo apt-get remove -y unattended-upgrades
 
           # Function to wait for the dpkg lock to be released
           function wait_for_dpkg_lock() {
@@ -167,7 +133,7 @@ jobs:
           wait_for_dpkg_lock
 
           echo "Updating package list"
-          apt-get update -y
+          sudo apt-get update -y
 
           # Build Vespa components
           echo "Installing jdk 17"
@@ -179,7 +145,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
 
       - name: Run Integration Tests
         run: |
@@ -197,20 +163,20 @@ jobs:
 
           export PYTHONPATH="./src:."
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output.txt
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
+            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-integ-tests-report-${{ matrix.part }}
+          name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
           path: |
-            marqo/.coverage.${{ matrix.part }}
-            marqo/pytest_result_summary.md
-            marqo/pytest_output.txt
+            marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
           include-hidden-files: true
 
   Merge-Coverage:
@@ -224,35 +190,26 @@ jobs:
         with:
           path: marqo
 
-      - name: Download all coverage files
+      - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
-
-      - name: Move Coverage Files
-        run: mv marqo-integ-tests-report-*/.* marqo/
+        with:
+          pattern: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-*
+          path: coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Merge Coverage Results
         run: |
           cd marqo
           pip install coverage
+          mkdir -p coverage-reports
+          # Move coverage files to marqo directory for combining
+          find ../coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
           coverage combine
+          # Store the combined coverage in a directory specific to this configuration
+          cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-integ-tests-report
-          path: marqo/.coverage
+          name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           include-hidden-files: true
-
-  Stop-Runner:
-    needs:
-      - Create-Matrix # Ensures it starts only after the runners are ready
-      - Test-Marqo # required to wait when the main job is done
-    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
-    strategy:
-      matrix:
-        instance: [0, 1] # Zero-based index for JSON list access
-    uses: ./.github/workflows/stop_ec2_runner.yml
-    with:
-      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
-      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
-    secrets: inherit

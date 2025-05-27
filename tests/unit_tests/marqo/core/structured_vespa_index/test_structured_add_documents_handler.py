@@ -10,7 +10,7 @@ from marqo.vespa.vespa_client import VespaClient
 from unit_tests.marqo_test import MarqoTestCase
 
 
-class TestUnstructuredAddDocumentsHandler(MarqoTestCase):
+class TestStructuredAddDocumentsHandler(MarqoTestCase):
     IMAGE_URL = 'https://sample.com/abcd.png'
     AUDIO_URL = 'https://sample.com/abcd.wav'
     VIDEO_URL = 'https://sample.com/abcd.mp4'

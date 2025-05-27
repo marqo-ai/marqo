@@ -85,7 +85,10 @@ jobs:
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
     needs: [check-if-image-exists, build-and-push-image]
-    if: (needs.check-if-image-exists.result == 'success') && (needs.check-if-image-exists.outputs.image_exists == 'true' || needs.build-and-push-image.result == 'success')
+    if: |
+      always() &&
+      (needs.check-if-image-exists.result == 'success') && 
+      (needs.check-if-image-exists.outputs.image_exists == 'true' || needs.build-and-push-image.result == 'success')
     outputs:
       list: ${{ steps.generate-versions.outputs.list }}
       to_version: ${{ steps.get-to-version.outputs.to_version }}
@@ -142,7 +145,9 @@ jobs:
     # Job to trigger execution workflows for backwards compatibility test for each version combination
     name: ${{ matrix.from_version }} Run all backwards compatibility tests execution workflows
     needs: [orchestrate, check-if-image-exists, build-and-push-image]
-    if: needs.orchestrate.result == 'success'
+    if: |
+      always() &&
+      needs.orchestrate.result == 'success'
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
@@ -171,7 +176,9 @@ jobs:
     # Job to trigger execution workflows for rollback test for each version combination
     name: ${{ matrix.from_version }} Run all rollback tests execution workflows
     needs: [ orchestrate, check-if-image-exists, build-and-push-image ]
-    if: needs.orchestrate.result == 'success'
+    if: |
+      always() &&
+      needs.orchestrate.result == 'success'
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}

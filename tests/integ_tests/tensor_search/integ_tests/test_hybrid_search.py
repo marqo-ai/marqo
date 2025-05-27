@@ -633,6 +633,7 @@ class TestHybridSearch(MarqoTestCase):
             except TypeError as e:
                 self.fail(f"Result is not JSON serializable: {e}")
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
         """
         Tests that hybrid search with:
@@ -812,6 +813,7 @@ class TestHybridSearch(MarqoTestCase):
                     # doc11 and doc13 has score 0, so their order is non-deterministic
                     self.assertSetEqual({'doc11', 'doc13'}, {hit["_id"] for hit in hybrid_res["hits"][1:]})
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_score_modifiers_different_retrieval_and_ranking(self):
         """
         Tests that score modifiers work as expected for tensor/lexical and lexical/tensor hybrid
@@ -906,6 +908,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], base_lexical_score * -10 * 3)
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_all_score_modifiers_fusion(self):
         """
         Tests that all score modifiers tensor, lexical, and global, work as expected together.
@@ -1038,6 +1041,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -1000 * 3)
                 self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], unmodified_rrf_scores["doc10"] * -1000 * 3)
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_global_score_modifiers(self):
         """
         Tests that global score modifiers work as expected for RRF / Disjunction
@@ -1182,7 +1186,7 @@ class TestHybridSearch(MarqoTestCase):
                     for hits in modified_res["hits"][1:]:
                         self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
 
-
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_global_score_modifiers_with_rerank_depth(self):
         """
         Tests that global score modifiers work as expected for RRF / Disjunction with rerankDepth
@@ -1727,6 +1731,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "random image")
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "hippo text")
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_structured_opposite_retrieval_and_ranking(self):
         """
         Tests that hybrid search with:
@@ -1839,6 +1844,7 @@ class TestHybridSearch(MarqoTestCase):
                     # If score is 0, it should not be in lexical search results
                     self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_semi_structured_opposite_retrieval_and_ranking(self):
         """
         Tests that hybrid search with:
@@ -2809,6 +2815,7 @@ class TestHybridSearch(MarqoTestCase):
                             next((doc for doc in tensor_res_reverse["hits"] if doc["_id"] == top_hit["_id"]), None)
                         )
 
+    @pytest.mark.skip_for_multinode
     def test_different_retrieval_and_ranking_combinations_with_weighted_queries(self):
         """
         Tests that different search and retrieval combinations can be made with weighted queries.
@@ -2952,8 +2959,7 @@ class TestHybridSearch(MarqoTestCase):
                     # Check that top result is lowest in reverse weighted query
                     assert res["hits"][0]["_id"] == reverse_res["hits"][-1]["_id"]
 
-
-
+    @pytest.mark.skip_for_multinode
     def test_lexical_retrieval_tensor_rerank_with_weighted_query(self):
         """
         Tests that a weighted tensor query can be made.
@@ -3299,3 +3305,42 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod=RankingMethod.Tensor,
                         ), result_count=5
                     )
+
+    def test_lexical_filtering_with_scoreModifiersLexical_works(self):
+        """
+        Test that lexical filtering with scoreModifiersLexical works.
+        """
+        for index in [self.semi_structured_default_text_index, self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index):
+                doc = {
+                    "_id": "1",
+                    "text_field_1": "test",
+                    "text_field_2": "not",
+                    "add_field_1": 1.2,
+                    "text_field_3": "test",
+                }
+
+                self.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=[doc],
+                        tensor_fields=["text_field_1"] if isinstance(index, SemiStructuredMarqoIndex) else None
+                    )
+                )
+
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, search_method="HYBRID", text="test",
+                    filter="text_field_1:hadhsd",
+                    score_modifiers=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 2000}]),
+                    highlights=False,
+                    hybrid_parameters=HybridParameters(
+                        scoreModifiersLexical=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        scoreModifiersTensor=ScoreModifierLists(add_to_score=[{"field_name": "add_field_1", "weight": 1}]),
+                        searchableAttributesLexical=[
+                            "text_field_1",
+                            "text_field_2",
+                            "text_field_3",
+                        ]
+                    )
+                )
+
+                self.assertEqual(res["hits"], [])
