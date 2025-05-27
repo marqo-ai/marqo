@@ -22,10 +22,16 @@ LARGE_OPEN_CLIP_TEST_MODELS = [
     'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k',
     'open_clip/ViT-H-14-378-quickgelu/dfn5b',
     'open_clip/ViT-SO400M-14-SigLIP-384/webli',
+    "open_clip/ViT-L-16-SigLIP-384/webli",
+    "open_clip/ViT-B-16-SigLIP/webli",
     "visheratin/nllb-siglip-mrl-large",
     "visheratin/nllb-clip-large-siglip",
     "visheratin/nllb-siglip-mrl-base",
-    "visheratin/nllb-clip-base-siglip"
+    "visheratin/nllb-clip-base-siglip",
+    "timm/ViT-B-16-SigLIP2",
+    "timm/ViT-B-16-SigLIP2-256",
+    "timm/ViT-B-16-SigLIP2-512",
+    "timm/ViT-L-16-SigLIP2-256",
 ]
 
 @pytest.mark.largemodel
@@ -88,6 +94,8 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         self.eps = 1e-6
 
     def test_embeddings_regression(self):
+        has_reference_embedding = self.model_name in self.open_clip_embeddings_reference
+
         try:
             self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
         except KeyError:
@@ -96,7 +104,6 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         text_texts = ['hello', 'this is a test sentence. so is this.']
         for text in text_texts:
             with self.subTest(f"Test text: {text}"):
-                embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
                 pipeline_embeddings = self.encode_content_helper(
                     content=[text],
                     model_name=self.model_name,
@@ -105,10 +112,19 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
                     normalize_embeddings=True
                 )
 
-                embeddings_difference = self.calculate_embeddings_difference(
-                    embeddings_reference, pipeline_embeddings[0]
-                )
-                self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
+                ground_truth_embeddings = self.open_clip_embeddings_reference.get(self.model_name, {}).get(text, None)
+
+                if ground_truth_embeddings:
+                    embeddings_reference = np.array(ground_truth_embeddings).reshape(-1)
+                    embeddings_difference = self.calculate_embeddings_difference(
+                        embeddings_reference, pipeline_embeddings[0]
+                    )
+                    self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
+                else:
+                    print(f"Model {self.model_name} on {self.device} generates embeddings for text '{text}': "
+                          f"{pipeline_embeddings[0].tolist()}")
+
+                    self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
 
     def test_open_clip_encode_text_normalized(self):
         """
