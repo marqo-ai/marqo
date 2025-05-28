@@ -299,8 +299,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(images)
-                outputs = outputs.to(torch.float32)
+                    outputs = self.model.encode_image(images).to(torch.float32)
             else:
                 outputs = self.model.encode_image(images).to(torch.float32)
 
@@ -318,8 +317,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_text(text)
-                outputs = outputs.to(torch.float32)
+                    outputs = self.model.encode_text(text).to(torch.float32)
             else:
                 outputs = self.model.encode_text(text).to(torch.float32)
 
