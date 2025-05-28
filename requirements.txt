@@ -5,6 +5,7 @@
 # dependencies (or upgrades of these dependencies) in this file. Please not if the dependency is platform-relevant,
 # meaning you need to use one version for arm64 and another for amd64, you still need to follow the process in
 # marqo-base repo and build a new base image.
+--extra-index-url https://download.pytorch.org/whl/cu113
 
 msgpack==1.1.0
 msgpack_numpy==0.4.8
@@ -17,6 +18,6 @@ open-clip-torch==2.32.0
 transformers==4.45.2
 tokenizers==0.20.2
 
-torch==1.13.1+cu113
-torchaudio==0.13.1+cu113
-torchvision==0.14.1+cu113
+torch==1.13.1+cu113 ; platform_machine == "x86_64"
+torchaudio==0.13.1+cu113 ; platform_machine == "x86_64"
+torchvision==0.14.1+cu113 ; platform_machine == "x86_64"
