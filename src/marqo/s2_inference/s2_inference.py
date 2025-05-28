@@ -41,10 +41,6 @@ _available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
-_marqo_inference_cache = MarqoInferenceCache(
-    cache_size=read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE),
-    cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
-
 
 
 def vectorise(
@@ -65,69 +61,8 @@ def vectorise(
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-
-    if _marqo_inference_cache.is_enabled() and enable_cache:
-        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality,
-                                     media_download_headers, **kwargs)
-    else:
-        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers,
-                                        **kwargs)
-
-def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, media_download_headers,
-                          **kwargs):
-    if isinstance(content, str):
-        vectorised = _marqo_inference_cache.get(model_cache_key, content)
-        if vectorised is None:
-            vectorised = _encode_without_cache(
-                model_cache_key, content, normalize_embeddings, modality, media_download_headers,
-                **kwargs
-            )
-            _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
-        else:
-            vectorised = _convert_cached_embeddings_to_output(vectorised)
-        return vectorised
-    elif isinstance(content, list):
-        return _vectorise_list_with_cache(
-            model, model_cache_key, content, normalize_embeddings, modality,
-            media_download_headers,
-            **kwargs
-        )
-    else:
-        raise TypeError(f"Unsupported content type: {type(content).__name__}")
-
-def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality,  media_download_headers,
-                               **kwargs):
-    contents_to_vectorise = []
-    cached_output = []
-
-    # Collect the content that needs to be vectorised
-    for loc, content_item in enumerate(content):
-        if isinstance(content_item, str):
-            vectorised = _marqo_inference_cache.get(model_cache_key, content_item)
-            if vectorised is None:
-                contents_to_vectorise.append(content_item)
-            else:
-                cached_output.append((loc, vectorised))
-        else:
-            contents_to_vectorise.append(content_item)
-
-    if contents_to_vectorise:
-        vectorised_outputs = _encode_without_cache(
-            model_cache_key, contents_to_vectorise, normalize_embeddings, modality,
-            media_download_headers, **kwargs
-        )
-        # Cache the vectorised outputs
-        for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
-            if isinstance(content_item, str):
-                _marqo_inference_cache.set(model_cache_key, content_item, vectorised_output)
-        # Insert the cached outputs back into the vectorised outputs
-        for loc, cached_vector in cached_output:
-            vectorised_outputs.insert(loc, cached_vector)
-    else:
-        vectorised_outputs = [vector for _, vector in cached_output]
-
-    return vectorised_outputs
-
+    return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                                    **kwargs)
 
 def _vectorise_without_cache(
         model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
@@ -181,11 +116,6 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 def get_available_models() -> Dict:
     """Returns the available models in the cache."""
     return _available_models
-
-
-def get_marqo_inference_cache() -> MarqoInferenceCache:
-    """Returns the _marqo_inference_cache object"""
-    return _marqo_inference_cache
 
 
 def is_preprocessor_preload(model_properties: dict = None) -> bool:
@@ -597,12 +527,6 @@ def clear_loaded_models() -> None:
     if torch.cuda.is_available():
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
-
-
-def clear_marqo_inference_cache() -> None:
-    """ clears the inference cache if it is enabled"""
-    if _marqo_inference_cache.is_enabled():
-        _marqo_inference_cache.clear()
 
 
 def get_model_properties_from_registry(model_name: str) -> dict:
