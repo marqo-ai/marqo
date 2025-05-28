@@ -34,6 +34,7 @@ jobs:
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
+          ref: 'yihan/siglip2'
 
       - name: Install dependencies
         run: |
