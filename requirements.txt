@@ -16,3 +16,7 @@ uvicorn==0.34.0
 open-clip-torch==2.32.0
 transformers==4.45.2
 tokenizers==0.20.2
+
+torch==1.13.1+cu113
+torchaudio==0.13.1+cu113
+torchvision==0.14.1+cu113
