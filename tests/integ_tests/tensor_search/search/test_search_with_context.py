@@ -15,6 +15,8 @@ from marqo.exceptions import InvalidArgumentError, InternalError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from integ_tests.marqo_test import MarqoTestCase
 from integ_tests.utils.transition import *
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 
 class TestSearchWithContext(MarqoTestCase):
 
@@ -33,8 +35,10 @@ class TestSearchWithContext(MarqoTestCase):
             name=cls.structured_index_basic,
             model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
-                FieldRequest(name='text_field_1', type=FieldType.Text),
-                FieldRequest(name='text_field_2', type=FieldType.Text),
+                FieldRequest(name='text_field_1', type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch]),
+                FieldRequest(name='text_field_2', type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
                 FieldRequest(name='score_field', type=FieldType.Float,
                              features=[FieldFeature.ScoreModifier]),
@@ -369,6 +373,170 @@ class TestSearchWithContext(MarqoTestCase):
                     # doc1 should be at the bottom
                     self.assertEqual(result_ids[-1], "doc1")
                     # TODO: Fix SLERP here, maybe don't have negative weights first.
+
+    def test_hybrid_search_with_context_documents_succeeds(self):
+        """
+        Context documents should work with hybrid search. Trying it with:
+        1. disjunction / rrf
+        2. tensor / tensor
+        3. tensor / lexical
+        4. lexical / tensor
+
+        using hybridParameters.queryLexical and hybridParameters.queryTensor and query = None
+        """
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents to the index
+                docs = [
+                    {"_id": "doc1", "text_field_1": "red shirt with collar unisex"},
+                    {"_id": "doc2", "text_field_1": "black long pants for men"},
+                    {"_id": "doc3", "text_field_1": "black shorts unisex"},
+                    {"_id": "doc4", "text_field_1": "black shirt for men"},
+                    {"_id": "doc5", "text_field_1": "grey pants for women"},
+                    {"_id": "doc6", "text_field_1": "green hat unisex"},
+                ]
+
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                test_cases = [
+                    ("disjunction", "rrf", {"black": 1}, "shorts"),
+                    ("tensor", "tensor", {"black": 1}, None),
+                    ("tensor", "lexical", {"black": 1}, "shorts"),
+                    ("lexical", "tensor", {"black": 1}, "shorts")
+                ]
+
+                for retrieval_method, ranking_method, query_tensor, query_lexical in test_cases:
+                    with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                        # Use context documents to put doc1 at the bottom, bring doc6 to the top
+                        with self.subTest("With context documents"):
+                            results_with_context_docs = tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text=None,
+                                context=SearchContext(
+                                    documents=SearchContextDocuments(
+                                        ids={"doc1": -10.0, "doc3": 10},
+                                        parameters=SearchContextDocumentsParameters(
+                                            tensorFields=["text_field_1"],
+                                            excludeInputDocuments=False
+                                        )
+                                    )
+                                ),
+                                interpolation_method="nlerp",
+                                result_count=6,
+                                search_method="HYBRID",
+                                hybrid_parameters= HybridParameters(
+                                    retrievalMethod= retrieval_method,
+                                    rankingMethod= ranking_method,
+                                    queryLexical=query_lexical,
+                                    queryTensor=query_tensor
+                                )
+                            )
+
+                            # Verify search results
+                            self.assertIn("hits", results_with_context_docs)
+                            result_ids = [hit["_id"] for hit in results_with_context_docs["hits"]]
+                            self.assertEqual(result_ids[0], "doc3")
+
+                            if retrieval_method == "disjunction" and ranking_method == "rrf" or \
+                                retrieval_method == "tensor" and ranking_method == "tensor":
+                                # In disjunction/rrf or tensor/tensor, doc1 will be at the bottom.
+                                # In lexical retrieval, it won't be present, in lexical ranking,
+                                # it won't be at the bottom.
+                                self.assertEqual(result_ids[-1], "doc1")
+
+    def test_hybrid_search_with_custom_vectory_query_and_context_documents_succeeds(self):
+        """
+        Using CustomVectorQuery with context documents must work with hybrid search
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents to the index
+                docs = [
+                    {"_id": "doc1", "text_field_1": "red shirt with collar unisex"},
+                    {"_id": "doc2", "text_field_1": "black long pants for men"},
+                    {"_id": "doc3", "text_field_1": "black shorts unisex"},
+                    {"_id": "doc4", "text_field_1": "black shirt for men"},
+                    {"_id": "doc5", "text_field_1": "grey pants for women"},
+                    {"_id": "doc6", "text_field_1": "green hat unisex"},
+                ]
+
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content= "green",       # only doc6 matches this
+                            vector=[1 for i in range(self.DIMENSION)],  # Meaningless vector
+                        )
+                    ),
+                    context=SearchContext(
+                        documents=SearchContextDocuments(
+                            ids={"doc1": 10},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                excludeInputDocuments=False
+                            ),
+                        )
+                    ),
+                    result_count=6,
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        alpha=0.1,      # Make sure lexical result comes first
+                    )
+                )
+
+                # Verify search results
+                self.assertIn("hits", results)
+                result_ids = [hit["_id"] for hit in results["hits"]]
+                self.assertEqual(result_ids[0], "doc6")     # Because it's a lexical hit
+                self.assertEqual(result_ids[1], "doc1")     # Because of context document increasing value
+
+    def test_hybrid_search_with_str_query_tensor_and_context_fails(self):
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                with self.assertRaises(InvalidArgumentError) as ex:
+                    results_with_context_docs = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=SearchContext(
+                            documents=SearchContextDocuments(
+                                ids={"doc1": -10.0, "doc3": 10},
+                                parameters=SearchContextDocumentsParameters(
+                                    tensorFields=["text_field_1"],
+                                    excludeInputDocuments=False
+                                )
+                            )
+                        ),
+                        interpolation_method="nlerp",
+                        result_count=6,
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod="tensor",
+                            rankingMethod="lexical",
+                            queryLexical="a string",
+                            queryTensor="just a string"
+                        )
+                    )
+                self.assertIn("Cannot use 'context' for a search with a string 'q'", str(ex.exception))
 
     def test_search_with_context_documents_all_interpolation_methods_succeeds(self):
         """Test that search works correctly with context documents using different interpolation methods.
@@ -833,79 +1001,6 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_rerank_depth(self):
         """Test that search with context documents honors rerank_depth parameter."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index.type):
-                # Add documents to the index
-                docs = [
-                    {"_id": f"doc_{i}", "text_field_1": f"Test document {i}"} for i in range(10)
-                ]
-
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=docs,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Create search context
-                search_context = SearchContext(
-                    documents=SearchContextDocuments(
-                        ids={"doc_0": 1.0, "doc_1": 1.0},
-                        parameters=SearchContextDocumentsParameters(
-                            tensorFields=["text_field_1"],
-                            excludeInputDocuments=False
-                        )
-                    )
-                )
-
-                # Case 1: result_count < rerank_depth → limit is respected
-                with self.subTest(case="result_count_less_than_rerank_depth"):
-                    results = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        context=search_context,
-                        result_count=3,
-                        rerank_depth=5
-                    )
-                    self.assertEqual(len(results["hits"]), 3)
-
-                # Case 2: offset beyond rerank_depth → results still present
-                with self.subTest(case="offset_beyond_rerank_depth"):
-                    results = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        context=search_context,
-                        result_count=1,
-                        offset=3,
-                        rerank_depth=2
-                    )
-                    self.assertEqual(len(results["hits"]), 1)
-
-                # Case 3: result_count > rerank_depth → limit overrides rerank_depth
-                with self.subTest(case="result_count_exceeds_rerank_depth"):
-                    results = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        context=search_context,
-                        result_count=5,
-                        rerank_depth=3
-                    )
-                    self.assertEqual(len(results["hits"]), 5)
-
-    # TODO: Hybrid search with context documents (rrf, tensor/tensor)
-    def test_search_with_context_documents_hybrid_search(self):
-        """
-        Test that search with context documents works with hybrid search in the following scenarios:
-        1. disjunction / rrf
-        2. tensor retrieval / tensor ranking
-        3. lexical retrieval / tensor ranking
-        4. tensor retrieval / lexical ranking
-        """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index

@@ -927,6 +927,11 @@ def get_query_vectors_from_jobs(
             result[qidx] = list(merged_vector)
 
         elif isinstance(q.q, str):
+            if q.context:
+                raise core_exceptions.InvalidArgumentError(
+                    f"Cannot use 'context' for a search with a string 'q' (or queryTensor): '{q.q}'. "
+                    f"To use 'context', please provide a dictionary or a CustomVectorQuery object as the query instead."
+                )
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 job_to_vectors=job_to_vectors,

@@ -16,6 +16,9 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from integ_tests.marqo_test import MarqoTestCase
 import pytest
 
+from marqo.tensor_search import tensor_search, index_meta_cache
+from marqo.core.models.marqo_index import IndexType
+
 
 class TestRecommender(MarqoTestCase):
 
@@ -691,6 +694,80 @@ class TestRecommender(MarqoTestCase):
                     # We only assert < 3 as the exact number of results varies across runs,
                     # but for one searchable attribute and one shard is capped at ef_search
                     self.assertTrue(len(res["hits"]) <= 3)
+
+    def test_get_doc_vectors_from_ids_noDocumentsProvided_fails(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                with self.assertRaises(InvalidArgumentError):
+                    self.recommender.get_doc_vectors_from_ids(index.name, [])
+
+    def test_get_doc_vectors_from_ids_allZeroWeights_fails(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                documents = {"doc1": 0.0, "doc2": 0.0}
+                with self.assertRaises(InvalidArgumentError):
+                    self.recommender.get_doc_vectors_from_ids(index.name, documents)
+
+    def test_get_doc_vectors_from_ids_invalidTensorField_fails(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index:
+                    mock_index = mock.Mock()
+                    mock_index.type = IndexType.Structured
+                    mock_index.tensor_field_map = {"valid_field": {}}
+                    mock_get_index.return_value = mock_index
+
+                    with self.assertRaises(InvalidFieldNameError):
+                        self.recommender.get_doc_vectors_from_ids(
+                            index.name,
+                            documents=["doc1"],
+                            tensor_fields=["invalid_field"]
+                        )
+
+    def test_get_doc_vectors_from_ids_documentNotFound_fails(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
+                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
+                    mock_get_index.return_value = index
+                    mock_get_docs.return_value.dict.return_value = {
+                        "results": [{"_id": "doc1", "_found": False}]
+                    }
+
+                    with self.assertRaises(InvalidArgumentError):
+                        self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
+
+    def test_get_doc_vectors_from_ids_documentWithoutEmbeddings_fails(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
+                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
+                    mock_get_index.return_value = index
+                    mock_get_docs.return_value.dict.return_value = {
+                        "results": [{"_id": "doc1", "_found": True, "_tensor_facets": []}]
+                    }
+
+                    with self.assertRaises(InvalidArgumentError):
+                        self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
+
+    def test_get_doc_vectors_from_ids_success(self):
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(index_type=index.name):
+                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
+                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
+                    mock_get_index.return_value = index
+                    mock_get_docs.return_value.dict.return_value = {
+                        "results": [{
+                            "_id": "doc1",
+                            "_found": True,
+                            "_tensor_facets": [{"field1": "value", "_embedding": [0.1, 0.2, 0.3]}]
+                        }]
+                    }
+
+                    result = self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
+                    expected = {"doc1": [[0.1, 0.2, 0.3]]}
+                    self.assertEqual(result, expected)
+
 
 if __name__ == '__main__':
     unittest.main()

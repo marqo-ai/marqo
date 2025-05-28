@@ -186,10 +186,15 @@ class HybridSearch:
             query_text_search = lexical_query
 
             if context is None:
+                # If no context, create it with a tensor component
                 context = SearchContext(
                     tensor=[SearchContextTensor(vector=tensor_query, weight=1)]
                 )
+            elif context.tensor is None:
+                # If no context.tensor, create it
+                context.tensor = [SearchContextTensor(vector=tensor_query, weight=1)]
             else:
+                # If context.tensor exists, append the tensor query to it
                 context.tensor.append(SearchContextTensor(vector=tensor_query, weight=1))
         elif tensor_query is None and lexical_query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.

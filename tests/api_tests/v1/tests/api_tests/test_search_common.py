@@ -380,3 +380,97 @@ class TestSearchCommon(MarqoTestCase):
                         )
                     assert e.exception.status_code == 400
                     assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)
+
+    def test_search_with_context_documents(self):
+        for index_name in [self.unstructured_text_index_name, self.structured_text_index_name]:
+            with self.subTest(index=index_name):
+                self.client.index(index_name=index_name).add_documents(
+                    [
+                        {
+                            "title": "A comparison of the best pets",
+                            "content": "Animals",
+                            "_id": "d1"
+                        },
+                        {
+                            "title": "The history of dogs",
+                            "content": "A history of household pets",
+                            "_id": "d2"
+                        }
+                    ],
+                    tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+
+                for interpolation_method in ["lerp", "nlerp", "slerp"]:
+                    context = {
+                        "documents": {
+                            "parameters": {
+                                "excludeInputDocuments": False,
+                                "tensorFields": ["title", "content"]
+                            },
+                            "ids": {
+                                "d1": 1
+                            }
+                        }
+                    }
+
+                    res = self.client.index(index_name).search(q={"best pets": 1},
+                                                                context=context,
+                                                                search_method="TENSOR",
+                                                                interpolation_method=interpolation_method
+                                                                )
+                    self.assertEqual(res["hits"][0]["_id"], "d1")
+
+    def test_hybrid_search_with_context_documents(self):
+        for index_name in [self.unstructured_text_index_name, self.structured_text_index_name]:
+            with self.subTest(index=index_name):
+                self.client.index(index_name=index_name).add_documents(
+                    [
+                        {
+                            "title": "A comparison of the best pets",
+                            "content": "Animals",
+                            "_id": "d1"
+                        },
+                        {
+                            "title": "The history of dogs",
+                            "content": "A history of household pets",
+                            "_id": "d2"
+                        }
+                    ],
+                    tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+
+                test_cases = [
+                    ("disjunction", "rrf", {"best pets": 1}, "animals"),
+                    ("tensor", "tensor", {"best pets": 1}, None),
+                    ("tensor", "lexical", {"best pets": 1}, "animals"),
+                    ("lexical", "tensor", {"best pets": 1}, "animals")
+                ]
+
+                for interpolation_method in ["lerp", "nlerp", "slerp"]:
+                    context = {
+                        "documents": {
+                            "parameters": {
+                                "excludeInputDocuments": False,
+                                "tensorFields": ["title", "content"]
+                            },
+                            "ids": {
+                                "d1": 1
+                            }
+                        }
+                    }
+
+                    for retrieval_method, ranking_method, query_tensor, query_lexical in test_cases:
+                        with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                            res = self.client.index(index_name).search(
+                                q=None,
+                                context=context,
+                                search_method="HYBRID",
+                                hybrid_parameters={
+                                    "queryTensor": query_tensor,
+                                    "queryLexical": query_lexical,
+                                    "retrievalMethod": retrieval_method,
+                                    "rankingMethod": ranking_method
+                                },
+                                interpolation_method=interpolation_method
+                            )
+                            self.assertEqual(res["hits"][0]["_id"], "d1")
