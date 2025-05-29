@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
 from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
 

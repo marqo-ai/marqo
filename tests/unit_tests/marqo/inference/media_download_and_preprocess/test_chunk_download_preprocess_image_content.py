@@ -8,7 +8,7 @@ from tests.integ_tests.marqo_test import TestImageUrls
 from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_media
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.type import *
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class CLIPPreprocessor(AbstractPreprocessor):
