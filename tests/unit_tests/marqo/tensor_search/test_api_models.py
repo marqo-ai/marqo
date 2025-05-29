@@ -6,8 +6,8 @@ from marqo.tensor_search.enums import SearchMethod
 class TestSearchQueryModel(unittest.TestCase):
     def test_default_values(self):
         """Test default values for SearchQuery model"""
-        query = SearchQuery()
-        self.assertIsNone(query.q)
+        query = SearchQuery(q="test query")
+        self.assertEqual(query.q, "test query")
         self.assertIsNone(query.searchableAttributes)
         self.assertEqual(query.searchMethod, SearchMethod.TENSOR)
         self.assertEqual(query.limit, 10)
@@ -23,7 +23,7 @@ class TestSearchQueryModel(unittest.TestCase):
     
     def test_approximate_threshold_parameter(self):
         """Test setting approximateThreshold parameter"""
-        query = SearchQuery(approximateThreshold=0.85)
+        query = SearchQuery(q="test query", approximateThreshold=0.85)
         self.assertEqual(query.approximateThreshold, 0.85)
         
     def test_setting_all_params(self):

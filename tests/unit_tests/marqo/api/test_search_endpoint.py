@@ -7,7 +7,9 @@ from marqo.tensor_search import api
 class TestSearchEndpointApproximateThreshold(unittest.TestCase):
     def setUp(self):
         # Create a mock for tensor_search.search
-        self.search_patcher = patch('marqo.tensor_search.api.tensor_search.search')
+        self.search_patcher = patch(
+            'marqo.tensor_search.api.tensor_search.search'
+        )
         self.mock_search = self.search_patcher.start()
         self.mock_search.return_value = {"hits": [], "query": "test query"}
         
@@ -18,13 +20,27 @@ class TestSearchEndpointApproximateThreshold(unittest.TestCase):
         self.mock_get_config.return_value = self.mock_config
         
         # Create a mock for the API validation
-        self.validation_patcher = patch('marqo.tensor_search.api.api_validation.validate_device')
+        self.validation_patcher = patch(
+            'marqo.tensor_search.api.api_validation.validate_device'
+        )
         self.mock_validate_device = self.validation_patcher.start()
         self.mock_validate_device.return_value = "cpu"
         
         # Create a mock for the parse_request_object function
-        self.parse_patcher = patch('marqo.tensor_search.api.parse_request_object')
+        self.parse_patcher = patch(
+            'marqo.tensor_search.api.parse_request_object'
+        )
         self.mock_parse = self.parse_patcher.start()
+        
+        # Mock the telemetry system
+        self.telemetry_patcher = patch(
+            'marqo.tensor_search.api.RequestMetricsStore.for_request'
+        )
+        self.mock_telemetry = self.telemetry_patcher.start()
+        mock_metrics = MagicMock()
+        self.mock_telemetry.return_value = mock_metrics
+        mock_metrics.time.return_value.__enter__ = MagicMock()
+        mock_metrics.time.return_value.__exit__ = MagicMock()
         
     def tearDown(self):
         # Stop all patchers
@@ -32,9 +48,11 @@ class TestSearchEndpointApproximateThreshold(unittest.TestCase):
         self.config_patcher.stop()
         self.validation_patcher.stop()
         self.parse_patcher.stop()
+        self.telemetry_patcher.stop()
         
     def test_search_endpoint_with_approximate_threshold(self):
-        """Test that the search endpoint passes approximateThreshold to tensor_search.search"""
+        """Test that the search endpoint passes approximateThreshold to 
+        tensor_search.search"""
         # Create a mock SearchQuery with approximateThreshold
         mock_search_query = MagicMock()
         mock_search_query.q = "test query"
@@ -63,11 +81,14 @@ class TestSearchEndpointApproximateThreshold(unittest.TestCase):
         # Call the search endpoint
         api.search(
             index_name="test_index",
-            search_query_dict={"q": "test query", "approximateThreshold": 0.8},
+            search_query_dict={
+                "q": "test query", "approximateThreshold": 0.8
+            },
             device="cpu"
         )
         
-        # Check that tensor_search.search was called with the correct parameters
+        # Check that tensor_search.search was called with the correct 
+        # parameters
         self.mock_search.assert_called_once()
         call_kwargs = self.mock_search.call_args[1]
         self.assertEqual(call_kwargs.get('approximate_threshold'), 0.8)
@@ -106,7 +127,8 @@ class TestSearchEndpointApproximateThreshold(unittest.TestCase):
             device="cpu"
         )
         
-        # Check that tensor_search.search was called with the correct parameters
+        # Check that tensor_search.search was called with the correct 
+        # parameters
         self.mock_search.assert_called_once()
         call_kwargs = self.mock_search.call_args[1]
         self.assertIsNone(call_kwargs.get('approximate_threshold'))
