@@ -5,13 +5,13 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, 
 from marqo.core.models.add_docs_params import AddDocsParams
 import marqo.tensor_search.tensor_search
 from marqo.tensor_search import tensor_search, delete_docs
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from unittest.mock import patch
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api import exceptions as api_exceptions
 from marqo.tensor_search import enums
-from integ_tests.utils.transition import add_docs_batched
+from tests.integ_tests.utils.transition import add_docs_batched
 import os
 from marqo.vespa.models.delete_document_response import DeleteBatchDocumentResponse, DeleteBatchResponse
 

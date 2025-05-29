@@ -3,7 +3,7 @@ from typing import cast
 
 from marqo.core.models.marqo_index import *
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestSemiStructuredVespaSchema(MarqoTestCase):

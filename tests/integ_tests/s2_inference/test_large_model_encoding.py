@@ -22,7 +22,7 @@ from marqo.s2_inference.s2_inference import _load_model as og_load_model
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
     _convert_tensor_to_numpy
 from marqo.s2_inference.types import FloatTensor
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 from marqo.core.inference.api.modality import Modality
 from marqo.s2_inference.configs import ModelCache
 import shutil

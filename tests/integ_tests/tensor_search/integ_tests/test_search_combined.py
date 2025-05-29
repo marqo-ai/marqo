@@ -10,7 +10,7 @@ from hypothesis import given, strategies as st
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError

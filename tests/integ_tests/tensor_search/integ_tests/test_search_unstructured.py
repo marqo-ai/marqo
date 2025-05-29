@@ -7,8 +7,8 @@ from unittest import mock
 
 import math
 import requests
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 import marqo.core.exceptions as core_exceptions
 from marqo.api import exceptions as errors

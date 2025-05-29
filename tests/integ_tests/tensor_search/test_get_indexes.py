@@ -5,7 +5,7 @@ from marqo.api.exceptions import IndexNotFoundError, MarqoError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import unittest
 import copy
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 def _index_is_present(index_name, index_results):

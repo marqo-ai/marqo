@@ -4,7 +4,7 @@ import PIL.Image
 import numpy as np
 import torch
 
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_media
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.type import *

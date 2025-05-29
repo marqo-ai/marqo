@@ -8,7 +8,7 @@ from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 @unittest.skip(reason='temporarily skip tests using mocked vectorise')

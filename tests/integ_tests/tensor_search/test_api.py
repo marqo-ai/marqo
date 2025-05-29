@@ -13,7 +13,7 @@ from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
 import marqo.tensor_search.api as api
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions

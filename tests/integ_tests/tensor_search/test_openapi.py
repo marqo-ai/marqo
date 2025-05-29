@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from marqo.tensor_search.api import app
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class OpenApiTests(MarqoTestCase):

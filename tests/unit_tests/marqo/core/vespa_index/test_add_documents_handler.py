@@ -17,7 +17,7 @@ from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocume
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from marqo.vespa.vespa_client import VespaClient
 from unit_tests.marqo_test import MarqoTestCase
-from integ_tests.marqo_test import MarqoTestCase as fixture
+from tests.integ_tests.marqo_test import MarqoTestCase as fixture
 
 
 class DummyAddDocumentsHandler(AddDocumentsHandler):

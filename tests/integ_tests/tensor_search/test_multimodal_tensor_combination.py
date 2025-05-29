@@ -12,7 +12,7 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField
 from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestMultimodalTensorCombination(MarqoTestCase):
