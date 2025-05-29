@@ -89,7 +89,7 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_ENTITY)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
-        self.assertEquals({'loc': ['modality'], 'msg': 'field required', 'type': 'value_error.missing'},
+        self.assertEqual({'loc': ['modality'], 'msg': 'field required', 'type': 'value_error.missing'},
                           unpacked_response["detail"][0])
 
     def test_vectorise_raise_inference_error(self):
