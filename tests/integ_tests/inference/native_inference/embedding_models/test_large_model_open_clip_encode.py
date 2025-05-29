@@ -114,8 +114,8 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
                     )
                     self.assertTrue(embeddings_difference < 1e-4,
                                     f"Reference embeddings for model '{self.model_name}' on '{self.device}' "
-                                    f"for text '{text}' from file {self.json_file} does not match the generated one."
-                                    f"Reference:\n{embeddings_reference}\n"
+                                    f"for text '{text}' from file {self.json_file} does not match the generated one. "
+                                    f"Reference:\n{ground_truth_embeddings}\n"
                                     f"Generated:\n{pipeline_embeddings[0].tolist()}\n")
                 else:
                     self.fail(f"Reference embeddings for model '{self.model_name}' on '{self.device}' for text '{text}'"
