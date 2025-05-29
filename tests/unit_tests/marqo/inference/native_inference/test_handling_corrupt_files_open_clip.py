@@ -18,7 +18,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
             "model_auth": None,
             "calling_func" : "unit_test"
         }
-        self.dummpy_model_properties = [
+        self.dummy_model_properties = [
             {
                 # from url
                 "name": "ViT-B-32",
@@ -57,7 +57,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     def test_corrupted_file_handling_runtime_error(self, mock_os_remove, mock_create_model_and_transforms):
         """Ensure that a proper error is raised when a corrupted file is encountered. The file should be removed."""
         mock_create_model_and_transforms.side_effect = RuntimeError("The file might be corrupted")
-        for model_properties in self.dummpy_model_properties:
+        for model_properties in self.dummy_model_properties:
             with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                        return_value = self.dummpy_corrupted_file):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
@@ -74,7 +74,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     def test_corrupted_file_handling_unpickling_error(self, mock_os_remove, mock_create_model_and_transforms):
         """Ensure that a proper error is raised when a corrupted file is encountered. The file should be removed."""
         mock_create_model_and_transforms.side_effect = UnpicklingError("The file might be corrupted")
-        for model_properties in self.dummpy_model_properties:
+        for model_properties in self.dummy_model_properties:
             with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                        return_value=self.dummpy_corrupted_file):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
@@ -94,14 +94,14 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         mock_os_remove.side_effect = OSError("Permission denied")
         with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                    return_value = self.dummpy_corrupted_file):
-            for model_properties in self.dummpy_model_properties:
+            for model_properties in self.dummy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties, max_retries=1)
                 self.assertIn("Marqo encountered an error while attempting to delete a corrupted file",
                               str(context.exception))
                 mock_os_remove.assert_called_with(self.dummpy_corrupted_file)
-                self.assertEqual(mock_os_remove.call_count, 1)  # retries 3 times
+                self.assertEqual(mock_os_remove.call_count, 1)
 
                 # Reset the mock
                 mock_os_remove.reset_mock()
@@ -113,7 +113,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         mock_create_model_and_transforms.side_effect = Exception("An error occurred")
         with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                    return_value = self.dummpy_corrupted_file):
-            for model_properties in self.dummpy_model_properties:
+            for model_properties in self.dummy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties, max_retries=1)
@@ -128,7 +128,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
             "This could be because the operator doesn't exist for this backend")
         with patch("marqo.inference.native_inference.embedding_models.open_clip_model.download_model",
                    return_value=self.dummpy_corrupted_file):
-            for model_properties in self.dummpy_model_properties:
+            for model_properties in self.dummy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties, max_retries=1)

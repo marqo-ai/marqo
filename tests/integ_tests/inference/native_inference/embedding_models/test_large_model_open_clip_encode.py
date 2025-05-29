@@ -107,7 +107,7 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
 
                 ground_truth_embeddings = self.open_clip_embeddings_reference.get(self.model_name, {}).get(text, None)
 
-                if ground_truth_embeddings:
+                if ground_truth_embeddings is not None:
                     embeddings_reference = np.array(ground_truth_embeddings).reshape(-1)
                     embeddings_difference = self.calculate_embeddings_difference(
                         embeddings_reference, pipeline_embeddings[0]
