@@ -1,0 +1,6 @@
+1. 
+Vespa supports a parameter called approximate threshold. Update Marqo so that it supports this configuration for hybrid search (tensor part) as well as basic tensor search.
+
+2.
+You're completely off. Don't use targetHits. Set ranking.matching
+.approximateThreshold as outlined here @https://docs.vespa.ai/en/reference/query-api-reference.html#ranking.matching 
