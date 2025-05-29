@@ -10,15 +10,14 @@ from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.core.inference.api import ModelManager, ModelError
 from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.logging import get_logger
 from marqo.s2_inference import constants
-from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
+from marqo.s2_inference.configs import get_default_normalization
 from marqo.s2_inference.errors import (
     InvalidModelPropertiesError, ModelLoadError,
     ModelNotInCacheError, ModelDownloadError)
-from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
-from marqo.s2_inference.sbert_utils import Model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.preprocessors_model import Preprocessors

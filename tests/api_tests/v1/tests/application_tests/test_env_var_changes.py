@@ -19,6 +19,10 @@ We may test multiple different env vars in the same test case. This is because
 """
 import json
 import unittest
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Optional, List
+
+import math
 
 from tests import marqo_test
 from tests import utilities
@@ -73,36 +77,25 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         res = self.client.index("test_index_for_preload_models").get_loaded_models()
         assert set([item["model_name"] for item in res["models"]]) == set(custom_models)
 
-    @unittest.skip(reason="Temproraliy skips this until inference caching is implemented")
-    def test_multiple_env_vars(self):
-        # TODO: Add log test
+    def test_inference_cache(self):
         """
-            Ensures that rerun_marqo_with_env_vars can work with several different env vars
-            at the same time
-
-            3 things in the same command:
-            1. Load models
-            2. set max EF
-            3. set log level to debug
-
-            Also, asserts that Marqo's debug output is as expected
+            Ensures that inference cache works for search but not add_docs when enabled
         """
 
         # Restart marqo with new max values
-        max_ef = 6000
         new_models = ["hf/e5-large-v2"]
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
             env_vars=[
                 "-e", f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
-                "-e", f"MARQO_LOG_LEVEL=debug",
-                "-e", f"MARQO_INFERENCE_CACHE_SIZE=10"
+                "-e", f"MARQO_INFERENCE_CACHE_SIZE=10",  # enable cache on inference side
+                "-e", f"MARQO_API_INFERENCE_CACHE_SIZE=10",  # enable inference cache on api side
             ],
             calling_class=self.__class__.__name__
         )
 
         # Create index with same number of replicas and EF
-        res_0 = self.client.create_index(index_name=index_name, ann_parameters={
+        self.client.create_index(index_name=index_name, ann_parameters={
             "spaceType": 'prenormalized-angular', "parameters": {"efConstruction": 5000, "m": 16}}
         )
 
@@ -117,32 +110,56 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Test inference cache
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
-        inference_time = 10
-        cache_reading_time = 5
+        min_inference_time_ms = 8      # inference usually takes at least 8ms
+        cache_reading_time_ms = 2      # if it hits cache, it's usually less than 2ms
 
-        # Single query
-        # First search
-        r = telemetry_client.index(index_name).search(q="test")
-        self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > inference_time)
-        # Second search
-        single_q_cache_time = []
-        for _ in range(5):
-            r = telemetry_client.index(index_name).search(q="test")
-            single_q_cache_time.append(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"])
-        self.assertTrue(min(single_q_cache_time) < cache_reading_time, single_q_cache_time)
-
-        # Multiple queries
-        r = telemetry_client.index(index_name).search(q={"random": 1, "query": 2})
-        self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > inference_time)
-        # Second search
-        multiple_q_cache_time = []
-        for _ in range(5):
-            r = telemetry_client.index(index_name).search(q={"random": 1, "query": 2})
-            multiple_q_cache_time.append(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"])
-        self.assertTrue(min(multiple_q_cache_time) < cache_reading_time, multiple_q_cache_time)
+        # Test search query's embedding is cached when inference cache is enabled
+        for query in ["test", {"random": 1, "query": 2}]:
+            with self.subTest(f"Search query: {query}"):
+                # Single query
+                # First search that misses cache should take longer
+                r = telemetry_client.index(index_name).search(q=query)
+                self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > min_inference_time_ms)
+                
+                # Run a few more times to make sure we populate it on API side cache as well as inference side cache
+                self._run_in_threads(lambda client: client.index(index_name).search(q=query),
+                                     max_workers=5, count=50)
+                
+                # Following searches should hit cache, average latency should be low
+                inference_latency = self._run_in_threads(
+                    lambda client: client.index(index_name).search(q=query),
+                    max_workers=1, count=10, telemetry_name="search.vector_inference_full_pipeline")
+                self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
 
         # Test to ensure inference cache is not working for add_documents:
-        for _ in range(3):
-            r = telemetry_client.index(index_name).add_documents([{"test": "test"}],
-                                                                 tensor_fields=["test"])
-            self.assertTrue(r["telemetry"]["timesMs"]["add_documents.create_vectors"] > inference_time)
+        with self.subTest("Add document"):
+            # we do add doc one at a time to reduce the load on inference so the latency is small, we then verify
+            # all the latency telemetry data points are larger than the min_inference_time_ms to verify cache is not
+            # involved in this process
+            inference_latency = self._run_in_threads(
+                lambda client: client.index(index_name).add_documents([{"test": "test"}], tensor_fields=["test"]),
+                max_workers=1, count=10, telemetry_name="add_documents.inference.all"
+            )
+            self.assertTrue(all([latency > min_inference_time_ms for latency in inference_latency]), inference_latency)
+
+    def _run_in_threads(self, operation: Callable[[Client], dict], max_workers: int,
+                        count: int, telemetry_name: Optional[str] = None) -> List[float]:
+        results = []
+
+        # Using ThreadPoolExecutor to simulate concurrent access, we use a new client every time to avoid
+        # connection pooling, so we can hit most api workers in split mode
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(operation, Client(**self.client_settings, return_telemetry=True))
+                       for _ in range(count)]
+
+            # Collect results or errors from the futures
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+
+                    if telemetry_name:
+                        results.append(res["telemetry"]["timesMs"][telemetry_name])
+                except Exception as e:
+                    self.fail(f'Exception raised when collecting results: {e}')
+
+        return results

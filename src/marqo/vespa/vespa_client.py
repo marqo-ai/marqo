@@ -1062,7 +1062,7 @@ class VespaClient:
         """
 
         if error.code == 8 and error.message == "Search request soft doomed during query setup and initialization.":
-            logger.warn('Detected soft doomed query')
+            logger.warning('Detected soft doomed query')
             return True
         if error.code == 12 and resp.status_code == 504:
             return True
