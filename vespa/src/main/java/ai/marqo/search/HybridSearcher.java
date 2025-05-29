@@ -1,5 +1,7 @@
 package ai.marqo.search;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -15,11 +17,7 @@ import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -72,6 +70,20 @@ public class HybridSearcher extends Searcher {
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
+
+        // Pagination exclusion logic: parse paginationExclusions JSON set of doc IDs
+        Set<String> idsToExclude = new HashSet<>();
+        String exclusionsJson =
+                query.properties().getString("marqo__hybrid.paginationExclusions", null);
+        if (exclusionsJson != null) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                idsToExclude =
+                        mapper.readValue(exclusionsJson, new TypeReference<Set<String>>() {});
+            } catch (Exception e) {
+                logIfVerbose("Failed to parse paginationExclusions: " + e.getMessage(), verbose);
+            }
+        }
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -163,6 +175,14 @@ public class HybridSearcher extends Searcher {
                             + resultTensor.toString(),
                     verbose);
 
+            // Filter out excluded IDs before fusion
+            if (!idsToExclude.isEmpty()) {
+                resultLexical =
+                        new Result(queryLexical, filterHits(resultLexical.hits(), idsToExclude));
+                resultTensor =
+                        new Result(queryTensor, filterHits(resultTensor.hits(), idsToExclude));
+            }
+
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
@@ -193,7 +213,13 @@ public class HybridSearcher extends Searcher {
         // Post-process the main hits result list.
         HitGroup processedHits =
                 postProcessResults(
-                        hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
+                        hitsForPostProcessing,
+                        query,
+                        rerankDepthGlobal,
+                        limit,
+                        offset,
+                        idsToExclude,
+                        verbose);
 
         // --- Attach facets results if available ---
         if (!futureFacets.isEmpty()) {
@@ -234,6 +260,17 @@ public class HybridSearcher extends Searcher {
         // --- End facets attachment ---
 
         return new Result(query, processedHits);
+    }
+
+    private HitGroup filterHits(HitGroup originalHits, Set<String> idsToExclude) {
+        HitGroup filtered = new HitGroup();
+        for (Hit hit : originalHits.asList()) {
+            String docId = extractDocIdFromHitId(hit.getId().toString());
+            if (!idsToExclude.contains(docId)) {
+                filtered.add(hit);
+            }
+        }
+        return filtered;
     }
 
     /**
@@ -383,6 +420,7 @@ public class HybridSearcher extends Searcher {
             Integer rerankDepthGlobal,
             int limit,
             int offset,
+            Set<String> idsToExclude,
             boolean verbose) {
         // Split original hits into 2 lists: result to rerank and excess hits
         // Excess hits will not be reranked, and will be added back after reranking the other
@@ -457,7 +495,10 @@ public class HybridSearcher extends Searcher {
                     String.format(
                             "Trimming result list. " + "limit: %d, offset: %d", limit, offset),
                     verbose);
-            resultToRerank.trim(offset, limit + offset);
+            int totalExclusions = idsToExclude.size();
+            resultToRerank.trim(
+                    Math.max(0, offset - totalExclusions),
+                    Math.max(0, (limit + offset) - totalExclusions));
         } else {
             logIfVerbose(String.format("Trimming result list. " + "limit: %d", limit), verbose);
             resultToRerank.trim(0, limit);

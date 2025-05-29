@@ -1,6 +1,7 @@
+import hashlib
 from abc import ABC
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Set
 
 from pydantic.v1 import validator, root_validator
 
@@ -67,6 +68,7 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     global_rerank_depth: Optional[int] = None
     facets: Optional[FacetsParameters] = None
     track_total_hits: Optional[bool] = None
+    pagination_exclusions: Optional[List[str]] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
@@ -85,3 +87,15 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
                              "'hybridParameters' dict parameter.")
 
         return values
+
+    def get_query_hash_without_offset(self):
+        query_copy = self.copy(deep=True)
+        query_copy.offset = None
+        normalized_json = query_copy.json(
+            sort_keys=True,
+            exclude_unset=False,
+            exclude_none=True,
+            separators=(',', ':')  # compact
+        )
+
+        return hashlib.sha256(normalized_json.encode('utf-8')).hexdigest()
