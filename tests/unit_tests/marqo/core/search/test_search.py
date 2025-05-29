@@ -504,5 +504,40 @@ class SearchTest(unittest.TestCase):
             resp = tensor_search.search(self.config, "index_name", "query", search_method="lexical")
             self.assertNotIn("age", resp['hits'][0])
 
+    def test_tensor_search_with_target_hits(self):
+        """Test that targetHits parameter is passed correctly to the vespa query"""
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", target_hits=50)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        
+        # Check that targetHits:50 is in the YQL
+        self.assertIn("targetHits:50", call_args['yql'])
+        # Check that it's not using the default calculation (limit + offset = 3)
+        self.assertNotIn("targetHits:3", call_args['yql'])
+    
+    def test_hybrid_search_with_target_hits_tensor(self):
+        """Test that targetHitsTensor parameter is passed correctly in hybrid search"""
+        tensor_search.search(
+            self.config, "index_name", "query", 
+            search_method="hybrid",
+            hybrid_parameters=HybridParameters(targetHitsTensor=100)
+        )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        
+        # Check that targetHits:100 is in the tensor YQL
+        self.assertIn("targetHits:100", call_args['marqo__yql.tensor'])
+        # Check that it's not using the default calculation
+        self.assertNotIn("targetHits:3", call_args['marqo__yql.tensor'])
+    
+    def test_tensor_search_without_target_hits_uses_default(self):
+        """Test that when targetHits is not provided, default calculation is used"""
+        tensor_search.search(self.config, "index_name", "query", search_method="tensor", result_count=10, offset=5)
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        
+        # Default calculation should be limit + offset = 10 + 5 = 15
+        self.assertIn("targetHits:15", call_args['yql'])
+
 if __name__ == '__main__':
     unittest.main()

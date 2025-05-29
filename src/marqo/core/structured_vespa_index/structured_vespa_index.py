@@ -446,6 +446,9 @@ class StructuredVespaIndex(VespaIndex):
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
             query['timeout'] = 300 * 1000  # 5 minutes
+            
+        if marqo_query.approximate_threshold is not None:
+            query['ranking.matching.approximateThreshold'] = marqo_query.approximate_threshold
 
         return query
 
@@ -644,6 +647,9 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
+            
+        if marqo_query.approximate_threshold is not None:
+            query['ranking.matching.approximateThreshold'] = marqo_query.approximate_threshold
 
         return query
 
@@ -741,7 +747,6 @@ class StructuredVespaIndex(VespaIndex):
             terms.append(
                 f'('
                 f'{{'
-                f'targetHits:{rerank_depth}, '
                 f'approximate:{str(marqo_query.approximate)}, '
                 f'hnsw.exploreAdditionalHits:{additional_hits}'
                 f'}}'

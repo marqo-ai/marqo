@@ -42,6 +42,7 @@ class SearchQuery(BaseMarqoModel):
     limit: int = 10
     offset: int = 0
     rerankDepth: Optional[int] = None
+    approximateThreshold: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     showHighlights: bool = True

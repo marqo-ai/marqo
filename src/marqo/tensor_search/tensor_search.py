@@ -22,12 +22,12 @@ Notes on search behaviour with caching and searchable attributes:
         - Searching an existing but uncached field will return the best result
             (the uncached field will be searched)
         - Searching all fields will return a poor result
-            (the uncached field won’t be searched)
+            (the uncached field won't be searched)
     Vector search:
         - Searching an existing but uncached field will return no results (the
-            uncached field won’t be searched)
+            uncached field won't be searched)
         - Searching all fields will return a poor result (the uncached field
-            won’t be searched)
+            won't be searched)
 
 """
 import typing
@@ -303,7 +303,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
            result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
-           approximate: Optional[bool] = None,
+           approximate: Optional[bool] = None, approximate_threshold: Optional[int] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: Optional[str] = None,
@@ -335,6 +335,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         result_count:
         offset:
         rerank_depth:
+        target_hits: The targetHits parameter for approximate nearest neighbor search
         search_method:
         searchable_attributes:
         verbose:
@@ -432,7 +433,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth,
+                approximate_threshold=approximate_threshold
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -445,7 +447,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
+                approximate_threshold=approximate_threshold
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -1003,7 +1006,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None,
+        approximate_threshold: Optional[int] = None
 ) -> Dict:
     """
     
@@ -1026,6 +1030,7 @@ def _vector_text_search(
         highlights: if True, highlights will be returned
         text_query_prefix: prefix to add to text queries
         rerank_depth: the number of hits per shard during retrieval
+        target_hits: The targetHits parameter for approximate nearest neighbor search
     Returns:
 
     Note:
@@ -1086,7 +1091,8 @@ def _vector_text_search(
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
-        rerank_depth_tensor=rerank_depth
+        rerank_depth_tensor=rerank_depth,
+        approximate_threshold=approximate_threshold
     )
 
     vespa_index = vespa_index_factory(marqo_index)

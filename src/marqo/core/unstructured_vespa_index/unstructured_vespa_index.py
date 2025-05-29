@@ -110,6 +110,9 @@ class UnstructuredVespaIndex(VespaIndex):
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
             query['timeout'] = 300 * 1000  # 5 minutes
+            
+        if marqo_query.approximate_threshold is not None:
+            query['ranking.matching.approximateThreshold'] = marqo_query.approximate_threshold
 
         return query
 
@@ -121,8 +124,9 @@ class UnstructuredVespaIndex(VespaIndex):
             marqo_query.limit + marqo_query.offset
         )
 
-        target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-        additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
+        # Calculate hnsw.exploreAdditionalHits based on ef_search and limit+offset
+        rerank_depth = marqo_query.limit + marqo_query.offset
+        additional_hits = max(marqo_query.ef_search - rerank_depth, 0)
 
         if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
             query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
@@ -132,7 +136,6 @@ class UnstructuredVespaIndex(VespaIndex):
         return (
             f"("
             f"{{"
-            f"targetHits:{target_hits}, "
             f"approximate:{str(marqo_query.approximate)}, "
             f'hnsw.exploreAdditionalHits:{additional_hits}'
             f"}}"

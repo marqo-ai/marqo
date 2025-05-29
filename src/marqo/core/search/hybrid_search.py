@@ -42,6 +42,7 @@ class HybridSearch:
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
+            approximate_threshold: Optional[int] = None,
     ) -> Dict:
         """
 
@@ -67,6 +68,7 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
+                target_hits: The targetHits parameter for approximate nearest neighbor search (tensor part)
             Returns:
 
             Output format:
@@ -253,7 +255,8 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters,
             facets=facets,
-            track_total_hits=track_total_hits
+            track_total_hits=track_total_hits,
+            approximate_threshold=approximate_threshold
         )
 
         vespa_index = vespa_index_factory(marqo_index)

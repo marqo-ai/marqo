@@ -45,6 +45,7 @@ class MarqoTensorQuery(MarqoQuery):
     ef_search: Optional[int] = None
     approximate: bool = True
     rerank_depth_tensor: Optional[int] = None
+    approximate_threshold: Optional[int] = None
 
     # TODO - validate that ef_search >= offset+limit if provided
 
