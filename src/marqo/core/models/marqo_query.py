@@ -15,6 +15,9 @@ from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
 class MarqoQuery(StrictBaseModel, ABC):
     class Config(StrictBaseModel.Config):
         arbitrary_types_allowed = True  # To allow SearchFilter
+        json_encoders = {
+            SearchFilter: lambda v: str(v) if isinstance(v, SearchFilter) else v,
+        }
 
     index_name: str
     limit: int

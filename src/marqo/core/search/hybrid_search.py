@@ -284,7 +284,6 @@ class HybridSearch:
                         if int(existing_offset) < offset:
                             documents_to_exclude.update(offsets[existing_offset])
                     marqo_query.pagination_exclusions = list(documents_to_exclude)
-                    print(documents_to_exclude)
             else:
                 logger.warning(
                     f"Pagination offset {offset} not found in existing pagination document for hash "
