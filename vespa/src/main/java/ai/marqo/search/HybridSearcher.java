@@ -175,7 +175,6 @@ public class HybridSearcher extends Searcher {
                             + resultTensor.toString(),
                     verbose);
 
-
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
