@@ -263,10 +263,11 @@ class HybridSearch:
         )
 
         # Create query hash without offset
-        if offset % result_count == 0:
+        if offset % result_count == 0 and hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
             query_hash_without_offset = marqo_query.get_query_hash_without_offset()
         else:
-            logger.warning("Offset is not a multiple of limit. This is a wrong usage of pagination.")
+            if hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
+                logger.warning("Offset is not a multiple of limit. This is a wrong usage of pagination.")
             query_hash_without_offset = None
 
         if query_hash_without_offset is not None:
