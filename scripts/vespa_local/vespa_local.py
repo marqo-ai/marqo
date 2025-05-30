@@ -81,7 +81,6 @@ class VespaLocal:
             }
             """)
 
-
     def generate_application_package_files(self):
         """
         Generate files to be zipped for application package
@@ -159,7 +158,7 @@ class VespaLocalSingleNode(VespaLocal):
                 </container>
                 <content id="content_default" version="1.0">
                     <redundancy>2</redundancy>
-                    <documents garbage-collection="true">
+                    <documents>
                         <document type="test_vespa_client" mode="index"/>
                     </documents>
                     <tuning>
