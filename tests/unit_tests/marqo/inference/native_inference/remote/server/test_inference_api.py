@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 
 import msgpack
 import numpy as np
@@ -15,6 +15,7 @@ from starlette.status import (
 from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceError
+from marqo.inference.native_inference.remote.server import inference_api
 from marqo.inference.native_inference.remote.server.inference_api import app
 
 
@@ -160,6 +161,18 @@ class TestInferenceAPI(unittest.TestCase):
         response = self.client.get("/healthz")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+    @patch("marqo.inference.native_inference.remote.server.inference_api.bootstrap_otel")
+    def test_lifespan_integration_bootstrap_and_shutdown_otel(self, mock_bootstrap_otel):
+        mock_otel_shutdown_hook = Mock()
+        mock_bootstrap_otel.return_value = mock_otel_shutdown_hook
+
+        # Use FastAPI TestClient to simulate making a request to the app
+        with TestClient(inference_api.app) as _:
+            # Ensure the shutdown hook was called and Zookeeper stop method was triggered
+            mock_bootstrap_otel.assert_called_once_with(inference_api.app, service_name='marqo-inference')
+
+        mock_otel_shutdown_hook.assert_called_once()
 
     @unittest.skip(reason='not supported yet')
     def test_healthz_fails_if_exception_raised(self):
