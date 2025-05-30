@@ -81,40 +81,6 @@ class VespaLocal:
             }
             """)
 
-    def get_pagination_schema_content(self):
-        pagination_schema = []
-
-        pagination_schema.append(f'schema marqo__pagination {{')
-
-        # Document type with ID
-        pagination_schema.append('document {')
-
-        # id field for search
-        pagination_schema.append('field id type string {')
-        pagination_schema.append('  indexing: attribute | summary ')
-        pagination_schema.append('}')
-
-        # offsets field
-        pagination_schema.append('field offsets type map<string, array<string>> {')
-        pagination_schema.append('  indexing: summary')
-        pagination_schema.append('}')
-
-        # updated_at field
-        pagination_schema.append('field updated_at type long {')
-        pagination_schema.append('  indexing: attribute | summary')
-        pagination_schema.append('}')
-
-        pagination_schema.append('}')  # end document
-
-        # Add default document-summary for retrieval
-        pagination_schema.append('document-summary default {')
-        pagination_schema.append('  summary offsets { }')
-        pagination_schema.append('}')
-
-        pagination_schema.append('}')  # end schema
-
-        return '\n'.join(pagination_schema)
-
 
     def generate_application_package_files(self):
         """
@@ -131,9 +97,6 @@ class VespaLocal:
                     if file == "test_vespa_client.sd":
                         content_for_test_vespa_client_sd = self.get_test_vespa_client_schema_content()
                         f.write(content_for_test_vespa_client_sd)
-                    elif file == "marqo__pagination.sd":
-                        content_for_marqo_pagination_sd = self.get_pagination_schema_content()
-                        f.write(content_for_marqo_pagination_sd)
         for file in self.application_package_files[""]:
             file_path = os.path.join(self.base_dir, file)
             with open(file_path, 'w') as f:
@@ -170,7 +133,7 @@ class VespaLocalSingleNode(VespaLocal):
 
     def __init__(self):
         self.application_package_files = {
-            "schemas": ["test_vespa_client.sd", "marqo__pagination.sd"],
+            "schemas": ["test_vespa_client.sd"],
             "": ["services.xml"]
         }
         logger.info("Creating single node Vespa setup.")
@@ -196,9 +159,8 @@ class VespaLocalSingleNode(VespaLocal):
                 </container>
                 <content id="content_default" version="1.0">
                     <redundancy>2</redundancy>
-                    <documents garbage-collection="true" garbage-collection-interval="1800">
+                    <documents garbage-collection="true">
                         <document type="test_vespa_client" mode="index"/>
-                        <document type="marqo__pagination" mode="index" selection="marqo__pagination.updated_at &gt; now() - 1800"/>
                     </documents>
                     <tuning>
                         <resource-limits>
@@ -238,7 +200,7 @@ class VespaLocalMultiNode(VespaLocal):
         self.number_of_shards = number_of_shards
         self.number_of_replicas = number_of_replicas
         self.application_package_files = {
-            "schemas": ["test_vespa_client.sd", "marqo__pagination.sd"],
+            "schemas": ["test_vespa_client.sd"],
             "": ["hosts.xml", "services.xml"]
         }
         logger.info(f"Creating multi-node Vespa setup with {number_of_shards} shards and {number_of_replicas} replicas.")

@@ -599,6 +599,7 @@ class VespaApplicationPackage:
         # version of the config can be backed up, or marked as need-to-remove when rolling back.
         backup = VespaAppBackup()
         self._configure_query_profiles(backup)
+        self._configure_pagination_schema(backup)
         self._copy_components_jar()  # we do not back up jar file
         self._service_xml.config_components()
         self._marqo_config_store.update_version(to_version)
@@ -719,6 +720,34 @@ class VespaApplicationPackage:
         )
         logger.debug(f'Configuring query profiles {content}')
         self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
+
+    def _configure_pagination_schema(self, backup: VespaAppBackup) -> None:
+        schema_content = textwrap.dedent('''\
+            schema marqo__pagination {
+                document {
+                    field offsets type map<string, array<string>> {
+                        indexing: summary
+                    }
+                    field updated_at type long {
+                        indexing: attribute | summary
+                    }
+                }
+                document-summary default {
+                    summary offsets { }
+                }
+            }
+        ''')
+        logger.debug(f'Configuring pagination schema')
+        self._store.save_file(schema_content, 'schemas', 'marqo__pagination.sd', backup=backup)
+        self._service_xml.add_schema('marqo__pagination')
+
+        # Configure garbage collection for pagination documents
+        documents_elem = self._service_xml._ensure_only_one('content/documents')
+        documents_elem.set('garbage-collection', 'true')
+        documents_elem.set('garbage-collection-interval', '1800')
+        for doc in documents_elem.findall('document'):
+            if doc.get('type') == 'marqo__pagination':
+                doc.set('selection', 'marqo__pagination.updated_at > now() - 1800')
 
     def _copy_components_jar(self) -> None:
         components_jar_file = 'marqo-custom-searchers-deploy.jar'
