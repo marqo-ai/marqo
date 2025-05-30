@@ -175,18 +175,15 @@ public class HybridSearcher extends Searcher {
                             + resultTensor.toString(),
                     verbose);
 
-            // Filter out excluded IDs before fusion
-            if (!idsToExclude.isEmpty()) {
-                resultLexical =
-                        new Result(queryLexical, filterHits(resultLexical.hits(), idsToExclude));
-                resultTensor =
-                        new Result(queryTensor, filterHits(resultTensor.hits(), idsToExclude));
-            }
 
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
                         rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
+                // Filter out excluded IDs after fusion
+                if (!idsToExclude.isEmpty()) {
+                    hitsForPostProcessing = filterHits(hitsForPostProcessing, idsToExclude);
+                }
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
