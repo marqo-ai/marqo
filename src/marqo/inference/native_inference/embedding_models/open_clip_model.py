@@ -148,7 +148,8 @@ class OpenCLIPModel(AbstractCLIPModel):
 
         return aggregated_image_preprocess_config
 
-    def _load_model_and_image_preprocessor_from_checkpoint(self) -> Tuple[torch.nn.Module, Compose]:
+    def _load_model_and_image_preprocessor_from_checkpoint(self, weights_only: bool = True) \
+            -> Tuple[torch.nn.Module, Compose]:
         """Load the model and image preprocessor from a checkpoint file.
 
         The checkpoint file can be provided through a URL or a model_location object.
@@ -181,12 +182,19 @@ class OpenCLIPModel(AbstractCLIPModel):
                 pretrained=self.model_path,
                 precision=self.model_properties.precision,
                 device=self.device,
-                cache_dir=ModelCache.clip_cache_path
+                cache_dir=ModelCache.clip_cache_path,
+                load_weights_only=weights_only,
             )
             return model, preprocess
         except Exception as e:
+            if weights_only and isinstance(e, UnpicklingError) and "Weights only load failed" in str(e):
+                logger.warning(f'Marqo encountered an error when loading only weights of custom open_clip model '
+                               f'{self.model_properties.name} with model properties = {self.model_properties.dict()}.'
+                               f'Will load again with `weights_only = False`')
+                return self._load_model_and_image_preprocessor_from_checkpoint(weights_only=False)
+
             # RuntimeError is raised by torch 1.12.1, UnpicklingError is raised by torch 1.13.1
-            if (isinstance(e, (RuntimeError, UnpicklingError)) and "The file might be corrupted" in str(e)):
+            if isinstance(e, (RuntimeError, UnpicklingError)) and "The file might be corrupted" in str(e):
                 try:
                     os.remove(self.model_path)
                 except Exception as remove_e:
