@@ -199,7 +199,8 @@ def get_documents_by_ids(
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
     marqo_index = _get_latest_index(config, index_name)
-    batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
+    with RequestMetricsStore.for_request().time(f"get_documents.vespa"):
+        batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
     results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
@@ -881,11 +882,12 @@ def get_query_vectors_from_jobs(
             # Add context document vectors
             context_documents = q.get_context_documents()
             if context_documents:
-                context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
-                    index_name=q.index.name,
-                    documents=context_documents.ids,
-                    tensor_fields=context_documents.parameters.tensorFields
-                )
+                with RequestMetricsStore.for_request().time(f"search.vectorise.get_doc_vectors_from_ids"):
+                    context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
+                        index_name=q.index.name,
+                        documents=context_documents.ids,
+                        tensor_fields=context_documents.parameters.tensorFields
+                    )
 
                 # Update weights and vectors list
                 for document_id, vector_list in context_doc_vectors.items():
@@ -919,10 +921,11 @@ def get_query_vectors_from_jobs(
 
             # Use interpolation to combine all vectors
             vector_interpolation = from_interpolation_method(interpolation_method)
-            merged_vector = vector_interpolation.interpolate(
-                vectors=collected_vectors,
-                weights=collected_weights
-            )
+            with RequestMetricsStore.for_request().time(f"search.vectorise.interpolate_vectors"):
+                merged_vector = vector_interpolation.interpolate(
+                    vectors=collected_vectors,
+                    weights=collected_weights
+                )
 
             result[qidx] = list(merged_vector)
 
@@ -1042,14 +1045,14 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
     # TODO: we need to enable str/PIL image structure:
-    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
+    with RequestMetricsStore.for_request().time(f"search.vector.inference.vectorise_jobs"):
+        job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
 
     # 3. For each query, get associated vectors
     # Combination of context tensors & documents is also done here
-    with RequestMetricsStore.for_request().time(f"search.vector.inference.get_and_combine_vectors"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-            prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs, interpolation_method
-        )
+    qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
+        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs, interpolation_method
+    )
     return qidx_to_vectors
 
 
