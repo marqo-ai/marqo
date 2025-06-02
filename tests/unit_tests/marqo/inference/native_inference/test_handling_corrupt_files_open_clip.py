@@ -1,6 +1,6 @@
 import unittest
 from pickle import UnpicklingError
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.s2_inference import _load_model
@@ -16,22 +16,22 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
             "model_name": "test-corrupted-open-clip-model",
             "device": "cpu",
             "model_auth": None,
-            "calling_func" : "unit_test"
+            "calling_func": "unit_test"
         }
         self.dummy_model_properties = [
             {
                 # from url
                 "name": "ViT-B-32",
-                "dimensions" : 512,
+                "dimensions": 512,
                 "url": "https://a-url-to-a-corrupted-model.pt",
                 "type": "open_clip",
             },
             {
                 # from s3
                 "name": "ViT-B-32",
-                "dimensions" : 512,
+                "dimensions": 512,
                 "model_location": {
-                    "s3":{
+                    "s3": {
                         "Bucket": "a-bucket",
                         "Key": "a-path-to-a-corrupted-model.pt"},
                         },
@@ -43,7 +43,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 "dimensions": 512,
                 "model_location": {
                     "hf": {
-                        "repo_id" : "a-dummy-repo",
+                        "repo_id": "a-dummy-repo",
                         "filename": "a-path-to-a-corrupted-model.pt"},
                         },
                 "type": "open_clip",
@@ -105,6 +105,29 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
 
                 # Reset the mock
                 mock_os_remove.reset_mock()
+
+    @patch('open_clip.create_model', autospec=True)
+    @patch('marqo.inference.native_inference.embedding_models.open_clip_model.download_model', autospec=True)
+    def test_handling_unpickling_error_with_weights_only_true(self, mock_download, mock_create_model):
+        # Setup
+        mock_download.return_value = self.dummpy_corrupted_file
+
+        for model_properties in self.dummy_model_properties:
+            mock_create_model.reset_mock()
+            mock_download.reset_mock()
+            # first call raises a UnpicklingError, second returns a model
+            mock_create_model.side_effect = [UnpicklingError("Weights only load failed"), Mock()]
+
+            # Execute and Verify
+            _ = _load_model(**self.load_parameters, model_properties=model_properties, max_retries=1)
+
+            self.assertEqual(mock_create_model.call_count, 2)
+            # assert the first create_model call does not provide `load_weights_only` parameter
+            self.assertNotIn("load_weights_only", mock_create_model.call_args_list[0][1])
+            # assert the second create_model call specifies `load_weights_only=False`
+            self.assertEqual(mock_create_model.call_args_list[1][1]["load_weights_only"], False)
+            # assert download_model only called once
+            mock_download.assert_called_once()
 
     @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)

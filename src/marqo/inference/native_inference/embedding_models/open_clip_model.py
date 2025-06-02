@@ -148,8 +148,7 @@ class OpenCLIPModel(AbstractCLIPModel):
 
         return aggregated_image_preprocess_config
 
-    def _load_model_and_image_preprocessor_from_checkpoint(self, weights_only: bool = True) \
-            -> Tuple[torch.nn.Module, Compose]:
+    def _load_model_and_image_preprocessor_from_checkpoint(self) -> Tuple[torch.nn.Module, Compose]:
         """Load the model and image preprocessor from a checkpoint file.
 
         The checkpoint file can be provided through a URL or a model_location object.
@@ -176,23 +175,9 @@ class OpenCLIPModel(AbstractCLIPModel):
         try:
             self.image_preprocessor_config = self._aggregate_image_preprocessor_config()
             preprocess = image_transform_v2(self.image_preprocessor_config, is_train=False)
-            model = open_clip.create_model(
-                model_name=self.model_properties.name,
-                jit=self.model_properties.jit,
-                pretrained=self.model_path,
-                precision=self.model_properties.precision,
-                device=self.device,
-                cache_dir=ModelCache.clip_cache_path,
-                load_weights_only=weights_only,
-            )
+            model = self._create_model()
             return model, preprocess
         except Exception as e:
-            if weights_only and isinstance(e, UnpicklingError) and "Weights only load failed" in str(e):
-                logger.warning(f'Marqo encountered an error when loading only weights of custom open_clip model '
-                               f'{self.model_properties.name} with model properties = {self.model_properties.dict()}.'
-                               f'Will load again with `weights_only = False`')
-                return self._load_model_and_image_preprocessor_from_checkpoint(weights_only=False)
-
             # RuntimeError is raised by torch 1.12.1, UnpicklingError is raised by torch 1.13.1
             if isinstance(e, (RuntimeError, UnpicklingError)) and "The file might be corrupted" in str(e):
                 try:
@@ -232,6 +217,34 @@ class OpenCLIPModel(AbstractCLIPModel):
                     f"Please check and update your model properties and retry. "
                     f"You can find more details at {marqo_docs.bring_your_own_model()}"
                 )
+
+    def _create_model(self):
+        try:
+            return open_clip.create_model(
+                model_name=self.model_properties.name,
+                jit=self.model_properties.jit,
+                pretrained=self.model_path,
+                precision=self.model_properties.precision,
+                device=self.device,
+                cache_dir=ModelCache.clip_cache_path,
+            )
+        except Exception as e:
+            if isinstance(e, UnpicklingError) and "Weights only load failed" in str(e):
+                logger.warning(f'Marqo encountered an error when loading only weights of custom open_clip model '
+                               f'{self.model_properties.name} with model properties = {self.model_properties.dict()}.'
+                               f'Will load again with `weights_only = False`')
+
+                return open_clip.create_model(
+                    model_name=self.model_properties.name,
+                    jit=self.model_properties.jit,
+                    pretrained=self.model_path,
+                    precision=self.model_properties.precision,
+                    device=self.device,
+                    cache_dir=ModelCache.clip_cache_path,
+                    load_weights_only=False,
+                )
+            else:
+                raise e
 
     def _load_model_and_image_preprocessor_from_hf_repo(self) -> Tuple[torch.nn.Module, Compose]:
         """Load the model and image preprocessor from a hf_repo.
