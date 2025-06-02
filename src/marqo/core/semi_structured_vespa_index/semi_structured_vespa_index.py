@@ -46,7 +46,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         vespa_doc = SemiStructuredVespaDocument.from_vespa_document(vespa_document, marqo_index=self.get_marqo_index())
         marqo_doc = vespa_doc.to_marqo_document(marqo_index=self.get_marqo_index())
 
-        if return_highlights and vespa_doc.match_features:
+        if return_highlights and vespa_doc.fixed_fields.match_features:
             # Since tensor fields are stored in each individual field, we need to use same logic in structured
             # index to extract highlights
             marqo_doc[MARQO_DOC_HIGHLIGHTS] = StructuredVespaIndex._extract_highlights(
@@ -189,7 +189,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 grouping_query += build_field_group(field_parameters, field_name, f"-{field_id}", field_type_overwrite="float")
             else:
                 if field_parameters.type == "array":
-                    if self.get_marqo_index().name_to_string_array_field_map.get(field_id) is None:
+                    if self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
                         # Skip array field if it is not in the string array field map
                         continue
                 grouping_query += build_field_group(field_parameters, field_name, field_id)

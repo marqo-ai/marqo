@@ -32,30 +32,18 @@ permissions:
   id-token: write
 
 jobs:
-  Start-Runner:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: g4dn.2xlarge
-    secrets: inherit
-
-
   Test-Marqo:
     name: Run CUDA Docker Marqo API Tests
-    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
         working-directory: tests/api_tests/v1
-
-
     steps:
-
       - name: Checkout Marqo repo
         uses: actions/checkout@v3
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.9"
           cache: "pip"
@@ -81,15 +69,3 @@ jobs:
           bash scripts/start_cuda_docker_marqo.sh $MARQO_IMAGE_NAME
           
           pytest tests/
-
-  Stop-Runner:
-    needs:
-      - Start-Runner # required to get output from the start-runner job
-      - Test-Marqo # required to wait when the main job is done
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    uses: ./.github/workflows/stop_ec2_runner.yml
-    with:
-      label: ${{ needs.start-runner.outputs.label }}
-      ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    secrets: inherit
-

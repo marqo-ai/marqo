@@ -1,14 +1,13 @@
-from unittest import TestCase
 from unittest.mock import patch
 
 import PIL.Image
-import torch
 import numpy as np
+import torch
 
+from integ_tests.marqo_test import TestImageUrls
+from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_media
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.type import *
-from integ_tests.marqo_test import TestImageUrls
-from marqo.inference.native_inference.content_preprocessing import download_and_preprocess_image
 from unit_tests.marqo_test import MarqoTestCase
 
 
@@ -55,11 +54,8 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
     def testdownload_and_preprocess_image_valid_url(self, mock_preprocess, mock_download_image):
         content = [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value]
         preprocessor = CLIPPreprocessor()
-        results = download_and_preprocess_image(
-            content=content,
-            preprocessor=preprocessor,
-            preprocessing_config=self.preprocessing_config,
-        )
+        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                                preprocessing_config=self.preprocessing_config)
 
         self.assertEqual(2, len(results))
         self.assertEqual(1, len(results[0]))
@@ -81,12 +77,9 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         """Check behavior when a non-existent image URL is provided."""
         content = ["http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
-        results = download_and_preprocess_image(
-            content=content,
-            preprocessor=preprocessor,
-            preprocessing_config=self.preprocessing_config,
-            return_individual_error=True
-        )
+        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                                preprocessing_config=self.preprocessing_config,
+                                                return_individual_error=True)
 
         self.assertEqual(1, len(results))
         self.assertTrue(isinstance(results[0], InferenceErrorModel))
@@ -100,12 +93,8 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            download_and_preprocess_image(
-                content=content,
-                preprocessor=preprocessor,
-                preprocessing_config=self.preprocessing_config,
-                return_individual_error=False
-            )
+            download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                          preprocessing_config=self.preprocessing_config, return_individual_error=False)
         self.assertIn("This image does not exist in the test data", str(context.exception))
 
     @patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
@@ -116,12 +105,9 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         content = [TestImageUrls.IMAGE1.value, "http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_image(
-            content=content,
-            preprocessor=preprocessor,
-            preprocessing_config=self.preprocessing_config,
-            return_individual_error=True
-        )
+        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                                preprocessing_config=self.preprocessing_config,
+                                                return_individual_error=True)
 
         self.assertEqual(len(results), 2)
 
@@ -151,12 +137,9 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_image(
-            content=content,
-            preprocessor=preprocessor,
-            preprocessing_config=self.preprocessing_config,
-            return_individual_error=True
-        )
+        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                                preprocessing_config=self.preprocessing_config,
+                                                return_individual_error=True)
 
         self.assertEqual(len(results), 2)
 
@@ -180,12 +163,9 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_image(
-            content=content,
-            preprocessor=preprocessor,
-            preprocessing_config=self.preprocessing_config,
-            return_individual_error=True
-        )
+        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                                preprocessing_config=self.preprocessing_config,
+                                                return_individual_error=True)
 
         self.assertEqual(len(results), 3)
 
@@ -219,12 +199,8 @@ class TestChunkDownloadPreprocessImage(MarqoTestCase):
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            download_and_preprocess_image(
-                content=content,
-                preprocessor=preprocessor,
-                preprocessing_config=self.preprocessing_config,
-                return_individual_error=False
-            )
+            download_and_preprocess_media(content=content, preprocessor=preprocessor,
+                                          preprocessing_config=self.preprocessing_config, return_individual_error=False)
         self.assertIn("This image does not exist in the test data", str(context.exception))
 
         mock_download_image.assert_called()

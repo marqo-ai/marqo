@@ -5,19 +5,19 @@ from pydantic import BaseModel, Field
 
 # See https://docs.vespa.ai/en/reference/default-result-format.html
 class RootFields(BaseModel):
-    total_count: Optional[int] = Field(alias='totalCount')
+    total_count: Optional[int] = Field(None, alias='totalCount')
 
 
 class Degraded(BaseModel):
-    adaptive_timeout: Optional[bool] = Field(alias='adaptive-timeout')
-    match_phase: Optional[bool] = Field(alias='match-phase')
-    non_ideal_state: Optional[bool] = Field(alias='non-ideal-state')
-    timeout: Optional[bool]
+    adaptive_timeout: Optional[bool] = Field(None, alias='adaptive-timeout')
+    match_phase: Optional[bool] = Field(None, alias='match-phase')
+    non_ideal_state: Optional[bool] = Field(None, alias='non-ideal-state')
+    timeout: Optional[bool] = None
 
 
 class Coverage(BaseModel):
     coverage: int
-    degraded: Optional[Degraded]
+    degraded: Optional[Degraded] = None
     documents: int
     full: bool
     nodes: int
@@ -27,37 +27,37 @@ class Coverage(BaseModel):
 
 class Error(BaseModel):
     code: int
-    summary: Optional[str]
-    source: Optional[str]
-    message: Optional[str]
-    stack_trace: Optional[str] = Field(alias='stackTrace')
-    transient: Optional[bool]
+    summary: Optional[str] = None
+    source: Optional[str] = None
+    message: Optional[str] = None
+    stack_trace: Optional[str] = Field(None, alias='stackTrace')
+    transient: Optional[bool] = None
 
 
 class AbstractChild(BaseModel):
     # label, value, and recursive children occur in aggregation results
-    id: Optional[str]
+    id: Optional[str] = None
     relevance: float
-    source: Optional[str]
-    label: Optional[str]
-    value: Optional[str]
-    coverage: Optional[Coverage]
-    errors: Optional[List[Error]]
-    children: Optional[List['Child']]
+    source: Optional[str] = None
+    label: Optional[str] = None
+    value: Optional[str] = None
+    coverage: Optional[Coverage] = None
+    errors: Optional[List[Error]] = None
+    children: Optional[List['Child']] = None
 
 
 class Child(AbstractChild):
-    fields: Optional[Dict[str, Any]]
+    fields: Optional[Dict[str, Any]] = None
 
 
 class Root(AbstractChild):
-    fields: Optional[RootFields]
+    fields: Optional[RootFields] = None
 
 
 class QueryResult(BaseModel):
     root: Root
-    timing: Optional[Dict[str, Any]]
-    trace: Optional[Dict[str, Any]]
+    timing: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
 
     @property
     def hits(self) -> List[Child]:

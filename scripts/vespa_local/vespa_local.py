@@ -29,7 +29,7 @@ import logging
 import requests
 import argparse
 
-VESPA_VERSION = os.getenv('VESPA_VERSION', '8.472.109')
+VESPA_VERSION = os.getenv('VESPA_VERSION', '8.513.17')
 VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
 VESPA_CONFIG_URL="http://localhost:19071"
 VESPA_DOCUMENT_URL="http://localhost:8080"

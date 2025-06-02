@@ -3,16 +3,17 @@ import unittest
 import uuid
 from unittest import mock
 
-import pycurl
 import pytest
 import torch
 from fastapi.responses import ORJSONResponse
+from hypothesis import given, strategies as st
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.inference.api import MediaDownloadError
+from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -23,7 +24,6 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
-from hypothesis import given, settings, Verbosity, strategies as st
 
 
 class TestSearch(MarqoTestCase):
@@ -208,7 +208,6 @@ class TestSearch(MarqoTestCase):
         self.device_patcher.stop()
 
     @pytest.mark.largemodel
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_video(self):
         documents = [
@@ -245,7 +244,6 @@ class TestSearch(MarqoTestCase):
 
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     def test_search_audio(self):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
@@ -1023,11 +1021,6 @@ class TestSearch(MarqoTestCase):
 
         for index, method_name in indexes_to_test:
             with self.subTest(index_type=type(index).__name__):
-                # Mock the _get_lexical_contains_term method for StructuredVespaIndex
-                if isinstance(index, StructuredVespaIndex):
-                    index._get_lexical_contains_term = mock.MagicMock(
-                        side_effect=lambda phrase, query: f'contains("{phrase}")')
-
                 # Test cases
                 test_cases = [
                     # Test with score modifiers (should use OR)
@@ -1039,7 +1032,7 @@ class TestSearch(MarqoTestCase):
                             and_phrases=[],
                             score_modifiers=[ScoreModifier(field="field1", weight=1.0, type=ScoreModifierType.Multiply)]
                         ),
-                        'contains("term1") OR contains("term2")' if isinstance(index, StructuredVespaIndex)
+                        'default contains "term1" OR default contains "term2"' if isinstance(index, StructuredVespaIndex)
                         else '(default contains "term1" OR default contains "term2")'
                     ),
                     # Test without score modifiers (should use weakAnd)
@@ -1050,7 +1043,7 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=[]
                         ),
-                        'weakAnd(contains("term1"), contains("term2"))' if isinstance(index, StructuredVespaIndex)
+                        'weakAnd(default contains "term1", default contains "term2")' if isinstance(index, StructuredVespaIndex)
                         else '(weakAnd(default contains "term1", default contains "term2"))'
                     ),
                     # Test with both OR and AND phrases
@@ -1061,7 +1054,8 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=["term3", "term4"]
                         ),
-                        '(weakAnd(contains("term1"), contains("term2"))) AND (contains("term3") AND contains("term4"))'
+                        '(weakAnd(default contains "term1", default contains "term2")) AND '
+                        '(default contains "term3" AND default contains "term4")'
                         if isinstance(index, StructuredVespaIndex)
                         else '((weakAnd(default contains "term1", default contains "term2")) '
                              'AND (default contains "term3" AND default contains "term4"))'
@@ -1211,36 +1205,10 @@ class TestSearch(MarqoTestCase):
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
 
-    @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     def test_video_size_limit(self):
-        """Tests that searching with videos respects the file size limit"""
-
-        with mock.patch('marqo.s2_inference.clip_utils.pycurl.Curl') as mock_curl:
-            # Setup mock curl instance
-            mock_curl_instance = mock.MagicMock()
-            mock_curl.return_value = mock_curl_instance
-
-            # Store the progress callback
-            progress_callback = None
-
-            def mock_setopt(option, value):
-                nonlocal progress_callback
-                if option == pycurl.XFERINFOFUNCTION:
-                    progress_callback = value
-                return mock_curl_instance
-
-            def mock_perform():
-                # Call the stored progress callback with a large file size
-                if progress_callback:
-                    progress_callback(0, 400_000_000, 0, 0)  # Simulate 400MB download
-                raise pycurl.error(pycurl.E_ABORTED_BY_CALLBACK, "Callback aborted")
-
-            mock_curl_instance.setopt.side_effect = mock_setopt
-            mock_curl_instance.perform.side_effect = mock_perform
-            mock_curl_instance.getinfo.return_value = 200
-
+        """Ensure that the MediaExceedsMaxSizeError is converted to InvalidArgError."""
+        with mock.patch("marqo.inference.native_inference.local_inference.NativeInferenceLocal.vectorise") as mock_vectorise:
+            mock_vectorise.side_effect = MediaExceedsMaxSizeError("exceeds the maximum allowed size")
             with self.assertRaises(api_exceptions.InvalidArgError) as e:
                 tensor_search.search(
                     config=self.config,
@@ -1248,7 +1216,6 @@ class TestSearch(MarqoTestCase):
                     text="http://example.com/large_video.mp4",
                     search_method=SearchMethod.TENSOR,
                 )
-
             self.assertIn("exceeds the maximum allowed size", str(e.exception))
 
     def test_search_results_always_json_serializable(self):
@@ -1282,6 +1249,7 @@ class TestSearch(MarqoTestCase):
                     except TypeError as e:
                         self.fail(f"Result is not JSON serializable: {e}")
 
+    @pytest.mark.skip_for_multinode
     def test_rerank_depth_tensor_search_with_limit_offset_and_ef_search(self):
         """Test rerank_depth interaction with result_count, offset, and ef_search."""
 

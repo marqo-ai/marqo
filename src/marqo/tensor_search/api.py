@@ -1,6 +1,7 @@
 """The API entrypoint for Tensor Search"""
 import json
-from typing import List
+from contextlib import asynccontextmanager
+from typing import List, Type, Any, TypeVar
 
 import pydantic
 import uvicorn
@@ -8,7 +9,11 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pydantic.v1 import parse_obj_as
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -17,6 +22,7 @@ from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
+from marqo.api.models.get_batch_documents_request import GetBatchDocumentsRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
 from marqo.api.models.rollback_request import RollbackRequest
@@ -26,6 +32,7 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
+from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
@@ -41,6 +48,7 @@ from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
+from marqo.otel import bootstrap_otel
 
 logger = get_logger(__name__)
 
@@ -73,6 +81,7 @@ def generate_config() -> config.Config:
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference
         model_manager = native_inference_local_config.model_manager
+        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
     else:
         inference = NativeInferenceClient(
             base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
@@ -83,7 +92,18 @@ def generate_config() -> config.Config:
             base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
         )
 
-    return config.Config(vespa_client, inference, model_manager, zookeeper_client)
+        # initialise inference cache
+        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
+        if inference_cache_size > 0:  # enable inference cache
+            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
+            caching_inference = CachingInference(
+                delegate=inference,
+                cache_size=inference_cache_size,
+                cache_type=inference_cache_type
+            )
+            return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
+        else:
+            return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -91,9 +111,20 @@ _config = generate_config()
 if __name__ in ["__main__", "api"]:
     on_start(_config)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-api')
+
+    yield
+
+    otel_shutdown_hook()
+    get_config().stop_and_close_zookeeper_client()
+
 app = FastAPI(
     title="Marqo",
-    version=version.get_version()
+    version=version.get_version(),
+    lifespan=lifespan,
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
@@ -144,8 +175,12 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
 
         # Inference exceptions
+        # TODO - Inference Server currently only raises InferenceError in the remote model, so these two catches
+        # TODO - are not used in the remote mode. But they will be used in the combined mode.
         (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
         (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
+        # TODO - Distinguish recoverable vs unrecoverable errors for InferenceError
+        (inference_exceptions.InferenceError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
@@ -205,6 +240,26 @@ async def api_validation_exception_handler(request: Request, exc: RequestValidat
     )
 
 
+# For validation error raised from PydanticV1 model classes
+@app.exception_handler(pydantic.v1.ValidationError)
+async def validation_exception_handler(request, exc: pydantic.v1.ValidationError) -> JSONResponse:
+    """Catch pydantic v1 validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
+
+    body = {
+        "message": json.dumps(error_messages),
+        "code": InvalidArgError.code,
+        "type": InvalidArgError.error_type,
+        "link": InvalidArgError.link
+    }
+    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
+
+
+# For validation error raised from PydanticV2 model classes
 @app.exception_handler(pydantic.ValidationError)
 async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
@@ -240,12 +295,17 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
         return JSONResponse(content=body, status_code=500)
 
 
-@app.on_event("shutdown")
-def shutdown_event():
-    """Close the Zookeeper client on shutdown."""
-    marqo_config = get_config()
-    marqo_config.stop_and_close_zookeeper_client()
-
+# TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+# The new FastAPI (using pydantic v2) auto converts the request body to a v2 model. It raises error when we
+# provide a v1 model type in the API method parameter. The workaround we use here take in the body as a dict and
+# manually converts it to an v1 model. It catches the v1.Validation error and converts it to FastAPI's
+# RequestValidationError to keep the behaviour consistent with the auto-injecting mechanism
+T = TypeVar('T')
+def parse_request_object(obj_type: Type[T], obj: Any) -> T:
+    try:
+        return parse_obj_as(obj_type, obj)
+    except pydantic.v1.ValidationError as e:
+        raise RequestValidationError(errors=e.errors()) from e
 
 @app.get("/", summary="Basic information")
 def root():
@@ -254,13 +314,16 @@ def root():
 
 
 @app.post("/indexes/{index_name}")
-def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
+def create_index(index_name: str, settings_dict: dict, marqo_config: config.Config = Depends(get_config)):
     """
     Create index with settings. Please refer to the following documents for details about creating different types
     of index:
     - [Unstructured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-index/)
     - [Structured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-structured-index/)
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  IndexSettings can be injected after migrated to v2
+    settings = parse_request_object(IndexSettings, settings_dict)
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     return JSONResponse(
         content={
@@ -335,13 +398,17 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
-def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  SearchQuery can be injected after migrated to v2
+        search_query = parse_request_object(SearchQuery, search_query_dict)
+
         result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
@@ -367,7 +434,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 
 @app.post("/indexes/{index_name}/recommend")
 @throttle(RequestType.SEARCH)
-def recommend(query: RecommendQuery, index_name: str,
+def recommend(query_dict: dict, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
     """
     Recommend similar documents. Input a list of existing document IDs or dict of IDs and weights, and the response
@@ -376,6 +443,10 @@ def recommend(query: RecommendQuery, index_name: str,
     Please refer to [Recommend API document](https://docs.marqo.ai/latest/reference/api/search/recommend/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  RecommendQuery can be injected after migrated to v2
+        query = parse_request_object(RecommendQuery, query_dict)
+
         return marqo_config.recommender.recommend(
             index_name=index_name,
             documents=query.documents,
@@ -398,7 +469,7 @@ def recommend(query: RecommendQuery, index_name: str,
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.SEARCH)
-def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
+def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
     """
     Vectorise a piece of content (string or weighted dictionary) or list of content and return the corresponding
@@ -406,6 +477,10 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
     details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  EmbedRequest can be injected after migrated to v2
+        embedding_request = parse_request_object(EmbedRequest, embedding_request_dict)
+
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
             index_name=index_name, device=device,
@@ -418,8 +493,8 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-        body: AddDocsBodyParams,
         index_name: str,
+        body_dict: dict,
         marqo_config: config.Config = Depends(get_config),
         device: str = Depends(api_validation.validate_device)):
     """
@@ -427,6 +502,9 @@ def add_or_replace_documents(
     Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
     for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  AddDocsBodyParams can be injected after migrated to v2
+    body = parse_request_object(AddDocsBodyParams, body_dict)
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device)
 
@@ -438,13 +516,17 @@ def add_or_replace_documents(
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
-        body: UpdateDocumentsBodyParams,
         index_name: str,
+        body_dict: dict,
         marqo_config: config.Config = Depends(get_config)):
     """
     Update an array of documents in a given index. Please refer to
     [Update document API](https://docs.marqo.ai/latest/reference/api/documents/update-documents/) for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  UpdateDocumentsBodyParams can be injected after migrated to v2
+    body = parse_request_object(UpdateDocumentsBodyParams, body_dict)
+
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
@@ -466,16 +548,38 @@ def get_document_by_id(index_name: str, document_id: str,
 
 
 @app.get("/indexes/{index_name}/documents")
-def get_documents_by_ids(
+def get_documents_by_ids_via_get(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
     """
-    Gets a selection of documents based on their IDs. Please refer to
+    Gets a selection of documents based on their IDs via a GET request. Please refer to
     [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
     """
     res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
+        show_vectors=expose_facets
+    )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+
+
+@app.post("/indexes/{index_name}/documents/get-batch")
+def get_documents_by_ids_via_post(
+        index_name: str,
+        get_batch_documents_request_dict: dict,
+        marqo_config: config.Config = Depends(get_config),
+        expose_facets: bool = False
+):
+    """
+    Gets a selection of documents based on their IDs via a POST request. Please refer to
+    [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
+    """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  GetBatchDocumentsRequest can be injected after migrated to v2
+    get_batch_documents_request = parse_request_object(GetBatchDocumentsRequest, get_batch_documents_request_dict)
+
+    res = tensor_search.get_documents_by_ids(
+        config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
         show_vectors=expose_facets
     )
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
@@ -541,19 +645,21 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
 
 @app.post("/batch/indexes/create", include_in_schema=False)
 @utils.enable_batch_apis()
-def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
+def batch_create_indexes(index_settings_with_name_list: List[dict],
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  IndexSettingsWithName can be injected after migrated to v2
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
 
-    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for
-                            settings in index_settings_with_name_list]
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)
 
     return JSONResponse(
         content={
             "acknowledged": True,
-            "index_names": [settings.indexName for settings in index_settings_with_name_list]
+            "index_names": [settings.indexName for settings in index_settings]
         },
         status_code=200
     )
@@ -579,8 +685,13 @@ def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
 
 @app.post("/rollback", include_in_schema=False)
 @utils.enable_upgrade_api()
-def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
+def rollback_marqo(req_dict: dict, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
+
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  IndexSettingsWithName can be injected after migrated to v2
+    req = parse_request_object(RollbackRequest, req_dict)
+
     rollback_runner = RollbackRunner(marqo_config.vespa_client, marqo_config.index_management)
     rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 

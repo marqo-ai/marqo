@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.models.marqo_add_documents_response import BatchResponseStats

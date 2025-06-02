@@ -2,13 +2,13 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
+
+import pydantic.v1 as pydantic
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
@@ -128,13 +128,16 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
+
 class VideoPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+
 class AudioPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
@@ -276,6 +279,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)
 
@@ -621,7 +625,9 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         Check if the index supports partial updates.
         """
-        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

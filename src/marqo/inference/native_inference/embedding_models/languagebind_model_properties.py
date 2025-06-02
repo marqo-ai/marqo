@@ -1,7 +1,7 @@
 from typing import Optional, List
 
-from pydantic import Field, root_validator
-from pydantic import validator
+from pydantic.v1 import Field, root_validator
+from pydantic.v1 import validator
 
 from marqo.base_model import MarqoBaseModel
 from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties

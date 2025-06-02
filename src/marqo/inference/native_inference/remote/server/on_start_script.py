@@ -104,7 +104,7 @@ class CacheModels:
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         # TODO [Refactoring device logic] use device info gathered from device manager
-        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cuda', 'cpu']
+        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cuda']
 
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 

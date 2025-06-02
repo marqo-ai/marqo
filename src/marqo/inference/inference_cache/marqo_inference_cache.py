@@ -1,10 +1,17 @@
-from typing import List, Optional, Union, Tuple
+import sys
+import time
+from typing import Optional, Union, TypeVar
 
+from marqo import logging
 from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.abstract_cache import MarqoAbstractCache
 from marqo.inference.inference_cache.enums import MarqoCacheType
 from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
 from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
+from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector, CacheStatsCollector
+
+T = TypeVar("T")
+logger = logging.get_logger(__name__)
 
 
 class MarqoInferenceCache:
@@ -19,8 +26,12 @@ class MarqoInferenceCache:
         MarqoCacheType.LFU: MarqoLFUCache,
     }
 
-    def __init__(self, cache_size: int = 0, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
+    def __init__(self, cache_size: int, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
         self._cache = self._build_cache(cache_size, cache_type)
+        self._stats: CacheStatsCollector = OTELCacheStatsCollector(
+            curr_size_fn=lambda: self._cache.currsize,
+            max_size_fn=lambda: self._cache.maxsize
+        )
 
     def _build_cache(self, cache_size: int, cache_type: MarqoCacheType) -> Optional[MarqoAbstractCache]:
         """Return a cache instance based on the cache type and size.
@@ -35,46 +46,40 @@ class MarqoInferenceCache:
         Raises:
             EnvVarError: If the cache size or type is invalid.
         """
-        if not isinstance(cache_size, int) or cache_size < 0:
-            raise EnvVarError(f"Invalid cache size: {cache_size}. "
-                              f"Must be a non-negative integer. "
-                              f"Please set the 'MARQO_INFERENCE_CACHE_SIZE' "
-                              f"environment variable to a non-negative integer.")
-        elif cache_size == 0:
-            return None
-        elif cache_size > 0:
-            if cache_type not in self._CACHE_TYPES_MAPPING:
-                raise EnvVarError(f"Invalid cache type: {cache_type}. "
-                                  f"Must be one of {self._CACHE_TYPES_MAPPING.keys()}."
-                                  f"Please set the 'MARQO_INFERENCE_CACHE_TYPE' "
-                                  f"environment variable to one of the valid cache types.")
-            return self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
+        if not isinstance(cache_size, int) or cache_size < 1:
+            raise EnvVarError(f"Invalid cache size: {cache_size}. Must be a positive integer.")
+
+        if cache_type not in self._CACHE_TYPES_MAPPING:
+            raise EnvVarError(f"Invalid cache type: {cache_type}. "
+                              f"Must be one of {self._CACHE_TYPES_MAPPING.keys()}.")
+        cache = self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
+        logger.info(f'Built inference cache with type {cache_type} and size {cache_size}')
+        return cache
+
+    def get(self, model_cache_key: str, content: str, default=None) -> Optional[T]:
+        key = self._generate_key(model_cache_key, content)
+        cache = self._cache
+
+        now = time.perf_counter()
+        value = cache.get(key)
+        elapsed = time.perf_counter() - now
+
+        if value is None:
+            self._stats.record_get(False, elapsed)
+            return default
         else:
-            ValueError(f"Invalid cache size: {cache_size}.")
+            self._stats.record_get(True, elapsed)
+            return value
 
-    def get(self, model_cache_key: str, content: str, default=None) -> Optional[List[float]]:
+    def set(self, model_cache_key: str, content: str, value: T) -> None:
         key = self._generate_key(model_cache_key, content)
-        return self._cache.get(key, default)
 
-    def set(self, model_cache_key: str, content: str, value: List[float]) -> None:
-        self.__setitem__(model_cache_key, content, value)
-
-    def __getitem__(self, model_cache_key: str, content: str, key: str) -> List[float]:
-        key = self._generate_key(model_cache_key, content)
-        return self._cache[key]
-
-    def __setitem__(self, model_cache_key: str, content: str, value: List[float]) -> None:
-        key = self._generate_key(model_cache_key, content)
+        now = time.perf_counter()
         self._cache[key] = value
+        elapsed = time.perf_counter() - now
 
-    def __contains__(self, item: Tuple) -> bool:
-        if len(item) != 2:
-            raise ValueError("MarqoInferenceCache received an unsupported input for 'in' operation. "
-                             "Expected input is a tuple with 'model-cache-key' and 'content'. "
-                             "E.g., ('my-model-cache-key', 'content'). ")
-        model_cache_key, content = item
-        key = self._generate_key(model_cache_key, content)
-        return key in self._cache
+        item_size = sys.getsizeof(value) + sys.getsizeof(key)
+        self._stats.record_set(item_size, elapsed)
 
     def _generate_key(self, model_cache_key: str, content: str) -> str:
         if not isinstance(model_cache_key, str):
@@ -87,17 +92,3 @@ class MarqoInferenceCache:
         """Clear the cache."""
         if self._cache is not None:
             self._cache.clear()
-
-    def is_enabled(self) -> bool:
-        """Return True if the cache is enabled, else False."""
-        return self._cache is not None
-
-    @property
-    def maxsize(self) -> int:
-        """Return the maximum size of the cache."""
-        return self._cache.maxsize
-
-    @property
-    def currsize(self) -> int:
-        """Return the current size of the cache."""
-        return self._cache.currsize

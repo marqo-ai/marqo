@@ -2,10 +2,16 @@ import marqo.core.inference.api.exceptions as inference_api_exceptions
 from marqo.core.exceptions import DeviceError
 from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.inference.native_inference.embedding_models.hugging_face_model import HuggingFaceModel
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
+from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 from marqo.inference.native_inference.embedding_models.open_clip_model import OpenCLIPModel
 from marqo.inference.native_inference.embedding_models.random_model import RandomModel
 from marqo.inference.native_inference.inference_pipeline.hugging_face_model_inference_pipeline import \
     HuggingFaceModelInferencePipeline
+from marqo.inference.native_inference.inference_pipeline.languagebind_model_inference_pipeline import \
+    LanguagebindModelInferencePipeline
+from marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline import \
+    MultilingualCLIPModelInferencePipeline
 from marqo.inference.native_inference.inference_pipeline.open_clip_model_inference_pipeline import (
     OpenCLIPModelInferencePipeline)
 from marqo.inference.native_inference.inference_pipeline.random_model_inference_pipeline import \
@@ -15,8 +21,6 @@ from marqo.inference.type import *
 from marqo.s2_inference.errors import S2InferenceError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.no_model_utils import NO_MODEL
-from marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline import MultilingualCLIPModelInferencePipeline
-from marqo.inference.native_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
 
 
 class NativeInferenceLocal(Inference):
@@ -43,6 +47,8 @@ class NativeInferenceLocal(Inference):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, MultilingualCLIPModel):
             return MultilingualCLIPModelInferencePipeline(model, request).run_pipeline()
+        elif isinstance(model, LanguagebindModel):
+            return LanguagebindModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, NO_MODEL):
             # TODO do we need to create a pipeline class for this?
             error = f"Cannot vectorise anything with '{ModelType.NO_MODEL}'. " \

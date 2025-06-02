@@ -144,7 +144,7 @@ class TestVespaLocalSingleNode(TestVespaLocal):
                   "--name vespa "
                   "--hostname vespa-container "
                   "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 --publish 127.0.0.1:5005:5005 "
-                  f"vespaengine/vespa:8.472.109"),
+                  f"vespaengine/vespa:8.513.17"),
         ]
         mock_system.assert_has_calls(expected_calls, any_order=True)
 

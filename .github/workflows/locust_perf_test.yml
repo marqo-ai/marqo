@@ -76,20 +76,9 @@ on:
           Embedding model to use to create the index. This is ignored when testing Marqo Cloud
 
 jobs:
-  Start-Runner:
-    uses: ./.github/workflows/start_ec2_runner.yml
-    with:
-      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-      ec2-instance-type: t3.xlarge
-    secrets: inherit
-
   Test-Marqo:
     name: Run Locust Performance Tests
-    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-
-    
-
+    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     steps:
 
       - name: Checkout marqo repo
@@ -98,7 +87,7 @@ jobs:
           ref: ${{ github.event.inputs.marqo_ref }}
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.9"
 
@@ -137,14 +126,3 @@ jobs:
         with:
           name: marqo-locust-test-report
           path: perf_tests/report/
-
-  Stop-Runner:
-    needs:
-      - Start-Runner # required to get output from the start-runner job
-      - Test-Marqo # required to wait when the main job is done
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    uses: ./.github/workflows/stop_ec2_runner.yml
-    with:
-      label: ${{ needs.start-runner.outputs.label }}
-      ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    secrets: inherit

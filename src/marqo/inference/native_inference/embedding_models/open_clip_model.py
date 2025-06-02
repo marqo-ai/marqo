@@ -1,4 +1,5 @@
 import os
+from pickle import UnpicklingError
 
 import numpy as np
 import open_clip
@@ -6,7 +7,7 @@ import torch
 from PIL.Image import Image
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
@@ -184,7 +185,8 @@ class OpenCLIPModel(AbstractCLIPModel):
             )
             return model, preprocess
         except Exception as e:
-            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)):
+            # RuntimeError is raised by torch 1.12.1, UnpicklingError is raised by torch 1.13.1
+            if (isinstance(e, (RuntimeError, UnpicklingError)) and "The file might be corrupted" in str(e)):
                 try:
                     os.remove(self.model_path)
                 except Exception as remove_e:
