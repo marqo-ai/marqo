@@ -428,7 +428,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                ef_search=ef_search, approximate=approximate, approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
@@ -1001,7 +1002,7 @@ def _vector_text_search(
         config: Config, marqo_index: MarqoIndex,
         query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5,
         offset: int = 0,
-        ef_search: Optional[int] = None, approximate: bool = True,
+        ef_search: Optional[int] = None, approximate: bool = True, approximate_threshold: Optional[float] = None,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
@@ -1085,6 +1086,7 @@ def _vector_text_search(
         limit=result_count,
         ef_search=ef_search,
         approximate=approximate,
+        approximate_threshold=approximate_threshold,
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
