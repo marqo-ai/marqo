@@ -85,7 +85,7 @@ class TestSearchCommon(MarqoTestCase):
 
     def test_lexical_query_can_not_be_none(self):
         context = {"tensor": [{"vector": [1, ] * 384, "weight": 1},
-                          {"vector": [2, ] * 384, "weight": 2}]}
+                              {"vector": [2, ] * 384, "weight": 2}]}
 
         test_case = [
             (None, context, "with context"),
@@ -100,7 +100,7 @@ class TestSearchCommon(MarqoTestCase):
 
     def test_tensor_search_query_can_be_none(self):
         context = {"tensor": [{"vector": [1, ] * 384, "weight": 1},
-                          {"vector": [2, ] * 384, "weight": 2}]}
+                              {"vector": [2, ] * 384, "weight": 2}]}
         for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
             res = self.client.index(index_name).search(q=None, context=context)
             self.assertIn("hits", res)
@@ -118,7 +118,6 @@ class TestSearchCommon(MarqoTestCase):
                 "_id": "2"
             }
         ]
-
 
         kwargs_list = [
             {"media_download_headers": {"marqo_media_header": "media_header_test_key"}},
@@ -141,14 +140,13 @@ class TestSearchCommon(MarqoTestCase):
                         "A private image without an extension": 1
                     }
                 ]:
-
                     with self.subTest(f"{index_name} - {kwargs} - {query}"):
                         res = self.client.index(index_name).search(query, **kwargs)
                         self.assertIn("hits", res, res)
                         self.assertEqual(2, len(res["hits"]), res)
 
     def test_invalidArgError_is_raised_when_searching_a_private_image(self):
-        query= "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small"
+        query = "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small"
         for index_name in [self.structured_image_index_name, self.unstructured_image_index_name]:
             with self.subTest(f"{index_name}"):
                 with self.assertRaises(MarqoWebError) as e:
@@ -172,10 +170,10 @@ class TestSearchCommon(MarqoTestCase):
         for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
             with self.subTest(index=index_name):
                 docs = [{
-                            "title": f"Doc {i}",
-                            "content": "some extra info",
-                            "_id": str(i)
-                        } for i in range(10)]
+                    "title": f"Doc {i}",
+                    "content": "some extra info",
+                    "_id": str(i)
+                } for i in range(10)]
                 tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
 
                 add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
@@ -208,10 +206,10 @@ class TestSearchCommon(MarqoTestCase):
         for index_name in [self.unstructured_image_index_name, self.structured_image_index_name]:
             with self.subTest(index=index_name):
                 docs = [{
-                            "title": f"Doc {i}",
-                            "content": "some extra info",
-                            "_id": str(i)
-                        } for i in range(10)]
+                    "title": f"Doc {i}",
+                    "content": "some extra info",
+                    "_id": str(i)
+                } for i in range(10)]
                 tensor_fields = ["title", "content"] if index_name == self.unstructured_image_index_name else None
 
                 add_res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
@@ -249,7 +247,7 @@ class TestSearchCommon(MarqoTestCase):
                         }
                     )
                     self.assertEqual(len(res["hits"]), 10)
-    
+
     def test_hybrid_search_validations(self):
         # Add docs
         docs = [
@@ -267,7 +265,8 @@ class TestSearchCommon(MarqoTestCase):
         for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
             with self.subTest(index_name):
                 self.client.index(index_name).add_documents(
-                    docs, tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                    docs,
+                    tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
                 )
                 # Hybrid search with no query or context should raise an error
                 with self.subTest("Hybrid search with no query or context"):
@@ -276,7 +275,8 @@ class TestSearchCommon(MarqoTestCase):
                             search_method="HYBRID"
                         )
                     assert e.exception.status_code == 422
-                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(
+                        e.exception)
 
                 with self.subTest("Hybrid search with no query or context should raise an error"):
                     with self.assertRaises(MarqoWebError) as e:
@@ -285,7 +285,8 @@ class TestSearchCommon(MarqoTestCase):
                             hybrid_parameters={}
                         )
                     assert e.exception.status_code == 422
-                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(e.exception)
+                    assert "One of Query(q), context, hybridParameters.queryTensor, or hybridParameters.queryTensor is required for HYBRID search but all are missing" in str(
+                        e.exception)
 
                 with self.subTest("Hybrid search with query and queryTensor/queryLexical should raise an error"):
                     with self.assertRaises(MarqoWebError) as e:
@@ -297,7 +298,8 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 422
-                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(
+                        e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             q="Cool",
@@ -307,9 +309,11 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 422
-                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(e.exception)
+                    assert "Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided" in str(
+                        e.exception)
 
-                with self.subTest("Hybrid search with only one queryTensor/queryLexical and retrievalMethod=disjunction raises an error"):
+                with self.subTest(
+                        "Hybrid search with only one queryTensor/queryLexical and retrievalMethod=disjunction raises an error"):
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -318,7 +322,8 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(
+                        e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -327,10 +332,11 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(e.exception)
+                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(
+                        e.exception)
 
-
-                with self.subTest("Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
+                with self.subTest(
+                        "Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
                     self.client.index(index_name).search(
                         search_method="HYBRID",
                         hybrid_parameters={
@@ -355,7 +361,8 @@ class TestSearchCommon(MarqoTestCase):
                         }
                     )
 
-                with self.subTest("Hybrid search with lexicalQuery and retrieval/ranking methods 'Tensor' should raise an error"):
+                with self.subTest(
+                        "Hybrid search with lexicalQuery and retrieval/ranking methods 'Tensor' should raise an error"):
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -366,9 +373,11 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "'hybridParameters.queryLexical' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'tensor'." in str(e.exception)
+                    assert "'hybridParameters.queryLexical' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'tensor'." in str(
+                        e.exception)
 
-                with self.subTest("Hybrid search with tensorQuery and retrieval/ranking methods 'Lexical' should raise an error"):
+                with self.subTest(
+                        "Hybrid search with tensorQuery and retrieval/ranking methods 'Lexical' should raise an error"):
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -379,4 +388,74 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)
+                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(
+                        e.exception)
+
+    def test_approximate_threshold(self):
+        """Test approximate threshold parameter behavior across search methods."""
+        # Add test documents
+        docs = [
+            {
+                "title": "Test Document 1",
+                "content": "This is a test document with some content",
+                "_id": "1"
+            },
+            {
+                "title": "Test Document 2",
+                "content": "Another test document with different content",
+                "_id": "2"
+            }
+        ]
+
+        for index_name in [self.structured_text_index_name,
+                           self.unstructured_text_index_name]:
+            with self.subTest(index_name=index_name):
+                # Add documents to index
+                tensor_fields = (["title", "content"] if
+                                 index_name == self.unstructured_text_index_name
+                                 else None)
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
+
+                # Test valid and invalid threshold values for TENSOR and HYBRID
+                search_methods = ["TENSOR", "HYBRID"]
+                for search_method in search_methods:
+                    # Test valid approximate threshold values (0-1)
+                    for threshold in [0.0, 0.5, 1.0]:
+                        with self.subTest(f"{search_method} threshold {threshold}"):
+                            res = self.client.index(index_name).search(
+                                q="test",
+                                search_method=search_method,
+                                approximate_threshold=threshold
+                            )
+                            self.assertIn("hits", res)
+
+                    # Test invalid approximate threshold values (outside 0-1)
+                    invalid_thresholds = [-0.1, -1.0, 1.1, 2.0]
+                    for threshold in invalid_thresholds:
+                        with self.subTest(f"Invalid {search_method} threshold {threshold}"):
+                            with self.assertRaises(MarqoWebError) as e:
+                                self.client.index(index_name).search(
+                                    q="test",
+                                    search_method=search_method,
+                                    approximate_threshold=threshold
+                                )
+                            self.assertEqual(e.exception.status_code, 422)
+                            self.assertIn(
+                                "'approximateThreshold' must be between 0 and 1",
+                                str(e.exception))
+
+                # Test that approximate threshold fails for LEXICAL search
+                with self.subTest("LEXICAL search with threshold should fail"):
+                    with self.assertRaises(MarqoWebError) as e:
+                        self.client.index(index_name).search(
+                            q="test",
+                            search_method="LEXICAL",
+                            approximate_threshold=0.5
+                        )
+                    self.assertEqual(e.exception.status_code, 422)
+                    error_msg = str(e.exception)
+                    self.assertIn("'approximateThreshold'", error_msg)
+                    self.assertIn("HYBRID", error_msg)
+                    self.assertIn("TENSOR", error_msg)
