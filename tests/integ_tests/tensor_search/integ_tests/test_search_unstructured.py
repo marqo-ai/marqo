@@ -1564,3 +1564,72 @@ class TestSearchUnstructured(MarqoTestCase):
         # Assert that no characters fail
         self.assertEqual(failed_characters, [],
                          f"Expected no characters to fail, but got: {failed_characters}")
+
+    def test_approximate_threshold(self):
+        """
+        Test approximate threshold parameter for both tensor and hybrid search
+        in unstructured indexes.
+        """
+        # Test documents
+        docs = [
+            {"_id": "doc1", "text_field_1": "red apple fruit"},
+            {"_id": "doc2", "text_field_1": "blue berry fruit"},
+            {"_id": "doc3", "text_field_1": "green grape fruit"},
+            {"_id": "doc4", "text_field_1": "yellow banana fruit"},
+        ]
+
+        # Add documents to the index
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+                tensor_fields=["text_field_1"]
+            )
+        )
+
+        test_cases = [
+            (SearchMethod.TENSOR, "tensor search"),
+            (SearchMethod.HYBRID, "hybrid search"),
+        ]
+
+        approximate_threshold_values = [0.0, 0.5, 0.8, 1.0]
+
+        for search_method, method_name in test_cases:
+            with self.subTest(search_method=method_name):
+                # Test different approximate threshold values
+                for approx_threshold in approximate_threshold_values:
+                    with self.subTest(approximate_threshold=approx_threshold):
+                        # Mock VespaClient.query method to capture params
+                        with mock.patch.object(
+                                self.config.vespa_client, 'query',
+                                wraps=self.config.vespa_client.query
+                        ) as mock_query:
+                            # Perform search with approximate threshold
+                            results = tensor_search.search(
+                                config=self.config,
+                                index_name=self.default_text_index,
+                                text="fruit",
+                                search_method=search_method,
+                                approximate_threshold=approx_threshold,
+                                result_count=4
+                            )
+
+                            # Verify the search returned results
+                            self.assertIn("hits", results)
+                            self.assertGreater(len(results["hits"]), 0)
+
+                            # Verify the mock was called
+                            self.assertTrue(mock_query.called)
+
+                            # Get the call arguments
+                            call_args, call_kwargs = mock_query.call_args
+
+                            # Verify approximate_threshold was passed correctly
+                            # It should be in the ranking.matching.approximateThreshold
+                            key_name = 'ranking.matching.approximateThreshold'
+                            self.assertIn(key_name, call_kwargs)
+                            self.assertEqual(
+                                call_kwargs[key_name],
+                                approx_threshold
+                            )
