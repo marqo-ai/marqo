@@ -12,7 +12,7 @@ COPY vespa/src /app/vespa/src
 RUN mvn clean package -T 1C
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:51 as base_image
+FROM marqoai/marqo-base:52 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var

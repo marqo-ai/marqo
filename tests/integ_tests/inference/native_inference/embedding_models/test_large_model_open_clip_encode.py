@@ -22,10 +22,16 @@ LARGE_OPEN_CLIP_TEST_MODELS = [
     'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k',
     'open_clip/ViT-H-14-378-quickgelu/dfn5b',
     'open_clip/ViT-SO400M-14-SigLIP-384/webli',
+    "open_clip/ViT-L-16-SigLIP-384/webli",
+    "open_clip/ViT-B-16-SigLIP/webli",
     "visheratin/nllb-siglip-mrl-large",
     "visheratin/nllb-clip-large-siglip",
     "visheratin/nllb-siglip-mrl-base",
-    "visheratin/nllb-clip-base-siglip"
+    "visheratin/nllb-clip-base-siglip",
+    "timm/ViT-B-16-SigLIP2",
+    "timm/ViT-B-16-SigLIP2-256",
+    "timm/ViT-B-16-SigLIP2-512",
+    "timm/ViT-L-16-SigLIP2-256",
 ]
 
 @pytest.mark.largemodel
@@ -70,11 +76,11 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         clear_loaded_models()
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent.parent.parent
-        json_file = target_dir / "embeddings_reference" / "embeddings_large_open_clip_python_3_8.json"
-        if not os.path.exists(json_file):
-            raise FileNotFoundError(f"File {json_file} not found, which is needed to compare embeddings.")
+        cls.json_file = target_dir / "embeddings_reference" / "embeddings_large_open_clip_python_3_8.json"
+        if not os.path.exists(cls.json_file):
+            raise FileNotFoundError(f"File {cls.json_file} not found, which is needed to compare embeddings.")
 
-        with open(json_file, 'r') as f:
+        with open(cls.json_file, 'r') as f:
             cls.open_clip_embeddings_reference = json.load(f)
 
     def setUp(self):
@@ -88,15 +94,9 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
         self.eps = 1e-6
 
     def test_embeddings_regression(self):
-        try:
-            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
-        except KeyError:
-            self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
-
         text_texts = ['hello', 'this is a test sentence. so is this.']
         for text in text_texts:
             with self.subTest(f"Test text: {text}"):
-                embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
                 pipeline_embeddings = self.encode_content_helper(
                     content=[text],
                     model_name=self.model_name,
@@ -105,10 +105,22 @@ class TestLargeModelOpenClipModelEncode(InferenceTestCase):
                     normalize_embeddings=True
                 )
 
-                embeddings_difference = self.calculate_embeddings_difference(
-                    embeddings_reference, pipeline_embeddings[0]
-                )
-                self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
+                ground_truth_embeddings = self.open_clip_embeddings_reference.get(self.model_name, {}).get(text, None)
+
+                if ground_truth_embeddings is not None:
+                    embeddings_reference = np.array(ground_truth_embeddings).reshape(-1)
+                    embeddings_difference = self.calculate_embeddings_difference(
+                        embeddings_reference, pipeline_embeddings[0]
+                    )
+                    self.assertTrue(embeddings_difference < 1e-4,
+                                    f"Reference embeddings for model '{self.model_name}' on '{self.device}' "
+                                    f"for text '{text}' from file {self.json_file} does not match the generated one. "
+                                    f"Reference:\n{ground_truth_embeddings}\n"
+                                    f"Generated:\n{pipeline_embeddings[0].tolist()}\n")
+                else:
+                    self.fail(f"Reference embeddings for model '{self.model_name}' on '{self.device}' for text '{text}'"
+                              f" is missing from file {self.json_file}. The generated embedding is\n"
+                              f"{pipeline_embeddings[0].tolist()}")
 
     def test_open_clip_encode_text_normalized(self):
         """
