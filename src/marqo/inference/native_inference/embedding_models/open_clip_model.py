@@ -228,8 +228,8 @@ class OpenCLIPModel(AbstractCLIPModel):
                 device=self.device,
                 cache_dir=ModelCache.clip_cache_path,
             )
-        except Exception as e:
-            if isinstance(e, UnpicklingError) and "Weights only load failed" in str(e):
+        except UnpicklingError as e:
+            if "Weights only load failed" in str(e):
                 logger.warning(f'Marqo encountered an error when loading only weights of custom open_clip model '
                                f'{self.model_properties.name} with model properties = {self.model_properties.dict()}.'
                                f'Will load again with `weights_only = False`')
