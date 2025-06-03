@@ -400,8 +400,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
-        if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
-            raise api_exceptions.InvalidArgError("attributes_to_retrieve must be a sequence")
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")

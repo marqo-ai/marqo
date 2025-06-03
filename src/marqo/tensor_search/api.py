@@ -652,8 +652,7 @@ def batch_create_indexes(index_settings_with_name_list: List[dict],
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in
-                      index_settings_with_name_list]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
 
     marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
