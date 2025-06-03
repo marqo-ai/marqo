@@ -1,7 +1,7 @@
 """The API entrypoint for Tensor Search"""
 import json
 from contextlib import asynccontextmanager
-from typing import List, Type, Any, TypeVar
+from typing import List, Type, Any, TypeVar, Optional, Iterable, Dict
 
 import pydantic
 import uvicorn
@@ -10,10 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
-from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -31,24 +28,32 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.models import MarqoIndex, MarqoHybridQuery
+from marqo.core.models.facets_parameters import FacetsParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.monitoring import memory_profiler
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
-from marqo.tensor_search import tensor_search, utils
-from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.otel import bootstrap_otel
+from marqo.tensor_search import tensor_search, utils, index_meta_cache
+from marqo.tensor_search.enums import RequestType, EnvVars, SearchMethod
+from marqo.tensor_search.models.api_models import SearchQuery, BulkSearchQueryEntity
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext, Qidx
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+from marqo.tensor_search.tensor_search import run_vectorise_pipeline
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
-from marqo.otel import bootstrap_otel
 
 logger = get_logger(__name__)
 
@@ -119,6 +124,7 @@ async def lifespan(app: FastAPI):
     yield
 
     otel_shutdown_hook()
+    get_config().vespa_client.close()
     get_config().stop_and_close_zookeeper_client()
 
 app = FastAPI(
@@ -395,7 +401,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
-
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
@@ -430,6 +435,141 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             track_total_hits=search_query.trackTotalHits
         )
         return ORJSONResponse(result)
+
+
+@app.post("/indexes/{index_name}/search_async")
+async def search_async_api(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
+           marqo_config: config.Config = Depends(get_config)):
+    """
+    Search for documents matching a specific query in the given index. Please refer to
+    [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
+    """
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+        #  SearchQuery can be injected after migrated to v2
+        search_query = parse_request_object(SearchQuery, search_query_dict)
+        marqo_index = index_meta_cache.get_index(index_management=marqo_config.index_management, index_name=index_name)
+
+        return await search_async(config=marqo_config, query=search_query.q,
+            marqo_index=marqo_index,
+            searchable_attributes=search_query.searchableAttributes,
+            result_count=search_query.limit, offset=search_query.offset,
+            rerank_depth=search_query.rerankDepth,
+            ef_search=search_query.efSearch,
+            filter_string=search_query.filter, device=device,
+            attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+            media_download_headers=search_query.mediaDownloadHeaders,
+            context=search_query.context,
+            score_modifiers=search_query.scoreModifiers,
+            model_auth=search_query.modelAuth,
+            text_query_prefix=search_query.textQueryPrefix,
+            hybrid_parameters=search_query.hybridParameters,
+            facets=search_query.facets,
+            track_total_hits=search_query.trackTotalHits)
+
+async def search_async(config: config.Config, marqo_index: MarqoIndex, query: str,
+        result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
+        ef_search: Optional[int] = None,
+        searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
+        media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
+        score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
+        text_query_prefix: Optional[str] = None,
+        hybrid_parameters: HybridParameters = None,
+        facets: Optional[FacetsParameters] = None,
+        track_total_hits: Optional[bool] = None,
+):
+
+    # # SEARCH TIMER-LOGGER (pre-processing)
+    if boost is not None:
+        raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
+
+    RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
+
+    index_name = marqo_index.name
+
+    # Use default hybrid settings if not provided
+    if hybrid_parameters is None:
+        hybrid_parameters = HybridParameters()
+
+    # Determine the text query prefix
+    text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
+    # split queries into lexical and tensor
+    if query is None:
+        tensor_query = hybrid_parameters.queryTensor
+        lexical_query = hybrid_parameters.queryLexical
+    else:
+        tensor_query = query
+        lexical_query = query
+
+    # Edge cases for q data type
+    if tensor_query is None and lexical_query is None:
+        query_text_vectorise = None
+        query_text_search = None
+
+    else:  # string or dict query
+        query_text_vectorise = tensor_query
+        query_text_search = lexical_query
+
+    queries = [BulkSearchQueryEntity(
+        q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
+        limit=result_count,
+        offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
+        boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
+        hybridParameters=hybrid_parameters
+    )]
+
+    if (
+            hybrid_parameters.retrievalMethod in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction]
+            or
+            hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
+    ):
+        with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        vectorised_text = list(qidx_to_vectors.values())[0]
+    else:
+        vectorised_text = None
+
+    # Parse text into required and optional terms.
+    if query_text_search:
+        (required_terms, optional_terms) = utils.parse_lexical_query(query_text_search)
+    else:
+        required_terms = []
+        optional_terms = []
+
+    marqo_query = MarqoHybridQuery(
+        index_name=index_name,
+        vector_query=vectorised_text,
+        filter=filter_string,
+        limit=result_count,
+        ef_search=ef_search,
+        approximate=True,
+        offset=offset,
+        global_rerank_depth=rerank_depth,
+        or_phrases=optional_terms,
+        and_phrases=required_terms,
+        attributes_to_retrieve=attributes_to_retrieve,
+        searchable_attributes=searchable_attributes,
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        # Hybrid-specific attributes
+        score_modifiers_lexical=hybrid_parameters.scoreModifiersLexical.to_marqo_score_modifiers()
+        if hybrid_parameters.scoreModifiersLexical is not None else None,
+        score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
+        if hybrid_parameters.scoreModifiersTensor is not None else None,
+        hybrid_parameters=hybrid_parameters,
+        facets=facets,
+        track_total_hits=track_total_hits
+    )
+
+    vespa_index = vespa_index_factory(marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+    RequestMetricsStore.for_request().stop("search.hybrid.processing_before_vespa")
+
+    # SEARCH TIMER-LOGGER (roundtrip)
+    with RequestMetricsStore.for_request().time("search.hybrid.vespa"):
+        return await config.vespa_client.query_async(**vespa_query)
 
 
 @app.post("/indexes/{index_name}/recommend")

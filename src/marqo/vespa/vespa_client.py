@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import httpcore
 import httpx
 import orjson
+from starlette.responses import StreamingResponse
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -66,6 +67,7 @@ class VespaClient:
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
+        self.async_http_client = httpx.AsyncClient()
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
@@ -78,6 +80,7 @@ class VespaClient:
         Close the VespaClient object.
         """
         self.http_client.close()
+        self.async_http_client.aclose()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
@@ -250,6 +253,35 @@ class VespaClient:
         self._query_raise_for_status(resp)
 
         return QueryResult(**orjson.loads(resp.text))
+
+    async def query_async(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
+                          query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
+        query_features_list = {
+            f'input.query({key})': value for key, value in query_features.items()
+        } if query_features else {}
+
+        query = {
+            'yql': yql,
+            'hits': hits,
+            'ranking': ranking,
+            'model.restrict': model_restrict,
+            **query_features_list,
+            **kwargs
+        }
+
+        # Use default timeout if not already set.
+        if timeout:
+            query['timeout'] = f"{timeout}ms"
+        else:
+            query['timeout'] = f"{self.default_search_timeout_ms}ms"
+
+        query = {key: value for key, value in query.items() if value is not None}
+
+        logger.debug(f'Query: {query}')
+
+        response = await self.async_http_client.post(f'{self.query_url}/search/', json=query)
+
+        return StreamingResponse(response.iter_bytes(), media_type="application/json")
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """
