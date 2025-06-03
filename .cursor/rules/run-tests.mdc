@@ -8,5 +8,5 @@ alwaysApply: true
 - To run unit and integ tests, make sure working directory is repo root and set PYTHONPATH=./src.
 - If running integ or API tests, make sure Vespa is running via docker ps. If not running, use
 python scripts/vespa_local/vespa_local.py full_start to run Vespa first.
-- To run API tests, first run Marqo API in one process by running src/marqo/tensor_search/api.py using PYTHONPATH=./src MARQO_ENABLE_BATCH_APIS=true MARQO_MODE=COMBINED MARQO_MODELS_TO_PRELOAD="[]". While the API is running, run API tests via pytest using PYTHONPATH=./tests/api_tests/v1/tests/api_tests . If Marqo API fails to run, stop. Terminate Marqo API when done.
+- To run API tests, first run Marqo API in one process by running src/marqo/tensor_search/api.py using PYTHONPATH=./src MARQO_ENABLE_BATCH_APIS=true MARQO_MODE=COMBINED. While the API is running, run API tests via pytest using PYTHONPATH=./tests/api_tests/v1/tests/api_tests . If Marqo API fails to run, stop. Terminate Marqo API when done.
 - Unit tests must follow the same package hierarchy as the code they test.
