@@ -104,8 +104,8 @@ class ApiTests(MarqoTestCase):
 
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(f"result limit must be less than or equal to the "
-                                f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
-                                response.json()["message"])
+                              f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
+                              response.json()["message"])
 
     def test_custom_search_offset(self):
         """
@@ -128,8 +128,8 @@ class ApiTests(MarqoTestCase):
 
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(f"The search result offset must be less than or equal "
-                                f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
-                                response.json()["message"])
+                              f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
+                              response.json()["message"])
 
 
 class ValidationApiTests(MarqoTestCase):
@@ -247,7 +247,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
             docs=[{'field1': 'hello', 'field2': 'world'}],
             tensor_fields=['field1'],
         ))
-
 
     def test_search_timeout_short_timer_fails(self):
         # Set up the test API client with the correct env vars set
@@ -427,6 +426,66 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["code"], "invalid_argument")
         self.assertEqual(response.json()["type"], "invalid_request")
         assert "Could not find model properties for" in response.json()["message"]
+
+    def test_approximate_threshold_with_lexical_method_error(self):
+        """Test that approximateThreshold used with lexical method returns validation error"""
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+            "q": "test",
+            "searchMethod": "LEXICAL",
+            "approximateThreshold": 0.5
+        })
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+        self.assertIn("'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods",
+                      response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_with_approximate_false_error(self):
+        """Test that approximateThreshold used when approximate=false returns validation error"""
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+            "q": "test",
+            "searchMethod": "TENSOR",
+            "approximate": False,
+            "approximateThreshold": 0.5
+        })
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+        self.assertIn("'approximateThreshold' cannot be set when 'approximate' is False",
+                      response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_outside_range_error(self):
+        """Test that approximateThreshold outside of 0 to 1 range returns validation error"""
+        invalid_thresholds = [-0.1, -1.0, 1.1, 2.0, 5.0]
+
+        for threshold in invalid_thresholds:
+            with self.subTest(threshold=threshold):
+                response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "approximateThreshold": threshold
+                })
+
+                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+                self.assertIn(f"'approximateThreshold' must be between 0 and 1, got {threshold}",
+                              response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_valid_values(self):
+        """Test that valid approximateThreshold values work correctly with TENSOR search method"""
+        valid_thresholds = [0.0, 0.5, 1.0]
+
+        for threshold in valid_thresholds:
+            with self.subTest(threshold=threshold):
+                response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "approximateThreshold": threshold
+                })
+
+                # Should return 200 (success) since these are valid combinations
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("hits", response.json())
 
     def test_create_index_snake_case_fails(self):
         """
@@ -618,6 +677,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_parse_pydantic_v1_model(self):
         """Ensures parse_request_object parses pydantic v1 model"""
+
         class PydanticV1Model(pydantic.v1.BaseModel):
             field1: str
 
@@ -629,6 +689,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_not_parse_pydantic_v2_model(self):
         """Ensures parse_request_object does not parse pydantic v2 model"""
+
         class PydanticV2Model(pydantic.BaseModel):
             field1: str
 
@@ -641,6 +702,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_raise_request_validation_exception(self):
         """Ensures parse_request_object raises RequestValidationError on pydantic v1 validation error"""
+
         class PydanticV1Model(pydantic.v1.BaseModel):
             field2: str
 
