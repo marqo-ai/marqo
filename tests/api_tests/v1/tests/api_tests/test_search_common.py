@@ -391,8 +391,91 @@ class TestSearchCommon(MarqoTestCase):
                     assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(
                         e.exception)
 
-    def test_approximate_threshold(self):
-        """Test approximate threshold parameter behavior across search methods."""
+    def test_approximate_threshold_success(self):
+        """Test approximate threshold parameter success cases with result comparison."""
+        # Add 100 documents - 50 with content:small, 50 with content:large
+        docs = []
+        # First 50 docs with content:small
+        for i in range(50):
+            docs.append({
+                '_id': str(i + 1),
+                'title': 'This is a test document.',
+                'content': 'small'
+            })
+        # Next 50 docs with content:large
+        for i in range(50, 100):
+            docs.append({
+                '_id': str(i + 1),
+                'title': 'This is a test document.',
+                'content': 'large'
+            })
+
+        for index_name in [self.structured_text_index_name,
+                           self.unstructured_text_index_name]:
+            with self.subTest(index_name=index_name):
+                # Add documents to index
+                tensor_fields = (['title'] if
+                                 index_name == self.unstructured_text_index_name
+                                 else None)
+                self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
+
+                # Test for TENSOR and HYBRID search methods
+                search_methods = ["TENSOR", "HYBRID"]
+                for search_method in search_methods:
+                    with self.subTest(f"{search_method} search"):
+                        # Get baseline results without approximate threshold
+                        with self.subTest(f"{search_method} baseline"):
+                            baseline_res = self.client.index(index_name).search(
+                                q="test",
+                                search_method=search_method,
+                                filter_string="content:small",
+                                limit=10
+                            )
+                            baseline_ids = {hit['_id'] for hit in baseline_res['hits']}
+
+                        # Test threshold 0.0 (< 0.5) - should match baseline
+                        with self.subTest(f"{search_method} threshold 0.0"):
+                            res_0 = self.client.index(index_name).search(
+                                q="test",
+                                search_method=search_method,
+                                approximate_threshold=0.0,
+                                filter_string="content:small",
+                                limit=10
+                            )
+                            ids_0 = {hit['_id'] for hit in res_0['hits']}
+                            self.assertEqual(baseline_ids, ids_0,
+                                             f"Threshold 0.0 results should match baseline for {search_method}")
+
+                        # Test threshold 0.5 (>= 0.5) - should differ from baseline
+                        with self.subTest(f"{search_method} threshold 0.5"):
+                            res_05 = self.client.index(index_name).search(
+                                q="test",
+                                search_method=search_method,
+                                approximate_threshold=0.5,
+                                filter_string="content:small",
+                                limit=10
+                            )
+                            ids_05 = {hit['_id'] for hit in res_05['hits']}
+                            self.assertNotEqual(baseline_ids, ids_05,
+                                                f"Threshold 0.5 results should differ from baseline for {search_method}")
+
+                        # Test threshold 1.0 (>= 0.5) - should differ from baseline
+                        with self.subTest(f"{search_method} threshold 1.0"):
+                            res_1 = self.client.index(index_name).search(
+                                q="test",
+                                search_method=search_method,
+                                approximate_threshold=1.0,
+                                filter_string="content:small",
+                                limit=10
+                            )
+                            ids_1 = {hit['_id'] for hit in res_1['hits']}
+                            self.assertNotEqual(baseline_ids, ids_1,
+                                                f"Threshold 1.0 results should differ from baseline for {search_method}")
+
+    def test_approximate_threshold_failures(self):
+        """Test approximate threshold parameter failure cases."""
         # Add test documents
         docs = [
             {
@@ -418,19 +501,9 @@ class TestSearchCommon(MarqoTestCase):
                     docs, tensor_fields=tensor_fields
                 )
 
-                # Test valid and invalid threshold values for TENSOR and HYBRID
+                # Test invalid approximate threshold values for TENSOR and HYBRID
                 search_methods = ["TENSOR", "HYBRID"]
                 for search_method in search_methods:
-                    # Test valid approximate threshold values (0-1)
-                    for threshold in [0.0, 0.5, 1.0]:
-                        with self.subTest(f"{search_method} threshold {threshold}"):
-                            res = self.client.index(index_name).search(
-                                q="test",
-                                search_method=search_method,
-                                approximate_threshold=threshold
-                            )
-                            self.assertIn("hits", res)
-
                     # Test invalid approximate threshold values (outside 0-1)
                     invalid_thresholds = [-0.1, -1.0, 1.1, 2.0]
                     for threshold in invalid_thresholds:
