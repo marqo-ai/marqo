@@ -71,6 +71,7 @@ class VespaClient:
             trust_env=False,  # skip proxy & env-var lookups
             event_hooks=None,
             auth=None,
+            http2=True,
         )
         self.async_http_client = httpx.AsyncClient(
             limits=httpx.Limits(
@@ -82,6 +83,7 @@ class VespaClient:
             trust_env=False,  # skip proxy & env-var lookups
             event_hooks=None,
             auth=None,
+            http2=True,
         )
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name

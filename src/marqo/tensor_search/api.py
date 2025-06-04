@@ -32,6 +32,7 @@ from marqo.core.models import MarqoIndex, MarqoHybridQuery
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.monitoring import memory_profiler
+from marqo.core.search.search_filter import MarqoFilterStringParser
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -549,7 +550,7 @@ def vespa_query(config: config.Config, marqo_index: MarqoIndex, query: str,
         query_text_vectorise = tensor_query
         query_text_search = lexical_query
 
-    queries = [BulkSearchQueryEntity( # slow
+    queries = [BulkSearchQueryEntity.construct( # slow
         q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
         limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
@@ -576,10 +577,10 @@ def vespa_query(config: config.Config, marqo_index: MarqoIndex, query: str,
         required_terms = []
         optional_terms = []
 
-    marqo_query = MarqoHybridQuery(  # slow
+    marqo_query = MarqoHybridQuery.construct(  # slow
         index_name=index_name,
         vector_query=vectorised_text,
-        filter=filter_string,
+        filter=MarqoFilterStringParser().parse(filter_string),
         limit=result_count,
         ef_search=ef_search,
         approximate=True,
