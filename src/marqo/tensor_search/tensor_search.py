@@ -22,12 +22,12 @@ Notes on search behaviour with caching and searchable attributes:
         - Searching an existing but uncached field will return the best result
             (the uncached field will be searched)
         - Searching all fields will return a poor result
-            (the uncached field won’t be searched)
+            (the uncached field won't be searched)
     Vector search:
         - Searching an existing but uncached field will return no results (the
-            uncached field won’t be searched)
+            uncached field won't be searched)
         - Searching all fields will return a poor result (the uncached field
-            won’t be searched)
+            won't be searched)
 
 """
 import typing
@@ -1246,5 +1246,94 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
+
+
+def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optional[List[str]] = None) -> List[str]:
+    """
+    Get the Vespa field names for embeddings based on the index type.
+    
+    Args:
+        marqo_index: The Marqo index object
+        tensor_field_names: Specific tensor fields to get embeddings for. If None, get all.
+    
+    Returns:
+        List of Vespa field names for embeddings
+    """
+    from marqo.core.models.marqo_index import IndexType
+    
+    if marqo_index.type == IndexType.Structured:
+        # For structured indexes, embeddings are stored per field
+        if hasattr(marqo_index, 'tensor_fields'):
+            if tensor_field_names:
+                # Filter to only requested fields
+                requested_tensor_fields = [tf for tf in marqo_index.tensor_fields 
+                                         if tf.name in tensor_field_names]
+            else:
+                requested_tensor_fields = marqo_index.tensor_fields
+            
+            return [tf.embeddings_field_name for tf in requested_tensor_fields]
+    else:
+        # For unstructured indexes, there's typically one embeddings field
+        # You'll need to import the field name from unstructured_common
+        from marqo.core.unstructured_vespa_index import common as unstructured_common
+        return [unstructured_common.VESPA_DOC_EMBEDDINGS]
+    
+    return []
+
+
+def get_doc_vectors_per_tensor_field_by_ids(
+    config: Config, 
+    index_name: str, 
+    document_ids: List[str],
+    tensor_fields: Optional[List[str]] = None
+) -> Dict[str, Dict[str, List[List[float]]]]:
+    """
+    Get only the embeddings for documents by their IDs.
+    
+    Args:
+        config: Marqo config
+        index_name: Name of the index
+        document_ids: List of document IDs to fetch
+        tensor_fields: Specific tensor fields to get. If None, get all tensor fields.
+    
+    Returns:
+        Dict mapping document_id to field_name to list of embedding vectors
+    """
+    marqo_index = _get_latest_index(config, index_name)
+    
+    # Get the embedding field names we want to retrieve
+    embedding_fields = get_embedding_field_names(marqo_index, tensor_fields)
+    
+    # Add the document ID field so we can identify the documents
+    fields_to_retrieve = [common.FIELD_ID] + embedding_fields
+    
+    # Get documents with only embedding fields
+    batch_get = config.vespa_client.get_batch(
+        document_ids, 
+        marqo_index.schema_name,
+        fields=fields_to_retrieve
+    )
+    
+    vespa_index = vespa_index_factory(marqo_index)
+    result = {}
+    
+    for response in batch_get.responses:
+        if response.status == 200:
+            # Convert the vespa document to get embeddings
+            marqo_doc = vespa_index.to_marqo_document(response.document.dict())
+            doc_id = marqo_doc.get('_id')
+            
+            # Extract embeddings from the document
+            if constants.MARQO_DOC_TENSORS in marqo_doc:
+                doc_embeddings = {}
+                tensors_data = marqo_doc[constants.MARQO_DOC_TENSORS]
+                
+                for field_name, field_data in tensors_data.items():
+                    if constants.MARQO_DOC_EMBEDDINGS in field_data:
+                        doc_embeddings[field_name] = field_data[constants.MARQO_DOC_EMBEDDINGS]
+                
+                result[doc_id] = doc_embeddings
+    
+    return result
 
 

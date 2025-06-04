@@ -70,33 +70,42 @@ class Recommender:
                         raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
                                                     f'Available tensor fields: {", ".join(valid_tensor_fields)}')
 
-        marqo_documents = tensor_search.get_documents_by_ids(
+        # Use the new optimized method to get only embeddings
+        doc_embeddings_by_field = tensor_search.get_doc_vectors_per_tensor_field_by_ids(
             config.Config(self.vespa_client, inference=self.inference),
-            index_name, document_ids, show_vectors=True
-        ).dict(exclude_none=True, by_alias=True)
+            index_name, 
+            document_ids, 
+            tensor_fields=tensor_fields
+        )
 
-        # Make sure all documents were found
+        # Check that all documents were found
         not_found = []
-        for document in marqo_documents['results']:
-            if not document['_found']:
-                not_found.append(document['_id'])
+        for doc_id in document_ids:
+            if doc_id not in doc_embeddings_by_field:
+                not_found.append(doc_id)
 
         if len(not_found) > 0:
             raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
 
+        # Flatten the embeddings structure to match the expected return format
+        # Convert from Dict[doc_id, Dict[field_name, List[List[float]]]] 
+        # to Dict[doc_id, List[List[float]]]
         doc_vectors: Dict[str, List[List[float]]] = {}
         docs_without_vectors = []
-        for document in marqo_documents['results']:
+        
+        for doc_id, field_embeddings in doc_embeddings_by_field.items():
             vectors: List[List[float]] = []
-            for tensor_facet in document['_tensor_facets']:
-                field = list(tensor_facet.keys())[0]
-                if tensor_fields is None or field in tensor_fields:
-                    vectors.append(tensor_facet['_embedding'])
-
-            doc_vectors[document['_id']] = vectors
+            
+            # Flatten all embeddings from all fields for this document
+            for field_name, embedding_list in field_embeddings.items():
+                # Only include if tensor_fields is None or this field is in tensor_fields
+                if tensor_fields is None or field_name in tensor_fields:
+                    vectors.extend(embedding_list)
+            
+            doc_vectors[doc_id] = vectors
 
             if len(vectors) == 0:
-                docs_without_vectors.append(document['_id'])
+                docs_without_vectors.append(doc_id)
 
         if len(docs_without_vectors) > 0:
             raise InvalidArgumentError(
