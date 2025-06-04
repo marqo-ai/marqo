@@ -65,9 +65,24 @@ class VespaClient:
         self.document_url = document_url.strip('/')
         self.query_url = query_url.strip('/')
         self.http_client = httpx.Client(
-            limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
+            limits=httpx.Limits(max_keepalive_connections=50, max_connections=25),
+            cookies=None,
+            follow_redirects=False,
+            trust_env=False,  # skip proxy & env-var lookups
+            event_hooks=None,
+            auth=None,
         )
-        self.async_http_client = httpx.AsyncClient()
+        self.async_http_client = httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=25
+            ),
+            cookies=None,
+            follow_redirects=False,
+            trust_env=False,  # skip proxy & env-var lookups
+            event_hooks=None,
+            auth=None,
+        )
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
@@ -277,9 +292,44 @@ class VespaClient:
 
         query = {key: value for key, value in query.items() if value is not None}
 
-        logger.debug(f'Query: {query}')
+        # logger.debug(f'Query: {query}')   # slow
 
-        response = await self.async_http_client.post(f'{self.query_url}/search/', json=query)
+        body_bytes = orjson.dumps(query)
+        req = self.async_http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
+                                             headers={"Content-Type": "application/json"})
+        response = await self.async_http_client.send(req)
+
+        return StreamingResponse(response.aiter_bytes(), media_type="application/json")
+
+    def query_sync(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
+                   query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
+        query_features_list = {
+            f'input.query({key})': value for key, value in query_features.items()
+        } if query_features else {}
+
+        query = {
+            'yql': yql,
+            'hits': hits,
+            'ranking': ranking,
+            'model.restrict': model_restrict,
+            **query_features_list,
+            **kwargs
+        }
+
+        # Use default timeout if not already set.
+        if timeout:
+            query['timeout'] = f"{timeout}ms"
+        else:
+            query['timeout'] = f"{self.default_search_timeout_ms}ms"
+
+        query = {key: value for key, value in query.items() if value is not None}
+
+        # logger.debug(f'Query: {query}')   # slow
+
+        body_bytes = orjson.dumps(query)
+        req = self.http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
+                                             headers={"Content-Type": "application/json"})
+        response = self.http_client.send(req)
 
         return StreamingResponse(response.iter_bytes(), media_type="application/json")
 
