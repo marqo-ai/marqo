@@ -4,7 +4,7 @@ import json
 import pydantic
 
 from marqo.core.models.marqo_index import FieldType, FieldFeature, Field, MarqoIndex
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @pytest.mark.unittest

@@ -6,8 +6,8 @@ import pytest
 import torch
 from parameterized import parameterized_class
 
-from integ_tests.inference.inference_test_case import *
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.inference.inference_test_case import *
+from tests.integ_tests.marqo_test import TestImageUrls
 from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
 from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
 

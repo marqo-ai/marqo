@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
 from marqo.core.models.add_docs_params import AddDocsParams

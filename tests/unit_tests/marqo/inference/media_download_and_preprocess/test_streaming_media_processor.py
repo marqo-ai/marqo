@@ -5,7 +5,7 @@ from unittest.mock import patch
 import ffmpeg
 import torch
 
-from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls
+from tests.integ_tests.marqo_test import TestAudioUrls, TestVideoUrls
 from marqo.core.inference.api import *
 from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor

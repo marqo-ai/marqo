@@ -6,7 +6,7 @@ from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.models.index_settings import IndexSettings
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestGetSettings(MarqoTestCase):

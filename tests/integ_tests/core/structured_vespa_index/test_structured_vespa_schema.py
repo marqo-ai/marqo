@@ -3,7 +3,7 @@ import os
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredVespaSchema(MarqoTestCase):

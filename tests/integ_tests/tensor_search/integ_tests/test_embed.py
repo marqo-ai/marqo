@@ -18,7 +18,7 @@ from marqo.tensor_search.api import embed
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
 from marqo.vespa.models import QueryResult
 from marqo.vespa.models.query_result import Root, Child, RootFields
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import InvalidArgError
 
 import unittest

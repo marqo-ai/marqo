@@ -439,7 +439,8 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold
         }
         query = {k: v for k, v in query.items() if v is not None}
 
@@ -614,6 +615,7 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
             'query_features': query_inputs,
             'presentation.summary': summary,
 

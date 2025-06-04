@@ -1,12 +1,12 @@
 import copy
 import unittest
 from unittest import mock
-from integ_tests.utils.transition import add_docs_caller
+from tests.integ_tests.utils.transition import add_docs_caller
 from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.enums import TensorField
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 import pprint
 

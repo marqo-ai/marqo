@@ -4,8 +4,8 @@ import uuid
 from unittest import mock
 from unittest.mock import patch
 
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.utils.transition import *
+from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.utils.transition import *
 
 from marqo.api.exceptions import (
     InvalidArgError,
