@@ -4,7 +4,7 @@ from pathlib import Path
 
 from parameterized import parameterized_class
 
-from integ_tests.inference.inference_test_case import *
+from tests.integ_tests.inference.inference_test_case import *
 from marqo.inference.native_inference.load_model import load_model, clear_loaded_models
 
 HF_TEST_MODELS = [

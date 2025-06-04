@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutErr
 from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from integ_tests.marqo_test import AsyncMarqoTestCase
+from tests.integ_tests.marqo_test import AsyncMarqoTestCase
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
@@ -428,7 +428,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             self.assertIn("Network Error", r.message)
 
     def test_get_vespa_version(self):
-        expected_vespa_version = '8.472.109'
+        expected_vespa_version = '8.513.17'
         version = self.client.get_vespa_version()
         self.assertEqual(expected_vespa_version, version)
 

@@ -4,8 +4,8 @@ from unittest import mock
 
 from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.utils.transition import add_docs_caller
+from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.utils.transition import add_docs_caller
 
 
 @unittest.skip

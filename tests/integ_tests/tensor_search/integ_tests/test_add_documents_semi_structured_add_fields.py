@@ -8,7 +8,7 @@ from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import SemiStructuredFieldCountConfig
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import unittest
 

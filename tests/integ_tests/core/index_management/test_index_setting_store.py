@@ -6,7 +6,7 @@ import pytest
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.index_management.vespa_application_package import IndexSettingStore
 from marqo.core.models.marqo_index import Field, FieldType, MarqoIndex, Model
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @pytest.mark.unittest

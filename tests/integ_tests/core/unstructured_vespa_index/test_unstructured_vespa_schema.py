@@ -2,7 +2,7 @@ import os
 
 from marqo.core.models.marqo_index import *
 from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestUnstructuredVespaSchema(MarqoTestCase):

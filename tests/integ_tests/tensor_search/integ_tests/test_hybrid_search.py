@@ -7,7 +7,7 @@ from unittest import mock
 import httpx
 import numpy as np
 from fastapi.responses import ORJSONResponse
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
 
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions

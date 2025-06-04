@@ -1,5 +1,5 @@
 import pytest
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_query import MarqoHybridQuery

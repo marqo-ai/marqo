@@ -21,9 +21,9 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 from marqo.tensor_search import index_meta_cache
 

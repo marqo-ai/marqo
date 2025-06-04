@@ -13,7 +13,7 @@ from marqo.core import exceptions as core_exceptions
 from marqo.tensor_search.api import api_validation_exception_handler
 from marqo.tensor_search.api import marqo_base_exception_handler
 from marqo.vespa import exceptions as vespa_exceptions
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 import marqo.core.inference.api.exceptions as inference_exceptions
 
 

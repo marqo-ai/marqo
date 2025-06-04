@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from orjson import orjson
 from pydantic.v1 import ValidationError
 from starlette import status
@@ -7,6 +9,7 @@ from marqo import version, logging
 from marqo.inference.native_inference.remote.server.inference_config import Config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start
 from marqo.logging import LOGGING_CONFIG
+from marqo.otel import bootstrap_otel
 from marqo.tensor_search.telemetry import TelemetryMiddleware
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, Body
 from marqo.core.inference.api import InferenceRequest, InferenceError
@@ -22,9 +25,20 @@ logger = logging.get_logger(__name__)
 _config = Config()
 if __name__ in ["__main__", "inference_api"]:
     on_start(_config)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-inference')
+
+    yield
+
+    otel_shutdown_hook()
+
 app = FastAPI(
-    name='Marqo Inference',
+    title='Marqo Inference',
     version=version.get_version(),
+    lifespan=lifespan,
 )
 app.add_middleware(TelemetryMiddleware)
 
@@ -56,12 +70,6 @@ async def general_exception_handler(request: Request, exc: Exception):
     media_type = request.headers.get("Accept", "application/json")
     error_response = {"detail": str(exc)}
     return _serialise_error(error_response, status.HTTP_500_INTERNAL_SERVER_ERROR, media_type)
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """clean up on shutdown."""
-    pass
 
 
 @app.get("/", summary="Basic information")

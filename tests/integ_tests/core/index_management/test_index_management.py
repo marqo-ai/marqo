@@ -30,7 +30,7 @@ from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestIndexManagement(MarqoTestCase):

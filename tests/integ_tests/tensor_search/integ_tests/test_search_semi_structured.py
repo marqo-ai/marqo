@@ -9,8 +9,8 @@ import math
 import requests
 
 import marqo.core.exceptions as core_exceptions
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError

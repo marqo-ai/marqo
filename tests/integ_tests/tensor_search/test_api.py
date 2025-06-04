@@ -1,25 +1,27 @@
 import importlib
 import os
 import sys
-import unittest
 import uuid
 from unittest import mock
 from unittest.mock import patch
 
 import pydantic
+import pytest
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
 import marqo.tensor_search.api as api
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.vespa import exceptions as vespa_exceptions
@@ -102,8 +104,8 @@ class ApiTests(MarqoTestCase):
 
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(f"result limit must be less than or equal to the "
-                                f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
-                                response.json()["message"])
+                              f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
+                              response.json()["message"])
 
     def test_custom_search_offset(self):
         """
@@ -126,8 +128,8 @@ class ApiTests(MarqoTestCase):
 
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(f"The search result offset must be less than or equal "
-                                f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
-                                response.json()["message"])
+                              f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
+                              response.json()["message"])
 
 
 class ValidationApiTests(MarqoTestCase):
@@ -235,10 +237,23 @@ class TestApiCustomEnvVars(MarqoTestCase):
         cls.unstructured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
+        cls.add_documents(cls.config, AddDocsParams(
+            index_name=cls.structured_index.name,
+            docs=[{'field1': 'hello', 'field2': 'world'}],
+        ))
+
+        cls.add_documents(cls.config, AddDocsParams(
+            index_name=cls.unstructured_index.name,
+            docs=[{'field1': 'hello', 'field2': 'world'}],
+            tensor_fields=['field1'],
+        ))
+
     def test_search_timeout_short_timer_fails(self):
         # Set up the test API client with the correct env vars set
-        with mock.patch.dict(os.environ, {"VESPA_SEARCH_TIMEOUT_MS": "1"}):
+        with mock.patch.dict(os.environ, {
+            "VESPA_SEARCH_TIMEOUT_MS": "1",
+            "MARQO_MODE": "COMBINED"
+        }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
             # VespaClient will be created with default timeout of 1ms
             self.client = TestClient(api.app)
@@ -256,21 +271,42 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.json()["type"], "invalid_request")
 
             with self.subTest(search_method="HYBRID"):
-                for index in [self.structured_index]:   # TODO: add unstructured when supported
+                for index in [self.unstructured_index, self.structured_index]:
                     with self.subTest(index=index.name):
                         res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
                             "q": "irrelevant",
                             "searchMethod": "HYBRID"
                         })
                         # The search request must timeout, since the timeout is set to 1ms
-                        try:
-                            self.assertEqual(res.status_code, 504)
-                            self.assertEqual(res.json()["code"], "vector_store_timeout")
-                            self.assertEqual(res.json()["type"], "invalid_request")
-                        except AssertionError as e:
-                            # Allowing scenario where hybrid searcher returns 500
-                            # TODO: Remove this when hybrid searcher gives correct error code
-                            self.assertEqual(res.status_code, 500)
+                        self.assertEqual(res.status_code, 504)
+                        self.assertEqual(res.json()["code"], "vector_store_timeout")
+                        self.assertEqual(res.json()["type"], "invalid_request")
+
+    def test_inference_cache_caches_query_string(self):
+        with mock.patch.dict(os.environ, {
+            "MARQO_INFERENCE_CACHE_SIZE": "10",
+            "MARQO_INFERENCE_CACHE_TYPE": "LFU",
+            "MARQO_MODE": "COMBINED",
+            "MARQO_ENABLE_THROTTLING": "FALSE"
+        }):
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+
+            inference = api.get_config().inference
+            self.assertIsInstance(inference, CachingInference)
+            with patch.object(inference.delegate, "vectorise", wraps=inference.delegate.vectorise) as mock_vectorise:
+                with TestClient(api.app) as client:
+                    for index in [self.unstructured_index, self.structured_index]:
+                        with self.subTest(index=index.name):
+                            mock_vectorise.reset_mock()
+                            client.post("/indexes/" + index.name + "/search?telemetry=true",
+                                        json={"q": f"hello {index.name}"})
+                            mock_vectorise.assert_called_once()
+
+                            # the second request with the same query should hit cache
+                            mock_vectorise.reset_mock()
+                            client.post("/indexes/" + index.name + "/search?telemetry=true",
+                                        json={"q": f"hello {index.name}"})
+                            mock_vectorise.assert_not_called()
 
 
 class TestApiErrors(MarqoTestCase):
@@ -300,7 +336,10 @@ class TestApiErrors(MarqoTestCase):
         cls.structured_index = cls.indexes[1]
 
     def setUp(self):
-        self.client = TestClient(api.app)
+        with mock.patch.dict(os.environ, {"MARQO_MODE": "COMBINED"}):
+            # reload the api module to recreated config in combined mode
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+            self.client = TestClient(api.app)
 
     def test_index_not_found_error(self):
         index_name = self.random_index_name()
@@ -324,7 +363,6 @@ class TestApiErrors(MarqoTestCase):
         assert "already exists" in response.json()["message"] and self.structured_index.name in response.json()[
             "message"]
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_invalid_field_name(self):
         # use attributesToRetrieve on a non-existent field
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
@@ -351,7 +389,6 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["errors"], True)
         self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
-    @unittest.skip(reason='Temporarily skipping this test since it requires a inference_api to be running')
     def test_filter_string_parsing_error(self):
         response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
@@ -389,6 +426,66 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["code"], "invalid_argument")
         self.assertEqual(response.json()["type"], "invalid_request")
         assert "Could not find model properties for" in response.json()["message"]
+
+    def test_approximate_threshold_with_lexical_method_error(self):
+        """Test that approximateThreshold used with lexical method returns validation error"""
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+            "q": "test",
+            "searchMethod": "LEXICAL",
+            "approximateThreshold": 0.5
+        })
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+        self.assertIn("'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods",
+                      response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_with_approximate_false_error(self):
+        """Test that approximateThreshold used when approximate=false returns validation error"""
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+            "q": "test",
+            "searchMethod": "TENSOR",
+            "approximate": False,
+            "approximateThreshold": 0.5
+        })
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+        self.assertIn("'approximateThreshold' cannot be set when 'approximate' is False",
+                      response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_outside_range_error(self):
+        """Test that approximateThreshold outside of 0 to 1 range returns validation error"""
+        invalid_thresholds = [-0.1, -1.0, 1.1, 2.0, 5.0]
+
+        for threshold in invalid_thresholds:
+            with self.subTest(threshold=threshold):
+                response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "approximateThreshold": threshold
+                })
+
+                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.json()["detail"][0]["type"], "value_error")
+                self.assertIn(f"'approximateThreshold' must be between 0 and 1, got {threshold}",
+                              response.json()["detail"][0]["msg"])
+
+    def test_approximate_threshold_valid_values(self):
+        """Test that valid approximateThreshold values work correctly with TENSOR search method"""
+        valid_thresholds = [0.0, 0.5, 1.0]
+
+        for threshold in valid_thresholds:
+            with self.subTest(threshold=threshold):
+                response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "approximateThreshold": threshold
+                })
+
+                # Should return 200 (success) since these are valid combinations
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("hits", response.json())
 
     def test_create_index_snake_case_fails(self):
         """
@@ -580,6 +677,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_parse_pydantic_v1_model(self):
         """Ensures parse_request_object parses pydantic v1 model"""
+
         class PydanticV1Model(pydantic.v1.BaseModel):
             field1: str
 
@@ -591,6 +689,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_not_parse_pydantic_v2_model(self):
         """Ensures parse_request_object does not parse pydantic v2 model"""
+
         class PydanticV2Model(pydantic.BaseModel):
             field1: str
 
@@ -603,6 +702,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_parse_request_object_should_raise_request_validation_exception(self):
         """Ensures parse_request_object raises RequestValidationError on pydantic v1 validation error"""
+
         class PydanticV1Model(pydantic.v1.BaseModel):
             field2: str
 

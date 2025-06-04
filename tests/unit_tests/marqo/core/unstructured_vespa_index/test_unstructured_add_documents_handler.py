@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 # TODO should I move utility method from integ_tests.MarqoTestCase to MarqoTestCase?
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import AddDocumentsError, InternalError
 from marqo.core.inference.api import Inference, Modality, MediaDownloadError, InferenceRequest, InferenceResult, \
     InferenceError, InferenceErrorModel

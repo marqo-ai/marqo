@@ -45,6 +45,7 @@ class SearchQuery(BaseMarqoModel):
     rerankDepth: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
+    approximateThreshold: Optional[float] = None
     showHighlights: bool = True
     reRanker: str = None
     filter: str = None
@@ -280,6 +281,23 @@ class SearchQuery(BaseMarqoModel):
         if track_total_hits and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"trackTotalHits can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_approximate_threshold(cls, values):
+        """Validate that approximateThreshold is only set for hybrid or tensor search and is a valid value."""
+        approximate_threshold = values.get('approximateThreshold')
+        search_method = values.get('searchMethod')
+        approximate = values.get('approximate')
+
+        if approximate_threshold is not None:
+            if search_method.upper() != SearchMethod.HYBRID and search_method.upper() != SearchMethod.TENSOR:
+                raise ValueError(f"'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods")
+            if approximate is False:
+                raise ValueError(f"'approximateThreshold' cannot be set when 'approximate' is False")
+            if approximate_threshold < 0 or approximate_threshold > 1:
+                raise ValueError(f"'approximateThreshold' must be between 0 and 1, got {approximate_threshold}.")
+
         return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:

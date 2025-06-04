@@ -4,8 +4,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from integ_tests.inference.inference_test_case import InferenceTestCase
-from integ_tests.marqo_test import TestImageUrls, TestVideoUrls, TestAudioUrls
+from tests.integ_tests.inference.inference_test_case import InferenceTestCase
+from tests.integ_tests.marqo_test import TestImageUrls, TestVideoUrls, TestAudioUrls
 from marqo.core.inference.api import *
 from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal

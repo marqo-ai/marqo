@@ -6,7 +6,7 @@ from unittest import mock
 
 import numpy as np
 
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import BadRequestError
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.core.models.add_docs_params import AddDocsParams
