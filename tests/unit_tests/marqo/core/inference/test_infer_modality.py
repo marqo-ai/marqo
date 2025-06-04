@@ -1,12 +1,15 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import base64
+from io import BytesIO
 
 import requests
+from PIL import Image
 
 from marqo.core.inference.api import Modality
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
-    get_url_file_extension
+    get_url_file_extension, _is_base64_image, _decode_base64_image
 
 
 class TestMultimodalUtils(unittest.TestCase):
@@ -157,3 +160,118 @@ class TestMultimodalUtils(unittest.TestCase):
             mock_fetch.assert_not_called()
             mock_magic.assert_called_once_with(bytes, mime=True)
             mock_infer_on_mime.assert_called_once_with("image/jpeg")
+
+    def test_is_base64_image_data_url_format(self):
+        """Test recognition of data URL format base64 images."""
+        # Create a small test image (1x1 red pixel PNG)
+        img = Image.new('RGB', (1, 1), color='red')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Test data URL format
+        data_url = f"data:image/png;base64,{base64_data}"
+        self.assertTrue(_is_base64_image(data_url))
+        
+        # Test different image formats
+        data_url_jpeg = f"data:image/jpeg;base64,{base64_data}"
+        self.assertTrue(_is_base64_image(data_url_jpeg))
+
+    def test_is_base64_image_plain_base64(self):
+        """Test recognition of plain base64 images without data URL prefix."""
+        # Create a small test image (1x1 blue pixel PNG)
+        img = Image.new('RGB', (1, 1), color='blue')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        with patch('magic.from_buffer') as mock_magic:
+            mock_magic.return_value = 'image/png'
+            self.assertTrue(_is_base64_image(base64_data))
+
+    def test_is_base64_image_invalid_cases(self):
+        """Test rejection of invalid base64 image cases."""
+        # Test short strings
+        self.assertFalse(_is_base64_image("short"))
+        
+        # Test non-base64 strings
+        self.assertFalse(_is_base64_image("not_base64_at_all" * 10))
+        
+        # Test non-image mime types
+        with patch('magic.from_buffer') as mock_magic:
+            mock_magic.return_value = 'text/plain'
+            self.assertFalse(_is_base64_image("VGhpcyBpcyBub3QgYW4gaW1hZ2U=" * 5))
+        
+        # Test invalid data URL format
+        self.assertFalse(_is_base64_image("data:text/plain;base64,VGVzdA=="))
+        
+        # Test None and non-string inputs
+        self.assertFalse(_is_base64_image(None))
+        self.assertFalse(_is_base64_image(123))
+
+    def test_decode_base64_image_data_url(self):
+        """Test decoding of data URL format base64 images."""
+        # Create a small test image
+        img = Image.new('RGB', (1, 1), color='green')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        original_bytes = buffer.getvalue()
+        base64_data = base64.b64encode(original_bytes).decode('utf-8')
+        
+        # Test data URL format
+        data_url = f"data:image/png;base64,{base64_data}"
+        decoded_bytes = _decode_base64_image(data_url)
+        self.assertEqual(decoded_bytes, original_bytes)
+
+    def test_decode_base64_image_plain_base64(self):
+        """Test decoding of plain base64 images."""
+        # Create a small test image
+        img = Image.new('RGB', (1, 1), color='yellow')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        original_bytes = buffer.getvalue()
+        base64_data = base64.b64encode(original_bytes).decode('utf-8')
+        
+        # Test plain base64
+        decoded_bytes = _decode_base64_image(base64_data)
+        self.assertEqual(decoded_bytes, original_bytes)
+
+    def test_decode_base64_image_invalid_input(self):
+        """Test error handling for invalid base64 input."""
+        with self.assertRaises(ValueError):
+            _decode_base64_image("invalid_base64!!!")
+        
+        with self.assertRaises(ValueError):
+            _decode_base64_image("data:image/png;base64,invalid_base64!!!")
+
+    def test_infer_modality_base64_images(self):
+        """Test that infer_modality correctly identifies base64 images."""
+        # Create a small test image
+        img = Image.new('RGB', (1, 1), color='purple')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Test data URL format
+        data_url = f"data:image/png;base64,{base64_data}"
+        self.assertEqual(infer_modality(data_url), Modality.IMAGE)
+        
+        # Test plain base64 with mocked magic
+        with patch('marqo.core.inference.modality_utils._is_base64_image') as mock_is_base64:
+            mock_is_base64.return_value = True
+            self.assertEqual(infer_modality(base64_data), Modality.IMAGE)
+
+    def test_infer_modality_base64_takes_precedence(self):
+        """Test that base64 detection takes precedence over URL validation."""
+        # Create a string that looks like a URL but is actually base64
+        img = Image.new('RGB', (1, 1), color='orange')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        data_url = f"data:image/png;base64,{base64_data}"
+        
+        # Even if this somehow gets past URL validation, base64 should be detected first
+        with patch('marqo.core.inference.modality_utils.validate_url') as mock_validate:
+            mock_validate.return_value = True  # Pretend it's a valid URL
+            self.assertEqual(infer_modality(data_url), Modality.IMAGE)

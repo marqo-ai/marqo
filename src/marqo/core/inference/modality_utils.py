@@ -1,5 +1,6 @@
 import io
 import os
+import base64
 from contextlib import contextmanager
 from typing import Optional, Union, List
 from urllib.parse import urlparse
@@ -80,6 +81,76 @@ def _infer_modality_based_on_mime_type(mime_object: str) -> Modality:
         return Modality.TEXT
 
 
+def _is_base64_image(content: str) -> bool:
+    """
+    Check if a string is a base64-encoded image.
+    
+    Args:
+        content: The string to check
+        
+    Returns:
+        bool: True if the content is a base64-encoded image, False otherwise
+    """
+    if not isinstance(content, str):
+        return False
+        
+    # Check for data URL format: data:image/[format];base64,[base64_data]
+    if content.startswith('data:image/') and ';base64,' in content:
+        return True
+        
+    # Check for plain base64 string (without data URL prefix)
+    # We'll be more conservative and only check if it looks like base64 encoding
+    # and has a reasonable length for an image
+    if len(content) > 100:  # Minimum reasonable size for a base64 image
+        try:
+            # Try to decode as base64
+            if content.startswith('data:'):
+                # Extract base64 part from data URL
+                if ';base64,' in content:
+                    base64_part = content.split(';base64,', 1)[1]
+                else:
+                    return False
+            else:
+                base64_part = content
+                
+            # Try to decode the base64 content
+            decoded = base64.b64decode(base64_part, validate=True)
+            
+            # Use python-magic to check if it's actually an image
+            mime_type = magic.from_buffer(decoded, mime=True)
+            return mime_type.startswith('image/')
+            
+        except (base64.binascii.Error, ValueError, magic.MagicException):
+            return False
+            
+    return False
+
+
+def _decode_base64_image(content: str) -> bytes:
+    """
+    Decode a base64-encoded image string to bytes.
+    
+    Args:
+        content: Base64-encoded image string (with or without data URL prefix)
+        
+    Returns:
+        bytes: The decoded image data
+        
+    Raises:
+        ValueError: If the content cannot be decoded
+    """
+    try:
+        if content.startswith('data:') and ';base64,' in content:
+            # Extract base64 part from data URL
+            base64_part = content.split(';base64,', 1)[1]
+        else:
+            base64_part = content
+            
+        return base64.b64decode(base64_part, validate=True)
+    except (base64.binascii.Error, ValueError) as e:
+        raise ValueError(f"Invalid base64 image data: {e}")
+
+
 # TODO this method is copied from s2_inference.multimodal_modal_load class, improve it
 def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
     """
@@ -91,9 +162,15 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
 
     If the content is a bytes object, we will infer the modality based on the MIME type and return the modality.
 
+    If the content is a base64-encoded image string, we will return IMAGE.
+
     If the content is neither a URL nor a bytes object, we will return TEXT.
     """
     if isinstance(content, str):
+        # Check if it's a base64-encoded image first
+        if _is_base64_image(content):
+            return Modality.IMAGE
+            
         if not validate_url(content):
             return Modality.TEXT
 

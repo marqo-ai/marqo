@@ -1,4 +1,5 @@
 import os
+import base64
 from io import BytesIO
 
 import certifi
@@ -48,6 +49,10 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
 
     # if it is a string, determine if it is a local file or url
     if isinstance(thing, str):
+        # Check if it's a base64-encoded image first
+        if _is_base64_image(thing):
+            return True
+            
         name, extension = os.path.splitext(thing.lower())
 
         # if it has the correct extension, asssume yes
@@ -143,12 +148,100 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     return img
 
 
+def _is_base64_image(content: str) -> bool:
+    """
+    Check if a string is a base64-encoded image.
+    
+    Args:
+        content: The string to check
+        
+    Returns:
+        bool: True if the content is a base64-encoded image, False otherwise
+    """
+    if not isinstance(content, str):
+        return False
+        
+    # Check for data URL format: data:image/[format];base64,[base64_data]
+    if content.startswith('data:image/') and ';base64,' in content:
+        return True
+        
+    # Check for plain base64 string (without data URL prefix)
+    # We'll be more conservative and only check if it looks like base64 encoding
+    # and has a reasonable length for an image
+    if len(content) > 100:  # Minimum reasonable size for a base64 image
+        try:
+            # Try to decode as base64
+            if content.startswith('data:'):
+                # Extract base64 part from data URL
+                if ';base64,' in content:
+                    base64_part = content.split(';base64,', 1)[1]
+                else:
+                    return False
+            else:
+                base64_part = content
+                
+            # Try to decode the base64 content
+            import magic
+            decoded = base64.b64decode(base64_part, validate=True)
+            
+            # Use python-magic to check if it's actually an image
+            mime_type = magic.from_buffer(decoded, mime=True)
+            return mime_type.startswith('image/')
+            
+        except (base64.binascii.Error, ValueError):
+            try:
+                import magic
+                return False
+            except ImportError:
+                return False
+            
+    return False
+
+
+def _load_base64_image(content: str) -> ImageType:
+    """
+    Load a base64-encoded image string into a PIL Image.
+    
+    Args:
+        content: Base64-encoded image string (with or without data URL prefix)
+        
+    Returns:
+        ImageType: PIL Image object
+        
+    Raises:
+        UnidentifiedImageError: If the content cannot be decoded or loaded as an image
+    """
+    try:
+        if content.startswith('data:') and ';base64,' in content:
+            # Extract base64 part from data URL
+            base64_part = content.split(';base64,', 1)[1]
+        else:
+            base64_part = content
+            
+        # Decode base64 to bytes
+        image_bytes = base64.b64decode(base64_part, validate=True)
+        
+        # Create PIL Image from bytes
+        image_buffer = BytesIO(image_bytes)
+        img = Image.open(image_buffer)
+        
+        # Load the image to ensure it's valid
+        img.load()
+        
+        return img
+        
+    except (base64.binascii.Error, ValueError) as e:
+        raise UnidentifiedImageError(f"Invalid base64 image data: {e}")
+    except Exception as e:
+        raise UnidentifiedImageError(f"Error loading base64 image: {e}")
+
+
 def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
-        image_path (str): Local or remote path to image.
+        image_path (str): Local or remote path to image, or base64-encoded image string.
         media_download_headers (dict): header for the image download
         timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
@@ -158,6 +251,10 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
     Returns:
         ImageType: In-memory PIL image.
     """
+    # Check if it's a base64-encoded image first
+    if _is_base64_image(image_path):
+        return _load_base64_image(image_path)
+        
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):
@@ -180,7 +277,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
             if metrics_obj is not None:
                 metrics_obj.stop(f"media_download.image.{image_path}")
     else:
-        raise UnidentifiedImageError(f"Input str of {image_path} is not a local file or a valid url. "
+        raise UnidentifiedImageError(f"Input str of {image_path} is not a local file, a valid url, or a base64-encoded image. "
                                      f"If you are using Marqo Cloud, please note that images can only be downloaded "
                                      f"from a URL and local files are not supported. "
                                      f"If you are running Marqo in a Docker container, you will need to use a Docker "
