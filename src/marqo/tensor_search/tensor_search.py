@@ -84,6 +84,10 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
+from marqo.core.models.marqo_index import IndexType
+from marqo.core.structured_vespa_index import common as structured_common
+from marqo.core.unstructured_vespa_index import common as unstructured_common
+
 
 logger = get_logger(__name__)
 
@@ -1261,9 +1265,8 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
     Returns:
         List of Vespa field names for embeddings
     """
-    from marqo.core.models.marqo_index import IndexType
     
-    if marqo_index.type == IndexType.Structured:
+    if marqo_index.type in {IndexType.Structured, IndexType.SemiStructured}:
         # For structured indexes, embeddings are stored per field
         if hasattr(marqo_index, 'tensor_fields'):
             if tensor_field_names:
@@ -1275,9 +1278,7 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
             
             return [tf.embeddings_field_name for tf in requested_tensor_fields]
     else:
-        # For unstructured indexes, there's typically one embeddings field
-        # You'll need to import the field name from unstructured_common
-        from marqo.core.unstructured_vespa_index import common as unstructured_common
+        # For legacy unstructured indexes, there's typically one embeddings field
         return [unstructured_common.VESPA_DOC_EMBEDDINGS]
     
     return []
@@ -1301,20 +1302,24 @@ def get_doc_vectors_per_tensor_field_by_ids(
     Returns:
         Dict mapping document_id to field_name to list of embedding vectors
     """
+
+    # TODO: Add maximum retrievable docs for context docs
+    # TODO: Add unsuccessful docs list + reason
     marqo_index = _get_latest_index(config, index_name)
     
     # Get the embedding field names we want to retrieve
     embedding_fields = get_embedding_field_names(marqo_index, tensor_fields)
     
-    # Add the document ID field so we can identify the documents
-    fields_to_retrieve = [common.FIELD_ID] + embedding_fields
+    # Add the document ID field so we can identify the documents (structured and unstructured are the same here)
+    fields_to_retrieve = [structured_common.FIELD_ID] + embedding_fields
     
     # Get documents with only embedding fields
-    batch_get = config.vespa_client.get_batch(
-        document_ids, 
-        marqo_index.schema_name,
-        fields=fields_to_retrieve
-    )
+    with RequestMetricsStore.for_request().time(f"get_document_vectors.vespa"):
+        batch_get = config.vespa_client.get_batch(
+            document_ids,
+            marqo_index.schema_name,
+            fields=fields_to_retrieve
+        )
     
     vespa_index = vespa_index_factory(marqo_index)
     result = {}
@@ -1327,6 +1332,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
             
             # Extract embeddings from the document
             if constants.MARQO_DOC_TENSORS in marqo_doc:
+                # TODO: For unstructured, we have all the embeddings, but how can we map the embeddings to the field names?
                 doc_embeddings = {}
                 tensors_data = marqo_doc[constants.MARQO_DOC_TENSORS]
                 
@@ -1335,6 +1341,13 @@ def get_doc_vectors_per_tensor_field_by_ids(
                         doc_embeddings[field_name] = field_data[constants.MARQO_DOC_EMBEDDINGS]
                 
                 result[doc_id] = doc_embeddings
+            else:
+                # Document has no vectors
+                result[doc_id] = {}
+
+        else:
+            # TODO: Add doc to failures list.
+            pass
     
     return result
 

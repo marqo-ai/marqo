@@ -417,24 +417,27 @@ class VespaClient:
                   schema: str,
                   fields: Optional[List[str]] = None,
                   concurrency: Optional[int] = None,
-                  timeout: int = 60,
-                  tensor_fields_only: bool = False,
-                  embeddings_only: bool = False) -> GetBatchResponse:
+                  timeout: int = 60) -> GetBatchResponse:
         """
         Get a batch of documents by ID concurrently.
-        
+
+        Documents will be fetched with `concurrency` concurrent pooled connections.
+
+        Missing (404) documents will be returned in the response. Any other non-200 responses will raise an exception.
+
         Args:
-            tensor_fields_only: If True, only return tensor-related fields (chunks + embeddings)
-            embeddings_only: If True, only return embedding fields (no chunks or other data)
+            ids: List of document IDs to get
+            schema: Schema to get from
+            fields: A optional list of fields to fetch from the document
+            concurrency: Number of concurrent get requests
+            timeout: Timeout in seconds per request
+
+        Returns:
+            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404)
+
         """
         if not ids:
             return GetBatchResponse(responses=[], errors=False)
-
-        # Determine which fields to retrieve based on flags
-        if embeddings_only or tensor_fields_only:
-            # You'll need to pass the marqo_index here to determine field names
-            # This requires modifying the method signature
-            pass
 
         if concurrency is None:
             concurrency = self.get_pool_size

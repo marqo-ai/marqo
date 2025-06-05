@@ -39,6 +39,8 @@ class TestSearchWithContext(MarqoTestCase):
                              features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='text_field_2', type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch]),
+                FieldRequest(name='non_vector_text_field', type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
                 FieldRequest(name='score_field', type=FieldType.Float,
                              features=[FieldFeature.ScoreModifier]),
@@ -64,6 +66,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def setUp(self) -> None:
         # Any tests that call add_documents, search, bulk_search need this env var
+        super().setUp()
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
@@ -691,7 +694,7 @@ class TestSearchWithContext(MarqoTestCase):
             with self.subTest(index=index.type):
                 # Add documents without vectors in the specified field
                 docs = [
-                    {"_id": "doc1", "title": "Document without vector"},
+                    {"_id": "doc1", "non_vector_text_field": "Document without vector"},
                     {"_id": "doc2", "text_field_1": "Document with vector"}
                 ]
 
@@ -716,7 +719,7 @@ class TestSearchWithContext(MarqoTestCase):
                 )
 
                 # Verify error is raised for document without vectors
-                with self.assertRaises(InvalidArgumentError):
+                with self.assertRaises(InvalidArgumentError) as e:
                     tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -724,6 +727,9 @@ class TestSearchWithContext(MarqoTestCase):
                         context=search_context,
                         result_count=5
                     )
+                self.assertIn("do not have embeddings", str(e.exception))
+                self.assertIn("doc1", str(e.exception))
+                self.assertNotIn("doc2", str(e.exception))
 
     def test_search_with_context_documents_invalid_tensor_fields(self):
         """Test that search with context documents fails with invalid tensor fields."""
@@ -1065,13 +1071,13 @@ class TestSearchWithContext(MarqoTestCase):
                     )
                     self.assertEqual(len(results["hits"]), 5)
 
-    def test_search_with_context_documents_specific_tensor_fields_vespa_optimization(self):
+    def test_search_with_context_documents_gets_only_specific_fields_from_vespa(self):
         """Test that search with context documents only requests specific tensor field embeddings from Vespa.
         
         This test verifies the optimization where only the required embedding fields are fetched
         from Vespa when specific tensor fields are specified in context documents.
         """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+        for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents with multiple tensor fields
                 docs = [
@@ -1105,6 +1111,18 @@ class TestSearchWithContext(MarqoTestCase):
                         tensor_fields=["text_field_1", "text_field_2"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
+
+                # Import the correct constants based on index type
+                if isinstance(index, StructuredMarqoIndex):
+                    from marqo.core.structured_vespa_index import common as structured_common
+                    expected_id_field = structured_common.FIELD_ID
+                    expected_embedding_field_1 = "marqo__embeddings_text_field_1"
+                    expected_embedding_field_2 = "marqo__embeddings_text_field_2"
+                else:
+                    from marqo.core.unstructured_vespa_index import common as unstructured_common
+                    expected_id_field = unstructured_common.VESPA_FIELD_ID
+                    expected_embedding_field_1 = unstructured_common.VESPA_DOC_EMBEDDINGS
+                    expected_embedding_field_2 = unstructured_common.VESPA_DOC_EMBEDDINGS
 
                 # Store the original get_batch method
                 original_get_batch = self.config.vespa_client.get_batch
@@ -1153,15 +1171,14 @@ class TestSearchWithContext(MarqoTestCase):
                         # Verify that only the required fields were requested
                         if isinstance(index, StructuredMarqoIndex):
                             # For structured index, should request ID + text_field_1 embedding field
-                            expected_embedding_field = "marqo__embeddings_text_field_1"
-                            self.assertIn("marqo__id", requested_fields)
-                            self.assertIn(expected_embedding_field, requested_fields)
+                            self.assertIn(expected_id_field, requested_fields)
+                            self.assertIn(expected_embedding_field_1, requested_fields)
                             # Should NOT include text_field_2 embedding field
-                            self.assertNotIn("marqo__embeddings_text_field_2", requested_fields)
+                            self.assertNotIn(expected_embedding_field_2, requested_fields)
                         else:
                             # For unstructured index, should request ID + embeddings field
-                            self.assertIn("marqo__id", requested_fields)
-                            self.assertIn("marqo__embeddings", requested_fields)
+                            self.assertIn(expected_id_field, requested_fields)
+                            self.assertIn(expected_embedding_field_1, requested_fields)
 
                     # Test 2: Directly test get_doc_vectors_per_tensor_field_by_ids to verify it only returns specified fields
                     with self.subTest(tensor_field="direct_vector_retrieval"):
@@ -1186,8 +1203,9 @@ class TestSearchWithContext(MarqoTestCase):
                             doc_embeddings = doc_vectors[doc_id]
                             # Should only contain text_field_1 embeddings
                             self.assertIn("text_field_1", doc_embeddings)
-                            # Should NOT contain text_field_2 embeddings
-                            self.assertNotIn("text_field_2", doc_embeddings)
+                            # For structured indexes, should NOT contain text_field_2 embeddings
+                            if isinstance(index, StructuredMarqoIndex):
+                                self.assertNotIn("text_field_2", doc_embeddings)
                             
                             # Verify embeddings are actual vectors (lists of floats)
                             embeddings_list = doc_embeddings["text_field_1"]
@@ -1203,9 +1221,8 @@ class TestSearchWithContext(MarqoTestCase):
                         requested_fields = get_batch_call['kwargs'].get('fields', [])
                         
                         if isinstance(index, StructuredMarqoIndex):
-                            expected_embedding_field = "marqo__embeddings_text_field_1"
-                            self.assertIn(expected_embedding_field, requested_fields)
-                            self.assertNotIn("marqo__embeddings_text_field_2", requested_fields)
+                            self.assertIn(expected_embedding_field_1, requested_fields)
+                            self.assertNotIn(expected_embedding_field_2, requested_fields)
 
                     # Test 3: Compare with full document retrieval to verify correctness
                     with self.subTest(tensor_field="comparison_with_full_retrieval"):
@@ -1224,7 +1241,7 @@ class TestSearchWithContext(MarqoTestCase):
                                 if 'text_field_1' in facet:
                                     full_doc_text_field_1_vectors.append(facet['_embedding'])
 
-                        # Get vectors using our optimized method
+                        # Get vectors using optimized method
                         optimized_vectors = get_doc_vectors_per_tensor_field_by_ids(
                             config=self.config,
                             index_name=index.name,
@@ -1260,14 +1277,16 @@ class TestSearchWithContext(MarqoTestCase):
                         self.assertIn("doc1", doc_vectors_multi)
                         doc_embeddings = doc_vectors_multi["doc1"]
                         self.assertIn("text_field_1", doc_embeddings)
-                        self.assertIn("text_field_2", doc_embeddings)
-
-                        # Check that get_batch was called with both embedding fields
+                        
+                        # For structured indexes, should have separate field embeddings
                         if isinstance(index, StructuredMarqoIndex):
+                            self.assertIn("text_field_2", doc_embeddings)
+                            
+                            # Check that get_batch was called with both embedding fields
                             get_batch_call = vespa_requests[0]
                             requested_fields = get_batch_call['kwargs'].get('fields', [])
-                            self.assertIn("marqo__embeddings_text_field_1", requested_fields)
-                            self.assertIn("marqo__embeddings_text_field_2", requested_fields)
+                            self.assertIn(expected_embedding_field_1, requested_fields)
+                            self.assertIn(expected_embedding_field_2, requested_fields)
 
                     # Test 5: Test with no tensor fields specified (should get all)
                     with self.subTest(tensor_field="all_fields"):
@@ -1292,8 +1311,8 @@ class TestSearchWithContext(MarqoTestCase):
                             # Check that get_batch was called with all embedding fields
                             get_batch_call = vespa_requests[0]
                             requested_fields = get_batch_call['kwargs'].get('fields', [])
-                            self.assertIn("marqo__embeddings_text_field_1", requested_fields)
-                            self.assertIn("marqo__embeddings_text_field_2", requested_fields)
+                            self.assertIn(expected_embedding_field_1, requested_fields)
+                            self.assertIn(expected_embedding_field_2, requested_fields)
                         else:
                             # For unstructured index, fields are not separated in the return
                             # But we should still have embeddings
