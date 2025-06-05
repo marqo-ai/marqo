@@ -1,0 +1,60 @@
+from enum import Enum
+from pydantic.v1 import root_validator, Field
+from typing import Union
+
+from marqo.base_model import StrictBaseModel
+
+
+class RelevanceCutoffMethod(str, Enum):
+    RelativeMaxScore = "relative_max_score"
+    GapDetection = "gap_detection"
+    MeanStdDev = "mean_std_dev"
+
+
+class RelativeMaxScoreParameters(StrictBaseModel):
+    relative_score_factor: float = Field(..., gt=0, le=1, alias="relativeScoreFactor")
+
+
+class MeanStdParameters(StrictBaseModel):
+    std_dev_factor: float = Field(..., gt=0, alias="stdDevFactor")
+
+
+class RelevanceCutoffModel(StrictBaseModel):
+    """
+    The RelevanceCutoffModel defines how to apply relevance cutoff in search results.
+
+    Attributes:
+        method (RelevanceCutoffMethod): The method to use for relevance cutoff.
+        probeDepth (int): The number of documents to probe for relevance cutoff. Defaults to 1000. We use
+            a lexical search as a probe search. Check Vespa Customer Searcher for more details.
+        parameters (Union[RelativeMaxScoreParameters, MeanStdParameters]): The parameters for the relevance cutoff method.
+            If the method is RelativeMaxScore, you must provide 'relativeScoreFactor' as a parameter.
+            If the method is MeanStd, you must provide 'stdDevFactor' as a parameter.
+            Check Vespa Customer Searcher for more details.
+    """
+    method: RelevanceCutoffMethod
+    probeDepth: int = Field(1000, ge=1)
+    parameters: Union[RelativeMaxScoreParameters, MeanStdParameters, None] = None
+
+    @root_validator(pre=False, skip_on_failure=True)
+    def _validate_method_and_parameters(cls, values):
+        """
+        Validates that the parameters provided match the method selected for relevance cutoff.
+        """
+        method = values.get('method')
+        parameters = values.get('parameters')
+
+        if method == RelevanceCutoffMethod.RelativeMaxScore:
+            if not isinstance(parameters, RelativeMaxScoreParameters):
+                raise ValueError(f"You must provide '{[f.alias for f in RelativeMaxScoreParameters.__fields__.values()]}'"
+                                 f" as parameters for method '{method}'")
+        elif method == RelevanceCutoffMethod.MeanStdDev:
+            if not isinstance(parameters, MeanStdParameters):
+                raise ValueError(f"You must provide '{[f.alias for f in MeanStdParameters.__fields__.values()]}'"
+                                 f" as parameters for {method}")
+        elif method == RelevanceCutoffMethod.GapDetection:
+            if parameters is not None:
+                raise ValueError(f"{method} does not require any parameters, but received {parameters}")
+        else:
+            raise ValueError(f"Unknown relevance cutoff method: {method}")
+        return values

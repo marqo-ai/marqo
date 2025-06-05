@@ -18,7 +18,8 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
-
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 class BaseMarqoModel(BaseModel):
     class Config:
@@ -58,6 +59,8 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
+    sortBy: Optional[SortByModel] = None
+    relevanceCutoff: Optional[RelevanceCutoffModel] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -283,6 +286,26 @@ class SearchQuery(BaseMarqoModel):
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
+
+    @root_validator(pre=False)
+    def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
+        """Validate that relevance cutoff is only provided for hybrid search"""
+        relevance_cutoff = values.get('relevanceCutoff')
+        search_method = values.get('searchMethod')
+        if relevance_cutoff is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"RelevanceCutoff can only be provided for 'HYBRID' search, but "
+                             f"received search method '{search_method}'")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_sort_by_only_works_for_hybrid_search(cls, values):
+        """Validate that sortBy is only provided for hybrid search"""
+        sort_by = values.get('sortBy')
+        search_method = values.get('searchMethod')
+        if sort_by is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"sortBy can only be provided for 'HYBRID' search, but "
+                             f"received search method {search_method}")
+        return values
 
 
 class BulkSearchQueryEntity(SearchQuery):

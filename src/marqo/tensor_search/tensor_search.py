@@ -81,6 +81,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 logger = get_logger(__name__)
 
@@ -318,6 +320,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            hybrid_parameters: Optional[HybridParameters] = None,
            facets: Optional[FacetsParameters] = None,
            track_total_hits: Optional[bool] = None,
+           relevance_cutoff: Optional[RelevanceCutoffModel] = None,
+           sort_by: Optional[SortByModel] = None,
+
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -445,7 +450,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
+                relevance_cutoff=relevance_cutoff, sort_by=sort_by
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:

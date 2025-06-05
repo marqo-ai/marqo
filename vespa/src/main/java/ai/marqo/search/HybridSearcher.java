@@ -73,6 +73,22 @@ public class HybridSearcher extends Searcher {
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
 
+        // Relevance Cut-off Parameters
+        String sortByMethod = query.properties().getString("sortBy", null);
+        if (sortByMethod != null) {
+            if (sortByMethod.equals("relative_max_score")) {
+                Double relativeScoreFactor = query.properties().getDouble("relativeScoreFactor");
+            } else if (sortByMethod.equals("mean_std_dev")) {
+                Double stdDevFactor = query.properties().getDouble("stdDevFactor");
+            } else {
+                ;
+            }
+        }
+
+        Integer probeDepth = query.properties().getInteger("probeDepth", null);
+
+        // Sort by Parameters
+
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
@@ -183,6 +199,10 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException(
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
+
+        // This is where sort happens
+        // minSortCandidates
+        //
 
         // Post-process the main hits result list.
         HitGroup processedHits =
@@ -454,6 +474,13 @@ public class HybridSearcher extends Searcher {
 
         return resultToRerank;
     }
+
+
+    HitGroup applyGlobalScoreModifiers() {
+
+    }
+
+
 
     void raiseErrorIfPresent(Result resultLexical, Result resultTensor) {
         // Raise error if either result list has an error. Make sure error messages are combined
