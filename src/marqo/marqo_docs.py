@@ -82,3 +82,6 @@ def hugging_face_trust_remote_code():
 
 def update_documents_response():
     return _build_url('reference/api/documents/update-documents/#response')
+
+def hybrid_parameters():
+    return _build_url('reference/api/search/search/#hybrid-parameters')
