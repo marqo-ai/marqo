@@ -1,11 +1,12 @@
 """The API entrypoint for Tensor Search"""
 import json
+import random
 from contextlib import asynccontextmanager
 from typing import List, Type, Any, TypeVar, Optional, Iterable, Dict
 
 import pydantic
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
@@ -125,7 +126,7 @@ async def lifespan(app: FastAPI):
     yield
 
     otel_shutdown_hook()
-    get_config().vespa_client.close()
+    await get_config().vespa_client.close()
     get_config().stop_and_close_zookeeper_client()
 
 app = FastAPI(
@@ -404,8 +405,10 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
-def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
+def search(index_name: str, search_query_dict: dict, iteration: int = Query(1000),
+           device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
+    cpu_activity_place_holder(iteration)
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
@@ -438,9 +441,71 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
         return ORJSONResponse(result)
 
 
+def cpu_activity_place_holder(iteration: int) -> int:
+    sum_num = 0
+    for _ in range(iteration):
+        sum_num += random.randint(1, 10)
+    return sum_num
+
+
+@app.get("/dummy_async")
+async def dummy_async_api(iteration: int = Query(1000)):
+    sum_num = cpu_activity_place_holder(iteration)
+    return ORJSONResponse({'result': sum_num})
+
+
+@app.get("/dummy_sync")
+def dummy_sync_api(iteration: int = Query(1000)):
+    sum_num = cpu_activity_place_holder(iteration)
+    return ORJSONResponse({'result': sum_num})
+
+
+@app.post("/vespa_proxy_async")
+async def vespa_proxy_async(query_dict: dict, iteration: int = Query(1000),
+                            marqo_config: config.Config = Depends(get_config)):
+    cpu_activity_place_holder(iteration)
+    return await marqo_config.vespa_client.query_async(**query_dict)
+
+
+@app.post("/vespa_proxy_sync")
+def vespa_proxy_sync(query_dict: dict, iteration: int = Query(1000),
+                     marqo_config: config.Config = Depends(get_config)):
+    cpu_activity_place_holder(iteration)
+    return marqo_config.vespa_client.query_sync(**query_dict)
+
+
+@app.post("/indexes/{index_name}/convert_search")
+def convert_query(index_name: str, search_query_dict: dict,
+                  device: str = Depends(api_validation.validate_device),
+                  marqo_config: config.Config = Depends(get_config)):
+    search_query = parse_request_object(SearchQuery, search_query_dict)
+    marqo_index = index_meta_cache.get_index(index_management=marqo_config.index_management, index_name=index_name)
+
+    query = vespa_query(config=marqo_config, query=search_query.q,
+                        marqo_index=marqo_index,
+                        searchable_attributes=search_query.searchableAttributes,
+                        result_count=search_query.limit, offset=search_query.offset,
+                        rerank_depth=search_query.rerankDepth,
+                        ef_search=search_query.efSearch,
+                        filter_string=search_query.filter, device=device,
+                        attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+                        media_download_headers=search_query.mediaDownloadHeaders,
+                        context=search_query.context,
+                        score_modifiers=search_query.scoreModifiers,
+                        model_auth=search_query.modelAuth,
+                        text_query_prefix=search_query.textQueryPrefix,
+                        hybrid_parameters=search_query.hybridParameters,
+                        facets=search_query.facets,
+                        track_total_hits=search_query.trackTotalHits)
+
+    return ORJSONResponse(query)
+
+
 @app.post("/indexes/{index_name}/search_async")
-async def search_async_api(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(get_config)):
+async def search_async_api(index_name: str, search_query_dict: dict, iteration: int = Query(1000),
+                           device: str = Depends(api_validation.validate_device),
+                           marqo_config: config.Config = Depends(get_config)):
+    cpu_activity_place_holder(iteration)
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
@@ -474,8 +539,10 @@ async def search_async_api(index_name: str, search_query_dict: dict, device: str
 
 
 @app.post("/indexes/{index_name}/search_sync")
-def search_sync_api(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(get_config)):
+def search_sync_api(index_name: str, search_query_dict: dict, iteration: int = Query(1000),
+                    device: str = Depends(api_validation.validate_device),
+                    marqo_config: config.Config = Depends(get_config)):
+    cpu_activity_place_holder(iteration)
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.

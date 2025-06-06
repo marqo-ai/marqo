@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import httpcore
 import httpx
 import orjson
+from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
 import marqo.logging
@@ -92,12 +93,12 @@ class VespaClient:
         self.delete_pool_size = delete_pool_size
         self.partial_pool_size = partial_update_pool_size
 
-    def close(self):
+    async def close(self):
         """
         Close the VespaClient object.
         """
         self.http_client.close()
-        self.async_http_client.aclose()
+        await self.async_http_client.aclose()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
@@ -299,9 +300,14 @@ class VespaClient:
         body_bytes = orjson.dumps(query)
         req = self.async_http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
                                              headers={"Content-Type": "application/json"})
-        response = await self.async_http_client.send(req)
 
-        return StreamingResponse(response.aiter_bytes(), media_type="application/json")
+        r = await self.async_http_client.send(req, stream=True)
+        return StreamingResponse(
+            r.aiter_raw(),
+            status_code=r.status_code,
+            headers=r.headers,
+            background=BackgroundTask(r.aclose)
+        )
 
     def query_sync(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
                    query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
@@ -331,9 +337,14 @@ class VespaClient:
         body_bytes = orjson.dumps(query)
         req = self.http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
                                              headers={"Content-Type": "application/json"})
-        response = self.http_client.send(req)
 
-        return StreamingResponse(response.iter_bytes(), media_type="application/json")
+        r = self.http_client.send(req, stream=True)
+        return StreamingResponse(
+            r.aiter_raw(),
+            status_code=r.status_code,
+            headers=r.headers,
+            background=BackgroundTask(r.aclose)
+        )
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

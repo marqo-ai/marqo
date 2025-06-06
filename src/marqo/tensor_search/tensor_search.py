@@ -971,12 +971,12 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     try:
-        prefixed_queries = add_prefix_to_queries(queries)
+        prefixed_queries = add_prefix_to_queries(queries)  # slow
     except s2_inference_errors.MediaDownloadError as e:
         raise api_exceptions.InvalidArgError(message=str(e)) from e
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
-    # we can still use qidx_to_job. But the jobs structure may need to be different
+    # we can still use qidx_to_job. But the jobs structure may need to be different  # do we need this? slow
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
         prefixed_queries, config, device)
 
