@@ -663,9 +663,9 @@ class StructuredVespaIndex(VespaIndex):
 
         # Sort by part
         if marqo_query.sort_by:
-            query["marqo_hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
-            query["marqo_hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sortDepth
-            query["marqo_hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.minSortCandidates
+            query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
+            query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sortDepth
+            query["marqo__hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.minSortCandidates
 
             query["query_features"]["marqo__sort_field_weights_0"] = {}
             query["query_features"]["marqo__sort_field_weights_1"] = {}

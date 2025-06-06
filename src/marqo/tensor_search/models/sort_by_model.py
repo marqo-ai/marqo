@@ -1,8 +1,11 @@
 from enum import Enum
-from pydantic.v1 import Field
+from pydantic.v1 import Field, validator
+from sqlalchemy.log import echo_property
 from typing import List, Optional
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
+from marqo.api.exceptions import InvalidFieldNameError
 
 
 class SortOrder(str, Enum):
@@ -15,7 +18,6 @@ class SortMissingPolicy(str, Enum):
     First = "first"
 
 
-
 class SortByField(StrictBaseModel):
     """
     The sort by field model defines how to sort the results based on the target field.
@@ -25,9 +27,18 @@ class SortByField(StrictBaseModel):
         order (SortOrder): The order of sorting, either asc(ascending) or desc(descending). Defaults to desc.
         missing (SortMissingPolicy): Defines how to handle missing values in the sort field. Defaults to last.
     """
-    field_name: str = Field(alias="fieldName")
+    field_name: str = Field(alias="fieldName", dependent=validate_field_name)
     order: SortOrder = SortOrder.Desc
     missing: SortMissingPolicy = SortMissingPolicy.Last
+
+    @validator('field_name')
+    def _validate_field_name(cls, v):
+        """Validate the field name is in a valid format."""
+        try:
+            validate_field_name(v)
+        except InvalidFieldNameError as e:
+            raise ValueError(e)
+        return v
 
 
 class SortByModel(StrictBaseModel):
@@ -43,6 +54,6 @@ class SortByModel(StrictBaseModel):
         minSortCandidates (Optional[int]): The minimum number of candidates to be retrieved.
             Check Vespa Customer Searcher for more details.
     """
-    fields: List[SortByField]
+    fields: List[SortByField] = Field(..., min_items=1, max_items=3)
     sortDepth: Optional[int] = Field(None, ge=1)
     minSortCandidates: Optional[int] = Field(None, ge=1)

@@ -315,4 +315,7 @@ class HybridSearch:
             f"{total_results} results from Vespa."
         )
 
+        if sort_by is not None:
+            gathered_results["_sortByCandidates"] = responses.root.fields.sort_by_candidates
+
         return gathered_results

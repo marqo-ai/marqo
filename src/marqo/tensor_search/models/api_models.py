@@ -307,6 +307,29 @@ class SearchQuery(BaseMarqoModel):
                              f"received search method {search_method}")
         return values
 
+    @root_validator(pre=False)
+    def _validate_sort_by_cannot_be_used_with_global_score_modifiers(cls, values):
+        """Validate that sortBy cannot be used with global score modifiers"""
+        sort_by = values.get('sortBy')
+        score_modifiers = values.get('scoreModifiers')
+        if sort_by is not None and score_modifiers is not None:
+            raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in"
+                             "the same rerank phase. "
+                             "Please use sortBy only for sorting by fields and scoreModifiers only for modifying scores")
+        return values
+
+    @root_validator(pre=False)
+    def _set_sort_by_minSortCandidates_parameters(cls, values):
+        """Set sortBy parameters to None if not provided"""
+        sort_by = values.get('sortBy')
+        relevance_cutoff = values.get('relevanceCutoff')
+        if (not sort_by is None) and relevance_cutoff is None and sort_by.minSortCandidates is None:
+            sort_by.minSortCandidates = max(
+                3 * values.get('limit', 10),
+                values.get('offset') + values.get('limit')
+            )
+        return values
+
 
 class BulkSearchQueryEntity(SearchQuery):
     index: MarqoIndex
