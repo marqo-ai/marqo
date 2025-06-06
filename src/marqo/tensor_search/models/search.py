@@ -72,6 +72,7 @@ class SearchContextTensor(BaseModel):
 class SearchContextDocumentsParameters(BaseModel):
     tensorFields: Optional[List[str]] = None
     excludeInputDocuments: Optional[bool] = True
+    concurrency: Optional[int] = None
 
 
 class SearchContextDocuments(BaseModel):

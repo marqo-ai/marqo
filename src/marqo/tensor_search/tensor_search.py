@@ -891,7 +891,8 @@ def get_query_vectors_from_jobs(
                     context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
                         index_name=q.index.name,
                         documents=context_documents.ids,
-                        tensor_fields=context_documents.parameters.tensorFields
+                        tensor_fields=context_documents.parameters.tensorFields,
+                        concurrency=context_documents.parameters.concurrency
                     )
 
                 # Update weights and vectors list
@@ -1288,7 +1289,8 @@ def get_doc_vectors_per_tensor_field_by_ids(
     config: Config, 
     index_name: str, 
     document_ids: List[str],
-    tensor_fields: Optional[List[str]] = None
+    tensor_fields: Optional[List[str]] = None,
+    concurrency: Optional[int] = None
 ) -> Dict[str, Dict[str, List[List[float]]]]:
     """
     Get only the embeddings for documents by their IDs.
@@ -1318,7 +1320,8 @@ def get_doc_vectors_per_tensor_field_by_ids(
         batch_get = config.vespa_client.get_batch(
             document_ids,
             marqo_index.schema_name,
-            fields=fields_to_retrieve
+            fields=fields_to_retrieve,
+            concurrency=concurrency
         )
     
     vespa_index = vespa_index_factory(marqo_index)
