@@ -340,10 +340,10 @@ class VespaClient:
 
         r = self.http_client.send(req, stream=True)
         return StreamingResponse(
-            r.aiter_raw(),
+            r.iter_raw(),
             status_code=r.status_code,
             headers=r.headers,
-            background=BackgroundTask(r.aclose)
+            background=BackgroundTask(r.close)
         )
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:

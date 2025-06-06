@@ -26,7 +26,29 @@ class NativeInferenceClient(Inference):
         """
         self.base_url = base_url.rstrip("/")
         limits = httpx.Limits(max_keepalive_connections=pool_size, max_connections=None)
-        self.client = httpx.Client(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout))
+
+        self.client = httpx.Client(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout),
+                                   cookies=None,
+                                   follow_redirects=False,
+                                   trust_env=False,  # skip proxy & env-var lookups
+                                   event_hooks=None,
+                                   auth=None,
+                                   )
+
+        self.async_client = httpx.AsyncClient(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout),
+                                              cookies=None,
+                                              follow_redirects=False,
+                                              trust_env=False,  # skip proxy & env-var lookups
+                                              event_hooks=None,
+                                              auth=None,
+                                              )
+
+    async def close(self):
+        """
+        Close the clients.
+        """
+        self.client.close()
+        await self.async_client.aclose()
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """
@@ -62,3 +84,35 @@ class NativeInferenceClient(Inference):
             return InferenceResult.parse_obj(result_dict)
         except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, ValidationError) as e:
             raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e
+
+    async def vectorise_async(self, request: InferenceRequest) -> InferenceResult:
+        url = f"{self.base_url}/vectorise"
+        headers = {"Content-Type": "application/msgpack", "Accept": "application/msgpack"}
+
+        # Convert the request to a dict (honoring aliases) and then pack with MessagePack
+        request_dict = request.dict(by_alias=True)
+        request_bytes = msgpack.packb(request_dict, use_bin_type=True)
+
+        try:
+            response = await self.async_client.post(url, headers=headers, content=request_bytes)
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            # The error response is also msgpack encoded
+            if isinstance(e, httpx.HTTPStatusError) and e.response is not None and e.response.content:
+                try:
+                    error_response = msgpack.unpackb(e.response.content, raw=False)
+                    error_message = error_response["detail"]
+                except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError):
+                    logger.warning('Error parsing error message', exc_info=True)
+                    error_message = 'Error parsing error message in msgpack format'
+            else:
+                error_message = str(e)
+            raise InferenceError(f"HTTP error when calling remote inference service: {error_message}") from e
+
+        # Unpack the MessagePack response (with numpy support)
+        try:
+            result_dict = msgpack.unpackb(response.content, raw=False)
+            return InferenceResult.parse_obj(result_dict)
+        except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, ValidationError) as e:
+            raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e
+

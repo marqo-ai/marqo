@@ -52,6 +52,44 @@ class CachingInference(Inference):
 
         return inference_result
 
+    async def vectorise_async(self, request: InferenceRequest) -> InferenceResult:
+        if self.should_skip_cache(request):
+            return self.delegate.vectorise(request)
+
+        model_cache_key = self.model_cache_key(request.model_config.model_properties)
+
+        cached_result: List[Tuple[int, str, np.ndarray]] = []
+        contents_to_vectorise: List[str] = []
+
+        for index, content in enumerate(request.contents):
+            embedding = self.inference_cache.get(model_cache_key, content)
+            if embedding is not None:
+                cached_result.append((index, content, embedding))
+            else:
+                contents_to_vectorise.append(content)
+
+        if not contents_to_vectorise:
+            return InferenceResult(result=[[(content, embedding)] for _, content, embedding in cached_result])
+
+        new_request = request.copy(update={"contents": contents_to_vectorise})
+        inference_result = await self.delegate.vectorise_async(new_request)
+
+        for r in inference_result.result:
+            if not isinstance(r, InferenceErrorModel):
+                if len(r) > 1:
+                    raise RuntimeError(f"Inference cache does not support chunking but got {len(r)} chunks. "
+                                       f"Preprocessing config: "
+                                       f"{orjson.dumps(dict(new_request.preprocessing_config)).decode('utf-8')}")
+                content, embedding = r[0]
+                self.inference_cache.set(model_cache_key, content, embedding)
+
+        # Merge result
+        if cached_result:
+            for loc, content, embedding in cached_result:
+                inference_result.result.insert(loc, [(content, embedding)])
+
+        return inference_result
+
     def model_cache_key(self, model_properties) -> str:
         """
         Generate a md5 hash (32 bytes) based on the modal_properties dictionary. Since we need to store the model

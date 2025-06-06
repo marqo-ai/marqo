@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, Tuple, Union
 
@@ -78,6 +79,14 @@ class Inference(ABC):
             InferenceError: if an error impacting the whole batch of contents occurs during inference.
         """
         pass
+
+    async def vectorise_async(self, request: InferenceRequest) -> InferenceResult:
+        """
+        Default async implementation: run `.vectorise(...)` in a background thread.
+        Subclasses can override if they want true async I/O instead.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.vectorise, request)
 
 
 class ModelManager(ABC):
