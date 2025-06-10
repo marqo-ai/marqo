@@ -156,8 +156,10 @@ class TestOnStartScript(unittest.TestCase):
     
     def test_SetEnableVideoGPUAcceleration_none_input_check_fails(self):
         """Test when the env variable is None(not set by the users) and the check fails, the env var is set to 'FALSE'."""
-        with mock.patch.dict('os.environ', {}), \
-        mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+        if EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION in os.environ:
+            del os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION]
+
+        with mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
             mock_check_gpu_acceleration.side_effect = exceptions.StartupSanityCheckError('GPU not available')
 
             # Create instance of the class
@@ -172,8 +174,9 @@ class TestOnStartScript(unittest.TestCase):
 
     def test_SetEnableVideoGPUAcceleration_none_input_check_pass(self):
         """Test when the env variable is None(not set by the users) and the check pass, the env var is set to 'TRUE'."""
-        with mock.patch.dict('os.environ', {}), \
-        mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+        if EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION in os.environ:
+            del os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION]
+        with mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
             mock_check_gpu_acceleration.return_value = None
 
             # Create instance of the class
