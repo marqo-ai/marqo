@@ -1,4 +1,10 @@
 #!/bin/bash
+
+
+haproxy -f /etc/haproxy/haproxy.cfg &
+echo "HAProxy started"
+
+
 #source /opt/bash-utils/logger.sh
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
 if [ -z "${MARQO_CUDA_PATH}" ]; then
