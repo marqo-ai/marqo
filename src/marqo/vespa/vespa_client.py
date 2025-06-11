@@ -92,6 +92,25 @@ class VespaClient:
         self.get_pool_size = get_pool_size
         self.delete_pool_size = delete_pool_size
         self.partial_pool_size = partial_update_pool_size
+        # index_name = 'marqo__test_01fn'
+        index_name = 'marqo__donotdelete_01yihan_01219'
+        self.static_body_bytes = orjson.dumps(
+            {
+                "yql": 'select all_inventory, all_sizes_in_stock_array, all_sizes_array, '
+                       'any_variant_inventory_available, available_markets, color, compare_at_price, handle, id, '
+                       'image, image_url, named_tags_names, inventory_policy, meta, named_tags, option_name, price, '
+                       'product_image_plus, product_type, published_at, tags, title, title_es, updated_at, variants, '
+                       'vendor, marqo__int_fields, marqo__float_fields, marqo__bool_fields, '
+                       'marqo__string_array_all_sizes_in_stock_array, marqo__string_array_all_sizes_array, '
+                       'marqo__string_array_available_markets, marqo__string_array_named_tags_names, '
+                       'marqo__string_array_named_tags, marqo__string_array_tags, marqo__id '
+                       f'from {index_name} where default contains "dress";',
+                "hits": 1,
+                "ranking": {
+                    "profile": "default"
+                }
+            }
+        )
 
     async def close(self):
         """
@@ -226,20 +245,8 @@ class VespaClient:
         raise VespaError(f"Vespa application did not converge within {timeout} seconds. "
                          f"The convergence status is {self._get_convergence_status()}")
 
-    def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
-        """
-        Query Vespa.
-        Args:
-            yql: YQL query
-            hits: Number of hits to return
-            ranking: Ranking profile to use
-            model_restrict: Schema to restrict the query to
-            query_features: Query features
-            **kwargs: Additional query parameters
-        Returns:
-            Query result as a VespaQueryResult object
-        """
+    def convert_query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
+                      query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
         query_features_list = {
             f'input.query({key})': value for key, value in query_features.items()
         } if query_features else {}
@@ -260,8 +267,13 @@ class VespaClient:
             query['timeout'] = f"{self.default_search_timeout_ms}ms"
 
         query = {key: value for key, value in query.items() if value is not None}
+        return query
 
-        logger.debug(f'Query: {query}')
+    def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
+              query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
+
+        query = self.convert_query(yql, hits=hits, ranking=ranking, model_restrict=model_restrict,
+                                   query_features=query_features, timeout=timeout, **kwargs)
 
         try:
             resp = self.http_client.post(f'{self.query_url}/search/', json=query)
@@ -274,32 +286,25 @@ class VespaClient:
 
     async def query_async(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
                           query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
-        query_features_list = {
-            f'input.query({key})': value for key, value in query_features.items()
-        } if query_features else {}
-
-        query = {
-            'yql': yql,
-            'hits': hits,
-            'ranking': ranking,
-            'model.restrict': model_restrict,
-            **query_features_list,
-            **kwargs
-        }
-
-        # Use default timeout if not already set.
-        if timeout:
-            query['timeout'] = f"{timeout}ms"
-        else:
-            query['timeout'] = f"{self.default_search_timeout_ms}ms"
-
-        query = {key: value for key, value in query.items() if value is not None}
-
-        # logger.debug(f'Query: {query}')   # slow
+        query = self.convert_query(yql, hits=hits, ranking=ranking, model_restrict=model_restrict,
+                                   query_features=query_features, timeout=timeout, **kwargs)
 
         body_bytes = orjson.dumps(query)
+        return await self.stream_response_async(body_bytes)
+
+    async def proxy_async(self, request):
+        async def upstream_body():
+            async for chunk in request.stream():
+                yield chunk
+
+        return await self.stream_response_async(upstream_body())
+
+    async def proxy_static_async(self):
+        return await self.stream_response_async(self.static_body_bytes)
+
+    async def stream_response_async(self, body_bytes):
         req = self.async_http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
-                                             headers={"Content-Type": "application/json"})
+                                                   headers={"Content-Type": "application/json"})
 
         r = await self.async_http_client.send(req, stream=True)
         return StreamingResponse(
@@ -311,30 +316,21 @@ class VespaClient:
 
     def query_sync(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
                    query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
-        query_features_list = {
-            f'input.query({key})': value for key, value in query_features.items()
-        } if query_features else {}
-
-        query = {
-            'yql': yql,
-            'hits': hits,
-            'ranking': ranking,
-            'model.restrict': model_restrict,
-            **query_features_list,
-            **kwargs
-        }
-
-        # Use default timeout if not already set.
-        if timeout:
-            query['timeout'] = f"{timeout}ms"
-        else:
-            query['timeout'] = f"{self.default_search_timeout_ms}ms"
-
-        query = {key: value for key, value in query.items() if value is not None}
-
-        # logger.debug(f'Query: {query}')   # slow
+        query = self.convert_query(yql, hits=hits, ranking=ranking, model_restrict=model_restrict,
+                                   query_features=query_features, timeout=timeout, **kwargs)
 
         body_bytes = orjson.dumps(query)
+        return self.stream_response_sync(body_bytes)
+
+    def proxy_sync(self, request):
+        body_bytes = asyncio.get_event_loop().run_until_complete(request.body())
+
+        return self.stream_response_sync(body_bytes)
+
+    def proxy_static_sync(self):
+        return self.stream_response_sync(self.static_body_bytes)
+
+    def stream_response_sync(self, body_bytes):
         req = self.http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
                                              headers={"Content-Type": "application/json"})
 

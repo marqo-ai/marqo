@@ -475,6 +475,26 @@ def vespa_proxy_sync(query_dict: dict, iteration: int = Query(1000),
     return marqo_config.vespa_client.query_sync(**query_dict)
 
 
+@app.post("/raw_proxy_async")
+async def raw_proxy_async(req: Request, marqo_config: config.Config = Depends(get_config)):
+    return await marqo_config.vespa_client.proxy_async(req)
+
+
+@app.post("/raw_proxy_sync")
+def raw_proxy_sync(req: Request, marqo_config: config.Config = Depends(get_config)):
+    return marqo_config.vespa_client.proxy_sync(req)
+
+
+@app.post("/static_proxy_async")
+async def static_proxy_async(marqo_config: config.Config = Depends(get_config)):
+    return await marqo_config.vespa_client.proxy_static_async()
+
+
+@app.post("/static_proxy_sync")
+def static_proxy_sync(marqo_config: config.Config = Depends(get_config)):
+    return marqo_config.vespa_client.proxy_static_sync()
+
+
 @app.post("/indexes/{index_name}/convert_search")
 def convert_query(index_name: str, search_query_dict: dict,
                   device: str = Depends(api_validation.validate_device),
@@ -482,7 +502,11 @@ def convert_query(index_name: str, search_query_dict: dict,
     search_query = parse_request_object(SearchQuery, search_query_dict)
     marqo_index = index_meta_cache.get_index(index_management=marqo_config.index_management, index_name=index_name)
 
+    inf_req = inference_request(search_query.q, device, marqo_index)
+    inference_result = marqo_config.inference.vectorise(inf_req)
+
     query = vespa_query(query=search_query.q,
+                        vector_query=inference_result.result[0][0][1].tolist(),
                         marqo_index=marqo_index,
                         searchable_attributes=search_query.searchableAttributes,
                         result_count=search_query.limit, offset=search_query.offset,
@@ -494,6 +518,8 @@ def convert_query(index_name: str, search_query_dict: dict,
                         hybrid_parameters=search_query.hybridParameters,
                         facets=search_query.facets,
                         track_total_hits=search_query.trackTotalHits)
+
+    query = marqo_config.vespa_client.convert_query(**query)
 
     return ORJSONResponse(query)
 
