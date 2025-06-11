@@ -277,6 +277,7 @@ public class HybridSearcher extends Searcher {
         return new Result(query, processedHits);
     }
 
+
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
@@ -287,8 +288,8 @@ public class HybridSearcher extends Searcher {
         ObjectMapper mapper = new ObjectMapper();
         List<SortField> parsedSortByFields;
         try {
-            parsedSortByFields =
-                    mapper.readValue(sortByFields, new TypeReference<List<SortField>>() {});
+            parsedSortByFields = mapper.readValue(
+                    sortByFields, new TypeReference<List<SortField>>() {});
         } catch (Exception e) {
             throw new RuntimeException(
                     "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
@@ -297,62 +298,59 @@ public class HybridSearcher extends Searcher {
         List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
         int depth = (sortByDepth != null) ? sortByDepth : allHits.size();
 
-        List<Hit> hitsToSort = new ArrayList<>(allHits.subList(0, Math.min(depth, allHits.size())));
-        List<Hit> hitsAfterDepth =
-                (depth < allHits.size())
-                        ? new ArrayList<>(allHits.subList(depth, allHits.size()))
-                        : new ArrayList<>();
+        List<Hit> hitsToSort = new ArrayList<>(
+                allHits.subList(0, Math.min(depth, allHits.size())));
+        List<Hit> hitsAfterDepth = (depth < allHits.size())
+                ? new ArrayList<>(allHits.subList(depth, allHits.size()))
+                : new ArrayList<>();
 
-        // Build comparator chain based on matchfeatures
+        // Build comparator chain based on configured SortFields
         Comparator<Hit> sortComparator = null;
-
         for (int i = 0; i < parsedSortByFields.size(); i++) {
-            final int fieldIndex = i;
-            final SortField sortField = parsedSortByFields.get(i);
-
-            Function<Hit, Double> sortKeyExtractor =
-                    hit -> {
-                        FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
-                        if (matchFeatures == null) return null;
-                        double val = matchFeatures.getDouble("sort_field_value_" + fieldIndex);
-                        return (val == -1e50) ? null : Double.valueOf(val);
-                    };
-
-            Comparator<Double> baseComparator = Comparator.naturalOrder();
-            if ("desc".equalsIgnoreCase(sortField.order)) {
-                baseComparator = baseComparator.reversed(); // Only reverse the value ordering
+            final int idx = i;
+            SortField sf = parsedSortByFields.get(i);
+            Function<Hit, Double> keyExtractor = hit -> {
+                FeatureData mf = (FeatureData) hit.getField("matchfeatures");
+                if (mf == null) return null;
+                double v = mf.getDouble("sort_field_value_" + idx);
+                return (v == -1e50) ? null : v;
+            };
+            Comparator<Double> base = Comparator.naturalOrder();
+            if ("desc".equalsIgnoreCase(sf.order)) {
+                base = base.reversed();
             }
-
-            Comparator<Double> missingHandler =
-                    "last".equalsIgnoreCase(sortField.missing)
-                            ? Comparator.nullsLast(baseComparator)
-                            : Comparator.nullsFirst(baseComparator);
-
-            Comparator<Hit> comparator = Comparator.comparing(sortKeyExtractor, missingHandler);
-
-            sortComparator =
-                    (sortComparator == null)
-                            ? comparator
-                            : sortComparator.thenComparing(comparator);
+            Comparator<Double> nullAware = "last".equalsIgnoreCase(sf.missing)
+                    ? Comparator.nullsLast(base)
+                    : Comparator.nullsFirst(base);
+            Comparator<Hit> fieldComparator = Comparator.comparing(keyExtractor, nullAware);
+            sortComparator = (sortComparator == null)
+                    ? fieldComparator
+                    : sortComparator.thenComparing(fieldComparator);
         }
 
-        // Sort top hits
-        if (sortComparator != null) {
-            hitsToSort.sort(sortComparator);
-        }
+        // Append relevance as final tie-breaker (always descending)
+        Comparator<Hit> relevanceTie = Comparator
+                .comparingDouble((Hit h) -> h.getRelevance().getScore())
+                .reversed();
+        // always combine with relevance tie-break
+        sortComparator = sortComparator.thenComparing(relevanceTie);
+        hitsToSort.sort(sortComparator);
 
-        List<Hit> combinedHits = new ArrayList<>(hitsToSort);
-        combinedHits.addAll(hitsAfterDepth);
+        // Merge sorted slice with the remainder
+        List<Hit> combined = new ArrayList<>(hitsToSort);
+        combined.addAll(hitsAfterDepth);
 
-        for (int i = 0; i < combinedHits.size(); i++) {
-            combinedHits.get(i).setRelevance(1.0 / (i + 1));
+        // Reset relevance to reflect new positions
+        for (int i = 0; i < combined.size(); i++) {
+            combined.get(i).setRelevance(1.0 / (i + 1));
         }
 
         HitGroup result = new HitGroup();
-        result.addAll(combinedHits);
+        result.addAll(combined);
         result.trim(offset, limit);
         return result;
     }
+
 
     /**
      * Implement feature score scaling and normalization
