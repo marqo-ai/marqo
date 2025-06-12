@@ -73,6 +73,13 @@ class VespaClient:
         self.delete_pool_size = delete_pool_size
         self.partial_pool_size = partial_update_pool_size
 
+        # Persistent transport, so we don't keep initializing
+        self.async_transport = httpx.AsyncHTTPTransport(
+            limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size),
+            http1=True,
+            http2=False  # Using http2 is slightly slower
+        )
+
     def close(self):
         """
         Close the VespaClient object.
@@ -942,7 +949,8 @@ class VespaClient:
                                schema: str,
                                connections: int, timeout: int) -> GetBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections)) as async_client:
+                                                         max_connections=connections),
+                                     transport=self.async_transport) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
