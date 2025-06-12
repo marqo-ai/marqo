@@ -74,6 +74,13 @@ class SearchContextDocumentsParameters(BaseModel):
     excludeInputDocuments: Optional[bool] = True
     concurrency: Optional[int] = None
 
+    @validator('tensorFields', pre=True, always=True)
+    def check_tensor_fields_not_empty(cls, v):
+        if v == []:
+            raise InvalidArgError('context document tensorFields parameter must be non-empty list.'
+                                  ' If you want to use all tensor fields, do not define this parameter.')
+        return v
+
 
 class SearchContextDocuments(BaseModel):
     ids: Optional[Dict[str, float]]
