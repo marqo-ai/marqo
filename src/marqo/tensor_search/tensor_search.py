@@ -1264,25 +1264,39 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
         tensor_field_names: Specific tensor fields to get embeddings for. If None, get all.
     
     Returns:
-        List of Vespa field names for embeddings
+        List of Marqo tensor field names and Vespa field names for embeddings
+        marqo_field_names, vespa_field_names
     """
     
     if marqo_index.type in {IndexType.Structured, IndexType.SemiStructured}:
         # For structured indexes, embeddings are stored per field
         if hasattr(marqo_index, 'tensor_fields'):
             if tensor_field_names:
-                # Filter to only requested fields
-                requested_tensor_fields = [tf for tf in marqo_index.tensor_fields 
-                                         if tf.name in tensor_field_names]
+                index_tensor_field_names = [tf.name for tf in marqo_index.tensor_fields]
+                requested_tensor_fields = []
+                for tf_name in tensor_field_names:
+                    if tf_name in index_tensor_field_names:
+                        # If tf_name is in index_tensor_field_names, append the corresponding item
+                        # in marqo_index.tensor_fields that has that name
+                        requested_tensor_fields.append(
+                            next(tf for tf in marqo_index.tensor_fields if tf.name == tf_name)
+                        )
+                    else:
+                        raise core_exceptions.InvalidArgumentError(
+                            f"Tensor field '{tf_name}' not found in index '{marqo_index.name}'. "
+                            f"Available tensor fields: {index_tensor_field_names}"
+                        )
             else:
                 requested_tensor_fields = marqo_index.tensor_fields
             
-            return [tf.embeddings_field_name for tf in requested_tensor_fields]
+            return ([tf.name for tf in requested_tensor_fields],
+                    [tf.embeddings_field_name for tf in requested_tensor_fields])
     else:
         # For legacy unstructured indexes, there's typically one embeddings field
-        return [unstructured_common.VESPA_DOC_EMBEDDINGS]
+        return (tensor_field_names,
+                [unstructured_common.VESPA_DOC_EMBEDDINGS])
     
-    return []
+    return ([], [])
 
 
 def get_doc_vectors_per_tensor_field_by_ids(
@@ -1307,10 +1321,11 @@ def get_doc_vectors_per_tensor_field_by_ids(
 
     # TODO: Add maximum retrievable docs for context docs
     # TODO: Add unsuccessful docs list + reason
-    marqo_index = _get_latest_index(config, index_name)
+    # We can just use the cache here since we refresh every 1s.
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     
     # Get the embedding field names we want to retrieve
-    embedding_fields = get_embedding_field_names(marqo_index, tensor_fields)
+    viable_tensor_fields, embedding_fields = get_embedding_field_names(marqo_index, tensor_fields)
     
     # Add the document ID field so we can identify the documents (structured and unstructured are the same here)
     fields_to_retrieve = [structured_common.FIELD_ID] + embedding_fields
@@ -1329,24 +1344,33 @@ def get_doc_vectors_per_tensor_field_by_ids(
     
     for response in batch_get.responses:
         if response.status == 200:
-            # Convert the vespa document to get embeddings
-            marqo_doc = vespa_index.to_marqo_document(response.document.dict())
-            doc_id = marqo_doc.get('_id')
-            
-            # Extract embeddings from the document
-            if constants.MARQO_DOC_TENSORS in marqo_doc:
-                # TODO: For unstructured, we have all the embeddings, but how can we map the embeddings to the field names?
-                doc_embeddings = {}
-                tensors_data = marqo_doc[constants.MARQO_DOC_TENSORS]
-                
-                for field_name, field_data in tensors_data.items():
-                    if constants.MARQO_DOC_EMBEDDINGS in field_data:
-                        doc_embeddings[field_name] = field_data[constants.MARQO_DOC_EMBEDDINGS]
-                
-                result[doc_id] = doc_embeddings
-            else:
-                # Document has no vectors
-                result[doc_id] = {}
+
+            # Extract vectors directly (for structured and semi-structured)
+            # Skip turning into marqo document
+            raw_response_dict = response.document.fields
+            doc_id = raw_response_dict["marqo__id"]
+            # Initialize the result for this document ID
+            result[doc_id] = {}
+            # TODO, this is for structured/semi-structured. Handle unstructured.
+            # Check every requested tensor field (same index as embedding_fields list)
+            for i in range(len(viable_tensor_fields)):
+                # Get marqo tensor field name from vespa field name
+                marqo_tensor_field_name = viable_tensor_fields[i]
+                retrieved_embedding_field_name = embedding_fields[i]
+
+                if retrieved_embedding_field_name in raw_response_dict:
+                    try:
+                        # If the field exists, add all the tensors to the result
+                        result[doc_id][marqo_tensor_field_name] = list(raw_response_dict
+                                                                       [retrieved_embedding_field_name]["blocks"].values())
+                    except (KeyError, AttributeError, TypeError) as e:
+                        raise core_exceptions.VespaDocumentParsingError(
+                            f'Cannot parse Vespa doc embeddings field {retrieved_embedding_field_name} '
+                            f'with value {raw_response_dict[retrieved_embedding_field_name]}'
+                        ) from e
+                else:
+                    # Otherwise, field is empty list
+                    result[doc_id][marqo_tensor_field_name] = []
 
         else:
             # TODO: Add doc to failures list.
