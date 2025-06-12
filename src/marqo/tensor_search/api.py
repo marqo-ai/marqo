@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pip._internal import req
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -32,7 +33,7 @@ from marqo.core.inference.api import exceptions as inference_exceptions, Inferen
     TextPreprocessingConfig, ModelConfig
 from marqo.core.models import MarqoIndex, MarqoHybridQuery
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.monitoring import memory_profiler
 from marqo.core.search.search_filter import MarqoFilterStringParser
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -42,15 +43,12 @@ from marqo.inference.native_inference.remote.client.model_manager_client import 
 from marqo.logging import get_logger, LOGGING_CONFIG
 from marqo.otel import bootstrap_otel
 from marqo.tensor_search import tensor_search, utils, index_meta_cache
-from marqo.tensor_search.enums import RequestType, EnvVars, SearchMethod
-from marqo.tensor_search.models.api_models import SearchQuery, BulkSearchQueryEntity
+from marqo.tensor_search.enums import RequestType, EnvVars
+from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
-from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, Qidx
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
-from marqo.tensor_search.tensor_search import run_vectorise_pipeline
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
@@ -476,23 +474,27 @@ def vespa_proxy_sync(query_dict: dict, iteration: int = Query(1000),
 
 
 @app.post("/raw_proxy_async")
-async def raw_proxy_async(req: Request, marqo_config: config.Config = Depends(get_config)):
-    return await marqo_config.vespa_client.proxy_async(req)
+async def raw_proxy_async(req: Request, curl: bool = Query(False), marqo_config: config.Config = Depends(get_config)):
+    return await marqo_config.vespa_client.proxy_async(use_curl=curl, request=req)
+
+
+async def get_raw_body(request: Request) -> bytes:
+    return await request.body()
 
 
 @app.post("/raw_proxy_sync")
-def raw_proxy_sync(req: Request, marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.vespa_client.proxy_sync(req)
+def raw_proxy_sync(body_bytes: bytes = Depends(get_raw_body), curl: bool = Query(False), marqo_config: config.Config = Depends(get_config)):
+    return marqo_config.vespa_client.proxy_sync(use_curl=curl, body_bytes=body_bytes)
 
 
 @app.post("/static_proxy_async")
-async def static_proxy_async(marqo_config: config.Config = Depends(get_config)):
-    return await marqo_config.vespa_client.proxy_static_async()
+async def static_proxy_async(curl: bool = Query(False), marqo_config: config.Config = Depends(get_config)):
+    return await marqo_config.vespa_client.proxy_async(use_curl=curl)
 
 
 @app.post("/static_proxy_sync")
-def static_proxy_sync(marqo_config: config.Config = Depends(get_config)):
-    return marqo_config.vespa_client.proxy_static_sync()
+def static_proxy_sync(curl: bool = Query(False), marqo_config: config.Config = Depends(get_config)):
+    return marqo_config.vespa_client.proxy_sync(use_curl=curl)
 
 
 @app.post("/indexes/{index_name}/convert_search")

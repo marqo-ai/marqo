@@ -13,6 +13,7 @@ import httpcore
 import httpx
 import orjson
 from starlette.background import BackgroundTask
+from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
 import marqo.logging
@@ -30,6 +31,7 @@ from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, 
     DeleteBatchResponse, DeleteAllDocumentsResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
+from curl_cffi import requests, CurlOpt
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -65,8 +67,9 @@ class VespaClient:
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
         self.query_url = query_url.strip('/')
+        limits = httpx.Limits(max_keepalive_connections=25, max_connections=50)
         self.http_client = httpx.Client(
-            limits=httpx.Limits(max_keepalive_connections=50, max_connections=25),
+            limits=limits,
             cookies=None,
             follow_redirects=False,
             trust_env=False,  # skip proxy & env-var lookups
@@ -75,10 +78,7 @@ class VespaClient:
             http2=True,
         )
         self.async_http_client = httpx.AsyncClient(
-            limits=httpx.Limits(
-                max_connections=50,
-                max_keepalive_connections=25
-            ),
+            limits=limits,
             cookies=None,
             follow_redirects=False,
             trust_env=False,  # skip proxy & env-var lookups
@@ -86,6 +86,12 @@ class VespaClient:
             auth=None,
             http2=True,
         )
+        curl_options = {
+            CurlOpt.HTTP_CONTENT_DECODING: 0,
+            CurlOpt.HTTP_TRANSFER_DECODING: 0
+        }
+        self.sync_curl_session = requests.Session(curl_options=curl_options)
+        self.async_curl_session = requests.AsyncSession(curl_options=curl_options)
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
@@ -269,6 +275,7 @@ class VespaClient:
         query = {key: value for key, value in query.items() if value is not None}
         return query
 
+    # Query and parse query result (sync)
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
 
@@ -284,6 +291,7 @@ class VespaClient:
 
         return QueryResult(**orjson.loads(resp.text))
 
+    # Async proxies
     async def query_async(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
                           query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
         query = self.convert_query(yql, hits=hits, ranking=ranking, model_restrict=model_restrict,
@@ -292,15 +300,13 @@ class VespaClient:
         body_bytes = orjson.dumps(query)
         return await self.stream_response_async(body_bytes)
 
-    async def proxy_async(self, request):
-        async def upstream_body():
-            async for chunk in request.stream():
-                yield chunk
-
-        return await self.stream_response_async(upstream_body())
-
-    async def proxy_static_async(self):
-        return await self.stream_response_async(self.static_body_bytes)
+    async def proxy_async(self, use_curl: bool, request: Optional[Request] = None):
+        if use_curl:
+            body_bytes = self.static_body_bytes if request is None else await request.body()
+            return await self.stream_response_async_curl(body_bytes)
+        else:
+            body_bytes = self.static_body_bytes if request is None else request.stream()
+            return await self.stream_response_async(body_bytes)
 
     async def stream_response_async(self, body_bytes):
         req = self.async_http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
@@ -314,6 +320,22 @@ class VespaClient:
             background=BackgroundTask(r.aclose)
         )
 
+    async def stream_response_async_curl(self, body_bytes):
+        resp = await self.async_curl_session.post(
+            f'{self.query_url}/search/',
+            data=body_bytes,
+            headers={"Content-Type": "application/json"},
+            stream=True
+        )
+
+        return StreamingResponse(
+            resp.aiter_content(),
+            status_code=resp.status_code,
+            headers=resp.headers,
+            background=BackgroundTask(resp.aclose)
+        )
+
+    # Sync proxies
     def query_sync(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
                    query_features: Dict[str, Any] = None, timeout: float = None, **kwargs):
         query = self.convert_query(yql, hits=hits, ranking=ranking, model_restrict=model_restrict,
@@ -322,13 +344,13 @@ class VespaClient:
         body_bytes = orjson.dumps(query)
         return self.stream_response_sync(body_bytes)
 
-    def proxy_sync(self, request):
-        body_bytes = asyncio.get_event_loop().run_until_complete(request.body())
+    def proxy_sync(self, use_curl: bool, body_bytes: Optional[bytes] = None):
+        body_bytes = self.static_body_bytes if body_bytes is None else body_bytes
 
-        return self.stream_response_sync(body_bytes)
-
-    def proxy_static_sync(self):
-        return self.stream_response_sync(self.static_body_bytes)
+        if use_curl:
+            return self.stream_response_sync_curl(body_bytes)
+        else:
+            return self.stream_response_sync(body_bytes)
 
     def stream_response_sync(self, body_bytes):
         req = self.http_client.build_request('POST', f'{self.query_url}/search/', content=body_bytes,
@@ -337,6 +359,21 @@ class VespaClient:
         r = self.http_client.send(req, stream=True)
         return StreamingResponse(
             r.iter_raw(),
+            status_code=r.status_code,
+            headers=r.headers,
+            background=BackgroundTask(r.close)
+        )
+
+    def stream_response_sync_curl(self, body_bytes):
+        r = self.sync_curl_session.post(
+            f'{self.query_url}/search/',
+            data=body_bytes,
+            headers={"Content-Type": "application/json"},
+            stream=True,
+        )
+
+        return StreamingResponse(
+            r.iter_content(),
             status_code=r.status_code,
             headers=r.headers,
             background=BackgroundTask(r.close)
