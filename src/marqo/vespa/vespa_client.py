@@ -59,6 +59,8 @@ class VespaClient:
             get_pool_size: Number of connections to keep in batch get requests connection pool to Vespa
             delete_pool_size: Number of connections to keep batch delete requests connection pool to Vespa
             partial_update_pool_size: Number of connections to keep batch partial update requests connection pool to Vespa
+            default_search_timeout_ms: Default timeout for search queries in milliseconds
+            content_cluster_name: Name of the Vespa content cluster to use for document operations
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
@@ -73,9 +75,11 @@ class VespaClient:
         self.delete_pool_size = delete_pool_size
         self.partial_pool_size = partial_update_pool_size
 
-        # Persistent transport, so we don't keep initializing
+        # Persistent transport, so we don't keep initializing per request
         self.async_transport = httpx.AsyncHTTPTransport(
-            limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size),
+            limits=httpx.Limits(
+                max_keepalive_connections=self.get_pool_size,
+                max_connections=self.get_pool_size),
             http1=True,
             http2=False  # Using http2 is slightly slower
         )
@@ -85,6 +89,7 @@ class VespaClient:
         Close the VespaClient object.
         """
         self.http_client.close()
+        self.async_transport.aclose()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
@@ -948,9 +953,7 @@ class VespaClient:
                                fields: Optional[List[str]],
                                schema: str,
                                connections: int, timeout: int) -> GetBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections),
-                                     transport=self.async_transport) as async_client:
+        async with httpx.AsyncClient(transport=self.async_transport) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(

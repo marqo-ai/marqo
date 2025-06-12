@@ -18,7 +18,7 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
         EnvVars.VESPA_FEED_POOL_SIZE: 10,
-        EnvVars.VESPA_GET_POOL_SIZE: 10,
+        EnvVars.MARQO_GET_POOL_SIZE: 10,        # TODO: Decide env var name
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
 
