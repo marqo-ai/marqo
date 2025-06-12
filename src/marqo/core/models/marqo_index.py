@@ -93,6 +93,7 @@ class Field(ImmutableStrictBaseModel):
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
+    language: Optional[str] = None  # Language for linguistic processing in Vespa
 
     @root_validator
     def check_all_fields(cls, values):

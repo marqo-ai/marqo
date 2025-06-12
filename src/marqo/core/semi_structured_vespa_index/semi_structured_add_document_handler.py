@@ -51,12 +51,16 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             field_name: Name of the field
             field_content: Content of the field
         """
+        # Validate language mapping before processing
+        self._validate_language_mapping_for_field(field_name, field_content)
+        
         # Process field using parent class handler
         super()._handle_field(marqo_doc, field_name, field_content)
 
         # Add lexical field if content is a string
         if isinstance(marqo_doc[field_name], str):
-            self._add_lexical_field_to_index(field_name)
+            language = self._get_field_language(field_name)
+            self._add_lexical_field_to_index(field_name, language)
 
         # Add string array field if content is list of strings and index version supports it
         is_string_array = (
@@ -93,8 +97,48 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             from marqo.tensor_search import index_meta_cache
             index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
-    def _add_lexical_field_to_index(self, field_name):
+    def _get_field_language(self, field_name):
+        """Extract language specification for a field from mappings."""
+        if not self.add_docs_params.mappings:
+            return None
+        
+        field_mapping = self.add_docs_params.mappings.get(field_name)
+        if not field_mapping:
+            return None
+        
+        if field_mapping.get('type') == 'text_field_language':
+            return field_mapping.get('language')
+        
+        return None
+
+    def _validate_language_mapping_for_field(self, field_name, field_content):
+        """Validate that language mapping is only used for text fields."""
+        if not self.add_docs_params.mappings:
+            return
+            
+        field_mapping = self.add_docs_params.mappings.get(field_name)
+        if not field_mapping or field_mapping.get('type') != 'text_field_language':
+            return
+            
+        # Language mapping can only be used for string content
+        if not isinstance(field_content, str):
+            from marqo.api.exceptions import BadRequestError
+            raise BadRequestError(
+                f"Language mapping for field '{field_name}' can only be used with text (string) content, "
+                f"but received {type(field_content).__name__}. "
+                f"Language specification is only supported for text fields."
+            )
+
+    def _add_lexical_field_to_index(self, field_name, language=None):
         if field_name in self.marqo_index.field_map:
+            # Check if existing field has different language - this would be an error
+            existing_field = self.marqo_index.field_map[field_name]
+            if existing_field.language != language:
+                if language is not None:
+                    from marqo.api.exceptions import BadRequestError
+                    raise BadRequestError(f"Field '{field_name}' already exists with a different language configuration. "
+                                        f"Cannot change language from '{existing_field.language}' to '{language}' "
+                                        f"for existing field.")
             return
 
         max_lexical_field_count = self.field_count_config.max_lexical_field_count
@@ -105,12 +149,14 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                                      f'limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing lexical fields to marqo index
-        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}')
+        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}' + 
+                    (f' with language {language}' if language else ''))
 
         self.marqo_index.lexical_fields.append(
             Field(name=field_name, type=FieldType.Text,
                   features=[FieldFeature.LexicalSearch],
-                  lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}')
+                  lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}',
+                  language=language)
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

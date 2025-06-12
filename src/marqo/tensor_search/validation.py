@@ -567,6 +567,15 @@ def validate_mappings_object(
             elif config["type"] == enums.MappingsObjectType.custom_vector:
                 validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
+                
+            elif config["type"] == enums.MappingsObjectType.text_field_language:
+                validate_text_field_language_mappings_object(config)
+                # Language fields can only be used with semi-structured indexes
+                if structured_marqo_index is not None:
+                    raise InvalidArgError(
+                        f"Language field mapping '{field_name}' cannot be used with structured indexes. "
+                        f"Language specification is only supported for semi-structured indexes."
+                    )
 
         return mappings_object
     except jsonschema.ValidationError as e:
@@ -633,6 +642,49 @@ def validate_custom_vector_mappings_object(mappings_object: Dict):
         raise InvalidArgError(
             f"Error validating custom vector mappings object. Reason: \n{str(e)}"
             f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
+        )
+
+    return mappings_object
+
+
+def validate_text_field_language_mappings_object(mappings_object: Dict):
+    """Validates the text field language mappings object
+    
+    Args:
+        mappings_object: The mapping configuration for a text field with language
+        
+    Returns:
+        The original object, if it passes validation
+        
+    Raises InvalidArgError if the object is badly formatted
+    
+    Example text field language mappings must look like this:
+    "my_text_field": {
+        "type": "text_field_language",
+        "language": "es"
+    }
+    """
+    try:
+        from marqo.tensor_search.models.mappings_object import text_field_language_mappings_schema
+        jsonschema.validate(instance=mappings_object, schema=text_field_language_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating text field language mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
+        )
+
+    # Validate language code format (basic validation)
+    language = mappings_object.get("language", "")
+    if not language or not isinstance(language, str):
+        raise InvalidArgError(
+            f"Invalid language code '{language}'. Language must be a non-empty string."
+        )
+    
+    # Basic language code validation - allow ISO 639-1 (2 char) and ISO 639-3 (3 char) codes
+    if not (2 <= len(language) <= 3 and language.isalpha() and language.islower()):
+        raise InvalidArgError(
+            f"Invalid language code '{language}'. Language must be a 2-3 character lowercase alphabetic code "
+            f"(e.g., 'en', 'es', 'zh', 'fra')."
         )
 
     return mappings_object

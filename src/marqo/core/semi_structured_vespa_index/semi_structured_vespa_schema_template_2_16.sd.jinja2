@@ -75,6 +75,11 @@ schema {{ index.schema_name }} {
         field {{ lexical_field.lexical_field_name }} type string {
             indexing: index | summary
             index: enable-bm25
+            {%- if lexical_field.language %}
+            match {
+                language: {{ lexical_field.language }}
+            }
+            {%- endif %}
         }
         {% endfor -%}
 

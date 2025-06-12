@@ -410,6 +410,18 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
         #  SearchQuery can be injected after migrated to v2
         search_query = parse_request_object(SearchQuery, search_query_dict)
 
+        # Validate language specification for semi-structured indexes only
+        if search_query.model and search_query.model.get('language'):
+            from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
+            from marqo.tensor_search.index_meta_cache import get_index
+            
+            marqo_index = get_index(IndexManagement(marqo_config), index_name)
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise InvalidArgError(
+                    f"model.language parameter is only supported for semi-structured indexes. "
+                    f"Index '{index_name}' is of type {marqo_index.type.value}."
+                )
+
         result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
@@ -429,7 +441,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters,
             facets=search_query.facets,
-            track_total_hits=search_query.trackTotalHits
+            track_total_hits=search_query.trackTotalHits,
+            model=search_query.model
         )
         return ORJSONResponse(result)
 
