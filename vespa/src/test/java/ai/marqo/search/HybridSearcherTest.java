@@ -1,7 +1,5 @@
 package ai.marqo.search;
 
-import ai.marqo.search.HybridSearcher;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -624,7 +622,6 @@ class HybridSearcherTest {
         }
     }
 
-
     /**
      * Test for sortBy feature in HybridSearcher.
      */
@@ -635,7 +632,7 @@ class HybridSearcherTest {
          * Test that verifies sorting of results based on a single sort field.
          */
         @Test
-        void shouldSortResultsWithOneSortField(){
+        void shouldSortResultsWithOneSortField() {
             HitGroup testHitGroup = new HitGroup();
 
             FeatureData fd1 = mock(FeatureData.class);
@@ -653,21 +650,20 @@ class HybridSearcherTest {
 
             hybridSearcher = new HybridSearcher();
 
-            HitGroup res = hybridSearcher.postProcessBySort(
-                    testHitGroup,
-                    "[{ \"field_name\": \"test\", \"order\": \"asc\", \"missing\": \"last\" }]",
-                    2,
-                    2,
-                    0
-            );
+            HitGroup res =
+                    hybridSearcher.postProcessBySort(
+                            testHitGroup,
+                            "[{ \"field_name\": \"test\", \"order\": \"asc\", \"missing\": \"last\""
+                                    + " }]",
+                            2,
+                            2,
+                            0);
 
             // Verify that the hits are sorted by the specified field
-            assertThat(res.get(0).getId().toString())
-                    .isEqualTo("doc2");
+            assertThat(res.get(0).getId().toString()).isEqualTo("doc2");
             assertThat(res.get(0).getRelevance().getScore()).isEqualTo(1.0);
 
-            assertThat(res.get(1).getId().toString())
-                    .isEqualTo("doc1");
+            assertThat(res.get(1).getId().toString()).isEqualTo("doc1");
             assertThat(res.get(1).getRelevance().getScore()).isEqualTo(0.5);
         }
 
@@ -746,11 +742,12 @@ class HybridSearcherTest {
 
             HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
             HybridSearcher searcher = new HybridSearcher();
-            String sortJson = "[{"
-                    + "\"field_name\":\"ignored\","
-                    + "\"order\":\"asc\","
-                    + "\"missing\":\"last\""
-                    + "}]";
+            String sortJson =
+                    "[{"
+                            + "\"field_name\":\"ignored\","
+                            + "\"order\":\"asc\","
+                            + "\"missing\":\"last\""
+                            + "}]";
 
             // full-depth, no trim
             // expected:
@@ -762,8 +759,8 @@ class HybridSearcherTest {
             assertThat(out.asList())
                     .extracting(hit -> hit.getId().toString())
                     .containsExactly(
-                            "doc2", "doc4", "doc3", "doc6", "doc7", "doc8", "doc9", "doc10", "doc1", "doc5"
-                    );
+                            "doc2", "doc4", "doc3", "doc6", "doc7", "doc8", "doc9", "doc10", "doc1",
+                            "doc5");
         }
 
         /**
@@ -774,27 +771,28 @@ class HybridSearcherTest {
         void sort1FieldWithDescOrderAndFirstMissingPolicy() {
             HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
             HybridSearcher searcher = new HybridSearcher();
-            String sortJson = "[{"
-                    + "\"field_name\":\"ignored\","
-                    + "\"order\":\"desc\","
-                    + "\"missing\":\"first\""
-                    + "}]";
+            String sortJson =
+                    "[{"
+                            + "\"field_name\":\"ignored\","
+                            + "\"order\":\"desc\","
+                            + "\"missing\":\"first\""
+                            + "}]";
 
             HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
             assertThat(out.asList())
                     .extracting(hit -> hit.getId().toString())
                     .containsExactly(
-                            "doc1",   // missing first  (–1e50, highest missing rel=0.55)
-                            "doc5",   // missing second (–1e50, next missing rel=0.45)
-                            "doc10",  // sort=9.0
-                            "doc9",   // sort=8.0
-                            "doc8",   // sort=7.0
-                            "doc7",   // sort=6.0
-                            "doc6",   // sort=5.0
-                            "doc4",   // sort=2.0, tie-break on original rel=0.85 (before doc3)
-                            "doc3",   // sort=2.0, tie-break rel=0.75
-                            "doc2"    // sort=1.0
-                    );
+                            "doc1", // missing first  (–1e50, highest missing rel=0.55)
+                            "doc5", // missing second (–1e50, next missing rel=0.45)
+                            "doc10", // sort=9.0
+                            "doc9", // sort=8.0
+                            "doc8", // sort=7.0
+                            "doc7", // sort=6.0
+                            "doc6", // sort=5.0
+                            "doc4", // sort=2.0, tie-break on original rel=0.85 (before doc3)
+                            "doc3", // sort=2.0, tie-break rel=0.75
+                            "doc2" // sort=1.0
+                            );
         }
     }
 }
