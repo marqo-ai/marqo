@@ -486,6 +486,11 @@ class StructuredVespaIndex(VespaIndex):
             'presentation.summary': summary,
             'ranking': ranking
         }
+        
+        # Add language parameter for query-time linguistic processing
+        if marqo_query.language:
+            query['language'] = marqo_query.language
+            
         query = {k: v for k, v in query.items() if v is not None}
 
         return query
@@ -638,6 +643,10 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
 
+        # Add language parameter for query-time linguistic processing
+        if marqo_query.language:
+            query['language'] = marqo_query.language
+            
         query = {k: v for k, v in query.items() if v is not None}
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
