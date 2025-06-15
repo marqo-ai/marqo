@@ -1,3 +1,5 @@
+import random
+
 import copy
 import json
 import os
@@ -58,19 +60,19 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
         # Documents for TestSearchSortByFeatureSort1Field
         test_sort1field_docs = [
-            {"_id": "0", "content": "doc zero", "sort_field_1": 0.0},  # zero value
-            {"_id": "1", "content": "doc mid", "sort_field_1": 5.3},  # mid value
-            {"_id": "2", "content": "doc high", "sort_field_1": 10},  # highest value
-            {"_id": "3", "content": "doc tie1", "sort_field_1": 3},  # tie value for relevance tiebreak
-            {"_id": "4", "content": "doc tie2", "sort_field_1": 3},  # tie value for relevance tiebreak
-            {"_id": "5", "content": "doc missing tie1", "sort_field_1": "invalid"},  # wrong type treated as missing
-            {"_id": "6", "content": "doc missing", "sort_field_1": ["test"]},  # wrong type treated as missing
-            {"_id": "7", "content": "doc missing tie1 relevant"},  # missing field entirely
-            {"_id": "8", "content": "doc negative", "sort_field_1": -1},  # negative value
-            {"_id": "9", "content": "doc float", "sort_field_1": 2.5},  # float value
+            {"_id": "0", "content": ' '.join([f"content{i}" for i in range(1)]), "sort_field_1": 0.0},  # zero value
+            {"_id": "1", "content": ' '.join([f"content{i}" for i in range(4)]), "sort_field_1": 5.3},  # mid value
+            {"_id": "2", "content": ' '.join([f"content{i}" for i in range(6)]), "sort_field_1": 10},  # highest value
+            {"_id": "3", "content": ' '.join([f"content{i}" for i in range(10)]), "sort_field_1": 3},  # tie value for relevance tiebreak
+            {"_id": "4", "content": ' '.join([f"content{i}" for i in range(7)]), "sort_field_1": 3},  # tie value for relevance tiebreak
+            {"_id": "5", "content": ' '.join([f"content{i}" for i in range(8)]), "sort_field_1": "invalid"},  # wrong type treated as missing
+            {"_id": "6", "content": ' '.join([f"content{i}" for i in range(3)]), "sort_field_1": ["test"]},  # wrong type treated as missing
+            {"_id": "7", "content": ' '.join([f"content{i}" for i in range(9)])},  # missing field entirely
+            {"_id": "8", "content": ' '.join([f"content{i}" for i in range(2)]), "sort_field_1": -1},  # negative value
+            {"_id": "9", "content": ' '.join([f"content{i}" for i in range(5)]), "sort_field_1": 2.5},  # float value
         ]
 
-        res = cls.add_documents(
+        _ = cls.add_documents(
             config=cls.config,
             add_docs_params=AddDocsParams(
                 docs=test_sort1field_docs,
@@ -79,6 +81,18 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 tensor_fields=['content'],
             )
         )
+
+        expected_normal_search_order = [
+            "3", "7", "5", "4", "2", "9", "1", "6", "8", "0"
+        ]
+
+        # Check if the documents are indexed correctly
+        normal_search_res = [r["_id"] for r in cls._help_sort_function()["hits"]]
+        if normal_search_res != expected_normal_search_order:
+            raise RuntimeError(
+                f"Expected normal search order to be {expected_normal_search_order}, "
+                f"but got {normal_search_res}"
+            )
 
     def setUp(self):
         """Ensure documents are not changed before each test."""
@@ -94,10 +108,12 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 f"Expected 10 documents in index {self.index_name} for sorting tests"
             )
 
-    def _help_sort_function(self, query: str, sort_by: Optional[dict], limit=10, offset=0) -> dict:
+    @classmethod
+    def _help_sort_function(cls, query: Optional[str] = ' '.join([f"content{i}" for i in range(10)]),
+                            sort_by: Optional[dict] = None, limit=10, offset=0) -> dict:
         return json.loads(search(
-            index_name=self.index_name,
-            marqo_config=self.config,
+            index_name=cls.index_name,
+            marqo_config=cls.config,
             device="cpu",
             search_query_dict={
                 "q": query,
@@ -128,7 +144,6 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 "7", "5", "6" # missing fields sorted by relevance, with _id 7 coming before _id 5 and _id 6
             ]
         """
-        query = "doc missing tie1 relevant"
         sort_by = {
             "fields": [
                 {
@@ -138,7 +153,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         }
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(query, sort_by)
+            res = self._help_sort_function(sort_by=sort_by)
             self.assertEqual(10,res["_sortByCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
@@ -163,7 +178,6 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 "1", "2" # ascending order of the highest values
             ]
         """
-        query = "doc missing tie1 relevant"
         sort_by = {
             "fields": [
                 {
@@ -175,7 +189,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         }
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(query, sort_by)
+            res = self._help_sort_function(sort_by=sort_by)
             self.assertEqual(10,res["_sortByCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
@@ -192,7 +206,6 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         however the _score field should be different as we use normalized relevance scores during sorting, even if
         the sort field does not exist in the index.
         """
-        query = "doc missing tie1 relevant positive integer"
         sort_by = {
             "fields": [
                 {
@@ -205,12 +218,8 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(query, sort_by)
-            regular_res = self._help_sort_function(query, None)
-
-            print(res["hits"])
-            print([r["_id"] for r in res["hits"]])
-
+            res = self._help_sort_function(sort_by=sort_by)
+            regular_res = self._help_sort_function()
             self.assertEqual(len(regular_res["hits"]), len(res["hits"]))
             for i in range(len(regular_res["hits"])):
                 for field in regular_res["hits"][i].keys():
@@ -233,15 +242,16 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         same as if no sort was applied.
 
         Expected results:
-            - Before sort: ['7', '5', '3', '6', '4', '9', '8', '0', '1', '2']
-            - After sort with sortDepth=5:
+            - Before sort: ['3', '7', '5', '4', '2', '9', '1', '6', '8', '0']
+            - After sort with sortDepth=6:
             [
-                '2', '3', # Sorted documents with descending sort_field_1 values
-                '7', '5', '6', # Missing fields sorted by relevance
-                '8', '0', '4', '1', '9' # Unsorted documents after sort depth limit
+                '2', # Highest value
+                '3', '4', # Tie values sorted by relevance, with _id 3 coming before _id 4
+                '9', # Sorted be descending order of numeric values
+                '7', '5', # Missing fields last, sorted by relevance
+                '1', '6', '8', '0' # Unsorted documents after sort depth limit
             ]
         """
-        query = "doc missing tie1 relevant positive integer"
         sort_by = {
             "fields": [
                 {
@@ -250,17 +260,96 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                     "missing": "last"
                 }
             ],
-            "sortDepth": 5  # Limit the sort depth to 5
+            "sortDepth": 6  # Limit the sort depth to 6
         }
-
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(query, sort_by)
+            res = self._help_sort_function(sort_by=sort_by)
             self.assertEqual(10, res["_sortByCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
             ids = [hit["_id"] for hit in hits]
             self.assertEqual(
-                ['2', '3', '7', '5', '6', '8', '0', '4', '1', '9'],
+                ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
+                ids
+            )
+
+    def test_sort_by_with_limit_and_offset(self):
+        """
+        Test the sort by functionality with limit and offset parameters. We also include the sort depth parameter here
+        for a more comprehensive test.
+        Expected results:
+            - Before sort: ['3', '7', '5', '4', '2', '9', '1', '6', '8', '0']
+            - After sort with sortDepth=6:
+            [
+                '3', '4', # Tie values sorted by relevance, with _id 3 coming before _id 4
+                '7', '5', # Missing fields last, sorted by relevance
+                '2', '9', '1', '6', '8', '0' # Unsorted documents after sort depth limit
+            ]
+            And we trim the results based on the limit and offset parameters.
+        """
+        for _ in range(10):
+            limit = random.randint(1, 10)
+            offset = random.randint(0, 9)
+
+            sort_by = {
+                "fields": [
+                    {
+                        "field_name": "sort_field_1",
+                        "order": "desc",
+                        "missing": "last"
+                    }
+                ],
+                "sortDepth": 4,  # Limit the sort depth to 6
+                "minSortCandidates": 10  # Ensure we have enough candidates for sorting
+            }
+
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by, limit=limit, offset=offset)
+            self.assertEqual(10, res["_sortByCandidates"])
+            hits = res["hits"]
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                # Adjust the expected ids based on offset and limit
+                ['3', '4', '7', '5', '2', '9', '1', '6', '8', '0'][offset:offset + limit],
+                ids
+            )
+
+    def test_min_sort_candidates_parameter(self):
+        """
+        Test the minSortCandidates parameter to ensure it works as expected.
+        The minSortCandidates parameter should ensure that at least a certain number of documents are considered for sorting,
+        even if the sort depth is limited.
+
+        Expected results:
+            - Before sort: ['3', '7', '5', '4', '2', '9', '1', '6', '8', '0']
+            - After sort with minSortCandidates=10:
+            [
+                '2', # Highest value
+                '3', '4', # Tie values sorted by relevance, with _id 3 coming before _id 4
+                '9', # Sorted be descending order of numeric values
+                '7', '5', # Missing fields last, sorted by relevance
+                '1', '6', '8', '0' # Unsorted documents after sort depth limit
+            ]
+        """
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                    "order": "desc",
+                    "missing": "last"
+                }
+            ],
+            "minSortCandidates": 10  # Ensure we have enough candidates for sorting
+        }
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by)
+            self.assertEqual(10, res["_sortByCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
                 ids
             )
