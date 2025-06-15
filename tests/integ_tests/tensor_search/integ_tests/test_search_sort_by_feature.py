@@ -66,8 +66,8 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             {"_id": "5", "content": "doc missing tie1", "sort_field_1": "invalid"},  # wrong type treated as missing
             {"_id": "6", "content": "doc missing", "sort_field_1": ["test"]},  # wrong type treated as missing
             {"_id": "7", "content": "doc missing tie1 relevant"},  # missing field entirely
-            {"_id": "8", "content": "doc_neg", "sort_field_1": -1},  # negative value
-            {"_id": "9", "content": "doc_float", "sort_field_1": 2.5},  # float value
+            {"_id": "8", "content": "doc negative", "sort_field_1": -1},  # negative value
+            {"_id": "9", "content": "doc float", "sort_field_1": 2.5},  # float value
         ]
 
         res = cls.add_documents(
@@ -94,7 +94,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 f"Expected 10 documents in index {self.index_name} for sorting tests"
             )
 
-    def _help_sort_function(self, query:str, sort_by:dict, limit=10, offset=0) -> dict:
+    def _help_sort_function(self, query: str, sort_by: Optional[dict], limit=10, offset=0) -> dict:
         return json.loads(search(
             index_name=self.index_name,
             marqo_config=self.config,
@@ -105,8 +105,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 "hybridParameters": {
                     "retrievalMethod": "disjunction",
                     "rankingMethod": "rrf",
-                    "alpha": 0.3,
-                    "rrfK": 10,
+                    "alpha": 0.5,
                 },
                 "sortBy": sort_by,
                 "limit": limit,
@@ -186,4 +185,82 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 ids
             )
 
-    
+    def test_sort_by_when_fields_does_not_exist(self):
+        """
+        Test sorting by a field that does not exist in the index.
+        The expected behavior is all the documents should be returned in the same order as if no sort was applied,
+        however the _score field should be different as we use normalized relevance scores during sorting, even if
+        the sort field does not exist in the index.
+        """
+        query = "doc missing tie1 relevant positive integer"
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "non_existent_field",
+                    "order": "asc",  # Ascending order
+                    "missing": "last"  # Missing values should come last
+                }
+            ]
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(query, sort_by)
+            regular_res = self._help_sort_function(query, None)
+
+            print(res["hits"])
+            print([r["_id"] for r in res["hits"]])
+
+            self.assertEqual(len(regular_res["hits"]), len(res["hits"]))
+            for i in range(len(regular_res["hits"])):
+                for field in regular_res["hits"][i].keys():
+                    if field != "_score":
+                        self.assertEqual(
+                            regular_res["hits"][i][field],
+                            res["hits"][i][field],
+                            f"Field {field} does not match for hit {i}"
+                        )
+                    else:
+                        self.assertNotEqual(
+                            regular_res["hits"][i][field],
+                            res["hits"][i][field],
+                        )
+
+    def test_sort_depth_parameter(self):
+        """
+        Test the sort depth parameter to ensure it works as expected.
+        The sort depth should limit the number of documents considered for sorting, with the rest being the
+        same as if no sort was applied.
+
+        Expected results:
+            - Before sort: ['7', '5', '3', '6', '4', '9', '8', '0', '1', '2']
+            - After sort with sortDepth=5:
+            [
+                '2', '3', # Sorted documents with descending sort_field_1 values
+                '7', '5', '6', # Missing fields sorted by relevance
+                '8', '0', '4', '1', '9' # Unsorted documents after sort depth limit
+            ]
+        """
+        query = "doc missing tie1 relevant positive integer"
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                    "order": "desc",
+                    "missing": "last"
+                }
+            ],
+            "sortDepth": 5  # Limit the sort depth to 5
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(query, sort_by)
+            self.assertEqual(10, res["_sortByCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '3', '7', '5', '6', '8', '0', '4', '1', '9'],
+                ids
+            )
