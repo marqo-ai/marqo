@@ -1,16 +1,18 @@
 import unittest
 from unittest.mock import Mock, patch
 from pydantic.v1 import ValidationError
+import semver
 
 from marqo.api.exceptions import InvalidArgError
-from marqo.core.exceptions import InvalidArgumentError
+from marqo.core.exceptions import InvalidArgumentError, AddDocumentsError
 from marqo.tensor_search.enums import SearchMethod, MappingsObjectType
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search import validation
 from marqo.tensor_search.models.mappings_object import text_field_mappings_schema
 from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, SemiStructuredMarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import SemiStructuredAddDocumentsHandler
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler
 from marqo.core.models.marqo_query import MarqoLexicalQuery, MarqoHybridQuery
 
 
@@ -23,7 +25,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": "es"
         }
-        
+
         result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
@@ -33,10 +35,10 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": ""
         }
-        
+
         with self.assertRaises(InvalidArgError) as cm:
             validation.validate_text_field_mappings_object(invalid_mapping)
-        
+
         self.assertIn("Error validating text field mappings object", str(cm.exception))
 
     def test_validate_text_field_mappings_object_valid_long_language(self):
@@ -45,7 +47,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": "spanish"
         }
-        
+
         result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
@@ -55,7 +57,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": "ES"
         }
-        
+
         result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
@@ -65,7 +67,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": "e5"
         }
-        
+
         result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
@@ -75,7 +77,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
             "type": "text_field",
             "language": "spa"
         }
-        
+
         result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
@@ -84,7 +86,7 @@ class TestLanguageMappingValidation(unittest.TestCase):
         invalid_mapping = {
             "type": "text_field"
         }
-        
+
         with self.assertRaises(InvalidArgError):
             validation.validate_text_field_mappings_object(invalid_mapping)
 
@@ -99,7 +101,7 @@ class TestSearchQueryLanguageValidation(unittest.TestCase):
             searchMethod=SearchMethod.LEXICAL,
             language="es"
         )
-        
+
         self.assertEqual(search_query.language, "es")
         self.assertEqual(search_query.searchMethod, SearchMethod.LEXICAL)
 
@@ -110,7 +112,7 @@ class TestSearchQueryLanguageValidation(unittest.TestCase):
             searchMethod=SearchMethod.HYBRID,
             language="fr"
         )
-        
+
         self.assertEqual(search_query.language, "fr")
         self.assertEqual(search_query.searchMethod, SearchMethod.HYBRID)
 
@@ -122,7 +124,7 @@ class TestSearchQueryLanguageValidation(unittest.TestCase):
                 searchMethod=SearchMethod.TENSOR,
                 language="es"
             )
-        
+
         self.assertIn("language parameter is not supported for TENSOR search method", str(cm.exception))
 
     def test_search_query_language_none_valid(self):
@@ -131,7 +133,7 @@ class TestSearchQueryLanguageValidation(unittest.TestCase):
             q="test query",
             searchMethod=SearchMethod.TENSOR
         )
-        
+
         self.assertIsNone(search_query.language)
 
     def test_search_query_no_language_valid(self):
@@ -140,7 +142,7 @@ class TestSearchQueryLanguageValidation(unittest.TestCase):
             q="test query",
             searchMethod=SearchMethod.TENSOR
         )
-        
+
         self.assertIsNone(search_query.language)
 
 
@@ -156,7 +158,7 @@ class TestFieldModelLanguageProperty(unittest.TestCase):
             lexical_field_name="marqo__title",
             language="es"
         )
-        
+
         self.assertEqual(field.language, "es")
         self.assertEqual(field.name, "title")
         self.assertEqual(field.type, FieldType.Text)
@@ -169,7 +171,7 @@ class TestFieldModelLanguageProperty(unittest.TestCase):
             features=[FieldFeature.LexicalSearch],
             lexical_field_name="marqo__title"
         )
-        
+
         self.assertIsNone(field.language)
 
 
@@ -185,7 +187,7 @@ class TestMarqoQueryLanguageProperty(unittest.TestCase):
             limit=10,
             language="es"
         )
-        
+
         self.assertEqual(query.language, "es")
         self.assertEqual(query.index_name, "test_index")
 
@@ -197,18 +199,18 @@ class TestMarqoQueryLanguageProperty(unittest.TestCase):
             and_phrases=["test"],
             limit=10
         )
-        
+
         self.assertIsNone(query.language)
 
     def test_marqo_hybrid_query_inherits_language(self):
         """Test that MarqoHybridQuery inherits language property from MarqoLexicalQuery"""
         from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
-        
+
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF
         )
-        
+
         query = MarqoHybridQuery(
             index_name="test_index",
             vector_query=[0.1, 0.2, 0.3],
@@ -218,7 +220,7 @@ class TestMarqoQueryLanguageProperty(unittest.TestCase):
             hybrid_parameters=hybrid_params,
             language="fr"
         )
-        
+
         self.assertEqual(query.language, "fr")
 
 
@@ -230,13 +232,15 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
         self.mock_vespa_client = Mock()
         self.mock_index_management = Mock()
         self.mock_inference = Mock()
-        
+
         # Create a mock semi-structured index
         self.mock_index = Mock(spec=SemiStructuredMarqoIndex)
         self.mock_index.name = "test_index"
         self.mock_index.field_map = {}
         self.mock_index.lexical_fields = []
         self.mock_index.clear_cache = Mock()
+        self.mock_index.normalize_embeddings = True
+        self.mock_index.parsed_marqo_version = Mock(return_value=semver.VersionInfo.parse("2.14.0"))
 
     def test_get_field_language_with_mapping(self):
         """Test extracting language from mappings"""
@@ -252,7 +256,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
                 }
             }
         )
-        
+
         handler = SemiStructuredAddDocumentsHandler(
             marqo_index=self.mock_index,
             add_docs_params=add_docs_params,
@@ -260,7 +264,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             index_management=self.mock_index_management,
             inference=self.mock_inference
         )
-        
+
         language = handler._get_field_language("title", "test content")
         self.assertEqual(language, "es")
 
@@ -273,7 +277,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             tensor_fields=[],
             mappings={}
         )
-        
+
         handler = SemiStructuredAddDocumentsHandler(
             marqo_index=self.mock_index,
             add_docs_params=add_docs_params,
@@ -281,7 +285,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             index_management=self.mock_index_management,
             inference=self.mock_inference
         )
-        
+
         language = handler._get_field_language("title", "test content")
         self.assertIsNone(language)
 
@@ -298,7 +302,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
                 }
             }
         )
-        
+
         handler = SemiStructuredAddDocumentsHandler(
             marqo_index=self.mock_index,
             add_docs_params=add_docs_params,
@@ -306,7 +310,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             index_management=self.mock_index_management,
             inference=self.mock_inference
         )
-        
+
         language = handler._get_field_language("title", "test content")
         self.assertIsNone(language)
 
@@ -324,7 +328,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
                 }
             }
         )
-        
+
         handler = SemiStructuredAddDocumentsHandler(
             marqo_index=self.mock_index,
             add_docs_params=add_docs_params,
@@ -332,7 +336,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             index_management=self.mock_index_management,
             inference=self.mock_inference
         )
-        
+
         # Should not raise exception
         language = handler._get_field_language("title", "test content")
         self.assertEqual(language, "es")
@@ -351,7 +355,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
                 }
             }
         )
-        
+
         handler = SemiStructuredAddDocumentsHandler(
             marqo_index=self.mock_index,
             add_docs_params=add_docs_params,
@@ -359,10 +363,10 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             index_management=self.mock_index_management,
             inference=self.mock_inference
         )
-        
-        with self.assertRaises(InvalidArgumentError) as cm:
+
+        with self.assertRaises(AddDocumentsError) as cm:
             handler._get_field_language("price", 10.5)
-        
+
         self.assertIn("Language mapping for field 'price' can only be used with text", str(cm.exception))
 
 
@@ -377,23 +381,23 @@ class TestMappingsValidationIntegration(unittest.TestCase):
                 "language": "es"
             }
         }
-        
+
         result = validation.validate_mappings_object(mappings)
         self.assertEqual(result, mappings)
 
     def test_validate_mappings_object_language_field_structured_index_valid(self):
         """Test that language mappings are now allowed for all index types"""
         from marqo.core.models.marqo_index import StructuredMarqoIndex
-        
+
         mock_structured_index = Mock(spec=StructuredMarqoIndex)
-        
+
         mappings = {
             "title": {
                 "type": "text_field",
                 "language": "es"
             }
         }
-        
+
         # Language fields are now supported for all index types
         result = validation.validate_mappings_object(mappings, mock_structured_index)
         self.assertEqual(result, mappings)
@@ -406,7 +410,7 @@ class TestMappingsValidationIntegration(unittest.TestCase):
                 "invalid_field": "value"
             }
         }
-        
+
         with self.assertRaises(InvalidArgError):
             validation.validate_mappings_object(mappings)
 
