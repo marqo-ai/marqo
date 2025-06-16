@@ -1,11 +1,10 @@
 from enum import Enum
 from pydantic.v1 import Field, validator
-from sqlalchemy.log import echo_property
 from typing import List, Optional
 
+from marqo.api.exceptions import InvalidFieldNameError
 from marqo.base_model import StrictBaseModel
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
-from marqo.api.exceptions import InvalidFieldNameError
 
 
 class SortOrder(str, Enum):
