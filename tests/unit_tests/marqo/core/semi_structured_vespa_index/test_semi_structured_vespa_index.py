@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from marqo.core.models import MarqoQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestSemiStructuredVespaIndex(MarqoTestCase):

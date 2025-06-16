@@ -13,7 +13,7 @@ from marqo.s2_inference.s2_inference import (
     _update_available_models
 )
 
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 @unittest.skip
 class TestGenericModelSupport(MarqoTestCase):

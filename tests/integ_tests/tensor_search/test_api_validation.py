@@ -1,6 +1,6 @@
 from marqo.tensor_search.web import api_validation
 from marqo.api.exceptions import InvalidArgError
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestApiValidation(MarqoTestCase):

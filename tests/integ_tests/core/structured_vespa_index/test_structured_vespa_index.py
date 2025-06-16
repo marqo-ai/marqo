@@ -5,7 +5,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core import exceptions as core_exceptions
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredVespaIndex(MarqoTestCase):

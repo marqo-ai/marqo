@@ -7,7 +7,7 @@ from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
 from marqo.tensor_search.web import api_utils
 from marqo.api.exceptions import InvalidArgError, InternalError, BadRequestError
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 import unittest
 
 

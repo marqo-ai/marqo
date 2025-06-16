@@ -8,7 +8,7 @@ from marqo.s2_inference.reranking.model_utils import load_owl_vit
 from marqo.s2_inference.s2_inference import validate_model_properties, \
     _create_model_cache_key, _update_available_models, clear_loaded_models, get_available_models
 from marqo.tensor_search.tensor_search import eject_model, get_loaded_models, get_cpu_info
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 def load_model(model_name: str, device: str, model_properteis: dict = None) -> None:

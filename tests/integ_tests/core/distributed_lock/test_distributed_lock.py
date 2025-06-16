@@ -6,7 +6,7 @@ from kazoo.handlers.threading import KazooTimeoutError
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
 from marqo.core.exceptions import BackendCommunicationError
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError
 
 

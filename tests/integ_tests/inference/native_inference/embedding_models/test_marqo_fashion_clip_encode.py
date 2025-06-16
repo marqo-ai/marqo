@@ -1,6 +1,6 @@
 import numpy as np
 
-from integ_tests.inference.inference_test_case import InferenceTestCase
+from tests.integ_tests.inference.inference_test_case import InferenceTestCase
 from marqo.inference.native_inference.load_model import clear_loaded_models
 
 

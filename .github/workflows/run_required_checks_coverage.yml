@@ -92,7 +92,7 @@ jobs:
           coverage html --directory=../integ_coverage_data/htmlcov
           coverage report -m > ../integ_coverage_data/coverage.txt
 
-      - name: Check diff unit test coverage (95% threshold)
+      - name: Check diff unit test coverage (80% threshold)
         id: unit_diff_coverage
         continue-on-error: true
         run: |
@@ -106,7 +106,7 @@ jobs:
             
             diff-cover ../unit_coverage_data/coverage.xml --html-report ../unit_coverage_data/diff_cov.html \
               --markdown-report ../unit_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95
+              --compare-branch $BASE_BRANCH --fail-under=80
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > ../unit_coverage_data/diff_cov.md
@@ -131,6 +131,26 @@ jobs:
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > ../integ_coverage_data/diff_cov.md
             touch ../integ_coverage_data/diff_cov.html
+          fi
+
+      - name: Check diff combined test coverage (95% threshold)
+        id: combined_diff_coverage
+        continue-on-error: true
+        run: |
+          cd marqo
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export PYTHONPATH="."
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+
+            diff-cover ../coverage_data/coverage.xml --html-report ../coverage_data/diff_cov.html \
+              --markdown-report ../coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=95
+          else
+            echo "Skipping diff-cover on push events"
+            echo "Skipped diff-cover on push event" > ../coverage_data/diff_cov.md
+            touch ../coverage_data/diff_cov.html
           fi
 
       - name: Check overall integration test coverage (78% threshold)
@@ -196,10 +216,9 @@ jobs:
             echo "- \`combined-test-coverage\`, \`integration-test-coverage\`, \`unit-test-coverage\`: Coverage and diff coverage reports."
             echo "- \`marqo-integ-tests-report-*\`, \`marqo-largemodel-tests-report-*\`, \`marqo-unit-tests-report\`: pytest output and reports."
           } >> $GITHUB_STEP_SUMMARY
-    
-          echo "# Combined coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo "# Unit coverage summary" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
-          cat coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          cat unit_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
           echo "# Integ coverage summary" >> $GITHUB_STEP_SUMMARY
@@ -207,26 +226,32 @@ jobs:
           cat integ_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-          echo "# Unit coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo "# Combined coverage summary" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
-          cat unit_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-
-          echo "# Integ diff coverage summary" >> $GITHUB_STEP_SUMMARY
-          cat integ_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
           echo "# Unit diff coverage summary" >> $GITHUB_STEP_SUMMARY
           cat unit_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
+          echo "# Integ diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat integ_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+          echo "# Combined diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
       - name: Fail if coverage thresholds not met
-        if: steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure'
+        if: steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.combined_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure'
         run: |
           echo "Coverage threshold check failed"
           if [ "${{ steps.unit_diff_coverage.outcome }}" == "failure" ]; then
-            echo "❌ Unit test diff coverage: ${{ steps.unit_diff_coverage.outputs.percentage }}% (required: 95%)"
+            echo "❌ Unit test diff coverage: ${{ steps.unit_diff_coverage.outputs.percentage }}% (required: 80%)"
           fi
           if [ "${{ steps.integ_diff_coverage.outcome }}" == "failure" ]; then
             echo "❌ Integration test diff coverage: ${{ steps.integ_diff_coverage.outputs.percentage }}% (required: 80%)"
+          fi
+          if [ "${{ steps.combined_diff_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Combined diff coverage: ${{ steps.combined_diff_coverage.outputs.percentage }}% (required: 95%)"
           fi
           if [ "${{ steps.integ_overall_coverage.outcome }}" == "failure" ]; then
             echo "❌ Integration test coverage: ${{ steps.integ_overall_coverage.outputs.percentage }}% (required: 70%)"

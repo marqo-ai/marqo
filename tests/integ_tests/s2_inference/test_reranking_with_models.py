@@ -5,7 +5,7 @@ import numpy as np
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference.errors import RerankerError,RerankerNameError
 from marqo.s2_inference.s2_inference import clear_loaded_models
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 
 
 class TestRerankingWithModels(unittest.TestCase):

@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 from marqo.s2_inference.model_registry import _get_open_clip_properties
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,

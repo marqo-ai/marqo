@@ -10,7 +10,7 @@ from hypothesis import given, strategies as st
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
@@ -163,7 +163,7 @@ class TestSearch(MarqoTestCase):
             ],
             model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
             tensor_fields=["text_field_1",
-                        "video_field_1", "audio_field_1", "image_field_1"],
+                           "video_field_1", "audio_field_1", "image_field_1"],
             normalize_embeddings=True,
         )
 
@@ -208,12 +208,16 @@ class TestSearch(MarqoTestCase):
         self.device_patcher.stop()
 
     @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+    @pytest.mark.skipif(torch.cuda.is_available() is False,
+                        reason="We skip the large model test if we don't have cuda support")
     def test_search_video(self):
         documents = [
-            {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
+            {
+                "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
+                "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
+             "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -226,7 +230,8 @@ class TestSearch(MarqoTestCase):
                         index_name=index.name,
                         docs=documents,
                         tensor_fields=["text_field_1",
-                        "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                                       "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index,
+                                                                                                        UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -240,15 +245,20 @@ class TestSearch(MarqoTestCase):
                 # Assertions
                 self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
                 self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
-                self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Video should have higher score
+                self.assertGreater(results['hits'][0]['_score'],
+                                   results['hits'][1]['_score'])  # Video should have higher score
 
     @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+    @pytest.mark.skipif(torch.cuda.is_available() is False,
+                        reason="We skip the large model test if we don't have cuda support")
     def test_search_audio(self):
         documents = [
-            {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
+            {
+                "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
+                "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
+             "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -261,7 +271,8 @@ class TestSearch(MarqoTestCase):
                         index_name=index.name,
                         docs=documents,
                         tensor_fields=["text_field_1",
-                        "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                                       "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index,
+                                                                                                        UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -275,8 +286,8 @@ class TestSearch(MarqoTestCase):
                 # Assertions
                 self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
                 self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result
-                self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Audio should have higher score
-
+                self.assertGreater(results['hits'][0]['_score'],
+                                   results['hits'][1]['_score'])  # Audio should have higher score
 
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
@@ -373,7 +384,6 @@ class TestSearch(MarqoTestCase):
                         if expected_id:
                             self.assertEqual(expected_id, res["hits"][0]["_id"])
 
-    
     def test_filtering_list_case_image(self):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
@@ -749,35 +759,37 @@ class TestSearch(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"_id": "doc1", "text_field_1": "some text"},
-                            {"_id": "doc2", "text_field_1": "some text"},
-                            {"_id": "doc3", "text_field_1": "another text"},
+                                 {"_id": "doc1", "text_field_1": "some text"},
+                                 {"_id": "doc2", "text_field_1": "some text"},
+                                 {"_id": "doc3", "text_field_1": "another text"},
 
-                            # Docs with vespa special chars
-                            {"_id": "doc4", "text_field_1": "som\"e text"},
-                            {"_id": "doc5", "text_field_1": "som\\e text"},
-                        ] + [
-                            # Docs with marqo filter special chars
-                            {"_id": f"doc with {char}", "text_field_1": f"som{char}e text"}
-                            for char in MARQO_FILTER_STRING_SPECIAL_CHARS
-                        ],
+                                 # Docs with vespa special chars
+                                 {"_id": "doc4", "text_field_1": "som\"e text"},
+                                 {"_id": "doc5", "text_field_1": "som\\e text"},
+                             ] + [
+                                 # Docs with marqo filter special chars
+                                 {"_id": f"doc with {char}", "text_field_1": f"som{char}e text"}
+                                 for char in MARQO_FILTER_STRING_SPECIAL_CHARS
+                             ],
                     )
                 )
 
                 # Define test parameters as tuples expected_ids)
                 test_cases = [
-                    ('text_field_1 in ((some text), (hello))', ["doc1", "doc2"]),
+                                 ('text_field_1 in ((some text), (hello))', ["doc1", "doc2"]),
 
-                    # Special chars in vespa YQL DSL --> '\', '"'
-                    ('text_field_1 in ((som\\e text), (hello))', ["doc1", "doc2"]),    # e does not need to be escaped. \ is ignored. Will retrieve normal text.
-                    ('text_field_1 in ((som\\\\e text), (hello))', ["doc5"]),  # \ is escaped
-                    ('text_field_1 in ((som"e text), (hello))', ["doc4"]),
-                    ('text_field_1 in ((som\\"e text), (hello))', ["doc4"]),    # " does not need to be escaped. \ is ignored.
-                ] + [
-                    # Testing marqo filter special chars
-                    (f'text_field_1 in ((som\\{char}e text), (hello))', [f"doc with {char}"])
-                    for char in MARQO_FILTER_STRING_SPECIAL_CHARS
-                ]
+                                 # Special chars in vespa YQL DSL --> '\', '"'
+                                 ('text_field_1 in ((som\\e text), (hello))', ["doc1", "doc2"]),
+                                 # e does not need to be escaped. \ is ignored. Will retrieve normal text.
+                                 ('text_field_1 in ((som\\\\e text), (hello))', ["doc5"]),  # \ is escaped
+                                 ('text_field_1 in ((som"e text), (hello))', ["doc4"]),
+                                 ('text_field_1 in ((som\\"e text), (hello))', ["doc4"]),
+                                 # " does not need to be escaped. \ is ignored.
+                             ] + [
+                                 # Testing marqo filter special chars
+                                 (f'text_field_1 in ((som\\{char}e text), (hello))', [f"doc with {char}"])
+                                 for char in MARQO_FILTER_STRING_SPECIAL_CHARS
+                             ]
 
                 for filter_string, expected_ids in test_cases:
                     with self.subTest(f"filter_string={filter_string}, expected_ids={expected_ids}"):
@@ -1032,7 +1044,8 @@ class TestSearch(MarqoTestCase):
                             and_phrases=[],
                             score_modifiers=[ScoreModifier(field="field1", weight=1.0, type=ScoreModifierType.Multiply)]
                         ),
-                        'default contains "term1" OR default contains "term2"' if isinstance(index, StructuredVespaIndex)
+                        'default contains "term1" OR default contains "term2"' if isinstance(index,
+                                                                                             StructuredVespaIndex)
                         else '(default contains "term1" OR default contains "term2")'
                     ),
                     # Test without score modifiers (should use weakAnd)
@@ -1043,7 +1056,8 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=[]
                         ),
-                        'weakAnd(default contains "term1", default contains "term2")' if isinstance(index, StructuredVespaIndex)
+                        'weakAnd(default contains "term1", default contains "term2")' if isinstance(index,
+                                                                                                    StructuredVespaIndex)
                         else '(weakAnd(default contains "term1", default contains "term2"))'
                     ),
                     # Test with both OR and AND phrases
@@ -1130,17 +1144,19 @@ class TestSearch(MarqoTestCase):
             ('hello\\normal char', []),
             ('1\\"2', ['doc1']),
             ('"exact match"', ['doc2']),
-            ('\\"escaped\\"', ['doc4', 'red_herring_4']),   # Vespa tokenizer removes " so both docs are retrieved
-            ('escaped', ['doc4', 'red_herring_4']),         # Vespa tokenizer removes " so both docs are retrieved
+            ('\\"escaped\\"', ['doc4', 'red_herring_4']),  # Vespa tokenizer removes " so both docs are retrieved
+            ('escaped', ['doc4', 'red_herring_4']),  # Vespa tokenizer removes " so both docs are retrieved
             ('"exacto" wrong"', ['doc3']),
             ('""', []),
             ('"', []),
-            ('back\\\\slash', ['doc5']),    # escaped backslash
-            ('\\\\"backslashinfront', ['doc7']),       # escaped backslash before double quote (quote will be treated as whitespace)
-            ('\\\\"backslashatend\\\\"', ['doc8']),       # escaped backslash before double quote on both sides (quote will be treated as whitespace)
-            ('\\\\\\"literalbackslashthenquote', ['doc9']),   # escaped backslash before escaped double quote
-            ('\\word', ['red_herring_0']),         # backslash to escape normal character (removed)
-            ('word\\', ['red_herring_0'])    # stray backslash (removed)
+            ('back\\\\slash', ['doc5']),  # escaped backslash
+            ('\\\\"backslashinfront', ['doc7']),
+            # escaped backslash before double quote (quote will be treated as whitespace)
+            ('\\\\"backslashatend\\\\"', ['doc8']),
+            # escaped backslash before double quote on both sides (quote will be treated as whitespace)
+            ('\\\\\\"literalbackslashthenquote', ['doc9']),  # escaped backslash before escaped double quote
+            ('\\word', ['red_herring_0']),  # backslash to escape normal character (removed)
+            ('word\\', ['red_herring_0'])  # stray backslash (removed)
         ]
 
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
@@ -1168,7 +1184,6 @@ class TestSearch(MarqoTestCase):
                         self.assertEqual(len(expected_ids), len(res['hits']))
                         self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
 
-
     def test_search_private_image_return_proper_error(self):
         """A test to ensure that InvalidArgumentError is raised when searching for a private image."""
         test_queries_list = [
@@ -1186,7 +1201,6 @@ class TestSearch(MarqoTestCase):
                         )
                     self.assertIn("Error downloading media file", str(e.exception))
                     self.assertIn("403 Client Error", str(e.exception))
-
 
     def test_search_invalid_image_url_image_return_proper_error(self):
         """A test to ensure that InvalidArgumentError is raised when searching for an invalid image url."""
@@ -1207,7 +1221,8 @@ class TestSearch(MarqoTestCase):
 
     def test_video_size_limit(self):
         """Ensure that the MediaExceedsMaxSizeError is converted to InvalidArgError."""
-        with mock.patch("marqo.inference.native_inference.local_inference.NativeInferenceLocal.vectorise") as mock_vectorise:
+        with mock.patch(
+                "marqo.inference.native_inference.local_inference.NativeInferenceLocal.vectorise") as mock_vectorise:
             mock_vectorise.side_effect = MediaExceedsMaxSizeError("exceeds the maximum allowed size")
             with self.assertRaises(api_exceptions.InvalidArgError) as e:
                 tensor_search.search(
@@ -1305,6 +1320,84 @@ class TestSearch(MarqoTestCase):
                         ef_search=3
                     )
                     self.assertEqual(len(res["hits"]), 3)
+
+    def test_approximate_threshold(self):
+        """
+        Test approximate threshold parameter for both tensor and hybrid search
+        across structured and unstructured indexes.
+        """
+        # Test documents
+        docs = [
+            {"_id": "doc1", "text_field_1": "red apple fruit"},
+            {"_id": "doc2", "text_field_1": "blue berry fruit"},
+            {"_id": "doc3", "text_field_1": "green grape fruit"},
+            {"_id": "doc4", "text_field_1": "yellow banana fruit"},
+        ]
+
+        test_cases = [
+            (SearchMethod.TENSOR, "tensor search"),
+            (SearchMethod.HYBRID, "hybrid search"),
+        ]
+
+        approximate_threshold_values = [0.0, 0.5, 0.8, 1.0]
+
+        for index in [self.unstructured_default_text_index,
+                      self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                tensor_fields = (["text_field_1"]
+                                 if isinstance(index, UnstructuredMarqoIndex)
+                                 else None)
+
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                for search_method, method_name in test_cases:
+                    with self.subTest(search_method=method_name):
+                        # Test different approximate threshold values
+                        for approx_threshold in approximate_threshold_values:
+                            with self.subTest(
+                                    approximate_threshold=approx_threshold
+                            ):
+                                # Mock VespaClient.query method to capture params
+                                with mock.patch.object(
+                                        self.config.vespa_client, 'query',
+                                        wraps=self.config.vespa_client.query
+                                ) as mock_query:
+                                    # Perform search with approximate threshold
+                                    results = tensor_search.search(
+                                        config=self.config,
+                                        index_name=index.name,
+                                        text="fruit",
+                                        search_method=search_method,
+                                        approximate_threshold=approx_threshold,
+                                        result_count=4
+                                    )
+
+                                    # Verify the search returned results
+                                    self.assertIn("hits", results)
+                                    self.assertGreater(len(results["hits"]), 0)
+
+                                    # Verify the mock was called
+                                    self.assertTrue(mock_query.called)
+
+                                    # Get the call arguments
+                                    call_args, call_kwargs = mock_query.call_args
+
+                                    # Verify approximate_threshold was passed correctly
+                                    # It should be in the ranking.matching.approximateThreshold
+                                    key_name = 'ranking.matching.approximateThreshold'
+                                    self.assertIn(key_name, call_kwargs)
+                                    self.assertEqual(
+                                        call_kwargs[key_name],
+                                        approx_threshold
+                                    )
 
 
 # Set up text strategy to prioritize " and \\
