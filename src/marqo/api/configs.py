@@ -41,6 +41,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
         EnvVars.MARQO_MAX_SEARCH_LIMIT: 1000,
         EnvVars.MARQO_MAX_SEARCH_OFFSET: 10000,
+        EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: 10,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
 
         # Throttling

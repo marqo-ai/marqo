@@ -169,7 +169,7 @@ class Recommender:
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
         if interpolation_method is None:
-            interpolation_method = self.get_default_interpolation_method(marqo_index)
+            interpolation_method = self.get_default_interpolation_method(marqo_index, documents)
 
         vector_interpolation = from_interpolation_method(interpolation_method)
 
@@ -252,9 +252,21 @@ class Recommender:
 
         return results
 
-    def get_default_interpolation_method(self, marqo_index: MarqoIndex) -> InterpolationMethod:
+    def get_default_interpolation_method(self, marqo_index: MarqoIndex,
+                                         context_documents: Union[List[str], Dict[str, float]]) -> InterpolationMethod:
+        """
+        Returns the default interpolation method based on the index configuration and whether context documents
+        exist. For recommend endpoint, context documents always exist.
+
+        For indexes that normalize embeddings, SLERP is used if context documents are provided, NLERP is used
+        otherwise (None).
+        """
         if marqo_index.normalize_embeddings:
-            return InterpolationMethod.SLERP
+            if context_documents is not None:
+                return InterpolationMethod.SLERP
+            else:
+                # NLERP is used to preserve existing search behavior with no context docs.
+                return InterpolationMethod.NLERP
         else:
             return InterpolationMethod.LERP
 

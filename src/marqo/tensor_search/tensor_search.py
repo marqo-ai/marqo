@@ -380,6 +380,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     max_search_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_LIMIT)
     max_search_offset = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_OFFSET)
+    max_search_context_docs = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS)
 
     check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
     check_limit = True if max_search_limit is None else result_count <= int(max_search_limit)
@@ -436,6 +437,12 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
         # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
         if context is not None and context.documents is not None:
+            if len(context.documents.ids) > max_search_context_docs:
+                raise api_exceptions.IllegalRequestedDocCount(
+                    f"Search context documents limit exceeded. "
+                    f"Maximum allowed is {max_search_context_docs}, but got {len(context.documents.ids)}. "
+                    f"To increase, set the environment variable '{EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS}'"
+                )
             if context.documents.parameters.excludeInputDocuments:
                 filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.ids.keys()), filter)
 
@@ -886,6 +893,9 @@ def get_query_vectors_from_jobs(
 
             # Add context document vectors
             context_documents = q.get_context_documents()
+            if interpolation_method is None:
+                interpolation_method = config.recommender.get_default_interpolation_method(q.index, context_documents)
+
             if context_documents:
                 with RequestMetricsStore.for_request().time(f"search.vectorise.get_doc_vectors_from_ids"):
                     context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
@@ -904,17 +914,6 @@ def get_query_vectors_from_jobs(
 
                 # Save original doc ids for exclusion filtering
                 all_document_ids = list(context_documents.ids.keys())
-
-                # Determine default interpolation method using normalize embeddings if documents provided
-                if interpolation_method is None:
-                    interpolation_method = config.recommender.get_default_interpolation_method(q.index)
-            else:
-                # If no documents, default interpolation method ALWAYS NLERP or LERP (to preserve existing behavior)
-                if interpolation_method is None:
-                    if q.index.normalize_embeddings:
-                        interpolation_method = InterpolationMethod.NLERP
-                    else:
-                        interpolation_method = InterpolationMethod.LERP
 
             # Make sure all vectors are the same size
             for vector in collected_vectors:

@@ -18,6 +18,7 @@ class VectorisedJobPointer(BaseModel):
     start_idx: int
     end_idx: int
 
+
 class VectorisedJobs(BaseModel):
     """A vectorised job describes content (e.q. search queries, images, video, audio) that can be vectorised (i.e can be sent to 
     `s2_inference.vectorise`) in a single batch given they share common inference parameters.
@@ -59,19 +60,15 @@ class VectorisedJobs(BaseModel):
             end_idx=len(self.content)
         )
 
+
 class SearchContextTensor(BaseModel):
     vector: List[float]
     weight: float
 
-    def __init__(self, **data):
-        try:
-            super().__init__(**data)
-        except ValidationError as e:
-            raise InvalidArgError(message=e.json())
 
 class SearchContextDocumentsParameters(BaseModel):
     tensorFields: Optional[List[str]] = None
-    excludeInputDocuments: Optional[bool] = True
+    excludeInputDocuments: bool = True
     concurrency: Optional[int] = None
 
     @validator('tensorFields', pre=True, always=True)
@@ -94,6 +91,7 @@ class SearchContextDocuments(BaseModel):
             raise InvalidArgError('context["documents"]["ids"] must be present and a non-empty dict of '
                                   'document id to weight pairs.')
         return v
+
 
 class SearchContext(BaseModel):
     tensor: Optional[List[SearchContextTensor]]

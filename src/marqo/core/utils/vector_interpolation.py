@@ -13,6 +13,10 @@ class ZeroSumWeightsError(InvalidArgumentError):
     pass
 
 
+class AllZeroWeightsError(InvalidArgumentError):
+    pass
+
+
 class ZeroMagnitudeVectorError(InvalidArgumentError):
     pass
 
@@ -62,7 +66,7 @@ class Lerp(VectorInterpolation):
             The interpolated vector
 
         Raises:
-            ZeroSumWeightsError: If the sum of the weights is zero
+            AllZeroWeightsError: If all weights are zero
         """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
@@ -82,8 +86,8 @@ class Lerp(VectorInterpolation):
         weight_sum = np.sum(np.abs(np_weights))
 
         if weight_sum == 0:
-            raise ZeroSumWeightsError(
-                'Sum of weights is zero. LERP cannot interpolate vectors with zero sum of weights'
+            raise AllZeroWeightsError(
+                'All weights are zero. LERP cannot interpolate vectors with all zero weights.'
             )
 
         # Calculate normalized weights (divide all by sum of absolute values)
@@ -112,7 +116,7 @@ class Nlerp(Lerp):
             The interpolated vector
 
         Raises:
-            ZeroSumWeightsError: If the sum of the weights is zero
+            AllZeroWeightsError: If all weights are zero
             ZeroMagnitudeVectorError: If the interpolated vector has zero magnitude
         """
         lerp_result = super().interpolate(vectors, weights)
@@ -156,7 +160,7 @@ class Slerp(VectorInterpolation):
             The interpolated vector
 
         Raises:
-            ZeroSumWeightsError: If the sum of a consecutive pair of weights is zero
+            AllZeroWeightsError: If all weights are zero
         """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
@@ -217,8 +221,8 @@ class Slerp(VectorInterpolation):
             sum = np.abs(w0) + np.abs(w1)
 
             if sum == 0:
-                raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
-                                          'vectors with a sum weight of zero'.format(w0, w1))
+                raise AllZeroWeightsError('Weights of both vectors {} and {} zero. SLERP cannot interpolate '
+                                          'vectors with a sum weight of zero'.format(i-1, i))
 
             result = self._slerp(result, vectors[i], w1 / sum, prenormalized)
             weights_copy[i] = sum / 2
@@ -240,8 +244,8 @@ class Slerp(VectorInterpolation):
                 sum = np.abs(w0) + np.abs(w1)
 
                 if sum == 0:
-                    raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
-                                              'vectors with a sum weight of zero'.format(w0, w1))
+	                raise AllZeroWeightsError('Weights of both vectors {} and {} zero. SLERP cannot interpolate '
+	                                          'vectors with a sum weight of zero'.format(i - 1, i))
 
                 result.append(
                     self._slerp(vectors[i], vectors[i + 1], w1 / sum, prenormalized)

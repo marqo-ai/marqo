@@ -70,7 +70,7 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
-                track_total_hits: if True, total hits will be returned. If not provided, no total hits will be returned.
+                track_total_hits: if True, total hits before reranking will be returned.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
             Returns:
 
