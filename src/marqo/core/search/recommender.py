@@ -63,6 +63,7 @@ class Recommender:
 
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
+        # See if recommend breaks for unstructured
         if marqo_index.type == IndexType.Structured:
             # Validate tensor field names
             if tensor_fields is not None:

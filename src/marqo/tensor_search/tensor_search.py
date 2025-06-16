@@ -1320,7 +1320,6 @@ def get_doc_vectors_per_tensor_field_by_ids(
     """
 
     # TODO: Add maximum retrievable docs for context docs
-    # TODO: Add unsuccessful docs list + reason
     # We can just use the cache here since we refresh every 1s.
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     
@@ -1343,15 +1342,14 @@ def get_doc_vectors_per_tensor_field_by_ids(
     result = {}
     
     for response in batch_get.responses:
-        if response.status == 200:
+        # Extract vectors directly (for structured and semi-structured)
+        # Skip turning into marqo document
+        raw_response_dict = response.document.fields
+        doc_id = raw_response_dict["marqo__id"]
 
-            # Extract vectors directly (for structured and semi-structured)
-            # Skip turning into marqo document
-            raw_response_dict = response.document.fields
-            doc_id = raw_response_dict["marqo__id"]
+        if response.status == 200:
             # Initialize the result for this document ID
             result[doc_id] = {}
-            # TODO, this is for structured/semi-structured. Handle unstructured.
             # Check every requested tensor field (same index as embedding_fields list)
             for i in range(len(viable_tensor_fields)):
                 # Get marqo tensor field name from vespa field name
@@ -1371,11 +1369,12 @@ def get_doc_vectors_per_tensor_field_by_ids(
                 else:
                     # Otherwise, field is empty list
                     result[doc_id][marqo_tensor_field_name] = []
-
         else:
-            # TODO: Add doc to failures list.
-            pass
-    
+            # If the response is not successful, error out
+            raise core_exceptions.InvalidArgumentError(
+                f"Failed to retrieve document {doc_id} from index {index_name}. "
+                f"Response status: {response.status}, message: {response.message}"
+            )
     return result
 
 
