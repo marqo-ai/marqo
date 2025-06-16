@@ -122,6 +122,8 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             "fields": [
                 {
                     "field_name": "sort_field_1",
+                    "sortDepth": 10,
+                    "minSortCandidates": 10
                 }
             ]
         }
