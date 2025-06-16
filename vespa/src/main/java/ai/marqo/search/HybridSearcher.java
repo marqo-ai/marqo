@@ -1,7 +1,5 @@
 package ai.marqo.search;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -18,7 +16,6 @@ import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -27,7 +24,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -50,12 +46,6 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
-
-    private static class SortField {
-        public String field_name;
-        public String order;
-        public String missing;
-    }
 
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -82,14 +72,6 @@ public class HybridSearcher extends Searcher {
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
-
-        // Relevance Cut-off Parameters
-
-        // Sort by Parameters
-        String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
-        Integer sortByDepth = query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
-        Integer minSortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", -1);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -132,12 +114,6 @@ public class HybridSearcher extends Searcher {
             }
         }
         // --- End facets subquery handling ---
-
-        // --- Update the query limit if sort is used
-        if (sortByFields != null && !sortByFields.isEmpty()) {
-            query.setHits(minSortCandidates);
-            query.setOffset(0);
-        }
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -208,33 +184,10 @@ public class HybridSearcher extends Searcher {
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
 
-        // Determine post-processing mode based on query parameters
-        HitGroup processedHits;
-        Tensor queryMultWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
-        Tensor queryAddWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
-        if (sortByFields != null) {
-            // If sortBy is set, we will sort the hits after post-processing
-            processedHits =
-                    postProcessBySort(
-                            hitsForPostProcessing, sortByFields, sortByDepth, limit, offset);
-            processedHits.setField("marqo__sortByCandidates", hitsForPostProcessing.size());
-        } else if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
-            logIfVerbose("Global score modifiers found. Will apply them.", verbose);
-            processedHits =
-                    postProcessResults(
-                            hitsForPostProcessing,
-                            query,
-                            rerankDepthGlobal,
-                            limit,
-                            offset,
-                            verbose);
-        } else {
-            logIfVerbose("No global score modifiers found. Will not apply them.", verbose);
-            processedHits = hitsForPostProcessing;
-        }
+        // Post-process the main hits result list.
+        HitGroup processedHits =
+                postProcessResults(
+                        hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
 
         // --- Attach facets results if available ---
         if (!futureFacets.isEmpty()) {
@@ -275,81 +228,6 @@ public class HybridSearcher extends Searcher {
         // --- End facets attachment ---
 
         return new Result(query, processedHits);
-    }
-
-    HitGroup postProcessBySort(
-            HitGroup hitsForPostProcessing,
-            String sortByFields,
-            Integer sortByDepth,
-            Integer limit,
-            Integer offset) {
-
-        ObjectMapper mapper = new ObjectMapper();
-        List<SortField> parsedSortByFields;
-        try {
-            parsedSortByFields =
-                    mapper.readValue(sortByFields, new TypeReference<List<SortField>>() {});
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
-        }
-
-        List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
-        int depth = (sortByDepth != null) ? sortByDepth : allHits.size();
-
-        List<Hit> hitsToSort = new ArrayList<>(allHits.subList(0, Math.min(depth, allHits.size())));
-        List<Hit> hitsAfterDepth =
-                (depth < allHits.size())
-                        ? new ArrayList<>(allHits.subList(depth, allHits.size()))
-                        : new ArrayList<>();
-
-        // Build comparator chain based on configured SortFields
-        Comparator<Hit> sortComparator = null;
-        for (int i = 0; i < parsedSortByFields.size(); i++) {
-            final int idx = i;
-            SortField sf = parsedSortByFields.get(i);
-            Function<Hit, Double> keyExtractor =
-                    hit -> {
-                        FeatureData mf = (FeatureData) hit.getField("matchfeatures");
-                        if (mf == null) return null;
-                        double v = mf.getDouble("sort_field_value_" + idx);
-                        return (v == -1e50) ? null : v;
-                    };
-            Comparator<Double> base = Comparator.naturalOrder();
-            if ("desc".equalsIgnoreCase(sf.order)) {
-                base = base.reversed();
-            }
-            Comparator<Double> nullAware =
-                    "last".equalsIgnoreCase(sf.missing)
-                            ? Comparator.nullsLast(base)
-                            : Comparator.nullsFirst(base);
-            Comparator<Hit> fieldComparator = Comparator.comparing(keyExtractor, nullAware);
-            sortComparator =
-                    (sortComparator == null)
-                            ? fieldComparator
-                            : sortComparator.thenComparing(fieldComparator);
-        }
-
-        // Append relevance as final tie-breaker (always descending)
-        Comparator<Hit> relevanceTie =
-                Comparator.comparingDouble((Hit h) -> h.getRelevance().getScore()).reversed();
-        // always combine with relevance tie-break
-        sortComparator = sortComparator.thenComparing(relevanceTie);
-        hitsToSort.sort(sortComparator);
-
-        // Merge sorted slice with the remainder
-        List<Hit> combined = new ArrayList<>(hitsToSort);
-        combined.addAll(hitsAfterDepth);
-
-        // Reset relevance to reflect new positions
-        for (int i = 0; i < combined.size(); i++) {
-            combined.get(i).setRelevance(1.0 / (i + 1));
-        }
-
-        HitGroup result = new HitGroup();
-        result.addAll(combined);
-        result.trim(offset, limit);
-        return result;
     }
 
     /**
