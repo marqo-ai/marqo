@@ -5,7 +5,7 @@ import pydantic.v1 as pydantic
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import TooManyFieldsError
+from marqo.core.exceptions import TooManyFieldsError, AddDocumentsError
 from marqo.core.inference.api import Inference
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
@@ -61,7 +61,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         # Add string array field if content is list of strings and index version supports it
         is_string_array = (
-            isinstance(field_content, list) and 
+            isinstance(field_content, list) and
             all(isinstance(elem, str) for elem in field_content)
         )
         if (is_string_array and
@@ -98,35 +98,34 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         """Extract language specification for a field from mappings and validate."""
         if not self.add_docs_params.mappings:
             return None
-        
+
         field_mapping = self.add_docs_params.mappings.get(field_name)
         if not field_mapping:
             return None
-        
+
         if field_mapping.get('type') == 'text_field':
             # Language mapping can only be used for string content
             if not isinstance(field_content, str):
-                from marqo.core.exceptions import InvalidArgumentError
-                raise InvalidArgumentError(
+                raise AddDocumentsError(
                     f"Language mapping for field '{field_name}' can only be used with text (string) content, "
                     f"but received {type(field_content).__name__}. "
                     f"Language specification is only supported for text fields."
                 )
             return field_mapping.get('language')
-        
+
         return None
 
 
     def _add_lexical_field_to_index(self, field_name, language=None):
         if field_name in self.marqo_index.field_map:
-            # Check if existing field has different language - this would be an error
-            existing_field = self.marqo_index.field_map[field_name]
-            if existing_field.language != language:
-                if language is not None:
-                    from marqo.core.exceptions import InvalidArgumentError
-                    raise InvalidArgumentError(f"Field '{field_name}' already exists with a different language configuration. "
-                                        f"Cannot change language from '{existing_field.language}' to '{language}' "
-                                        f"for existing field.")
+            if language is not None:
+                existing_field = self.marqo_index.field_map[field_name]
+                if existing_field.language != language:
+                    raise AddDocumentsError(
+                        f"Field '{field_name}' already exists with a different language configuration. "
+                        f"Cannot change language from '{existing_field.language}' to '{language}' "
+                        f"for existing field."
+                    )
             return
 
         max_lexical_field_count = self.field_count_config.max_lexical_field_count
@@ -137,7 +136,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                                      f'limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing lexical fields to marqo index
-        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}' + 
+        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}' +
                     (f' with language {language}' if language else ''))
 
         self.marqo_index.lexical_fields.append(

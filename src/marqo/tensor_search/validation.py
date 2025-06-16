@@ -16,7 +16,7 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
-    custom_vector_mappings_schema,
+    custom_vector_mappings_schema, text_field_mappings_schema,
 )
 from marqo.tensor_search.models.search import SearchContext
 
@@ -659,7 +659,6 @@ def validate_text_field_mappings_object(mappings_object: Dict):
     }
     """
     try:
-        from marqo.tensor_search.models.mappings_object import text_field_mappings_schema
         jsonschema.validate(instance=mappings_object, schema=text_field_mappings_schema)
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
