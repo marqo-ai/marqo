@@ -353,3 +353,323 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
                 ids
             )
+
+    def test_small_sort_limit_without_specifying_min_sort_candidates(self):
+        """
+        Test the case where the sort limit is smaller than the number of documents,
+        and minSortCandidates is not specified.
+        In this case, the sort candidates is defaulted to be max(3 * limit, limit + offset).
+
+        # We get the top 6 hits and only return the top 2 hits by sort order, so we return ['2', '3'].
+        """
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                    "order": "desc",
+                    "missing": "last"
+                }
+            ]
+        }
+
+        res = self._help_sort_function(sort_by=sort_by, limit=2, offset=0)
+
+        self.assertEqual(6, res["_sortByCandidates"])  # Default is max(3 * limit, limit + offset)
+        hits = res["hits"]
+        self.assertEqual(2, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '3'],
+            ids
+        )
+
+
+class TestSearchSortByFeatureSort2Fields(MarqoTestCase):
+    """
+    Test sorting functionality of the Marqo search API when sorting by two fields.
+    Primary sort on sort_field_1, secondary sort on sort_field_2.
+    """
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # create a fresh index for two-field sorting tests
+        idx = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+        cls.create_indexes([idx])
+        cls.index_name = idx.name
+
+        # Documents with two sort fields
+        docs = [
+            {"_id": "0", "content": ' '.join([f"content{i}" for i in range(1)]), "sort_field_1": 0.0,
+             "sort_field_2": 10},
+            {"_id": "1", "content": ' '.join([f"content{i}" for i in range(4)]), "sort_field_1": 5.3,
+             "sort_field_2": 5},
+            {"_id": "2", "content": ' '.join([f"content{i}" for i in range(6)]), "sort_field_1": 10, "sort_field_2": 0},
+            {"_id": "3", "content": ' '.join([f"content{i}" for i in range(10)]), "sort_field_1": 3, "sort_field_2": 5},
+            {"_id": "4", "content": ' '.join([f"content{i}" for i in range(7)]), "sort_field_1": 3, "sort_field_2": 7},
+            {"_id": "5", "content": ' '.join([f"content{i}" for i in range(8)]), "sort_field_1": "invalid",
+             "sort_field_2": 1},
+            {"_id": "6", "content": ' '.join([f"content{i}" for i in range(3)]), "sort_field_1": ["test"],
+             "sort_field_2": 2},
+            {"_id": "7", "content": ' '.join([f"content{i}" for i in range(9)])},
+            {"_id": "8", "content": ' '.join([f"content{i}" for i in range(2)]), "sort_field_1": -1,
+             "sort_field_2": -5},
+            {"_id": "9", "content": ' '.join([f"content{i}" for i in range(5)]), "sort_field_1": 2.5,
+             "sort_field_2": "invalid"},
+        ]
+
+        # index documents
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=docs,
+                index_name=cls.index_name,
+                documents=docs,
+                tensor_fields=['content'],
+            )
+        )
+
+        # verify indexing order without explicit sort (primary by relevance)
+        expected = ["3", "7", "5", "4", "2", "9", "1", "6", "8", "0"]
+        actual = [r["_id"] for r in cls._help_sort_function()["hits"]]
+        if actual != expected:
+            raise RuntimeError(f"Unexpected default relevance order: {actual}")
+
+    @classmethod
+    def _help_sort_function(cls, query: Optional[str] = ' '.join([f"content{i}" for i in range(10)]),
+                            sort_by: Optional[dict] = None, limit=10, offset=0) -> dict:
+        return json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict={
+                "q": query,
+                "searchMethod": SearchMethod.HYBRID,
+                "hybridParameters": {
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                    "alpha": 0.5,
+                },
+                "sortBy": sort_by,
+                "limit": limit,
+                "offset": offset
+            }
+        ).body.decode('utf-8'))
+
+    def setUp(self):
+        # ensure count unchanged before each test
+        count = self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents
+        self.assertEqual(count, 10, f"Expected 10 documents, found {count}")
+
+    def tearDown(self):
+        # ensure count unchanged after each test
+        count = self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents
+        self.assertEqual(count, 10, f"Expected 10 documents, found {count}")
+
+    def test_simple_sort_two_fields_default_settings(self):
+        """
+        Expected results:
+            [
+                "2", "1", # primary sort_field_1 desc
+                "4", "3", # primary sort_field_1 tie, sorted by sort_field_2 desc
+                "9", "0", "8", # primary sort_field_1 desc,
+                "6", "5", # missing primary first, sorted by sort_field_2 desc
+                "7", # missing both fields
+            ]
+        """
+        sort_by = {
+            "fields": [
+                {"field_name": "sort_field_1"},
+                {"field_name": "sort_field_2"}
+            ]
+        }
+        res = self._help_sort_function(sort_by=sort_by)
+        ids = [h["_id"] for h in res["hits"]]
+        # primary desc on field1, secondary desc on field2
+        self.assertEqual(ids, ['2', '1', '4', '3', '9', '0', '8', '6', '5', '7'])
+
+    def test_simple_sort_two_fields_non_default_parameters(self):  # asc, missing first
+        sort_by = {
+            "fields": [
+                {"field_name": "sort_field_1", "order": "asc", "missing": "first"},
+                {"field_name": "sort_field_2", "order": "asc", "missing": "first"}
+            ]
+        }
+        res = self._help_sort_function(sort_by=sort_by)
+        ids = [h["_id"] for h in res["hits"]]
+        # missing primary first (7,5,6), then field1 asc, then field2 asc tie-break
+        self.assertEqual(ids, ['7', '5', '6', '8', '0', '9', '3', '4', '1', '2'])
+
+    def test_sort_by_when_fields_do_not_exist_two_fields(self):
+        """
+        Sorting with non-existent fields should return documents in the same order as if no sort was applied, with
+        the relevance score being different due to normalization.
+        """
+        sort_by = {
+            "fields": [
+                {"field_name": "no_field_1", "order": "asc", "missing": "last"},
+                {"field_name": "no_field_2", "order": "asc", "missing": "last"}
+            ]
+        }
+        # ensure ordering (excluding score) matches relevance-only order
+        base = self._help_sort_function()
+        res = self._help_sort_function(sort_by=sort_by)
+        for i in range(len(base["hits"])):
+            for k in base["hits"][i]:
+                if k != '_score':
+                    self.assertEqual(base["hits"][i][k], res["hits"][i][k],
+                                     f"Field {k} does not match for hit {i}")
+                else:
+                    self.assertNotEqual(base["hits"][i][k], res["hits"][i][k])
+
+
+class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
+    """
+    Test sorting functionality of the Marqo search API when sorting by three fields.
+    Primary: sort_field_1, Secondary: sort_field_2, Tertiary: sort_field_3.
+    """
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # create a fresh index for three-field sorting tests
+        idx = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+        cls.create_indexes([idx])
+        cls.index_name = idx.name
+
+        # Documents with three sort fields (types mixed to test missing/invalid handling)
+        docs = [
+            {"_id": "0", "content": "content0", "sort_field_1": 0.0, "sort_field_2": 10, "sort_field_3": 1},
+            {"_id": "1", "content": " ".join(f"content{i}" for i in range(4)),
+             "sort_field_1": 5.3, "sort_field_2": 5, "sort_field_3": 2},
+            {"_id": "2", "content": " ".join(f"content{i}" for i in range(6)),
+             "sort_field_1": 10, "sort_field_2": 0, "sort_field_3": 3},
+            # Tie on field1=3 and field2=5, broken by field3
+            {"_id": "3", "content": " ".join(f"content{i}" for i in range(10)),
+             "sort_field_1": 3, "sort_field_2": 5, "sort_field_3": 5},
+            {"_id": "4", "content": " ".join(f"content{i}" for i in range(7)),
+             "sort_field_1": 3, "sort_field_2": 5, "sort_field_3": 4},
+            # Invalid / missing cases
+            {"_id": "5", "content": " ".join(f"content{i}" for i in range(8)),
+             "sort_field_1": "invalid", "sort_field_2": 1, "sort_field_3": 6},
+            {"_id": "6", "content": " ".join(f"content{i}" for i in range(3)),
+             "sort_field_1": ["test"], "sort_field_2": 2, "sort_field_3": 7},
+            {"_id": "7", "content": " ".join(f"content{i}" for i in range(9))},  # missing all three
+            {"_id": "8", "content": " ".join(f"content{i}" for i in range(2)),
+             "sort_field_1": -1, "sort_field_2": -5, "sort_field_3": -2},
+            {"_id": "9", "content": " ".join(f"content{i}" for i in range(5)),
+             "sort_field_1": 2.5, "sort_field_2": "invalid", "sort_field_3": 8},
+        ]
+
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=docs,
+                index_name=cls.index_name,
+                documents=docs,
+                tensor_fields=['content'],
+            )
+        )
+
+        # verify default relevance ordering
+        expected_relevance = ["3", "7", "5", "4", "2", "9", "1", "6", "8", "0"]
+        actual = [r["_id"] for r in cls._help_sort_function()["hits"]]
+        if actual != expected_relevance:
+            raise RuntimeError(f"Unexpected default relevance order: {actual}")
+
+    @classmethod
+    def _help_sort_function(cls, query: Optional[str] = ' '.join(f"content{i}" for i in range(10)),
+                            sort_by: Optional[dict] = None, limit=10, offset=0) -> dict:
+        return json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict={
+                "q": query,
+                "searchMethod": SearchMethod.HYBRID,
+                "hybridParameters": {
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                    "alpha": 0.5,
+                },
+                "sortBy": sort_by,
+                "limit": limit,
+                "offset": offset
+            }
+        ).body.decode('utf-8'))
+
+    def setUp(self):
+        count = self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents
+        self.assertEqual(count, 10, f"Expected 10 docs, found {count}")
+
+    def tearDown(self):
+        count = self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents
+        self.assertEqual(count, 10, f"Expected 10 docs, found {count}")
+
+    def test_simple_sort_three_fields_default_settings(self):
+        """
+        Default: all descending, missing-last.
+        Expect:
+          ['2','1',      # sort_field_1: 10, 5.3
+           '3','4',      # tie 3 → tie-break on field2 then field3  (tie on f1 & f2 → f3: 5>4)
+           '9','0','8',  # 2.5, 0, -1
+           '6','5',      # missing f1 group, sorted by f2 desc: 2,1
+           '7']          # missing f1 & f2 & f3
+        """
+        sort_by = {
+            "fields": [
+                {"field_name": "sort_field_1"},
+                {"field_name": "sort_field_2"},
+                {"field_name": "sort_field_3"}
+            ]
+        }
+        res = self._help_sort_function(sort_by=sort_by)
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertEqual(ids,
+                         ['2', '1', '3', '4', '9', '0', '8', '6', '5', '7'])
+
+    def test_simple_sort_three_fields_non_default_parameters(self):
+        """
+        Ascending + missing-first on all three:
+        - missing f1 first (7,5,6), within that: f2 asc → missing f2 (7), 1 (5), 2 (6)
+        - then f1 asc: -1(8),0(0),2.5(9),3(3,4),5.3(1),10(2)
+        - tie on f1=3: both f2=5 → f3 asc: 4(4) then 5(3)
+        """
+        sort_by = {
+            "fields": [
+                {"field_name": "sort_field_1", "order": "asc", "missing": "first"},
+                {"field_name": "sort_field_2", "order": "asc", "missing": "first"},
+                {"field_name": "sort_field_3", "order": "asc", "missing": "first"}
+            ]
+        }
+        res = self._help_sort_function(sort_by=sort_by)
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertEqual(ids,
+                         ['7', '5', '6',      # missing f1 group
+                          '8', '0', '9',      # then f1=-1,0,2.5
+                          '4', '3',          # f1=3 tie: f2 same → f3 asc: 4<5
+                          '1', '2'])         # then 5.3,10
+
+    def test_sort_by_when_fields_do_not_exist_three_fields(self):
+        """
+        Sorting by three non-existent fields should preserve relevance-only order
+        (but _score is normalized differently).
+        """
+        sort_by = {
+            "fields": [
+                {"field_name": "no1", "order": "asc", "missing": "last"},
+                {"field_name": "no2", "order": "asc", "missing": "last"},
+                {"field_name": "no3", "order": "asc", "missing": "last"}
+            ]
+        }
+        base = self._help_sort_function()
+        res = self._help_sort_function(sort_by=sort_by)
+        for i in range(len(base["hits"])):
+            for k in base["hits"][i]:
+                if k != "_score":
+                    self.assertEqual(base["hits"][i][k], res["hits"][i][k],
+                                     f"Field {k} mismatch at position {i}")
+                else:
+                    self.assertNotEqual(base["hits"][i][k], res["hits"][i][k])
