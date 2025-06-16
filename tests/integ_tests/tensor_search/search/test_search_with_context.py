@@ -13,8 +13,8 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, ZeroSumWeightsError, ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError, InternalError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.utils.transition import *
+from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.utils.transition import *
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 
