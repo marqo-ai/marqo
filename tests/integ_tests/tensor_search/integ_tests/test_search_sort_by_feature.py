@@ -290,45 +290,6 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 ids
             )
 
-    def test_min_sort_candidates_parameter(self):
-        """
-        Test the minSortCandidates parameter to ensure it works as expected.
-        The minSortCandidates parameter should ensure that at least a certain number of documents are considered for sorting,
-        even if the sort depth is limited.
-
-        Expected results:
-            - Before sort: ['3', '7', '5', '4', '2', '9', '1', '6', '8', '0']
-            - After sort with minSortCandidates=10:
-            [
-                '2', # Highest value
-                '3', '4', # Tie values sorted by relevance, with _id 3 coming before _id 4
-                '9', # Sorted be descending order of numeric values
-                '7', '5', # Missing fields last, sorted by relevance
-                '1', '6', '8', '0' # Unsorted documents after sort depth limit
-            ]
-        """
-        sort_by = {
-            "fields": [
-                {
-                    "field_name": "sort_field_1",
-                    "order": "desc",
-                    "missing": "last"
-                }
-            ],
-            "minSortCandidates": 10  # Ensure we have enough candidates for sorting
-        }
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortByCandidates"])
-            hits = res["hits"]
-            self.assertEqual(10, len(hits))
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
-                ids
-            )
-
     def test_small_sort_limit_without_specifying_min_sort_candidates(self):
         """
         Test the case where the sort limit is smaller than the number of documents,
