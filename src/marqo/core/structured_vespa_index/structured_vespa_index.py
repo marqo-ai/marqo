@@ -484,13 +484,10 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
+            'language': marqo_query.language
         }
         
-        # Add language parameter for query-time linguistic processing
-        if marqo_query.language:
-            query['language'] = marqo_query.language
-            
         query = {k: v for k, v in query.items() if v is not None}
 
         return query
@@ -623,6 +620,7 @@ class StructuredVespaIndex(VespaIndex):
             'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
             'query_features': query_inputs,
             'presentation.summary': summary,
+            'language': marqo_query.language,
 
             # Custom searcher parameters
             'marqo__yql.tensor': None if (
@@ -642,10 +640,6 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
-
-        # Add language parameter for query-time linguistic processing
-        if marqo_query.language:
-            query['language'] = marqo_query.language
             
         query = {k: v for k, v in query.items() if v is not None}
 

@@ -69,11 +69,11 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "es"
             },
             "description": {
-                "type": "text_field_language", 
+                "type": "text_field", 
                 "language": "en"
             }
         }
@@ -120,7 +120,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "content": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "es"
             }
         }
@@ -142,7 +142,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
             index_name=self.semi_structured_index_name,
             text="gatos",
             search_method=SearchMethod.LEXICAL,
-            model={"language": "es"}
+            language="es"
         )
         
         self.assertGreater(len(search_result["hits"]), 0)
@@ -166,11 +166,11 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "fr"
             },
             "content": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "fr"
             }
         }
@@ -192,7 +192,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
             index_name=self.semi_structured_index_name,
             text="chat",
             search_method=SearchMethod.HYBRID,
-            model={"language": "fr"}
+            language="fr"
         )
         
         self.assertGreater(len(search_result["hits"]), 0)
@@ -201,23 +201,11 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         """Test validation of invalid language codes."""
         docs = [{"_id": "test1", "title": "Test content"}]
         
-        # Test invalid language codes
+        # Test only empty language codes (other validation was removed)
         invalid_mappings = [
             {
                 "title": {
-                    "type": "text_field_language",
-                    "language": "invalid_lang_code"
-                }
-            },
-            {
-                "title": {
-                    "type": "text_field_language", 
-                    "language": "1234"
-                }
-            },
-            {
-                "title": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": ""
                 }
             }
@@ -236,7 +224,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
                     )
                 )
                 
-                # Should have errors for invalid language codes
+                # Should have errors for empty language codes
                 self.assertTrue(response.errors)
 
     def test_language_with_tensor_search_validation(self):
@@ -258,31 +246,31 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         search_query = SearchQuery(
             q="test query",
             searchMethod=SearchMethod.TENSOR,
-            model={"language": "en"}
+            language="en"
         )
         
-        with self.assertRaisesRegex(Exception, "model.language.*not.*supported.*tensor"):
+        with self.assertRaisesRegex(Exception, "language.*not.*supported.*tensor"):
             # This should be caught by validation in the search endpoint
             tensor_search.search(
                 config=self.config,
                 index_name=self.semi_structured_index_name,
                 text=search_query.q,
                 search_method=search_query.searchMethod,
-                model=search_query.model
+                language=search_query.language
             )
 
     def test_language_with_unstructured_index_validation(self):
-        """Test that language mapping is rejected for unstructured indexes."""
+        """Test that language mapping works for unstructured indexes (now supported)."""
         docs = [{"_id": "test1", "title": "Test content"}]
         
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "en"
             }
         }
         
-        # Should fail because unstructured indexes don't support language mappings
+        # Should succeed because language mappings are now supported for all index types
         response = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
@@ -294,8 +282,8 @@ class TestLanguageAPIIntegration(MarqoTestCase):
             )
         )
         
-        # Should have errors for using language mapping with unstructured index
-        self.assertTrue(response.errors)
+        # Should not have errors
+        self.assertFalse(response.errors)
 
     def test_language_mapping_validation_non_text_fields(self):
         """Test that language mappings are rejected for non-text fields."""
@@ -311,19 +299,19 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         invalid_mappings = [
             {
                 "numeric_field": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "en"
                 }
             },
             {
                 "boolean_field": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "en"
                 }
             },
             {
                 "list_field": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "en"
                 }
             }
@@ -364,15 +352,15 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "title_en": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "en"
             },
             "title_es": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "es"
             },
             "title_fr": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "fr"
             }
         }
@@ -419,7 +407,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "content": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "en"
             }
         }
@@ -441,7 +429,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
             index_name=self.semi_structured_index_name,
             text="running",
             search_method=SearchMethod.LEXICAL,
-            model={"language": "en"}
+            language="en"
         )
         
         self.assertGreater(len(lexical_result["hits"]), 0)
@@ -452,7 +440,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
             index_name=self.semi_structured_index_name,
             text="corriendo",
             search_method=SearchMethod.HYBRID,
-            model={"language": "es"}
+            language="es"
         )
         
         self.assertGreater(len(hybrid_result["hits"]), 0)
@@ -487,7 +475,7 @@ class TestLanguageAPIIntegration(MarqoTestCase):
         
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "en"
             }
         }

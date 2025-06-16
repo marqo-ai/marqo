@@ -43,7 +43,7 @@ class HybridSearch:
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
-            model: Optional[Dict[str, str]] = None,
+            language: Optional[str] = None,
     ) -> Dict:
         """
 
@@ -257,7 +257,7 @@ class HybridSearch:
             hybrid_parameters=hybrid_parameters,
             facets=facets,
             track_total_hits=track_total_hits,
-            language=model.get('language') if model else None
+            language=language
         )
 
         vespa_index = vespa_index_factory(marqo_index)

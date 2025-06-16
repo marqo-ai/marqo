@@ -59,7 +59,7 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
-    model: Optional[Dict[str, str]] = None
+    language: Optional[str] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -300,15 +300,15 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def validate_model_language_only_for_lexical_hybrid(cls, values):
-        """Validate that model.language is only provided for lexical/hybrid search"""
-        model = values.get('model')
+    def validate_language_only_for_lexical_hybrid(cls, values):
+        """Validate that language is only provided for lexical/hybrid search"""
+        language = values.get('language')
         search_method = values.get('searchMethod')
         
-        if model and model.get('language'):
+        if language:
             if search_method == SearchMethod.TENSOR:
                 raise ValueError(
-                    "model.language parameter is not supported for TENSOR search method. "
+                    "language parameter is not supported for TENSOR search method. "
                     "Language specification only applies to lexical and hybrid search."
                 )
         return values

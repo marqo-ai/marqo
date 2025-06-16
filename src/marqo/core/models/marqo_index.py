@@ -98,6 +98,12 @@ class Field(ImmutableStrictBaseModel):
     @root_validator
     def check_all_fields(cls, values):
         validate_structured_field(values, marqo_index=True)
+        
+        # Validate that language is only specified for fields with LexicalSearch feature
+        language = values.get('language')
+        features = values.get('features', [])
+        if language and FieldFeature.LexicalSearch not in features:
+            raise ValueError(f"Field '{values.get('name', '')}' specifies language '{language}' but does not have the LexicalSearch feature")
 
         return values
 

@@ -104,7 +104,7 @@ class RequestType:
 class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
     custom_vector = "custom_vector"
-    text_field_language = "text_field_language"
+    text_field = "text_field"
 
 
 class SearchDb:

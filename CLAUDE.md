@@ -1,11 +1,12 @@
 # Environment Setup
+
 Make sure the virtual environment is activated before running any commands.
 
 # Tests
 
 - Unit tests are in ./tests/unit_tests, integ tests are in ./tests/integ_tests, API tests are in
   ./tests/api_tests/v1/tests/api_tests
-- If you add new tests, make sure to run them and verify they pass.
+- If you add new tests or change any tests, make sure to run them and verify they pass.
 - To run unit and integ tests, make sure working directory is repo root and set PYTHONPATH=./src.
 - If running integ or API tests, make sure Vespa is running via docker ps. If not running, use
   python scripts/vespa_local/vespa_local.py full_start to run Vespa first.
@@ -48,3 +49,8 @@ Each index type has dedicated handlers:
 
 - **Main branch**: `mainline`
 - **Feature branches**: Typically `username/feature-description`
+
+# Errors
+
+- Core classes must only raise marqo.core.exceptions or marqo.exceptions, never marqo.api.exceptions. The mapping to
+  API exceptions is done in the API layer.

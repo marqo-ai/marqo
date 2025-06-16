@@ -59,13 +59,13 @@ custom_vector_mappings_schema = {
     "additionalProperties": False
 }
 
-text_field_language_mappings_schema = {
+text_field_mappings_schema = {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "type": "object",
     "properties": {
         "type": {
             "type": "string",
-            "enum": [MappingsObjectType.text_field_language]
+            "enum": [MappingsObjectType.text_field]
         },
         "language": {
             "type": "string",

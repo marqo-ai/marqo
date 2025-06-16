@@ -2,11 +2,12 @@ import unittest
 from unittest.mock import Mock, patch
 from pydantic.v1 import ValidationError
 
-from marqo.api.exceptions import InvalidArgError, BadRequestError
+from marqo.api.exceptions import InvalidArgError
+from marqo.core.exceptions import InvalidArgumentError
 from marqo.tensor_search.enums import SearchMethod, MappingsObjectType
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search import validation
-from marqo.tensor_search.models.mappings_object import text_field_language_mappings_schema
+from marqo.tensor_search.models.mappings_object import text_field_mappings_schema
 from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, SemiStructuredMarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import SemiStructuredAddDocumentsHandler
@@ -16,138 +17,131 @@ from marqo.core.models.marqo_query import MarqoLexicalQuery, MarqoHybridQuery
 class TestLanguageMappingValidation(unittest.TestCase):
     """Test language field mapping validation"""
 
-    def test_validate_text_field_language_mappings_object_valid(self):
+    def test_validate_text_field_mappings_object_valid(self):
         """Test validation of valid text field language mapping"""
         valid_mapping = {
-            "type": "text_field_language",
+            "type": "text_field",
             "language": "es"
         }
         
-        result = validation.validate_text_field_language_mappings_object(valid_mapping)
+        result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
-    def test_validate_text_field_language_mappings_object_invalid_language_empty(self):
+    def test_validate_text_field_mappings_object_invalid_language_empty(self):
         """Test validation fails for empty language"""
         invalid_mapping = {
-            "type": "text_field_language",
+            "type": "text_field",
             "language": ""
         }
         
         with self.assertRaises(InvalidArgError) as cm:
-            validation.validate_text_field_language_mappings_object(invalid_mapping)
+            validation.validate_text_field_mappings_object(invalid_mapping)
         
-        self.assertIn("Invalid language code", str(cm.exception))
+        self.assertIn("Error validating text field mappings object", str(cm.exception))
 
-    def test_validate_text_field_language_mappings_object_invalid_language_too_long(self):
-        """Test validation fails for language code too long"""
-        invalid_mapping = {
-            "type": "text_field_language",
+    def test_validate_text_field_mappings_object_valid_long_language(self):
+        """Test validation succeeds for longer language codes (length validation removed)"""
+        valid_mapping = {
+            "type": "text_field",
             "language": "spanish"
         }
         
-        with self.assertRaises(InvalidArgError) as cm:
-            validation.validate_text_field_language_mappings_object(invalid_mapping)
-        
-        self.assertIn("Invalid language code", str(cm.exception))
+        result = validation.validate_text_field_mappings_object(valid_mapping)
+        self.assertEqual(result, valid_mapping)
 
-    def test_validate_text_field_language_mappings_object_invalid_language_uppercase(self):
-        """Test validation fails for uppercase language code"""
-        invalid_mapping = {
-            "type": "text_field_language",
+    def test_validate_text_field_mappings_object_valid_uppercase(self):
+        """Test validation succeeds for uppercase language codes (validation relaxed)"""
+        valid_mapping = {
+            "type": "text_field",
             "language": "ES"
         }
         
-        with self.assertRaises(InvalidArgError) as cm:
-            validation.validate_text_field_language_mappings_object(invalid_mapping)
-        
-        self.assertIn("Invalid language code", str(cm.exception))
+        result = validation.validate_text_field_mappings_object(valid_mapping)
+        self.assertEqual(result, valid_mapping)
 
-    def test_validate_text_field_language_mappings_object_invalid_language_numeric(self):
-        """Test validation fails for numeric language code"""
-        invalid_mapping = {
-            "type": "text_field_language",
+    def test_validate_text_field_mappings_object_valid_numeric(self):
+        """Test validation succeeds for numeric language codes (validation relaxed)"""
+        valid_mapping = {
+            "type": "text_field",
             "language": "e5"
         }
         
-        with self.assertRaises(InvalidArgError) as cm:
-            validation.validate_text_field_language_mappings_object(invalid_mapping)
-        
-        self.assertIn("Invalid language code", str(cm.exception))
+        result = validation.validate_text_field_mappings_object(valid_mapping)
+        self.assertEqual(result, valid_mapping)
 
-    def test_validate_text_field_language_mappings_object_valid_three_char(self):
+    def test_validate_text_field_mappings_object_valid_three_char(self):
         """Test validation succeeds for 3-character language codes"""
         valid_mapping = {
-            "type": "text_field_language",
+            "type": "text_field",
             "language": "spa"
         }
         
-        result = validation.validate_text_field_language_mappings_object(valid_mapping)
+        result = validation.validate_text_field_mappings_object(valid_mapping)
         self.assertEqual(result, valid_mapping)
 
-    def test_validate_text_field_language_mappings_object_missing_language(self):
+    def test_validate_text_field_mappings_object_missing_language(self):
         """Test validation fails when language is missing"""
         invalid_mapping = {
-            "type": "text_field_language"
+            "type": "text_field"
         }
         
         with self.assertRaises(InvalidArgError):
-            validation.validate_text_field_language_mappings_object(invalid_mapping)
+            validation.validate_text_field_mappings_object(invalid_mapping)
 
 
 class TestSearchQueryLanguageValidation(unittest.TestCase):
     """Test search query model language validation"""
 
-    def test_search_query_model_language_lexical_valid(self):
-        """Test that model.language is allowed for lexical search"""
+    def test_search_query_language_lexical_valid(self):
+        """Test that language is allowed for lexical search"""
         search_query = SearchQuery(
             q="test query",
             searchMethod=SearchMethod.LEXICAL,
-            model={"language": "es"}
+            language="es"
         )
         
-        self.assertEqual(search_query.model["language"], "es")
+        self.assertEqual(search_query.language, "es")
         self.assertEqual(search_query.searchMethod, SearchMethod.LEXICAL)
 
-    def test_search_query_model_language_hybrid_valid(self):
-        """Test that model.language is allowed for hybrid search"""
+    def test_search_query_language_hybrid_valid(self):
+        """Test that language is allowed for hybrid search"""
         search_query = SearchQuery(
             q="test query",
             searchMethod=SearchMethod.HYBRID,
-            model={"language": "fr"}
+            language="fr"
         )
         
-        self.assertEqual(search_query.model["language"], "fr")
+        self.assertEqual(search_query.language, "fr")
         self.assertEqual(search_query.searchMethod, SearchMethod.HYBRID)
 
-    def test_search_query_model_language_tensor_invalid(self):
-        """Test that model.language is not allowed for tensor search"""
+    def test_search_query_language_tensor_invalid(self):
+        """Test that language is not allowed for tensor search"""
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
                 q="test query",
                 searchMethod=SearchMethod.TENSOR,
-                model={"language": "es"}
+                language="es"
             )
         
-        self.assertIn("model.language parameter is not supported for TENSOR search method", str(cm.exception))
+        self.assertIn("language parameter is not supported for TENSOR search method", str(cm.exception))
 
-    def test_search_query_model_language_none_valid(self):
-        """Test that model parameter without language is valid"""
-        search_query = SearchQuery(
-            q="test query",
-            searchMethod=SearchMethod.TENSOR,
-            model={"some_other_param": "value"}
-        )
-        
-        self.assertEqual(search_query.model["some_other_param"], "value")
-
-    def test_search_query_no_model_valid(self):
-        """Test that search query without model parameter is valid"""
+    def test_search_query_language_none_valid(self):
+        """Test that search query without language parameter is valid"""
         search_query = SearchQuery(
             q="test query",
             searchMethod=SearchMethod.TENSOR
         )
         
-        self.assertIsNone(search_query.model)
+        self.assertIsNone(search_query.language)
+
+    def test_search_query_no_language_valid(self):
+        """Test that search query without language parameter is valid"""
+        search_query = SearchQuery(
+            q="test query",
+            searchMethod=SearchMethod.TENSOR
+        )
+        
+        self.assertIsNone(search_query.language)
 
 
 class TestFieldModelLanguageProperty(unittest.TestCase):
@@ -250,9 +244,10 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             docs=[{"_id": "1", "title": "test"}],
             index_name="test_index",
             device="cpu",
+            tensor_fields=[],
             mappings={
                 "title": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "es"
                 }
             }
@@ -266,7 +261,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             inference=self.mock_inference
         )
         
-        language = handler._get_field_language("title")
+        language = handler._get_field_language("title", "test content")
         self.assertEqual(language, "es")
 
     def test_get_field_language_without_mapping(self):
@@ -275,6 +270,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             docs=[{"_id": "1", "title": "test"}],
             index_name="test_index",
             device="cpu",
+            tensor_fields=[],
             mappings={}
         )
         
@@ -286,7 +282,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             inference=self.mock_inference
         )
         
-        language = handler._get_field_language("title")
+        language = handler._get_field_language("title", "test content")
         self.assertIsNone(language)
 
     def test_get_field_language_wrong_mapping_type(self):
@@ -295,6 +291,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             docs=[{"_id": "1", "title": "test"}],
             index_name="test_index",
             device="cpu",
+            tensor_fields=[],
             mappings={
                 "title": {
                     "type": "custom_vector"
@@ -310,7 +307,7 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             inference=self.mock_inference
         )
         
-        language = handler._get_field_language("title")
+        language = handler._get_field_language("title", "test content")
         self.assertIsNone(language)
 
     def test_validate_language_mapping_for_text_field_valid(self):
@@ -319,9 +316,10 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             docs=[{"_id": "1", "title": "test"}],
             index_name="test_index",
             device="cpu",
+            tensor_fields=[],
             mappings={
                 "title": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "es"
                 }
             }
@@ -336,7 +334,8 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
         )
         
         # Should not raise exception
-        handler._validate_language_mapping_for_field("title", "test content")
+        language = handler._get_field_language("title", "test content")
+        self.assertEqual(language, "es")
 
     def test_validate_language_mapping_for_non_text_field_invalid(self):
         """Test validation fails for non-text field with language mapping"""
@@ -344,9 +343,10 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             docs=[{"_id": "1", "price": 10.5}],
             index_name="test_index",
             device="cpu",
+            tensor_fields=[],
             mappings={
                 "price": {
-                    "type": "text_field_language",
+                    "type": "text_field",
                     "language": "es"
                 }
             }
@@ -360,8 +360,8 @@ class TestSemiStructuredAddDocumentHandlerLanguage(unittest.TestCase):
             inference=self.mock_inference
         )
         
-        with self.assertRaises(BadRequestError) as cm:
-            handler._validate_language_mapping_for_field("price", 10.5)
+        with self.assertRaises(InvalidArgumentError) as cm:
+            handler._get_field_language("price", 10.5)
         
         self.assertIn("Language mapping for field 'price' can only be used with text", str(cm.exception))
 
@@ -373,7 +373,7 @@ class TestMappingsValidationIntegration(unittest.TestCase):
         """Test mappings validation includes language field"""
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "es"
             }
         }
@@ -381,29 +381,28 @@ class TestMappingsValidationIntegration(unittest.TestCase):
         result = validation.validate_mappings_object(mappings)
         self.assertEqual(result, mappings)
 
-    def test_validate_mappings_object_language_field_structured_index_error(self):
-        """Test that language mappings are rejected for structured indexes"""
+    def test_validate_mappings_object_language_field_structured_index_valid(self):
+        """Test that language mappings are now allowed for all index types"""
         from marqo.core.models.marqo_index import StructuredMarqoIndex
         
         mock_structured_index = Mock(spec=StructuredMarqoIndex)
         
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "language": "es"
             }
         }
         
-        with self.assertRaises(InvalidArgError) as cm:
-            validation.validate_mappings_object(mappings, mock_structured_index)
-        
-        self.assertIn("Language field mapping 'title' cannot be used with structured indexes", str(cm.exception))
+        # Language fields are now supported for all index types
+        result = validation.validate_mappings_object(mappings, mock_structured_index)
+        self.assertEqual(result, mappings)
 
     def test_validate_mappings_object_language_field_invalid_schema(self):
         """Test mappings validation rejects invalid language field schema"""
         mappings = {
             "title": {
-                "type": "text_field_language",
+                "type": "text_field",
                 "invalid_field": "value"
             }
         }

@@ -53,7 +53,7 @@ class TestLanguageFunctionality(unittest.TestCase):
                 "tensorFields": [],
                 "mappings": {
                     "title": {
-                        "type": "text_field_language",
+                        "type": "text_field",
                         "language": "fr"
                     }
                 }
@@ -69,9 +69,7 @@ class TestLanguageFunctionality(unittest.TestCase):
             json={
                 "q": "Intelligence",
                 "searchMethod": "LEXICAL",
-                "model": {
-                    "language": "fr"
-                }
+                "language": "fr"
             }
         )
         search_response.raise_for_status()
@@ -105,11 +103,11 @@ class TestLanguageFunctionality(unittest.TestCase):
                 "tensorFields": ["title"],
                 "mappings": {
                     "title": {
-                        "type": "text_field_language",
+                        "type": "text_field",
                         "language": "es"
                     },
                     "description": {
-                        "type": "text_field_language", 
+                        "type": "text_field", 
                         "language": "en"
                     }
                 }
@@ -149,7 +147,7 @@ class TestLanguageFunctionality(unittest.TestCase):
                 "tensorFields": [],
                 "mappings": {
                     "content": {
-                        "type": "text_field_language",
+                        "type": "text_field",
                         "language": "es"
                     }
                 }
@@ -163,7 +161,7 @@ class TestLanguageFunctionality(unittest.TestCase):
             json={
                 "q": "gatos",
                 "searchMethod": "LEXICAL",
-                "model": {"language": "es"}
+                "language": "es"
             }
         )
         search_response.raise_for_status()
@@ -193,11 +191,11 @@ class TestLanguageFunctionality(unittest.TestCase):
                 "tensorFields": ["title"],
                 "mappings": {
                     "title": {
-                        "type": "text_field_language",
+                        "type": "text_field",
                         "language": "fr"
                     },
                     "content": {
-                        "type": "text_field_language",
+                        "type": "text_field",
                         "language": "fr"
                     }
                 }
@@ -211,7 +209,7 @@ class TestLanguageFunctionality(unittest.TestCase):
             json={
                 "q": "chat",
                 "searchMethod": "HYBRID",
-                "model": {"language": "fr"}
+                "language": "fr"
             }
         )
         search_response.raise_for_status()
@@ -237,7 +235,7 @@ class TestLanguageFunctionality(unittest.TestCase):
             json={
                 "q": "test query",
                 "searchMethod": "TENSOR",
-                "model": {"language": "en"}
+                "language": "en"
             }
         )
         
@@ -245,5 +243,5 @@ class TestLanguageFunctionality(unittest.TestCase):
         self.assertEqual(search_response.status_code, 422)
         error_result = search_response.json()
         error_msg = str(error_result)
-        self.assertIn("model.language", error_msg)
+        self.assertIn("language", error_msg)
         self.assertIn("TENSOR", error_msg)
