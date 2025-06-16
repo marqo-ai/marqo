@@ -1,3 +1,27 @@
+# Release 2.20.0
+
+## New features
+- Inference cache ([#1223](https://github.com/marqo-ai/marqo/pull/1223)). Implement inference caching to improve performance and reduce computational overhead for repeated inference operations. In our experiments, 
+we have observed 40% increase in throughput and 25% reduction in P50 latency for ecommerce search traffic. See [here](https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/) for how to enable and configure the cache.
+- SigLIP 2 model support ([#1229](https://github.com/marqo-ai/marqo/pull/1229)). Add support for SigLIP2 models, expanding the range of available embedding models.
+- Approximate threshold parameter ([#1232](https://github.com/marqo-ai/marqo/pull/1232)). Add support for approximate threshold search parameters to improve search performance and relevance tuning. 
+See [here](https://docs.marqo.ai/latest/reference/api/search/search/#approximate-threshold) for details and usage.
+
+# Release 2.19.3
+
+## Bug fixes and minor changes
+- Fix a bug affecting recall when combining `searchable_attributes` and required terms in lexical and hybrid (rrf) queries ([#1221](https://github.com/marqo-ai/marqo/pull/1221)).
+
+# Release 2.19.2
+
+## Bug fixes and minor changes
+- Fix a bug that affects how filters are applied in hybrid mode lexical search ([#1220](https://github.com/marqo-ai/marqo/pull/1220)).
+- 
+# Release 2.19.1
+
+## Bug fixes and minor changes
+- Improve mdoel warm-up logic ([#1217](https://github.com/marqo-ai/marqo/pull/1217)). Warm up models into a single device only to reduce memory usage.
+
 # Release 2.19.0
 
 ## New features & Performance improvements
