@@ -93,17 +93,11 @@ class Field(ImmutableStrictBaseModel):
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
-    language: Optional[str] = None  # Language for linguistic processing in Vespa
+    language: Optional[str] = None
 
     @root_validator
     def check_all_fields(cls, values):
         validate_structured_field(values, marqo_index=True)
-        
-        # Validate that language is only specified for fields with LexicalSearch feature
-        language = values.get('language')
-        features = values.get('features', [])
-        if language and FieldFeature.LexicalSearch not in features:
-            raise ValueError(f"Field '{values.get('name', '')}' specifies language '{language}' but does not have the LexicalSearch feature")
 
         return values
 
@@ -699,6 +693,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     name: str = values['name']
     type: FieldType = values['type']
     features: List[FieldFeature] = values['features']
+    language: str = values['language']
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
     validate_field_name(name)
@@ -722,7 +717,13 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
         )
 
-    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int, 
+    if language is not None and FieldFeature.LexicalSearch not in features:
+        raise ValueError(
+            f'{name}: language can only be populated when {FieldFeature.LexicalSearch.value} '
+            f'feature is present'
+        )
+
+    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int,
                                                                FieldType.Double, FieldType.MapFloat, 
                                                                FieldType.MapInt, FieldType.MapDouble,
                                                                FieldType.Long, FieldType.MapLong]:

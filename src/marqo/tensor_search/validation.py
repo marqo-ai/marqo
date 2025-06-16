@@ -6,7 +6,7 @@ import jsonschema
 import marqo.core.models.marqo_index as marqo_index
 from marqo import marqo_docs
 from marqo.api.exceptions import (
-    InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
+    InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError, InternalError)
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search import constants as tensor_search_constants
 from marqo.tensor_search import enums, utils
@@ -570,6 +570,11 @@ def validate_mappings_object(
                 
             elif config["type"] == enums.MappingsObjectType.text_field:
                 validate_text_field_mappings_object(config)
+
+            else:
+                raise InternalError(
+                    f'Unknown mappings object type `{config["type"]}` for field `{field_name}`'
+                )
 
         return mappings_object
     except jsonschema.ValidationError as e:

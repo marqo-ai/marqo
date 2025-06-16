@@ -410,8 +410,6 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
         #  SearchQuery can be injected after migrated to v2
         search_query = parse_request_object(SearchQuery, search_query_dict)
 
-        # Language validation is handled in SearchQuery model validation
-
         result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,

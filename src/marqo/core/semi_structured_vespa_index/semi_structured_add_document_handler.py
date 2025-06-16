@@ -104,7 +104,6 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             return None
 
         if field_mapping.get('type') == 'text_field':
-            # Language mapping can only be used for string content
             if not isinstance(field_content, str):
                 raise AddDocumentsError(
                     f"Language mapping for field '{field_name}' can only be used with text (string) content, "
