@@ -27,10 +27,7 @@ class SemiStructuredVespaSchema(VespaSchema):
     def generate_vespa_schema(cls, marqo_index: SemiStructuredMarqoIndex) -> str:
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
-        if marqo_index.index_supports_partial_updates:
-            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template_2_16.sd.jinja2")
-        else:
-            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
+        vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
         return vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
 
     def _generate_marqo_index(self, schema_name: str) -> SemiStructuredMarqoIndex:
