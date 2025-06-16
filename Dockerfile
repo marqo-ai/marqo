@@ -46,18 +46,27 @@ USER root
 
 # Install build dependencies
 RUN dnf groupinstall -y "Development Tools" && \
-    dnf install -y pcre-devel tar make gcc systemd-devel openssl-devel && \
+    dnf install -y \
+        pcre-devel \
+        tar \
+        make \
+        gcc \
+        systemd-devel \
+        openssl-devel \
+        zlib-devel \
+        curl && \
     dnf clean all
 
 # Install HAProxy 2.9.4
 RUN curl -O https://www.haproxy.org/download/2.9/src/haproxy-2.9.4.tar.gz && \
     tar xzf haproxy-2.9.4.tar.gz && \
     cd haproxy-2.9.4 && \
-    make TARGET=linux-glibc USE_OPENSSL=1 USE_ZLIB=1 USE_PCRE=1 USE_SYSTEMD=1 -j$(nproc) && \
+    make TARGET=linux-glibc USE_OPENSSL=1 USE_PROMEX=1 USE_ZLIB=1 USE_PCRE=1 USE_SYSTEMD=1 -j$(nproc) && \
     make install && \
     cd .. && rm -rf haproxy-2.9.4 haproxy-2.9.4.tar.gz
 
 COPY haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
+
 
 
 COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
