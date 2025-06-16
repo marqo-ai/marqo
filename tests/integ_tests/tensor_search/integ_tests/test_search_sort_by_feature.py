@@ -1,36 +1,11 @@
+import json
 import random
 
-import copy
-import json
-import os
-import unittest
-from unittest import mock
-
-import httpx
-import numpy as np
-from fastapi.responses import ORJSONResponse
-from torch.onnx.symbolic_opset9 import tensor
-
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
-
-import marqo.core.exceptions as core_exceptions
-import marqo.vespa.exceptions as vespa_exceptions
+from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import CustomVectorQuery
-from marqo.tensor_search.models.api_models import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
-import pytest
-import json
-
-import unittest
-
 from marqo.tensor_search.api import search
+from marqo.tensor_search.enums import SearchMethod
 
 
 class TestSearchSortByFeatureSort1Field(MarqoTestCase):
