@@ -129,7 +129,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortByCandidates"])
+            self.assertEqual(None, res["_sortByCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
             ids = [hit["_id"] for hit in hits]
