@@ -121,10 +121,10 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             "fields": [
                 {
                     "field_name": "sort_field_1",
-                    "sortDepth": 10,
-                    "minSortCandidates": 10
                 }
-            ]
+            ],
+            "sortDepth": 10,
+            "minSortCandidates": 10
         }
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
