@@ -1,4 +1,4 @@
-{# semi_structured_vespa_schema_template.sd.jinja2 -#}
+{# semi_structured_vespa_schema_template_2_16.sd.jinja2 -#}
 schema {{ index.schema_name }} {
     document {
         field marqo__id type string {
@@ -6,6 +6,20 @@ schema {{ index.schema_name }} {
             attribute: fast-search
             rank: filter
         }
+
+        field marqo__version_uuid type string {
+                indexing: attribute | summary
+        }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
         {# Reserved fields for bool, int and float fields -#}
         field marqo__int_fields type map<string, long> {
             indexing: summary
@@ -48,12 +62,6 @@ schema {{ index.schema_name }} {
                                   rank: filter }
         }
 
-        field marqo__string_array type array<string> {
-            indexing: attribute | summary
-            attribute: fast-search
-            rank: filter
-        }
-
         {# All int and float fields will be added score modifiers -#}
         field marqo__score_modifiers type tensor<double>(p{}) {
             indexing: attribute | summary
@@ -67,6 +75,14 @@ schema {{ index.schema_name }} {
         field {{ lexical_field.lexical_field_name }} type string {
             indexing: index | summary
             index: enable-bm25
+        }
+        {% endfor -%}
+
+        {% for string_array_field in index.string_array_fields -%}
+        field {{ string_array_field.string_array_field_name }} type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
         }
         {% endfor -%}
 
@@ -116,6 +132,9 @@ schema {{ index.schema_name }} {
             query(marqo__add_weights_tensor) tensor<double>(p{})
             query(marqo__mult_weights_global) tensor<double>(p{})
             query(marqo__add_weights_global) tensor<double>(p{})
+            query(marqo__sort_field_weights_0) tensor<double>(p{})
+            query(marqo__sort_field_weights_1) tensor<double>(p{})
+            query(marqo__sort_field_weights_2) tensor<double>(p{})
         }
 
         function mult_modifier(mult_weights) {
@@ -185,7 +204,23 @@ schema {{ index.schema_name }} {
             expression: {{ max_score(embedding_score, index.tensor_fields) }}
         }
 
-        match-features: global_mult_modifier global_add_modifier
+        function sort_field_value(sort_weights) {
+            expression: if (count(sort_weights * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(sort_weights * attribute(marqo__score_modifiers), prod))
+        }
+
+        function sort_field_value_0() {
+            expression: sort_field_value(query(marqo__sort_field_weights_0))
+        }
+
+        function sort_field_value_1() {
+            expression: sort_field_value(query(marqo__sort_field_weights_1))
+        }
+
+        function sort_field_value_2() {
+            expression: sort_field_value(query(marqo__sort_field_weights_2))
+        }
+
+        match-features: global_mult_modifier global_add_modifier sort_field_value_0  sort_field_value_1 sort_field_value_2
     }
 
     {% if index.lexical_fields -%}
@@ -225,6 +260,9 @@ schema {{ index.schema_name }} {
             query(marqo__add_weights_tensor) tensor<double>(p{})
             query(marqo__mult_weights_global) tensor<double>(p{})
             query(marqo__add_weights_global) tensor<double>(p{})
+            query(marqo__sort_field_weights_0) tensor<double>(p{})
+            query(marqo__sort_field_weights_1) tensor<double>(p{})
+            query(marqo__sort_field_weights_2) tensor<double>(p{})
         }
     }
 
@@ -254,10 +292,13 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}
@@ -268,10 +309,13 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}
