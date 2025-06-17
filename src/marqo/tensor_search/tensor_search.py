@@ -45,8 +45,7 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
-    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
+from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
 from marqo.core.inference.modality_utils import infer_modality
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -1265,6 +1264,9 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
     Returns:
         List of Marqo tensor field names and Vespa field names for embeddings
         marqo_field_names, vespa_field_names
+
+        For structured/semistructured: returned marqo_field_names can never be None.
+        For unstructured: returned marqo_field_names can be None if no tensor fields are specified.
     """
     
     if marqo_index.type in {IndexType.Structured, IndexType.SemiStructured}:
@@ -1290,12 +1292,18 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
             
             return ([tf.name for tf in requested_tensor_fields],
                     [tf.embeddings_field_name for tf in requested_tensor_fields])
+        else:
+            # Index has no tensor fields at all
+            raise core_exceptions.InvalidArgumentError(
+                f"Index '{marqo_index.name}' has no tensor fields, cannot retrieve embeddings"
+                f" for {tensor_field_names}"
+            )
     else:
-        # For legacy unstructured indexes, there's typically one embeddings field
-        return (tensor_field_names,
+        # For legacy unstructured indexes, there's one embeddings field
+        # For the marqo_field_names, just return a dummy name (as if document has 1 big tensor field)
+        # Fetching vectors for legacy unstructured will always return all vectors in marqo__embeddings in 1 list.
+        return (["embeddings_generic"],
                 [unstructured_common.VESPA_DOC_EMBEDDINGS])
-    
-    return ([], [])
 
 
 def get_doc_vectors_per_tensor_field_by_ids(
@@ -1318,7 +1326,6 @@ def get_doc_vectors_per_tensor_field_by_ids(
         Dict mapping document_id to field_name to list of embedding vectors
     """
 
-    # TODO: Add maximum retrievable docs for context docs
     # We can just use the cache here since we refresh every 1s.
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     
@@ -1350,6 +1357,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
             # Initialize the result for this document ID
             result[doc_id] = {}
             # Check every requested tensor field (same index as embedding_fields list)
+            # Legacy unstructured will have exactly 1 vespa & 1 marqo embedding field name. Treat it like 1 tensor field.
             for i in range(len(viable_tensor_fields)):
                 # Get marqo tensor field name from vespa field name
                 marqo_tensor_field_name = viable_tensor_fields[i]

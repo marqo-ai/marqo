@@ -22,6 +22,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     structured_index_basic = "structured_index_basic"
     unstructured_index_basic = "unstructured_index_basic"
+    legacy_unstructured_index_basic = "legacy_unstructured_index_basic"
     
     # The index in this test is created with 'hf/all-MiniLM-L6-v2' with 384 dimensions
     # Don't use random model for this test suite as we need to guarantee the same query generate the same embeddings
@@ -54,15 +55,24 @@ class TestSearchWithContext(MarqoTestCase):
             model=Model(name="hf/all-MiniLM-L6-v2"),
         )
 
+        legacy_unstructured_index_basic_request = cls.unstructured_marqo_index_request(
+            name=cls.legacy_unstructured_index_basic,
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            marqo_version='2.12.0'
+        )
+
         # List of indexes to loop through per test. Test itself should extract index name.
         cls.indexes = cls.create_indexes([
             structured_index_basic_request,
             unstructured_index_basic_request,
+            legacy_unstructured_index_basic_request
         ])
+
 
         # Default text indexes for the context.documents tests
         cls.structured_default_text_index = cls.indexes[0]  # Use the structured index we created
         cls.unstructured_default_text_index = cls.indexes[1]  # Use the unstructured index we created
+        cls.legacy_unstructured_default_text_index = cls.indexes[2]  # Use the legacy unstructured index we created
 
     def setUp(self) -> None:
         # Any tests that call add_documents, search, bulk_search need this env var
@@ -109,7 +119,8 @@ class TestSearchWithContext(MarqoTestCase):
 
     # Search with context.tensor
     def test_search(self):
-        for index_name in [self.structured_index_basic, self.unstructured_index_basic]:
+        for index_name in [self.structured_index_basic, self.unstructured_index_basic,
+                           self.legacy_unstructured_index_basic]:
             with self.subTest(msg=index_name):
                 query = {
                     "A rider is riding a horse jumping over the barrier": 1,
@@ -191,7 +202,8 @@ class TestSearchWithContext(MarqoTestCase):
 
         Checks tensorFields and excludeInputDocuments parameters.
         """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
+                      self.legacy_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
