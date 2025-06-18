@@ -118,7 +118,7 @@ class TestSortByModels(TestCase):
         )
         self.assertEqual(query.sortBy.sortCandidates, 60)  # max(3*10, 10+50)
 
-    def test_sort_by_explicit_sort_candidates_preserved_case_1(self):
+    def test_sort_by_explicit_sort_candidates_preserved_greater_than_offset_plus_limit_and_three_times_limit(self):
         """Ensure that if sortCandidates is explicitly set, it is preserved, when
         it's larger than offset + limit and greater than 3 * limit."""
         query = SearchQuery(
@@ -130,7 +130,7 @@ class TestSortByModels(TestCase):
         )
         self.assertEqual(query.sortBy.sortCandidates, 77)
 
-    def test_sort_by_explicit_sort_candidates_preserved_case_2(self):
+    def test_sort_by_explicit_sort_candidates_preserved_greater_than_offset_plus_limit_smaller_than_three_times_limit(self):
         """Ensure that if sortCandidates is explicitly set, it is preserved, when
         it's larger than offset + limit but smaller than 3 * limit."""
         query = SearchQuery(
