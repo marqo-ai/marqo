@@ -104,6 +104,39 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             }
         ).body.decode('utf-8'))
 
+    def test_simple_sort_with_default_settings(self):
+        """
+        The simple sort test check based on default values:
+        - Sort by a single field (sort_field_1).
+        - Sort order is descending by default.
+        - No missing values policy is specified, so the default is 'last'.
+        So the results should be in the following order:
+            [
+                "2", "1", # numeric values in descending order
+                "3", "4", # tie values sorted by relevance, with _id 3 coming before _id 4
+                "9", "0", "8", # descending order of numeric values
+                "7", "5", "6" # missing fields sorted by relevance, with _id 7 coming before _id 5 and _id 6
+            ]
+        """
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by)
+            self.assertEqual(10, res["_sortByCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+                ids
+            )
+
     def test_simple_sort_non_default_parameters(self):
         """
         The simple sort test check based on default values:
