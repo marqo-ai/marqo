@@ -318,6 +318,6 @@ class HybridSearch:
         )
 
         if sort_by is not None:
-            gathered_results["_sortByCandidates"] = responses.root.fields.sort_by_candidates
+            gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
 
         return gathered_results

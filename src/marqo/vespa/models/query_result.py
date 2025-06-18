@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 # See https://docs.vespa.ai/en/reference/default-result-format.html
 class RootFields(BaseModel):
     total_count: Optional[int] = Field(None, alias='totalCount')
-    sort_by_candidates: Optional[int] = Field(None, alias='marqo__sortByCandidates')
+    sort_candidates: Optional[int] = Field(None, alias='marqo__sortCandidates')
 
 
 class Degraded(BaseModel):

@@ -242,13 +242,13 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
         sort_fields = r['marqo__hybrid.sortBy.fields']
         sort_depth = r["marqo__hybrid.sortBy.sortDepth"]
-        min_sort_candidates = r["marqo__hybrid.sortBy.sortCandidates"]
+        sort_candidates = r["marqo__hybrid.sortBy.sortCandidates"]
 
         self.assertEqual(1, len(sort_fields))
         self.assertEqual("title", sort_fields[0]["field_name"])
         self.assertEqual("asc", sort_fields[0]["order"].value)
         self.assertEqual(None, sort_depth)
-        self.assertEqual(30, min_sort_candidates)
+        self.assertEqual(30, sort_candidates)
 
     def test_sort_by_with_missing_first(self):
         """Test a field with missing='first' and all optional params."""
