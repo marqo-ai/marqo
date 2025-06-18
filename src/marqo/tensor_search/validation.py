@@ -544,7 +544,7 @@ def validate_mappings_object(
         for field_name, config in mappings_object.items():
             validate_field_name(field_name)
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_mappings_object(config)
+                _validate_multimodal_combination_mappings_object(config)
                 if structured_marqo_index is not None:
                     if (
                             field_name not in structured_marqo_index.field_map or
@@ -565,11 +565,11 @@ def validate_mappings_object(
                             )
 
             elif config["type"] == enums.MappingsObjectType.custom_vector:
-                validate_custom_vector_mappings_object(config)
+                _validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
                 
             elif config["type"] == enums.MappingsObjectType.text_field:
-                validate_text_field_mappings_object(config)
+                _validate_text_field_mappings_object(config)
 
             else:
                 raise InternalError(
@@ -584,7 +584,7 @@ def validate_mappings_object(
         )
 
 
-def validate_multimodal_combination_mappings_object(mappings_object: Dict):
+def _validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 
     Args:
@@ -623,7 +623,7 @@ def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     return mappings_object
 
 
-def validate_custom_vector_mappings_object(mappings_object: Dict):
+def _validate_custom_vector_mappings_object(mappings_object: Dict):
     """Validates the custom vector mappings object
     Args:
         mappings_object:
@@ -646,7 +646,7 @@ def validate_custom_vector_mappings_object(mappings_object: Dict):
     return mappings_object
 
 
-def validate_text_field_mappings_object(mappings_object: Dict):
+def _validate_text_field_mappings_object(mappings_object: Dict):
     """Validates the text field mappings object
     
     Args:
