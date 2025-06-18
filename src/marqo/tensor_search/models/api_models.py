@@ -63,6 +63,9 @@ class SearchQuery(BaseMarqoModel):
     sortBy: Optional[SortByModel] = None
     relevanceCutoff: Optional[RelevanceCutoffModel] = None
 
+    # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
+    _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
+
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
         """Preprocess the searchMethod value for validation.
@@ -337,15 +340,34 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def _set_sort_by_minSortCandidates_parameters(cls, values):
-        """Set sortBy parameters to None if not provided"""
+    def _set_sort_by_sortCandidates_parameters(cls, values):
+        """Set the value for sortCandidates in sortBy if it is not provided.
+
+        Logics:
+        - If relevanceCutoff is provided, do not set sortCandidates, otherwise:
+        - If sortBy.sortCandidates is None, set it to the maximum of:
+            - _DEFAULT_SORT_CANDIDATES_MULTIPLIER * limit
+            - offset + limit
+        - If sortBy.sortCandidates is provided, ensure it is at least as large as offset + limit.
+        """
         sort_by = values.get('sortBy')
         relevance_cutoff = values.get('relevanceCutoff')
-        if (not sort_by is None) and relevance_cutoff is None and sort_by.minSortCandidates is None:
-            sort_by.minSortCandidates = max(
-                3 * values.get('limit', 10),
+        if sort_by is None or relevance_cutoff is not None:
+            return values
+
+        if sort_by.sortCandidates is None:
+            sort_by.sortCandidates = max(
+                cls._DEFAULT_SORT_CANDIDATES_MULTIPLIER * values.get('limit'),
                 values.get('offset') + values.get('limit')
             )
+        else:
+            # If sortCandidates is provided, ensure it is at least as large as offset + limit
+            if sort_by.sortCandidates < (values.get('offset') + values.get('limit')):
+                raise ValueError(
+                    f"sortCandidates must be at least as large as offset + limit. Received "
+                    f" sortCandidates={sort_by.sortCandidates}, limit={values.get('limit')}, "
+                    f" offset={values.get('offset')} "
+                )
         return values
 
 

@@ -18,7 +18,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     5. Sort by 1 single field will field name of different types (e.g., string). In this case, the field should be
     treated as a missing field, and the sort order should be applied accordingly.
     6. Sorty by 1 single field but the field never exists in the index.
-    7. Test limit, offset, sortDepth, minSortCandidates parameters to ensure they work as expected.
+    7. Test limit, offset, sortDepth, sortCandidates parameters to ensure they work as expected.
     """
 
     @classmethod
@@ -124,7 +124,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ],
             "sortDepth": 10,
-            "minSortCandidates": 10
+            "sortCandidates": 10
         }
         for _ in range(10):
             # We run it several times to ensure that the results are consistent

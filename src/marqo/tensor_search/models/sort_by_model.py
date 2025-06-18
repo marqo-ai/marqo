@@ -50,9 +50,9 @@ class SortByModel(StrictBaseModel):
             be used as tiebreakers for fields presented earlier.
         sortDepth (Optional[int]): The depth of sorting at the global phase.
             Check Vespa Customer Searcher for more details.
-        minSortCandidates (Optional[int]): The minimum number of candidates to be retrieved.
+        sortCandidates (Optional[int]): The minimum number of candidates to be retrieved.
             Check Vespa Customer Searcher for more details.
     """
     fields: List[SortByField] = Field(..., min_items=1, max_items=3)
     sortDepth: Optional[int] = Field(None, ge=1)
-    minSortCandidates: Optional[int] = Field(None, ge=1)
+    sortCandidates: Optional[int] = Field(None, ge=1)

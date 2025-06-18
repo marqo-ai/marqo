@@ -119,7 +119,7 @@ class TestSearchRelevanceCutoffFeatureSort1Field(MarqoTestCase):
                 }
             ],
             "sortDepth": 10,
-            "minSortCandidates": 10
+            "sortCandidates": 10
         }
 
         relevance_cutoff = {
