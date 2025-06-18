@@ -11,6 +11,7 @@ import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.query.ranking.RankFeatures;
 import com.yahoo.search.result.ErrorMessage;
+import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.*;
@@ -618,6 +619,180 @@ class HybridSearcherTest {
                             "SELECT * FROM sources * WHERE brand = 'nike' | all()",
                             "SELECT * FROM sources * WHERE category = 'shoes' | all()",
                             "lexical yql");
+        }
+    }
+
+    /**
+     * Test for sortBy feature in HybridSearcher.
+     */
+    @Nested
+    class sortByTest {
+
+        /**
+         * Test that verifies sorting of results based on a single sort field.
+         */
+        @Test
+        void shouldSortResultsWithOneSortField() {
+            HitGroup testHitGroup = new HitGroup();
+
+            FeatureData fd1 = mock(FeatureData.class);
+            when(fd1.getDouble("sort_field_value_0")).thenReturn(0.8);
+            Hit hit1 = new Hit("doc1", 0.85);
+            hit1.setField("matchfeatures", fd1);
+
+            FeatureData fd2 = mock(FeatureData.class);
+            when(fd2.getDouble("sort_field_value_0")).thenReturn(0.5);
+            Hit hit2 = new Hit("doc2", 0.83);
+            hit2.setField("matchfeatures", fd2);
+
+            testHitGroup.add(hit1);
+            testHitGroup.add(hit2);
+
+            hybridSearcher = new HybridSearcher();
+
+            HitGroup res =
+                    hybridSearcher.postProcessBySort(
+                            testHitGroup,
+                            "[{ \"field_name\": \"test\", \"order\": \"asc\", \"missing\": \"last\""
+                                    + " }]",
+                            2,
+                            2,
+                            0);
+
+            // Verify that the hits are sorted by the specified field
+            assertThat(res.get(0).getId().toString()).isEqualTo("doc2");
+            assertThat(res.get(0).getRelevance().getScore()).isEqualTo(1.0);
+
+            assertThat(res.get(1).getId().toString()).isEqualTo("doc1");
+            assertThat(res.get(1).getRelevance().getScore()).isEqualTo(0.5);
+        }
+
+        HitGroup helpGenerateHitGroupWithOnlySortFieldValue0() {
+            FeatureData f1 = mock(FeatureData.class);
+            when(f1.getDouble("sort_field_value_0")).thenReturn(-1e50);
+            Hit doc1 = new Hit("doc1", 0.55);
+            doc1.setField("matchfeatures", f1);
+
+            FeatureData f2 = mock(FeatureData.class);
+            when(f2.getDouble("sort_field_value_0")).thenReturn(1.0);
+            Hit doc2 = new Hit("doc2", 0.65);
+            doc2.setField("matchfeatures", f2);
+
+            FeatureData f3 = mock(FeatureData.class);
+            when(f3.getDouble("sort_field_value_0")).thenReturn(2.0);
+            Hit doc3 = new Hit("doc3", 0.75);
+            doc3.setField("matchfeatures", f3);
+
+            FeatureData f4 = mock(FeatureData.class);
+            when(f4.getDouble("sort_field_value_0")).thenReturn(2.0);
+            Hit doc4 = new Hit("doc4", 0.85);
+            doc4.setField("matchfeatures", f4);
+
+            FeatureData f5 = mock(FeatureData.class);
+            when(f5.getDouble("sort_field_value_0")).thenReturn(-1e50);
+            Hit doc5 = new Hit("doc5", 0.45);
+            doc5.setField("matchfeatures", f5);
+
+            FeatureData f6 = mock(FeatureData.class);
+            when(f6.getDouble("sort_field_value_0")).thenReturn(5.0);
+            Hit doc6 = new Hit("doc6", 0.95);
+            doc6.setField("matchfeatures", f6);
+
+            FeatureData f7 = mock(FeatureData.class);
+            when(f7.getDouble("sort_field_value_0")).thenReturn(6.0);
+            Hit doc7 = new Hit("doc7", 0.90);
+            doc7.setField("matchfeatures", f7);
+
+            FeatureData f8 = mock(FeatureData.class);
+            when(f8.getDouble("sort_field_value_0")).thenReturn(7.0);
+            Hit doc8 = new Hit("doc8", 0.80);
+            doc8.setField("matchfeatures", f8);
+
+            FeatureData f9 = mock(FeatureData.class);
+            when(f9.getDouble("sort_field_value_0")).thenReturn(8.0);
+            Hit doc9 = new Hit("doc9", 0.70);
+            doc9.setField("matchfeatures", f9);
+
+            FeatureData f10 = mock(FeatureData.class);
+            when(f10.getDouble("sort_field_value_0")).thenReturn(9.0);
+            Hit doc10 = new Hit("doc10", 1.00);
+            doc10.setField("matchfeatures", f10);
+
+            HitGroup hits = new HitGroup();
+            hits.add(doc1);
+            hits.add(doc2);
+            hits.add(doc3);
+            hits.add(doc4);
+            hits.add(doc5);
+            hits.add(doc6);
+            hits.add(doc7);
+            hits.add(doc8);
+            hits.add(doc9);
+            hits.add(doc10);
+            return hits;
+        }
+
+        /**
+         * Test that verifies sorting of results based on a single sort field with ascending order
+         * and last missing policy.
+         */
+        @Test
+        void sort1FieldWithAscOrderAndLastMissingPolicy() {
+            // build 10 distinct docs by hand
+
+            HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
+            HybridSearcher searcher = new HybridSearcher();
+            String sortJson =
+                    "[{"
+                            + "\"field_name\":\"ignored\","
+                            + "\"order\":\"asc\","
+                            + "\"missing\":\"last\""
+                            + "}]";
+
+            // full-depth, no trim
+            // expected:
+            // 1) doc2 (1.0)
+            // 2) doc3 & doc4 both 2.0 → tie by original relevance: doc4(0.85) before doc3(0.75)
+            // 3) doc6(5),doc7(6),doc8(7),doc9(8),doc10(9)
+            // 4) missing last: doc1,doc5
+            HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+            assertThat(out.asList())
+                    .extracting(hit -> hit.getId().toString())
+                    .containsExactly(
+                            "doc2", "doc4", "doc3", "doc6", "doc7", "doc8", "doc9", "doc10", "doc1",
+                            "doc5");
+        }
+
+        /**
+         * Test that verifies sorting of results based on a single sort field with desc order
+         * and first missing policy.
+         */
+        @Test
+        void sort1FieldWithDescOrderAndFirstMissingPolicy() {
+            HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
+            HybridSearcher searcher = new HybridSearcher();
+            String sortJson =
+                    "[{"
+                            + "\"field_name\":\"ignored\","
+                            + "\"order\":\"desc\","
+                            + "\"missing\":\"first\""
+                            + "}]";
+
+            HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+            assertThat(out.asList())
+                    .extracting(hit -> hit.getId().toString())
+                    .containsExactly(
+                            "doc1", // missing first  (–1e50, highest missing rel=0.55)
+                            "doc5", // missing second (–1e50, next missing rel=0.45)
+                            "doc10", // sort=9.0
+                            "doc9", // sort=8.0
+                            "doc8", // sort=7.0
+                            "doc7", // sort=6.0
+                            "doc6", // sort=5.0
+                            "doc4", // sort=2.0, tie-break on original rel=0.85 (before doc3)
+                            "doc3", // sort=2.0, tie-break rel=0.75
+                            "doc2" // sort=1.0
+                            );
         }
     }
 }
