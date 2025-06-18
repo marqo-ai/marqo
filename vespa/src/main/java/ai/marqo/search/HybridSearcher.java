@@ -89,7 +89,7 @@ public class HybridSearcher extends Searcher {
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
         Integer sortByDepth = query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
         Integer minSortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", -1);
+                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", -1);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);

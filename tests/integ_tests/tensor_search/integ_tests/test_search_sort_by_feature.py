@@ -128,7 +128,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortByCandidates"])
+            self.assertEqual(10, res["_sortCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
             ids = [hit["_id"] for hit in hits]
@@ -164,7 +164,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10,res["_sortByCandidates"])
+            self.assertEqual(10,res["_sortCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
             ids = [hit["_id"] for hit in hits]
@@ -239,7 +239,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortByCandidates"])
+            self.assertEqual(10, res["_sortCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))
             ids = [hit["_id"] for hit in hits]
@@ -280,7 +280,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by, limit=limit, offset=offset)
-            self.assertEqual(10, res["_sortByCandidates"])
+            self.assertEqual(10, res["_sortCandidates"])
             hits = res["hits"]
             ids = [hit["_id"] for hit in hits]
             self.assertEqual(
@@ -309,7 +309,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
         res = self._help_sort_function(sort_by=sort_by, limit=2, offset=0)
 
-        self.assertEqual(6, res["_sortByCandidates"])  # Default is max(3 * limit, limit + offset)
+        self.assertEqual(6, res["_sortCandidates"])  # Default is max(3 * limit, limit + offset)
         hits = res["hits"]
         self.assertEqual(2, len(hits))
         ids = [hit["_id"] for hit in hits]
