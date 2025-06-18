@@ -19,7 +19,8 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
-
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 class BaseMarqoModel(BaseModel):
     class Config:
@@ -60,7 +61,12 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
+    sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
+    relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
+
+    # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
+    _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):
@@ -307,6 +313,68 @@ class SearchQuery(BaseMarqoModel):
     def get_context_documents(self) -> Optional[SearchContextDocuments]:
         """Extract the documents from the context, if provided"""
         return self.context.documents if self.context is not None else None
+    
+    @root_validator(pre=False)
+    def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
+        """Validate that relevance cutoff is only provided for hybrid search"""
+        relevance_cutoff = values.get('relevanceCutoff')
+        search_method = values.get('searchMethod')
+        if relevance_cutoff is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"RelevanceCutoff can only be provided for 'HYBRID' search, but "
+                             f"received search method '{search_method}'")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_sort_by_only_works_for_hybrid_search(cls, values):
+        """Validate that sortBy is only provided for hybrid search"""
+        sort_by = values.get('sort_by')
+        search_method = values.get('searchMethod')
+        if sort_by is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"sortBy can only be provided for 'HYBRID' search, but "
+                             f"received search method {search_method}")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_sort_by_cannot_be_used_with_global_score_modifiers(cls, values):
+        """Validate that sortBy cannot be used with global score modifiers"""
+        sort_by = values.get('sort_by')
+        score_modifiers = values.get('scoreModifiers')
+        if sort_by is not None and score_modifiers is not None:
+            raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in"
+                             "the same rerank phase. "
+                             "Please use sortBy only for sorting by fields and scoreModifiers only for modifying scores")
+        return values
+
+    @root_validator(pre=False)
+    def _set_sort_by_sortCandidates_parameters(cls, values):
+        """Set the value for sortCandidates in sortBy if it is not provided.
+
+        Logics:
+        - If relevanceCutoff is provided, do not set sortCandidates, otherwise:
+        - If sortBy.sortCandidates is None, set it to the maximum of:
+            - _DEFAULT_SORT_CANDIDATES_MULTIPLIER * limit
+            - offset + limit
+        - If sortBy.sortCandidates is provided, ensure it is at least as large as offset + limit.
+        """
+        sort_by = values.get('sort_by')
+        relevance_cutoff = values.get('relevance_cutoff')
+        if sort_by is None or relevance_cutoff is not None:
+            return values
+
+        if sort_by.sort_candidates is None:
+            sort_by.sort_candidates = max(
+                cls._DEFAULT_SORT_CANDIDATES_MULTIPLIER * values.get('limit'),
+                values.get('offset') + values.get('limit')
+            )
+        else:
+            # If sortCandidates is provided, ensure it is at least as large as offset + limit
+            if sort_by.sort_candidates < (values.get('offset') + values.get('limit')):
+                raise ValueError(
+                    f"sortCandidates must be at least as large as offset + limit. Received "
+                    f" sortCandidates={sort_by.sort_candidates}, limit={values.get('limit')}, "
+                    f" offset={values.get('offset')} "
+                )
+        return values
 
 
 class BulkSearchQueryEntity(SearchQuery):
