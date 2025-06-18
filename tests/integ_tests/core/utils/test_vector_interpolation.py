@@ -115,7 +115,7 @@ class TestLerp(unittest.TestCase):
                     [1, 0, 0, 1],
                 ],
                 [0, 0, 0],
-                'Zero sum of weights -- all zero'
+                'All zero weights'
             )
         ]
 
@@ -289,7 +289,7 @@ class TestNlerp(MarqoTestCase):
                     [1, 0, 0, 1],
                 ],
                 [0, 0, 0],
-                'Zero sum of weights -- all zero'
+                'All zero weights'
             )
         ]
 

@@ -1,10 +1,10 @@
 import os
 import unittest
 from unittest import mock
-
+from marqo.tensor_search.enums import EnvVars
 from pydantic.v1.error_wrappers import ValidationError
 from marqo.core.exceptions import InvalidFieldNameError
-from marqo.api.exceptions import InvalidArgError
+from marqo.api.exceptions import InvalidArgError, IllegalRequestedDocCount
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -938,3 +938,159 @@ class TestSearchWithContext(MarqoTestCase):
                             # For unstructured index, fields are not separated in the return
                             # But we should still have embeddings
                             self.assertGreater(len(doc_embeddings), 0)
+
+    def test_search_with_context_documents_concurrency_parameter_controls_vespa_concurrency(self):
+        """Test that context.documents.parameters.concurrency is passed to vespa_client.get_batch."""
+        index = self.structured_default_text_index
+        
+        # Add documents to the index
+        docs = [
+            {"_id": "doc1", "text_field_1": "Test document 1"},
+            {"_id": "doc2", "text_field_1": "Test document 2"}
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name,
+                docs=docs,
+                tensor_fields=None
+            )
+        )
+
+        # Mock vespa_client.get_batch to capture the concurrency parameter
+        original_get_batch = self.config.vespa_client.get_batch
+        captured_concurrency = []
+
+        def mock_get_batch(*args, **kwargs):
+            captured_concurrency.append(kwargs.get('concurrency'))
+            return original_get_batch(*args, **kwargs)
+
+        with mock.patch.object(self.config.vespa_client, 'get_batch', side_effect=mock_get_batch):
+            # Create search context with specific concurrency
+            search_context = SearchContext(
+                documents=SearchContextDocuments(
+                    ids={"doc1": 1.0, "doc2": 1.0},
+                    parameters=SearchContextDocumentsParameters(
+                        tensorFields=["text_field_1"],
+                        excludeInputDocuments=False,
+                        concurrency=5  # Test with concurrency=5
+                    )
+                )
+            )
+
+            # Perform search with context documents
+            tensor_search.search(
+                config=self.config,
+                index_name=index.name,
+                text=None,
+                context=search_context,
+                result_count=5
+            )
+
+            # Verify that get_batch was called with the correct concurrency parameter
+            self.assertEqual(len(captured_concurrency), 1, "get_batch should have been called")
+            self.assertEqual(captured_concurrency[0], 5, "get_batch should be called with concurrency=5")
+
+    def test_search_with_context_documents_max_search_context_docs_env_var(self):
+        """Test that MARQO_MAX_SEARCH_CONTEXT_DOCS environment variable controls the limit for context documents."""
+
+        
+        index = self.structured_default_text_index
+        
+        # Add documents to the index
+        docs = [
+            {"_id": f"doc_{i}", "text_field_1": f"Test document {i}"} 
+            for i in range(15)  # Create more than default limit (10)
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name,
+                docs=docs,
+                tensor_fields=None
+            )
+        )
+
+        # Test 1: Default limit (should be 10) - try with 11 documents, should fail
+        with self.subTest("default_limit_exceeded"):
+            search_context = SearchContext(
+                documents=SearchContextDocuments(
+                    ids={f"doc_{i}": 1.0 for i in range(11)},  # 11 documents > default limit of 10
+                    parameters=SearchContextDocumentsParameters(
+                        tensorFields=["text_field_1"],
+                        excludeInputDocuments=False
+                    )
+                )
+            )
+
+            with self.assertRaises(IllegalRequestedDocCount) as cm:
+                tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text=None,
+                    context=search_context,
+                    result_count=5
+                )
+            
+            # Verify the error message mentions the correct limit and env var
+            error_message = str(cm.exception.message)
+            self.assertIn("Search context documents limit exceeded", error_message)
+            self.assertIn("Maximum allowed is 10", error_message)
+            self.assertIn("but got 11", error_message)
+            self.assertIn(EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS, error_message)
+
+        # Test 2: Set environment variable to 11, same search should now pass
+        with self.subTest("increased_limit_passes"):
+            with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: "11"}):
+                search_context = SearchContext(
+                    documents=SearchContextDocuments(
+                        ids={f"doc_{i}": 1.0 for i in range(11)},  # 11 documents = new limit of 11
+                        parameters=SearchContextDocumentsParameters(
+                            tensorFields=["text_field_1"],
+                            excludeInputDocuments=False
+                        )
+                    )
+                )
+
+                # This should now pass without raising an exception
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text=None,
+                    context=search_context,
+                    result_count=5
+                )
+                
+                # Verify search was successful
+                self.assertIn("hits", results)
+                self.assertGreater(len(results["hits"]), 0)
+
+        # Test 3: Even with increased limit, exceeding it should still fail
+        with self.subTest("increased_limit_still_enforced"):
+            with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: "11"}):
+                search_context = SearchContext(
+                    documents=SearchContextDocuments(
+                        ids={f"doc_{i}": 1.0 for i in range(12)},  # 12 documents > new limit of 11
+                        parameters=SearchContextDocumentsParameters(
+                            tensorFields=["text_field_1"],
+                            excludeInputDocuments=False
+                        )
+                    )
+                )
+
+                with self.assertRaises(IllegalRequestedDocCount) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=search_context,
+                        result_count=5
+                    )
+                
+                # Verify the error message reflects the new limit
+                error_message = str(cm.exception.message)
+                self.assertIn("Search context documents limit exceeded", error_message)
+                self.assertIn("Maximum allowed is 11", error_message)
+                self.assertIn("but got 12", error_message)

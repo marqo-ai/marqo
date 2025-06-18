@@ -86,7 +86,6 @@ from marqo.vespa.models import QueryResult
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.structured_vespa_index import common as structured_common
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core.search.recommender import get_context_vectors_from_document_ids
 
 
 logger = get_logger(__name__)
@@ -437,7 +436,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
         # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
         if context is not None and context.documents is not None:
-            if len(context.documents.ids) > max_search_context_docs:
+            if len(context.documents.ids) > int(max_search_context_docs):
                 raise api_exceptions.IllegalRequestedDocCount(
                     f"Search context documents limit exceeded. "
                     f"Maximum allowed is {max_search_context_docs}, but got {len(context.documents.ids)}. "

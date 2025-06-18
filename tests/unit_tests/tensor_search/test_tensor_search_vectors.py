@@ -325,7 +325,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
     def test_empty_document_ids(self, mock_vespa_factory, mock_get_index, mock_metrics):
-        """Test with empty document IDs list"""
+        """Test handling of empty document IDs list"""
         
         # Mock RequestMetricsStore
         mock_metrics_instance = Mock()
@@ -333,6 +333,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         mock_metrics_instance.time.return_value.__enter__ = Mock()
         mock_metrics_instance.time.return_value.__exit__ = Mock()
         
+        # Mock dependencies
         mock_get_index.return_value = self.mock_index
         mock_vespa_index = Mock()
         mock_vespa_factory.return_value = mock_vespa_index
@@ -346,8 +347,133 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         result = get_doc_vectors_per_tensor_field_by_ids(
             self.mock_config, 
             "test_index", 
-            []
+            [],  # Empty document IDs
+            tensor_fields=["title"]
         )
         
-        # Should return empty result
-        assert result == {} 
+        # Verify empty result
+        assert result == {}
+        
+        # Verify get_batch was called with empty document list
+        expected_fields = [structured_common.FIELD_ID, "emb_title"]
+        self.mock_vespa_client.get_batch.assert_called_once_with(
+            [], "test_schema", fields=expected_fields, concurrency=None
+        )
+
+    @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
+    @patch('marqo.tensor_search.tensor_search._get_latest_index')
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
+    def test_uses_cache_not_get_latest_index(self, mock_vespa_factory, mock_get_index, mock_get_latest_index, mock_metrics):
+        """Test that get_doc_vectors_per_tensor_field_by_ids uses index_meta_cache.get_index instead of _get_latest_index for efficiency"""
+        
+        # Mock RequestMetricsStore
+        mock_metrics_instance = Mock()
+        mock_metrics.for_request.return_value = mock_metrics_instance
+        mock_metrics_instance.time.return_value.__enter__ = Mock()
+        mock_metrics_instance.time.return_value.__exit__ = Mock()
+        
+        # Mock dependencies
+        mock_get_index.return_value = self.mock_index
+        mock_vespa_index = Mock()
+        mock_vespa_factory.return_value = mock_vespa_index
+        
+        # Mock Vespa response
+        mock_doc_response = Mock()
+        mock_doc_response.status = 200
+        mock_doc_response.document.fields = {
+            "marqo__id": "doc1",
+            "emb_title": {
+                "blocks": {
+                    "0": [0.1, 0.2, 0.3]
+                }
+            }
+        }
+        
+        mock_batch_response = Mock()
+        mock_batch_response.responses = [mock_doc_response]
+        self.mock_vespa_client.get_batch.return_value = mock_batch_response
+        
+        # Call the function
+        result = get_doc_vectors_per_tensor_field_by_ids(
+            self.mock_config, 
+            "test_index", 
+            ["doc1"],
+            tensor_fields=["title"]
+        )
+        
+        # Verify that index_meta_cache.get_index was called
+        mock_get_index.assert_called_once_with(index_management=self.mock_config.index_management, index_name="test_index")
+        
+        # Verify that _get_latest_index was NOT called
+        mock_get_latest_index.assert_not_called()
+        
+        # Verify result is correct
+        expected = {
+            "doc1": {
+                "title": [[0.1, 0.2, 0.3]]
+            }
+        }
+        assert result == expected
+
+    @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
+    def test_no_call_to_marqo_document_conversion(self, mock_vespa_factory, mock_get_index, mock_metrics):
+        """Test that get_doc_vectors_per_tensor_field_by_ids does not call vespa_index.to_marqo_document for efficiency"""
+        
+        # Mock RequestMetricsStore
+        mock_metrics_instance = Mock()
+        mock_metrics.for_request.return_value = mock_metrics_instance
+        mock_metrics_instance.time.return_value.__enter__ = Mock()
+        mock_metrics_instance.time.return_value.__exit__ = Mock()
+        
+        # Mock dependencies
+        mock_get_index.return_value = self.mock_index
+        mock_vespa_index = Mock()
+        mock_vespa_factory.return_value = mock_vespa_index
+        
+        # Mock Vespa response
+        mock_doc_response = Mock()
+        mock_doc_response.status = 200
+        mock_doc_response.document.fields = {
+            "marqo__id": "doc1",
+            "emb_title": {
+                "blocks": {
+                    "0": [0.1, 0.2, 0.3]
+                }
+            },
+            "emb_desc": {
+                "blocks": {
+                    "0": [0.7, 0.8, 0.9]
+                }
+            }
+        }
+        
+        mock_batch_response = Mock()
+        mock_batch_response.responses = [mock_doc_response]
+        self.mock_vespa_client.get_batch.return_value = mock_batch_response
+        
+        # Call the function
+        result = get_doc_vectors_per_tensor_field_by_ids(
+            self.mock_config, 
+            "test_index", 
+            ["doc1"],
+            tensor_fields=["title", "description"]
+        )
+        
+        # Verify that vespa_index_factory was called (this is still needed to create the vespa_index)
+        mock_vespa_factory.assert_called_once_with(self.mock_index)
+        
+        # Verify that to_marqo_document was NOT called on the vespa_index
+        # This is the key efficiency optimization - we skip the expensive Pydantic parsing
+        mock_vespa_index.to_marqo_document.assert_not_called()
+        
+        # Verify result is still correct (processed directly from raw Vespa response)
+        expected = {
+            "doc1": {
+                "title": [[0.1, 0.2, 0.3]],
+                "description": [[0.7, 0.8, 0.9]]
+            }
+        }
+        assert result == expected 

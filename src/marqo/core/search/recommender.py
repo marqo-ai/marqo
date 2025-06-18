@@ -210,16 +210,13 @@ class Recommender:
         except AllZeroWeightsError as e:
             if interpolation_method == InterpolationMethod.SLERP:
                 raise InvalidArgumentError(
-                    'Sum of one or more consecutive weights is zero. '
-                    'SLERP cannot interpolate vectors with zero sum of weights. Such weight pairs are prone to causing '
-                    'this error depending on document embeddings, and should be avoided',
-                    cause=e
-                ) from e
-            else:  # lerp or nlerp
+                    'SLERP cannot interpolate vectors with all zero weights. '
+                    'Please ensure at least one weight is non-zero.'
+                )
+            else:
                 raise InvalidArgumentError(
-                    'Sum of weights is zero. LERP/NLERP requires non-zero sum of weights',
-                    cause=e
-                ) from e
+                    'All weights are zero. LERP/NLERP requires at least one non-zero weight'
+                )
         except ZeroMagnitudeVectorError as e:
             if interpolation_method == InterpolationMethod.NLERP:
                 raise InvalidArgumentError(
