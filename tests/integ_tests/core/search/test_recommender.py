@@ -754,14 +754,12 @@ class TestRecommender(MarqoTestCase):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(index_type=index.name):
                 with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
-                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
+                        mock.patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids') as mock_get_doc_vectors:
                     mock_get_index.return_value = index
-                    mock_get_docs.return_value.dict.return_value = {
-                        "results": [{
-                            "_id": "doc1",
-                            "_found": True,
-                            "_tensor_facets": [{"field1": "value", "_embedding": [0.1, 0.2, 0.3]}]
-                        }]
+                    mock_get_doc_vectors.return_value = {
+                        "doc1": {
+                            "field1": [[0.1, 0.2, 0.3]]
+                        }
                     }
 
                     result = self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])

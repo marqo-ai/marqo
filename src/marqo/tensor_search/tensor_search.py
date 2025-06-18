@@ -53,7 +53,7 @@ from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
 from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
+from marqo.core.utils.vector_interpolation import from_interpolation_method, AllZeroWeightsError, \
     ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
@@ -86,6 +86,7 @@ from marqo.vespa.models import QueryResult
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.structured_vespa_index import common as structured_common
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.search.recommender import get_context_vectors_from_document_ids
 
 
 logger = get_logger(__name__)
@@ -1300,9 +1301,9 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
             )
     else:
         # For legacy unstructured indexes, there's one embeddings field
-        # For the marqo_field_names, just return a dummy name (as if document has 1 big tensor field)
+        # For the marqo_field_names, just return a dummy name marqo__embeddings (as if document has 1 big tensor field)
         # Fetching vectors for legacy unstructured will always return all vectors in marqo__embeddings in 1 list.
-        return (["embeddings_generic"],
+        return ([unstructured_common.VESPA_DOC_EMBEDDINGS],
                 [unstructured_common.VESPA_DOC_EMBEDDINGS])
 
 
@@ -1346,17 +1347,19 @@ def get_doc_vectors_per_tensor_field_by_ids(
     
     vespa_index = vespa_index_factory(marqo_index)
     result = {}
-    
-    for response in batch_get.responses:
-        # Extract vectors directly (for structured and semi-structured)
-        # Skip turning into marqo document
-        raw_response_dict = response.document.fields
-        doc_id = raw_response_dict["marqo__id"]
+
+    # Using index so correct document_id can be fetched for error message if needed
+    for i in range(len(batch_get.responses)):
+        response = batch_get.responses[i]
 
         if response.status == 200:
+            # Extract vectors directly (for structured and semi-structured)
+            # Skip turning into marqo document
+            raw_response_dict = response.document.fields
+            doc_id = raw_response_dict["marqo__id"]
+
             # Initialize the result for this document ID
             result[doc_id] = {}
-            # Check every requested tensor field (same index as embedding_fields list)
             # Legacy unstructured will have exactly 1 vespa & 1 marqo embedding field name. Treat it like 1 tensor field.
             for i in range(len(viable_tensor_fields)):
                 # Get marqo tensor field name from vespa field name
@@ -1379,7 +1382,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
         else:
             # If the response is not successful, error out
             raise core_exceptions.InvalidArgumentError(
-                f"Failed to retrieve document {doc_id} from index {index_name}. "
+                f"Failed to retrieve document {document_ids[i]} from index {index_name}. "
                 f"Response status: {response.status}, message: {response.message}"
             )
     return result

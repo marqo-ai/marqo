@@ -70,7 +70,7 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
         
         result = get_embedding_field_names(mock_index)
         
-        assert result == (["embeddings_generic"], [unstructured_common.VESPA_DOC_EMBEDDINGS])
+        assert result == (["marqo__embeddings"], [unstructured_common.VESPA_DOC_EMBEDDINGS])
     
     def test_structured_index_no_tensor_fields(self):
         """Test structured index with no tensor fields"""
@@ -263,10 +263,10 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
             ["doc1"]
         )
         
-        # For unstructured indices, the result should use "embeddings_generic" as the key
+        # For unstructured indices, the result should use "marqo__embeddings" as the key
         expected = {
             "doc1": {
-                "embeddings_generic": [[0.1, 0.2, 0.3]]
+                "marqo__embeddings": [[0.1, 0.2, 0.3]]
             }
         }
         assert result == expected

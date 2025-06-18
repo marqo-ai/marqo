@@ -21,7 +21,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
-from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, ZeroSumWeightsError, ZeroMagnitudeVectorError
+from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, AllZeroWeightsError, ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex

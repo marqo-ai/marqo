@@ -9,10 +9,6 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.exceptions import InternalError, InvalidArgumentError
 
 
-class ZeroSumWeightsError(InvalidArgumentError):
-    pass
-
-
 class AllZeroWeightsError(InvalidArgumentError):
     pass
 
@@ -74,13 +70,15 @@ class Lerp(VectorInterpolation):
         if len(vectors) != len(weights):
             raise ValueError('Vectors and weights must have the same length')
 
-        # Convert inputs to NumPy arrays for faster processing
+        # Check if all vectors have the same length BEFORE creating NumPy arrays
+        # This avoids the NumPy deprecation warning about ragged arrays
+        vector_lengths = [len(v) for v in vectors]
+        if len(set(vector_lengths)) != 1:
+            raise ValueError('Vectors must have the same length')
+
+        # Now safe to convert to NumPy arrays since all vectors have same length
         np_vectors = np.array(vectors)
         np_weights = np.array(weights)
-        
-        # Check if all vectors have the same length
-        if len(set(len(v) for v in vectors)) != 1:
-            raise ValueError('Vectors must have the same length')
         
         # Get sum of absolute values of weights
         weight_sum = np.sum(np.abs(np_weights))
@@ -168,6 +166,16 @@ class Slerp(VectorInterpolation):
         if len(vectors) != len(weights):
             raise ValueError('Vectors and weights must have the same length')
 
+        # Check if all vectors have the same length
+        if len(set(len(v) for v in vectors)) != 1:
+            raise ValueError('Vectors must have the same length')
+
+        # Early validation: check if all weights are zero
+        np_weights = np.array(weights)
+        weight_sum = np.sum(np.abs(np_weights))
+        if weight_sum == 0:
+            raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate vectors with all zero weights.')
+
         if self.method == self.Method.Sequential:
             return self._interpolate_sequential(vectors, weights, prenormalized)
         elif self.method == self.Method.Hierarchical:
@@ -221,8 +229,8 @@ class Slerp(VectorInterpolation):
             sum = np.abs(w0) + np.abs(w1)
 
             if sum == 0:
-                raise AllZeroWeightsError('Weights of both vectors {} and {} zero. SLERP cannot interpolate '
-                                          'vectors with a sum weight of zero'.format(i-1, i))
+                raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate '
+                                          'vectors with all zero weights.')
 
             result = self._slerp(result, vectors[i], w1 / sum, prenormalized)
             weights_copy[i] = sum / 2
@@ -244,8 +252,8 @@ class Slerp(VectorInterpolation):
                 sum = np.abs(w0) + np.abs(w1)
 
                 if sum == 0:
-	                raise AllZeroWeightsError('Weights of both vectors {} and {} zero. SLERP cannot interpolate '
-	                                          'vectors with a sum weight of zero'.format(i - 1, i))
+                    raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate '
+                                              'vectors with all zero weights.')
 
                 result.append(
                     self._slerp(vectors[i], vectors[i + 1], w1 / sum, prenormalized)

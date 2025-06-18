@@ -7,12 +7,13 @@ from marqo.core.inference.api import Inference
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
-from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
+from marqo.core.utils.vector_interpolation import from_interpolation_method, AllZeroWeightsError, \
     ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 
 class Recommender:
@@ -102,8 +103,13 @@ class Recommender:
             
             # Flatten all embeddings from all fields for this document
             for field_name, embedding_list in field_embeddings.items():
-                # Only include if tensor_fields is None or this field is in tensor_fields
-                if tensor_fields is None or field_name in tensor_fields:
+                # For legacy unstructured indices, field_name will be "marqo__embeddings"
+                # and we should include all embeddings regardless of tensor_fields filter
+                # since all embeddings are stored together in marqo__embeddings
+                if (tensor_fields is None or 
+                    field_name in tensor_fields or
+                    (marqo_index.type == IndexType.Unstructured and
+                     field_name == unstructured_common.VESPA_DOC_EMBEDDINGS)):
                     vectors.extend(embedding_list)
             
             doc_vectors[doc_id] = vectors
@@ -201,7 +207,7 @@ class Recommender:
             interpolated_vector = vector_interpolation.interpolate(
                 vectors, weights
             )
-        except ZeroSumWeightsError as e:
+        except AllZeroWeightsError as e:
             if interpolation_method == InterpolationMethod.SLERP:
                 raise InvalidArgumentError(
                     'Sum of one or more consecutive weights is zero. '
