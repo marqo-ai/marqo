@@ -20,7 +20,7 @@ class TestRelevanceCutoffModel(TestCase):
         )
         self.assertEqual(m.method, RelevanceCutoffMethod.RelativeMaxScore)
         self.assertIsInstance(m.parameters, RelativeMaxScoreParameters)
-        self.assertEqual(m.probeDepth, 1000)
+        self.assertEqual(m.probe_depth, 1000)
 
     def test_relative_max_score_missing_parameters(self):
         with self.assertRaises(ValidationError) as cm:

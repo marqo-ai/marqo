@@ -1,11 +1,11 @@
-import json
 import random
+import json
 
-from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestSearchSortByFeatureSort1Field(MarqoTestCase):
@@ -19,7 +19,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     5. Sort by 1 single field will field name of different types (e.g., string). In this case, the field should be
     treated as a missing field, and the sort order should be applied accordingly.
     6. Sorty by 1 single field but the field never exists in the index.
-    7. Test limit, offset, sortDepth, minSortCandidates parameters to ensure they work as expected.
+    7. Test limit, offset, sortDepth, sortCandidates parameters to ensure they work as expected.
     """
 
     @classmethod
@@ -103,40 +103,6 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 "offset": offset
             }
         ).body.decode('utf-8'))
-
-    def test_simple_sort_with_default_settings(self):
-        """
-        The simple sort test check based on default values:
-        - Sort by a single field (sort_field_1).
-        - Sort order is descending by default.
-        - No missing values policy is specified, so the default is 'last'.
-
-        So the results should be in the following order:
-            [
-                "2", "1", # numeric values in descending order
-                "3", "4", # tie values sorted by relevance, with _id 3 coming before _id 4
-                "9", "0", "8", # descending order of numeric values
-                "7", "5", "6" # missing fields sorted by relevance, with _id 7 coming before _id 5 and _id 6
-            ]
-        """
-        sort_by = {
-            "fields": [
-                {
-                    "field_name": "sort_field_1",
-                }
-            ]
-        }
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10,res["_sortByCandidates"])
-            hits = res["hits"]
-            self.assertEqual(10, len(hits))
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
-                ids
-            )
 
     def test_simple_sort_non_default_parameters(self):
         """

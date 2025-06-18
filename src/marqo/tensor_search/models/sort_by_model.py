@@ -26,7 +26,7 @@ class SortByField(StrictBaseModel):
         order (SortOrder): The order of sorting, either asc(ascending) or desc(descending). Defaults to desc.
         missing (SortMissingPolicy): Defines how to handle missing values in the sort field. Defaults to last.
     """
-    field_name: str = Field(alias="fieldName", dependent=validate_field_name)
+    field_name: str = Field(alias="fieldName")
     order: SortOrder = SortOrder.Desc
     missing: SortMissingPolicy = SortMissingPolicy.Last
 
@@ -48,11 +48,11 @@ class SortByModel(StrictBaseModel):
         fields (List[SortByField]): A list of SortByField objects that define the fields to sort by.
             Note that the order of fields in this list determines the order of sorting. Fields presented later will
             be used as tiebreakers for fields presented earlier.
-        sortDepth (Optional[int]): The depth of sorting at the global phase.
+        sort_depth (Optional[int]): The depth of sorting at the global phase.
             Check Vespa Customer Searcher for more details.
-        sortCandidates (Optional[int]): The minimum number of candidates to be retrieved.
+        sort_candidates (Optional[int]): The minimum number of candidates to be retrieved.
             Check Vespa Customer Searcher for more details.
     """
     fields: List[SortByField] = Field(..., min_items=1, max_items=3)
-    sortDepth: Optional[int] = Field(None, ge=1)
-    sortCandidates: Optional[int] = Field(None, ge=1)
+    sort_depth: Optional[int] = Field(None, ge=1, alias="sortDepth")
+    sort_candidates: Optional[int] = Field(None, ge=1, alias="sortCandidates")

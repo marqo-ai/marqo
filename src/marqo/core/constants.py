@@ -23,7 +23,7 @@ MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.1
 MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION = semver.VersionInfo.parse('2.13.0')
 MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0')
 MARQO_RERANK_DEPTH_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0')
-MARQO_SORT_BY_MINIMUM_VERSION = semver.VersionInfo.parse('2.20.0')
+MARQO_SORT_BY_MINIMUM_VERSION = semver.VersionInfo.parse('2.21.0')
 
 # For score modifiers
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
