@@ -275,7 +275,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                     }
                 ],
                 "sortDepth": 4,  # Limit the sort depth to 6
-                "minSortCandidates": 10  # Ensure we have enough candidates for sorting
+                "sortCandidates": 10  # Ensure we have enough candidates for sorting
             }
 
             # We run it several times to ensure that the results are consistent
@@ -292,7 +292,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     def test_small_sort_limit_without_specifying_min_sort_candidates(self):
         """
         Test the case where the sort limit is smaller than the number of documents,
-        and minSortCandidates is not specified.
+        and sortCandidates is not specified.
         In this case, the sort candidates is defaulted to be max(3 * limit, limit + offset).
 
         # We get the top 6 hits and only return the top 2 hits by sort order, so we return ['2', '3'].
