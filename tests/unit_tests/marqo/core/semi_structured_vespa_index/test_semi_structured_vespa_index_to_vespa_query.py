@@ -446,7 +446,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.RelativeMaxScore,
             parameters=params,
-            probeDepth=5
+            probe_depth=5
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
@@ -476,7 +476,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.MeanStdDev,
             parameters=params,
-            probeDepth=7
+            probe_depth=7
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
@@ -498,7 +498,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         # custom probeDepth
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection,
-            probeDepth=42
+            probe_depth=42
         )
         r2 = self.index._to_vespa_hybrid_query(self.hybrid_query)
         self.assertEqual(42, r2["marqo__hybrid.relevanceCutoff.probeDepth"])

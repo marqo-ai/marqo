@@ -60,8 +60,8 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
-    sortBy: Optional[SortByModel] = None
-    relevanceCutoff: Optional[RelevanceCutoffModel] = None
+    sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
+    relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -321,7 +321,7 @@ class SearchQuery(BaseMarqoModel):
     @root_validator(pre=False)
     def _validate_sort_by_only_works_for_hybrid_search(cls, values):
         """Validate that sortBy is only provided for hybrid search"""
-        sort_by = values.get('sortBy')
+        sort_by = values.get('sort_by')
         search_method = values.get('searchMethod')
         if sort_by is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"sortBy can only be provided for 'HYBRID' search, but "
@@ -331,7 +331,7 @@ class SearchQuery(BaseMarqoModel):
     @root_validator(pre=False)
     def _validate_sort_by_cannot_be_used_with_global_score_modifiers(cls, values):
         """Validate that sortBy cannot be used with global score modifiers"""
-        sort_by = values.get('sortBy')
+        sort_by = values.get('sort_by')
         score_modifiers = values.get('scoreModifiers')
         if sort_by is not None and score_modifiers is not None:
             raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in"
@@ -350,22 +350,22 @@ class SearchQuery(BaseMarqoModel):
             - offset + limit
         - If sortBy.sortCandidates is provided, ensure it is at least as large as offset + limit.
         """
-        sort_by = values.get('sortBy')
-        relevance_cutoff = values.get('relevanceCutoff')
+        sort_by = values.get('sort_by')
+        relevance_cutoff = values.get('relevance_cutoff')
         if sort_by is None or relevance_cutoff is not None:
             return values
 
-        if sort_by.sortCandidates is None:
-            sort_by.sortCandidates = max(
+        if sort_by.sort_candidates is None:
+            sort_by.sort_candidates = max(
                 cls._DEFAULT_SORT_CANDIDATES_MULTIPLIER * values.get('limit'),
                 values.get('offset') + values.get('limit')
             )
         else:
             # If sortCandidates is provided, ensure it is at least as large as offset + limit
-            if sort_by.sortCandidates < (values.get('offset') + values.get('limit')):
+            if sort_by.sort_candidates < (values.get('offset') + values.get('limit')):
                 raise ValueError(
                     f"sortCandidates must be at least as large as offset + limit. Received "
-                    f" sortCandidates={sort_by.sortCandidates}, limit={values.get('limit')}, "
+                    f" sortCandidates={sort_by.sort_candidates}, limit={values.get('limit')}, "
                     f" offset={values.get('offset')} "
                 )
         return values
