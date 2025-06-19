@@ -219,7 +219,7 @@ public class HybridSearcher extends Searcher {
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortByDepth, limit, offset);
-            processedHits.setField("marqo__sortByCandidates", hitsForPostProcessing.size());
+            processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
         } else if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
                 || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
             logIfVerbose("Global score modifiers found. Will apply them.", verbose);
