@@ -1,0 +1,133 @@
+import unittest
+from marqo.tensor_search.models.search import SearchContextDocumentsParameters, SearchContextDocuments
+from marqo.api.exceptions import InvalidArgError
+from pydantic.v1 import ValidationError
+
+
+class TestSearchContextDocumentsParameters(unittest.TestCase):
+    """Test SearchContextDocumentsParameters validation"""
+
+    def test_tensor_fields_validation_empty_list(self):
+        """Test that empty tensorFields list raises error"""
+        with self.assertRaises(InvalidArgError) as cm:
+            SearchContextDocumentsParameters(tensorFields=[])
+        self.assertIn('tensorFields parameter must be non-empty list', str(cm.exception))
+
+    def test_tensor_fields_validation_none(self):
+        """Test that None tensorFields is valid"""
+        # Should not raise error
+        params = SearchContextDocumentsParameters(tensorFields=None)
+        self.assertIsNone(params.tensorFields)
+
+    def test_tensor_fields_validation_valid_list(self):
+        """Test that valid tensorFields list works"""
+        params = SearchContextDocumentsParameters(tensorFields=["field1", "field2"])
+        self.assertEqual(params.tensorFields, ["field1", "field2"])
+
+
+class TestSearchContextDocuments(unittest.TestCase):
+    """Test SearchContextDocuments validation"""
+
+    def test_ids_validation(self):
+        """Test that ids field validation works correctly"""
+        # Valid case
+        docs = SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
+        self.assertEqual(docs.ids, {"doc1": 1.0, "doc2": 0.5})
+
+    def test_parameters_validation(self):
+        """Test that parameters field works correctly"""
+        params = SearchContextDocumentsParameters(excludeInputDocuments=False)
+        docs = SearchContextDocuments(ids={"doc1": 1.0}, parameters=params)
+        self.assertFalse(docs.parameters.excludeInputDocuments)
+
+    def test_default_parameters(self):
+        """Test that default parameters are created when not provided"""
+        docs = SearchContextDocuments(ids={"doc1": 1.0})
+        self.assertIsNotNone(docs.parameters)
+        self.assertTrue(docs.parameters.excludeInputDocuments)  # Default value
+
+    # Error scenario tests
+    def test_search_context_documents_with_empty_ids_fails(self):
+        """Test that empty ids dict raises error"""
+        with self.assertRaises(InvalidArgError) as cm:
+            SearchContextDocuments(ids={})
+        self.assertIn('must be present and a non-empty dict', str(cm.exception))
+
+    def test_search_context_documents_with_none_ids_fails(self):
+        """Test that None ids raises error"""
+        with self.assertRaises(InvalidArgError) as cm:
+            SearchContextDocuments(ids=None)
+        self.assertIn('must be present and a non-empty dict', str(cm.exception))
+
+    def test_search_context_documents_with_valid_ids_succeeds(self):
+        """Test that valid ids dict succeeds"""
+        docs = SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
+        self.assertEqual(docs.ids, {"doc1": 1.0, "doc2": 0.5})
+
+
+class TestSearchContextDocumentsParametersErrorScenarios(unittest.TestCase):
+    """Test SearchContextDocumentsParameters error scenarios"""
+
+    def test_concurrency_validation(self):
+        """Test concurrency parameter validation"""
+        # Valid positive integer
+        params = SearchContextDocumentsParameters(concurrency=5)
+        self.assertEqual(params.concurrency, 5)
+        
+        # None should be valid
+        params = SearchContextDocumentsParameters(concurrency=None)
+        self.assertIsNone(params.concurrency)
+
+    def test_exclude_input_documents_boolean_validation(self):
+        """Test excludeInputDocuments boolean validation"""
+        # Valid boolean values
+        params = SearchContextDocumentsParameters(excludeInputDocuments=True)
+        self.assertTrue(params.excludeInputDocuments)
+        
+        params = SearchContextDocumentsParameters(excludeInputDocuments=False)
+        self.assertFalse(params.excludeInputDocuments)
+
+    def test_tensor_fields_empty_string_in_list_fails(self):
+        """Test that empty string in tensorFields list is handled"""
+        # This should work - empty strings are valid field names in some contexts
+        params = SearchContextDocumentsParameters(tensorFields=["field1", "", "field2"])
+        self.assertEqual(params.tensorFields, ["field1", "", "field2"])
+
+
+class TestSearchContextDocumentsErrorScenarios(unittest.TestCase):
+    """Test SearchContextDocuments error scenarios"""
+
+    def test_search_context_documents_parameters_inheritance(self):
+        """Test that SearchContextDocuments properly uses SearchContextDocumentsParameters"""
+        params = SearchContextDocumentsParameters(
+            tensorFields=["field1"],
+            excludeInputDocuments=False,
+            concurrency=10
+        )
+        docs = SearchContextDocuments(ids={"doc1": 1.0}, parameters=params)
+        
+        self.assertEqual(docs.parameters.tensorFields, ["field1"])
+        self.assertFalse(docs.parameters.excludeInputDocuments)
+        self.assertEqual(docs.parameters.concurrency, 10)
+
+    def test_search_context_documents_with_invalid_weight_types(self):
+        """Test that invalid weight types are handled by pydantic"""
+        # This should work as pydantic will convert string numbers to float
+        docs = SearchContextDocuments(ids={"doc1": "1.0", "doc2": "0.5"})
+        self.assertEqual(docs.ids, {"doc1": 1.0, "doc2": 0.5})
+
+    def test_search_context_documents_with_negative_weights(self):
+        """Test that negative weights are allowed"""
+        # Negative weights should be allowed
+        docs = SearchContextDocuments(ids={"doc1": -1.0, "doc2": 0.5})
+        self.assertEqual(docs.ids, {"doc1": -1.0, "doc2": 0.5})
+
+    def test_search_context_documents_with_zero_weights(self):
+        """Test that zero weights are allowed"""
+        # Zero weights should be allowed
+        docs = SearchContextDocuments(ids={"doc1": 0.0, "doc2": 1.0})
+        self.assertEqual(docs.ids, {"doc1": 0.0, "doc2": 1.0})
+
+
+if __name__ == '__main__':
+    unittest.main() 

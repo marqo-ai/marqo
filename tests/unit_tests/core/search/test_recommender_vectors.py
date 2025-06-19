@@ -6,6 +6,12 @@ from marqo.core.search.recommender import Recommender
 from marqo.core.models.marqo_index import IndexType, StructuredMarqoIndex, UnstructuredMarqoIndex
 from marqo.exceptions import InvalidArgumentError
 from marqo.core.exceptions import InvalidFieldNameError
+from marqo.vespa.vespa_client import VespaClient
+from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.api import Inference
+from marqo.core.models.interpolation_method import InterpolationMethod
+from marqo.core.utils.vector_interpolation import AllZeroWeightsError
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
 class TestRecommenderGetDocVectorsFromIds:
@@ -254,17 +260,359 @@ class TestRecommenderGetDocVectorsFromIds:
             )
         
         assert "No documents with non-zero weight provided" in str(exc_info.value)
-    
+
     @patch('marqo.tensor_search.index_meta_cache.get_index')
-    def test_unstructured_index_no_validation(self, mock_get_index):
-        """Test that unstructured index doesn't validate tensor field names"""
+    @patch('marqo.config.Config')
+    @patch('marqo.tensor_search.tensor_search.search')
+    def test_recommend_with_interpolation_method_none(self, mock_search, mock_config_class, mock_get_index):
+        """Test recommend method when interpolation_method is None"""
+
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.name = "test_index"
+        mock_index.normalize_embeddings = True
+        mock_index.type = IndexType.Structured
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        mock_search.return_value = {"hits": []}
+        
+        # Mock get_doc_vectors_from_ids to return some vectors
+        with patch.object(self.recommender, 'get_doc_vectors_from_ids') as mock_get_vectors:
+            mock_get_vectors.return_value = {
+                "doc1": [[0.1, 0.2, 0.3]]
+            }
+            
+            # Mock get_default_interpolation_method
+            with patch.object(self.recommender, 'get_default_interpolation_method') as mock_get_default:
+                mock_get_default.return_value = InterpolationMethod.SLERP
+                
+                # Call recommend with interpolation_method=None
+                result = self.recommender.recommend(
+                    index_name="test_index",
+                    documents=["doc1"],
+                    interpolation_method=None  # This triggers interpolation method selection
+                )
+                
+                # Verify get_default_interpolation_method was called
+                mock_get_default.assert_called_once_with(mock_index, ["doc1"])
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.config.Config')
+    @patch('marqo.tensor_search.tensor_search.search')
+    def test_recommend_with_dict_documents_filtering(self, mock_search, mock_config_class, mock_get_index):
+        """Test recommend method with dict documents for filtering"""
+        
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.name = "test_index"
+        mock_index.normalize_embeddings = True
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        mock_search.return_value = {"hits": []}
+        
+        # Mock get_doc_vectors_from_ids to return some vectors
+        with patch.object(self.recommender, 'get_doc_vectors_from_ids') as mock_get_vectors:
+            mock_get_vectors.return_value = {
+                "doc1": [[0.1, 0.2, 0.3]],
+                "doc2": [[0.4, 0.5, 0.6]]
+            }
+            
+            # Mock get_exclusion_filter to verify it's called with all document IDs
+            with patch.object(self.recommender, 'get_exclusion_filter') as mock_get_filter:
+                mock_get_filter.return_value = "filtered"
+                
+                # Call recommend with dict documents
+                documents = {"doc1": 1.0, "doc2": 0.5, "doc3": 0.0}  # doc3 has zero weight
+                result = self.recommender.recommend(
+                    index_name="test_index",
+                    documents=documents,
+                    exclude_input_documents=True
+                )
+                
+                # Verify get_exclusion_filter was called with ALL document IDs
+                # including zero-weight documents for proper filtering
+                mock_get_filter.assert_called_once()
+                args = mock_get_filter.call_args[0]
+                all_document_ids = args[1]  # Second argument should be all_document_ids
+                assert set(all_document_ids) == {"doc1", "doc2", "doc3"}
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.config.Config')
+    @patch('marqo.tensor_search.tensor_search.search')
+    def test_recommend_slerp_all_zero_weights_error(self, mock_search, mock_config_class, mock_get_index):
+        """Test recommend method SLERP error handling"""
+        
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.name = "test_index"
+        mock_index.normalize_embeddings = True
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock get_doc_vectors_from_ids to return some vectors
+        with patch.object(self.recommender, 'get_doc_vectors_from_ids') as mock_get_vectors:
+            mock_get_vectors.return_value = {
+                "doc1": [[0.1, 0.2, 0.3]]
+            }
+            
+            # Mock vector interpolation to raise AllZeroWeightsError
+            with patch('marqo.core.utils.vector_interpolation.from_interpolation_method') as mock_from_interp:
+                mock_interpolation = Mock()
+                mock_interpolation.interpolate.side_effect = AllZeroWeightsError("All weights are zero")
+                mock_from_interp.return_value = mock_interpolation
+                
+                # Test SLERP error handling
+                with pytest.raises(InvalidArgumentError) as exc_info:
+                    self.recommender.recommend(
+                        index_name="test_index",
+                        documents={"doc1": 0.0},  # Zero weight to trigger error
+                        interpolation_method=InterpolationMethod.SLERP
+                    )
+                
+                # Verify SLERP-specific error message
+                assert "SLERP cannot interpolate vectors with all zero weights" in str(exc_info.value)
+
+    def test_get_default_interpolation_method_normalize_embeddings_with_context(self):
+        """Test get_default_interpolation_method with normalize_embeddings=True and context docs"""
+        
+        # Mock index with normalize_embeddings=True
+        mock_index = Mock()
+        mock_index.normalize_embeddings = True
+        
+        # Test with context documents
+        result = self.recommender.get_default_interpolation_method(mock_index, ["doc1"])
+        
+        # Should return SLERP for normalized embeddings with context docs
+        assert result == InterpolationMethod.SLERP
+
+    def test_get_default_interpolation_method_normalize_embeddings_no_context(self):
+        """Test get_default_interpolation_method with normalize_embeddings=True and no context docs"""
+        
+        # Mock index with normalize_embeddings=True
+        mock_index = Mock()
+        mock_index.normalize_embeddings = True
+        
+        # Test with no context documents
+        result = self.recommender.get_default_interpolation_method(mock_index, None)
+        
+        # Should return NLERP for normalized embeddings without context docs
+        assert result == InterpolationMethod.NLERP
+
+    def test_get_default_interpolation_method_no_normalize_embeddings(self):
+        """Test get_default_interpolation_method with normalize_embeddings=False"""
+        
+        # Mock index with normalize_embeddings=False
+        mock_index = Mock()
+        mock_index.normalize_embeddings = False
+        
+        # Test with any context documents
+        result = self.recommender.get_default_interpolation_method(mock_index, ["doc1"])
+        
+        # Should return LERP for non-normalized embeddings
+        assert result == InterpolationMethod.LERP
+
+    # Error scenario tests
+    def test_get_doc_vectors_from_ids_with_invalid_document_ids_fails(self):
+        """Test get_doc_vectors_from_ids with invalid document IDs"""
+        
+        # Test with invalid document ID format (should be caught by validation elsewhere)
+        with pytest.raises(Exception):  # Specific exception depends on validation layer
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=[""]  # Empty string ID
+            )
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    def test_get_doc_vectors_from_ids_with_nonexistent_index_fails(self, mock_get_index):
+        """Test get_doc_vectors_from_ids with nonexistent index"""
+        
+        # Mock index not found
+        from marqo.core.exceptions import IndexNotFoundError
+        mock_get_index.side_effect = IndexNotFoundError("Index not found")
+        
+        with pytest.raises(IndexNotFoundError):
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="nonexistent_index",
+                documents=["doc1"]
+            )
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    def test_get_doc_vectors_from_ids_with_invalid_tensor_fields_fails(self, mock_get_index):
+        """Test get_doc_vectors_from_ids with invalid tensor fields for structured index"""
+        
+        # Mock structured index with specific tensor fields
+        mock_structured_index = Mock(spec=StructuredMarqoIndex)
+        mock_structured_index.type = IndexType.Structured
+        mock_structured_index.tensor_field_map = {"valid_field": "some_config"}
+        mock_get_index.return_value = mock_structured_index
+        
+        with pytest.raises(InvalidFieldNameError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=["doc1"],
+                tensor_fields=["invalid_field"]
+            )
+        assert "Tensor field \"invalid_field\" not found" in str(exc_info.value)
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
+    @patch('marqo.config.Config')
+    def test_get_doc_vectors_from_ids_with_missing_documents_fails(self, mock_config_class, mock_get_vectors, mock_get_index):
+        """Test get_doc_vectors_from_ids when some documents are not found"""
+        
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.type = IndexType.Structured
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock get_doc_vectors_per_tensor_field_by_ids to return only some documents
+        mock_get_vectors.return_value = {
+            "doc1": {"field1": [[0.1, 0.2]]}
+            # doc2 is missing
+        }
+        
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=["doc1", "doc2"]  # doc2 will be missing
+            )
+        assert "The following document IDs were not found: doc2" in str(exc_info.value)
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
+    @patch('marqo.config.Config')
+    def test_get_doc_vectors_from_ids_with_documents_without_embeddings_fails(self, mock_config_class, mock_get_vectors, mock_get_index):
+        """Test get_doc_vectors_from_ids when documents have no embeddings"""
+        
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.type = IndexType.Structured
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock get_doc_vectors_per_tensor_field_by_ids to return documents with no embeddings
+        mock_get_vectors.return_value = {
+            "doc1": {"field1": []},  # No embeddings
+            "doc2": {"field1": [[0.1, 0.2]]}  # Has embeddings
+        }
+        
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=["doc1", "doc2"]
+            )
+        assert "The following documents do not have embeddings: doc1" in str(exc_info.value)
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.config.Config')
+    @patch('marqo.tensor_search.tensor_search.search')
+    def test_recommend_with_lerp_all_zero_weights_error(self, mock_search, mock_config_class, mock_get_index):
+        """Test recommend method LERP all zero weights error handling"""
+        
+        # Mock dependencies
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.name = "test_index"
+        mock_index.normalize_embeddings = False
+        mock_index.type = IndexType.Structured
+        mock_get_index.return_value = mock_index
+        
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock get_doc_vectors_from_ids to return some vectors
+        with patch.object(self.recommender, 'get_doc_vectors_from_ids') as mock_get_vectors:
+            mock_get_vectors.return_value = {
+                "doc1": [[0.1, 0.2, 0.3]]
+            }
+            
+            # Mock vector interpolation to raise AllZeroWeightsError
+            with patch('marqo.core.utils.vector_interpolation.from_interpolation_method') as mock_from_interp:
+                mock_interpolation = Mock()
+                mock_interpolation.interpolate.side_effect = AllZeroWeightsError("All weights are zero")
+                mock_from_interp.return_value = mock_interpolation
+                
+                # Test LERP/NLERP error handling (non-SLERP case)
+                with pytest.raises(InvalidArgumentError) as exc_info:
+                    self.recommender.recommend(
+                        index_name="test_index",
+                        documents={"doc1": 0.0},  # Zero weight to trigger error
+                        interpolation_method=InterpolationMethod.LERP
+                    )
+                
+                # Verify LERP/NLERP error message
+                assert "All weights are zero. LERP/NLERP requires at least one non-zero weight" in str(exc_info.value)
+
+    def test_get_exclusion_filter_for_structured_index(self):
+        """Test get_exclusion_filter for structured index format"""
+        
+        # Mock structured index
+        mock_index = Mock()
+        mock_index.type = IndexType.Structured
+        
+        # Test structured index filter format
+        result = self.recommender.get_exclusion_filter(
+            mock_index, 
+            ["doc1", "doc2"], 
+            None
+        )
+        expected = "NOT _id IN (doc1, doc2)"
+        assert result == expected
+
+    def test_get_exclusion_filter_for_unstructured_index(self):
+        """Test get_exclusion_filter for unstructured index format"""
         
         # Mock unstructured index
-        mock_unstructured_index = Mock(spec=UnstructuredMarqoIndex)
-        mock_unstructured_index.type = IndexType.Unstructured
-        mock_get_index.return_value = mock_unstructured_index
+        mock_index = Mock()
+        mock_index.type = IndexType.Unstructured
         
-        # This should not raise an error for unstructured index
-        # Just verify the setup doesn't crash (actual function call will be mocked in integration)
-        # The validation only happens for structured indexes
-        pass 
+        # Test unstructured index filter format
+        result = self.recommender.get_exclusion_filter(
+            mock_index, 
+            ["doc1", "doc2"], 
+            None
+        )
+        expected = "NOT (_id:(doc1) OR _id:(doc2))"
+        assert result == expected
+
+    def test_get_exclusion_filter_with_user_filter(self):
+        """Test get_exclusion_filter combined with user filter"""
+        
+        # Mock structured index
+        mock_index = Mock()
+        mock_index.type = IndexType.Structured
+        
+        # Test with user filter
+        result = self.recommender.get_exclusion_filter(
+            mock_index, 
+            ["doc1"], 
+            "category:books"
+        )
+        expected = "(category:books) AND NOT _id IN (doc1)"
+        assert result == expected
+
+    def test_get_exclusion_filter_with_empty_user_filter(self):
+        """Test get_exclusion_filter with empty user filter"""
+        
+        # Mock structured index
+        mock_index = Mock()
+        mock_index.type = IndexType.Structured
+        
+        # Test with empty user filter
+        result = self.recommender.get_exclusion_filter(
+            mock_index, 
+            ["doc1"], 
+            "   "  # Empty/whitespace filter
+        )
+        expected = "NOT _id IN (doc1)"
+        assert result == expected 

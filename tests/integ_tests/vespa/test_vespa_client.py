@@ -1,7 +1,7 @@
 import functools
 import os
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, AsyncMock
 
 import httpcore
 import httpx
@@ -599,6 +599,27 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             self.assertNotEqual(call[0][0], async_pool_size)
         
         client.close()
+
+    def test_vespa_client_close_calls_async_transport_aclose(self):
+        """Test that VespaClient.close() calls async_transport.aclose()"""
+        # Create a VespaClient with correct parameters
+        client = VespaClient(
+            config_url="http://localhost:19071",
+            document_url="http://localhost:8080",
+            query_url="http://localhost:8080",
+            content_cluster_name="test_cluster",
+            async_pool_size=10,
+            get_batch_concurrency_limit=5
+        )
+        
+        # Mock the async_transport.aclose method
+        client.async_transport.aclose = AsyncMock()
+        
+        # Call close method
+        client.close()
+        
+        # Verify that async_transport.aclose was called
+        client.async_transport.aclose.assert_called_once()
 
     def test_vespa_async_pool_size_env_var(self):
         """Test that VESPA_ASYNC_POOL_SIZE environment variable properly creates async_transport with correct connection size"""
