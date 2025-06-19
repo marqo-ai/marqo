@@ -27,6 +27,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
 import semver
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 
 class HybridSearch:
@@ -44,6 +46,8 @@ class HybridSearch:
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
             language: Optional[str] = None,
+            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
+            sort_by: Optional[SortByModel] = None
     ) -> Dict:
         """
 
@@ -69,6 +73,8 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
+                relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
+                sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
             Returns:
 
             Output format:
@@ -257,7 +263,9 @@ class HybridSearch:
             hybrid_parameters=hybrid_parameters,
             facets=facets,
             track_total_hits=track_total_hits,
-            language=language
+            language=language,
+            relevance_cutoff=relevance_cutoff,
+            sort_by=sort_by
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -310,5 +318,8 @@ class HybridSearch:
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
             f"{total_results} results from Vespa."
         )
+
+        if sort_by is not None:
+            gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
 
         return gathered_results
