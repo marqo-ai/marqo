@@ -6,6 +6,98 @@ from marqo.core.models.marqo_index import *
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
+from marqo.core.exceptions import UnsupportedFeatureError
+from unittest.mock import patch, MagicMock
+from marqo.core.models.marqo_index import MarqoIndex
+
+
+class TestSearchSortByFeature(MarqoTestCase):
+    """
+    This test class is designed to test the sort_by API of Marqo search API.
+    Functional tests are in other classes.
+    """
+
+    def test_sort_by_is_blocked_if_the_index_version_is_prior_to_2_21(self):
+        """
+        Test that sort_by is blocked if the index version is prior to 2.21.
+        """
+        # Create an index with a version prior to 2.21
+        mock_index = MagicMock(spec=MarqoIndex)
+        mock_index.marqo_version = "2.20.0"  # Version prior to 2.21
+        mock_index.name = "test_index"
+
+        with (patch("marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=mock_index)
+              as mock_get_index):
+            # Attempt to use sort_by on the index
+            with self.assertRaises(UnsupportedFeatureError) as e:
+                search(
+                    index_name=mock_index.name,
+                    marqo_config=self.config,
+                    device="cpu",
+                    search_query_dict={
+                        "q": "test",
+                        "searchMethod": SearchMethod.HYBRID,
+                        "hybridParameters": {
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "alpha": 0.5,
+                        },
+                        "sortBy": {
+                            "fields": [
+                                {
+                                    "field_name": "sort_field_1",
+                                    "order": "asc",
+                                    "missing": "first"
+                                }
+                            ]
+                        }
+                    }
+                )
+
+            self.assertIn(
+                "The 'sortBy' feature is only supported for unstructured indexes created "
+                "with Marqo version",
+                str(e.exception)
+            )
+
+    def test_sort_by_is_block_if_the_search_is_on_a_structured_index(self):
+        mock_index = MagicMock(spec=MarqoIndex)
+        mock_index.marqo_version = "2.21.0"
+        mock_index.name = "test_index"
+        mock_index.type="structured" # Type set to 2.21
+
+        with (patch("marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=mock_index)
+              as mock_get_index):
+            # Attempt to use sort_by on the index
+            with self.assertRaises(UnsupportedFeatureError) as e:
+                search(
+                    index_name=mock_index.name,
+                    marqo_config=self.config,
+                    device="cpu",
+                    search_query_dict={
+                        "q": "test",
+                        "searchMethod": SearchMethod.HYBRID,
+                        "hybridParameters": {
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "alpha": 0.5,
+                        },
+                        "sortBy": {
+                            "fields": [
+                                {
+                                    "field_name": "sort_field_1",
+                                    "order": "asc",
+                                    "missing": "first"
+                                }
+                            ]
+                        }
+                    }
+                )
+
+            self.assertIn(
+                "Your index is either a structured index or an old unstructured index",
+                str(e.exception)
+            )
 
 
 class TestSearchSortByFeatureSort1Field(MarqoTestCase):
@@ -275,7 +367,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                     }
                 ],
                 "sortDepth": 4,  # Limit the sort depth to 6
-                "sortCandidates": 10  # Ensure we have enough candidates for sorting
+                "sortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
             }
 
             # We run it several times to ensure that the results are consistent
