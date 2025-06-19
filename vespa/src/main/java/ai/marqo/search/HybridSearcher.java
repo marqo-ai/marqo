@@ -87,9 +87,10 @@ public class HybridSearcher extends Searcher {
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
-        Integer sortByDepth = query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
-        Integer minSortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", -1);
+        Integer sortBySortDepth =
+                query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
+        Integer sortBySortCandidates =
+                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", null);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -135,7 +136,7 @@ public class HybridSearcher extends Searcher {
 
         // --- Update the query limit if sort is used
         if (sortByFields != null && !sortByFields.isEmpty()) {
-            query.setHits(minSortCandidates);
+            query.setHits(sortBySortCandidates);
             query.setOffset(0);
         }
 
@@ -218,7 +219,7 @@ public class HybridSearcher extends Searcher {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
-                            hitsForPostProcessing, sortByFields, sortByDepth, limit, offset);
+                            hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
             processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
         } else if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
                 || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
@@ -280,7 +281,7 @@ public class HybridSearcher extends Searcher {
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
-            Integer sortByDepth,
+            Integer sortBySortDepth,
             Integer limit,
             Integer offset) {
 
@@ -295,7 +296,7 @@ public class HybridSearcher extends Searcher {
         }
 
         List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
-        int depth = (sortByDepth != null) ? sortByDepth : allHits.size();
+        int depth = (sortBySortDepth != null) ? sortBySortDepth : allHits.size();
 
         List<Hit> hitsToSort = new ArrayList<>(allHits.subList(0, Math.min(depth, allHits.size())));
         List<Hit> hitsAfterDepth =
