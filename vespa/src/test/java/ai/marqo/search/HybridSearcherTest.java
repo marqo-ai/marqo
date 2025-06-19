@@ -930,5 +930,82 @@ class HybridSearcherTest {
             verify(spy, never())
                     .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
         }
+
+        /**
+         * Test that verifies that neither postProcessBySort nor postProcessResults is
+         * called when there is no sortBy and no global‐modifier tensors in the query.
+         */
+        @Test
+        void whenNoSortByAndNoModifiers_noPostProcessingMethodsAreCalled() {
+            // 1) Spy on the real HybridSearcher
+            HybridSearcher spy = spy(new HybridSearcher());
+
+            // 2) Stub out both overloads of createSubQuery to bypass its internals
+            doAnswer(inv -> inv.getArgument(0))
+                    .when(spy).createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
+            doAnswer(inv -> inv.getArgument(0))
+                    .when(spy).createSubQuery(
+                            any(Query.class), anyString(), anyString(), anyBoolean(), anyString());
+
+            // 3) Stub extractTensorRankFeature to always return null
+            //    (so both mult_weights_global and add_weights_global are 'absent')
+            doReturn(null)
+                    .when(spy).extractTensorRankFeature(any(Query.class), anyString());
+
+            // 4) Also stub the two post‐processors so that, if they *did* get called,
+            //    they’d return an empty HitGroup instead of blowing up
+            doReturn(new HitGroup())
+                    .when(spy).postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
+            doReturn(new HitGroup())
+                    .when(spy).postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+
+            // 5) Build a Query with *no* sortBy.fields and *no* modifier tensors
+            Query q = new Query("?q");
+            q.properties().set("hits", 1);
+            q.properties().set("offset", 0);
+            q.properties().set("marqo__hybrid.retrievalMethod", "lexical");
+            q.properties().set("marqo__hybrid.rankingMethod", "lexical");
+            // note: we do NOT set marqo__hybrid.sortBy.fields
+            // and extractTensorRankFeature will return null for all names
+
+            // 6) Execute
+            spy.search(q, makeEmptyExec());
+
+            // 7) Assert that neither branch ran
+            verify(spy, never())
+                    .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
+            verify(spy, never())
+                    .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+        }
+
+        /*
+            Test that verifies that postProcessResults is called when only modifiers exist
+            (i.e., no sortBy.fields).
+         */
+        @Test
+        void whenOnlyModifiersExist_postProcessResultsIsCalled() {
+            HybridSearcher spy = spy(new HybridSearcher());
+            doAnswer(inv -> inv.getArgument(0))
+                    .when(spy).createSubQuery(any(), anyString(), anyString(), anyBoolean());
+            // simulate “has a global mult modifier” but no sortBy
+            Tensor dummy = Tensor.from("tensor<float>(d0[1]):[1]");
+            doReturn(dummy).when(spy).extractTensorRankFeature(any(), contains("mult_weights_global"));
+            doReturn(null).when(spy).extractTensorRankFeature(any(), contains("add_weights_global"));
+            doReturn(new HitGroup()).when(spy)
+                    .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+
+            Query q = new Query("?q");
+            q.properties().set("hits", 1);
+            q.properties().set("offset", 0);
+            q.properties().set("marqo__hybrid.retrievalMethod", "lexical");
+            q.properties().set("marqo__hybrid.rankingMethod", "lexical");
+            // no sortBy.fields
+
+            spy.search(q, makeEmptyExec());
+
+            verify(spy, times(1))
+                    .postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
+            verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
+        }
     }
 }
