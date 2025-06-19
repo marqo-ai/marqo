@@ -326,18 +326,23 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             res = self._help_sort_function(sort_by=sort_by)
             regular_res = self._help_sort_function()
             self.assertEqual(len(regular_res["hits"]), len(res["hits"]))
+            self.assertEqual(
+                [hit["_id"] for hit in regular_res["hits"]],
+                [hit["_id"] for hit in res["hits"]]
+            )
             for i in range(len(regular_res["hits"])):
                 for field in regular_res["hits"][i].keys():
                     if field != "_score":
                         self.assertEqual(
                             regular_res["hits"][i][field],
                             res["hits"][i][field],
-                            f"Field {field} does not match for hit {i}"
+                            f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
                         )
                     else:
                         self.assertNotEqual(
                             regular_res["hits"][i][field],
                             res["hits"][i][field],
+                            f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
                         )
 
     def test_sort_depth_parameter(self):
