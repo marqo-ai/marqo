@@ -99,6 +99,45 @@ class TestSearchSortByFeature(MarqoTestCase):
                 str(e.exception)
             )
 
+    def test_sort_by_is_blocked_if_the_index_is_a_legacy_index(self):
+        mock_index = MagicMock(spec=MarqoIndex)
+        mock_index.marqo_version = "2.12.0"
+        mock_index.name = "test_index"
+        mock_index.type="unstructured"
+
+        with (patch("marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=mock_index)
+              as mock_get_index):
+            # Attempt to use sort_by on the index
+            with self.assertRaises(UnsupportedFeatureError) as e:
+                search(
+                    index_name=mock_index.name,
+                    marqo_config=self.config,
+                    device="cpu",
+                    search_query_dict={
+                        "q": "test",
+                        "searchMethod": SearchMethod.HYBRID,
+                        "hybridParameters": {
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "alpha": 0.5,
+                        },
+                        "sortBy": {
+                            "fields": [
+                                {
+                                    "field_name": "sort_field_1",
+                                    "order": "asc",
+                                    "missing": "first"
+                                }
+                            ]
+                        }
+                    }
+                )
+
+            self.assertIn(
+                "Your index is either a structured index or an old unstructured index",
+                str(e.exception)
+            )
+
 
 class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     """

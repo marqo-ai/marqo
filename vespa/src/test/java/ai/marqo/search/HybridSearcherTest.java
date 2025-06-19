@@ -1,5 +1,10 @@
 package ai.marqo.search;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.Query;
@@ -15,6 +20,9 @@ import com.yahoo.search.searchchain.SearchChainRegistry;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -22,15 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
-
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class HybridSearcherTest {
     private HybridSearcher hybridSearcher;
@@ -759,7 +758,7 @@ class HybridSearcherTest {
                             "doc4", // sort=2.0, tie-break on original rel=0.85 (before doc3)
                             "doc3", // sort=2.0, tie-break rel=0.75
                             "doc2" // sort=1.0
-                    );
+                            );
         }
 
         /**
@@ -771,19 +770,19 @@ class HybridSearcherTest {
         HitGroup helpGenerateHitGroupWithTwoSortFieldValues() {
             HitGroup hits = new HitGroup();
             double[][] values = {
-                    {1.0, 10.0},
-                    {1.0,  5.0},
-                    {2.0,  3.0},
-                    {2.0,  7.0},
-                    {-1e50, -1e50},
-                    {-1e50, -1e50}
+                {1.0, 10.0},
+                {1.0, 5.0},
+                {2.0, 3.0},
+                {2.0, 7.0},
+                {-1e50, -1e50},
+                {-1e50, -1e50}
             };
             double[] relevances = {0.10, 0.20, 0.30, 0.40, 0.05, 0.06};
             for (int i = 0; i < values.length; i++) {
                 FeatureData f = mock(FeatureData.class);
                 when(f.getDouble("sort_field_value_0")).thenReturn(values[i][0]);
                 when(f.getDouble("sort_field_value_1")).thenReturn(values[i][1]);
-                Hit h = new Hit("doc" + (i+1), relevances[i]);
+                Hit h = new Hit("doc" + (i + 1), relevances[i]);
                 h.setField("matchfeatures", f);
                 hits.add(h);
             }
@@ -796,10 +795,11 @@ class HybridSearcherTest {
             HybridSearcher searcher = new HybridSearcher();
             // first sort_field_value_0 asc, missing last
             // then sort_field_value_1 asc, missing last
-            String sortJson = "["
-                    + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"last\"},"
-                    + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"last\"}"
-                    + "]";
+            String sortJson =
+                    "["
+                            + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"last\"}"
+                            + "]";
 
             HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
             // Expected:
@@ -811,8 +811,7 @@ class HybridSearcherTest {
                     .containsExactly(
                             "doc2", "doc1",
                             "doc3", "doc4",
-                            "doc6", "doc5"
-                    );
+                            "doc6", "doc5");
         }
 
         /**
@@ -822,12 +821,12 @@ class HybridSearcherTest {
          */
         HitGroup helpGenerateHitGroupWithThreeSortFieldValues() {
             HitGroup hits = new HitGroup();
-            String[] ids = {"docA","docB","docC","docD"};
+            String[] ids = {"docA", "docB", "docC", "docD"};
             double[][] values = {
-                    {1.0, 1.0, 3.0},  // docA
-                    {1.0, 1.0, 2.0},  // docB
-                    {1.0, 2.0, 1.0},  // docC
-                    {-1e50, -1e50, -1e50} // docD missing all
+                {1.0, 1.0, 3.0}, // docA
+                {1.0, 1.0, 2.0}, // docB
+                {1.0, 2.0, 1.0}, // docC
+                {-1e50, -1e50, -1e50} // docD missing all
             };
             double[] relevances = {0.40, 0.50, 0.60, 0.70};
             for (int i = 0; i < ids.length; i++) {
@@ -847,11 +846,10 @@ class HybridSearcherTest {
             HitGroup hitsToSort = helpGenerateHitGroupWithThreeSortFieldValues();
             HybridSearcher searcher = new HybridSearcher();
             // all three ascending, missing first
-            String sortJson = "["
-                    + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
-                    + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
-                    + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"}"
-                    + "]";
+            String sortJson =
+                    "[{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
+                        + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
+                        + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"}]";
 
             HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
             // Expected:
@@ -862,21 +860,19 @@ class HybridSearcherTest {
             // 3) then docC
             assertThat(out.asList())
                     .extracting(hit -> hit.getId().toString())
-                    .containsExactly(
-                            "docD", "docB", "docA", "docC"
-                    );
+                    .containsExactly("docD", "docB", "docA", "docC");
         }
 
         private Execution makeEmptyExec() {
             Execution exec = mock(Execution.class);
             when(exec.search(any(Query.class)))
-                    .thenAnswer(invocation -> {
-                        Query q = invocation.getArgument(0);
-                        return new Result(q, new HitGroup());
-                    });
+                    .thenAnswer(
+                            invocation -> {
+                                Query q = invocation.getArgument(0);
+                                return new Result(q, new HitGroup());
+                            });
             return exec;
         }
-
 
         /**
          * Test that verifies that postProcessBySort is called when sortBy is set in the query.
@@ -888,24 +884,32 @@ class HybridSearcherTest {
 
             // 2) Stub out createSubQuery (both overloads) so we never NPE inside it
             doAnswer(inv -> inv.getArgument(0))
-                    .when(spy).createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
+                    .when(spy)
+                    .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
             doAnswer(inv -> inv.getArgument(0))
-                    .when(spy).createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean(), anyString());
+                    .when(spy)
+                    .createSubQuery(
+                            any(Query.class), anyString(), anyString(), anyBoolean(), anyString());
 
             // 3) Stub extractTensorRankFeature to return:
             //    • null for “mult_weights_global” or “add_weights_global”
             //    • an empty Tensor for everything else (fields_to_rank_*)
-            doAnswer(inv -> {
-                String name = inv.getArgument(1);
-                if (name.contains("mult_weights_global") || name.contains("add_weights_global")) {
-                    return null;
-                }
-                // non-null so createSubQuery and co. won’t blow up
-                return Tensor.from("tensor<float>()");
-            }).when(spy).extractTensorRankFeature(any(Query.class), anyString());
+            doAnswer(
+                            inv -> {
+                                String name = inv.getArgument(1);
+                                if (name.contains("mult_weights_global")
+                                        || name.contains("add_weights_global")) {
+                                    return null;
+                                }
+                                // non-null so createSubQuery and co. won’t blow up
+                                return Tensor.from("tensor<float>()");
+                            })
+                    .when(spy)
+                    .extractTensorRankFeature(any(Query.class), anyString());
 
             // 4) Stub postProcessBySort so it just returns an empty HitGroup
-            doReturn(new HitGroup()).when(spy)
+            doReturn(new HitGroup())
+                    .when(spy)
                     .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
 
             // 5) Build a Query that triggers the sortBy branch
@@ -914,10 +918,10 @@ class HybridSearcherTest {
             q.properties().set("offset", 0);
             q.properties().set("marqo__hybrid.retrievalMethod", "lexical");
             q.properties().set("marqo__hybrid.rankingMethod", "lexical");
-            q.properties().set(
-                    "marqo__hybrid.sortBy.fields",
-                    "[{\"field_name\":\"foo\",\"order\":\"asc\",\"missing\":\"last\"}]"
-            );
+            q.properties()
+                    .set(
+                            "marqo__hybrid.sortBy.fields",
+                            "[{\"field_name\":\"foo\",\"order\":\"asc\",\"missing\":\"last\"}]");
             // MUST set this to avoid the NPE you saw
             q.properties().set("marqo__hybrid.sortBy.sortCandidates", 10);
 
@@ -942,22 +946,25 @@ class HybridSearcherTest {
 
             // 2) Stub out both overloads of createSubQuery to bypass its internals
             doAnswer(inv -> inv.getArgument(0))
-                    .when(spy).createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
+                    .when(spy)
+                    .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
             doAnswer(inv -> inv.getArgument(0))
-                    .when(spy).createSubQuery(
+                    .when(spy)
+                    .createSubQuery(
                             any(Query.class), anyString(), anyString(), anyBoolean(), anyString());
 
             // 3) Stub extractTensorRankFeature to always return null
             //    (so both mult_weights_global and add_weights_global are 'absent')
-            doReturn(null)
-                    .when(spy).extractTensorRankFeature(any(Query.class), anyString());
+            doReturn(null).when(spy).extractTensorRankFeature(any(Query.class), anyString());
 
             // 4) Also stub the two post‐processors so that, if they *did* get called,
             //    they’d return an empty HitGroup instead of blowing up
             doReturn(new HitGroup())
-                    .when(spy).postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
+                    .when(spy)
+                    .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
             doReturn(new HitGroup())
-                    .when(spy).postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                    .when(spy)
+                    .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
 
             // 5) Build a Query with *no* sortBy.fields and *no* modifier tensors
             Query q = new Query("?q");
@@ -979,19 +986,25 @@ class HybridSearcherTest {
         }
 
         /*
-            Test that verifies that postProcessResults is called when only modifiers exist
-            (i.e., no sortBy.fields).
-         */
+           Test that verifies that postProcessResults is called when only modifiers exist
+           (i.e., no sortBy.fields).
+        */
         @Test
         void whenOnlyModifiersExist_postProcessResultsIsCalled() {
             HybridSearcher spy = spy(new HybridSearcher());
             doAnswer(inv -> inv.getArgument(0))
-                    .when(spy).createSubQuery(any(), anyString(), anyString(), anyBoolean());
+                    .when(spy)
+                    .createSubQuery(any(), anyString(), anyString(), anyBoolean());
             // simulate “has a global mult modifier” but no sortBy
             Tensor dummy = Tensor.from("tensor<float>(d0[1]):[1]");
-            doReturn(dummy).when(spy).extractTensorRankFeature(any(), contains("mult_weights_global"));
-            doReturn(null).when(spy).extractTensorRankFeature(any(), contains("add_weights_global"));
-            doReturn(new HitGroup()).when(spy)
+            doReturn(dummy)
+                    .when(spy)
+                    .extractTensorRankFeature(any(), contains("mult_weights_global"));
+            doReturn(null)
+                    .when(spy)
+                    .extractTensorRankFeature(any(), contains("add_weights_global"));
+            doReturn(new HitGroup())
+                    .when(spy)
                     .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
 
             Query q = new Query("?q");
@@ -1003,8 +1016,7 @@ class HybridSearcherTest {
 
             spy.search(q, makeEmptyExec());
 
-            verify(spy, times(1))
-                    .postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
+            verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
             verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
         }
     }
