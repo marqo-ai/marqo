@@ -1,5 +1,5 @@
 import unittest
-from marqo.tensor_search.models.search import SearchContextDocumentsParameters, SearchContextDocuments
+from marqo.tensor_search.models.search import SearchContextDocumentsParameters, SearchContextDocuments, SearchContext, SearchContextTensor
 from marqo.api.exceptions import InvalidArgError
 from pydantic.v1 import ValidationError
 
@@ -9,7 +9,7 @@ class TestSearchContextDocumentsParameters(unittest.TestCase):
 
     def test_tensor_fields_validation_empty_list(self):
         """Test that empty tensorFields list raises error"""
-        with self.assertRaises(InvalidArgError) as cm:
+        with self.assertRaises(ValueError) as cm:
             SearchContextDocumentsParameters(tensorFields=[])
         self.assertIn('tensorFields parameter must be non-empty list', str(cm.exception))
 
@@ -17,12 +17,12 @@ class TestSearchContextDocumentsParameters(unittest.TestCase):
         """Test that None tensorFields is valid"""
         # Should not raise error
         params = SearchContextDocumentsParameters(tensorFields=None)
-        self.assertIsNone(params.tensorFields)
+        self.assertIsNone(params.tensor_fields)
 
     def test_tensor_fields_validation_valid_list(self):
         """Test that valid tensorFields list works"""
         params = SearchContextDocumentsParameters(tensorFields=["field1", "field2"])
-        self.assertEqual(params.tensorFields, ["field1", "field2"])
+        self.assertEqual(params.tensor_fields, ["field1", "field2"])
 
 
 class TestSearchContextDocuments(unittest.TestCase):
@@ -38,24 +38,24 @@ class TestSearchContextDocuments(unittest.TestCase):
         """Test that parameters field works correctly"""
         params = SearchContextDocumentsParameters(excludeInputDocuments=False)
         docs = SearchContextDocuments(ids={"doc1": 1.0}, parameters=params)
-        self.assertFalse(docs.parameters.excludeInputDocuments)
+        self.assertFalse(docs.parameters.exclude_input_documents)
 
     def test_default_parameters(self):
         """Test that default parameters are created when not provided"""
         docs = SearchContextDocuments(ids={"doc1": 1.0})
         self.assertIsNotNone(docs.parameters)
-        self.assertTrue(docs.parameters.excludeInputDocuments)  # Default value
+        self.assertTrue(docs.parameters.exclude_input_documents)  # Default value
 
     # Error scenario tests
     def test_search_context_documents_with_empty_ids_fails(self):
         """Test that empty ids dict raises error"""
-        with self.assertRaises(InvalidArgError) as cm:
+        with self.assertRaises(ValueError) as cm:
             SearchContextDocuments(ids={})
         self.assertIn('must be present and a non-empty dict', str(cm.exception))
 
     def test_search_context_documents_with_none_ids_fails(self):
         """Test that None ids raises error"""
-        with self.assertRaises(InvalidArgError) as cm:
+        with self.assertRaises(ValueError) as cm:
             SearchContextDocuments(ids=None)
         self.assertIn('must be present and a non-empty dict', str(cm.exception))
 
@@ -82,16 +82,16 @@ class TestSearchContextDocumentsParametersErrorScenarios(unittest.TestCase):
         """Test excludeInputDocuments boolean validation"""
         # Valid boolean values
         params = SearchContextDocumentsParameters(excludeInputDocuments=True)
-        self.assertTrue(params.excludeInputDocuments)
+        self.assertTrue(params.exclude_input_documents)
         
         params = SearchContextDocumentsParameters(excludeInputDocuments=False)
-        self.assertFalse(params.excludeInputDocuments)
+        self.assertFalse(params.exclude_input_documents)
 
     def test_tensor_fields_empty_string_in_list_fails(self):
         """Test that empty string in tensorFields list is handled"""
         # This should work - empty strings are valid field names in some contexts
         params = SearchContextDocumentsParameters(tensorFields=["field1", "", "field2"])
-        self.assertEqual(params.tensorFields, ["field1", "", "field2"])
+        self.assertEqual(params.tensor_fields, ["field1", "", "field2"])
 
 
 class TestSearchContextDocumentsErrorScenarios(unittest.TestCase):
@@ -106,8 +106,8 @@ class TestSearchContextDocumentsErrorScenarios(unittest.TestCase):
         )
         docs = SearchContextDocuments(ids={"doc1": 1.0}, parameters=params)
         
-        self.assertEqual(docs.parameters.tensorFields, ["field1"])
-        self.assertFalse(docs.parameters.excludeInputDocuments)
+        self.assertEqual(docs.parameters.tensor_fields, ["field1"])
+        self.assertFalse(docs.parameters.exclude_input_documents)
         self.assertEqual(docs.parameters.concurrency, 10)
 
     def test_search_context_documents_with_invalid_weight_types(self):
@@ -127,6 +127,40 @@ class TestSearchContextDocumentsErrorScenarios(unittest.TestCase):
         # Zero weights should be allowed
         docs = SearchContextDocuments(ids={"doc1": 0.0, "doc2": 1.0})
         self.assertEqual(docs.ids, {"doc1": 0.0, "doc2": 1.0})
+
+
+class TestSearchContext(unittest.TestCase):
+    """Test SearchContext validation"""
+
+    def test_tensor_type_validation_with_invalid_types(self):
+        """Test that passing non-list types for tensor raises InvalidArgError"""
+        invalid_types = [
+            ("not_a_list", "str"),
+            (123, "int"), 
+            ({"key": "value"}, "dict")
+        ]
+        
+        for invalid_value, expected_type in invalid_types:
+            with self.subTest(value=invalid_value, expected_type=expected_type):
+                with self.assertRaises(InvalidArgError) as cm:
+                    SearchContext(tensor=invalid_value)
+                self.assertIn('context tensor must be a list', str(cm.exception))
+                self.assertIn(expected_type, str(cm.exception))
+
+    def test_tensor_valid_list(self):
+        """Test that passing a valid list of SearchContextTensor works"""
+        # Should not raise error
+        tensor_list = [SearchContextTensor(vector=[0.1, 0.2, 0.3], weight=1.0)]
+        context = SearchContext(tensor=tensor_list)
+        self.assertEqual(len(context.tensor), 1)
+        self.assertEqual(context.tensor[0].weight, 1.0)
+
+    def test_tensor_none_is_valid(self):
+        """Test that None tensor is valid when documents are provided"""
+        docs = SearchContextDocuments(ids={"doc1": 1.0})
+        context = SearchContext(tensor=None, documents=docs)
+        self.assertIsNone(context.tensor)
+        self.assertIsNotNone(context.documents)
 
 
 if __name__ == '__main__':

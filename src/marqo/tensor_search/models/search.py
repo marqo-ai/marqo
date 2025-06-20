@@ -1,7 +1,7 @@
 import json
 from typing import Any, Union, List, Dict, Optional, NewType
 
-from pydantic.v1 import BaseModel, validator, ValidationError, root_validator
+from pydantic.v1 import BaseModel, validator, ValidationError, root_validator, Field
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.inference.api import Modality
@@ -67,14 +67,14 @@ class SearchContextTensor(BaseModel):
 
 
 class SearchContextDocumentsParameters(BaseModel):
-    tensorFields: Optional[List[str]] = None
-    excludeInputDocuments: bool = True
+    tensor_fields: Optional[List[str]] = Field(None, alias='tensorFields')
+    exclude_input_documents: bool = Field(True, alias='excludeInputDocuments')
     concurrency: Optional[int] = None
 
-    @validator('tensorFields', pre=True, always=True)
+    @validator('tensor_fields', pre=True, always=True)
     def check_tensor_fields_not_empty(cls, v):
         if v == []:
-            raise InvalidArgError('context document tensorFields parameter must be non-empty list.'
+            raise ValueError('context document tensorFields parameter must be non-empty list.'
                                   ' If you want to use all tensor fields, do not define this parameter.')
         return v
 
@@ -86,9 +86,8 @@ class SearchContextDocuments(BaseModel):
 
     @validator('ids', pre=True, always=True)
     def check_ids_not_empty(cls, v):
-        # Manually raising error because pydantic gives confusing error message
         if not v:
-            raise InvalidArgError('context["documents"]["ids"] must be present and a non-empty dict of '
+            raise ValueError('context["documents"]["ids"] must be present and a non-empty dict of '
                                   'document id to weight pairs.')
         return v
 
@@ -106,6 +105,8 @@ class SearchContext(BaseModel):
     @validator('tensor', pre=True, always=True)
     def check_vector_length(cls, v):
         if v is not None:
+            if not isinstance(v, list):
+                raise InvalidArgError(f'context tensor must be a list, but you provided {type(v)}')
             if not (1 <= len(v) <= 64):
                 raise InvalidArgError('The number of tensors must be between 1 and 64')
         return v
@@ -117,7 +118,7 @@ class SearchContext(BaseModel):
         documents = values.get('documents')
 
         if tensor is None and documents is None:
-            raise InvalidArgError('At least 1 form of context (tensor or documents) must be provided')
+            raise ValueError('At least 1 form of context (tensor or documents) must be provided')
 
         return values
 

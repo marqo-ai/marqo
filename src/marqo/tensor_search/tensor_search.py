@@ -85,6 +85,7 @@ from marqo.vespa.models import QueryResult
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.structured_vespa_index import common as structured_common
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.vespa_index.vespa_schema import MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
@@ -452,13 +453,20 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
         # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
         if context is not None and context.documents is not None:
+            # Disallow context docs for legacy unstructured indexes
+            if marqo_index.type == IndexType.Unstructured:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"Search context is not supported for unstructured indexes created with Marqo version "
+                    f"{MINIMUM_SEMI_STRUCTURED_INDEX_VERSION} or later. "
+                    f"This index was created with Marqo {marqo_index_version}."
+                )
             if len(context.documents.ids) > int(max_search_context_docs):
                 raise api_exceptions.IllegalRequestedDocCount(
                     f"Search context documents limit exceeded. "
                     f"Maximum allowed is {max_search_context_docs}, but got {len(context.documents.ids)}. "
                     f"To increase, set the environment variable '{EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS}'"
                 )
-            if context.documents.parameters.excludeInputDocuments:
+            if context.documents.parameters.exclude_input_documents:
                 filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.ids.keys()), filter)
 
         if search_method.upper() == SearchMethod.TENSOR:
@@ -914,12 +922,12 @@ def get_query_vectors_from_jobs(
 
             if context_documents:
                 with RequestMetricsStore.for_request().time(f"search.vectorise.get_doc_vectors_from_ids"):
-                    context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
-                        index_name=q.index.name,
-                        documents=context_documents.ids,
-                        tensor_fields=context_documents.parameters.tensorFields,
-                        concurrency=context_documents.parameters.concurrency
-                    )
+                                            context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
+                            index_name=q.index.name,
+                            documents=context_documents.ids,
+                            tensor_fields=context_documents.parameters.tensor_fields,
+                            concurrency=context_documents.parameters.concurrency
+                        )
 
                 # Update weights and vectors list
                 for document_id, vector_list in context_doc_vectors.items():
@@ -1156,7 +1164,7 @@ def _vector_text_search(
         index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
-    with RequestMetricsStore.for_request().time(f"search.vector.inference.full_pipeline"):
+    with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
@@ -1270,7 +1278,8 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     )
 
 
-def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optional[List[str]] = None) -> List[str]:
+def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optional[List[str]] = None) \
+        -> (Tuple)[List[str], List[str]]:
     """
     Get the Vespa field names for embeddings based on the index type.
     
@@ -1316,11 +1325,10 @@ def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optio
                 f" for {tensor_field_names}"
             )
     else:
-        # For legacy unstructured indexes, there's one embeddings field
-        # For the marqo_field_names, just return a dummy name marqo__embeddings (as if document has 1 big tensor field)
-        # Fetching vectors for legacy unstructured will always return all vectors in marqo__embeddings in 1 list.
-        return ([unstructured_common.VESPA_DOC_EMBEDDINGS],
-                [unstructured_common.VESPA_DOC_EMBEDDINGS])
+        raise InternalError(
+            f"Attempting to retrieve only embeddings for unstructured index '{marqo_index.name}'"
+            f" which was created before {MINIMUM_SEMI_STRUCTURED_INDEX_VERSION}. This functionality should be disabled."
+        )
 
 
 def get_doc_vectors_per_tensor_field_by_ids(
@@ -1365,8 +1373,8 @@ def get_doc_vectors_per_tensor_field_by_ids(
     result = {}
 
     # Using index so correct document_id can be fetched for error message if needed
-    for i in range(len(batch_get.responses)):
-        response = batch_get.responses[i]
+    for res_idx in range(len(batch_get.responses)):
+        response = batch_get.responses[res_idx]
 
         if response.status == 200:
             # Extract vectors directly (for structured and semi-structured)
@@ -1376,11 +1384,10 @@ def get_doc_vectors_per_tensor_field_by_ids(
 
             # Initialize the result for this document ID
             result[doc_id] = {}
-            # Legacy unstructured will have exactly 1 vespa & 1 marqo embedding field name. Treat it like 1 tensor field.
-            for i in range(len(viable_tensor_fields)):
+            for tf_idx in range(len(viable_tensor_fields)):
                 # Get marqo tensor field name from vespa field name
-                marqo_tensor_field_name = viable_tensor_fields[i]
-                retrieved_embedding_field_name = embedding_fields[i]
+                marqo_tensor_field_name = viable_tensor_fields[tf_idx]
+                retrieved_embedding_field_name = embedding_fields[tf_idx]
 
                 if retrieved_embedding_field_name in raw_response_dict:
                     try:
@@ -1398,7 +1405,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
         else:
             # If the response is not successful, error out
             raise core_exceptions.InvalidArgumentError(
-                f"Failed to retrieve document {document_ids[i]} from index {index_name}. "
+                f"Failed to retrieve document {document_ids[res_idx]} from index {index_name}. "
                 f"Response status: {response.status}, message: {response.message}"
             )
     return result

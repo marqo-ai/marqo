@@ -3,7 +3,7 @@ import unittest
 from unittest import mock
 from marqo.tensor_search.enums import EnvVars
 from pydantic.v1.error_wrappers import ValidationError
-from marqo.core.exceptions import InvalidFieldNameError
+from marqo.core.exceptions import InvalidFieldNameError, UnsupportedFeatureError
 from marqo.api.exceptions import InvalidArgError, IllegalRequestedDocCount
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -1094,3 +1094,40 @@ class TestSearchWithContext(MarqoTestCase):
                 self.assertIn("Search context documents limit exceeded", error_message)
                 self.assertIn("Maximum allowed is 11", error_message)
                 self.assertIn("but got 12", error_message)
+
+    def test_search_with_context_documents_fails_for_legacy_unstructured_index(self):
+        """Test that search with context documents fails for legacy unstructured indexes."""
+        # Add some documents to the legacy index first
+        docs = [
+            {"_id": "doc1", "text_field_1": "machine learning algorithms"},
+            {"_id": "doc2", "text_field_1": "deep neural networks"},
+        ]
+        
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.legacy_unstructured_default_text_index.name,
+                docs=docs,
+                tensor_fields=["text_field_1"]
+            )
+        )
+
+        # Create search context with documents
+        search_context = SearchContext(
+            documents=SearchContextDocuments(
+                ids={"doc1": 1.0, "doc2": 0.5}
+            )
+        )
+
+        # Should raise UnsupportedFeatureError for legacy unstructured index
+        with self.assertRaises(UnsupportedFeatureError) as cm:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.legacy_unstructured_default_text_index.name,
+                text=None,
+                context=search_context,
+                search_method="tensor"
+            )
+
+        self.assertIn("Search context is not supported for unstructured indexes", str(cm.exception))
+        self.assertIn("2.13.0", str(cm.exception))

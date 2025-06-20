@@ -119,7 +119,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 # Single query
                 # First search that misses cache should take longer
                 r = telemetry_client.index(index_name).search(q=query)
-                self.assertTrue(r["telemetry"]["timesMs"]["search.vector.inference.full_pipeline"] > min_inference_time_ms)
+                self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > min_inference_time_ms)
                 
                 # Run a few more times to make sure we populate it on API side cache as well as inference side cache
                 self._run_in_threads(lambda client: client.index(index_name).search(q=query),
@@ -128,7 +128,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 # Following searches should hit cache, average latency should be low
                 inference_latency = self._run_in_threads(
                     lambda client: client.index(index_name).search(q=query),
-                    max_workers=1, count=10, telemetry_name="search.vector.inference.full_pipeline")
+                    max_workers=1, count=10, telemetry_name="search.vector_inference_full_pipeline")
                 self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
 
         # Test to ensure inference cache is not working for add_documents:

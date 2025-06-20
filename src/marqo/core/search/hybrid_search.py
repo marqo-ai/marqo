@@ -74,7 +74,8 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
-                track_total_hits: if True, total hits before reranking will be returned.
+                track_total_hits: if True, total hits before reranking will be returned. For disjunction, this will be
+                the number of tensor OR lexical hits.
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
