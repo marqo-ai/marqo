@@ -39,7 +39,8 @@ class Recommender:
             concurrency: Max number of concurrent requests to use when fetching documents by batch
 
         Returns:
-            A dictionary mapping document IDs to lists of vector embeddings
+            A dictionary mapping document IDs to lists of vector embeddings. This is flattened to 1 list per document
+                ID (not separated by tensor field). Order of embeddings is not guaranteed.
         """
 
         # TODO - Extract search and get_docs from tensor_search and refactor this
@@ -48,6 +49,13 @@ class Recommender:
 
         if documents is None or len(documents) == 0:
             raise InvalidArgumentError('No document IDs provided')
+
+        # Check for duplicate document IDs when documents is a list
+        if isinstance(documents, list):
+            unique_docs = set(documents)
+            if len(unique_docs) != len(documents):
+                duplicates = [doc for doc in unique_docs if documents.count(doc) > 1]
+                raise InvalidArgumentError(f'Duplicate document IDs found: {", ".join(duplicates)}')
 
         # remove docs with zero weight
         original_documents = documents
@@ -64,7 +72,6 @@ class Recommender:
 
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
-        # See if recommend breaks for unstructured
         if marqo_index.type == IndexType.Structured:
             # Validate tensor field names
             if tensor_fields is not None:
@@ -208,15 +215,10 @@ class Recommender:
                 vectors, weights
             )
         except AllZeroWeightsError as e:
-            if interpolation_method == InterpolationMethod.SLERP:
-                raise InvalidArgumentError(
-                    'SLERP cannot interpolate vectors with all zero weights. '
-                    'Please ensure at least one weight is non-zero.'
-                )
-            else:
-                raise InvalidArgumentError(
-                    'All weights are zero. LERP/NLERP requires at least one non-zero weight'
-                )
+            raise InvalidArgumentError(
+                f'Cannot interpolate vectors with all zero weights. '
+                'Please ensure at least one weight is non-zero.'
+            )
         except ZeroMagnitudeVectorError as e:
             if interpolation_method == InterpolationMethod.NLERP:
                 raise InvalidArgumentError(

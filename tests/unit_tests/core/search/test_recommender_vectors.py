@@ -624,4 +624,46 @@ class TestRecommenderGetDocVectorsFromIds:
             "   "  # Empty/whitespace filter
         )
         expected = "NOT _id IN (doc1)"
-        assert result == expected 
+        assert result == expected
+
+    def test_duplicate_document_ids_in_list_fails(self):
+        """Test that duplicate document IDs in a list raise InvalidArgumentError
+        for get_doc_vectors_from_ids"""
+
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=["doc1", "doc2", "doc1", "doc3", "doc2"]
+            )
+
+        error_message = str(exc_info.value)
+        assert "Duplicate document IDs found" in error_message
+        # Should mention both duplicate IDs
+        assert "doc1" in error_message
+        assert "doc2" in error_message
+
+    def test_single_duplicate_document_id_in_list_fails(self):
+        """Test that a single duplicate document ID in a list raises InvalidArgumentError"""
+
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=["doc1", "doc2", "doc3", "doc1"]
+            )
+
+        error_message = str(exc_info.value)
+        assert "Duplicate document IDs found" in error_message
+        assert "doc1" in error_message
+
+    def test_recommend_with_duplicate_document_ids_fails(self):
+        """Test that recommend method also catches duplicate document IDs"""
+        
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            self.recommender.recommend(
+                index_name="test_index",
+                documents=["doc1", "doc2", "doc1"]
+            )
+        
+        error_message = str(exc_info.value)
+        assert "Duplicate document IDs found" in error_message
+        assert "doc1" in error_message 
