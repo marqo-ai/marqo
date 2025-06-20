@@ -14,7 +14,8 @@ from marqo.core.models.facets_parameters import (
 from marqo.core.search.hybrid_search import HybridSearch
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
-from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search.models.api_models import ScoreModifierLists, CustomVectorQuery
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextTensor
 from marqo.config import Config
 
 
@@ -42,7 +43,7 @@ class TestHybridSearch(TestCase):
         # Mock marqo_index
         marqo_index = Mock(spec=SemiStructuredMarqoIndex)
         marqo_index.name = "test_index"
-        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.15.0")
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.21.0")
         marqo_index.model = Mock()
         marqo_index.model.get_text_query_prefix.return_value = ""
         
@@ -181,7 +182,7 @@ class TestHybridSearch(TestCase):
         # Mock marqo_index
         marqo_index = Mock(spec=SemiStructuredMarqoIndex)
         marqo_index.name = "test_index"
-        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.15.0")
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.21.0")
         marqo_index.model = Mock()
         marqo_index.model.get_text_query_prefix.return_value = ""
         
@@ -213,7 +214,6 @@ class TestHybridSearch(TestCase):
         }
         
         # Create CustomVectorQuery
-        from marqo.tensor_search.models.api_models import CustomVectorQuery
         custom_query = CustomVectorQuery(
             customVector=CustomVectorQuery.CustomVector(
                 content="test content",
@@ -222,7 +222,6 @@ class TestHybridSearch(TestCase):
         )
         
         # Create context with tensor=None (this triggers line 200)
-        from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
         context = SearchContext(
             tensor=None,  # This is key - tensor is None
             documents=SearchContextDocuments(ids={"doc1": 1.0})
@@ -269,7 +268,7 @@ class TestHybridSearch(TestCase):
         # Mock marqo_index
         marqo_index = Mock(spec=SemiStructuredMarqoIndex)
         marqo_index.name = "test_index"
-        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.15.0")
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.21.0")
         marqo_index.model = Mock()
         marqo_index.model.get_text_query_prefix.return_value = ""
         
@@ -301,7 +300,6 @@ class TestHybridSearch(TestCase):
         }
         
         # Create CustomVectorQuery
-        from marqo.tensor_search.models.api_models import CustomVectorQuery
         custom_query = CustomVectorQuery(
             customVector=CustomVectorQuery.CustomVector(
                 content="test content",
@@ -310,7 +308,6 @@ class TestHybridSearch(TestCase):
         )
         
         # Create context with existing tensor (this triggers the append scenario)
-        from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
         existing_tensor = SearchContextTensor(vector=[0.1, 0.2, 0.3], weight=0.5)
         context = SearchContext(
             tensor=[existing_tensor]  # Already has a tensor

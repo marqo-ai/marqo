@@ -3,8 +3,8 @@ from unittest.mock import Mock, patch, AsyncMock
 from marqo.vespa.vespa_client import VespaClient
 
 
-class TestVespaClientClose(unittest.TestCase):
-    """Test VespaClient close method"""
+class TestVespaClient(unittest.TestCase):
+    """Test VespaClient functionality"""
 
     def setUp(self):
         """Set up test fixtures"""
@@ -31,11 +31,7 @@ class TestVespaClientClose(unittest.TestCase):
         # Verify that aclose was called
         mock_async_transport.aclose.assert_called_once()
 
-    def test_vespa_client_close_handles_missing_async_transport(self):
-        """Test that VespaClient.close handles missing async_transport gracefully"""
-        
-        # Skip this test since the actual implementation doesn't handle missing async_transport
-        self.skipTest("VespaClient.close() expects async_transport to exist")
+
 
     def test_get_content_url_single_path(self):
         """Test get_content_url with single path component"""
@@ -94,37 +90,6 @@ class TestVespaClientClose(unittest.TestCase):
         
         self.assertEqual(client.default_search_timeout_ms, 5000)
         # Note: pool_size and async_pool_size are not stored as instance attributes
-
-
-class TestVespaClientErrorScenarios(unittest.TestCase):
-    """Test VespaClient error scenarios"""
-
-    def setUp(self):
-        """Set up test fixtures"""
-        self.vespa_client = VespaClient(
-            config_url="http://localhost:19071",
-            document_url="http://localhost:8080",
-            query_url="http://localhost:8080",
-            content_cluster_name="test_cluster"
-        )
-
-    def test_vespa_client_close_with_exception_in_aclose(self):
-        """Test that VespaClient.close handles exceptions in aclose gracefully"""
-        
-        # Skip this test since the actual implementation doesn't handle exceptions
-        self.skipTest("VespaClient.close() doesn't handle exceptions in aclose")
-
-    def test_get_content_url_with_none_base_url_fails(self):
-        """Test get_content_url with None base URL"""
-        
-        # Skip this test since the actual implementation might handle None gracefully
-        self.skipTest("get_content_url behavior with None base URL may vary")
-
-    def test_get_content_url_with_invalid_base_url_type_fails(self):
-        """Test get_content_url with invalid base URL type"""
-        
-        # Skip this test since the actual implementation might handle invalid types gracefully
-        self.skipTest("get_content_url behavior with invalid base URL types may vary")
 
     def test_vespa_client_initialization_missing_required_params_fails(self):
         """Test VespaClient initialization fails with missing required parameters"""

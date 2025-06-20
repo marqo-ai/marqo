@@ -5,7 +5,7 @@ from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.core.models.interpolation_method import InterpolationMethod
 
 
@@ -252,10 +252,7 @@ class TestSearchQueryContextMethods(unittest.TestCase):
         result = query.get_context_tensor()
         self.assertIsNone(result)
 
-    def test_get_context_tensor_with_context_no_tensor(self):
-        """Test get_context_tensor when context exists but has no tensor"""
-        # Skip this test since SearchContext requires at least one of tensor or documents
-        self.skipTest("SearchContext validation requires at least one of tensor or documents")
+
 
     def test_get_context_documents_with_context(self):
         """Test get_context_documents when context with documents is provided"""
@@ -280,15 +277,6 @@ class TestSearchQueryContextMethods(unittest.TestCase):
         self.assertIsNone(result)
 
     # Error scenario tests
-    def test_search_query_facets_only_for_hybrid_search(self):
-        """Test that facets can only be used with hybrid search"""
-        # Skip this test since we don't have the correct model structure
-        self.skipTest("FacetsParameters structure not available for testing")
-
-    def test_search_query_image_download_headers_validation_error(self):
-        """Test that invalid image download headers field raises validation error"""
-        # Skip this test since the field might be valid in some contexts
-        self.skipTest("Image download headers validation behavior varies")
 
     def test_search_query_with_invalid_search_method_fails(self):
         """Test that invalid search method raises validation error"""
@@ -298,15 +286,7 @@ class TestSearchQueryContextMethods(unittest.TestCase):
         error_details = str(cm.exception)
         self.assertIn("value is not a valid enumeration member", error_details)
 
-    def test_search_query_with_negative_limit_fails(self):
-        """Test that negative limit raises validation error"""
-        # Skip this test since SearchQuery may not validate negative limits at the pydantic level
-        self.skipTest("SearchQuery limit validation may be handled elsewhere")
 
-    def test_search_query_with_negative_offset_fails(self):
-        """Test that negative offset raises validation error"""
-        # Skip this test since SearchQuery may not validate negative offsets at the pydantic level
-        self.skipTest("SearchQuery offset validation may be handled elsewhere")
 
     def test_search_query_interpolation_method_validation(self):
         """Test interpolation method validation"""
@@ -395,10 +375,6 @@ class TestSearchQueryContextMethods(unittest.TestCase):
         query = SearchQuery(q="test", attributesToRetrieve=None)
         self.assertIsNone(query.attributesToRetrieve)
 
-
-class TestSearchQueryEdgeCases(unittest.TestCase):
-    """Test SearchQuery edge cases and boundary conditions"""
-
     def test_search_query_with_valid_tensor_context_only(self):
         """Test SearchQuery with only tensor context (no query)"""
         
@@ -411,7 +387,6 @@ class TestSearchQueryEdgeCases(unittest.TestCase):
 
     def test_search_query_with_valid_documents_context_only(self):
         """Test SearchQuery with only documents context (no query)"""
-        from marqo.tensor_search.models.search import SearchContextDocuments
         
         context_docs = SearchContextDocuments(ids={"doc1": 1.0})
         context = SearchContext(documents=context_docs)

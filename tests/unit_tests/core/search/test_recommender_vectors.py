@@ -288,15 +288,24 @@ class TestRecommenderGetDocVectorsFromIds:
             with patch.object(self.recommender, 'get_default_interpolation_method') as mock_get_default:
                 mock_get_default.return_value = InterpolationMethod.SLERP
                 
-                # Call recommend with interpolation_method=None
-                result = self.recommender.recommend(
-                    index_name="test_index",
-                    documents=["doc1"],
-                    interpolation_method=None  # This triggers interpolation method selection
-                )
-                
-                # Verify get_default_interpolation_method was called
-                mock_get_default.assert_called_once_with(mock_index, ["doc1"])
+                # Mock from_interpolation_method to capture which method is used
+                with patch('marqo.core.search.recommender.from_interpolation_method') as mock_from_interp:
+                    mock_interpolation = Mock()
+                    mock_interpolation.interpolate.return_value = [0.1, 0.2, 0.3]
+                    mock_from_interp.return_value = mock_interpolation
+                    
+                    # Call recommend with interpolation_method=None
+                    result = self.recommender.recommend(
+                        index_name="test_index",
+                        documents=["doc1"],
+                        interpolation_method=None  # This triggers interpolation method selection
+                    )
+                    
+                    # This confirms that get_default_interpolation_method is being called
+                    mock_get_default.assert_called_once_with(mock_index, ["doc1"])
+                    
+                    # Assert that the final interpolation method called would be SLERP
+                    mock_from_interp.assert_called_once_with(InterpolationMethod.SLERP)
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.config.Config')
