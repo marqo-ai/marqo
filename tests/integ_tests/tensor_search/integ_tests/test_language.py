@@ -337,6 +337,61 @@ class TestLanguage(MarqoTestCase):
                 hits_ids = [hit["_id"] for hit in result["hits"]]
                 self.assertEqual(['multi1', 'multi2'], hits_ids)
 
+    def test_language_tensor_lexical(self):
+        """Test index with three text fields: French, Portuguese, and English (automatic detection)."""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Green tree",
+                "description": "Grande collection",
+            },
+            {
+                "_id": "2",
+                "title": "Black dog",
+                "description": "Grande maison",
+            },
+            {
+                "_id": "3",
+                "title": "Big tree",
+                "description": "Grande collection connexions",
+            },
+        ]
+
+        mappings = {
+            "description": {"type": "text_field", "language": "fr"},
+        }
+
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.three_fields_index.name,
+                docs=docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+
+        self.assertFalse(response.errors,
+                         f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}")
+
+        result = tensor_search.search(
+            config=self.config,
+            index_name=self.three_fields_index.name,
+            text='dog collection connexions',
+            search_method='hybrid',
+            hybrid_parameters=HybridParameters(
+                retrievalMethod='tensor',
+                rankingMethod='lexical',
+            ),
+            language='fr'
+        )
+
+        # Verify the expected order when reranked lexically -- we've also verified this order is only
+        # returned when the language is set to French
+        self.assertGreater(len(result["hits"]), 0)
+        hits_ids = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(['3', '2', '1'], hits_ids)
+
     def test_language_change_scenarios(self):
         """Test different language change scenarios."""
 
@@ -450,7 +505,7 @@ class TestLanguage(MarqoTestCase):
             (SearchMethod.LEXICAL, "lexical", "running"),
             (SearchMethod.HYBRID, "hybrid_default", "swimming")
         ]
-        
+
         for search_method, method_name, search_text in search_tests:
             with self.subTest(search_method=method_name):
                 with self.assertRaises(UnsupportedFeatureError) as cm:
@@ -461,6 +516,6 @@ class TestLanguage(MarqoTestCase):
                         search_method=search_method,
                         language="en-US"
                     )
-                
+
                 # Verify we get an appropriate error
                 self.assertIn("language", str(cm.exception).lower())
