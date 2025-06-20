@@ -213,6 +213,10 @@ class TestLanguage(MarqoTestCase):
                         retrievalMethod=RetrievalMethod.Lexical,
                         rankingMethod=RankingMethod.Lexical
                     )),
+                    (SearchMethod.HYBRID, "hybrid_lexical", HybridParameters(
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor
+                    )),
                     (SearchMethod.HYBRID, "hybrid_rrf", None)
                 ]
 
