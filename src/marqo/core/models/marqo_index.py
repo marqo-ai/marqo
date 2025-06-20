@@ -704,7 +704,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     name: str = values['name']
     type: FieldType = values['type']
     features: List[FieldFeature] = values['features']
-    language: str = values['language']
+    language: str = values.get('language')
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
     validate_field_name(name)

@@ -1,6 +1,6 @@
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
-                                   InvalidDataRangeError, MarqoDocumentParsingError)
+                                   InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import *
@@ -357,6 +357,12 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         # TODO - There is some inefficiency here, as we are retrieving chunks even if highlights are false,
         # and also for lexical search. This applies to both with and without attributes_to_retrieve
+
+        # Structured indexes don't support language
+        if isinstance(marqo_query, MarqoLexicalQuery) and marqo_query.language is not None:
+            raise UnsupportedFeatureError(
+                f'Language is not supported for structured indexes'
+                )
 
         # Verify attributes to retrieve, if defined
         if marqo_query.attributes_to_retrieve is not None:

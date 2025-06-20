@@ -8,8 +8,10 @@ import os
 import uuid
 from unittest import mock
 
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.marqo_index import Model
+from marqo.core.models.marqo_index import Model, FieldType, FieldFeature
+from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
@@ -85,6 +87,20 @@ class TestLanguage(MarqoTestCase):
             model=Model(name='hf/e5-small-v2')
         )
         index_requests.append(cls.pt_br_index)
+
+        # Create a structured index for testing language search failure
+        cls.structured_index = cls.structured_marqo_index_request(
+            name='test_structured_lang_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2'),
+            fields=[
+                FieldRequest(name="title", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="content", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+            ],
+            tensor_fields=["title", "content"]
+        )
+        index_requests.append(cls.structured_index)
 
         # Batch create all indexes
         cls.indexes = cls.create_indexes(index_requests)
@@ -404,3 +420,43 @@ class TestLanguage(MarqoTestCase):
 
                             self.assertEqual(doc1["title"], scenario["first_docs"][0]["title"])
                             self.assertEqual(doc2["title"], scenario["second_docs"][0]["title"])
+
+    def test_structured_index_language_search_fails(self):
+        """Test that searching with language parameter fails for structured indexes."""
+
+        # Add documents to the structured index
+        docs = [
+            {"_id": "doc1", "title": "Running in the park", "content": "Exercise is good for health"},
+            {"_id": "doc2", "title": "Swimming in the ocean", "content": "Water sports are fun"}
+        ]
+
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.structured_index.name,
+                docs=docs
+            )
+        )
+
+        # Verify documents were added successfully
+        self.assertFalse(response.errors, "Failed to add documents to structured index")
+
+        # Test search methods with language parameter
+        search_tests = [
+            (SearchMethod.LEXICAL, "lexical", "running"),
+            (SearchMethod.HYBRID, "hybrid_default", "swimming")
+        ]
+        
+        for search_method, method_name, search_text in search_tests:
+            with self.subTest(search_method=method_name):
+                with self.assertRaises(UnsupportedFeatureError) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.structured_index.name,
+                        text=search_text,
+                        search_method=search_method,
+                        language="en-US"
+                    )
+                
+                # Verify we get an appropriate error
+                self.assertIn("language", str(cm.exception).lower())
