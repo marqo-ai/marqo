@@ -64,13 +64,15 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
         assert result == (["title", "description"], ["emb_title", "emb_desc"])
     
     def test_unstructured_index(self):
-        """Test getting embedding field names for unstructured index"""
+        """Test getting embedding field names for unstructured index - should raise error"""
         mock_index = Mock(spec=UnstructuredMarqoIndex)
         mock_index.type = IndexType.Unstructured
+        mock_index.name = "test_unstructured_index"  # Add name for error message
         
-        result = get_embedding_field_names(mock_index)
+        with pytest.raises(Exception) as exc_info:
+            get_embedding_field_names(mock_index)
         
-        assert result == (["marqo__embeddings"], [unstructured_common.VESPA_DOC_EMBEDDINGS])
+        assert "Attempting to retrieve only embeddings for unstructured index" in str(exc_info.value)
     
     def test_structured_index_no_tensor_fields(self):
         """Test structured index with no tensor fields"""
@@ -222,8 +224,8 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
-    def test_unstructured_index(self, mock_vespa_factory, mock_get_index, mock_metrics):
-        """Test with unstructured index"""
+    def test_unstructured_index_raises_error(self, mock_vespa_factory, mock_get_index, mock_metrics):
+        """Test that unstructured index raises error since function is only for structured/semi-structured"""
         
         # Mock RequestMetricsStore
         mock_metrics_instance = Mock()
@@ -235,47 +237,22 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         mock_unstructured_index = Mock(spec=UnstructuredMarqoIndex)
         mock_unstructured_index.type = IndexType.Unstructured
         mock_unstructured_index.schema_name = "test_schema"
+        mock_unstructured_index.name = "test_unstructured_index"  # Add name for error message
         
         mock_get_index.return_value = mock_unstructured_index
         mock_vespa_index = Mock()
         mock_vespa_factory.return_value = mock_vespa_index
         
-        # Mock Vespa response with proper fields structure
-        mock_doc_response = Mock()
-        mock_doc_response.status = 200
-        mock_doc_response.document.fields = {
-            "marqo__id": "doc1",
-            unstructured_common.VESPA_DOC_EMBEDDINGS: {
-                "blocks": {
-                    "0": [0.1, 0.2, 0.3]
-                }
-            }
-        }
+        # Call the function and expect it to raise an error
+        with pytest.raises(Exception) as exc_info:
+            get_doc_vectors_per_tensor_field_by_ids(
+                self.mock_config, 
+                "test_index", 
+                ["doc1"]
+            )
         
-        mock_batch_response = Mock()
-        mock_batch_response.responses = [mock_doc_response]
-        self.mock_vespa_client.get_batch.return_value = mock_batch_response
-        
-        # Call the function
-        result = get_doc_vectors_per_tensor_field_by_ids(
-            self.mock_config, 
-            "test_index", 
-            ["doc1"]
-        )
-        
-        # For unstructured indices, the result should use "marqo__embeddings" as the key
-        expected = {
-            "doc1": {
-                "marqo__embeddings": [[0.1, 0.2, 0.3]]
-            }
-        }
-        assert result == expected
-        
-        # Verify get_batch was called with unstructured embeddings field
-        expected_fields = [structured_common.FIELD_ID, unstructured_common.VESPA_DOC_EMBEDDINGS]
-        self.mock_vespa_client.get_batch.assert_called_once_with(
-            ["doc1"], "test_schema", fields=expected_fields, concurrency=None
-        )
+        # Verify error message
+        assert "Attempting to retrieve only embeddings for unstructured index" in str(exc_info.value)
     
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -477,3 +454,99 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
             }
         }
         assert result == expected 
+
+    @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
+    def test_multiple_documents_multiple_tensor_fields_loop_indexes(self, mock_vespa_factory, mock_get_index, mock_metrics):
+        """Test that loop indexes are handled correctly with 3 responses and 3 tensor fields each"""
+        
+        # Mock RequestMetricsStore
+        mock_metrics_instance = Mock()
+        mock_metrics.for_request.return_value = mock_metrics_instance
+        mock_metrics_instance.time.return_value.__enter__ = Mock()
+        mock_metrics_instance.time.return_value.__exit__ = Mock()
+        
+        # Create mock index with 3 tensor fields
+        mock_index = Mock(spec=StructuredMarqoIndex)
+        mock_index.type = IndexType.Structured
+        mock_index.schema_name = "test_schema"
+        
+        tensor_fields = [
+            TensorField(name="field1", chunk_field_name="chunks_field1", embeddings_field_name="emb_field1"),
+            TensorField(name="field2", chunk_field_name="chunks_field2", embeddings_field_name="emb_field2"),
+            TensorField(name="field3", chunk_field_name="chunks_field3", embeddings_field_name="emb_field3")
+        ]
+        mock_index.tensor_fields = tensor_fields
+        
+        # Mock dependencies
+        mock_get_index.return_value = mock_index
+        mock_vespa_index = Mock()
+        mock_vespa_factory.return_value = mock_vespa_index
+        
+        # Mock 3 Vespa responses with different embedding patterns to verify correct indexing
+        mock_responses = []
+        for i in range(3):
+            doc_id = f"doc{i+1}"
+            mock_response = Mock()
+            mock_response.status = 200
+            mock_response.document.fields = {
+                "marqo__id": doc_id,
+                "emb_field1": {
+                    "blocks": {
+                        "0": [0.1 + i, 0.2 + i, 0.3 + i],  # Different values per document
+                        "1": [0.4 + i, 0.5 + i, 0.6 + i]
+                    }
+                },
+                "emb_field2": {
+                    "blocks": {
+                        "0": [1.1 + i, 1.2 + i, 1.3 + i],
+                    }
+                },
+                "emb_field3": {
+                    "blocks": {
+                        "0": [2.1 + i, 2.2 + i, 2.3 + i],
+                        "1": [2.4 + i, 2.5 + i, 2.6 + i],
+                        "2": [2.7 + i, 2.8 + i, 2.9 + i]
+                    }
+                }
+            }
+            mock_responses.append(mock_response)
+        
+        mock_batch_response = Mock()
+        mock_batch_response.responses = mock_responses
+        self.mock_config.vespa_client.get_batch.return_value = mock_batch_response
+        
+        # Call the function with 3 document IDs
+        result = get_doc_vectors_per_tensor_field_by_ids(
+            self.mock_config, 
+            "test_index", 
+            ["doc1", "doc2", "doc3"],
+            tensor_fields=["field1", "field2", "field3"]
+        )
+        
+        # Verify that each document has the correct embeddings for each field
+        expected = {
+            "doc1": {
+                "field1": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+                "field2": [[1.1, 1.2, 1.3]],
+                "field3": [[2.1, 2.2, 2.3], [2.4, 2.5, 2.6], [2.7, 2.8, 2.9]]
+            },
+            "doc2": {
+                "field1": [[1.1, 1.2, 1.3], [1.4, 1.5, 1.6]],
+                "field2": [[2.1, 2.2, 2.3]],
+                "field3": [[3.1, 3.2, 3.3], [3.4, 3.5, 3.6], [3.7, 3.8, 3.9]]
+            },
+            "doc3": {
+                "field1": [[2.1, 2.2, 2.3], [2.4, 2.5, 2.6]],
+                "field2": [[3.1, 3.2, 3.3]],
+                "field3": [[4.1, 4.2, 4.3], [4.4, 4.5, 4.6], [4.7, 4.8, 4.9]]
+            }
+        }
+        assert result == expected
+        
+        # Verify get_batch was called with correct fields
+        expected_fields = [structured_common.FIELD_ID, "emb_field1", "emb_field2", "emb_field3"]
+        self.mock_config.vespa_client.get_batch.assert_called_once_with(
+            ["doc1", "doc2", "doc3"], "test_schema", fields=expected_fields, concurrency=None
+        )
