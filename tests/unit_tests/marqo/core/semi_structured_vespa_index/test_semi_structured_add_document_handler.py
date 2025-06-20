@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch, MagicMock
 import numpy as np
+from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import (
@@ -155,3 +156,66 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         # Verify document variety was preserved in the test setup
         doc_ids = [doc["_id"] for doc in docs]
         self.assertEqual(doc_ids, ["doc1", "doc2", "doc3"])
+
+    def test_add_documents_with_language_on_old_index_raises_error(self):
+        """Test that using language mapping on an old index raises AddDocumentsError"""
+        old_marqo_index = self.semi_structured_marqo_index(
+            name="old_test_index",
+            marqo_version="2.15.0",  # Version before language support
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        docs = [
+            {
+                "_id": "doc1",
+                "title": "Hola mundo",
+                "description": "Este es un documento en español"
+            }
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "language": "es"}
+        }
+
+        add_docs_params = AddDocsParams(
+            index_name="old_test_index",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings=mappings,
+            use_existing_tensors=False
+        )
+
+        mock_feed_responses = [
+            FeedBatchDocumentResponse(status=200, id="doc1", message="OK")
+        ]
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=mock_feed_responses,
+            errors=False
+        )
+        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
+
+        handler = SemiStructuredAddDocumentsHandler(
+            marqo_index=old_marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+
+        self.assertIsInstance(response, MarqoAddDocumentsResponse)
+        self.assertEqual(response.index_name, "old_test_index")
+        
+        error_items = [item for item in response.items if item.status != 200]
+        self.assertEqual(len(error_items), 1, "Expected exactly one error item")
+        
+        # Check that at least one document failed with the language version error
+        error_item = error_items[0]
+        self.assertIn("Language is only supported for indexes created with Marqo version", str(error_item.error))
+        self.assertIn("2.16.0", error_item.error)
+        self.assertIn("2.15.0", error_item.error)

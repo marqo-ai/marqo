@@ -18,7 +18,7 @@ from marqo.logging import get_logger
 # TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
-from marqo.core.constants import MARQO_SORT_BY_MINIMUM_VERSION
+import marqo.core.constants as constants
 
 logger = get_logger(__name__)
 
@@ -47,7 +47,7 @@ class FieldType(str, Enum):
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
     MapInt = 'map<text, int>'
-    MapLong = 'map<text, long>'  
+    MapLong = 'map<text, long>'
     MapFloat = 'map<text, float>'
     MapDouble = 'map<text, double>'
 
@@ -101,6 +101,7 @@ class Field(ImmutableStrictBaseModel):
         validate_structured_field(values, marqo_index=True)
 
         return values
+
 
 class StringArrayField(ImmutableStrictBaseModel):
     name: str
@@ -217,7 +218,7 @@ class Model(StrictBaseModel):
                 raise InvalidArgumentError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'
                 )
-            
+
     def get_text_query_prefix(self, request_level_prefix: Optional[str] = None) -> str:
         if request_level_prefix is not None:
             return request_level_prefix
@@ -245,7 +246,7 @@ class Model(StrictBaseModel):
 
         # Else return the model default as populated during initialization
         return self.text_chunk_prefix
-    
+
     def get_default_text_query_prefix(self) -> Optional[str]:
         return self._get_default_prefix("text_query_prefix")
 
@@ -349,8 +350,6 @@ class MarqoIndex(ImmutableBaseModel, ABC):
         if key not in self._cache:
             self._cache[key] = func()
         return self._cache[key]
-
-    
 
 
 class UnstructuredMarqoIndex(MarqoIndex):
@@ -516,14 +515,11 @@ class StructuredMarqoIndex(MarqoIndex):
 
 
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
-
-    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
-    _SORT_BY_SUPPORTED_VERSION = MARQO_SORT_BY_MINIMUM_VERSION
-
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
-    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    string_array_fields: Optional[List[
+        StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -550,7 +546,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
 
         return self._cache_or_get('name_to_string_array_field_map',
-                                  lambda : {} if self.string_array_fields is None 
+                                  lambda: {} if self.string_array_fields is None
                                   else {field.name: field for field in self.string_array_fields})
 
     @property
@@ -562,7 +558,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         Returns an empty dict if string_array_fields is None.
         """
         return self._cache_or_get('string_array_field_map',
-                                  lambda : {} if self.string_array_fields is None 
+                                  lambda: {} if self.string_array_fields is None
                                   else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
@@ -630,7 +626,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         return self._cache_or_get(
             'index_supports_partial_updates',
-            lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
+            lambda: self.parsed_marqo_version() >= constants.MARQO_PARTIAL_UPDATE_MINIMUM_VERSION)
+
+    @property
+    def index_supports_language(self) -> bool:
+        """
+        Check if the index supports language.
+        """
+        return self._cache_or_get(
+            'index_supports_language',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_LANGUAGE_MINIMUM_VERSION)
 
     @property
     def index_supports_sorty_by(self) -> bool:
@@ -639,7 +644,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         return self._cache_or_get(
             'index_supports_sort_by',
-            lambda: self.parsed_marqo_version() >= self._SORT_BY_SUPPORTED_VERSION)
+            lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_MINIMUM_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
@@ -735,14 +740,14 @@ def validate_structured_field(values, marqo_index: bool) -> None:
         )
 
     if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int,
-                                                               FieldType.Double, FieldType.MapFloat, 
+                                                               FieldType.Double, FieldType.MapFloat,
                                                                FieldType.MapInt, FieldType.MapDouble,
                                                                FieldType.Long, FieldType.MapLong]:
         raise ValueError(
-             f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-             f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
-             f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
-         )
+            f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+            f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
+            f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
+        )
 
     # These validations are specific to marqo_index.Field
     if marqo_index:
