@@ -1,0 +1,63 @@
+now  i want you to detect the cutoff count for the given probe lexical result,
+check the following code snippet to have a brief idea of the context and then write code into my
+file. For the normal fit method, the algorithm is here:
+def get_count(query: str, filter_string: str) -> int:
+    query = clean_query(query)
+    results = mq.index(index_name).search(
+        query,
+        search_method="LEXICAL",
+        limit=1000,
+        attributes_to_retrieve=[],
+        searchable_attributes=["title", "title_es", "body_html_safe"],
+        filter_string=filter_string
+    )
+
+    scores = [h["_score"] for h in results["hits"]]
+    mean_score = statistics.mean(scores)
+    std_score = statistics.pstdev(scores)
+    threshold = mean_score + (std_score * 1.2)
+    relevant_count = sum(1 for s in scores if s >= threshold)
+    return relevant_count
+
+switch (cutoffMethod) {
+            case "gapDetection" -> {
+                List<Hit> lexicalHits = new ArrayList<>(probeLexialResult.hits().asList());
+
+                if (lexicalHits.isEmpty()) {
+                    return 0;
+                } else {
+                    // Find the elbow point in the lexical hits
+                    double maxDelta = -1.0;
+                    int bestIndex = lexicalHits.size(); // default: keep all
+                    for (int i = 0; i < lexicalHits.size() - 1; i++) {
+                        double score1 = lexicalHits.get(i).getRelevance().getScore();
+                        double score2 = lexicalHits.get(i + 1).getRelevance().getScore();
+                        double delta = score1 - score2;
+                        if (delta > maxDelta) {
+                            maxDelta = delta;
+                            bestIndex = i + 1;
+                        }
+                    }
+                    // Respect minimum result constraint
+                    return Math.max(bestIndex, Math.max(0, minResults));
+                }
+            }
+            case "normalFit" ->
+                    // normalFit method
+                    throw new RuntimeException(
+                            "Not implemented yet. Please use lexicalCutoff or gapDetection.");
+            case "softCodedScoreCut" -> {
+                // softCodedScoreCut method
+                List<Hit> lexicalHits = new ArrayList<>(probeLexialResult.hits().asList());
+
+                double topScore = lexicalHits.get(0).getRelevance().getScore();
+                double dynamicThreshold = topScore * dummyParameter;
+
+                int matchedSize = 0;
+                for (Hit hit : lexicalHits) {
+                    if (hit.getRelevance().getScore() >= dynamicThreshold) {
+                        matchedSize += 1;
+                    }
+                }
+                return Math.max(matchedSize, Math.max(0, minResults));
+            }

@@ -320,4 +320,10 @@ class HybridSearch:
         if sort_by is not None:
             gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
 
+        # Add relevance cutoff information if available
+        if responses.root.fields.relevance_candidates is not None:
+            gathered_results["_relevanceCandidates"] = responses.root.fields.relevance_candidates
+        if responses.root.fields.probe_candidates is not None:
+            gathered_results["_probeCandidates"] = responses.root.fields.probe_candidates
+
         return gathered_results

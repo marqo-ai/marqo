@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 class RootFields(BaseModel):
     total_count: Optional[int] = Field(None, alias='totalCount')
     sort_candidates: Optional[int] = Field(None, alias='marqo__sortCandidates')
+    relevance_candidates: Optional[int] = Field(None, alias='marqo__relevanceCandidates')
+    probe_candidates: Optional[int] = Field(None, alias='marqo__probeCandidates')
 
 
 class Degraded(BaseModel):
