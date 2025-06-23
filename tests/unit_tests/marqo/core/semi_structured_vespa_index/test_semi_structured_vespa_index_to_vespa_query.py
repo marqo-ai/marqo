@@ -228,7 +228,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
         self.assertEqual("rating", sort_fields[1]["field_name"])
         self.assertEqual("asc", sort_fields[1]["order"].value)
         self.assertEqual(3, r['marqo__hybrid.sortBy.sortDepth'])
-        self.assertEqual(50, r['marqo__hybrid.sortBy.sortCandidates'])
+        self.assertEqual(50, r['marqo__hybrid.sortBy.minSortCandidates'])
 
     def test_sort_by_single_field_no_optional(self):
         """Test sorting by a single field with no optional params."""
@@ -308,7 +308,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
         self.assertEqual("first", fields[2]["missing"].value)
 
         self.assertEqual(4, r["marqo__hybrid.sortBy.sortDepth"])
-        self.assertEqual(100, r["marqo__hybrid.sortBy.sortCandidates"])
+        self.assertEqual(100, r["marqo__hybrid.sortBy.minSortCandidates"])
 
     def test_query_features_sort_field_weights_3_fields(self):
         """A fuzzy test to ensure that query_features are correctly populated with sort field weights."""
@@ -502,6 +502,63 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         )
         r2 = self.index._to_vespa_hybrid_query(self.hybrid_query)
         self.assertEqual(42, r2["marqo__hybrid.relevanceCutoff.probeDepth"])
+
+    def test_relevance_cutoff_edge_case_values(self):
+        """Test relevance cutoff with edge case parameter values."""
+        # Test minimum valid relativeScoreFactor
+        params = RelativeMaxScoreParameters(relativeScoreFactor=0.001)
+        self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=params,
+            probe_depth=1  # minimum probe depth
+        )
+        
+        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        self.assertAlmostEqual(0.001,
+                               r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
+        self.assertEqual(1, r["marqo__hybrid.relevanceCutoff.probeDepth"])
+        
+        # Test maximum valid relativeScoreFactor
+        params = RelativeMaxScoreParameters(relativeScoreFactor=1.0)
+        self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=params,
+            probe_depth=10000  # large probe depth
+        )
+        
+        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        self.assertAlmostEqual(1.0,
+                               r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
+        self.assertEqual(10000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
+
+    def test_relevance_cutoff_std_dev_edge_cases(self):
+        """Test MeanStdDev with edge case stdDevFactor values."""
+        # Test small stdDevFactor
+        params = MeanStdParameters(stdDevFactor=0.1)
+        self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.MeanStdDev,
+            parameters=params,
+            probe_depth=50
+        )
+        
+        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        self.assertEqual(RelevanceCutoffMethod.MeanStdDev,
+                         r["marqo__hybrid.relevanceCutoff.method"])
+        self.assertAlmostEqual(0.1,
+                               r["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"])
+        self.assertEqual(50, r["marqo__hybrid.relevanceCutoff.probeDepth"])
+        
+        # Test large stdDevFactor
+        params = MeanStdParameters(stdDevFactor=10.0)
+        self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.MeanStdDev,
+            parameters=params
+        )
+        
+        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        self.assertAlmostEqual(10.0,
+                               r["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"])
+        self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])  # default
 
 
 if __name__ == '__main__':
