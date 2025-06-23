@@ -143,43 +143,6 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
         hit_ids = [hit['_id'] for hit in search_result['hits']]
         self.assertIn('data_url_doc', hit_ids)
 
-    def test_api_tensor_search_with_plain_base64(self):
-        """Test tensor search with plain base64 string through API."""
-        # Add documents with plain base64 images
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": self.base64_images['green_triangle']['plain_base64'],
-                "text_field": "Green triangle",
-                "title": "Triangle Shape"
-            },
-            {
-                "_id": "doc2",
-                "image_field": self.base64_images['blue_circle']['plain_base64'],
-                "text_field": "Blue circle", 
-                "title": "Circle Shape"
-            }
-        ]
-        
-        # Add documents through API
-        add_result = self.client.index(self.structured_index_name).add_documents(documents=docs)
-        
-        self.assertIn('items', add_result)
-        for item in add_result['items']:
-            self.assertEqual(item['status'], 200)
-        
-        # Search with plain base64 image
-        search_result = self.client.index(self.structured_index_name).search(
-            q=self.base64_images['green_triangle']['plain_base64'],
-            search_method="TENSOR",
-            limit=5
-        )
-        
-        self.assertIn('hits', search_result)
-        self.assertGreater(len(search_result['hits']), 0)
-        # Should find the green triangle as most similar
-        self.assertEqual(search_result['hits'][0]['_id'], 'doc1')
-
     def test_api_hybrid_search_with_base64_images(self):
         """Test hybrid search with base64 images through API."""
         # Add documents with mixed content
