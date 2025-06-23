@@ -1,5 +1,7 @@
 package ai.marqo.search;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -57,10 +59,37 @@ public class HybridSearcher extends Searcher {
     // Magic number for missing sort field values
     private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
 
-    private static class SortField {
-        public String field_name;
-        public String order;
-        public String missing;
+    /**
+     * Represents a field to sort by in the search results.
+     * Uses Java record for immutability and conciseness.
+     */
+    private record SortField(
+            @JsonProperty("field_name") String fieldName,
+            @JsonProperty("order") SortOrder order,
+            @JsonProperty("missing") MissingOrder missing) {}
+
+    /** Sort order enum for better type safety */
+    private enum SortOrder {
+        ASC,
+        DESC;
+
+        @JsonCreator
+        public static SortOrder fromString(String value) {
+            if (value == null) return ASC; // default
+            return "desc".equalsIgnoreCase(value) ? DESC : ASC;
+        }
+    }
+
+    /** Missing value handling enum */
+    private enum MissingOrder {
+        FIRST,
+        LAST;
+
+        @JsonCreator
+        public static MissingOrder fromString(String value) {
+            if (value == null) return FIRST; // default
+            return "last".equalsIgnoreCase(value) ? LAST : FIRST;
+        }
     }
 
     // Compile the regex pattern once and store it as a static final variable
@@ -227,7 +256,12 @@ public class HybridSearcher extends Searcher {
             // If sortBy is not set, we use the default post-processing
             processedHits =
                     postProcessResults(
-                            hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
+                            hitsForPostProcessing,
+                            query,
+                            rerankDepthGlobal,
+                            limit,
+                            offset,
+                            verbose);
         }
 
         // --- Attach facets results if available ---
@@ -308,11 +342,11 @@ public class HybridSearcher extends Searcher {
                         return (v == MISSING_SORT_VALUE_SENTINEL) ? null : v;
                     };
             Comparator<Double> base = Comparator.naturalOrder();
-            if ("desc".equalsIgnoreCase(sf.order)) {
+            if (sf.order() == SortOrder.DESC) {
                 base = base.reversed();
             }
             Comparator<Double> nullAware =
-                    "last".equalsIgnoreCase(sf.missing)
+                    sf.missing() == MissingOrder.LAST
                             ? Comparator.nullsLast(base)
                             : Comparator.nullsFirst(base);
             Comparator<Hit> fieldComparator = Comparator.comparing(keyExtractor, nullAware);
