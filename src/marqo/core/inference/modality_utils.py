@@ -81,7 +81,7 @@ def _infer_modality_based_on_mime_type(mime_object: str) -> Modality:
         return Modality.TEXT
 
 
-def _is_base64_image(content: str) -> bool:
+def is_base64_image(content: str) -> bool:
     """
     Check if a string is a base64-encoded image.
     
@@ -143,7 +143,7 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
     """
     if isinstance(content, str):
         # Check if it's a base64-encoded image first
-        if _is_base64_image(content):
+        if is_base64_image(content):
             return Modality.IMAGE
 
         if not validate_url(content):

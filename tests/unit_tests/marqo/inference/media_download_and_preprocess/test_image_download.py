@@ -5,8 +5,9 @@ from io import BytesIO
 
 from PIL import Image, UnidentifiedImageError
 
+from marqo.core.inference.modality_utils import is_base64_image
 from marqo.inference.media_download_and_preprocess.image_download import (
-    _is_base64_image, _load_base64_image, load_image_from_path, format_and_load_CLIP_image
+    _load_base64_image, load_image_from_path, format_and_load_CLIP_image
 )
 
 
@@ -24,30 +25,30 @@ class TestBase64ImageSupport(unittest.TestCase):
 
     def test_is_base64_image_data_url_format(self):
         """Test recognition of data URL format base64 images."""
-        self.assertTrue(_is_base64_image(self.test_data_url))
+        self.assertTrue(is_base64_image(self.test_data_url))
         
         # Test different formats
         jpeg_data_url = f"data:image/jpeg;base64,{self.test_base64_data}"
-        self.assertTrue(_is_base64_image(jpeg_data_url))
+        self.assertTrue(is_base64_image(jpeg_data_url))
 
     def test_is_base64_image_plain_base64(self):
         """Test recognition of plain base64 images."""
         with patch('magic.from_buffer') as mock_magic:
             mock_magic.return_value = 'image/png'
-            self.assertTrue(_is_base64_image(self.test_base64_data))
+            self.assertTrue(is_base64_image(self.test_base64_data))
 
     def test_is_base64_image_invalid_cases(self):
         """Test rejection of invalid cases."""
         # Short string
-        self.assertFalse(_is_base64_image("short"))
+        self.assertFalse(is_base64_image("short"))
         
         # Non-base64 string
-        self.assertFalse(_is_base64_image("not_base64_at_all" * 10))
+        self.assertFalse(is_base64_image("not_base64_at_all" * 10))
         
         # Non-image content
         with patch('magic.from_buffer') as mock_magic:
             mock_magic.return_value = 'text/plain'
-            self.assertFalse(_is_base64_image("VGVzdCB0ZXh0" * 10))
+            self.assertFalse(is_base64_image("VGVzdCB0ZXh0" * 10))
 
     def test_load_base64_image_data_url(self):
         """Test loading base64 image from data URL format."""
@@ -71,7 +72,7 @@ class TestBase64ImageSupport(unittest.TestCase):
 
     def test_load_image_from_path_base64_data_url(self):
         """Test that load_image_from_path handles base64 data URLs."""
-        with patch('marqo.inference.media_download_and_preprocess.image_download._is_base64_image') as mock_is_base64:
+        with patch('marqo.inference.media_download_and_preprocess.image_download.is_base64_image') as mock_is_base64:
             with patch('marqo.inference.media_download_and_preprocess.image_download._load_base64_image') as mock_load:
                 mock_is_base64.return_value = True
                 mock_load.return_value = self.test_image
@@ -84,7 +85,7 @@ class TestBase64ImageSupport(unittest.TestCase):
 
     def test_load_image_from_path_base64_plain(self):
         """Test that load_image_from_path handles plain base64 strings."""
-        with patch('marqo.inference.media_download_and_preprocess.image_download._is_base64_image') as mock_is_base64:
+        with patch('marqo.inference.media_download_and_preprocess.image_download.is_base64_image') as mock_is_base64:
             with patch('marqo.inference.media_download_and_preprocess.image_download._load_base64_image') as mock_load:
                 mock_is_base64.return_value = True
                 mock_load.return_value = self.test_image
@@ -110,7 +111,7 @@ class TestBase64ImageSupport(unittest.TestCase):
         # Create a string that might look like a file path but is actually base64
         fake_path = "some/fake/path.png"
         
-        with patch('marqo.inference.media_download_and_preprocess.image_download._is_base64_image') as mock_is_base64:
+        with patch('marqo.inference.media_download_and_preprocess.image_download.is_base64_image') as mock_is_base64:
             with patch('marqo.inference.media_download_and_preprocess.image_download._load_base64_image') as mock_load:
                 with patch('os.path.isfile') as mock_isfile:
                     mock_is_base64.return_value = True

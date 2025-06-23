@@ -13,6 +13,7 @@ from requests.utils import requote_uri
 
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
+from marqo.core.inference.modality_utils import is_base64_image
 from marqo.s2_inference.errors import ImageDownloadError
 from marqo.s2_inference.types import *
 from marqo.s2_inference.types import Modality
@@ -50,7 +51,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # if it is a string, determine if it is a local file or url
     if isinstance(thing, str):
         # Check if it's a base64-encoded image first
-        if _is_base64_image(thing):
+        if is_base64_image(thing):
             return True
             
         name, extension = os.path.splitext(thing.lower())
@@ -148,56 +149,6 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     return img
 
 
-def _is_base64_image(content: str) -> bool:
-    """
-    Check if a string is a base64-encoded image.
-    
-    Args:
-        content: The string to check
-        
-    Returns:
-        bool: True if the content is a base64-encoded image, False otherwise
-    """
-    if not isinstance(content, str):
-        return False
-        
-    # Check for data URL format: data:image/[format];base64,[base64_data]
-    if content.startswith('data:image/') and ';base64,' in content:
-        return True
-        
-    # Check for plain base64 string (without data URL prefix)
-    # We'll be more conservative and only check if it looks like base64 encoding
-    # and has a reasonable length for an image
-    if len(content) > 100:  # Minimum reasonable size for a base64 image
-        try:
-            # Try to decode as base64
-            if content.startswith('data:'):
-                # Extract base64 part from data URL
-                if ';base64,' in content:
-                    base64_part = content.split(';base64,', 1)[1]
-                else:
-                    return False
-            else:
-                base64_part = content
-                
-            # Try to decode the base64 content
-            import magic
-            decoded = base64.b64decode(base64_part, validate=True)
-            
-            # Use python-magic to check if it's actually an image
-            mime_type = magic.from_buffer(decoded, mime=True)
-            return mime_type.startswith('image/')
-            
-        except (base64.binascii.Error, ValueError):
-            try:
-                import magic
-                return False
-            except ImportError:
-                return False
-            
-    return False
-
-
 def _load_base64_image(content: str) -> ImageType:
     """
     Load a base64-encoded image string into a PIL Image.
@@ -252,7 +203,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
         ImageType: In-memory PIL image.
     """
     # Check if it's a base64-encoded image first
-    if _is_base64_image(image_path):
+    if is_base64_image(image_path):
         return _load_base64_image(image_path)
         
     if os.path.isfile(image_path):
