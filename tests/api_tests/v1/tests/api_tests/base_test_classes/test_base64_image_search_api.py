@@ -4,7 +4,7 @@ from io import BytesIO
 
 from PIL import Image
 import requests
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestBase64ImageSearchAPI(MarqoTestCase):
@@ -79,27 +79,6 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
         content_type = response.headers.get('content-type', 'image/png')
         return f"data:{content_type};base64,{base64_data}"
 
-    # def test_api_error_handling_invalid_base64(self):
-    #     """Test API error handling for invalid base64 image data."""
-    #     # Try to add document with invalid base64
-    #     docs = [
-    #         {
-    #             "_id": "doc1",
-    #             "image_field": "data:image/png;base64,invalid_base64_data!!!",
-    #             "text_field": "Invalid base64 image"
-    #         }
-    #     ]
-    #
-    #     # This should handle the error gracefully during indexing
-    #     # Depending on implementation, it might skip the field or return an error
-    #     add_result = self.client.index(self.unstructured_index_name).add_documents(
-    #         documents=docs,
-    #         tensor_fields=["image_field", "text_field"]
-    #     )
-    #
-    #     # Check that the API returns some response (exact behavior may vary)
-    #     self.assertIn('items', add_result)
-
     def test_api_base64_images_rejected_in_add_documents(self):
         """Test that base64 images are properly rejected during document addition across all index types."""
 
@@ -153,7 +132,7 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
         search_methods = [
             ("tensor", "TENSOR", None),
             ("hybrid_rrf", "HYBRID", {"retrievalMethod": "disjunction", "rankingMethod": "rrf"}),
-            ("hybrid_tensor", "HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "tensor"})
+            ("hybrid_tensor", "HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "tensor"}),
         ]
 
         for index_type, index_name in index_configs:
@@ -207,6 +186,178 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
                         else:
                             score = first_hit['_score']
                         self.assertEqual(1.0, score, f"Score mismatch for {search_name} on {index_type} index")
+
+    def test_hybrid_search_with_base64_query_tensor_and_query_lexical(self):
+        """Test hybrid search with base64 image in queryTensor and text in queryLexical across all index types."""
+        # Convert real image URL to base64 for search query
+        hippo_base64 = self._url_to_base64(TestImageUrls.HIPPO_STATUE.value)
+
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
+        ]
+
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Add documents with real image URLs and text
+                docs = [
+                    {
+                        "_id": "hippo_statue_doc",
+                        "image": TestImageUrls.HIPPO_STATUE.value,
+                        "title": "AI generated hippo statue sculpture"
+                    },
+                    {
+                        "_id": "coco_doc",
+                        "image": TestImageUrls.COCO.value,
+                        "title": "COCO dataset image with various objects"
+                    },
+                    {
+                        "_id": "text_only_hippo",
+                        "title": "A document about hippo animals in the wild"
+                    },
+                    {
+                        "_id": "text_only_statue",
+                        "title": "Ancient statue sculpture art history"
+                    }
+                ]
+
+                # Add documents
+                if index_type == "unstructured":
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs,
+                        tensor_fields=["image", "title"]
+                    )
+                else:
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs
+                    )
+                self.assertFalse(add_result['errors'])
+
+                # Test 1: Basic base64 queryTensor with queryLexical
+                with self.subTest(query_type="basic_base64"):
+                    search_params = {
+                        "search_method": "HYBRID",
+                        "hybrid_parameters": {
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "queryTensor": hippo_base64,
+                            "queryLexical": "statue sculpture"
+                        }
+                    }
+
+                    search_result = self.client.index(index_name).search(**search_params)
+
+                    # Verify results
+                    self.assertIn('hits', search_result)
+                    self.assertGreater(len(search_result['hits']), 0)
+
+                    # The hippo statue document should be the first hit due to perfect image match
+                    first_hit = search_result['hits'][0]
+                    self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
+
+                    # Verify both tensor and lexical scores are present
+                    self.assertIn('_tensor_score', first_hit)
+                    self.assertIn('_lexical_score', first_hit)
+
+                    # Tensor score should be 1.0 for perfect match
+                    self.assertEqual(1.0, first_hit['_tensor_score'])
+
+                # Test 2: Dict queryTensor with base64 (weight 1) and text (weight 0)
+                with self.subTest(query_type="dict_base64_and_text"):
+                    search_params = {
+                        "search_method": "HYBRID",
+                        "hybrid_parameters": {
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "queryTensor": {
+                                hippo_base64: 1.0,
+                                "elephant animal": 0.0  # Weight 0 means this won't affect results
+                            },
+                            "queryLexical": "sculpture art"
+                        }
+                    }
+
+                    search_result = self.client.index(index_name).search(**search_params)
+
+                    # Verify results
+                    self.assertIn('hits', search_result)
+                    self.assertGreater(len(search_result['hits']), 0)
+
+                    # The hippo statue document should be the first hit due to perfect image match
+                    first_hit = search_result['hits'][0]
+                    self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
+
+                    # Tensor score should be 1.0 for perfect match (text with weight 0 shouldn't affect this)
+                    self.assertEqual(1.0, first_hit['_tensor_score'])
+
+    def test_tensor_search_with_base64_dict_query(self):
+        """Test tensor search with dict query containing base64 image and text with weights across all index types."""
+        # Convert real image URL to base64 for search query
+        hippo_base64 = self._url_to_base64(TestImageUrls.HIPPO_STATUE.value)
+
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
+        ]
+
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Add documents with real image URLs and text
+                docs = [
+                    {
+                        "_id": "hippo_statue_doc",
+                        "image": TestImageUrls.HIPPO_STATUE.value,
+                        "title": "AI generated hippo statue sculpture"
+                    },
+                    {
+                        "_id": "coco_doc",
+                        "image": TestImageUrls.COCO.value,
+                        "title": "COCO dataset image with various objects"
+                    },
+                    {
+                        "_id": "text_only_hippo",
+                        "title": "A document about hippo animals in the wild"
+                    },
+                    {
+                        "_id": "text_only_elephant",
+                        "title": "Elephant animal documentation and facts"
+                    }
+                ]
+
+                # Add documents
+                if index_type == "unstructured":
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs,
+                        tensor_fields=["image", "title"]
+                    )
+                else:
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs
+                    )
+                self.assertFalse(add_result['errors'])
+
+                # Test tensor search with dict query: base64 image (weight 0.8) and text (weight 0.2)
+                with self.subTest(query_type="dict_mixed_weights"):
+                    search_params = {
+                        "q": {
+                            hippo_base64: 0.8,
+                            "sculpture art": 0.2  # Lower weight for text
+                        },
+                        "search_method": "TENSOR"
+                    }
+
+                    search_result = self.client.index(index_name).search(**search_params)
+
+                    # Verify results
+                    self.assertIn('hits', search_result)
+                    self.assertGreater(len(search_result['hits']), 0)
+
+                    # The hippo statue document should still be the first hit due to strong image match
+                    first_hit = search_result['hits'][0]
+                    self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
+
+                    # Score should still be high due to strong image component
+                    self.assertGreater(first_hit['_score'], 0.8)
 
 
 if __name__ == '__main__':
