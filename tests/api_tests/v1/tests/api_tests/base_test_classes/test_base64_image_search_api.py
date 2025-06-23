@@ -2,6 +2,8 @@ import unittest
 import base64
 from io import BytesIO
 
+from marqo.errors import MarqoWebError
+
 from PIL import Image
 import requests
 from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
@@ -17,9 +19,6 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-
-        # Create test base64 images for consistent testing
-        cls.base64_images = cls._create_test_base64_images()
 
         cls.create_indexes([
             {
@@ -43,33 +42,6 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
     @classmethod
-    def _create_test_base64_images(cls):
-        """Create test base64 images for consistent testing."""
-        images = {}
-
-        # Create different colored images for testing
-        colors = [
-            ('red_square', 'red'),
-            ('blue_circle', 'blue'),
-            ('green_triangle', 'green'),
-            ('yellow_star', 'yellow')
-        ]
-
-        for name, color in colors:
-            # Create a simple colored square image (20x20 pixels)
-            img = Image.new('RGB', (20, 20), color=color)
-            buffer = BytesIO()
-            img.save(buffer, format='PNG')
-            base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-
-            images[name] = {
-                'data_url': f"data:image/png;base64,{base64_data}",
-                'description': f"A {color} colored square"
-            }
-
-        return images
-
-    @classmethod
     def _url_to_base64(cls, url: str):
         """Convert an image URL to base64 data URL format."""
         response = requests.get(url)
@@ -78,45 +50,6 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
         # Determine content type from response headers or default to png
         content_type = response.headers.get('content-type', 'image/png')
         return f"data:{content_type};base64,{base64_data}"
-
-    def test_api_base64_images_rejected_in_add_documents(self):
-        """Test that base64 images are properly rejected during document addition across all index types."""
-
-        index_configs = [
-            ("unstructured", self.unstructured_index_name),
-            ("structured", self.structured_index_name)
-        ]
-
-        for index_type, index_name in index_configs:
-            with self.subTest(index_type=index_type):
-                # Test with data URL format base64 image - using same field names for both
-                docs_with_data_url = [
-                    {
-                        "_id": "doc_with_base64_data_url",
-                        "image": self.base64_images['red_square']['data_url'],
-                        "title": "Document with base64 data URL"
-                    }
-                ]
-
-                # Try to add document with base64 data URL - should fail
-                if index_type == "unstructured":
-                    add_result = self.client.index(index_name).add_documents(
-                        documents=docs_with_data_url,
-                        tensor_fields=["image", "title"]
-                    )
-                else:
-                    add_result = self.client.index(index_name).add_documents(
-                        documents=docs_with_data_url
-                    )
-
-                # Verify the request failed with appropriate error
-                self.assertIn('items', add_result)
-                self.assertEqual(len(add_result['items']), 1)
-                item = add_result['items'][0]
-                self.assertEqual(item['status'], 400)
-                self.assertEqual(item['_id'], 'doc_with_base64_data_url')
-                self.assertIn('base64 image data', item['message'].lower())
-                self.assertIn('search queries', item['message'])
 
     def test_real_image_base64_search_all_methods_and_indexes(self):
         """Test base64 image search with real images (HIPPO_STATUE and COCO) across all index types and search methods."""
@@ -358,6 +291,94 @@ class TestBase64ImageSearchAPI(MarqoTestCase):
 
                     # Score should still be high due to strong image component
                     self.assertGreater(first_hit['_score'], 0.8)
+
+    def test_invalid_base64_image_search_returns_400_error(self):
+        """Test that searching with invalid base64 images returns 400 error for tensor and hybrid search."""
+        # Invalid base64 data URL with malformed base64 content
+        invalid_base64_data_url = "data:image/png;base64,invalid_base64_data!!!"
+
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
+        ]
+
+        search_methods = [
+            ("tensor", "TENSOR"),
+            ("hybrid_rrf", "HYBRID")
+        ]
+
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Add some valid documents first
+                docs = [
+                    {
+                        "_id": "test_doc",
+                        "image": TestImageUrls.HIPPO_STATUE.value,
+                        "title": "Test document for invalid base64 search"
+                    }
+                ]
+
+                # Add documents
+                if index_type == "unstructured":
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs,
+                        tensor_fields=["image", "title"]
+                    )
+                else:
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs
+                    )
+                self.assertFalse(add_result['errors'])
+
+                # Test each search method with invalid base64
+                for search_name, search_method in search_methods:
+                    with self.subTest(search_method=search_name):
+                        with self.assertRaises(MarqoWebError) as e:
+                            self.client.index(index_name).search(
+                                q=invalid_base64_data_url,
+                                search_method=search_method
+                            )
+                        assert e.exception.status_code == 400
+
+    def test_api_base64_images_rejected_in_add_documents(self):
+        """Test that base64 images are properly rejected during document addition across all index types."""
+
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
+        ]
+
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Test with data URL format base64 image - using same field names for both
+                docs_with_data_url = [
+                    {
+                        "_id": "doc_with_base64_data_url",
+                        "image": "data:image/png;base64,xxxyyyzzz",  # Invalid base64 data
+                        "title": "Document with base64 data URL"
+                    }
+                ]
+
+                # Try to add document with base64 data URL - should fail
+                if index_type == "unstructured":
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs_with_data_url,
+                        tensor_fields=["image", "title"]
+                    )
+                else:
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs_with_data_url
+                    )
+
+                # Verify the request failed with appropriate error
+                self.assertIn('items', add_result)
+                self.assertEqual(len(add_result['items']), 1)
+                item = add_result['items'][0]
+                self.assertEqual(item['status'], 400)
+                # Note: _id might be empty in error responses, so we check it exists as a key
+                self.assertIn('_id', item)
+                self.assertIn('base64 image data', item['message'].lower())
+                self.assertIn('search queries', item['message'])
 
 
 if __name__ == '__main__':
