@@ -147,7 +147,7 @@ class TestHybridSearchUnstructuredSortByFeature(BaseCompatibilityTestCase):
             ) # Add extra documents to the index to trigger a schema update
 
             # Delete the extra document to ensure it does not affect the search results
-            self.client.index.delete_documents(["extra_doc_1"])
+            self.client.index(index_name).delete_documents(["extra_doc_1"])
 
             # For each index, store results for different search methods
             for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
