@@ -143,7 +143,7 @@ class TestHybridSearchUnstructuredSortByFeature(BaseCompatibilityTestCase):
                 documents=[{
                     "_id": f"extra_doc_1",
                     "extra_text_field": "Extra document for schema update",
-                }]
+                }], tensor_fields=["extra_text_field"]
             ) # Add extra documents to the index to trigger a schema update
 
             # Delete the extra document to ensure it does not affect the search results
