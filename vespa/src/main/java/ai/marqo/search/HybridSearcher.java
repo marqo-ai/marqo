@@ -56,7 +56,9 @@ public class HybridSearcher extends Searcher {
     private static final ObjectReader SORT_FIELD_READER =
             OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
 
-    // Magic number for missing sort field values
+    // A magic number used to represent missing sort field values in search results as we can only
+    // return numeric values in match-features.
+    // The value -1e50 is chosen as it is an extremely low number unlikely to occur in real data.
     private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
 
     /**
