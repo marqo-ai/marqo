@@ -967,15 +967,18 @@ public class HybridSearcher extends Searcher {
                 // Find the elbow point in the lexical hits
                 double maxDelta = -1.0;
                 int bestIndex = lexicalHits.size(); // default: keep all
+
                 for (int i = 0; i < lexicalHits.size() - 1; i++) {
                     double score1 = lexicalHits.get(i).getRelevance().getScore();
                     double score2 = lexicalHits.get(i + 1).getRelevance().getScore();
                     double delta = score1 - score2;
+
                     if (delta > maxDelta) {
                         maxDelta = delta;
                         bestIndex = i + 1;
                     }
                 }
+
                 return bestIndex;
             }
             case MEAN_STD_DEV -> {
