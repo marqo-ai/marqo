@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
@@ -23,7 +22,6 @@ import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -315,6 +313,8 @@ public class HybridSearcher extends Searcher {
             Integer offset) {
 
         List<SortField> parsedSortByFields;
+        
+
         try {
             parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
         } catch (JsonProcessingException e) {
@@ -402,9 +402,9 @@ public class HybridSearcher extends Searcher {
             combined.get(i).setRelevance(1.0 / (i + 1));
         }
         /*
-        * TODO - check HitGroup.setOrdered and HitGroup HitSortOrderer
-        *  for better performance and avoiding of sorting in the downstream code.
-        */
+         * TODO - check HitGroup.setOrdered and HitGroup HitSortOrderer
+         *  for better performance and avoiding of sorting in the downstream code.
+         */
         HitGroup result = new HitGroup();
         result.addAll(combined);
         result.trim(offset, limit);
