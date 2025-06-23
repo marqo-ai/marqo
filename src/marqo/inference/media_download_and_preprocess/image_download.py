@@ -183,8 +183,6 @@ def _load_base64_image(content: str) -> ImageType:
         
     except (base64.binascii.Error, ValueError) as e:
         raise UnidentifiedImageError(f"Invalid base64 image data: {e}")
-    except Exception as e:
-        raise UnidentifiedImageError(f"Error loading base64 image: {e}")
 
 
 def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
