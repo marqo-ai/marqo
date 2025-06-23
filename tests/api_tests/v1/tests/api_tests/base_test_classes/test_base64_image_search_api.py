@@ -3,344 +3,211 @@ import base64
 from io import BytesIO
 
 from PIL import Image
-from tests.marqo_test import MarqoTestCase
+import requests
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestBase64ImageSearchAPI(MarqoTestCase):
     """Test base64 image search functionality through the API."""
 
+    structured_index_name = MarqoTestCase.random_index_name('structured_base64_index')
+    unstructured_index_name = MarqoTestCase.random_index_name('unstructured_base64_index')
+    image_model = 'open_clip/ViT-B-32/laion400m_e31'
+
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        
-        # Create test base64 images
+
+        # Create test base64 images for consistent testing
         cls.base64_images = cls._create_test_base64_images()
-        
-        # Create test indexes
-        cls.unstructured_index_name = "test-base64-unstructured"
-        cls.structured_index_name = "test-base64-structured" 
-        
-        # Delete indexes if they exist
-        try:
-            cls.client.delete_index(cls.unstructured_index_name)
-        except:
-            pass  # Index doesn't exist, which is fine
-        
-        try:
-            cls.client.delete_index(cls.structured_index_name)
-        except:
-            pass  # Index doesn't exist, which is fine
-        
-        # Create unstructured index
-        cls.client.create_index(
-            index_name=cls.unstructured_index_name,
-            settings_dict={
-                "model": "open_clip/ViT-B-32/laion400m_e31",
-                "treatUrlsAndPointersAsImages": True,
-                "type": "unstructured"
-            }
-        )
-        
-        # Create structured index  
-        cls.client.create_index(
-            index_name=cls.structured_index_name,
-            settings_dict={
+
+        cls.create_indexes([
+            {
+                "indexName": cls.structured_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/laion400m_e31",
+                "model": cls.image_model,
                 "allFields": [
-                    {"name": "text_field", "type": "text", "features": ["lexical_search"]},
-                    {"name": "image_field", "type": "image_pointer"},
-                    {"name": "title", "type": "text", "features": ["lexical_search"]}
+                    {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
+                    {"name": "image", "type": "image_pointer"},
                 ],
-                "tensorFields": ["text_field", "image_field", "title"]
+                "tensorFields": ["image"],
+            },
+            {
+                "indexName": cls.unstructured_index_name,
+                "type": "unstructured",
+                "model": cls.image_model,
+                "treatUrlsAndPointersAsImages": True
             }
-        )
+        ])
+
+        cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
     @classmethod
     def _create_test_base64_images(cls):
-        """Create test base64 images for API testing."""
+        """Create test base64 images for consistent testing."""
         images = {}
-        
-        colors = [('red_square', 'red'), ('blue_circle', 'blue'), ('green_triangle', 'green')]
-        
+
+        # Create different colored images for testing
+        colors = [
+            ('red_square', 'red'),
+            ('blue_circle', 'blue'),
+            ('green_triangle', 'green'),
+            ('yellow_star', 'yellow')
+        ]
+
         for name, color in colors:
-            # Create a small colored image (15x15 pixels)
-            img = Image.new('RGB', (15, 15), color=color)
+            # Create a simple colored square image (20x20 pixels)
+            img = Image.new('RGB', (20, 20), color=color)
             buffer = BytesIO()
             img.save(buffer, format='PNG')
             base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
+
             images[name] = {
                 'data_url': f"data:image/png;base64,{base64_data}",
-                'plain_base64': base64_data
+                'description': f"A {color} colored square"
             }
-        
+
         return images
 
     @classmethod
-    def tearDownClass(cls) -> None:
-        # Clean up test indexes
-        try:
-            cls.client.delete_index(cls.unstructured_index_name)
-        except:
-            pass
-        
-        try:
-            cls.client.delete_index(cls.structured_index_name)
-        except:
-            pass
-        
-        super().tearDownClass()
+    def _url_to_base64(cls, url: str):
+        """Convert an image URL to base64 data URL format."""
+        response = requests.get(url)
+        response.raise_for_status()
+        base64_data = base64.b64encode(response.content).decode('utf-8')
+        # Determine content type from response headers or default to png
+        content_type = response.headers.get('content-type', 'image/png')
+        return f"data:{content_type};base64,{base64_data}"
 
-    def setUp(self) -> None:
-        # Clear all documents from indexes before each test
-        try:
-            self.client.index(self.unstructured_index_name).delete_documents()
-        except:
-            pass
-        
-        try:
-            self.client.index(self.structured_index_name).delete_documents()  
-        except:
-            pass
+    # def test_api_error_handling_invalid_base64(self):
+    #     """Test API error handling for invalid base64 image data."""
+    #     # Try to add document with invalid base64
+    #     docs = [
+    #         {
+    #             "_id": "doc1",
+    #             "image_field": "data:image/png;base64,invalid_base64_data!!!",
+    #             "text_field": "Invalid base64 image"
+    #         }
+    #     ]
+    #
+    #     # This should handle the error gracefully during indexing
+    #     # Depending on implementation, it might skip the field or return an error
+    #     add_result = self.client.index(self.unstructured_index_name).add_documents(
+    #         documents=docs,
+    #         tensor_fields=["image_field", "text_field"]
+    #     )
+    #
+    #     # Check that the API returns some response (exact behavior may vary)
+    #     self.assertIn('items', add_result)
 
-    def test_api_tensor_search_with_base64_data_url(self):
-        """Test tensor search with base64 data URL through API."""
-        # Add documents with base64 images
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": self.base64_images['red_square']['data_url'],
-                "text_field": "Red square image"
-            },
-            {
-                "_id": "doc2", 
-                "image_field": self.base64_images['blue_circle']['data_url'],
-                "text_field": "Blue circle image"
-            }
+    def test_api_base64_images_rejected_in_add_documents(self):
+        """Test that base64 images are properly rejected during document addition across all index types."""
+
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
         ]
-        
-        # Add documents through API
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        self.assertIn('items', add_result)
-        for item in add_result['items']:
-            self.assertEqual(item['status'], 200)
-        
-        # Search with base64 image query
-        search_result = self.client.index(self.unstructured_index_name).search(
-            q=self.base64_images['red_square']['data_url'],
-            search_method="TENSOR",
-            limit=5
-        )
-        
-        self.assertIn('hits', search_result)
-        self.assertGreater(len(search_result['hits']), 0)
-        # Should find the red square document as most similar
-        hit_ids = [hit['_id'] for hit in search_result['hits']]
-        self.assertIn('data_url_doc', hit_ids)
 
-    def test_api_hybrid_search_with_base64_images(self):
-        """Test hybrid search with base64 images through API."""
-        # Add documents with mixed content
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": self.base64_images['red_square']['data_url'],
-                "text_field": "red square geometric shape"
-            },
-            {
-                "_id": "doc2",
-                "image_field": self.base64_images['blue_circle']['data_url'],
-                "text_field": "blue circle round shape"
-            },
-            {
-                "_id": "doc3",
-                "text_field": "red color description without image"
-            }
-        ]
-        
-        # Add documents
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        self.assertIn('items', add_result)
-        for item in add_result['items']:
-            self.assertEqual(item['status'], 200)
-        
-        # Test hybrid search with base64 image
-        hybrid_result = self.client.index(self.unstructured_index_name).search(
-            q=self.base64_images['red_square']['data_url'],
-            search_method="HYBRID",
-            hybrid_parameters={
-                "retrievalMethod": "disjunction",
-                "rankingMethod": "rrf"
-            },
-            limit=3
-        )
-        
-        self.assertIn('hits', hybrid_result)
-        self.assertGreater(len(hybrid_result['hits']), 0)
-        # Should find documents with red square being highly ranked
-        hit_ids = [hit['_id'] for hit in hybrid_result['hits']]
-        self.assertIn('doc1', hit_ids)
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Test with data URL format base64 image - using same field names for both
+                docs_with_data_url = [
+                    {
+                        "_id": "doc_with_base64_data_url",
+                        "image": self.base64_images['red_square']['data_url'],
+                        "title": "Document with base64 data URL"
+                    }
+                ]
 
-    def test_api_multimodal_query_with_base64(self):
-        """Test multimodal query with both text and base64 image through API."""
-        # Add documents
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": self.base64_images['blue_circle']['data_url'],
-                "text_field": "blue circle shape"
-            },
-            {
-                "_id": "doc2",
-                "image_field": self.base64_images['red_square']['data_url'],
-                "text_field": "red square shape" 
-            },
-            {
-                "_id": "doc3",
-                "text_field": "blue colored object description"
-            }
-        ]
-        
-        # Add documents
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        self.assertIn('items', add_result)
-        
-        # Test multimodal query with weighted terms
-        query = {
-            "blue shape": 1.0,
-            self.base64_images['blue_circle']['data_url']: 2.0
-        }
-        
-        search_result = self.client.index(self.unstructured_index_name).search(
-            q=query,
-            search_method="TENSOR",
-            limit=3
-        )
-        
-        self.assertIn('hits', search_result)
-        self.assertGreater(len(search_result['hits']), 0)
-        # Blue circle document should rank highest due to image similarity + text match
-        self.assertEqual(search_result['hits'][0]['_id'], 'doc1')
+                # Try to add document with base64 data URL - should fail
+                if index_type == "unstructured":
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs_with_data_url,
+                        tensor_fields=["image", "title"]
+                    )
+                else:
+                    add_result = self.client.index(index_name).add_documents(
+                        documents=docs_with_data_url
+                    )
 
-    def test_api_base64_image_with_highlights(self):
-        """Test that base64 images work properly with highlights through API."""
-        # Add document with base64 image
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": self.base64_images['green_triangle']['data_url'],
-                "text_field": "green triangle image"
-            }
-        ]
-        
-        # Add documents
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        self.assertIn('items', add_result)
-        self.assertEqual(add_result['items'][0]['status'], 200)
-        
-        # Search with highlights
-        search_result = self.client.index(self.unstructured_index_name).search(
-            q=self.base64_images['green_triangle']['data_url'],
-            search_method="TENSOR",
-            highlights=True,
-            limit=1
-        )
-        
-        self.assertIn('hits', search_result)
-        self.assertEqual(len(search_result['hits']), 1)
-        hit = search_result['hits'][0]
-        
-        # Check highlights
-        self.assertIn('_highlights', hit)
-        self.assertGreater(len(hit['_highlights']), 0)
-        
-        # The highlighted field should contain the base64 image
-        highlighted_field = hit['_highlights'][0]
-        self.assertIn('image_field', highlighted_field)
-        self.assertEqual(highlighted_field['image_field'], self.base64_images['green_triangle']['data_url'])
+                # Verify the request failed with appropriate error
+                self.assertIn('items', add_result)
+                self.assertEqual(len(add_result['items']), 1)
+                item = add_result['items'][0]
+                self.assertEqual(item['status'], 400)
+                self.assertEqual(item['_id'], 'doc_with_base64_data_url')
+                self.assertIn('base64 image data', item['message'].lower())
+                self.assertIn('search queries', item['message'])
 
-    def test_api_error_handling_invalid_base64(self):
-        """Test API error handling for invalid base64 image data."""
-        # Try to add document with invalid base64
-        docs = [
-            {
-                "_id": "doc1",
-                "image_field": "data:image/png;base64,invalid_base64_data!!!",
-                "text_field": "Invalid base64 image"
-            }
-        ]
-        
-        # This should handle the error gracefully during indexing
-        # Depending on implementation, it might skip the field or return an error
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        # Check that the API returns some response (exact behavior may vary)
-        self.assertIn('items', add_result)
+    def test_real_image_base64_search_all_methods_and_indexes(self):
+        """Test base64 image search with real images (HIPPO_STATUE and COCO) across all index types and search methods."""
+        # Convert real image URLs to base64 for search queries
+        hippo_base64 = self._url_to_base64(TestImageUrls.HIPPO_STATUE.value)
 
-    def test_api_mixed_image_formats(self):
-        """Test API with mixed image formats (URL, base64 data URL, plain base64)."""
-        # Add documents with different image formats
-        docs = [
-            {
-                "_id": "url_doc",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
-                "text_field": "hippo from URL"
-            },
-            {
-                "_id": "data_url_doc",
-                "image_field": self.base64_images['red_square']['data_url'],
-                "text_field": "red square from data URL"
-            },
-            {
-                "_id": "base64_doc", 
-                "image_field": self.base64_images['blue_circle']['plain_base64'],
-                "text_field": "blue circle from base64"
-            }
+        # Define test parameters
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
         ]
-        
-        # Add documents
-        add_result = self.client.index(self.unstructured_index_name).add_documents(
-            documents=docs,
-            tensor_fields=["image_field", "text_field"]
-        )
-        
-        self.assertIn('items', add_result)
-        for item in add_result['items']:
-            self.assertEqual(item['status'], 200)
-        
-        # Search with base64 data URL should find the matching document
-        search_result = self.client.index(self.unstructured_index_name).search(
-            q=self.base64_images['red_square']['data_url'],
-            search_method="TENSOR",
-            limit=3
-        )
-        
-        self.assertIn('hits', search_result)
-        self.assertGreater(len(search_result['hits']), 0)
-        # Should find the red square document as most similar
-        hit_ids = [hit['_id'] for hit in search_result['hits']]
-        self.assertIn('data_url_doc', hit_ids)
+
+        search_methods = [
+            ("tensor", "TENSOR", None),
+            ("hybrid_rrf", "HYBRID", {"retrievalMethod": "disjunction", "rankingMethod": "rrf"}),
+            ("hybrid_tensor", "HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "tensor"})
+        ]
+
+        for index_type, index_name in index_configs:
+            with self.subTest(index_type=index_type):
+                # Add documents with real image URLs
+                docs = [
+                    {
+                        "_id": "hippo_doc",
+                        "image": TestImageUrls.HIPPO_STATUE.value,
+                        "title": "AI generated hippo statue"
+                    },
+                    {
+                        "_id": "coco_doc",
+                        "image": TestImageUrls.COCO.value,
+                        "title": "COCO dataset image"
+                    }
+                ]
+
+                # Add documents
+                add_result = self.client.index(index_name).add_documents(
+                    documents=docs,
+                    tensor_fields=["image"] if index_type == "unstructured" else None
+                )
+                self.assertFalse(add_result['errors'])
+
+                # Test each search method
+                for search_name, search_method, hybrid_params in search_methods:
+                    with self.subTest(search_method=search_name):
+                        # Search with HIPPO_STATUE base64 image
+                        search_params = {
+                            "q": hippo_base64,
+                            "search_method": search_method,
+                        }
+
+                        if hybrid_params:
+                            search_params["hybrid_parameters"] = hybrid_params
+
+                        search_result = self.client.index(index_name).search(**search_params)
+
+                        # Verify results
+                        self.assertIn('hits', search_result)
+                        self.assertEqual(2, len(search_result['hits']))
+
+                        # The hippo document should be the first hit since we're searching with hippo image
+                        first_hit = search_result['hits'][0]
+                        self.assertEqual('hippo_doc', first_hit['_id'])
+
+                        # Verify score is 1 for the first hit
+                        if search_name == 'hybrid_rrf':
+                            score = first_hit['_tensor_score']
+                        else:
+                            score = first_hit['_score']
+                        self.assertEqual(1.0, score, f"Score mismatch for {search_name} on {index_type} index")
 
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()
