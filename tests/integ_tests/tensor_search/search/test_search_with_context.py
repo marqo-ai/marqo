@@ -202,8 +202,7 @@ class TestSearchWithContext(MarqoTestCase):
 
         Checks tensorFields and excludeInputDocuments parameters.
         """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
@@ -323,8 +322,7 @@ class TestSearchWithContext(MarqoTestCase):
         """Test that search works correctly when context documents, tensors, and queries are provided.
         Use relevant data and sample searches
         """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
@@ -392,8 +390,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_missing_documents(self):
         """Test that search with context documents fails when documents don't exist."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add some documents
                 docs = [
@@ -433,8 +430,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_exclude_input_succeeds(self):
         """Test that search with context documents excludes input documents when requested."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
@@ -481,8 +477,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_include_input_succeeds(self):
         """Test that search with context documents includes input documents when requested."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
@@ -528,8 +523,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_filter(self):
         """Test that search with context documents respects filter parameter."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index using the helper method
                 self._populate_index_orchids(index)
@@ -576,8 +570,7 @@ class TestSearchWithContext(MarqoTestCase):
 
     def test_search_with_context_documents_score_modifiers(self):
         """Test that search with context documents works with score modifiers."""
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index,
-                      self.legacy_unstructured_default_text_index]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents to the index
                 docs = [
@@ -702,7 +695,7 @@ class TestSearchWithContext(MarqoTestCase):
         This test verifies the optimization where only the required embedding fields are fetched
         from Vespa when specific tensor fields are specified in context documents.
         """
-        for index in [self.structured_default_text_index, self.legacy_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents with multiple tensor fields
                 docs = [
