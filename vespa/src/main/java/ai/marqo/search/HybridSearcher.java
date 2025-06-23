@@ -3,6 +3,7 @@ package ai.marqo.search;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Strings;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -140,7 +141,7 @@ public class HybridSearcher extends Searcher {
         // --- End facets subquery handling ---
 
         // --- Update the query limit if sort is used
-        if (sortByFields != null && !sortByFields.isEmpty()) {
+        if (!Strings.isNullOrEmpty(sortByFields)) {
             query.setHits(sortBySortCandidates);
             query.setOffset(0);
         }
@@ -216,30 +217,17 @@ public class HybridSearcher extends Searcher {
 
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
-        Tensor queryMultWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
-        Tensor queryAddWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
         if (sortByFields != null) {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
             processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
-        } else if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
-            logIfVerbose("Global score modifiers found. Will apply them.", verbose);
+        } else {
+            // If sortBy is not set, we use the default post-processing
             processedHits =
                     postProcessResults(
-                            hitsForPostProcessing,
-                            query,
-                            rerankDepthGlobal,
-                            limit,
-                            offset,
-                            verbose);
-        } else {
-            logIfVerbose("No global score modifiers found. Will not apply them.", verbose);
-            processedHits = hitsForPostProcessing;
+                            hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
         }
 
         // --- Attach facets results if available ---
