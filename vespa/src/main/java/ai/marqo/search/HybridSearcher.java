@@ -2,6 +2,7 @@ package ai.marqo.search;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -17,6 +18,7 @@ import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -45,6 +47,14 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
+
+    // Thread-safe ObjectReader for parsing SortField JSON
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectReader SORT_FIELD_READER =
+            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+
+    // Magic number for missing sort field values
+    private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
 
     private static class SortField {
         public String field_name;
@@ -280,12 +290,10 @@ public class HybridSearcher extends Searcher {
             Integer limit,
             Integer offset) {
 
-        ObjectMapper mapper = new ObjectMapper();
         List<SortField> parsedSortByFields;
         try {
-            parsedSortByFields =
-                    mapper.readValue(sortByFields, new TypeReference<List<SortField>>() {});
-        } catch (Exception e) {
+            parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
+        } catch (IOException e) {
             throw new RuntimeException(
                     "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
         }
@@ -309,7 +317,7 @@ public class HybridSearcher extends Searcher {
                         FeatureData mf = (FeatureData) hit.getField("matchfeatures");
                         if (mf == null) return null;
                         double v = mf.getDouble("sort_field_value_" + idx);
-                        return (v == -1e50) ? null : v;
+                        return (v == MISSING_SORT_VALUE_SENTINEL) ? null : v;
                     };
             Comparator<Double> base = Comparator.naturalOrder();
             if ("desc".equalsIgnoreCase(sf.order)) {
