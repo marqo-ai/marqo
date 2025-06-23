@@ -313,7 +313,6 @@ public class HybridSearcher extends Searcher {
             Integer offset) {
 
         List<SortField> parsedSortByFields;
-        
 
         try {
             parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
@@ -345,6 +344,13 @@ public class HybridSearcher extends Searcher {
             if (field.missing() == null) {
                 throw new RuntimeException("missing is required for sort field at index " + i);
             }
+        }
+
+        // Validate sortBySortDepth requirements
+        if (sortBySortDepth != null && sortBySortDepth < 1) {
+            throw new RuntimeException(
+                    "sortBySortDepth must be greater than or equal to 1. Found: "
+                            + sortBySortDepth);
         }
 
         List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());

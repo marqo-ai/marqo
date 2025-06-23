@@ -688,5 +688,59 @@ class SortByTest {
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("fieldName is required for sort field at index 2");
         }
+
+        @Test
+        void shouldThrowExceptionForInvalidSortDepth() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+            String validSortJson =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
+
+            // Test sortBySortDepth = 0
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, 0, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBySortDepth must be greater than or equal to 1. Found: 0");
+
+            // Test sortBySortDepth = -1
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, -1, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBySortDepth must be greater than or equal to 1. Found: -1");
+
+            // Test sortBySortDepth = -10 (more negative)
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, -10, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBySortDepth must be greater than or equal to 1. Found: -10");
+        }
+
+        @Test
+        void shouldAcceptValidSortDepth() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+            String validSortJson =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
+
+            // Test sortBySortDepth = null (should work - uses default)
+            HitGroup result1 = searcher.postProcessBySort(hits, validSortJson, null, 10, 0);
+            assertThat((Object) result1).isNotNull();
+            assertThat(result1.asList()).hasSize(1);
+
+            // Test sortBySortDepth = 1 (should work)
+            HitGroup result2 = searcher.postProcessBySort(hits, validSortJson, 1, 10, 0);
+            assertThat((Object) result2).isNotNull();
+            assertThat(result2.asList()).hasSize(1);
+
+            // Test sortBySortDepth = 5 (should work)
+            HitGroup result3 = searcher.postProcessBySort(hits, validSortJson, 5, 10, 0);
+            assertThat((Object) result3).isNotNull();
+            assertThat(result3.asList()).hasSize(1);
+
+            // Test sortBySortDepth = 100 (larger than hit count, should work)
+            HitGroup result4 = searcher.postProcessBySort(hits, validSortJson, 100, 10, 0);
+            assertThat((Object) result4).isNotNull();
+            assertThat(result4.asList()).hasSize(1);
+        }
     }
 }
