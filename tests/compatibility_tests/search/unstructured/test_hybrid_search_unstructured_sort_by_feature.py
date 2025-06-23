@@ -25,7 +25,7 @@ class TestHybridSearchUnstructuredSortByFeature(BaseCompatibilityTestCase):
     tensor_fields = ["multimodal_field", "text_field", "image_field"]
 
     unstructured_index_metadata = {
-        "indexName": "test_search_api_unstructured_index_hybrid",
+        "indexName": "test_search_api_unstructured_index_hybrid_sort_by_feature",
         "model": image_model,
         "treatUrlsAndPointersAsImages": True,
     }
