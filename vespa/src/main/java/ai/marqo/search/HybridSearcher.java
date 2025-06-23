@@ -401,7 +401,10 @@ public class HybridSearcher extends Searcher {
         for (int i = 0; i < combined.size(); i++) {
             combined.get(i).setRelevance(1.0 / (i + 1));
         }
-
+        /*
+        * TODO - check HitGroup.setOrdered and HitGroup HitSortOrderer
+        *  for better performance and avoiding of sorting in the downstream code.
+        */
         HitGroup result = new HitGroup();
         result.addAll(combined);
         result.trim(offset, limit);
