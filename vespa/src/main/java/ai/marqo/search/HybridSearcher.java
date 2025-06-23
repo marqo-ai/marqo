@@ -360,7 +360,10 @@ public class HybridSearcher extends Searcher {
         Comparator<Hit> relevanceTie =
                 Comparator.comparingDouble((Hit h) -> h.getRelevance().getScore()).reversed();
         // always combine with relevance tie-break
-        sortComparator = sortComparator.thenComparing(relevanceTie);
+        sortComparator =
+                (sortComparator == null)
+                        ? relevanceTie
+                        : sortComparator.thenComparing(relevanceTie);
         hitsToSort.sort(sortComparator);
 
         // Merge sorted slice with the remainder

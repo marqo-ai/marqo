@@ -1,6 +1,7 @@
 package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -16,6 +17,7 @@ import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -357,5 +359,240 @@ class SortByTest {
 
         verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
+    }
+
+    @Nested
+    class SortJsonParsingTest {
+
+        private HitGroup createDummyHitGroup() {
+            FeatureData f1 = mock(FeatureData.class);
+            when(f1.getDouble("sort_field_value_0")).thenReturn(1.0);
+            when(f1.getDouble("sort_field_value_1")).thenReturn(2.0);
+            when(f1.getDouble("sort_field_value_2")).thenReturn(3.0);
+            Hit doc1 = new Hit("doc1", 0.5);
+            doc1.setField("matchfeatures", f1);
+
+            HitGroup hits = new HitGroup();
+            hits.add(doc1);
+
+            return hits;
+        }
+
+        @Test
+        void shouldParseValidSortJsonWith1Field() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String sortJson = "[{\"field_name\":\"score\",\"order\":\"asc\",\"missing\":\"last\"}]";
+
+            // Should not throw exception
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldParseValidSortJsonWith2Fields() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String sortJson =
+                    "[{\"field_name\":\"score\",\"order\":\"desc\",\"missing\":\"first\"},"
+                        + "{\"field_name\":\"timestamp\",\"order\":\"asc\",\"missing\":\"last\"}]";
+
+            // Should not throw exception
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldParseValidSortJsonWith3Fields() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String sortJson =
+                    "[{\"field_name\":\"score\",\"order\":\"desc\",\"missing\":\"first\"},"
+                        + "{\"field_name\":\"timestamp\",\"order\":\"asc\",\"missing\":\"last\"},"
+                        + "{\"field_name\":\"category\",\"order\":\"desc\",\"missing\":\"first\"}]";
+
+            // Should not throw exception
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldParseVariousMissingAndOrderValues() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test different combinations of order and missing values
+            String[] testCases = {
+                "[{\"field_name\":\"f1\",\"order\":\"ASC\",\"missing\":\"FIRST\"}]",
+                "[{\"field_name\":\"f1\",\"order\":\"DESC\",\"missing\":\"LAST\"}]",
+                "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"first\"}]",
+                "[{\"field_name\":\"f1\",\"order\":\"desc\",\"missing\":\"last\"}]",
+                "[{\"field_name\":\"f1\",\"order\":\"Asc\",\"missing\":\"First\"}]",
+                "[{\"field_name\":\"f1\",\"order\":\"Desc\",\"missing\":\"Last\"}]"
+            };
+
+            for (String sortJson : testCases) {
+                // Should not throw exception for any of these cases
+                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+                assertThat((Object) result).isNotNull();
+            }
+        }
+
+        @Test
+        void shouldHandleNullOrderAndMissing() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test with null values (should use defaults: ASC and FIRST)
+            String sortJson = "[{\"field_name\":\"f1\",\"order\":null,\"missing\":null}]";
+
+            // Should not throw exception and use default values
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldThrowExceptionForInvalidJson() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String invalidJson = "{invalid json}";
+
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, invalidJson, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
+        }
+
+        @Test
+        void shouldThrowExceptionForMalformedJsonArray() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String malformedJson =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\",}]"; // trailing
+            // comma
+
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, malformedJson, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
+        }
+
+        @Test
+        void shouldHandleEmptyArray() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            String emptySortJson = "[]";
+
+            // Should not throw exception with 0 sort fields
+            HitGroup result = searcher.postProcessBySort(hits, emptySortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldHandleManyFields() {
+            HybridSearcher searcher = new HybridSearcher();
+
+            // Create hits with more sort field values
+            FeatureData f = mock(FeatureData.class);
+            for (int i = 0; i < 10; i++) {
+                when(f.getDouble("sort_field_value_" + i)).thenReturn((double) i);
+            }
+            Hit doc = new Hit("doc1", 0.5);
+            doc.setField("matchfeatures", f);
+            HitGroup hits = new HitGroup();
+            hits.add(doc);
+
+            // Build JSON with many fields (more than typical use case)
+            StringBuilder jsonBuilder = new StringBuilder("[");
+            for (int i = 0; i < 5; i++) {
+                if (i > 0) jsonBuilder.append(",");
+                jsonBuilder
+                        .append("{\"field_name\":\"f")
+                        .append(i)
+                        .append("\",")
+                        .append("\"order\":\"asc\",\"missing\":\"last\"}");
+            }
+            jsonBuilder.append("]");
+
+            String sortJson = jsonBuilder.toString();
+
+            // Should handle multiple fields without issues
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            assertThat((Object) result).isNotNull();
+            assertThat(result.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldHandleUnsupportedOrderValues() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test unsupported order values - should default to ASC
+            String[] unsupportedOrders = {"ascending", "descending", "up", "down", "invalid", ""};
+
+            for (String order : unsupportedOrders) {
+                String sortJson =
+                        "[{\"field_name\":\"f1\",\"order\":\""
+                                + order
+                                + "\",\"missing\":\"last\"}]";
+
+                // Should not throw exception, should default to ASC
+                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+                assertThat((Object) result).isNotNull();
+                assertThat(result.asList()).hasSize(1);
+            }
+        }
+
+        @Test
+        void shouldHandleUnsupportedMissingValues() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test unsupported missing values - should default to FIRST
+            String[] unsupportedMissing = {"top", "bottom", "start", "end", "invalid", ""};
+
+            for (String missing : unsupportedMissing) {
+                String sortJson =
+                        "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\""
+                                + missing
+                                + "\"}]";
+
+                // Should not throw exception, should default to FIRST
+                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+                assertThat((Object) result).isNotNull();
+                assertThat(result.asList()).hasSize(1);
+            }
+        }
+
+        @Test
+        void shouldHandleMissingRequiredFields() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test JSON missing required fields
+            String[] incompleteJsons = {
+                "[{\"order\":\"asc\",\"missing\":\"last\"}]", // missing field_name
+                "[{\"field_name\":\"f1\",\"missing\":\"last\"}]", // missing order
+                "[{\"field_name\":\"f1\",\"order\":\"asc\"}]" // missing missing
+            };
+
+            for (String sortJson : incompleteJsons) {
+                // Should handle gracefully (Jackson will use null for missing fields)
+                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+                assertThat((Object) result).isNotNull();
+                assertThat(result.asList()).hasSize(1);
+            }
+        }
     }
 }
