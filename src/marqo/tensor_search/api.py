@@ -405,35 +405,54 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
-    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
-        #  SearchQuery can be injected after migrated to v2
-        search_query = parse_request_object(SearchQuery, search_query_dict)
+    # Get configuration for query logging (outside timing to avoid overhead)
+    slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS))
+    log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS).upper() == "TRUE"
+    
+    def log_if_slow_query(elapsed_time_ms: float):
+        """Log query details if it's slow"""
+        if elapsed_time_ms > slow_query_threshold_ms:
+            if log_query_details:
+                logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms - Index: {index_name} - Query: {search_query_dict}')
+            else:
+                logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms - Index: {index_name}')
+    
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", log_if_slow_query):
+        try:
+            # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+            #  SearchQuery can be injected after migrated to v2
+            search_query = parse_request_object(SearchQuery, search_query_dict)
 
-        result = tensor_search.search(
-            config=marqo_config, text=search_query.q,
-            index_name=index_name, highlights=search_query.showHighlights,
-            searchable_attributes=search_query.searchableAttributes,
-            search_method=search_query.searchMethod,
-            result_count=search_query.limit, offset=search_query.offset,
-            rerank_depth=search_query.rerankDepth,
-            ef_search=search_query.efSearch, approximate=search_query.approximate,
-            approximate_threshold=search_query.approximateThreshold,
-            reranker=search_query.reRanker,
-            filter=search_query.filter, device=device,
-            attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            media_download_headers=search_query.mediaDownloadHeaders,
-            context=search_query.context,
-            score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth,
-            text_query_prefix=search_query.textQueryPrefix,
-            hybrid_parameters=search_query.hybridParameters,
-            facets=search_query.facets,
-            track_total_hits=search_query.trackTotalHits,
-            relevance_cutoff= search_query.relevance_cutoff,
-            sort_by = search_query.sort_by,
-        )
-        return ORJSONResponse(result)
+            result = tensor_search.search(
+                config=marqo_config, text=search_query.q,
+                index_name=index_name, highlights=search_query.showHighlights,
+                searchable_attributes=search_query.searchableAttributes,
+                search_method=search_query.searchMethod,
+                result_count=search_query.limit, offset=search_query.offset,
+                rerank_depth=search_query.rerankDepth,
+                ef_search=search_query.efSearch, approximate=search_query.approximate,
+                approximate_threshold=search_query.approximateThreshold,
+                reranker=search_query.reRanker,
+                filter=search_query.filter, device=device,
+                attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+                media_download_headers=search_query.mediaDownloadHeaders,
+                context=search_query.context,
+                score_modifiers=search_query.scoreModifiers,
+                model_auth=search_query.modelAuth,
+                text_query_prefix=search_query.textQueryPrefix,
+                hybrid_parameters=search_query.hybridParameters,
+                facets=search_query.facets,
+                track_total_hits=search_query.trackTotalHits,
+                relevance_cutoff= search_query.relevance_cutoff,
+                sort_by = search_query.sort_by,
+            )
+            return ORJSONResponse(result)
+        except Exception as e:
+            if log_query_details:
+                logger.error(f'Failed search query - Index: {index_name} - Error: {str(e)} - Query: {search_query_dict}')
+            else:
+                logger.error(f'Failed search query - Index: {index_name} - Error: {str(e)}')
+            raise
 
 
 @app.post("/indexes/{index_name}/recommend")
