@@ -216,7 +216,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
                 {"field_name": "rating", "order": "asc"}
             ],
             sortDepth=3,
-            sortCandidates=50
+            minSortCandidates=50
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
@@ -236,13 +236,13 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             fields=[
                 {"field_name": "title", "order": "asc"}
             ],
-            sortCandidates=30
+            minSortCandidates=30
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
         sort_fields = r['marqo__hybrid.sortBy.fields']
         sort_depth = r["marqo__hybrid.sortBy.sortDepth"]
-        sort_candidates = r["marqo__hybrid.sortBy.sortCandidates"]
+        sort_candidates = r["marqo__hybrid.sortBy.minSortCandidates"]
 
         self.assertEqual(1, len(sort_fields))
         self.assertEqual("title", sort_fields[0]["field_name"])
@@ -257,7 +257,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
                 {"field_name": "description", "order": "asc", "missing": "first"}
             ],
             sortDepth=2,
-            sortCandidates=20
+            minSortCandidates=20
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
@@ -268,7 +268,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
         self.assertEqual("asc", sort_fields[0]["order"].value)
         self.assertEqual("first", sort_fields[0]["missing"].value)
         self.assertEqual(2, r['marqo__hybrid.sortBy.sortDepth'])
-        self.assertEqual(20, r['marqo__hybrid.sortBy.sortCandidates'])
+        self.assertEqual(20, r['marqo__hybrid.sortBy.minSortCandidates'])
 
     def test_sort_by_none(self):
         """Test that no sort_by results in no sort fields present."""
@@ -277,7 +277,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
 
         self.assertNotIn("marqo__hybrid.sortBy.fields", r)
         self.assertNotIn("marqo__hybrid.sortBy.sortDepth", r)
-        self.assertNotIn("marqo__hybrid.sortBy.sortCandidates", r)
+        self.assertNotIn("marqo__hybrid.sortBy.minSortCandidates", r)
 
     def test_sort_by_three_fields_mixed_order_and_missing(self):
         """Test three fields with mixed order and missing policies."""
@@ -288,7 +288,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
                 {"field_name": "stock", "order": "desc", "missing": "first"}
             ],
             sortDepth=4,
-            sortCandidates=100
+            minSortCandidates=100
         )
 
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)

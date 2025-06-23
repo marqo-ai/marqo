@@ -37,7 +37,7 @@ class TestSortByModels(TestCase):
             sort_candidates=15
         )
         self.assertEqual(sort_by_model.sort_depth, 5)
-        self.assertEqual(sort_by_model.sort_candidates, 15)
+        self.assertEqual(sort_by_model.min_sort_candidates, 15)
 
     def test_sort_by_invalid_in_tensor_search(self):
         with self.assertRaises(ValueError) as e:
@@ -68,7 +68,7 @@ class TestSortByModels(TestCase):
             offset=5
         )
         # 3 * limit = 30 vs offset + limit = 15 -> max is 30
-        self.assertEqual(query.sort_by.sort_candidates, 30)
+        self.assertEqual(query.sort_by.min_sort_candidates, 30)
 
     def test_sort_by_rejected_in_lexical_search(self):
         with self.assertRaises(ValueError) as e:
@@ -116,43 +116,43 @@ class TestSortByModels(TestCase):
             limit=10,
             offset=50
         )
-        self.assertEqual(query.sort_by.sort_candidates, 60)  # max(3*10, 10+50)
+        self.assertEqual(query.sort_by.min_sort_candidates, 60)  # max(3*10, 10+50)
 
-    def test_sort_by_explicit_sort_candidates_preserved_greater_than_offset_plus_limit_and_three_times_limit(self):
-        """Ensure that if sortCandidates is explicitly set, it is preserved, when
+    def test_sort_by_explicit_min_sort_candidates_preserved_greater_than_offset_plus_limit_and_three_times_limit(self):
+        """Ensure that if minSortCandidates is explicitly set, it is preserved, when
         it's larger than offset + limit and greater than 3 * limit."""
         query = SearchQuery(
             q="explicit test",
             searchMethod=SearchMethod.HYBRID,
-            sortBy=SortByModel(fields=[SortByField(fieldName="value")], sort_candidates=77),
+            sortBy=SortByModel(fields=[SortByField(fieldName="value")], min_sort_candidates=77),
             limit=5,
             offset=2
         )
-        self.assertEqual(query.sort_by.sort_candidates, 77)
+        self.assertEqual(query.sort_by.min_sort_candidates, 77)
 
-    def test_sort_by_explicit_sort_candidates_preserved_greater_than_offset_plus_limit_smaller_than_three_times_limit(self):
-        """Ensure that if sortCandidates is explicitly set, it is preserved, when
+    def test_sort_by_explicit_min_sort_candidates_preserved_greater_than_offset_plus_limit_smaller_than_three_times_limit(self):
+        """Ensure that if minSortCandidates is explicitly set, it is preserved, when
         it's larger than offset + limit but smaller than 3 * limit."""
         query = SearchQuery(
             q="explicit test",
             searchMethod=SearchMethod.HYBRID,
-            sortBy=SortByModel(fields=[SortByField(fieldName="value")], sort_candidates=11),
+            sortBy=SortByModel(fields=[SortByField(fieldName="value")], min_sort_candidates=11),
             limit=5,
             offset=2
         )
-        self.assertEqual(query.sort_by.sort_candidates, 11)
+        self.assertEqual(query.sort_by.min_sort_candidates, 11)
 
     def test_sort_by_explicit_sort_candidates_checked_against_limit_and_offset(self):
-        """Ensure an error is raised if sortCandidates is less than offset + limit."""
+        """Ensure an error is raised if minSortCandidates is less than offset + limit."""
         with self.assertRaises(ValidationError) as e:
             _ = SearchQuery(
                 q="explicit test",
                 searchMethod=SearchMethod.HYBRID,
-                sortBy=SortByModel(fields=[SortByField(fieldName="value")], sort_candidates=77),
+                sortBy=SortByModel(fields=[SortByField(fieldName="value")], min_sort_candidates=77),
                 limit=50,
                 offset=29
             )
-        self.assertIn("sortCandidates must be at least as large as offset + limit", str(e.exception))
+        self.assertIn("minSortCandidates must be at least as large as offset + limit", str(e.exception))
 
     def test_sort_by_sort_candidates_with_default_limit_and_offset(self):
         query = SearchQuery(
@@ -160,7 +160,7 @@ class TestSortByModels(TestCase):
             searchMethod=SearchMethod.HYBRID,
             sortBy=SortByModel(fields=[SortByField(fieldName="value")]),
         )
-        self.assertEqual(30, query.sort_by.sort_candidates)
+        self.assertEqual(30, query.sort_by.min_sort_candidates)
 
     def test_sort_by_sort_candidates_can_be_none_if_relevance_cutoff_is_provided(self):
         query = SearchQuery(
@@ -173,7 +173,7 @@ class TestSortByModels(TestCase):
             )
         )
 
-        self.assertEqual(None, query.sort_by.sort_candidates)
+        self.assertEqual(None, query.sort_by.min_sort_candidates)
 
     def test_sort_by_invalid_sort_candidates_below_one(self):
         with self.assertRaises(ValidationError) as e:

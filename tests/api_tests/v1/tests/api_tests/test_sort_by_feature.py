@@ -272,12 +272,12 @@ class TestSortByFeature(MarqoTestCase):
                             "missing": "last"
                         },
                     ],
-                    "sortCandidates": 2
+                    "minSortCandidates": 2
                 }
             )
 
         self.assertIn(
-            "sortCandidates must be at least as large as offset + limit",
+            "minSortCandidates must be at least as large as offset + limit",
             str(cm.exception)
         )
 

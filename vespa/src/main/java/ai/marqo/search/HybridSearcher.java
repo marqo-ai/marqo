@@ -52,6 +52,11 @@ public class HybridSearcher extends Searcher {
         public String missing;
     }
 
+    // Constants for relevance cut-off methods
+    private static final String RELATIVE_MAX_SCORE = "relative_max_score";
+    private static final String MEAN_STD_DEV = "mean_std_dev";
+    private static final String GAP_DETECTION = "gap_detection";
+
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
 
@@ -83,13 +88,15 @@ public class HybridSearcher extends Searcher {
                 query.properties().getString("marqo__hybrid.relevanceCutoff.method", null);
         Integer relevanceCutoffProbeDepth =
                 query.properties().getInteger("marqo__hybrid.relevanceCutoff.probeDepth", null);
+        Double relevanceCutoffParameter =
+                readRelevanceCutoffParameter(query, relevanceCutoffMethod);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
         Integer sortBySortDepth =
                 query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
         int sortBySortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", -1);
+                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", -1);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -148,7 +155,11 @@ public class HybridSearcher extends Searcher {
 
             probeCandidates = probeLexicalResult.hits().size();
             relevanceCandidates =
-                    detectCutoffCount(probeLexicalResult.hits(), relevanceCutoffMethod, verbose);
+                    detectCutoffCount(
+                            probeLexicalResult.hits(),
+                            relevanceCutoffMethod,
+                            relevanceCutoffParameter,
+                            verbose);
             query.setHits(Math.max(relevanceCandidates, limit + offset));
             query.setOffset(0);
         }
@@ -308,7 +319,7 @@ public class HybridSearcher extends Searcher {
             processedHits.setField("marqo__relevanceCandidates", relevanceCandidates);
             processedHits.setField("marqo__probeCandidates", probeCandidates);
         }
-        
+
         return new Result(query, processedHits);
     }
 
@@ -385,6 +396,48 @@ public class HybridSearcher extends Searcher {
         result.addAll(combined);
         result.trim(offset, limit);
         return result;
+    }
+
+    /**
+     * Read the relevance cutoff parameter based on the relevance cutoff method.
+     **/
+    private Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethod) {
+        if (relevanceCutoffMethod == null) {
+            return null;
+        }
+        switch (relevanceCutoffMethod) {
+            case RELATIVE_MAX_SCORE -> {
+                Double value =
+                        query.properties()
+                                .getDouble(
+                                        "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor");
+                if (value == null) {
+                    throw new RuntimeException(
+                            "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor is"
+                                    + " missing");
+                }
+                return value;
+            }
+            case MEAN_STD_DEV -> {
+                Double value =
+                        query.properties()
+                                .getDouble(
+                                        "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor");
+                if (value == null) {
+                    throw new RuntimeException(
+                            "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor is missing");
+                }
+                return value;
+            }
+            case GAP_DETECTION -> {
+                // no cutoff parameter for gap detection
+                return null;
+            }
+            default -> {
+                throw new RuntimeException(
+                        "Unknown relevance cutoff method: " + relevanceCutoffMethod);
+            }
+        }
     }
 
     /**
@@ -892,11 +945,15 @@ public class HybridSearcher extends Searcher {
      * Detects the cutoff count for relevance filtering based on the specified method
      * @param probeCandidates The lexical search results to analyze
      * @param cutoffMethod The method to use for cutoff detection
+     * @param relevanceCutoffParameter The parameter for the cutoff method. It is unified across all methods.
      * @param verbose Whether to log verbose information
      * @return The number of relevant results to keep
      */
     private Integer detectCutoffCount(
-            HitGroup probeCandidates, String cutoffMethod, boolean verbose) {
+            HitGroup probeCandidates,
+            String cutoffMethod,
+            Double relevanceCutoffParameter,
+            boolean verbose) {
         List<Hit> lexicalHits = new ArrayList<>(probeCandidates.asList());
 
         if (lexicalHits.isEmpty()) {
@@ -904,11 +961,8 @@ public class HybridSearcher extends Searcher {
             return 0;
         }
 
-        int minResults = 0; // Default minimum results
-        double dummyParameter = 0.8; // Default parameter for softCodedScoreCut
-
         switch (cutoffMethod) {
-            case "gap_detection" -> {
+            case GAP_DETECTION -> {
                 logIfVerbose("Using gapDetection method for relevance cutoff", verbose);
                 // Find the elbow point in the lexical hits
                 double maxDelta = -1.0;
@@ -922,16 +976,9 @@ public class HybridSearcher extends Searcher {
                         bestIndex = i + 1;
                     }
                 }
-                // Respect minimum result constraint
-                int result = Math.max(bestIndex, Math.max(0, minResults));
-                logIfVerbose(
-                        String.format(
-                                "Gap detection found best cutoff at index %d (max delta: %.6f)",
-                                bestIndex, maxDelta),
-                        verbose);
-                return result;
+                return bestIndex;
             }
-            case "meand_std_dev" -> {
+            case MEAN_STD_DEV -> {
                 logIfVerbose("Using normalFit method for relevance cutoff", verbose);
                 // Calculate mean and standard deviation of scores
                 double sum = 0.0;
@@ -948,8 +995,7 @@ public class HybridSearcher extends Searcher {
                 }
                 double stdScore = Math.sqrt(sumSquaredDiffs / lexicalHits.size());
 
-                // Calculate threshold: mean + (std * 1.2)
-                double threshold = meanScore + (stdScore * 1.2);
+                double threshold = meanScore + (stdScore * relevanceCutoffParameter);
 
                 // Count relevant results
                 int relevantCount = 0;
@@ -958,18 +1004,12 @@ public class HybridSearcher extends Searcher {
                         relevantCount++;
                     }
                 }
-
-                logIfVerbose(
-                        String.format(
-                                "Normal fit: mean=%.6f, std=%.6f, threshold=%.6f, relevant=%d",
-                                meanScore, stdScore, threshold, relevantCount),
-                        verbose);
-                return Math.max(relevantCount, Math.max(0, minResults));
+                return relevantCount;
             }
-            case "relative_max_score" -> {
+            case RELATIVE_MAX_SCORE -> {
                 logIfVerbose("Using softCodedScoreCut method for relevance cutoff", verbose);
                 double topScore = lexicalHits.get(0).getRelevance().getScore();
-                double dynamicThreshold = topScore * dummyParameter;
+                double dynamicThreshold = topScore * relevanceCutoffParameter;
 
                 int matchedSize = 0;
                 for (Hit hit : lexicalHits) {
@@ -978,19 +1018,10 @@ public class HybridSearcher extends Searcher {
                     }
                 }
 
-                logIfVerbose(
-                        String.format(
-                                "Soft coded score cut: topScore=%.6f, threshold=%.6f, matched=%d",
-                                topScore, dynamicThreshold, matchedSize),
-                        verbose);
-                return Math.max(matchedSize, Math.max(0, minResults));
+                return matchedSize;
             }
             default -> {
-                throw new RuntimeException(
-                        "Unknown relevance cutoff method: "
-                                + cutoffMethod
-                                + ". Supported methods: gapDetection, normalFit,"
-                                + " softCodedScoreCut");
+                throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethod);
             }
         }
     }

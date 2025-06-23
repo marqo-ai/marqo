@@ -150,7 +150,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     5. Sort by 1 single field will field name of different types (e.g., string). In this case, the field should be
     treated as a missing field, and the sort order should be applied accordingly.
     6. Sorty by 1 single field but the field never exists in the index.
-    7. Test limit, offset, sortDepth, sortCandidates parameters to ensure they work as expected.
+    7. Test limit, offset, sortDepth, minSortCandidates parameters to ensure they work as expected.
     """
 
     @classmethod
@@ -411,7 +411,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                     }
                 ],
                 "sortDepth": 4,  # Limit the sort depth to 6
-                "sortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
+                "minSortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
             }
 
             # We run it several times to ensure that the results are consistent
@@ -428,7 +428,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     def test_small_sort_limit_without_specifying_min_sort_candidates(self):
         """
         Test the case where the sort limit is smaller than the number of documents,
-        and sortCandidates is not specified.
+        and minSortCandidates is not specified.
         In this case, the sort candidates is defaulted to be max(3 * limit, limit + offset).
 
         # We get the top 6 hits and only return the top 2 hits by sort order, so we return ['2', '3'].

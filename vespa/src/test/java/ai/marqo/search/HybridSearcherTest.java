@@ -923,7 +923,7 @@ class HybridSearcherTest {
                             "marqo__hybrid.sortBy.fields",
                             "[{\"field_name\":\"foo\",\"order\":\"asc\",\"missing\":\"last\"}]");
             // MUST set this to avoid the NPE you saw
-            q.properties().set("marqo__hybrid.sortBy.sortCandidates", 10);
+            q.properties().set("marqo__hybrid.sortBy.minSortCandidates", 10);
 
             // 6) Call search()
             spy.search(q, makeEmptyExec());
