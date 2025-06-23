@@ -56,7 +56,7 @@ class TestSearchQueryModel(TestCase):
 
     def test_search_context_documents_empty_ids_fails(self):
         """Test that SearchQuery with empty ids in documents context fails"""
-        with self.assertRaises(InvalidArgError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             SearchQuery(
                 context=SearchContext(
                     documents=SearchContextDocuments(
@@ -68,7 +68,7 @@ class TestSearchQueryModel(TestCase):
 
     def test_search_context_documents_no_ids_fails(self):
         """Test that SearchQuery with no ids in documents context fails"""
-        with self.assertRaises(InvalidArgError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             SearchQuery(
                 context=SearchContext(
                     documents=SearchContextDocuments(

@@ -384,8 +384,8 @@ class TestRecommenderGetDocVectorsFromIds:
                         interpolation_method=InterpolationMethod.SLERP
                     )
                 
-                # Verify SLERP-specific error message
-                assert "SLERP cannot interpolate vectors with all zero weights" in str(exc_info.value)
+                # Verify generic error message (same for all interpolation methods)
+                assert "Cannot interpolate vectors with all zero weights" in str(exc_info.value)
 
     def test_get_default_interpolation_method_normalize_embeddings_with_context(self):
         """Test get_default_interpolation_method with normalize_embeddings=True and context docs"""
@@ -559,8 +559,8 @@ class TestRecommenderGetDocVectorsFromIds:
                         interpolation_method=InterpolationMethod.LERP
                     )
                 
-                # Verify LERP/NLERP error message
-                assert "All weights are zero. LERP/NLERP requires at least one non-zero weight" in str(exc_info.value)
+                # Verify generic error message (same for all interpolation methods)
+                assert "Cannot interpolate vectors with all zero weights" in str(exc_info.value)
 
     def test_get_exclusion_filter_for_structured_index(self):
         """Test get_exclusion_filter for structured index format"""
