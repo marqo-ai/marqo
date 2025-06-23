@@ -7,7 +7,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.vespa.vespa_client import VespaClient
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredAddDocumentsHandler(MarqoTestCase):

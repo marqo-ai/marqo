@@ -1,10 +1,10 @@
 import numpy as np
 
-from integ_tests.inference.inference_test_case import InferenceTestCase
+from tests.integ_tests.inference.inference_test_case import InferenceTestCase
 from marqo.core.inference.api import *
 from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 import pytest
 
 

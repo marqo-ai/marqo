@@ -13,7 +13,7 @@ from marqo.config import Config
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import TensorField, SearchMethod
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from unittest import mock
 from marqo.api import exceptions, configs
 

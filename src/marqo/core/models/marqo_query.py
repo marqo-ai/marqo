@@ -10,6 +10,8 @@ from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -48,6 +50,7 @@ class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
     ef_search: Optional[int] = None
     approximate: bool = True
+    approximate_threshold: Optional[float] = None
     rerank_depth_tensor: Optional[int] = None
 
     # TODO - validate that ef_search >= offset+limit if provided
@@ -72,6 +75,8 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     facets: Optional[FacetsParameters] = None
     track_total_hits: Optional[bool] = None
     pagination_exclusions: Optional[List[str]] = None
+    relevance_cutoff: Optional[RelevanceCutoffModel] = None
+    sort_by: Optional[SortByModel] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

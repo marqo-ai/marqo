@@ -18,6 +18,7 @@ from marqo.logging import get_logger
 # TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
+from marqo.core.constants import MARQO_SORT_BY_MINIMUM_VERSION
 
 logger = get_logger(__name__)
 
@@ -516,6 +517,7 @@ class StructuredMarqoIndex(MarqoIndex):
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
 
     _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
+    _SORT_BY_SUPPORTED_VERSION = MARQO_SORT_BY_MINIMUM_VERSION
 
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
@@ -628,6 +630,15 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         return self._cache_or_get(
             'index_supports_partial_updates',
             lambda: self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION)
+
+    @property
+    def index_supports_sorty_by(self) -> bool:
+        """
+        Check if the index supports sort by.
+        """
+        return self._cache_or_get(
+            'index_supports_sort_by',
+            lambda: self.parsed_marqo_version() >= self._SORT_BY_SUPPORTED_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

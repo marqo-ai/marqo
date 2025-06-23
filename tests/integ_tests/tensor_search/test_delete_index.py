@@ -2,7 +2,7 @@ import unittest
 
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import tensor_search, index_meta_cache
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @unittest.skip

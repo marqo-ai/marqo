@@ -27,6 +27,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
 import semver
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 from marqo.vespa.models import VespaDocument
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +42,7 @@ class HybridSearch:
             self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
+            approximate_threshold: Optional[float] = None,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
@@ -48,6 +51,8 @@ class HybridSearch:
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
+            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
+            sort_by: Optional[SortByModel] = None
     ) -> Dict:
         """
 
@@ -73,6 +78,8 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
+                relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
+                sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
             Returns:
 
             Output format:
@@ -245,6 +252,7 @@ class HybridSearch:
             limit=result_count,
             ef_search=ef_search,
             approximate=approximate,
+            approximate_threshold=approximate_threshold,
             offset=offset,
             global_rerank_depth=rerank_depth,
             or_phrases=optional_terms,
@@ -259,7 +267,9 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters,
             facets=facets,
-            track_total_hits=track_total_hits
+            track_total_hits=track_total_hits,
+            relevance_cutoff=relevance_cutoff,
+            sort_by=sort_by
         )
 
         # Create query hash without offset
@@ -372,5 +382,8 @@ class HybridSearch:
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
             f"{total_results} results from Vespa."
         )
+
+        if sort_by is not None:
+            gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
 
         return gathered_results

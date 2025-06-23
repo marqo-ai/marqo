@@ -18,8 +18,8 @@ from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from integ_tests.utils.transition import add_docs_caller
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
     ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod

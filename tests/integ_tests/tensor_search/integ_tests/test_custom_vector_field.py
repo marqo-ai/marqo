@@ -12,7 +12,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from marqo.vespa.models import VespaDocument, FeedBatchDocumentResponse, FeedBatchResponse
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestCustomVectorField(MarqoTestCase):

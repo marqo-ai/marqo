@@ -10,6 +10,8 @@ from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod, RelativeMaxScoreParameters
+from marqo.tensor_search.models.sort_by_model import SortByModel
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -439,7 +441,8 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold
         }
         query = {k: v for k, v in query.items() if v is not None}
 
@@ -614,6 +617,7 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
             'query_features': query_inputs,
             'presentation.summary': summary,
 
@@ -645,6 +649,33 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
+
+        # Relevance cut-off part
+        if marqo_query.relevance_cutoff:
+            query["marqo__hybrid.relevanceCutoff.method"] = marqo_query.relevance_cutoff.method
+            if marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.RelativeMaxScore:
+                query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
+                    marqo_query.relevance_cutoff.parameters.relative_score_factor
+            elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
+                query["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"] = \
+                    marqo_query.relevance_cutoff.parameters.std_dev_factor
+            else:
+                # No parameters for other methods
+                pass
+            query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
+
+        # Sort by part
+        if marqo_query.sort_by:
+            query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
+            query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sort_depth
+            query["marqo__hybrid.sortBy.sortCandidates"] = marqo_query.sort_by.sort_candidates
+
+            query["query_features"]["marqo__sort_field_weights_0"] = {}
+            query["query_features"]["marqo__sort_field_weights_1"] = {}
+            query["query_features"]["marqo__sort_field_weights_2"] = {}
+
+            for index, field in enumerate(marqo_query.sort_by.fields):
+                query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
 
         return query
 

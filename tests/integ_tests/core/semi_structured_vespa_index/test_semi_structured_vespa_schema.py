@@ -3,7 +3,7 @@ from typing import cast
 
 from marqo.core.models.marqo_index import *
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestSemiStructuredVespaSchema(MarqoTestCase):
@@ -20,7 +20,6 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
         return '\n'.join([line for line in schema.splitlines() if line.strip()])
 
     def test_semi_structured_index_schema_random_model(self):
-
         test_cases = [
             # test_case_name, lexical_fields, tensor_fields, expected schema file, string_array_fields
             ('no_field', [], [], 'semi_structured_vespa_index_schema_no_field.sd', []),
@@ -81,7 +80,6 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
         2.16.0 is the version where partial update support was added to the semi-structured index, to do this we
         had to change what the schema looks like. This is why we have a different test for this case.
         Returns:
-
         """
 
         test_cases = [
@@ -89,8 +87,10 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
             ('no_field', [], [], 'semi_structured_vespa_index_schema_no_field.sd'),
             ('one_lexical_field', ['text_field'], [], 'semi_structured_vespa_index_schema_one_lexical_field.sd'),
             ('one_tensor_field', [], ['tensor_field'], 'semi_structured_vespa_index_schema_one_tensor_field.sd'),
-            ('one_lexical_one_tensor_field', ['text_field'], ['tensor_field'], 'semi_structured_vespa_index_schema_one_lexical_one_tensor_field.sd'),
-            ('multiple_lexical_tensor_fields', ['text_field1', 'text_field2'], ['tensor_field1', 'tensor_field2'], 'semi_structured_vespa_index_schema_multiple_lexical_tensor_fields.sd'),
+            ('one_lexical_one_tensor_field', ['text_field'], ['tensor_field'],
+             'semi_structured_vespa_index_schema_one_lexical_one_tensor_field.sd'),
+            ('multiple_lexical_tensor_fields', ['text_field1', 'text_field2'], ['tensor_field1', 'tensor_field2'],
+             'semi_structured_vespa_index_schema_multiple_lexical_tensor_fields.sd'),
         ]
 
         for test_case in test_cases:
@@ -103,14 +103,14 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
                     name="test_semi_structured_schema",
                     hnsw_config=HnswConfig(ef_construction=512, m=16),
                     distance_metric=DistanceMetric.PrenormalizedAngular,
-                    marqo_version = "2.15.0"
+                    marqo_version="2.15.0"
                 )
 
                 self.assertEqual("2.15.0", test_marqo_index_request.marqo_version)
 
                 _, index = SemiStructuredVespaSchema(test_marqo_index_request).generate_schema()
                 marqo_index = cast(SemiStructuredMarqoIndex, index)
-                
+
                 # Set the marqo_version explicitly to ensure it uses our mocked version
 
                 for lexical_field in lexical_fields:
@@ -132,6 +132,6 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
                     self._remove_empty_lines_in_schema(expected_schema),
                     self._remove_empty_lines_in_schema(generated_schema)
                 )
-                
+
                 # Verify the version was used in the index
                 self.assertEqual("2.15.0", marqo_index.marqo_version)

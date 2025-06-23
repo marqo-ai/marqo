@@ -1,5 +1,5 @@
 from marqo.core.models.marqo_index import *
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestUpdate(MarqoTestCase):

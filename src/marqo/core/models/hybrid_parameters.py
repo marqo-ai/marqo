@@ -100,7 +100,7 @@ class HybridParameters(StrictBaseModel):
         if isinstance(values.get('queryTensor'), dict):
             if not len(values.get('queryTensor')):
                 raise ValueError(
-                    "Multi-query search for queryTensor requires at least one query! Received empty dictionary. "
+                    "Multi-term query for queryTensor requires at least one query. Received empty dictionary"
                 )
 
 
