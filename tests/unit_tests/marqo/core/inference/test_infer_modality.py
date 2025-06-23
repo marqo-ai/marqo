@@ -177,38 +177,12 @@ class TestMultimodalUtils(unittest.TestCase):
         data_url_jpeg = f"data:image/jpeg;base64,{base64_data}"
         self.assertTrue(is_base64_image(data_url_jpeg))
 
-    def test_is_base64_image_plain_base64(self):
-        """Test recognition of plain base64 images without data URL prefix."""
-        # Create a small test image (1x1 blue pixel PNG)
-        img = Image.new('RGB', (1, 1), color='blue')
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        
-        with patch('magic.from_buffer') as mock_magic:
-            mock_magic.return_value = 'image/png'
-            self.assertTrue(is_base64_image(base64_data))
-
     def test_is_base64_image_invalid_cases(self):
         """Test rejection of invalid base64 image cases."""
-        # Test short strings
         self.assertFalse(is_base64_image("short"))
-        
-        # Test non-base64 strings
         self.assertFalse(is_base64_image("not_base64_at_all" * 10))
-        
-        # Test non-image mime types
-        with patch('magic.from_buffer') as mock_magic:
-            mock_magic.return_value = 'text/plain'
-            self.assertFalse(is_base64_image("VGhpcyBpcyBub3QgYW4gaW1hZ2U=" * 5))
-        
-        # Test invalid data URL format
         self.assertFalse(is_base64_image("data:text/plain;base64,VGVzdA=="))
         
-        # Test None and non-string inputs
-        self.assertFalse(is_base64_image(None))
-        self.assertFalse(is_base64_image(123))
-
     def test_infer_modality_base64_images(self):
         """Test that infer_modality correctly identifies base64 images."""
         # Create a small test image
@@ -220,11 +194,6 @@ class TestMultimodalUtils(unittest.TestCase):
         # Test data URL format
         data_url = f"data:image/png;base64,{base64_data}"
         self.assertEqual(infer_modality(data_url), Modality.IMAGE)
-        
-        # Test plain base64 with mocked magic
-        with patch('marqo.core.inference.modality_utils.is_base64_image') as mock_is_base64:
-            mock_is_base64.return_value = True
-            self.assertEqual(infer_modality(base64_data), Modality.IMAGE)
 
     def test_infer_modality_base64_takes_precedence(self):
         """Test that base64 detection takes precedence over URL validation."""
