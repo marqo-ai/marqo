@@ -27,13 +27,7 @@ def pytest_collection_modifyitems(config, items):
                 logger.debug(f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping.")
                 item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping."))
                 continue
-
-        if not test_case_version_marker:
-            logger.debug(f"Test class: {item.name} not marked with marqo_version. Skipping.")
-            item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} not marked with marqo_version. Skipping."))
-        else:
-            logger.debug(f"Test class: {item.name} not marked with marqo_version. Skipping.")
-            item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} not marked with marqo_version. Skipping."))
+        if test_case_version_marker:
             test_case_version = test_case_version_marker.args[0] #test_case_version is the version_to_test_against defined as the argument in the "marqo_version" marker above each compatibility test
             # Compare the test's required version_to_test_against with the version_to_test_against
             logger.debug(f"Testcase: {item.name}, with marqo_version: {test_case_version}, v/s version_to_test_against supplied in pytest arguments: {version_to_test_against}")
@@ -41,3 +35,6 @@ def pytest_collection_modifyitems(config, items):
             if test_case_version.compare(version_to_test_against) > 0:
                 logger.debug(f"marqo_version ({test_case_version}) should be <= supplied version_to_test_against: ({version_to_test_against}). Skipping.")
                 item.add_marker(pytest.mark.skip(reason=f"marqo_version ({test_case_version}) should be <= supplied version_to_test_against: ({version_to_test_against}). Skipping."))
+        else:
+            logger.debug(f"Test class: {item.name} not marked with marqo_version. Skipping.")
+            item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} not marked with marqo_version. Skipping."))
