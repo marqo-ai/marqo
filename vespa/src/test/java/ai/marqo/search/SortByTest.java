@@ -445,17 +445,27 @@ class SortByTest {
         }
 
         @Test
-        void shouldHandleNullOrderAndMissing() {
+        void shouldThrowExceptionForNullOrderAndMissing() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
-            // Test with null values (should use defaults: ASC and FIRST)
-            String sortJson = "[{\"field_name\":\"f1\",\"order\":null,\"missing\":null}]";
+            // Test with null order value
+            String sortJsonNullOrder =
+                    "[{\"field_name\":\"f1\",\"order\":null,\"missing\":\"last\"}]";
+            assertThatThrownBy(
+                            () -> searcher.postProcessBySort(hits, sortJsonNullOrder, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("order is required for sort field at index 0");
 
-            // Should not throw exception and use default values
-            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
-            assertThat((Object) result).isNotNull();
-            assertThat(result.asList()).hasSize(1);
+            // Test with null missing value
+            String sortJsonNullMissing =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":null}]";
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, sortJsonNullMissing, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("missing is required for sort field at index 0");
         }
 
         @Test
@@ -487,50 +497,55 @@ class SortByTest {
         }
 
         @Test
-        void shouldHandleEmptyArray() {
+        void shouldThrowExceptionForEmptyArray() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
             String emptySortJson = "[]";
 
-            // Should not throw exception with 0 sort fields
-            HitGroup result = searcher.postProcessBySort(hits, emptySortJson, null, 10, 0);
-            assertThat((Object) result).isNotNull();
-            assertThat(result.asList()).hasSize(1);
+            // Should throw exception for empty sort fields
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, emptySortJson, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBy fields cannot be empty. Must contain 1 to 3 sort fields.");
         }
 
         @Test
-        void shouldHandleManyFields() {
+        void shouldThrowExceptionForTooManyFields() {
             HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
 
-            // Create hits with more sort field values
-            FeatureData f = mock(FeatureData.class);
-            for (int i = 0; i < 10; i++) {
-                when(f.getDouble("sort_field_value_" + i)).thenReturn((double) i);
-            }
-            Hit doc = new Hit("doc1", 0.5);
-            doc.setField("matchfeatures", f);
-            HitGroup hits = new HitGroup();
-            hits.add(doc);
+            // Build JSON with more than 3 fields (4 fields)
+            String sortJsonWith4Fields =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"},"
+                            + "{\"field_name\":\"f3\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f4\",\"order\":\"desc\",\"missing\":\"first\"}]";
 
-            // Build JSON with many fields (more than typical use case)
-            StringBuilder jsonBuilder = new StringBuilder("[");
-            for (int i = 0; i < 5; i++) {
-                if (i > 0) jsonBuilder.append(",");
-                jsonBuilder
-                        .append("{\"field_name\":\"f")
-                        .append(i)
-                        .append("\",")
-                        .append("\"order\":\"asc\",\"missing\":\"last\"}");
-            }
-            jsonBuilder.append("]");
+            // Should throw exception for more than 3 fields
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, sortJsonWith4Fields, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBy fields cannot contain more than 3 sort fields. Found: 4");
 
-            String sortJson = jsonBuilder.toString();
+            // Build JSON with 5 fields to test the counter
+            String sortJsonWith5Fields =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"},"
+                            + "{\"field_name\":\"f3\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f4\",\"order\":\"desc\",\"missing\":\"first\"},"
+                            + "{\"field_name\":\"f5\",\"order\":\"asc\",\"missing\":\"last\"}]";
 
-            // Should handle multiple fields without issues
-            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
-            assertThat((Object) result).isNotNull();
-            assertThat(result.asList()).hasSize(1);
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, sortJsonWith5Fields, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "sortBy fields cannot contain more than 3 sort fields. Found: 5");
         }
 
         @Test
@@ -576,23 +591,102 @@ class SortByTest {
         }
 
         @Test
-        void shouldHandleMissingRequiredFields() {
+        void shouldThrowExceptionForMissingRequiredFields() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
-            // Test JSON missing required fields
-            String[] incompleteJsons = {
-                "[{\"order\":\"asc\",\"missing\":\"last\"}]", // missing field_name
-                "[{\"field_name\":\"f1\",\"missing\":\"last\"}]", // missing order
-                "[{\"field_name\":\"f1\",\"order\":\"asc\"}]" // missing missing
-            };
+            // Test JSON missing field_name
+            String missingFieldName = "[{\"order\":\"asc\",\"missing\":\"last\"}]";
+            assertThatThrownBy(
+                            () -> searcher.postProcessBySort(hits, missingFieldName, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("fieldName is required for sort field at index 0");
 
-            for (String sortJson : incompleteJsons) {
-                // Should handle gracefully (Jackson will use null for missing fields)
-                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
-                assertThat((Object) result).isNotNull();
-                assertThat(result.asList()).hasSize(1);
-            }
+            // Test JSON missing order
+            String missingOrder = "[{\"field_name\":\"f1\",\"missing\":\"last\"}]";
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, missingOrder, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("order is required for sort field at index 0");
+
+            // Test JSON missing missing
+            String missingMissing = "[{\"field_name\":\"f1\",\"order\":\"asc\"}]";
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, missingMissing, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("missing is required for sort field at index 0");
+
+            // Test empty field_name
+            String emptyFieldName =
+                    "[{\"field_name\":\"\",\"order\":\"asc\",\"missing\":\"last\"}]";
+            assertThatThrownBy(() -> searcher.postProcessBySort(hits, emptyFieldName, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("fieldName is required for sort field at index 0");
+
+            // Test whitespace-only field_name
+            String whitespaceFieldName =
+                    "[{\"field_name\":\"   \",\"order\":\"asc\",\"missing\":\"last\"}]";
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, whitespaceFieldName, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("fieldName is required for sort field at index 0");
+        }
+
+        @Test
+        void shouldAcceptValidSortFieldCounts() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test with exactly 1 field (should work)
+            String oneField = "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
+            HitGroup result1 = searcher.postProcessBySort(hits, oneField, null, 10, 0);
+            assertThat((Object) result1).isNotNull();
+            assertThat(result1.asList()).hasSize(1);
+
+            // Test with exactly 2 fields (should work)
+            String twoFields =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"}]";
+            HitGroup result2 = searcher.postProcessBySort(hits, twoFields, null, 10, 0);
+            assertThat((Object) result2).isNotNull();
+            assertThat(result2.asList()).hasSize(1);
+
+            // Test with exactly 3 fields (should work - boundary case)
+            String threeFields =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"},"
+                            + "{\"field_name\":\"f3\",\"order\":\"asc\",\"missing\":\"last\"}]";
+            HitGroup result3 = searcher.postProcessBySort(hits, threeFields, null, 10, 0);
+            assertThat((Object) result3).isNotNull();
+            assertThat(result3.asList()).hasSize(1);
+        }
+
+        @Test
+        void shouldValidateFieldsInCorrectOrder() {
+            HybridSearcher searcher = new HybridSearcher();
+            HitGroup hits = createDummyHitGroup();
+
+            // Test that validation works for fields at different indices
+            String invalidSecondField =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"missing\":\"first\"}]"; // missing order in
+            // 2nd field
+
+            assertThatThrownBy(
+                            () -> searcher.postProcessBySort(hits, invalidSecondField, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("order is required for sort field at index 1");
+
+            String invalidThirdField =
+                    "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
+                            + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"},"
+                            + "{\"order\":\"asc\",\"missing\":\"last\"}]"; // missing field_name in
+            // 3rd field
+
+            assertThatThrownBy(
+                            () -> searcher.postProcessBySort(hits, invalidThirdField, null, 10, 0))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("fieldName is required for sort field at index 2");
         }
     }
 }

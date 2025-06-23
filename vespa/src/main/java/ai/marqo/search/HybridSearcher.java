@@ -320,6 +320,31 @@ public class HybridSearcher extends Searcher {
                     "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
         }
 
+        // Validate sort fields requirements
+        if (parsedSortByFields.isEmpty()) {
+            throw new RuntimeException(
+                    "sortBy fields cannot be empty. Must contain 1 to 3 sort fields.");
+        }
+        if (parsedSortByFields.size() > 3) {
+            throw new RuntimeException(
+                    "sortBy fields cannot contain more than 3 sort fields. Found: "
+                            + parsedSortByFields.size());
+        }
+
+        // Validate that all required fields are provided
+        for (int i = 0; i < parsedSortByFields.size(); i++) {
+            SortField field = parsedSortByFields.get(i);
+            if (field.fieldName() == null || field.fieldName().trim().isEmpty()) {
+                throw new RuntimeException("fieldName is required for sort field at index " + i);
+            }
+            if (field.order() == null) {
+                throw new RuntimeException("order is required for sort field at index " + i);
+            }
+            if (field.missing() == null) {
+                throw new RuntimeException("missing is required for sort field at index " + i);
+            }
+        }
+
         List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
         int depth = (sortBySortDepth != null) ? sortBySortDepth : allHits.size();
 
