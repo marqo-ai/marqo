@@ -93,11 +93,11 @@ def _is_base64_image(content: str) -> bool:
     """
     if not isinstance(content, str):
         return False
-        
+
     # Check for data URL format: data:image/[format];base64,[base64_data]
     if content.startswith('data:image/') and ';base64,' in content:
         return True
-        
+
     # Check for plain base64 string (without data URL prefix)
     # We'll be more conservative and only check if it looks like base64 encoding
     # and has a reasonable length for an image
@@ -112,43 +112,18 @@ def _is_base64_image(content: str) -> bool:
                     return False
             else:
                 base64_part = content
-                
+
             # Try to decode the base64 content
             decoded = base64.b64decode(base64_part, validate=True)
-            
+
             # Use python-magic to check if it's actually an image
             mime_type = magic.from_buffer(decoded, mime=True)
             return mime_type.startswith('image/')
-            
+
         except (base64.binascii.Error, ValueError, magic.MagicException):
             return False
-            
+
     return False
-
-
-def _decode_base64_image(content: str) -> bytes:
-    """
-    Decode a base64-encoded image string to bytes.
-    
-    Args:
-        content: Base64-encoded image string (with or without data URL prefix)
-        
-    Returns:
-        bytes: The decoded image data
-        
-    Raises:
-        ValueError: If the content cannot be decoded
-    """
-    try:
-        if content.startswith('data:') and ';base64,' in content:
-            # Extract base64 part from data URL
-            base64_part = content.split(';base64,', 1)[1]
-        else:
-            base64_part = content
-            
-        return base64.b64decode(base64_part, validate=True)
-    except (base64.binascii.Error, ValueError) as e:
-        raise ValueError(f"Invalid base64 image data: {e}")
 
 
 # TODO this method is copied from s2_inference.multimodal_modal_load class, improve it
@@ -170,7 +145,7 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
         # Check if it's a base64-encoded image first
         if _is_base64_image(content):
             return Modality.IMAGE
-            
+
         if not validate_url(content):
             return Modality.TEXT
 

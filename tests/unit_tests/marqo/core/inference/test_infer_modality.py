@@ -9,7 +9,7 @@ from PIL import Image
 from marqo.core.inference.api import Modality
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
-    get_url_file_extension, _is_base64_image, _decode_base64_image
+    get_url_file_extension, _is_base64_image
 
 
 class TestMultimodalUtils(unittest.TestCase):
@@ -208,41 +208,6 @@ class TestMultimodalUtils(unittest.TestCase):
         # Test None and non-string inputs
         self.assertFalse(_is_base64_image(None))
         self.assertFalse(_is_base64_image(123))
-
-    def test_decode_base64_image_data_url(self):
-        """Test decoding of data URL format base64 images."""
-        # Create a small test image
-        img = Image.new('RGB', (1, 1), color='green')
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        original_bytes = buffer.getvalue()
-        base64_data = base64.b64encode(original_bytes).decode('utf-8')
-        
-        # Test data URL format
-        data_url = f"data:image/png;base64,{base64_data}"
-        decoded_bytes = _decode_base64_image(data_url)
-        self.assertEqual(decoded_bytes, original_bytes)
-
-    def test_decode_base64_image_plain_base64(self):
-        """Test decoding of plain base64 images."""
-        # Create a small test image
-        img = Image.new('RGB', (1, 1), color='yellow')
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        original_bytes = buffer.getvalue()
-        base64_data = base64.b64encode(original_bytes).decode('utf-8')
-        
-        # Test plain base64
-        decoded_bytes = _decode_base64_image(base64_data)
-        self.assertEqual(decoded_bytes, original_bytes)
-
-    def test_decode_base64_image_invalid_input(self):
-        """Test error handling for invalid base64 input."""
-        with self.assertRaises(ValueError):
-            _decode_base64_image("invalid_base64!!!")
-        
-        with self.assertRaises(ValueError):
-            _decode_base64_image("data:image/png;base64,invalid_base64!!!")
 
     def test_infer_modality_base64_images(self):
         """Test that infer_modality correctly identifies base64 images."""
