@@ -2,7 +2,9 @@ package ai.marqo.search;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
@@ -315,7 +317,7 @@ public class HybridSearcher extends Searcher {
         List<SortField> parsedSortByFields;
         try {
             parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
-        } catch (IOException e) {
+        } catch (JsonProcessingException e) {
             throw new RuntimeException(
                     "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
         }
