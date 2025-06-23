@@ -91,39 +91,7 @@ def is_base64_image(content: str) -> bool:
     Returns:
         bool: True if the content is a base64-encoded image, False otherwise
     """
-    if not isinstance(content, str):
-        return False
-
-    # Check for data URL format: data:image/[format];base64,[base64_data]
-    if content.startswith('data:image/') and ';base64,' in content:
-        return True
-
-    # Check for plain base64 string (without data URL prefix)
-    # We'll be more conservative and only check if it looks like base64 encoding
-    # and has a reasonable length for an image
-    if len(content) > 100:  # Minimum reasonable size for a base64 image
-        try:
-            # Try to decode as base64
-            if content.startswith('data:'):
-                # Extract base64 part from data URL
-                if ';base64,' in content:
-                    base64_part = content.split(';base64,', 1)[1]
-                else:
-                    return False
-            else:
-                base64_part = content
-
-            # Try to decode the base64 content
-            decoded = base64.b64decode(base64_part, validate=True)
-
-            # Use python-magic to check if it's actually an image
-            mime_type = magic.from_buffer(decoded, mime=True)
-            return mime_type.startswith('image/')
-
-        except (base64.binascii.Error, ValueError, magic.MagicException):
-            return False
-
-    return False
+    return content.startswith('data:image/')
 
 
 # TODO this method is copied from s2_inference.multimodal_modal_load class, improve it
