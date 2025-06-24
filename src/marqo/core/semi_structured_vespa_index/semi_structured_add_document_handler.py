@@ -104,12 +104,6 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             return None
 
         if field_mapping.get('type') == 'text_field':
-            if not isinstance(field_content, str):
-                raise AddDocumentsError(
-                    f"Language mapping for field '{field_name}' can only be used with text (string) content, "
-                    f"but received {type(field_content).__name__}. "
-                    f"Language specification is only supported for text fields."
-                )
             if not self.marqo_index.index_supports_language:
                 raise AddDocumentsError(
                     f'Language is only supported for indexes created with Marqo version '
