@@ -1,24 +1,14 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any
+from unittest.mock import Mock, patch
+
+from marqo import version
 
 from marqo.config import Config
+from marqo.core.models.marqo_index import MarqoIndex, IndexType, Model
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.marqo_index import MarqoIndex, IndexType, Model
 from marqo.vespa.models import QueryResult
 from marqo.vespa.models.query_result import Child, Root, Coverage
-
-
-class MockChild(dict):
-    """Mock Child object that behaves like a dict"""
-
-    def __init__(self, id, relevance, fields):
-        super().__init__()
-        self.id = id
-        self.relevance = relevance
-        self.fields = fields
-        self.update({"id": id, "relevance": relevance, "fields": fields})
 
 
 class TestTensorSearch(unittest.TestCase):
@@ -42,26 +32,21 @@ class TestTensorSearch(unittest.TestCase):
         self.mock_index.model.get_text_query_prefix.return_value = ""
         self.mock_index.model.get_dimension.return_value = 512
         self.mock_index.model.get_properties.return_value = {}
-        self.mock_index.parsed_marqo_version.return_value = "2.17.0"
+        self.mock_index.parsed_marqo_version.return_value = version.__version__
 
         # Setup mock Vespa response
-        self.mock_hit = MockChild(
+        self.mock_hit = Child(
             id="doc1",
             relevance=0.95,
             fields={"field1": "value1", "field2": "value2"}
         )
 
         # Setup proper QueryResult mock
-        mock_root = Mock(spec=Root)
-        mock_coverage = Mock(spec=Coverage)
-        mock_coverage.coverage = 100
-        mock_coverage.degraded = None
-        mock_root.coverage = mock_coverage
+        mock_coverage = Coverage(coverage=100, degraded=None, documents=1, full=True, nodes=1, results=1, resultsFull=1)
+        mock_root = Root(relevance=0, coverage=mock_coverage)
         mock_root.children = [self.mock_hit]
 
-        self.mock_query_result = Mock(spec=QueryResult)
-        self.mock_query_result.root = mock_root
-        self.mock_query_result.hits = [self.mock_hit]
+        self.mock_query_result = QueryResult(root=mock_root)
 
     @patch('marqo.tensor_search.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
@@ -103,7 +88,10 @@ class TestTensorSearch(unittest.TestCase):
             search_method=SearchMethod.LEXICAL
         )
 
-        # Verify
+        # Verify vespa_client.query was called with correct parameters
+        self.config.vespa_client.query.assert_called_once_with(query="test")
+        
+        # Verify search results
         self.assertEqual(result['query'], 'test query')
         self.assertEqual(result['limit'], 10)
         self.assertEqual(result['offset'], 0)
@@ -153,7 +141,10 @@ class TestTensorSearch(unittest.TestCase):
             search_method=SearchMethod.TENSOR
         )
 
-        # Verify
+        # Verify vespa_client.query was called with correct parameters
+        self.config.vespa_client.query.assert_called_once_with(query="vector_query")
+        
+        # Verify search results
         self.assertEqual(result['query'], 'test query')
         self.assertEqual(result['limit'], 10)
         self.assertEqual(result['offset'], 0)

@@ -2,7 +2,7 @@ import time
 import unittest
 from typing import List
 
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoHybridQuery, MarqoLexicalQuery
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoHybridQuery
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, TextSplitMethod,
     ImagePreProcessing, HnswConfig, DistanceMetric, Field, FieldType,
