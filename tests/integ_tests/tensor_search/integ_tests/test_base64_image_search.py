@@ -37,14 +37,23 @@ class TestBase64ImageSearch(MarqoTestCase):
             tensor_fields=["image"]
         )
 
+        # Create unstructured index with marqo_version 2.12 for base64 tests
+        cls.unstructured_base64_v212_index = cls.unstructured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
+        )
+
         cls.indexes = cls.create_indexes([
             cls.unstructured_base64_index,
-            cls.structured_base64_index
+            cls.structured_base64_index,
+            cls.unstructured_base64_v212_index
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_base64_index = cls.indexes[0]
         cls.structured_base64_index = cls.indexes[1]
+        cls.unstructured_base64_v212_index = cls.indexes[2]
 
     def setUp(self) -> None:
         super().setUp()
@@ -67,7 +76,8 @@ class TestBase64ImageSearch(MarqoTestCase):
         # Define test parameters
         index_configs = [
             ("unstructured", self.unstructured_base64_index),
-            ("structured", self.structured_base64_index)
+            ("structured", self.structured_base64_index),
+            ("unstructured_v212", self.unstructured_base64_v212_index)
         ]
 
         search_methods = [
@@ -93,7 +103,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                 ]
 
                 # Add documents
-                if index_type == "unstructured":
+                if index_type in ["unstructured", "unstructured_v212"]:
                     self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
@@ -149,7 +159,8 @@ class TestBase64ImageSearch(MarqoTestCase):
 
         index_configs = [
             ("unstructured", self.unstructured_base64_index),
-            ("structured", self.structured_base64_index)
+            ("structured", self.structured_base64_index),
+            ("unstructured_v212", self.unstructured_base64_v212_index)
         ]
 
         for index_type, marqo_index in index_configs:
@@ -177,7 +188,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                 ]
 
                 # Add documents
-                if index_type == "unstructured":
+                if index_type in ["unstructured", "unstructured_v212"]:
                     self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
@@ -263,7 +274,8 @@ class TestBase64ImageSearch(MarqoTestCase):
 
         index_configs = [
             ("unstructured", self.unstructured_base64_index),
-            ("structured", self.structured_base64_index)
+            ("structured", self.structured_base64_index),
+            ("unstructured_v212", self.unstructured_base64_v212_index)
         ]
 
         for index_type, marqo_index in index_configs:
@@ -291,7 +303,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                 ]
 
                 # Add documents
-                if index_type == "unstructured":
+                if index_type in ["unstructured", "unstructured_v212"]:
                     self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
@@ -338,7 +350,8 @@ class TestBase64ImageSearch(MarqoTestCase):
 
         index_configs = [
             ("unstructured", self.unstructured_base64_index),
-            ("structured", self.structured_base64_index)
+            ("structured", self.structured_base64_index),
+            ("unstructured_v212", self.unstructured_base64_v212_index)
         ]
 
         search_methods = [
@@ -358,7 +371,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                 ]
 
                 # Add documents
-                if index_type == "unstructured":
+                if index_type in ["unstructured", "unstructured_v212"]:
                     self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
@@ -391,7 +404,8 @@ class TestBase64ImageSearch(MarqoTestCase):
         """Test that base64 images are properly rejected during document addition across all index types."""
         index_configs = [
             ("unstructured", self.unstructured_base64_index),
-            ("structured", self.structured_base64_index)
+            ("structured", self.structured_base64_index),
+            ("unstructured_v212", self.unstructured_base64_v212_index)
         ]
 
         for index_type, marqo_index in index_configs:
@@ -406,7 +420,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                 ]
 
                 # Try to add document with base64 data URL - should return errors in response
-                if index_type == "unstructured":
+                if index_type in ["unstructured", "unstructured_v212"]:
                     result = self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
