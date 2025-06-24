@@ -777,7 +777,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
             {"_id": "5", "content": " ".join(f"content{i}" for i in range(8)),
              "sort_field_1": "invalid", "sort_field_2": 1, "sort_field_3": 6},
             {"_id": "6", "content": " ".join(f"content{i}" for i in range(3)),
-             "sort_field_1": ["test"], "sort_field_2": 2, "sort_field_3": 7},
+             "sort_field_1": ["test"], "sort_field_2": 2}, # Missing field 3
             {"_id": "7", "content": " ".join(f"content{i}" for i in range(9))},  # missing all three
             {"_id": "8", "content": " ".join(f"content{i}" for i in range(2)),
              "sort_field_1": -1, "sort_field_2": -5, "sort_field_3": -2},
@@ -1024,21 +1024,30 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
         # Using sort_field_3 which is missing in document 7
         sort_by = {
             "fields": [
-                {"field_name": "sort_field_3", "order": "desc", "missing": "last"}
+                {"field_name": "sort_field_3", "order": "desc", "missing": "first"}
             ]
         }
         
         res = self._help_sort_function(sort_by=sort_by)
         ids = [h["_id"] for h in res["hits"]]
-        
-        # Document 7 should be last due to missing field3 with missing="last"
-        # Other documents should be sorted by field3 values in descending order
-        self.assertEqual(ids[-1], '7', "Document with missing sort field should be last")
-        
-        # Verify that documents with sort field values come before missing ones
-        doc_7_pos = ids.index('7')
-        for i in range(doc_7_pos):
-            # All documents before position of doc 7 should have the sort field
-            doc_id = ids[i]
-            # Documents 0,1,2,3,4,5,6,8,9 should all have sort_field_3 and come before doc 7
-            self.assertIn(doc_id, ['0', '1', '2', '3', '4', '5', '6', '8', '9'])
+
+        self.assertEqual([
+            '7', '6', # Two missing sort_field_3, sorted by relevance
+            '9', '5', '3', '4', '2', '1', '0', '8' # Remaining documents sorted by sort_field_3 desc
+        ], ids)
+
+    def test_if_all_fields_missing_relevance_is_the_tie_breaker(self):
+        """Test if all sort fields are missing, relevance should be the tiebreaker."""
+        sort_by = {
+            "fields": [
+                {"field_name": "sort_field_void", "order": "desc", "missing": "last"}
+            ]
+        }
+
+        res = self._help_sort_function(sort_by=sort_by)
+        ids = [h["_id"] for h in res["hits"]]
+
+        self.assertEqual(
+            ["3", "7", "5", "4", "2", "9", "1", "6", "8", "0"],
+            ids,
+        )

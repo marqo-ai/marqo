@@ -549,11 +549,11 @@ class SortByTest {
         }
 
         @Test
-        void shouldHandleUnsupportedOrderValues() {
+        void shouldThrowExceptionForUnsupportedSortOrderValues() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
-            // Test unsupported order values - should default to ASC
+
             String[] unsupportedOrders = {"ascending", "descending", "up", "down", "invalid", ""};
 
             for (String order : unsupportedOrders) {
@@ -561,16 +561,18 @@ class SortByTest {
                         "[{\"field_name\":\"f1\",\"order\":\""
                                 + order
                                 + "\",\"missing\":\"last\"}]";
-
-                // Should not throw exception, should default to ASC
-                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
-                assertThat((Object) result).isNotNull();
-                assertThat(result.asList()).hasSize(1);
+                // Should throw exception for unsupported order values
+                assertThatThrownBy(
+                        () -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                        .isInstanceOf(RuntimeException.class)
+                        .hasMessageContaining(
+                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields"
+                        );
             }
         }
 
         @Test
-        void shouldHandleUnsupportedMissingValues() {
+        void shouldThrowExceptionsForUnsupportedMissingValues() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
@@ -582,11 +584,13 @@ class SortByTest {
                         "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\""
                                 + missing
                                 + "\"}]";
-
-                // Should not throw exception, should default to FIRST
-                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
-                assertThat((Object) result).isNotNull();
-                assertThat(result.asList()).hasSize(1);
+                // Should throw exception for unsupported missing values
+                assertThatThrownBy(
+                        () -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                        .isInstanceOf(RuntimeException.class)
+                        .hasMessageContaining(
+                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields"
+                        );
             }
         }
 
@@ -662,7 +666,7 @@ class SortByTest {
         }
 
         @Test
-        void shouldValidateFieldsInCorrectOrder() {
+        void shouldThrowWhenSortFieldJsonIsMissingOrderOrFieldNameAtCorrectIndex() {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 

@@ -77,8 +77,7 @@ public class HybridSearcher extends Searcher {
 
         @JsonCreator
         public static SortOrder fromString(String value) {
-            if (value == null) return ASC; // default
-            return "desc".equalsIgnoreCase(value) ? DESC : ASC;
+            return SortOrder.valueOf(value.toUpperCase(Locale.ROOT));
         }
     }
 
@@ -89,8 +88,7 @@ public class HybridSearcher extends Searcher {
 
         @JsonCreator
         public static MissingOrder fromString(String value) {
-            if (value == null) return FIRST; // default
-            return "last".equalsIgnoreCase(value) ? LAST : FIRST;
+            return MissingOrder.valueOf(value.toUpperCase(Locale.ROOT));
         }
     }
 
