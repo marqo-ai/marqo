@@ -1,8 +1,10 @@
+import base64
 import copy
 import uuid
 from unittest import mock
 
 import marqo
+import requests
 from marqo import enums
 from marqo.client import Client
 from marqo.enums import SearchMethods
@@ -454,3 +456,155 @@ class TestUnstructuredSearch(MarqoTestCase):
                                                                       searchable_attributes=["title"])
         self.assertEqual(len(search_res["hits"]), 1)
         self.assertEqual(search_res["hits"][0]["_id"], "1")
+
+    def _download_and_encode_image(self, url: str) -> str:
+        """Helper to download image and convert to base64."""
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return base64.b64encode(response.content).decode('utf-8')
+
+    def test_api_search_base64_image_document(self):
+        """Test API-level search with base64 encoded image in documents."""
+        # Small test image (1x1 PNG) as base64
+        small_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        docs = [
+            {
+                "_id": "base64_doc_1",
+                "image_field": small_png_base64,
+                "title": "Base64 Image Document"
+            }
+        ]
+
+        # Add documents with base64 image
+        add_res = self.client.index(self.image_index_name).add_documents(
+            docs, 
+            tensor_fields=["image_field", "title"]
+        )
+        self.assertEqual(len(add_res['items']), 1)
+        self.assertEqual(add_res['items'][0]['status'], 201)
+
+        # Search with text query
+        search_res = self.client.index(self.image_index_name).search(
+            q="image document",
+            limit=5
+        )
+
+        # Verify results
+        self.assertGreater(len(search_res["hits"]), 0)
+        found_doc = None
+        for hit in search_res["hits"]:
+            if hit["_id"] == "base64_doc_1":
+                found_doc = hit
+                break
+        
+        self.assertIsNotNone(found_doc)
+        self.assertEqual(found_doc["image_field"], small_png_base64)
+        self.assertIn("_highlights", found_doc)
+
+    def test_api_search_base64_data_url_format(self):
+        """Test API-level search with base64 data URL format."""
+        # Small test image as data URL
+        data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        docs = [
+            {
+                "_id": "data_url_doc",
+                "image_field": data_url,
+                "description": "Data URL image"
+            }
+        ]
+
+        # Add documents with data URL
+        add_res = self.client.index(self.image_index_name).add_documents(
+            docs, 
+            tensor_fields=["image_field", "description"]
+        )
+        self.assertEqual(len(add_res['items']), 1)
+        self.assertEqual(add_res['items'][0]['status'], 201)
+
+        # Search with text query
+        search_res = self.client.index(self.image_index_name).search(
+            q="image",
+            limit=5
+        )
+
+        # Verify results
+        self.assertGreater(len(search_res["hits"]), 0)
+        found_doc = None
+        for hit in search_res["hits"]:
+            if hit["_id"] == "data_url_doc":
+                found_doc = hit
+                break
+        
+        self.assertIsNotNone(found_doc)
+        self.assertEqual(found_doc["image_field"], data_url)
+
+    def test_api_search_with_base64_query(self):
+        """Test API-level search using base64 image as query."""
+        # Regular image URL document
+        test_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png"
+        
+        docs = [
+            {
+                "_id": "url_image_doc",
+                "image_field": test_image_url,
+                "title": "URL Image Document"
+            }
+        ]
+
+        # Add document with URL image
+        add_res = self.client.index(self.image_index_name).add_documents(
+            docs, 
+            tensor_fields=["image_field", "title"]
+        )
+        self.assertEqual(len(add_res['items']), 1)
+
+        # Convert the same image to base64 for query
+        base64_query = self._download_and_encode_image(test_image_url)
+
+        # Search using base64 as query
+        search_res = self.client.index(self.image_index_name).search(
+            q=base64_query,
+            limit=5
+        )
+
+        # Should find the similar image
+        self.assertGreater(len(search_res["hits"]), 0)
+        self.assertEqual(search_res["hits"][0]["_id"], "url_image_doc")
+        self.assertGreater(search_res["hits"][0]["_score"], 0.7)  # Should be very similar
+
+    def test_api_search_base64_mixed_content(self):
+        """Test API search with mixed base64 and URL images."""
+        small_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        test_url = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png"
+        
+        docs = [
+            {
+                "_id": "base64_mixed_1",
+                "image_field": small_png_base64,
+                "title": "Base64 Image"
+            },
+            {
+                "_id": "url_mixed_1", 
+                "image_field": test_url,
+                "title": "URL Image"
+            }
+        ]
+
+        # Add mixed documents
+        add_res = self.client.index(self.image_index_name).add_documents(
+            docs, 
+            tensor_fields=["image_field", "title"]
+        )
+        self.assertEqual(len(add_res['items']), 2)
+
+        # Search should find both
+        search_res = self.client.index(self.image_index_name).search(
+            q="image",
+            limit=10
+        )
+
+        self.assertGreaterEqual(len(search_res["hits"]), 2)
+        found_ids = {hit["_id"] for hit in search_res["hits"]}
+        self.assertTrue({"base64_mixed_1", "url_mixed_1"}.issubset(found_ids))

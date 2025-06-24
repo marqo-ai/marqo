@@ -6,7 +6,7 @@ import requests
 from marqo.core.inference.api import Modality
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
-    get_url_file_extension
+    get_url_file_extension, _is_base64_image, _get_base64_image_bytes
 
 
 class TestMultimodalUtils(unittest.TestCase):
@@ -157,3 +157,101 @@ class TestMultimodalUtils(unittest.TestCase):
             mock_fetch.assert_not_called()
             mock_magic.assert_called_once_with(bytes, mime=True)
             mock_infer_on_mime.assert_called_once_with("image/jpeg")
+
+    def test_is_base64_image_data_url(self):
+        """Test detection of base64 data URL format."""
+        valid_data_urls = [
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+            "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs="
+        ]
+        
+        for data_url in valid_data_urls:
+            with self.subTest(data_url=data_url):
+                self.assertTrue(_is_base64_image(data_url))
+        
+        # Invalid data URLs
+        invalid_data_urls = [
+            "data:image/jpeg;/9j/4AAQSkZJRgABAQEAYABgAAD/",  # Missing base64 marker
+            "data:text/plain;base64,SGVsbG8gV29ybGQ=",  # Not an image
+            "http://example.com/image.jpg",  # Not a data URL
+            ""
+        ]
+        
+        for data_url in invalid_data_urls:
+            with self.subTest(data_url=data_url):
+                self.assertFalse(_is_base64_image(data_url))
+
+    def test_is_base64_image_plain_base64(self):
+        """Test detection of plain base64 strings."""
+        # Valid base64 strings (long enough and proper format)
+        valid_base64 = [
+            "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        ]
+        
+        for base64_str in valid_base64:
+            with self.subTest(base64=base64_str[:50] + "..."):
+                self.assertTrue(_is_base64_image(base64_str))
+        
+        # Invalid cases
+        invalid_cases = [
+            "short",  # Too short
+            "notbase64!@#$%",  # Invalid characters
+            "validlength123",  # Not a multiple of 4
+            123,  # Not a string
+            None
+        ]
+        
+        for invalid in invalid_cases:
+            with self.subTest(invalid=invalid):
+                self.assertFalse(_is_base64_image(invalid))
+
+    def test_get_base64_image_bytes_data_url(self):
+        """Test extraction of bytes from base64 data URL."""
+        data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        image_bytes = _get_base64_image_bytes(data_url)
+        self.assertIsInstance(image_bytes, bytes)
+        self.assertGreater(len(image_bytes), 0)
+        
+        # Check PNG header
+        self.assertTrue(image_bytes.startswith(b'\x89PNG'))
+
+    def test_get_base64_image_bytes_plain_base64(self):
+        """Test extraction of bytes from plain base64 string."""
+        base64_str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        image_bytes = _get_base64_image_bytes(base64_str)
+        self.assertIsInstance(image_bytes, bytes)
+        self.assertGreater(len(image_bytes), 0)
+        
+        # Check PNG header
+        self.assertTrue(image_bytes.startswith(b'\x89PNG'))
+
+    def test_get_base64_image_bytes_invalid(self):
+        """Test error handling for invalid base64 strings."""
+        from marqo.core.inference.api import MediaDownloadError
+        
+        invalid_cases = [
+            "data:image/jpeg;invalid_marker,/9j/4AAQ",
+            "invalid!@#base64",
+            "data:image/png;base64,invalid_base64_content"
+        ]
+        
+        for invalid in invalid_cases:
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(MediaDownloadError):
+                    _get_base64_image_bytes(invalid)
+
+    def test_infer_modality_base64_image(self):
+        """Test that base64 images are correctly identified as IMAGE modality."""
+        base64_cases = [
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+            "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ]
+        
+        for base64_str in base64_cases:
+            with self.subTest(base64=base64_str[:50] + "..."):
+                self.assertEqual(infer_modality(base64_str), Modality.IMAGE)

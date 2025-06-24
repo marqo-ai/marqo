@@ -1,3 +1,5 @@
+import base64
+import binascii
 import os
 from io import BytesIO
 
@@ -28,6 +30,86 @@ def get_allowed_image_types():
     return {'.jpg', '.png', '.bmp', '.jpeg'}
 
 
+def _is_base64_image(content: str) -> bool:
+    """Check if the content is a base64-encoded image string.
+    
+    Args:
+        content (str): String to check for base64 image format
+        
+    Returns:
+        bool: True if content is a base64 image, False otherwise
+    """
+    if not isinstance(content, str):
+        return False
+    
+    # Check for data URL format: data:image/jpeg;base64,<base64_data>
+    if content.startswith('data:image/'):
+        return ';base64,' in content
+    
+    # Check if it's a plain base64 string (basic heuristic)
+    if len(content) > 50 and len(content) % 4 == 0:
+        try:
+            # Try to decode the content to see if it's valid base64
+            decoded_bytes = base64.b64decode(content, validate=True)
+            # Additional check: see if it looks like image data
+            # Many image formats start with specific magic bytes
+            if len(decoded_bytes) > 4:
+                # Check for common image headers
+                if (decoded_bytes.startswith(b'\x89PNG') or  # PNG
+                    decoded_bytes.startswith(b'\xff\xd8\xff') or  # JPEG
+                    decoded_bytes.startswith(b'GIF8') or  # GIF
+                    decoded_bytes.startswith(b'RIFF') or  # WebP/other RIFF formats
+                    decoded_bytes.startswith(b'BM')):  # BMP
+                    return True
+            return False
+        except Exception:
+            return False
+    
+    return False
+
+
+def _decode_base64_image(content: str) -> ImageType:
+    """Decode a base64 image string to a PIL Image.
+    
+    Args:
+        content (str): Base64 encoded image string
+        
+    Returns:
+        ImageType: PIL Image object
+        
+    Raises:
+        UnidentifiedImageError: If the base64 string cannot be decoded or is not a valid image
+    """
+    try:
+        # Handle data URL format
+        if content.startswith('data:image/'):
+            if ';base64,' not in content:
+                raise UnidentifiedImageError("Base64 data URL must contain ';base64,' marker")
+            # Extract the base64 part after the comma
+            base64_data = content.split(';base64,')[1]
+        else:
+            base64_data = content
+        
+        # Decode base64 string to bytes
+        image_bytes = base64.b64decode(base64_data)
+        
+        # Create PIL image from bytes
+        image_buffer = BytesIO(image_bytes)
+        img = Image.open(image_buffer)
+        
+        # Ensure image is loaded
+        img.load()
+        
+        return img
+        
+    except (binascii.Error, ValueError) as e:
+        raise UnidentifiedImageError(f"Invalid base64 encoding: {e}")
+    except UnidentifiedImageError:
+        raise
+    except Exception as e:
+        raise UnidentifiedImageError(f"Failed to decode base64 image: {e}")
+
+
 def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
     # assume the batch is the same type
@@ -46,8 +128,12 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     else:
         thing = inputs
 
-    # if it is a string, determine if it is a local file or url
+    # if it is a string, determine if it is a local file, url, or base64
     if isinstance(thing, str):
+        # Check for base64 image first
+        if _is_base64_image(thing):
+            return True
+            
         name, extension = os.path.splitext(thing.lower())
 
         # if it has the correct extension, asssume yes
@@ -129,7 +215,11 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     """
     # check for the input type
     if isinstance(image, str):
-        img = load_image_from_path(image, media_download_headers)
+        # Check if it's a base64 image first
+        if _is_base64_image(image):
+            img = _decode_base64_image(image)
+        else:
+            img = load_image_from_path(image, media_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
     elif isinstance(image, torch.Tensor):

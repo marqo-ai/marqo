@@ -1,9 +1,11 @@
+import base64
 import copy
 import os
 import random
 import unittest
 import uuid
 from unittest import mock
+from io import BytesIO
 
 import math
 import requests
@@ -1633,3 +1635,284 @@ class TestSearchUnstructured(MarqoTestCase):
                                 call_kwargs[key_name],
                                 approx_threshold
                             )
+
+    def _download_and_convert_to_base64(self, image_url: str) -> str:
+        """Helper method to download an image URL and convert it to base64 string.
+        
+        Args:
+            image_url (str): URL of the image to download and convert
+            
+        Returns:
+            str: Base64 encoded image string
+        """
+        try:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+            image_bytes = response.content
+            base64_string = base64.b64encode(image_bytes).decode('utf-8')
+            return base64_string
+        except Exception as e:
+            self.fail(f"Failed to download and convert image {image_url}: {e}")
+
+    def _create_base64_data_url(self, image_url: str, mime_type: str = "image/jpeg") -> str:
+        """Helper method to create a data URL format base64 string.
+        
+        Args:
+            image_url (str): URL of the image to download and convert
+            mime_type (str): MIME type for the data URL
+            
+        Returns:
+            str: Base64 data URL string
+        """
+        base64_string = self._download_and_convert_to_base64(image_url)
+        return f"data:{mime_type};base64,{base64_string}"
+
+    def test_base64_image_search_tensor(self):
+        """Test tensor search with base64 encoded images."""
+        # Convert test images to base64
+        hippo_realistic_base64 = self._download_and_convert_to_base64(TestImageUrls.HIPPO_REALISTIC.value)
+        hippo_statue_base64 = self._download_and_convert_to_base64(TestImageUrls.HIPPO_STATUE.value)
+        
+        # Create documents with base64 images
+        docs = [
+            {
+                "_id": "base64_hippo_realistic",
+                "image_field": hippo_realistic_base64,
+                "text_field": "realistic hippo image"
+            },
+            {
+                "_id": "base64_hippo_statue", 
+                "image_field": hippo_statue_base64,
+                "text_field": "hippo statue image"
+            }
+        ]
+
+        # Add documents to index
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_image_index,
+                docs=docs,
+                tensor_fields=["image_field", "text_field"]
+            )
+        )
+
+        # Search with text query
+        res = tensor_search.search(
+            text="hippo in water",
+            index_name=self.default_image_index,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR
+        )
+
+        # Verify results
+        self.assertEqual(len(res['hits']), 2)
+        returned_ids = {hit['_id'] for hit in res['hits']}
+        self.assertEqual(returned_ids, {"base64_hippo_realistic", "base64_hippo_statue"})
+        
+        # Verify highlights contain base64 strings
+        for hit in res['hits']:
+            self.assertIn('_highlights', hit)
+            self.assertTrue(len(hit['_highlights']) > 0)
+            # Check that the highlight contains the base64 image
+            highlight_fields = hit['_highlights'][0]
+            if 'image_field' in highlight_fields:
+                self.assertIn(highlight_fields['image_field'], [hippo_realistic_base64, hippo_statue_base64])
+
+    def test_base64_image_search_data_url_format(self):
+        """Test tensor search with base64 images in data URL format."""
+        # Convert test images to data URL format
+        hippo_realistic_data_url = self._create_base64_data_url(TestImageUrls.HIPPO_REALISTIC.value, "image/png")
+        hippo_statue_data_url = self._create_base64_data_url(TestImageUrls.HIPPO_STATUE.value, "image/png")
+        
+        # Create documents with data URL base64 images
+        docs = [
+            {
+                "_id": "data_url_hippo_realistic",
+                "image_field": hippo_realistic_data_url,
+                "description": "realistic hippo"
+            },
+            {
+                "_id": "data_url_hippo_statue",
+                "image_field": hippo_statue_data_url, 
+                "description": "hippo statue"
+            }
+        ]
+
+        # Add documents to index
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_image_index,
+                docs=docs,
+                tensor_fields=["image_field", "description"]
+            )
+        )
+
+        # Search with text query
+        res = tensor_search.search(
+            text="hippo animal",
+            index_name=self.default_image_index,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR
+        )
+
+        # Verify results
+        self.assertGreater(len(res['hits']), 0)
+        returned_ids = {hit['_id'] for hit in res['hits']}
+        self.assertTrue(returned_ids.intersection({"data_url_hippo_realistic", "data_url_hippo_statue"}))
+
+    def test_base64_image_search_with_base64_query(self):
+        """Test searching using a base64 image as the query."""
+        # Add regular URL-based image documents
+        hippo_url = TestImageUrls.HIPPO_REALISTIC.value
+        docs = [
+            {
+                "_id": "url_hippo",
+                "image_field": hippo_url,
+                "text_field": "hippo swimming"
+            }
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_image_index,
+                docs=docs,
+                tensor_fields=["image_field", "text_field"]
+            )
+        )
+
+        # Convert the same image to base64 and use as query
+        hippo_base64_query = self._download_and_convert_to_base64(hippo_url)
+
+        # Search using base64 image as query
+        res = tensor_search.search(
+            text=hippo_base64_query,
+            index_name=self.default_image_index,
+            result_count=5,
+            config=self.config,
+            search_method=SearchMethod.TENSOR
+        )
+
+        # Should find the similar image
+        self.assertGreater(len(res['hits']), 0)
+        self.assertEqual(res['hits'][0]['_id'], "url_hippo")
+        self.assertGreater(res['hits'][0]['_score'], 0.8)  # Should be very similar
+
+    def test_base64_image_search_highlights_format(self):
+        """Test that highlights are properly formatted for base64 images."""
+        base64_image = self._download_and_convert_to_base64(TestImageUrls.HIPPO_REALISTIC.value)
+        
+        docs = [
+            {
+                "_id": "base64_highlight_test",
+                "image_field": base64_image,
+                "text_field": "test image for highlights"
+            }
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_image_index,
+                docs=docs,
+                tensor_fields=["image_field"]
+            )
+        )
+
+        res = tensor_search.search(
+            text="hippo",
+            index_name=self.default_image_index,
+            result_count=1,
+            config=self.config,
+            search_method=SearchMethod.TENSOR
+        )
+
+        # Verify highlight format
+        self.assertEqual(len(res['hits']), 1)
+        hit = res['hits'][0]
+        self.assertIn('_highlights', hit)
+        self.assertTrue(len(hit['_highlights']) > 0)
+        
+        # The highlighted field should contain the base64 string
+        highlight = hit['_highlights'][0]
+        if 'image_field' in highlight:
+            self.assertEqual(highlight['image_field'], base64_image)
+
+    def test_base64_image_multi_search(self):
+        """Test multi-search functionality with base64 images."""
+        # Prepare base64 images
+        base64_images = [
+            self._download_and_convert_to_base64(TestImageUrls.HIPPO_REALISTIC.value),
+            self._download_and_convert_to_base64(TestImageUrls.HIPPO_STATUE.value)
+        ]
+        
+        # Create documents
+        docs = [
+            {"_id": f"multi_base64_{i}", "image_field": img, "index": i}
+            for i, img in enumerate(base64_images)
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_image_index,
+                docs=docs,
+                tensor_fields=["image_field"]
+            )
+        )
+
+        # Perform multi-search with base64 query
+        queries = [
+            {"q": base64_images[0], "index": self.default_image_index},
+            {"q": "hippo statue", "index": self.default_image_index}
+        ]
+
+        from marqo.tensor_search.api import multi_search
+        res = multi_search(
+            config=self.config,
+            queries=queries
+        )
+
+        # Verify results
+        self.assertEqual(len(res['result']), 2)
+        for result in res['result']:
+            self.assertGreater(len(result['hits']), 0)
+
+    def test_base64_image_search_error_handling(self):
+        """Test error handling for invalid base64 images."""
+        # Test with invalid base64 string
+        invalid_base64_docs = [
+            {
+                "_id": "invalid_base64",
+                "image_field": "invalid_base64_string!@#$%",
+                "text_field": "should fail"
+            }
+        ]
+
+        # This should handle gracefully - invalid base64 should be treated as text
+        try:
+            self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.default_image_index,
+                    docs=invalid_base64_docs,
+                    tensor_fields=["image_field", "text_field"]
+                )
+            )
+            # If it doesn't raise an exception, search should still work
+            res = tensor_search.search(
+                text="test",
+                index_name=self.default_image_index,
+                result_count=1,
+                config=self.config,
+                search_method=SearchMethod.TENSOR
+            )
+            # Should complete without error
+            self.assertIsInstance(res, dict)
+        except Exception as e:
+            # If it does raise an exception, it should be a meaningful one
+            self.assertIsInstance(e, (ValueError, TypeError, core_exceptions.MarqoError))
