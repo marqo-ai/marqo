@@ -434,13 +434,13 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if sort_by:
         if not isinstance(marqo_index, SemiStructuredMarqoIndex):
             raise core_exceptions.UnsupportedFeatureError(
-                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version"
+                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version "
                 f"{constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
                 f"Your index is either a structured index or an old unstructured index"
             )
         if not marqo_index.index_supports_sorty_by:
             raise core_exceptions.UnsupportedFeatureError(
-                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version"
+                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version "
                 f"{constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
                 f"This unstructured index was created with Marqo {marqo_index_version} "
             )

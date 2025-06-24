@@ -8,12 +8,15 @@ import static org.mockito.Mockito.when;
 
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
-import com.yahoo.search.*;
+import com.yahoo.search.Query;
+import com.yahoo.search.Result;
+import com.yahoo.search.Searcher;
 import com.yahoo.search.query.ranking.RankFeatures;
 import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
-import com.yahoo.search.searchchain.*;
+import com.yahoo.search.searchchain.Execution;
+import com.yahoo.search.searchchain.SearchChainRegistry;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
