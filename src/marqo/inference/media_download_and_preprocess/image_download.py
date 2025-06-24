@@ -163,12 +163,17 @@ def _load_base64_image(content: str) -> ImageType:
         UnidentifiedImageError: If the content cannot be decoded or loaded as an image
     """
     try:
-        if content.startswith('data:') and ';base64,' in content:
-            # Extract base64 part from data URL
+        # if content.startswith('data:') and ';base64,' in content:
+        #     # Extract base64 part from data URL
+        #     base64_part = content.split(';base64,', 1)[1]
+        # else:
+        #     base64_part = content
+
+        try:
             base64_part = content.split(';base64,', 1)[1]
-        else:
-            base64_part = content
-            
+        except IndexError:
+            raise ValueError()
+
         # Decode base64 to bytes
         image_bytes = base64.b64decode(base64_part, validate=True)
         

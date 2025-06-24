@@ -31,13 +31,15 @@ class TestBase64ImageSupport(unittest.TestCase):
 
     def test_load_image_from_path_with_invalid_base64(self):
         """Test error handling for invalid base64 data through public API."""
-        # Invalid base64 without data URL prefix should be treated as invalid path
-        with self.assertRaises(UnidentifiedImageError):
-            load_image_from_path("invalid_base64!!!", {})
-
-        # Invalid base64 with data URL prefix should fail during image decoding
-        with self.assertRaises(UnidentifiedImageError):
-            load_image_from_path("data:image/png;base64,invalid!!!", {})
+        invalid_cases = [
+            "invalid_base64!!!",
+            "data:image/png;base64,invalid!!!",
+            "data:image/xxxyyyzzz",
+        ]
+        for case in invalid_cases:
+            with self.subTest(case=case):
+                with self.assertRaises(UnidentifiedImageError):
+                    load_image_from_path(case, {})
 
     def test_load_image_from_path_handles_various_base64_formats(self):
         """Test that load_image_from_path handles different base64 formats."""
