@@ -27,7 +27,7 @@ def pytest_collection_modifyitems(config, items):
                 logger.debug(f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping.")
                 item.add_marker(pytest.mark.skip(reason=f"Testcase: {item.name} marked with skip_marqo_version: {skip_marqo_versions}. Skipping."))
                 continue
-        elif test_case_version_marker:
+        if test_case_version_marker:
             test_case_version = test_case_version_marker.args[0] #test_case_version is the version_to_test_against defined as the argument in the "marqo_version" marker above each compatibility test
             # Compare the test's required version_to_test_against with the version_to_test_against
             logger.debug(f"Testcase: {item.name}, with marqo_version: {test_case_version}, v/s version_to_test_against supplied in pytest arguments: {version_to_test_against}")
