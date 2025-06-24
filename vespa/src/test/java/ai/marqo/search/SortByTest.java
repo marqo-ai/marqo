@@ -553,7 +553,6 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             HitGroup hits = createDummyHitGroup();
 
-
             String[] unsupportedOrders = {"ascending", "descending", "up", "down", "invalid", ""};
 
             for (String order : unsupportedOrders) {
@@ -562,12 +561,10 @@ class SortByTest {
                                 + order
                                 + "\",\"missing\":\"last\"}]";
                 // Should throw exception for unsupported order values
-                assertThatThrownBy(
-                        () -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                assertThatThrownBy(() -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
                         .isInstanceOf(RuntimeException.class)
                         .hasMessageContaining(
-                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields"
-                        );
+                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
             }
         }
 
@@ -585,12 +582,10 @@ class SortByTest {
                                 + missing
                                 + "\"}]";
                 // Should throw exception for unsupported missing values
-                assertThatThrownBy(
-                        () -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                assertThatThrownBy(() -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
                         .isInstanceOf(RuntimeException.class)
                         .hasMessageContaining(
-                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields"
-                        );
+                                "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
             }
         }
 
