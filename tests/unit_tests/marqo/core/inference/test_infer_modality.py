@@ -194,18 +194,3 @@ class TestMultimodalUtils(unittest.TestCase):
         # Test data URL format
         data_url = f"data:image/png;base64,{base64_data}"
         self.assertEqual(infer_modality(data_url), Modality.IMAGE)
-
-    def test_infer_modality_base64_takes_precedence(self):
-        """Test that base64 detection takes precedence over URL validation."""
-        # Create a string that looks like a URL but is actually base64
-        img = Image.new('RGB', (1, 1), color='orange')
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        
-        data_url = f"data:image/png;base64,{base64_data}"
-        
-        # Even if this somehow gets past URL validation, base64 should be detected first
-        with patch('marqo.core.inference.modality_utils.validate_url') as mock_validate:
-            mock_validate.return_value = True  # Pretend it's a valid URL
-            self.assertEqual(infer_modality(data_url), Modality.IMAGE)

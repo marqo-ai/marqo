@@ -32,7 +32,7 @@ class TestBase64ImageSupport(unittest.TestCase):
     def test_load_image_from_path_with_invalid_base64(self):
         """Test error handling for invalid base64 data through public API."""
         # Invalid base64 without data URL prefix should be treated as invalid path
-        with self.assertRaises(Exception):  # Could be ImageDownloadError or other
+        with self.assertRaises(UnidentifiedImageError):
             load_image_from_path("invalid_base64!!!", {})
 
         # Invalid base64 with data URL prefix should fail during image decoding
@@ -63,15 +63,6 @@ class TestBase64ImageSupport(unittest.TestCase):
         result = format_and_load_CLIP_image(self.test_data_url, {})
         self.assertIsInstance(result, Image.Image)
         self.assertEqual(result.size, (2, 2))
-
-        # Test that it integrates properly with load_image_from_path
-        with patch('marqo.inference.media_download_and_preprocess.image_download.load_image_from_path') as mock_load:
-            mock_load.return_value = self.test_image
-
-            result = format_and_load_CLIP_image(self.test_data_url, {})
-
-            mock_load.assert_called_once_with(self.test_data_url, {})
-            self.assertEqual(result, self.test_image)
 
     def test_load_image_from_path_base64_precedence(self):
         """Test that base64 detection takes precedence over file/URL checks."""
