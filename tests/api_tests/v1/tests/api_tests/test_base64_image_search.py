@@ -3,7 +3,7 @@ import unittest
 
 import requests
 from marqo.errors import MarqoWebError
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestBase64ImageSearch(MarqoTestCase):
@@ -48,7 +48,7 @@ class TestBase64ImageSearch(MarqoTestCase):
         content_type = response.headers.get('content-type', 'image/png')
         return f"data:{content_type};base64,{base64_data}"
 
-    def test_real_image_base64_search_all_methods_and_indexes(self):
+    def test_image_base64_search_all_methods_and_indexes(self):
         """Test base64 image search with real images (HIPPO_STATUE and COCO) across all index types and search methods."""
         # Convert real image URLs to base64 for search queries
         hippo_base64 = self._url_to_base64(TestImageUrls.HIPPO_STATUE.value)
@@ -116,6 +116,64 @@ class TestBase64ImageSearch(MarqoTestCase):
                         else:
                             score = first_hit['_score']
                         self.assertEqual(1.0, score, f"Score mismatch for {search_name} on {index_type} index")
+
+    def test_image_base64_search_large(self):
+        """Test base64 image search with real images (HIPPO_STATUE and COCO) across all index types and search methods."""
+        # Convert real image URLs to base64 for search queries
+        hippo_base64 = self._url_to_base64(TestImageUrls.HIPPO_REALISTIC_LARGE.value)
+
+        # Define test parameters
+        index_configs = [
+            ("unstructured", self.unstructured_index_name),
+            ("structured", self.structured_index_name)
+        ]
+
+        search_methods = [
+            ("tensor", "TENSOR", None),
+            ("hybrid_rrf", "HYBRID", {"retrievalMethod": "disjunction", "rankingMethod": "rrf"}),
+            ("hybrid_tensor", "HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "tensor"}),
+        ]
+
+        # Add documents with real image URLs
+        docs = [
+            {
+                "_id": "hippo_doc",
+                "image": TestImageUrls.HIPPO_REALISTIC_LARGE.value,
+                "title": "AI generated hippo statue"
+            },
+            {
+                "_id": "coco_doc",
+                "image": TestImageUrls.COCO.value,
+                "title": "COCO dataset image"
+            }
+        ]
+
+        index_name = self.unstructured_index_name
+
+        add_result = self.client.index(index_name).add_documents(
+            documents=docs,
+            tensor_fields=["image"]
+        )
+        self.assertFalse(add_result['errors'])
+
+        search_params = {
+            "q": hippo_base64,
+            "search_method": 'TENSOR',
+        }
+
+        search_result = self.client.index(index_name).search(**search_params)
+
+        # Verify results
+        self.assertIn('hits', search_result)
+        self.assertEqual(2, len(search_result['hits']))
+
+        # The hippo document should be the first hit since we're searching with hippo image
+        first_hit = search_result['hits'][0]
+        self.assertEqual('hippo_doc', first_hit['_id'])
+
+        # Verify score is 1 for the first hit
+        score = first_hit['_score']
+        self.assertEqual(1.0, score)
 
     def test_hybrid_search_with_base64_query_tensor_and_query_lexical(self):
         """Test hybrid search with base64 image in queryTensor and text in queryLexical across all index types."""
