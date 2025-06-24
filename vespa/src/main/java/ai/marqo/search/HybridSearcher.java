@@ -2,6 +2,13 @@ package ai.marqo.search;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Strings;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -46,10 +53,45 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
 
-    private static class SortField {
-        public String field_name;
-        public String order;
-        public String missing;
+    // Thread-safe ObjectReader for parsing SortField JSON
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectReader SORT_FIELD_READER =
+            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+
+    // A magic number used to represent missing sort field values in search results as we can only
+    // return numeric values in match-features.
+    // The value -1e50 is chosen as it is an extremely low number unlikely to occur in real data.
+    private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
+
+    /**
+     * Represents a field to sort by in the search results.
+     * Uses Java record for immutability and conciseness.
+     */
+    private record SortField(
+            @JsonProperty("field_name") String fieldName,
+            @JsonProperty("order") SortOrder order,
+            @JsonProperty("missing") MissingOrder missing) {}
+
+    /** Sort order enum for better type safety */
+    private enum SortOrder {
+        ASC,
+        DESC;
+
+        @JsonCreator
+        public static SortOrder fromString(String value) {
+            return SortOrder.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
+
+    /** Missing value handling enum */
+    private enum MissingOrder {
+        FIRST,
+        LAST;
+
+        @JsonCreator
+        public static MissingOrder fromString(String value) {
+            return MissingOrder.valueOf(value.toUpperCase(Locale.ROOT));
+        }
     }
 
     // Constants for relevance cut-off methods
@@ -95,8 +137,8 @@ public class HybridSearcher extends Searcher {
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
         Integer sortBySortDepth =
                 query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
-        int sortBySortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", -1);
+        Integer sortBySortCandidates =
+                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", null);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -180,6 +222,12 @@ public class HybridSearcher extends Searcher {
             query.setOffset(0);
         }
 
+        // --- Update the query limit if sort is used
+        if (!Strings.isNullOrEmpty(sortByFields)) {
+            query.setHits(sortBySortCandidates);
+            query.setOffset(0);
+        }
+
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
@@ -251,19 +299,14 @@ public class HybridSearcher extends Searcher {
 
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
-        Tensor queryMultWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
-        Tensor queryAddWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
         if (sortByFields != null) {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
             processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
-        } else if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
-            logIfVerbose("Global score modifiers found. Will apply them.", verbose);
+        } else {
+            // If sortBy is not set, we use the default post-processing
             processedHits =
                     postProcessResults(
                             hitsForPostProcessing,
@@ -272,9 +315,6 @@ public class HybridSearcher extends Searcher {
                             limit,
                             offset,
                             verbose);
-        } else {
-            logIfVerbose("No global score modifiers found. Will not apply them.", verbose);
-            processedHits = hitsForPostProcessing;
         }
 
         // --- Attach facets results if available ---
@@ -330,14 +370,45 @@ public class HybridSearcher extends Searcher {
             Integer limit,
             Integer offset) {
 
-        ObjectMapper mapper = new ObjectMapper();
         List<SortField> parsedSortByFields;
+
         try {
-            parsedSortByFields =
-                    mapper.readValue(sortByFields, new TypeReference<List<SortField>>() {});
-        } catch (Exception e) {
+            parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
+        } catch (JsonProcessingException e) {
             throw new RuntimeException(
                     "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
+        }
+
+        // Validate sort fields requirements
+        if (parsedSortByFields.isEmpty()) {
+            throw new RuntimeException(
+                    "sortBy fields cannot be empty. Must contain 1 to 3 sort fields.");
+        }
+        if (parsedSortByFields.size() > 3) {
+            throw new RuntimeException(
+                    "sortBy fields cannot contain more than 3 sort fields. Found: "
+                            + parsedSortByFields.size());
+        }
+
+        // Validate that all required fields are provided
+        for (int i = 0; i < parsedSortByFields.size(); i++) {
+            SortField field = parsedSortByFields.get(i);
+            if (field.fieldName() == null || field.fieldName().trim().isEmpty()) {
+                throw new RuntimeException("fieldName is required for sort field at index " + i);
+            }
+            if (field.order() == null) {
+                throw new RuntimeException("order is required for sort field at index " + i);
+            }
+            if (field.missing() == null) {
+                throw new RuntimeException("missing is required for sort field at index " + i);
+            }
+        }
+
+        // Validate sortBySortDepth requirements
+        if (sortBySortDepth != null && sortBySortDepth < 1) {
+            throw new RuntimeException(
+                    "sortBySortDepth must be greater than or equal to 1. Found: "
+                            + sortBySortDepth);
         }
 
         List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
@@ -359,14 +430,14 @@ public class HybridSearcher extends Searcher {
                         FeatureData mf = (FeatureData) hit.getField("matchfeatures");
                         if (mf == null) return null;
                         double v = mf.getDouble("sort_field_value_" + idx);
-                        return (v == -1e50) ? null : v;
+                        return (v == MISSING_SORT_VALUE_SENTINEL) ? null : v;
                     };
             Comparator<Double> base = Comparator.naturalOrder();
-            if ("desc".equalsIgnoreCase(sf.order)) {
+            if (sf.order() == SortOrder.DESC) {
                 base = base.reversed();
             }
             Comparator<Double> nullAware =
-                    "last".equalsIgnoreCase(sf.missing)
+                    sf.missing() == MissingOrder.LAST
                             ? Comparator.nullsLast(base)
                             : Comparator.nullsFirst(base);
             Comparator<Hit> fieldComparator = Comparator.comparing(keyExtractor, nullAware);
@@ -380,7 +451,10 @@ public class HybridSearcher extends Searcher {
         Comparator<Hit> relevanceTie =
                 Comparator.comparingDouble((Hit h) -> h.getRelevance().getScore()).reversed();
         // always combine with relevance tie-break
-        sortComparator = sortComparator.thenComparing(relevanceTie);
+        sortComparator =
+                (sortComparator == null)
+                        ? relevanceTie
+                        : sortComparator.thenComparing(relevanceTie);
         hitsToSort.sort(sortComparator);
 
         // Merge sorted slice with the remainder
@@ -391,7 +465,10 @@ public class HybridSearcher extends Searcher {
         for (int i = 0; i < combined.size(); i++) {
             combined.get(i).setRelevance(1.0 / (i + 1));
         }
-
+        /*
+         * TODO - check HitGroup.setOrdered and HitGroup HitSortOrderer
+         *  for better performance and avoiding of sorting in the downstream code.
+         */
         HitGroup result = new HitGroup();
         result.addAll(combined);
         result.trim(offset, limit);
