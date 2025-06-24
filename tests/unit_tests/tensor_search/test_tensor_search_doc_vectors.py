@@ -63,7 +63,7 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
         
         assert result == (["title", "description"], ["emb_title", "emb_desc"])
     
-    def test_unstructured_index(self):
+    def test_legacy_unstructured_index_fails(self):
         """Test getting embedding field names for unstructured index - should raise error"""
         mock_index = Mock(spec=UnstructuredMarqoIndex)
         mock_index.type = IndexType.Unstructured
@@ -84,7 +84,7 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
         
         assert result == ([], [])
     
-    def test_structured_index_missing_tensor_fields_attribute(self):
+    def test_structured_index_missing_tensor_fields_attribute_fails(self):
         """Test structured index without tensor_fields attribute - should raise error"""
         mock_index = Mock(spec=StructuredMarqoIndex)
         mock_index.type = IndexType.Structured
@@ -124,7 +124,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
-    def test_successful_get_embeddings_structured_index(self, mock_vespa_factory, mock_get_index, mock_metrics):
+    def test_get_doc_vectors_structured_index_succeeds(self, mock_vespa_factory, mock_get_index, mock_metrics):
         """Test successfully getting embeddings from structured index"""
         
         # Mock RequestMetricsStore
@@ -186,7 +186,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
-    def test_document_not_found(self, mock_vespa_factory, mock_get_index, mock_metrics):
+    def test_vespa_document_not_found_fails(self, mock_vespa_factory, mock_get_index, mock_metrics):
         """Test handling of document not found (404)"""
         
         # Mock RequestMetricsStore
@@ -224,7 +224,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
-    def test_unstructured_index_raises_error(self, mock_vespa_factory, mock_get_index, mock_metrics):
+    def test_legacy_unstructured_index_fails(self, mock_vespa_factory, mock_get_index, mock_metrics):
         """Test that unstructured index raises error since function is only for structured/semi-structured"""
         
         # Mock RequestMetricsStore
@@ -342,7 +342,8 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
     def test_uses_cache_not_get_latest_index(self, mock_vespa_factory, mock_get_index, mock_get_latest_index, mock_metrics):
-        """Test that get_doc_vectors_per_tensor_field_by_ids uses index_meta_cache.get_index instead of _get_latest_index for efficiency"""
+        """Test that get_doc_vectors_per_tensor_field_by_ids uses
+        index_meta_cache.get_index instead of _get_latest_index for efficiency"""
         
         # Mock RequestMetricsStore
         mock_metrics_instance = Mock()
@@ -397,7 +398,8 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
     def test_no_call_to_marqo_document_conversion(self, mock_vespa_factory, mock_get_index, mock_metrics):
-        """Test that get_doc_vectors_per_tensor_field_by_ids does not call vespa_index.to_marqo_document for efficiency"""
+        """Test that get_doc_vectors_per_tensor_field_by_ids
+        does not call vespa_index.to_marqo_document for efficiency"""
         
         # Mock RequestMetricsStore
         mock_metrics_instance = Mock()
@@ -458,8 +460,9 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.vespa_index_factory')
-    def test_multiple_documents_multiple_tensor_fields_loop_indexes(self, mock_vespa_factory, mock_get_index, mock_metrics):
-        """Test that loop indexes are handled correctly with 3 responses and 3 tensor fields each"""
+    def test_get_vectors_from_multiple_documents_multiple_tensor_fields(self, mock_vespa_factory, mock_get_index, mock_metrics):
+        """Test that loop indexes are handled correctly with 3 responses and 3 tensor fields each
+        Tests that looping through result docs and fields is handled correctly"""
         
         # Mock RequestMetricsStore
         mock_metrics_instance = Mock()

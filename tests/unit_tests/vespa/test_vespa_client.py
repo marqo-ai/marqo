@@ -109,6 +109,28 @@ class TestVespaClient(unittest.TestCase):
                 content_cluster_name="test_cluster"
             )
 
+    def test_get_batch_with_empty_ids_returns_empty_response(self):
+        """Test get_batch with empty ids list returns empty response"""
+        result = self.vespa_client.get_batch(
+            ids=[],  # Empty list
+            schema="test_schema"
+        )
+        
+        # Should return empty response without making any requests
+        self.assertEqual(len(result.responses), 0)
+        self.assertFalse(result.errors)
+
+    def test_delete_batch_with_empty_ids_returns_empty_response(self):
+        """Test delete_batch with empty ids list returns empty response"""
+        result = self.vespa_client.delete_batch(
+            ids=[],  # Empty list
+            schema="test_schema"
+        )
+        
+        # Should return empty response without making any requests
+        self.assertEqual(len(result.responses), 0)
+        self.assertFalse(result.errors)
+
 
 if __name__ == '__main__':
     unittest.main() 

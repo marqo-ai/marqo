@@ -204,5 +204,85 @@ class TestSlerpVectorValidation(unittest.TestCase):
         np.testing.assert_array_almost_equal(result, [0.7071067811865476, 0.7071067811865475], decimal=10)
 
 
+class TestSlerpInternalMethods(unittest.TestCase):
+    """Test cases for Slerp internal methods to cover missing lines"""
+
+    def test_slerp_unknown_interpolation_method(self):
+        """Test Slerp with unknown interpolation method"""
+        slerp = Slerp()
+        slerp.method = "unknown_method"  # Set invalid method
+        
+        vectors = [[1, 0], [0, 1]]
+        weights = [1, 1]
+        
+        with self.assertRaises(InternalError) as cm:
+            slerp.interpolate(vectors, weights)
+        self.assertIn('Unknown interpolation method', str(cm.exception))
+
+    def test_slerp_sequential_all_zero_weights_in_loop(self):
+        """Test Slerp sequential method with all zero weights during processing"""
+        slerp = Slerp(method=Slerp.Method.Sequential)
+        
+        # Create scenario where weights become zero during sequential processing
+        vectors = [[1, 0], [0, 1], [1, 1]]
+        weights = [0, 0, 1]  # First two weights are zero
+        
+        with self.assertRaises(AllZeroWeightsError) as cm:
+            slerp.interpolate(vectors, weights)
+        self.assertIn('All weights are zero', str(cm.exception))
+
+    def test_slerp_hierarchical_all_zero_weights_in_loop(self):
+        """Test Slerp hierarchical method with all zero weights during processing"""
+        slerp = Slerp(method=Slerp.Method.Hierarchical)
+        
+        # Create scenario where weights become zero during hierarchical processing
+        vectors = [[1, 0], [0, 1], [1, 1], [0, 0]]
+        weights = [0, 0, 0, 0]  # All weights are zero
+        
+        with self.assertRaises(AllZeroWeightsError) as cm:
+            slerp.interpolate(vectors, weights)
+        self.assertIn('All weights are zero', str(cm.exception))
+
+    def test_slerp_sequential_method_execution(self):
+        """Test Slerp sequential method execution"""
+        slerp = Slerp(method=Slerp.Method.Sequential)
+        
+        vectors = [[1, 0], [0, 1], [1, 1]]
+        weights = [1, 1, 1]
+        
+        result = slerp.interpolate(vectors, weights)
+        # Ensure result is a list of 2 floats
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], float)
+        self.assertIsInstance(result[1], float)
+
+    def test_slerp_hierarchical_method_execution(self):
+        """Test Slerp hierarchical method execution"""
+        slerp = Slerp(method=Slerp.Method.Hierarchical)
+        
+        vectors = [[1, 0], [0, 1], [1, 1]]
+        weights = [1, 1, 1]
+        
+        result = slerp.interpolate(vectors, weights)
+        # Ensure result is a list of 2 floats
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], float)
+        self.assertIsInstance(result[1], float)
+
+    def test_slerp_hierarchical_odd_number_vectors(self):
+        """Test Slerp hierarchical method with odd number of vectors"""
+        slerp = Slerp(method=Slerp.Method.Hierarchical)
+        
+        # Use 5 vectors (odd number) to trigger the odd vector handling
+        vectors = [[1, 0], [0, 1], [1, 1], [-1, 0], [0, -1]]
+        weights = [1, 1, 1, 1, 1]
+        
+        result = slerp.interpolate(vectors, weights)
+        # Ensure result is a list of 2 floats
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], float)
+        self.assertIsInstance(result[1], float)
+
+
 if __name__ == '__main__':
     unittest.main() 

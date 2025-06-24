@@ -162,6 +162,37 @@ class TestSearchContext(unittest.TestCase):
         self.assertIsNone(context.tensor)
         self.assertIsNotNone(context.documents)
 
+    def test_tensor_length_validation_bounds(self):
+        """Test tensor length validation bounds"""
+        # Test with 0 tensors (should fail)
+        with self.assertRaises(InvalidArgError) as cm:
+            SearchContext(tensor=[])
+        self.assertIn('The number of tensors must be between 1 and 64', str(cm.exception))
+        
+        # Test with 65 tensors (should fail)
+        large_tensor_list = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(65)]
+        with self.assertRaises(InvalidArgError) as cm:
+            SearchContext(tensor=large_tensor_list)
+        self.assertIn('The number of tensors must be between 1 and 64', str(cm.exception))
+        
+        # Test with 1 tensor (should pass)
+        single_tensor = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0)]
+        context = SearchContext(tensor=single_tensor)
+        self.assertEqual(len(context.tensor), 1)
+        
+        # Test with 64 tensors (should pass)
+        max_tensor_list = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(64)]
+        context = SearchContext(tensor=max_tensor_list)
+        self.assertEqual(len(context.tensor), 64)
+
+    def test_search_context_validation_error_conversion(self):
+        """Test that ValidationError from parent init is converted to InvalidArgError"""
+        # Create a scenario that would cause ValidationError in the parent __init__
+        # This happens when we pass invalid data that fails pydantic validation
+        with self.assertRaises(InvalidArgError):
+            # Pass invalid tensor data that will cause ValidationError
+            SearchContext(tensor="invalid_tensor_data")
+
 
 if __name__ == '__main__':
     unittest.main() 
