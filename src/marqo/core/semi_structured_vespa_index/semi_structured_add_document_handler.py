@@ -56,7 +56,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         # Add lexical field if content is a string
         if isinstance(marqo_doc[field_name], str):
-            language = self._get_field_language(field_name, field_content)
+            language = self._get_field_language(field_name)
             self._add_lexical_field_to_index(field_name, language)
 
         # Add string array field if content is list of strings and index version supports it
@@ -94,7 +94,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             from marqo.tensor_search import index_meta_cache
             index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
-    def _get_field_language(self, field_name, field_content):
+    def _get_field_language(self, field_name):
         """Extract language specification for a field from mappings and validate."""
         if not self.add_docs_params.mappings:
             return None

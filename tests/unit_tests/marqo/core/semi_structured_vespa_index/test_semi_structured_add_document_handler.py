@@ -35,8 +35,8 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         self.mock_inference.vectorise.side_effect = vectorise_side_effect
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
-    def test_add_documents_comprehensive_success(self, mock_infer_modality):
-        """Test comprehensive document addition with variety of field types and language mappings"""
+    def test_add_documents_success(self, mock_infer_modality):
+        """Test document addition with variety of field types and language mappings"""
         # Cover different field types
         docs = [
             {
@@ -141,21 +141,17 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         response = handler.add_documents()
 
         self.assertIsInstance(response, MarqoAddDocumentsResponse)
-        self.assertEqual(response.index_name, "test_index")
+        self.assertEqual("test_index", response.index_name)
         self.assertIsInstance(response.processingTimeMs, (int, float))
         self.assertGreater(response.processingTimeMs, 0)
         self.assertGreater(len(response.items), 0)
 
         # Verify successful documents were processed correctly
         successful_items = [item for item in response.items if item.status == 200]
-        self.assertGreater(len(successful_items), 0)
+        self.assertEqual(3, len(successful_items))
 
         # Verify that vespa client was called for feeding documents
         self.mock_vespa_client.feed_batch.assert_called()
-
-        # Verify document variety was preserved in the test setup
-        doc_ids = [doc["_id"] for doc in docs]
-        self.assertEqual(doc_ids, ["doc1", "doc2", "doc3"])
 
     def test_add_documents_with_language_on_old_index_raises_error(self):
         """Test that using language mapping on an old index raises AddDocumentsError"""
@@ -209,11 +205,11 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         response = handler.add_documents()
 
         self.assertIsInstance(response, MarqoAddDocumentsResponse)
-        self.assertEqual(response.index_name, "old_test_index")
-        
+        self.assertEqual("old_test_index", response.index_name)
+
         error_items = [item for item in response.items if item.status != 200]
-        self.assertEqual(len(error_items), 1, "Expected exactly one error item")
-        
+        self.assertEqual(1, len(error_items), "Expected exactly one error item")
+
         # Check that at least one document failed with the language version error
         error_item = error_items[0]
         self.assertIn("Language is only supported for indexes created with Marqo version", str(error_item.error))
