@@ -1,7 +1,7 @@
 import json
 from typing import Any, Union, List, Dict, Optional, NewType
 
-from pydantic.v1 import BaseModel, validator, ValidationError, root_validator, Field
+from pydantic.v1 import BaseModel, validator, ValidationError, root_validator, Field, conlist
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.inference.api import Modality
@@ -93,7 +93,9 @@ class SearchContextDocuments(BaseModel):
 
 
 class SearchContext(BaseModel):
-    tensor: Optional[List[SearchContextTensor]]
+    tensor: Optional[List[SearchContextTensor]] = Field(
+        min_items=1, max_items=64
+    )
     documents: Optional[SearchContextDocuments]
 
     def __init__(self, **data):
@@ -101,15 +103,6 @@ class SearchContext(BaseModel):
             super().__init__(**data)
         except ValidationError as e:
             raise InvalidArgError(message=e.json())
-
-    @validator('tensor', pre=True, always=True)
-    def check_vector_length(cls, v):
-        if v is not None:
-            if not isinstance(v, list):
-                raise InvalidArgError(f'context tensor must be a list, but you provided {type(v)}')
-            if not (1 <= len(v) <= 64):
-                raise InvalidArgError('The number of tensors must be between 1 and 64')
-        return v
 
     # Root validator to confirm either tensor or documents MUST exist
     @root_validator(pre=False, skip_on_failure=True)

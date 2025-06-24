@@ -64,10 +64,6 @@ class TestSearchContextDocuments(unittest.TestCase):
         docs = SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
         self.assertEqual(docs.ids, {"doc1": 1.0, "doc2": 0.5})
 
-
-class TestSearchContextDocumentsParametersErrorScenarios(unittest.TestCase):
-    """Test SearchContextDocumentsParameters error scenarios"""
-
     def test_concurrency_validation(self):
         """Test concurrency parameter validation"""
         # Valid positive integer
@@ -92,10 +88,6 @@ class TestSearchContextDocumentsParametersErrorScenarios(unittest.TestCase):
         # This should work - empty strings are valid field names in some contexts
         params = SearchContextDocumentsParameters(tensorFields=["field1", "", "field2"])
         self.assertEqual(params.tensor_fields, ["field1", "", "field2"])
-
-
-class TestSearchContextDocumentsErrorScenarios(unittest.TestCase):
-    """Test SearchContextDocuments error scenarios"""
 
     def test_search_context_documents_parameters_inheritance(self):
         """Test that SearchContextDocuments properly uses SearchContextDocumentsParameters"""
@@ -144,8 +136,7 @@ class TestSearchContext(unittest.TestCase):
             with self.subTest(value=invalid_value, expected_type=expected_type):
                 with self.assertRaises(InvalidArgError) as cm:
                     SearchContext(tensor=invalid_value)
-                self.assertIn('context tensor must be a list', str(cm.exception))
-                self.assertIn(expected_type, str(cm.exception))
+                self.assertIn('not a valid list', str(cm.exception))
 
     def test_tensor_valid_list(self):
         """Test that passing a valid list of SearchContextTensor works"""
@@ -167,13 +158,13 @@ class TestSearchContext(unittest.TestCase):
         # Test with 0 tensors (should fail)
         with self.assertRaises(InvalidArgError) as cm:
             SearchContext(tensor=[])
-        self.assertIn('The number of tensors must be between 1 and 64', str(cm.exception))
+        self.assertIn('has at least 1 items', str(cm.exception))
         
         # Test with 65 tensors (should fail)
         large_tensor_list = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(65)]
         with self.assertRaises(InvalidArgError) as cm:
             SearchContext(tensor=large_tensor_list)
-        self.assertIn('The number of tensors must be between 1 and 64', str(cm.exception))
+        self.assertIn('has at most 64 items', str(cm.exception))
         
         # Test with 1 tensor (should pass)
         single_tensor = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0)]

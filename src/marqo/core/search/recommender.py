@@ -14,6 +14,7 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.tensor_search import utils, validation
 
 
 class Recommender:
@@ -66,6 +67,9 @@ class Recommender:
         else:
             document_ids = documents
             all_document_ids = original_documents
+
+        # Validate all IDS
+        document_ids = [validation.validate_id(id) for id in document_ids]
 
         if len(documents) == 0:
             raise InvalidArgumentError('No documents with non-zero weight provided')

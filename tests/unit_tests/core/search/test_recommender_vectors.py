@@ -12,6 +12,7 @@ from marqo.core.inference.api import Inference
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.utils.vector_interpolation import AllZeroWeightsError
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.api.exceptions import InvalidDocumentIdError
 
 
 class TestRecommenderGetDocVectorsFromIds:
@@ -238,6 +239,16 @@ class TestRecommenderGetDocVectorsFromIds:
             )
         
         assert "No document IDs provided" in str(exc_info.value)
+
+    def test_non_string_ids_fails(self):
+        """Test that document id validation catches non string IDs and errors out"""
+        with pytest.raises(InvalidDocumentIdError) as exc_info:
+            self.recommender.get_doc_vectors_from_ids(
+                index_name="test_index",
+                documents=[123, 456]
+            )
+
+        assert "Document _id must be a string type" in str(exc_info.value)
     
     def test_none_documents(self):
         """Test with None documents"""
