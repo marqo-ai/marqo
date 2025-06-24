@@ -1,15 +1,12 @@
-import unittest
 import base64
-from io import BytesIO
+import unittest
 
-from marqo.errors import MarqoWebError
-
-from PIL import Image
 import requests
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.errors import MarqoWebError
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
-class TestBase64ImageSearchAPI(MarqoTestCase):
+class TestBase64ImageSearch(MarqoTestCase):
     """Test base64 image search functionality through the API."""
 
     structured_index_name = MarqoTestCase.random_index_name('structured_base64_index')
