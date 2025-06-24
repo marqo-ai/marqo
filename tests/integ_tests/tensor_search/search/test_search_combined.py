@@ -12,18 +12,24 @@ import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
+from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
+from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, AllZeroWeightsError, ZeroMagnitudeVectorError
+from marqo.exceptions import InvalidArgumentError
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextDocumentsParameters
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 
 
 class TestSearch(MarqoTestCase):
@@ -206,6 +212,39 @@ class TestSearch(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    def _populate_index_orchids(self, index):
+        """Helper method to populate an index with orchid and related test documents.
+        
+        This method adds a standardized set of test documents including orchids, flowers,
+        and continents that can be used for testing context document functionality.
+        
+        Args:
+            index: The index to populate (structured or unstructured)
+            
+        Returns:
+            List of added document dictionaries
+        """
+        docs = [
+            {"_id": "orchid1", "text_field_1": "Anacamptis laxiflora is a species of orchid found in wet meadows with alkaline soil.", "tags": ["flower", "orchid"]},
+            {"_id": "orchid2", "text_field_1": "Cephalanthera longifolia reaches on average 20-60 centimetres in height and is a type of orchid.", "tags": ["flower", "orchid"]},
+            {"_id": "orchid3", "text_field_1": "Anacamptis morio subsp. longicornu is a subspecies of orchid found in the Mediterranean region.", "tags": ["flower", "orchid"]},
+            {"_id": "flower1", "text_field_1": "Red rose is a popular flower known for its beauty and fragrance.", "tags": ["flower", "rose"]},
+            {"_id": "continent1", "text_field_1": "Europe is a continent located entirely in the Northern Hemisphere and mostly in the Eastern Hemisphere.", "tags": ["continent"]},
+            {"_id": "continent2", "text_field_1": "Asia is Earth's largest and most populous continent, located primarily in the Eastern and Northern Hemispheres.", "tags": ["continent"]},
+            {"_id": "continent3", "text_field_1": "Africa is the world's second-largest and second-most populous continent, after Asia in both cases.", "tags": ["continent"]},
+        ]
+        
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name,
+                docs=docs,
+                tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+            )
+        )
+        
+        return docs
 
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False,
@@ -1246,7 +1285,7 @@ class TestSearch(MarqoTestCase):
             CustomVectorQuery(
                 customVector=CustomVectorQuery.CustomVector(
                     content="hello",
-                    vector=[0 for _ in range(384)]
+                    vector=[1 for _ in range(384)]
                 )
             )
         ]

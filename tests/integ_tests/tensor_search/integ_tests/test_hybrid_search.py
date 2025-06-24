@@ -2381,7 +2381,7 @@ class TestHybridSearch(MarqoTestCase):
                                     verbose=True
                                 )
                             )
-                        self.assertIn("unless retrieval_method and ranking_method are both 'tensor'", str(e.exception))
+                        self.assertIn("retrievalMethod and rankingMethod are both 'tensor'", str(e.exception))
 
     def test_hybrid_search_none_query_with_context_vectors_passes(self):
         """Test to ensure that context vectors work with no_model by setting query as None and providing context
