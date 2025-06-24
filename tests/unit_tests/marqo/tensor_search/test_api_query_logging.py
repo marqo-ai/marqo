@@ -27,10 +27,10 @@ class TestAPIQueryLogging(unittest.TestCase):
     @patch('marqo.tensor_search.api.get_config')
     @patch('marqo.tensor_search.api.RequestMetricsStore.for_request')
     @patch('marqo.tensor_search.api.utils.read_env_vars_and_defaults')
-    @patch('marqo.tensor_search.api.logger')
+    @patch('marqo.tensor_search.api.marqo_query_logger')
     @patch('marqo.tensor_search.api.tensor_search.search')
     @patch('marqo.tensor_search.api.api_validation.validate_device')
-    def test_slow_query_logging_enabled(self, mock_validate_device, mock_tensor_search, mock_logger, 
+    def test_slow_query_logging_enabled(self, mock_validate_device, mock_tensor_search, mock_marqo_query_logger, 
                                        mock_read_env, mock_request_store, mock_get_config):
         """Test that slow queries are logged when query details logging is enabled"""
         # Setup
@@ -57,22 +57,21 @@ class TestAPIQueryLogging(unittest.TestCase):
         
         # Verify
         self.assertEqual(response.status_code, 200)
-        mock_logger.warning.assert_called_once()
-        warning_call = mock_logger.warning.call_args[0][0]
+        mock_marqo_query_logger.warning.assert_called_once()
+        warning_call = mock_marqo_query_logger.warning.call_args[0][0]
         self.assertIn("Slow search query detected: 600.0ms", warning_call)
-        self.assertIn(f"Index: {self.index_name}", warning_call)
         self.assertIn("Query:", warning_call)
         self.assertIn("test query", warning_call)
 
     @patch('marqo.tensor_search.api.get_config')
     @patch('marqo.tensor_search.api.RequestMetricsStore.for_request')
     @patch('marqo.tensor_search.api.utils.read_env_vars_and_defaults')
-    @patch('marqo.tensor_search.api.logger')
+    @patch('marqo.tensor_search.api.marqo_query_logger')
     @patch('marqo.tensor_search.api.tensor_search.search')
     @patch('marqo.tensor_search.api.api_validation.validate_device')
-    def test_slow_query_logging_disabled(self, mock_validate_device, mock_tensor_search, mock_logger, 
+    def test_slow_query_logging_disabled(self, mock_validate_device, mock_tensor_search, mock_marqo_query_logger, 
                                         mock_read_env, mock_request_store, mock_get_config):
-        """Test that slow queries are logged without details when query details logging is disabled"""
+        """Test that slow queries are not logged when query details logging is disabled"""
         # Setup
         mock_validate_device.return_value = "cpu"
         mock_get_config.return_value = MagicMock()
@@ -97,11 +96,7 @@ class TestAPIQueryLogging(unittest.TestCase):
         
         # Verify
         self.assertEqual(response.status_code, 200)
-        mock_logger.warning.assert_called_once()
-        warning_call = mock_logger.warning.call_args[0][0]
-        self.assertIn("Slow search query detected: 600.0ms", warning_call)
-        self.assertIn(f"Index: {self.index_name}", warning_call)
-        self.assertNotIn("Query:", warning_call)
+        mock_marqo_query_logger.warning.assert_not_called()  # Should not log when details disabled
 
     @patch('marqo.tensor_search.api.get_config')
     @patch('marqo.tensor_search.api.RequestMetricsStore.for_request')
@@ -174,7 +169,6 @@ class TestAPIQueryLogging(unittest.TestCase):
         mock_search_logger.error.assert_called_once()
         error_call = mock_search_logger.error.call_args[0][0]
         self.assertIn("Failed search query", error_call)
-        self.assertIn(f"Index: {self.index_name}", error_call)
         self.assertIn("Search failed", error_call)
         self.assertIn("Query:", error_call)
 
@@ -213,7 +207,6 @@ class TestAPIQueryLogging(unittest.TestCase):
         mock_logger.error.assert_called_once()
         error_call = mock_logger.error.call_args[0][0]
         self.assertIn("Failed search query", error_call)
-        self.assertIn(f"Index: {self.index_name}", error_call)
         self.assertIn("Query:", error_call)
 
     @patch('marqo.tensor_search.api.get_config')
@@ -248,13 +241,8 @@ class TestAPIQueryLogging(unittest.TestCase):
             # It's ok if the client raises an exception, we're testing the logging
             pass
         
-        # Verify error was logged without details
-        mock_logger.error.assert_called_once()
-        error_call = mock_logger.error.call_args[0][0]
-        self.assertIn("Failed search query", error_call)
-        self.assertIn(f"Index: {self.index_name}", error_call)
-        self.assertIn("Search failed", error_call)
-        self.assertNotIn("Query:", error_call)
+        # Verify error was not logged when details disabled
+        mock_logger.error.assert_not_called()  # Should not log when details disabled
 
     @patch('marqo.tensor_search.api.get_config')
     @patch('marqo.tensor_search.api.RequestMetricsStore.for_request')

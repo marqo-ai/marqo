@@ -10,10 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
-from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -36,6 +33,7 @@ from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
+from marqo.otel import bootstrap_otel
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
@@ -48,9 +46,9 @@ from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
-from marqo.otel import bootstrap_otel
 
 logger = get_logger(__name__)
+marqo_query_logger = get_logger('marqo_query')
 
 
 def generate_config() -> config.Config:
@@ -411,12 +409,10 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     
     def log_if_slow_query(elapsed_time_ms: float):
         """Log query details if it's slow"""
-        if elapsed_time_ms > slow_query_threshold_ms:
-            if log_query_details:
-                logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms - Index: {index_name} - Query: {search_query_dict}')
-            else:
-                logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms - Index: {index_name}')
-    
+        if log_query_details and elapsed_time_ms > slow_query_threshold_ms:
+            marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
+                                       f'Query: {search_query_dict}')
+
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", log_if_slow_query):
         try:
             # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
@@ -449,9 +445,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             return ORJSONResponse(result)
         except Exception as e:
             if log_query_details:
-                logger.error(f'Failed search query - Index: {index_name} - Error: {str(e)} - Query: {search_query_dict}')
-            else:
-                logger.error(f'Failed search query - Index: {index_name} - Error: {str(e)}')
+                logger.error(f'Failed search query: Error: {str(e)}. Query: {search_query_dict}')
             raise
 
 

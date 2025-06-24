@@ -24,7 +24,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     def tearDown(self):
         # Clean up log handler
         if self.log_handler:
-            logging.getLogger('marqo.tensor_search.api').removeHandler(self.log_handler)
+            logging.getLogger('marqo_query').removeHandler(self.log_handler)
 
     def _setup_log_capture(self):
         """Set up log capture for testing"""
@@ -38,7 +38,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         
         self.log_handler = LogCapture(self.log_messages)
         self.log_handler.setLevel(logging.WARNING)
-        logger = logging.getLogger('marqo.tensor_search.api')
+        logger = logging.getLogger('marqo_query')
         logger.addHandler(self.log_handler)
         logger.setLevel(logging.WARNING)
 
@@ -81,7 +81,6 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         
         warning_log = warning_logs[0]
         self.assertIn("Slow search query detected:", warning_log)
-        self.assertIn(f"Index: {self.index_name}", warning_log)
         self.assertIn("Query:", warning_log)
         self.assertIn("integration test query", warning_log)
 
@@ -118,14 +117,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         # Verify response is successful
         self.assertEqual(response.status_code, 200)
         
-        # Verify slow query was logged without details
+        # Verify no slow query was logged when details disabled
         warning_logs = [msg for msg in self.log_messages if "Slow search query detected" in msg]
-        self.assertTrue(len(warning_logs) > 0, f"Expected slow query log, but got logs: {self.log_messages}")
-        
-        warning_log = warning_logs[0]
-        self.assertIn("Slow search query detected:", warning_log)
-        self.assertIn(f"Index: {self.index_name}", warning_log)
-        self.assertNotIn("Query:", warning_log)
+        self.assertEqual(len(warning_logs), 0, f"Expected no slow query logs when details disabled, but got: {warning_logs}")
 
     @patch.dict(os.environ, {
         EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "1000",  # High threshold
@@ -224,7 +218,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                           f"Expected error about search failure, got: {error_logs}")
             
             # Check for our specific error logging format
-            api_error_found = any("Failed search query" in log and "Index: test_query_logging_index" in log 
+            api_error_found = any("Failed search query" in log and "Query:" in log 
                                 for log in error_logs)
             self.assertTrue(api_error_found, 
                           f"Expected our API error logging format, got: {error_logs}")
