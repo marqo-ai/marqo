@@ -30,12 +30,13 @@ class TestBase64ImageSupport(unittest.TestCase):
         self.assertEqual(img.size, (2, 2))
 
     def test_load_image_from_path_with_invalid_base64(self):
-        """Test error handling for invalid base64 data through public API."""
+        """Test error handling for invalid base64 data."""
         invalid_cases = [
             "invalid_base64!!!",
             "data:image/png;base64,invalid!!!",
             "data:image/xxxyyyzzz",
         ]
+
         for case in invalid_cases:
             with self.subTest(case=case):
                 with self.assertRaises(UnidentifiedImageError):

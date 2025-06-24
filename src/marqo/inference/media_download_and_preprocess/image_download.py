@@ -53,7 +53,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         # Check if it's a base64-encoded image first
         if is_base64_image(thing):
             return True
-            
+
         name, extension = os.path.splitext(thing.lower())
 
         # if it has the correct extension, asssume yes
@@ -162,26 +162,19 @@ def _load_base64_image(content: str) -> ImageType:
     Raises:
         UnidentifiedImageError: If the content cannot be decoded or loaded as an image
     """
-    try:
-        try:
-            base64_part = content.split(';base64,', 1)[1]
-        except IndexError:
-            raise ValueError()
+    _, _, b64data = content.partition("base64,")
 
-        # Decode base64 to bytes
-        image_bytes = base64.b64decode(base64_part, validate=True)
-        
-        # Create PIL Image from bytes
-        image_buffer = BytesIO(image_bytes)
-        img = Image.open(image_buffer)
-        
-        # Load the image to ensure it's valid
+    try:
+        img_bytes = base64.b64decode(b64data)
+    except ValueError as e:
+        raise UnidentifiedImageError(f"Invalid base64 data: {e}")
+
+    # Open and load directly from the in-memory buffer
+    with BytesIO(img_bytes) as buf:
+        img = Image.open(buf)
         img.load()
-        
-        return img
-        
-    except (base64.binascii.Error, ValueError) as e:
-        raise UnidentifiedImageError(f"Invalid base64 image data: {e}")
+
+    return img
 
 
 def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
@@ -202,7 +195,7 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
     # Check if it's a base64-encoded image first
     if is_base64_image(image_path):
         return _load_base64_image(image_path)
-        
+
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):
@@ -225,13 +218,14 @@ def load_image_from_path(image_path: str, media_download_headers: dict, timeout_
             if metrics_obj is not None:
                 metrics_obj.stop(f"media_download.image.{image_path}")
     else:
-        raise UnidentifiedImageError(f"Input str of {image_path} is not a local file, a valid url, or a base64-encoded image. "
-                                     f"If you are using Marqo Cloud, please note that images can only be downloaded "
-                                     f"from a URL and local files are not supported. "
-                                     f"If you are running Marqo in a Docker container, you will need to use a Docker "
-                                     f"volume so that your container can access host files. "
-                                     f"For more information, please refer to: "
-                                     f"{marqo_docs.indexing_images()}")
+        raise UnidentifiedImageError(
+            f"Input str of {image_path} is not a local file, a valid url, or a base64-encoded image. "
+            f"If you are using Marqo Cloud, please note that images can only be downloaded "
+            f"from a URL and local files are not supported. "
+            f"If you are running Marqo in a Docker container, you will need to use a Docker "
+            f"volume so that your container can access host files. "
+            f"For more information, please refer to: "
+            f"{marqo_docs.indexing_images()}")
 
     return img
 
