@@ -453,7 +453,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                     }
                 ],
                 "sortDepth": 4,  # Limit the sort depth to 6
-                "sortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
+                "minSortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
             }
 
             # We run it several times to ensure that the results are consistent
