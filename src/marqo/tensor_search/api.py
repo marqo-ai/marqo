@@ -407,9 +407,12 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS))
     log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS).upper() == "TRUE"
     
+    # Track if error was logged to avoid duplicate logging
+    error_logged = [False]  # Use list to make it mutable in nested function
+    
     def log_if_slow_query(elapsed_time_ms: float):
-        """Log query details if it's slow"""
-        if log_query_details and elapsed_time_ms > slow_query_threshold_ms:
+        """Log query details if it's slow and no error was already logged"""
+        if log_query_details and elapsed_time_ms >= slow_query_threshold_ms and not error_logged[0]:
             marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
                                        f'Query: {search_query_dict}')
 
@@ -445,7 +448,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             return ORJSONResponse(result)
         except Exception as e:
             if log_query_details:
-                logger.error(f'Failed search query: Error: {str(e)}. Query: {search_query_dict}')
+                error_logged[0] = True  # Mark that error was logged
+                marqo_query_logger.error(f'Failed search query: Error: {str(e)}. Query: {search_query_dict}')
             raise
 
 
