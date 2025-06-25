@@ -47,9 +47,9 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: 10,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
 
-        # Vespa Query Logging
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: 500,
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "TRUE",
+        # Query Logging
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: 500,
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
 
         # Throttling
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",

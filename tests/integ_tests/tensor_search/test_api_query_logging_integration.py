@@ -87,8 +87,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         logger.setLevel(logging.INFO)
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "TRUE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     } | default_env_vars)
     def test_slow_query_logging(self):
         """Integration test for slow query logging with details enabled"""
@@ -117,8 +117,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     self.assertIn(f"Query: {search_query}", warning_log)
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "1000",  # High threshold
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "TRUE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1000",  # High threshold
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     } | default_env_vars)
     def test_fast_query_no_logging(self):
         """Integration test to verify fast queries are not logged"""
@@ -144,8 +144,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     self.assertEqual(len(warning_logs), 0, f"Expected no slow query logs, but got: {warning_logs}")
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "1",  # Low threshold
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "FALSE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Low threshold
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE"
     } | default_env_vars)
     def test_slow_query_no_logging_when_disabled(self):
         """Integration test to verify fast queries are not logged"""
@@ -171,8 +171,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     self.assertEqual(len(warning_logs), 0, f"Expected no slow query logs, but got: {warning_logs}")
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "500",
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "TRUE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "500",
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     } | default_env_vars)
     def test_search_error_logging(self):
         """Integration test for search error logging"""
@@ -201,8 +201,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     self.assertIn(f"Query: {search_query}", error_logs[0])
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "500",
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "FALSE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "500",
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE"
     } | default_env_vars)
     def test_search_error_no_logging_when_disabled(self):
         """Integration test for search error logging"""
@@ -227,8 +227,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                                     f"Expected no query log, but got logs: {self.log_messages}")
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "1",
-        EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS: "TRUE"
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     } | default_env_vars)
     def test_search_error_logging_overrides_slow_query_logging(self):
         """Integration test for search error logging"""

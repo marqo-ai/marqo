@@ -407,8 +407,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
     # Get configuration for query logging (outside timing to avoid overhead)
-    slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS))
-    log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_VESPA_LOG_QUERY_DETAILS).upper() == "TRUE"
+    slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
+    log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
     
     # Track if error was logged to avoid duplicate logging
     error_logged = [False]  # Use list to make it mutable in nested function
