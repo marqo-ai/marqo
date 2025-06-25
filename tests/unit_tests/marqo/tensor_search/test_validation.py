@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 from marqo.api.exceptions import InvalidArgError, InvalidFieldNameError
 from marqo.core.models import marqo_index
 from marqo.tensor_search import validation
-from marqo.tensor_search.enums import SearchMethod, MappingsObjectType
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 
 
@@ -190,17 +190,10 @@ class TestValidateMappingsObject(unittest.TestCase):
                 }
             },
             {
-                "description": "text field with language",
-                "mapping": {
-                    "text_field": {"type": "text_field", "language": "es"}
-                }
-            },
-            {
                 "description": "mixed field types",
                 "mapping": {
                     "multimodal": {"type": "multimodal_combination", "weights": {"text": 1.0}},
                     "vector": {"type": "custom_vector"},
-                    "text": {"type": "text_field", "language": "en"}
                 }
             },
             {
@@ -247,18 +240,6 @@ class TestValidateMappingsObject(unittest.TestCase):
                 "description": "custom vector extra properties",
                 "mapping": {"field": {"type": "custom_vector", "extra": "not_allowed"}},
                 "expected_error": "Additional properties are not allowed",
-                "exception_type": InvalidArgError
-            },
-            {
-                "description": "text field missing language",
-                "mapping": {"field": {"type": "text_field"}},
-                "expected_error": "'language' is a required property",
-                "exception_type": InvalidArgError
-            },
-            {
-                "description": "text field empty language",
-                "mapping": {"field": {"type": "text_field", "language": ""}},
-                "expected_error": "'' is too short",
                 "exception_type": InvalidArgError
             },
             {

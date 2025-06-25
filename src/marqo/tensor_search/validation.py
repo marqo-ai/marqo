@@ -567,9 +567,6 @@ def validate_mappings_object(
             elif config["type"] == enums.MappingsObjectType.custom_vector:
                 _validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
-                
-            elif config["type"] == enums.MappingsObjectType.text_field:
-                _validate_text_field_mappings_object(config)
 
             else:
                 raise InternalError(
@@ -646,32 +643,6 @@ def _validate_custom_vector_mappings_object(mappings_object: Dict):
     return mappings_object
 
 
-def _validate_text_field_mappings_object(mappings_object: Dict):
-    """Validates the text field mappings object
-    
-    Args:
-        mappings_object: The mapping configuration for a text field with language
-        
-    Returns:
-        The original object, if it passes validation
-        
-    Raises InvalidArgError if the object is badly formatted
-    
-    Example text field mappings must look like this:
-    "my_text_field": {
-        "type": "text_field",
-        "language": "es"
-    }
-    """
-    try:
-        jsonschema.validate(instance=mappings_object, schema=text_field_mappings_schema)
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating text field mappings object. Reason: \n{str(e)}"
-            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
-        )
-
-    return mappings_object
 
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):

@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch, MagicMock
 import numpy as np
-from marqo.core.exceptions import AddDocumentsError
+from marqo.core.exceptions import AddDocumentsError, InvalidArgumentError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import (
@@ -80,10 +80,10 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         mappings = {
             "title": {"type": "text_field", "language": "es"},
             "description": {"type": "text_field", "language": "en"},
-            "categories": {"type": "text_field"},  # No language specified
-            "tags": {"type": "text_field"},  # No language specified
+            "categories": {"type": "text_field", "language": "en"},
+            "tags": {"type": "text_field", "language": "en"},
             "multimodal_content": {"type": "text_field", "language": "en"},
-            "audio_description": {"type": "text_field"},  # No language specified
+            "audio_description": {"type": "text_field", "language": "en"},
             "my_custom_vector": {"type": "custom_vector"},
             "embedding_vector": {"type": "custom_vector"},
             "combined_content": {
@@ -215,3 +215,34 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         self.assertIn("Language is only supported for indexes created with Marqo version", str(error_item.error))
         self.assertIn("2.16.0", error_item.error)
         self.assertIn("2.15.0", error_item.error)
+
+    def test_text_field_mapping_without_language_raises_invalid_argument_error(self):
+        """Test that text_field mapping without language specification raises InvalidArgumentError"""
+        docs = [{"_id": "doc1", "title": "Test document"}]
+        mappings = {"title": {"type": "text_field"}}  # Missing language specification
+        
+        add_docs_params = AddDocsParams(
+            index_name="test_index",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings=mappings,
+            use_existing_tensors=False
+        )
+
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        with self.assertRaises(InvalidArgumentError):
+            SemiStructuredAddDocumentsHandler(
+                marqo_index=marqo_index,
+                add_docs_params=add_docs_params,
+                vespa_client=self.mock_vespa_client,
+                index_management=self.mock_index_management,
+                inference=self.mock_inference,
+                field_count_config=self.field_count_config
+            )
