@@ -54,6 +54,7 @@ class TestTensorSearch(unittest.TestCase):
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
     def test_search_lexical_method(self, mock_metrics, mock_parse_query, mock_vespa_factory, mock_get_index):
         """Test search with lexical method returns expected results."""
+        # TODO -- there's a lot of logic in .search() that we're not covering
         # Setup
         mock_get_index.return_value = self.mock_index
         mock_parse_query.return_value = (["test"], ["query"])
