@@ -14,7 +14,9 @@ from marqo.core.models.marqo_index import (
 )
 
 from marqo.config import Config
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.version import get_version
 from marqo.vespa.models import QueryResult
@@ -503,6 +505,30 @@ class SearchTest(unittest.TestCase):
             # Run search and validate age is not present in response
             resp = tensor_search.search(self.config, "index_name", "query", search_method="lexical")
             self.assertNotIn("age", resp['hits'][0])
+
+    def test_search_with_context_documents_fails_for_legacy_unstructured_index(self):
+        """Test that search with context documents fails for legacy unstructured indexes."""
+        self.set_index_to_return(self.legacy_unstructured_index)
+        
+        # Create search context with documents
+        search_context = SearchContext(
+            documents=SearchContextDocuments(
+                ids={"doc1": 1.0, "doc2": 0.5}
+            )
+        )
+        
+        # Should raise UnsupportedFeatureError for legacy unstructured index
+        with self.assertRaises(UnsupportedFeatureError) as cm:
+            tensor_search.search(
+                config=self.config,
+                index_name="legacy_unstructured_index",
+                text=None,
+                context=search_context,
+                search_method="tensor"
+            )
+        
+        self.assertIn("Search context is not supported for unstructured indexes", str(cm.exception))
+        self.assertIn("2.13.0", str(cm.exception))
 
 if __name__ == '__main__':
     unittest.main()

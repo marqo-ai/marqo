@@ -7,9 +7,12 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
-        # Common
+        EnvVars.MARQO_MODE: "COMBINED",  # one of COMBINED, API, INFERENCE
+
+        # Common config applicable for all modes
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_LOG_FORMAT: "plain",
+        EnvVars.MARQO_METRICS_EXPORT_INTERVAL: 30,
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
@@ -17,8 +20,8 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
+        EnvVars.VESPA_ASYNC_POOL_SIZE: 10,      # TODO: Decide default async pool size
         EnvVars.VESPA_FEED_POOL_SIZE: 10,
-        EnvVars.VESPA_GET_POOL_SIZE: 10,
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
 
@@ -41,6 +44,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
         EnvVars.MARQO_MAX_SEARCH_LIMIT: 1000,
         EnvVars.MARQO_MAX_SEARCH_OFFSET: 10000,
+        EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: 10,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
 
         # Throttling
@@ -64,6 +68,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_API_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_API_INFERENCE_CACHE_TYPE: "LRU",
 
+        EnvVars.MARQO_CONCURRENCY_LIMIT_PER_GET_REQUEST: 10,  # Used in get and search
         # 370 megabytes in bytes, read in API and passed to inference server
         EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,
         # 370 megabytes in bytes, read in API and passed to inference server
