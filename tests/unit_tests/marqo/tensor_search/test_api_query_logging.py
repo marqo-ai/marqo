@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from marqo.tensor_search.api import app
 from marqo.tensor_search.enums import EnvVars
-from unit_tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestAPIQueryLogging(MarqoTestCase):
