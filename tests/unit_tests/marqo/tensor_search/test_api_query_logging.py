@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
