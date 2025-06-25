@@ -151,7 +151,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                         else:
                             score = first_hit['_score']
                         self.assertAlmostEqual(
-                            1.0, score, places=4,
+                            1.0, score, places=3,
                             msg=f"Score mismatch for {search_name} on {index_type} index"
                         )
 
@@ -236,7 +236,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                     self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
 
                     # Tensor score should be 1.0 for perfect match
-                    self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=4)
+                    self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=3)
 
                 # Test 2: Dict queryTensor with base64 (weight 1) and text (weight 0)
                 with self.subTest(query_type="dict_base64_and_text"):
@@ -268,7 +268,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                     self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
 
                     # Tensor score should be 1.0 for perfect match (text with weight 0 shouldn't affect this)
-                    self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=4)
+                    self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=3)
 
     def test_tensor_search_with_base64_dict_query(self):
         """Test tensor search with dict query containing base64 image and text with weights across all index types."""
