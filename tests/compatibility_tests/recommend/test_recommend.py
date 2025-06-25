@@ -131,7 +131,9 @@ class TestRecommend(BaseCompatibilityTestCase):
                     limit = 10,
                     offset = 0,
                     show_highlights = True,
-                    attributes_to_retrieve=["text_field", "tags", "caption"]
+                    attributes_to_retrieve=["text_field", "tags", "caption"],
+                    # Hardcoding tensor field order because pre-2.21.0, order determined by vespa get return object
+                    tensor_fields=['multimodal_field', 'text_field', 'image_field']
                 )
                 all_results[index_name] = result
             except Exception as e:
@@ -160,7 +162,9 @@ class TestRecommend(BaseCompatibilityTestCase):
                     limit = 10,
                     offset = 0,
                     show_highlights = True,
-                    attributes_to_retrieve=["text_field", "tags", "caption"]
+                    attributes_to_retrieve=["text_field", "tags", "caption"],
+                    # Hardcoding tensor field order because pre-2.21.0, order determined by vespa get return object
+                    tensor_fields=['multimodal_field', 'text_field', 'image_field']
                 )
                 expected_result = stored_results[index_name]
                 self.logger.debug(f"Printing expected_result {expected_result}")
