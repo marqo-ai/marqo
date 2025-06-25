@@ -16,9 +16,6 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from tests.integ_tests.marqo_test import MarqoTestCase
 import pytest
 
-from marqo.tensor_search import tensor_search, index_meta_cache
-from marqo.core.models.marqo_index import IndexType
-
 
 class TestRecommender(MarqoTestCase):
 
@@ -191,14 +188,29 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
-                    # Note aside from interpolate in recommend,
-                    # search step also calls LERP interpolate once by default
                     mock_interpolate.assert_called_once()
 
                     ids = [doc["_id"] for doc in res["hits"]]
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
 
+    def test_recommend_slerpZeroSumWeights_failure(self):
+        """
+        Test that the recommender fails when the sum of consecutive weights is zero
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                    self.recommender.recommend(
+                        index_name=index.name,
+                        documents={"1": 1, "2": -1},
+                        tensor_fields=['title'],
+                        interpolation_method=InterpolationMethod.SLERP,
+                        exclude_input_documents=False,
+                    )
+                self.assertIn('SLERP cannot interpolate', str(ex.exception))
 
     def test_recommend_nlerp_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
@@ -218,9 +230,7 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
-                    # Note aside from interpolate in recommend,
-                    # search step also calls NLERP interpolate once by default
-                    self.assertEqual(mock_interpolate.call_count, 2)
+                    mock_interpolate.assert_called_once()
 
                     ids = [doc["_id"] for doc in res["hits"]]
 
@@ -273,12 +283,30 @@ class TestRecommender(MarqoTestCase):
                         exclude_input_documents=False,
                     )
 
-                    # Recommend calls LERP interpolate twice (once internally, once in search step)
-                    self.assertEqual(mock_interpolate.call_count, 2)
+                    mock_interpolate.assert_called_once()
 
                     ids = [doc["_id"] for doc in res["hits"]]
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
+
+    def test_recommend_lerpZeroSumWeights_failure(self):
+        """
+        Test that the recommender fails when the sum of all weights is zero with LERP (and NLERP)
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            for method in [InterpolationMethod.LERP, InterpolationMethod.NLERP]:
+                with self.subTest(type=index.type, method=method):
+                    self._populate_index(index)
+
+                    with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                        self.recommender.recommend(
+                            index_name=index.name,
+                            documents={"1": 1, "2": 2, "3": -3},
+                            tensor_fields=['title'],
+                            interpolation_method=method,
+                            exclude_input_documents=False,
+                        )
+                    self.assertIn('Sum of weights is zero', str(ex.exception))
 
     def test_recommend_docsWithZeroWeight_success(self):
         """
@@ -433,8 +461,7 @@ class TestRecommender(MarqoTestCase):
                 index_name=index.name,
                 documents=["1", "2"],
             )
-            # Note aside from interpolate in recommend,
-            # search step also calls LERP interpolate once by default
+
             mock_interpolate.assert_called_once()
 
     def test_defaultInterpolationMethodNonNormalized_success(self):
@@ -455,8 +482,7 @@ class TestRecommender(MarqoTestCase):
                 documents=["1", "2"],
             )
 
-            # Recommend calls LERP interpolate twice (once internally, once in search step)
-            self.assertEqual(mock_interpolate.call_count, 2)
+            mock_interpolate.assert_called_once()
 
     def test_recommend_excludeInputDocuments_success(self):
         """
@@ -694,78 +720,6 @@ class TestRecommender(MarqoTestCase):
                     # We only assert < 3 as the exact number of results varies across runs,
                     # but for one searchable attribute and one shard is capped at ef_search
                     self.assertTrue(len(res["hits"]) <= 3)
-
-    def test_get_doc_vectors_from_ids_noDocumentsProvided_fails(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                with self.assertRaises(InvalidArgumentError):
-                    self.recommender.get_doc_vectors_from_ids(index.name, [])
-
-    def test_get_doc_vectors_from_ids_allZeroWeights_fails(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                documents = {"doc1": 0.0, "doc2": 0.0}
-                with self.assertRaises(InvalidArgumentError):
-                    self.recommender.get_doc_vectors_from_ids(index.name, documents)
-
-    def test_get_doc_vectors_from_ids_invalidTensorField_fails(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index:
-                    mock_index = mock.Mock()
-                    mock_index.type = IndexType.Structured
-                    mock_index.tensor_field_map = {"valid_field": {}}
-                    mock_get_index.return_value = mock_index
-
-                    with self.assertRaises(InvalidFieldNameError):
-                        self.recommender.get_doc_vectors_from_ids(
-                            index.name,
-                            documents=["doc1"],
-                            tensor_fields=["invalid_field"]
-                        )
-
-    def test_get_doc_vectors_from_ids_documentNotFound_fails(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
-                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
-                    mock_get_index.return_value = index
-                    mock_get_docs.return_value.dict.return_value = {
-                        "results": [{"_id": "doc1", "_found": False}]
-                    }
-
-                    with self.assertRaises(InvalidArgumentError):
-                        self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
-
-    def test_get_doc_vectors_from_ids_documentWithoutEmbeddings_fails(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
-                        mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids') as mock_get_docs:
-                    mock_get_index.return_value = index
-                    mock_get_docs.return_value.dict.return_value = {
-                        "results": [{"_id": "doc1", "_found": True, "_tensor_facets": []}]
-                    }
-
-                    with self.assertRaises(InvalidArgumentError):
-                        self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
-
-    def test_get_doc_vectors_from_ids_success(self):
-        for index in [self.unstructured_text_index, self.structured_text_index]:
-            with self.subTest(index_type=index.name):
-                with mock.patch('marqo.tensor_search.index_meta_cache.get_index') as mock_get_index, \
-                        mock.patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids') as mock_get_doc_vectors:
-                    mock_get_index.return_value = index
-                    mock_get_doc_vectors.return_value = {
-                        "doc1": {
-                            "field1": [[0.1, 0.2, 0.3]]
-                        }
-                    }
-
-                    result = self.recommender.get_doc_vectors_from_ids(index.name, documents=["doc1"])
-                    expected = {"doc1": [[0.1, 0.2, 0.3]]}
-                    self.assertEqual(result, expected)
-
 
 if __name__ == '__main__':
     unittest.main()

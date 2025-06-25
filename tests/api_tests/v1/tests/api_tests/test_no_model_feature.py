@@ -205,7 +205,7 @@ class TestNoModelFeature(MarqoTestCase):
                                                          context={"tensor": [{"vector": [1, ] * self.DIMENSION,
                                                                               "weight": -1},
                                                                              {"vector": [1, ] * self.DIMENSION,
-                                                                              "weight": 2}], })
+                                                                              "weight": 1}], })
 
     def test_no_model_and_context_vectors_dimension(self):
         """Test to ensure no_model still raises error if context vector dimension is incorrect."""
