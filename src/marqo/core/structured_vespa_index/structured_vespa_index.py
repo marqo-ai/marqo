@@ -656,7 +656,7 @@ class StructuredVespaIndex(VespaIndex):
                 query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
                     marqo_query.relevance_cutoff.parameters.relative_score_factor
             elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
-                query["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"] = \
+                query["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"] = \
                     marqo_query.relevance_cutoff.parameters.std_dev_factor
             else:
                 # No parameters for other methods

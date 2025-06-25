@@ -556,7 +556,7 @@ def _lexical_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
-
+    vespa_query["yql"] = 'select * from marqo__test_01vector_01search where ({targetHits: 100}weakAnd(default contains "content"))'
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_vespa")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
 

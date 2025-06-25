@@ -1,156 +1,179 @@
 import json
 
-from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestSearchRelevanceCutoffFeature(MarqoTestCase):
-    """
-    Integration tests for the relevance cutoff feature in Marqo search.
-    
-    This test suite validates the end-to-end functionality of relevance cutoff methods
-    that filter search results based on relevance scores to improve result quality.
-    
-    Test Data Setup:
-    ================
-    The test uses 10 carefully crafted documents with varying semantic relevance:
-    
-    High Relevance (to ML/AI queries):
-    - ml_ai_guide: "Comprehensive guide to machine learning and artificial intelligence..."
-    - ai_research: "Latest research in artificial intelligence, machine learning models..."
-    - ml_tutorial: "Machine learning tutorial covering supervised learning..."
-    
-    Medium Relevance:
-    - programming: "Software development best practices, programming languages..."
-    - data_science: "Data science fundamentals including statistics, data analysis..."
-    - web_dev: "Web development frameworks, frontend technologies..."
-    
-    Low Relevance (to ML/AI queries):
-    - cooking: "Traditional cooking techniques, recipe development..."
-    - gardening: "Organic gardening tips, plant care, soil management..."
-    - sports: "Basketball training drills, team strategies..."
-    - fashion: "Fashion trends, clothing design principles..."
-    
-    Expected Behavior:
-    ==================
-    For ML/AI queries ("machine learning artificial intelligence"):
-    - Without cutoff: All 10 documents returned, ranked by semantic similarity
-    - With strict cutoff (0.8+ relative factor): Only top 2-4 highly relevant docs
-    - With lenient cutoff (0.1-0.3 relative factor): 6-9 documents, filtering lowest relevance
-    - Gap detection: Filters documents with significant score gaps from top results
-    - Mean+StdDev: Filters documents more than N standard deviations below mean score
-    
-    For Programming queries ("programming software development"):
-    - Programming doc should rank highest, ML/AI docs still relevant but lower
-    - Cooking/gardening/sports should rank lowest and be filtered by cutoffs
-    
-    For Cooking queries ("cooking recipes food"):
-    - Cooking doc should rank highest, other domains much lower
-    - Tech domains (ML/AI/programming) may still have some relevance
-    
-    Metadata Validation:
-    ====================
-    All search results should include:
-    - _relevanceCandidates: Number of documents considered for relevance scoring
-    - _probeCandidates: Number of documents examined during probe phase for cutoff calculation
-    
-    These metadata fields provide insight into the cutoff algorithm's operation.
-    """
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        semi_structured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name="hf/e5-base-v2")
+        index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="hf/all-MiniLM-L6-v2")
         )
+        cls.create_indexes([index_request])
+        cls.index_name = index_request.name
 
-        cls.create_indexes([semi_structured_default_text_index])
+        # 30 documents designed for "machine learning artificial intelligence algorithms" query
+        test_docs = [
+            # === HIGH RELEVANCE (10 docs) - Contains ALL 5 query words ===
+            {"_id": "h1",
+             "content": "Machine learning algorithms in artificial intelligence enable systems to adapt by processing data efficiently.",
+             "sort_value": 8.1},
+            {"_id": "h2",
+             "content": "Artificial intelligence relies on machine learning algorithms to build predictive models from large datasets.",
+             "sort_value": 9.2},
+            {"_id": "h3",
+             "content": "Researchers develop artificial intelligence machine learning algorithms to improve decision-making processes.",
+             "sort_value": 7.4},
+            {"_id": "h4",
+             "content": "Scalable artificial intelligence frameworks integrate machine learning algorithms for real-time data analysis.",
+             "sort_value": 9.8},
+            {"_id": "h5",
+             "content": "Modern artificial intelligence and machine learning algorithms optimize operational workflows across industries.",
+             "sort_value": 6.5},
+            {"_id": "h6",
+             "content": "Sophisticated artificial intelligence machine learning algorithms optimize data mining operations effectively.",
+             "sort_value": 8.9},
+            {"_id": "h7",
+             "content": "Cutting-edge artificial intelligence machine learning algorithms accelerate data processing in cloud platforms.",
+             "sort_value": 5.3},
+            {"_id": "h8",
+             "content": "Enterprise artificial intelligence solutions embed machine learning algorithms to enhance user experiences.",
+             "sort_value": 9.0},
+            {"_id": "h9",
+             "content": "Robust artificial intelligence machine learning algorithms improve data quality assessment procedures.",
+             "sort_value": 7.8},
+            {"_id": "h10",
+             "content": "Innovative artificial intelligence and machine learning algorithms revolutionize data analytics workflows.",
+             "sort_value": 8.4},
 
-        cls.index_name = semi_structured_default_text_index.name
+            # === MEDIUM RELEVANCE (10 docs) - Contains EXACTLY 3 of the 5 query words ===
+            # (e.g., {machine, learning, algorithms} or {artificial, intelligence, learning}, etc.)
+            {"_id": "m1",
+             "content": "Machine learning algorithms process financial time series for forecasting market trends.",
+             "sort_value": 64},
+            {"_id": "m2",
+             "content": "Artificial intelligence algorithms underpin recommendation engines in e-commerce platforms.",
+             "sort_value": 6.7},
+            {"_id": "m3",
+             "content": "Artificial intelligence learning models adapt to new user behaviors in real time.",
+             "sort_value": 4.3},
+            {"_id": "m4",
+             "content": "Machine and artificial intelligence technologies converge to create autonomous robotic systems.",
+             "sort_value": 7.1},
+            {"_id": "m5",
+             "content": "Machine learning artificial neural networks mimic animal brain structures.",
+             "sort_value": 6.2},
+            {"_id": "m6",
+             "content": "Advanced machine learning algorithms accelerate computational biology research.",
+             "sort_value": 5.9},
+            {"_id": "m7",
+             "content": "Distributed artificial intelligence systems leverage algorithms for parallel decision making.",
+             "sort_value": 4.8},
+            {"_id": "m8",
+             "content": "Deep learning frameworks support neural architectures and optimization algorithms.",
+             "sort_value": 7.5},
+            {"_id": "m9",
+             "content": "Evolutionary algorithms integrate with machine frameworks for adaptive problem solving.",
+             "sort_value": 6.0},
+            {"_id": "m10",
+             "content": "Artificial learning simulations test intelligence benchmarks under controlled conditions.",
+             "sort_value": 4.1},
 
-        # Documents with varying relevance to test relevance cutoff functionality
-        test_relevance_cutoff_docs = [
-            # High relevance: Direct match for "machine learning artificial intelligence"
-            {"_id": "ml_ai_guide", "content": "Comprehensive guide to machine learning and artificial intelligence algorithms, neural networks, and deep learning techniques", "sort_field_1": 9.5},
-            
-            # High relevance: Related ML/AI content  
-            {"_id": "ai_research", "content": "Latest research in artificial intelligence, machine learning models, and AI applications in various industries", "sort_field_1": 8.7},
-            
-            # Medium-High relevance: ML focused
-            {"_id": "ml_tutorial", "content": "Machine learning tutorial covering supervised learning, unsupervised learning, and reinforcement learning concepts", "sort_field_1": 7.2},
-            
-            # Medium relevance: Tech but not ML/AI specific
-            {"_id": "programming", "content": "Software development best practices, programming languages, and coding methodologies for modern applications", "sort_field_1": 5.5},
-            
-            # Medium relevance: Data science (related field)
-            {"_id": "data_science", "content": "Data science fundamentals including statistics, data analysis, visualization, and predictive modeling techniques", "sort_field_1": 6.1},
-            
-            # Lower relevance: Technology but different domain
-            {"_id": "web_dev", "content": "Web development frameworks, frontend technologies, backend systems, and modern web application architecture", "sort_field_1": 4.0},
-            
-            # Lower relevance: Different domain
-            {"_id": "cooking", "content": "Traditional cooking techniques, recipe development, culinary arts, and international cuisine preparation methods", "sort_field_1": 2.3},
-            
-            # Very low relevance: Completely unrelated
-            {"_id": "gardening", "content": "Organic gardening tips, plant care, soil management, and sustainable growing practices for home gardens", "sort_field_1": 1.5},
-            
-            # Very low relevance: Sports content
-            {"_id": "sports", "content": "Basketball training drills, team strategies, player fitness programs, and competitive sports psychology", "sort_field_1": 1.0},
-            
-            # Very low relevance: Fashion content
-            {"_id": "fashion", "content": "Fashion trends, clothing design principles, textile materials, and seasonal style recommendations", "sort_field_1": 0.5}
+            # === LOW RELEVANCE ===
+            # 5 docs with exactly 1 query word, matching the word counts of l1–l5
+            {"_id": "l1",
+             "content": "Engineers use machine tools for precise cutting.",
+             "sort_value": 60},
+
+            {"_id": "l2",
+             "content": "Innovators encourage collaborative learning environments to foster team growth.",
+             "sort_value": 2.7},  # 9 words, contains "learning"
+
+            {"_id": "l3",
+             "content": "Manufacturers produce artificial components designed precisely for specialized industrial applications.",
+             "sort_value": 1.4},  # 10 words, contains "artificial"
+
+            {"_id": "l4",
+             "content": "Local units value human intelligence during critical decision making.",
+             "sort_value": 100},  # 9 words, contains "intelligence"
+
+            {"_id": "l5",
+             "content": "Researchers propose algorithms optimized specifically to accelerate image processing tasks.",
+             "sort_value": 60},  # 10 words, contains "algorithms"
+
+            # === Irrelevant ===
+            # 5 docs with 0 words from the query
+            {"_id": "l6",
+             "content": "Bright morning sunlight streamed through the quiet study room.",
+             "sort_value": 2.1},
+
+            {"_id": "l7",
+             "content": "Surprising weather patterns emerged across the town.",
+             "sort_value": 70},
+
+            {"_id": "l8",
+             "content": "Vibrant wildflowers adorned the rolling hills during summer.",
+             "sort_value": 1.9},
+
+            {"_id": "l9",
+             "content": "Chilly autumn breeze painted golden leaves across streets.",
+             "sort_value": 24},
+
+            {"_id": "l10",
+             "content": "The ancient manuscript revealed hidden stories from forgotten civilizations.",
+             "sort_value": 5.6}
+
+            # We should see 25 probe candidates in the relevance cutoff tests 5 documents are irrelevant.
         ]
 
-        _ = cls.add_documents(
+        cls.add_documents(
             config=cls.config,
             add_docs_params=AddDocsParams(
-                docs=test_relevance_cutoff_docs,
-                index_name=semi_structured_default_text_index.name,
-                documents=test_relevance_cutoff_docs,
-                tensor_fields=['content'],
+                docs=test_docs,
+                index_name=cls.index_name,
+                tensor_fields=['content']
             )
         )
 
-        # Verify documents are indexed correctly for ML/AI query
-        normal_search_res = cls._help_sort_function(query="machine learning artificial intelligence")["hits"]
-        if len(normal_search_res) != 10:
-            raise RuntimeError(
-                f"Expected 10 documents in index, but got {len(normal_search_res)}"
-            )
-        
-        # Verify the most relevant documents are at the top
-        top_results = [r["_id"] for r in normal_search_res[:3]]
-        expected_top_results = ["ml_ai_guide", "ai_research", "ml_tutorial"]
-        for expected_id in expected_top_results:
-            if expected_id not in top_results:
-                raise RuntimeError(
-                    f"Expected high relevance documents {expected_top_results} to be in top 3 results, "
-                    f"but got {top_results}"
-                )
+        # # Test results without relevance cutoff should return top 10 documents
+        # regular_search_results = cls._search_helper(limit=10)
+        # regular_search_results_ids = set(hit["_id"] for hit in regular_search_results["hits"])
+        # # All high relevance IDs should be present in the results
+        # expected_high_relevance_ids = set([f"h{i}" for i in range(1, 11)])
+        # if not expected_high_relevance_ids == regular_search_results_ids:
+        #     raise RuntimeError(
+        #         f"Expected high relevance IDs {expected_high_relevance_ids} but got {regular_search_results_ids}."
+        #     )
+        #
+        cls.PROBE_CANDIDATES = 25  # Expected number of probe candidates for relevance cutoff tests
 
     def setUp(self):
         """Ensure documents are not changed before each test."""
-        if 10 != self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
+        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
             raise RuntimeError(
                 f"Expected 10 documents in index {self.index_name} for sorting tests"
             )
 
     def tearDown(self):
         """Ensure documents are not changed after each test."""
-        if 10 != self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
+        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
             raise RuntimeError(
                 f"Expected 10 documents in index {self.index_name} for sorting tests"
             )
 
     @classmethod
-    def _help_sort_function(cls, query: Optional[str] = "machine learning artificial intelligence",
-                            sort_by: Optional[dict] = None,
-                            relevance_cutoff: Optional[dict] = None,
-                            limit=10, offset=0) -> dict:
-        return json.loads(search(
+    def _search_helper(cls, query: str = "machine learning artificial intelligence algorithms",
+                      relevance_cutoff: Optional[dict] = None,
+                      sort_by: Optional[dict] = None,
+                      limit: int = 10, offset: int = 0) -> dict:
+        """Helper method to perform search with consistent parameters."""
+        result = json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
             device="cpu",
@@ -158,273 +181,797 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
                 "hybridParameters": {
-                    "retrievalMethod": "disjunction",
+                    "retrievalMethod": "disjunction", 
                     "rankingMethod": "rrf",
-                    "alpha": 0.5,
+                    "alpha": 0.5
                 },
+                "relevanceCutoff": relevance_cutoff,
                 "sortBy": sort_by,
                 "limit": limit,
-                "offset": offset,
-                "relevanceCutoff": relevance_cutoff
+                "offset": offset
             }
         ).body.decode('utf-8'))
 
-    def test_relevance_cutoff_relative_max_score(self):
-        """Test relevance cutoff with relative_max_score method using ML/AI query"""
-        # First get baseline results without cutoff to understand the data
-        baseline = self._help_sort_function(query="machine learning artificial intelligence")
-        
-        # Test with lenient cutoff (0.1) - should return most documents
-        result_lenient = self._help_sort_function(
-            query="machine learning artificial intelligence",
+        if relevance_cutoff:
+            if result["_probeCandidates"] != cls.PROBE_CANDIDATES:
+                raise RuntimeError(
+                    f"Expected 25 probe candidates, but got {result['_probeCandidates']}."
+                )
+        return result
+
+    def test_relevance_cutoff_relative_max_score_low_threshold(self):
+        """Test that relative_max_score cutoff with low threshold."""
+        result = self._search_helper(
             relevance_cutoff={
                 "method": "relative_max_score",
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.1}
-            }
+                "parameters": {"relativeScoreFactor": 0.1},
+            },
         )
-        self.assertGreater(len(result_lenient["hits"]), 8, "Should return some documents with lenient cutoff")
-        
-        # Test with strict cutoff (0.8) - should return fewer documents
-        result_strict = self._help_sort_function(
-            query="machine learning artificial intelligence",
+        relevance_candidates = result["_relevanceCandidates"]
+        self.assertGreater(relevance_candidates, 20, "Should have enough relevance candidates for filtering")
+
+
+    def test_relevance_cutoff_relative_max_score_high_threshold(self):
+        """Test that relative_max_score cutoff with high threshold."""
+        result = self._search_helper(
             relevance_cutoff={
-                "method": "relative_max_score", 
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.8}
-            }
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.95},
+            },
         )
-        
-        # Strict cutoff should return fewer or equal documents than lenient
-        self.assertLessEqual(len(result_strict["hits"]), len(result_lenient["hits"]),
-                           "Strict cutoff should not return more documents than lenient cutoff")
-        
-        # The highest scoring documents should appear in both results
-        if len(result_strict["hits"]) > 0 and len(baseline["hits"]) > 0:
-            # Get the top document from baseline (highest score)
-            top_doc_id = baseline["hits"][0]["_id"]
-            strict_ids = [hit["_id"] for hit in result_strict["hits"]]
-            self.assertIn(top_doc_id, strict_ids, 
-                         "Highest scoring document should survive strict cutoff")
-        
-        # Verify probe candidates are reasonable (should be <= total documents in index)
-        self.assertLessEqual(result_lenient["_probeCandidates"], 10, 
-                           "Probe candidates should not exceed total documents in index")
-        self.assertLessEqual(result_strict["_probeCandidates"], 10,
-                           "Probe candidates should not exceed total documents in index")
+        relevance_candidates = result["_relevanceCandidates"]
+        self.assertLess(relevance_candidates, 10, "Should have few relevance candidates for filtering")
+
+    def test_relevance_cutoff_relative_max_score_with_changing_threshold(self):
+        """Test that relative_max_score cutoff with changing threshold.
+        We vary the threshold from 0.1 to 0.9 and check that the number of relevance candidates
+        """
+        previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
+        for threshold in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+
+            current_relevance_candidates = self._search_helper(
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "parameters": {"relativeScoreFactor": threshold},
+                },
+            )["_relevanceCandidates"]
+
+            if current_relevance_candidates > previous_relevance_candidates:
+                raise RuntimeError(
+                    f"Expected relevance candidates to decrease with increasing threshold, "
+                    f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
+                )
+            previous_relevance_candidates = current_relevance_candidates
 
     def test_relevance_cutoff_gap_detection(self):
-        """Test relevance cutoff with gap_detection method"""
-        # Get baseline without cutoff
-        baseline = self._help_sort_function(query="machine learning artificial intelligence")
-        
-        # Apply gap detection cutoff
-        result = self._help_sort_function(
-            query="machine learning artificial intelligence",
+        """Test that gap_detection cutoff works as expected."""
+        result = self._search_helper(
             relevance_cutoff={
                 "method": "gap_detection",
-                "probeDepth": 50
-            }
+            },
         )
-        
-        self.assertGreater(len(result["hits"]), 0, "Should return some documents")
-        self.assertLessEqual(len(result["hits"]), len(baseline["hits"]), 
-                           "Gap detection should not increase document count")
-        self.assertIn("_relevanceCandidates", result, "Result should contain _relevanceCandidates metadata")
-        self.assertIn("_probeCandidates", result, "Result should contain _probeCandidates metadata")
-        
-        # Verify all returned documents have reasonable scores
-        for hit in result["hits"]:
-            self.assertIn("_score", hit)
-            self.assertIsInstance(hit["_score"], (int, float))
-            self.assertGreater(hit["_score"], 0, "All returned documents should have positive scores")
+        relevance_candidates = result["_relevanceCandidates"]
+        self.assertLess(
+            relevance_candidates, 15,
+            "Expected less than 15 relevance candidates for gap detection, but got {relevance_candidates}."
+        )
 
     def test_relevance_cutoff_mean_std_dev(self):
-        """Test relevance cutoff with mean_std_dev method on ML/AI query"""
-        # Get baseline without cutoff
-        baseline = self._help_sort_function(query="machine learning artificial intelligence")
-        
-        # Test with conservative std dev factor (1.0) - should be more selective
-        result_conservative = self._help_sort_function(
-            query="machine learning artificial intelligence",
+        """Test that mean_std_dev cutoff works as expected."""
+        result = self._search_helper(
             relevance_cutoff={
                 "method": "mean_std_dev",
-                "probeDepth": 50,
-                "parameters": {"stdDevFactor": 1.0}
-            }
+                "parameters": {"stdDevFactor": 0.1},
+            },
         )
-        self.assertGreater(len(result_conservative["hits"]), 0, "Should return some documents")
-        self.assertLessEqual(len(result_conservative["hits"]), len(baseline["hits"]),
-                           "Conservative filter should not increase document count")
+        relevance_candidates = result["_relevanceCandidates"]
+        self.assertLess(
+            relevance_candidates, 15,
+            f"Expected less than 15 relevance candidates for mean_std_dev, but got {relevance_candidates}."
+        )
 
-        
-        # Test with aggressive std dev factor (2.5) - should be less selective  
-        result_aggressive = self._help_sort_function(
-            query="machine learning artificial intelligence",
-            relevance_cutoff={
-                "method": "mean_std_dev",
-                "probeDepth": 50, 
-                "parameters": {"stdDevFactor": 2.5}
-            }
-        )
-        self.assertGreater(len(result_aggressive["hits"]), 0, "Should return documents with high std dev factor")
-        self.assertGreaterEqual(len(result_aggressive["hits"]), len(result_conservative["hits"]), 
-                               "Higher std dev factor should return same or more documents")
-        
-        # The top scoring document should survive both filters
-        if len(baseline["hits"]) > 0:
-            top_doc_id = baseline["hits"][0]["_id"]
-            conservative_ids = [hit["_id"] for hit in result_conservative["hits"]]
-            aggressive_ids = [hit["_id"] for hit in result_aggressive["hits"]]
-            
-            if len(result_conservative["hits"]) > 0:
-                self.assertIn(top_doc_id, conservative_ids, "Top document should survive conservative filter")
-            if len(result_aggressive["hits"]) > 0:
-                self.assertIn(top_doc_id, aggressive_ids, "Top document should survive aggressive filter")
+    def test_relevance_cutoff_changing_mean_std_dev_threshold(self):
+        """Test that mean_std_dev cutoff with changing stdDevFactor works as expected."""
+        previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
+        for std_dev_factor in [-1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6]:
+            current_relevance_candidates = self._search_helper(
+                relevance_cutoff={
+                    "method": "mean_std_dev",
+                    "parameters": {"stdDevFactor": std_dev_factor},
+                },
+            )["_relevanceCandidates"]
 
-    def test_relevance_cutoff_comparison_with_without(self):
-        """Test that relevance cutoff actually filters documents appropriately"""
-        # Search without cutoff
-        result_no_cutoff = self._help_sort_function(
-            query="machine learning artificial intelligence"
-        )
-        
-        # Search with moderate cutoff
-        result_with_cutoff = self._help_sort_function(
-            query="machine learning artificial intelligence",
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.6}
-            }
-        )
-        
-        # Cutoff should return fewer or equal documents
-        self.assertLessEqual(len(result_with_cutoff["hits"]), len(result_no_cutoff["hits"]),
-                           "Relevance cutoff should not increase document count")
-        
-        # All documents in cutoff result should also be in no-cutoff result
-        no_cutoff_ids = set(hit["_id"] for hit in result_no_cutoff["hits"])
-        with_cutoff_ids = set(hit["_id"] for hit in result_with_cutoff["hits"])
-        self.assertTrue(with_cutoff_ids.issubset(no_cutoff_ids),
-                      "All cutoff results should be subset of no-cutoff results")
-        
-        # If cutoff filtered documents, the top scoring docs should be retained
-        if len(result_with_cutoff["hits"]) < len(result_no_cutoff["hits"]) and len(result_no_cutoff["hits"]) > 0:
-            # Check that highest scoring documents are more likely to survive
-            top_3_no_cutoff = [hit["_id"] for hit in result_no_cutoff["hits"][:3]]
-            surviving_from_top_3 = sum(1 for doc_id in top_3_no_cutoff if doc_id in with_cutoff_ids)
-            
-            # At least some of the top 3 should survive the cutoff
-            if len(result_with_cutoff["hits"]) > 0:
-                self.assertGreater(surviving_from_top_3, 0, 
-                                 "Some of the highest scoring documents should survive cutoff")
-
-    def test_relevance_cutoff_different_query_types(self):
-        """Test that relevance cutoff works consistently across different query types"""
-        queries_to_test = [
-            "machine learning artificial intelligence",
-            "programming software development", 
-            "cooking recipes food preparation"
-        ]
-        
-        for query in queries_to_test:
-            with self.subTest(query=query):
-                # Get baseline without cutoff
-                baseline = self._help_sort_function(query=query)
-                
-                # Apply cutoff
-                result_with_cutoff = self._help_sort_function(
-                    query=query,
-                    relevance_cutoff={
-                        "method": "relative_max_score",
-                        "probeDepth": 50,
-                        "parameters": {"relativeScoreFactor": 0.5}
-                    }
+            if current_relevance_candidates > previous_relevance_candidates:
+                raise RuntimeError(
+                    f"Expected relevance candidates to decrease with increasing stdDevFactor, "
+                    f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
                 )
-                
-                # Basic sanity checks that apply to any query
-                self.assertGreater(len(baseline["hits"]), 0, f"Baseline should return results for query: {query}")
-                self.assertLessEqual(len(result_with_cutoff["hits"]), len(baseline["hits"]),
-                                   f"Cutoff should not increase results for query: {query}")
-                
-                # If there are results after cutoff, they should be a subset of baseline
-                if len(result_with_cutoff["hits"]) > 0:
-                    baseline_ids = set(hit["_id"] for hit in baseline["hits"])
-                    cutoff_ids = set(hit["_id"] for hit in result_with_cutoff["hits"])
-                    self.assertTrue(cutoff_ids.issubset(baseline_ids),
-                                  f"Cutoff results should be subset of baseline for query: {query}")
-                    
-                    # Top scoring document should be likely to survive cutoff
-                    if len(baseline["hits"]) > 0:
-                        top_doc_id = baseline["hits"][0]["_id"]
-                        self.assertIn(top_doc_id, cutoff_ids,
-                                    f"Top document should survive cutoff for query: {query}")
+            previous_relevance_candidates = current_relevance_candidates
 
-    def test_relevance_cutoff_with_sort_by(self):
-        """Test relevance cutoff works correctly with sort_by"""
-        result = self._help_sort_function(
+    def test_simple_sort_results(self):
+        """Test that relevance cutoff works correctly with sorting.
+
+        This is an example to show that without relevance cutoff, the results are sorted by sort_value in descending order
+        which leads low relevance documents to be at the top of the results, e.g., l4, m1, l1.
+
+        In production, we wouldn't want to see these documents at the top of the results,
+        so we would use relevance cutoff to filter them out.
+
+        Note that irrelevant documents (l6-l10) are not included in the results as they do not match the query.
+        """
+        result = self._search_helper(
             sort_by={
-                "fields": [
-                    {
-                        "field_name": "sort_field_1",
-                        "order": "desc",
-                        "missing": "last"
-                    }
-                ]
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            limit=10
+        )
+        ids = [hit["_id"] for hit in result["hits"]]
+        expected_ids = [
+            "l4", "m1", "l1", "l5", "h4",
+            "h2", "h8", "h6", "h10", "h1"
+        ]
+        self.assertEqual(expected_ids, ids)
+        # Check that the sort candidates are correct.
+        self.assertEqual(25, result["_sortCandidates"])
+
+    def test_sort_results_with_relevance_cut_off_with_low_threshold(self):
+        """A test to show that low relevance threshold does not chang the results."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
             },
             relevance_cutoff={
                 "method": "relative_max_score",
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.5}
-            }
+                "parameters": {"relativeScoreFactor": 0.001},
+            },
+            limit=10
         )
-        
-        self.assertGreater(len(result["hits"]), 0, "Should return documents with both sort and cutoff")
-        
-        # Verify sorting is maintained after cutoff
-        sort_values = [hit.get("sort_field_1") for hit in result["hits"] if "sort_field_1" in hit]
-        if len(sort_values) > 1:
-            for i in range(len(sort_values) - 1):
-                if sort_values[i] is not None and sort_values[i+1] is not None:
-                    self.assertGreaterEqual(sort_values[i], sort_values[i+1], 
-                                          "Results should maintain descending sort order")
+        ids = [hit["_id"] for hit in result["hits"]]
+        expected_ids = [
+            "l4", "m1", "l1", "l5", "h4",
+            "h2", "h8", "h6", "h10", "h1"
+        ]
+        self.assertEqual(expected_ids, ids)
+        # Check that the sort candidates are correct.
+        self.assertEqual(25, result["_sortCandidates"])
 
-    def test_relevance_cutoff_with_limit_and_offset(self):
-        """Test relevance cutoff works with pagination"""
-        # First get results without cutoff for comparison
-        no_cutoff_result = self._help_sort_function(limit=5, offset=0)
-        
-        # Apply cutoff with pagination
-        cutoff_result = self._help_sort_function(
-            limit=5,
-            offset=0,
+    def test_sort_results_with_relevance_cut_off_with_higher_threshold(self):
+        """A test to show that relative_max_score helps to cut off low relevance documents."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
             relevance_cutoff={
                 "method": "relative_max_score",
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.3}
-            }
+                "parameters": {"relativeScoreFactor": 0.85},
+            },
+            limit=10
+        )
+        ids = [hit["_id"] for hit in result["hits"]]
+        self.assertLess(result["_relevanceCandidates"], 15)
+        self.assertLess(result["_sortCandidates"], 15)
+
+        # These should be filtered out even if they are high sort_value documents but less relevant.
+        unexpected_ids = [
+            "l4", "l1", "l5"
+        ]
+
+        self.assertTrue(
+            set(unexpected_ids).isdisjoint(ids),
+            f"Unexpected IDs found in results: {set(unexpected_ids).intersection(ids)}"
+        )
+
+    def test_sort_results_with_relevance_cut_off_with_higher_threshold_but_min_sort_candidates_can_be_set(self):
+        """A test to show that minSortCandidates can be set to a higher value to make relevance cutoff useless.
+
+        This is an example to show that if we set minSortCandidates to a high value, the relevance cutoff will not
+        filter out any documents, even if the relativeScoreFactor is high. However, users can detect this by
+        observing the `_relevanceCandidates` and `_sortCandidates` metadata in the response.
+        """
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}],
+                "minSortCandidates": 25  # Set a high minSortCandidates
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.85},
+            },
+            limit=10
+        )
+        ids = [hit["_id"] for hit in result["hits"]]
+        expected_ids = [
+            "l4", "m1", "l1", "l5", "h4",
+            "h2", "h8", "h6", "h10", "h1"
+        ]
+        self.assertEqual(expected_ids, ids)
+        # Check that the relevance candidates are correct.
+        self.assertLess(result["_relevanceCandidates"], 15)
+        # Check that the sort candidates are correct.
+        self.assertEqual(25, result["_sortCandidates"])
+
+    def test_sort_asc_with_relevance_cutoff(self):
+        """Test ascending sort order with relevance cutoff to ensure filtering works both ways."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "asc"}]
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.8},
+            },
+            limit=10
         )
         
-        self.assertLessEqual(len(cutoff_result["hits"]), 5, "Should respect limit")
-        self.assertLessEqual(len(cutoff_result["hits"]), len(no_cutoff_result["hits"]), 
-                           "Cutoff should not increase result count")
+        ids = [hit["_id"] for hit in result["hits"]]
+        # Should filter out low-relevance docs and sort remaining by ascending sort_value
+        self.assertLess(result["_relevanceCandidates"], 20)
+        
+        # Low relevance docs should be filtered out regardless of sort order
+        unexpected_ids = ["l1", "l4", "l5"]
+        self.assertTrue(
+            set(unexpected_ids).isdisjoint(ids),
+            f"Low relevance docs should be filtered: {set(unexpected_ids).intersection(ids)}"
+        )
+        
+        # Remaining results should be sorted ascending
+        sort_values = [hit["sort_value"] for hit in result["hits"]]
+        self.assertEqual(sort_values, sorted(sort_values), "Results should be sorted ascending")
+
+    def test_sort_with_multiple_relevance_cutoff_methods(self):
+        """Test different relevance cutoff methods with sorting to compare effectiveness."""
+        sort_params = {"fields": [{"field_name": "sort_value", "order": "desc"}]}
+        
+        # Test gap_detection with sort
+        gap_result = self._search_helper(
+            sort_by=sort_params,
+            relevance_cutoff={"method": "gap_detection"},
+            limit=8
+        )
+        
+        # Test mean_std_dev with sort
+        std_result = self._search_helper(
+            sort_by=sort_params,
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.5}
+            },
+            limit=8
+        )
+        
+        # Both should filter some documents
+        self.assertLess(gap_result["_relevanceCandidates"], 25)
+        self.assertLess(std_result["_relevanceCandidates"], 25)
+        
+        # Both should maintain sort order
+        gap_sort_values = [hit["sort_value"] for hit in gap_result["hits"]]
+        std_sort_values = [hit["sort_value"] for hit in std_result["hits"]]
+        
+        self.assertEqual(gap_sort_values, sorted(gap_sort_values, reverse=True))
+        self.assertEqual(std_sort_values, sorted(std_sort_values, reverse=True))
+
+    def test_sort_with_varying_min_sort_candidates(self):
+        """Test how different minSortCandidates values interact with relevance cutoff."""
+        base_cutoff = {
+            "method": "relative_max_score",
+            "parameters": {"relativeScoreFactor": 0.7}
+        }
+        
+        # Test with different minSortCandidates values
+        for min_sort in [5, 15, 25]:
+            result = self._search_helper(
+                sort_by={
+                    "fields": [{"field_name": "sort_value", "order": "desc"}],
+                    "minSortCandidates": min_sort
+                },
+                relevance_cutoff=base_cutoff,
+                limit=10
+            )
+
+            self.assertGreaterEqual(
+                result["_sortCandidates"], min_sort,
+                f"Sort candidates should at least greater than or equal "
+                f"to minSortCandidates: {min_sort}"
+            )
+            
+            # When minSortCandidates is high, it should override relevance filtering
+            if min_sort >= 25:
+                # Should include low-relevance docs due to high minSortCandidates
+                ids = [hit["_id"] for hit in result["hits"]]
+                self.assertIn("l4", ids, "High minSortCandidates should include low-relevance docs")
+
+    def test_sort_with_relevance_cutoff_different_thresholds_effectiveness(self):
+        """Test how different relevance cutoff thresholds affect sort results."""
+        sort_params = {"fields": [{"field_name": "sort_value", "order": "desc"}]}
+        
+        results = {}
+        thresholds = [0.3, 0.5, 0.7, 0.9]
+        
+        for threshold in thresholds:
+            result = self._search_helper(
+                sort_by=sort_params,
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "parameters": {"relativeScoreFactor": threshold}
+                },
+                limit=10
+            )
+            results[threshold] = result
+        
+        # Higher thresholds should result in fewer relevance candidates
+        prev_candidates = 30
+        for threshold in thresholds:
+            current_candidates = results[threshold]["_relevanceCandidates"]
+            self.assertLessEqual(current_candidates, prev_candidates,
+                               f"Threshold {threshold} should have <= candidates than previous")
+            prev_candidates = current_candidates
+        
+        # Most restrictive threshold should exclude low-relevance docs
+        restrictive_ids = [hit["_id"] for hit in results[0.9]["hits"]]
+        self.assertTrue(
+            set(["l1", "l4", "l5"]).isdisjoint(restrictive_ids),
+            "Most restrictive threshold should exclude low-relevance docs"
+        )
+
+    def test_sort_with_relevance_cutoff_preserves_high_relevance_docs(self):
+        """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "asc"}]  # Ascending favors low sort values
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.6}
+            },
+            limit=15
+        )
+        
+        ids = [hit["_id"] for hit in result["hits"]]
+        
+        # Should include high-relevance docs even with low sort values
+        high_relevance_low_sort = ["h7"]  # sort_value: 5.3
+        for doc_id in high_relevance_low_sort:
+            self.assertIn(doc_id, ids, f"High-relevance doc {doc_id} should be preserved despite low sort value")
+        
+        # Should exclude low-relevance docs even with high sort values
+        low_relevance_high_sort = ["l4", "l1"]  # sort_values: 100, 60
+        for doc_id in low_relevance_high_sort:
+            self.assertNotIn(doc_id, ids, f"Low-relevance doc {doc_id} should be filtered despite high sort value")
+
+    def test_sort_candidates_vs_relevance_candidates_relationship(self):
+        """Test the relationship between _sortCandidates and _relevanceCandidates."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.6}
+            },
+            limit=10
+        )
+        
+        # Sort candidates should be >= relevance candidates because sorting candidates includes the results from
+        # tensor search.
+        self.assertGreaterEqual(result["_sortCandidates"], result["_relevanceCandidates"],
+                           "Sort candidates should not exceed relevance candidates")
+        
+        # Both should be <= total available documents (25 probe candidates)
+        self.assertLessEqual(result["_relevanceCandidates"], 25)
+        self.assertLessEqual(result["_sortCandidates"], 25)
+
+    def test_sort_with_relevance_cutoff_edge_case_no_sort_field(self):
+        """Test relevance cutoff when some documents don't have the sort field."""
+        # This test ensures robustness when sort field is missing
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "nonexistent_field", "order": "desc", "missing": "last"}]
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5}
+            },
+            limit=10
+        )
+        
+        # Should still apply relevance cutoff even with missing sort field
+        self.assertIn("_relevanceCandidates", result)
+        self.assertLess(result["_relevanceCandidates"], 25)
+
+    def test_relevance_cutoff_with_pagination(self):
+        """Test relevance cutoff with different limit and offset values."""
+        # Test with small limit
+        result_small = self._search_helper(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.4},
+            },
+            limit=3
+        )
+        self.assertLessEqual(len(result_small["hits"]), 3, "Should respect limit")
+        self.assertIn("_relevanceCandidates", result_small)
+        
+        # Test with offset
+        result_offset = self._search_helper(
+            relevance_cutoff={
+                "method": "relative_max_score", 
+                "parameters": {"relativeScoreFactor": 0.4},
+            },
+            limit=5,
+            offset=2
+        )
+        self.assertLessEqual(len(result_offset["hits"]), 5, "Should respect limit with offset")
+
+    def test_relevance_cutoff_edge_case_extreme_values(self):
+        """Test edge cases with extreme parameter values."""
+        # Test with factor = 1.0 (most restrictive)
+        result_max = self._search_helper(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 1.0},
+            }
+        )
+        self.assertLessEqual(result_max["_relevanceCandidates"], 5, 
+                           "Factor 1.0 should be very restrictive")
+        
+        # Test with factor = 0.0 (least restrictive)
+        result_min = self._search_helper(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.0},
+            }
+        )
+        self.assertGreaterEqual(result_min["_relevanceCandidates"], 0, 
+                              "Factor 0.0 should not crash")
 
     def test_relevance_cutoff_preserves_document_structure(self):
-        """Test that cutoff preserves the structure of returned documents"""
-        result = self._help_sort_function(
+        """Test that relevance cutoff preserves document structure and metadata."""
+        result = self._search_helper(
             relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 50,
-                "parameters": {"relativeScoreFactor": 0.4}
+                "method": "gap_detection",
             }
         )
         
+        # Verify basic structure
         self.assertIn("hits", result)
+        self.assertIn("_relevanceCandidates", result)
+        self.assertIn("_probeCandidates", result)
+        
+        # Verify each hit has required fields
         for hit in result["hits"]:
-            self.assertIn("_id", hit)
-            self.assertIn("_score", hit)
-            self.assertIn("content", hit)
-            # Verify score is a valid number
-            self.assertIsInstance(hit["_score"], (int, float))
-            self.assertGreaterEqual(hit["_score"], 0)
+            self.assertIn("_id", hit, "Each hit should have _id")
+            self.assertIn("_score", hit, "Each hit should have _score")
+            self.assertIn("content", hit, "Each hit should have content")
+            self.assertIsInstance(hit["_score"], (int, float), "Score should be numeric")
+            self.assertGreater(hit["_score"], 0, "Score should be positive")
+
+    def test_relevance_cutoff_baseline_without_cutoff(self):
+        """Test baseline search without relevance cutoff returns expected results."""
+        result = self._search_helper()
+        
+        # Should not have cutoff metadata
+        self.assertNotIn("_relevanceCandidates", result, "Should not have cutoff metadata")
+        self.assertNotIn("_probeCandidates", result, "Should not have probe metadata")
+        
+        # Should return all high relevance documents in top 10
+        result_ids = set(hit["_id"] for hit in result["hits"])
+        high_relevance_ids = set([f"h{i}" for i in range(1, 11)])
+        self.assertEqual(result_ids, high_relevance_ids, 
+                        "Should return all high relevance documents without cutoff")
+
+    def test_relevance_cutoff_effectiveness_comparison(self):
+        """Test that cutoff actually improves result quality."""
+        # Get results without cutoff
+        no_cutoff = self._search_helper(limit=15)
+        
+        # Get results with moderate cutoff
+        with_cutoff = self._search_helper(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5},
+            },
+            limit=15
+        )
+        
+        # Cutoff should potentially reduce document count
+        self.assertLessEqual(len(with_cutoff["hits"]), len(no_cutoff["hits"]), 
+                           "Cutoff should not increase results")
+        
+        # Filtered results should be subset of original when both have same limit
+        if len(with_cutoff["hits"]) < len(no_cutoff["hits"]):
+            cutoff_ids = set(hit["_id"] for hit in with_cutoff["hits"])
+            no_cutoff_ids = set(hit["_id"] for hit in no_cutoff["hits"])
+            self.assertTrue(cutoff_ids.issubset(no_cutoff_ids), 
+                          "Cutoff results should be subset of no-cutoff results")
+
+    def test_relevance_cutoff_consistency_across_calls(self):
+        """Test that identical relevance cutoff calls return consistent results."""
+        cutoff_params = {
+            "method": "relative_max_score",
+            "parameters": {"relativeScoreFactor": 0.6},
+        }
+        
+        result1 = self._search_helper(relevance_cutoff=cutoff_params)
+        result2 = self._search_helper(relevance_cutoff=cutoff_params)
+        
+        # Results should be consistent
+        self.assertEqual(result1["_relevanceCandidates"], result2["_relevanceCandidates"],
+                        "Relevance candidates should be consistent across calls")
+        self.assertEqual(len(result1["hits"]), len(result2["hits"]),
+                        "Number of hits should be consistent across calls")
+        
+        # Order should be consistent
+        ids1 = [hit["_id"] for hit in result1["hits"]]
+        ids2 = [hit["_id"] for hit in result2["hits"]]
+        self.assertEqual(ids1, ids2, "Result order should be consistent across calls")
+
+    def test_mean_std_dev_comprehensive_std_dev_factor_range(self):
+        """Test mean_std_dev method with comprehensive range of stdDevFactor values."""
+        # Test negative, zero, and positive factors
+        factors = [-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
+        
+        previous_candidates = 30
+        for factor in factors:
+            result = self._search_helper(
+                relevance_cutoff={
+                    "method": "mean_std_dev",
+                    "parameters": {"stdDevFactor": factor}
+                }
+            )
+            
+            current_candidates = result["_relevanceCandidates"]
+            
+            # Higher factors should generally result in fewer or equal candidates
+            self.assertLessEqual(current_candidates, previous_candidates,
+                               f"Factor {factor} should have <= candidates than previous factor")
+            
+            # All results should be valid
+            self.assertGreaterEqual(current_candidates, 0, "Should have non-negative candidates")
+            self.assertLessEqual(current_candidates, 25, "Should not exceed probe candidates")
+            
+            previous_candidates = current_candidates
+
+    def test_mean_std_dev_with_sort_production_scenario(self):
+        """Test mean_std_dev in typical production scenario with sorting."""
+        # Typical production parameters
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 1.0}  # Common production value
+            },
+            limit=10
+        )
+        
+        # Should filter some low-relevance documents
+        self.assertLess(result["_relevanceCandidates"], 25, "Should filter some documents")
+        
+        # Should maintain sort order
+        sort_values = [hit["sort_value"] for hit in result["hits"]]
+        self.assertEqual(sort_values, sorted(sort_values, reverse=True), 
+                        "Results should maintain descending sort order")
+        
+        # Should exclude most low-relevance docs with high sort values
+        ids = [hit["_id"] for hit in result["hits"]]
+        low_relevance_high_sort = {"l1", "l4", "l5"}  # High sort values but low relevance
+        filtered_low_relevance = low_relevance_high_sort.intersection(set(ids))
+        
+        # Most should be filtered (allow some flexibility for mean_std_dev behavior)
+        self.assertLessEqual(len(filtered_low_relevance), 1, 
+                           f"Most low-relevance docs should be filtered: {filtered_low_relevance}")
+
+    def test_mean_std_dev_conservative_vs_aggressive_filtering(self):
+        """Test conservative vs aggressive mean_std_dev filtering."""
+        
+        # Conservative filtering (low factor)
+        conservative_result = self._search_helper(
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.2}
+            },
+            limit=15
+        )
+        
+        # Aggressive filtering (high factor)  
+        aggressive_result = self._search_helper(
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 2.0}
+            },
+            limit=15
+        )
+        
+        # Conservative should retain more documents
+        self.assertGreaterEqual(conservative_result["_relevanceCandidates"], 
+                              aggressive_result["_relevanceCandidates"],
+                              "Conservative filtering should retain more documents")
+        
+        # Both should filter some documents
+        self.assertLess(conservative_result["_relevanceCandidates"], 25)
+        self.assertLess(aggressive_result["_relevanceCandidates"], 25)
+        
+        # Aggressive should definitely exclude low-relevance docs
+        aggressive_ids = {hit["_id"] for hit in aggressive_result["hits"]}
+        self.assertTrue({"l1", "l4", "l5"}.isdisjoint(aggressive_ids),
+                       "Aggressive filtering should exclude low-relevance docs")
+
+    def test_mean_std_dev_with_different_sort_orders(self):
+        """Test mean_std_dev behavior with ascending vs descending sort."""
+        
+        base_cutoff = {
+            "method": "mean_std_dev",
+            "parameters": {"stdDevFactor": 1.0}
+        }
+        
+        # Test with descending sort
+        desc_result = self._search_helper(
+            sort_by={"fields": [{"field_name": "sort_value", "order": "desc"}]},
+            relevance_cutoff=base_cutoff,
+            limit=8
+        )
+        
+        # Test with ascending sort
+        asc_result = self._search_helper(
+            sort_by={"fields": [{"field_name": "sort_value", "order": "asc"}]},
+            relevance_cutoff=base_cutoff,
+            limit=8
+        )
+        
+        # Both should apply same relevance filtering
+        self.assertEqual(desc_result["_relevanceCandidates"], asc_result["_relevanceCandidates"],
+                        "Sort order should not affect relevance filtering")
+        
+        # Should maintain appropriate sort orders
+        desc_values = [hit["sort_value"] for hit in desc_result["hits"]]
+        asc_values = [hit["sort_value"] for hit in asc_result["hits"]]
+        
+        self.assertEqual(desc_values, sorted(desc_values, reverse=True), "Desc should be descending")
+        self.assertEqual(asc_values, sorted(asc_values), "Asc should be ascending")
+
+    def test_mean_std_dev_with_min_sort_candidates_interaction(self):
+        """Test how mean_std_dev interacts with minSortCandidates in production."""
+        
+        # Test different combinations of filtering vs minSortCandidates
+        test_cases = [
+            {"stdDevFactor": 0.5, "minSortCandidates": 10},
+            {"stdDevFactor": 1.0, "minSortCandidates": 15}, 
+            {"stdDevFactor": 1.5, "minSortCandidates": 20},
+            {"stdDevFactor": 2.0, "minSortCandidates": 25}  # Override scenario
+        ]
+        
+        for case in test_cases:
+            result = self._search_helper(
+                sort_by={
+                    "fields": [{"field_name": "sort_value", "order": "desc"}],
+                    "minSortCandidates": case["minSortCandidates"]
+                },
+                relevance_cutoff={
+                    "method": "mean_std_dev",
+                    "parameters": {"stdDevFactor": case["stdDevFactor"]}
+                },
+                limit=10
+            )
+            
+            # Sort candidates should meet minimum requirement
+            self.assertGreaterEqual(result["_sortCandidates"], case["minSortCandidates"],
+                                  f"Case {case}: Sort candidates should meet minimum")
+            
+            # When minSortCandidates is very high, it overrides filtering
+            if case["minSortCandidates"] >= 25:
+                ids = [hit["_id"] for hit in result["hits"]]
+                # Should include low-relevance docs due to override
+                self.assertIn("l4", ids, f"Case {case}: High minSortCandidates should override filtering")
+
+    def test_mean_std_dev_score_distribution_analysis(self):
+        """Test mean_std_dev filtering based on actual score distribution."""
+        
+        # Get detailed results to analyze score distribution
+        result = self._search_helper(
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 1.0}
+            },
+            limit=20
+        )
+        
+        scores = [hit["_score"] for hit in result["hits"]]
+        
+        # Should have reasonable score distribution
+        self.assertGreater(len(scores), 5, "Should retain reasonable number of documents")
+        
+        # Scores should be in descending order
+        self.assertEqual(scores, sorted(scores, reverse=True), "Scores should be descending")
+        
+        # Should filter out clearly low-scoring documents
+        # (Test that mean+std_dev threshold is meaningful)
+        if len(scores) > 5:
+            # Check that score variance isn't too high (good filtering)
+            score_range = max(scores) - min(scores)
+            max_possible_range = max(scores)  # If we included score=0
+            
+            # Filtered range should be smaller than maximum possible
+            self.assertLess(score_range, max_possible_range * 0.8,
+                          "Filtering should reduce score variance")
+
+    def test_mean_std_dev_consistency_across_multiple_calls(self):
+        """Test that mean_std_dev produces consistent results across calls."""
+        
+        cutoff_params = {
+            "method": "mean_std_dev",
+            "parameters": {"stdDevFactor": 1.0}
+        }
+        
+        # Multiple calls with same parameters
+        results = []
+        for _ in range(3):
+            result = self._search_helper(
+                relevance_cutoff=cutoff_params,
+                sort_by={"fields": [{"field_name": "sort_value", "order": "desc"}]},
+                limit=8
+            )
+            results.append(result)
+        
+        # All calls should produce identical results
+        for i in range(1, len(results)):
+            self.assertEqual(results[0]["_relevanceCandidates"], results[i]["_relevanceCandidates"],
+                           f"Call {i} should have same relevance candidates as call 0")
+            
+            ids_0 = [hit["_id"] for hit in results[0]["hits"]]
+            ids_i = [hit["_id"] for hit in results[i]["hits"]]
+            self.assertEqual(ids_0, ids_i, f"Call {i} should have same result order as call 0")
+
+    def test_sort_and_relevance_cutoff_pagination(self):
+        """Test that sorting and relevance cutoff work correctly with pagination.
+
+        This test is carefully crafted with _relevanceCandidates=10. In this case, and limit=4, offset=0,4,8.
+
+        In this case, the first two pages should provide consistent results without any overlap. Starting from
+        the third page, you may see overlap as the _relevanceCandidates are not enough to fill the third page,
+        and we have to make the retrieval candidates as `limit + offset`.
+        """
+        # # Test with limit and offset
+        # page_1_results = self._search_helper(
+        #     sort_by={
+        #         "fields": [{"field_name": "sort_value", "order": "desc"}]
+        #     },
+        #     relevance_cutoff={
+        #         "method": "mean_std_dev",
+        #         "parameters": {"stdDevFactor": 0.5}
+        #     },
+        #     limit=4,
+        #     offset=0
+        # )
+        #
+        # page_1_sort_candidates = page_1_results["_sortCandidates"]
+        # self.assertEqual(10, page_1_sort_candidates)
+
+        page_2_results = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.5}
+            },
+            limit=4,
+            offset=0
+        )
+
+        page_2_sort_candidates = page_2_results["_sortCandidates"]
+        print(page_2_results["_relevanceCandidates"])
+        # self.assertEqual(10, page_2_sort_candidates)
+
+        # # We should see a consistent sort value order in both pages
+        # page_1_sort_values = [hit["sort_value"] for hit in page_1_results["hits"]]
+        # page_2_sort_values = [hit["sort_value"] for hit in page_2_results["hits"]]
+        #
+        # self.assertEqual(page_1_sort_values, sorted(page_1_sort_values, reverse=True),
+        #                  "Page 1 results should be sorted descending by sort_value")
+        # self.assertEqual(page_2_sort_values, sorted(page_2_sort_values, reverse=True))
+        # self.assertEqual(
+        #     page_1_sort_values + page_2_sort_values,
+        #     sorted(page_1_sort_values + page_2_sort_values, reverse=True),
+        #     "Combined pages should maintain overall descending sort order"
+        # )

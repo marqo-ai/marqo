@@ -364,8 +364,8 @@ class SearchQuery(BaseMarqoModel):
             # If min_sort_candidates is provided, ensure it is at least as large as offset + limit
             if sort_by.min_sort_candidates < (values.get('offset') + values.get('limit')):
                 raise ValueError(
-                    f" must be at least as large as offset + limit. Received "
-                    f" ={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
+                    f" minSortCandidates must be at least as large as offset + limit. Received "
+                    f" minSortCandidates={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
                     f" offset={values.get('offset')} "
                 )
         return values

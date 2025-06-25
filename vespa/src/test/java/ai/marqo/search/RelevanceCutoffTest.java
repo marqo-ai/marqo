@@ -1,5 +1,8 @@
 package ai.marqo.search;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.yahoo.search.Query;
 import com.yahoo.search.Searcher;
 import com.yahoo.search.result.Hit;
@@ -7,9 +10,6 @@ import com.yahoo.search.result.HitGroup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RelevanceCutoffTest {
     private HybridSearcher hybridSearcher;
@@ -48,9 +48,7 @@ class RelevanceCutoffTest {
             RuntimeException exception =
                     assertThrows(
                             RuntimeException.class,
-                            () ->
-                                    callReadRelevanceCutoffParameter(
-                                            query, "relative_max_score"));
+                            () -> callReadRelevanceCutoffParameter(query, "relative_max_score"));
             assertThat(exception.getMessage())
                     .contains(
                             "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor is"
@@ -60,8 +58,7 @@ class RelevanceCutoffTest {
         @Test
         void shouldReturnMeanStdDevFactorWhenMethodIsMeanStdDev() {
             Query query = new Query("search/?query=test");
-            query.properties()
-                    .set("marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor", 1.5);
+            query.properties().set("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor", 1.5);
 
             Double result = callReadRelevanceCutoffParameter(query, "mean_std_dev");
             assertThat(result).isEqualTo(1.5);
@@ -77,7 +74,7 @@ class RelevanceCutoffTest {
                             () -> callReadRelevanceCutoffParameter(query, "mean_std_dev"));
             assertThat(exception.getMessage())
                     .contains(
-                            "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor is"
+                            "marqo__hybrid.relevanceCutoff.parameters.stdDevFactor is"
                                     + " missing");
         }
 

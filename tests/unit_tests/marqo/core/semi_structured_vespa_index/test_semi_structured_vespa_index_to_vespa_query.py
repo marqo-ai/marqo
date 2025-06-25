@@ -416,7 +416,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         for key in [
             "marqo__hybrid.relevanceCutoff.method",
             "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor",
-            "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor",
+            "marqo__hybrid.relevanceCutoff.parameters.stdDevFactor",
             "marqo__hybrid.relevanceCutoff.probeDepth"
         ]:
             self.assertNotIn(key, r)
@@ -437,8 +437,8 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
                                r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
         # default probeDepth is 1000
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
-        # no meanStdDevFactor for this method
-        self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor", r)
+        # no stdDevFactor for this method
+        self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor", r)
 
     def test_relative_max_score_custom_probeDepth(self):
         """Custom probeDepth should be honoured for RelativeMaxScore."""
@@ -453,7 +453,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.assertEqual(5, r["marqo__hybrid.relevanceCutoff.probeDepth"])
 
     def test_mean_std_dev_default_probeDepth(self):
-        """MeanStdDev should set method, meanStdDevFactor, and default probeDepth."""
+        """MeanStdDev should set method, stdDevFactor, and default probeDepth."""
         params = MeanStdParameters(stdDevFactor=2.5)
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.MeanStdDev,
@@ -465,7 +465,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.assertEqual(RelevanceCutoffMethod.MeanStdDev,
                          r["marqo__hybrid.relevanceCutoff.method"])
         self.assertAlmostEqual(2.5,
-                               r["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"])
+                               r["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
         # no relativeScoreFactor for this method
         self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor", r)
@@ -493,7 +493,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
                          r["marqo__hybrid.relevanceCutoff.method"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
         self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor", r)
-        self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor", r)
+        self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor", r)
 
         # custom probeDepth
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
@@ -545,7 +545,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.assertEqual(RelevanceCutoffMethod.MeanStdDev,
                          r["marqo__hybrid.relevanceCutoff.method"])
         self.assertAlmostEqual(0.1,
-                               r["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"])
+                               r["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"])
         self.assertEqual(50, r["marqo__hybrid.relevanceCutoff.probeDepth"])
         
         # Test large stdDevFactor
@@ -557,7 +557,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         
         r = self.index._to_vespa_hybrid_query(self.hybrid_query)
         self.assertAlmostEqual(10.0,
-                               r["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"])
+                               r["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])  # default
 
 

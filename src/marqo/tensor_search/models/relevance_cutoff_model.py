@@ -12,11 +12,11 @@ class RelevanceCutoffMethod(str, Enum):
 
 
 class RelativeMaxScoreParameters(StrictBaseModel):
-    relative_score_factor: float = Field(..., gt=0, le=1, alias="relativeScoreFactor")
+    relative_score_factor: float = Field(..., ge=0, le=1, alias="relativeScoreFactor")
 
 
 class MeanStdParameters(StrictBaseModel):
-    std_dev_factor: float = Field(..., gt=0, alias="stdDevFactor")
+    std_dev_factor: float = Field(..., alias="stdDevFactor")
 
 
 class RelevanceCutoffModel(StrictBaseModel):

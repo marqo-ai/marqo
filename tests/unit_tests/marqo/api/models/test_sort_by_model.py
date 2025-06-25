@@ -34,7 +34,7 @@ class TestSortByModels(TestCase):
         sort_by_model = SortByModel(
             fields=[SortByField(fieldName="price")],
             sortDepth=5,
-            sort_candidates=15
+            min_sort_candidates=15
         )
         self.assertEqual(sort_by_model.sort_depth, 5)
         self.assertEqual(sort_by_model.min_sort_candidates, 15)
@@ -177,7 +177,7 @@ class TestSortByModels(TestCase):
 
     def test_sort_by_invalid_sort_candidates_below_one(self):
         with self.assertRaises(ValidationError) as e:
-            SortByModel(fields=[SortByField(fieldName="foo")], sort_candidates=0)
+            SortByModel(fields=[SortByField(fieldName="foo")], min_sort_candidates=0)
         self.assertIn("greater than or equal to 1", str(e.exception))
 
     def test_sort_by_invalid_sort_depth_below_one(self):

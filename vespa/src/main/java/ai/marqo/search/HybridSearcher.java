@@ -135,8 +135,8 @@ public class HybridSearcher extends Searcher {
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
         Integer sortBySortDepth =
                 query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
-        Integer sortBySortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", null);
+        int sortByMinSortCandidates =
+                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", -1);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -189,10 +189,6 @@ public class HybridSearcher extends Searcher {
             Query probeLexicalQuery =
                     createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
             Result probeLexicalResult = execution.search(probeLexicalQuery);
-            if (probeLexicalResult.hits().getError() != null) {
-                return new Result(query, probeLexicalResult.hits());
-            }
-
             probeCandidates = probeLexicalResult.hits().size();
             relevanceCandidates =
                     detectCutoffCount(
@@ -206,24 +202,20 @@ public class HybridSearcher extends Searcher {
         // --- End relevance cut-off handling ---
 
         // --- Update the query limit if sort is used
-        if (sortByFields != null && !sortByFields.isEmpty()) {
-            int newLimit = Math.max(sortBySortCandidates, query.getHits());
-            if (newLimit < 0) {
-                throw new RuntimeException(
-                        String.format(
-                                "The limit for sorting is a negative %d, which is invalid. Custom"
-                                        + " searcher received relevanceCandidates = %s,"
-                                        + " sortBySortCandidate = %s",
-                                newLimit, sortBySortCandidates, relevanceCandidates));
-            }
-            query.setHits(newLimit);
-            query.setOffset(0);
-        }
-
-        // --- Update the query limit if sort is used
         if (!Strings.isNullOrEmpty(sortByFields)) {
-            query.setHits(sortBySortCandidates);
-            query.setOffset(0);
+            if ((sortByMinSortCandidates < 0) && (relevanceCandidates < 0)) {
+                throw new RuntimeException(
+                        "marqo__hybrid.sortBy.minSortCandidates must be set if sortBy is used while"
+                                + " relevanceCutoff is not enable.");
+            } else {
+                int newLimit = Math.max(sortByMinSortCandidates, relevanceCandidates);
+                // Ideally this check is not needed as we guarantee that sortByMinSortCandidates is
+                // greater than or
+                // equal to limit + offset in Marqo Python API.
+                newLimit = Math.max(newLimit, limit + offset);
+                query.setHits(newLimit);
+                query.setOffset(0);
+            }
         }
 
         HitGroup hitsForPostProcessing;
@@ -496,11 +488,10 @@ public class HybridSearcher extends Searcher {
             case MEAN_STD_DEV -> {
                 Double value =
                         query.properties()
-                                .getDouble(
-                                        "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor");
+                                .getDouble("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor");
                 if (value == null) {
                     throw new RuntimeException(
-                            "marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor is missing");
+                            "marqo__hybrid.relevanceCutoff.parameters.stdDevFactor is missing");
                 }
                 return value;
             }
