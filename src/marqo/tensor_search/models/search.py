@@ -1,7 +1,7 @@
 import json
 from typing import Any, Union, List, Dict, Optional, NewType
 
-from pydantic.v1 import BaseModel, validator, ValidationError, root_validator, Field, conlist
+from pydantic.v1 import BaseModel, validator, ValidationError
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.inference.api import Modality
@@ -17,7 +17,6 @@ class VectorisedJobPointer(BaseModel):
     job_hash: JHash
     start_idx: int
     end_idx: int
-
 
 class VectorisedJobs(BaseModel):
     """A vectorised job describes content (e.q. search queries, images, video, audio) that can be vectorised (i.e can be sent to 
@@ -60,43 +59,13 @@ class VectorisedJobs(BaseModel):
             end_idx=len(self.content)
         )
 
-
 class SearchContextTensor(BaseModel):
     vector: List[float]
     weight: float
 
 
-class SearchContextDocumentsParameters(BaseModel):
-    tensor_fields: Optional[List[str]] = Field(None, alias='tensorFields')
-    exclude_input_documents: bool = Field(True, alias='excludeInputDocuments')
-    concurrency: Optional[int] = None
-
-    @validator('tensor_fields', pre=True, always=True)
-    def check_tensor_fields_not_empty(cls, v):
-        if v == []:
-            raise ValueError('context document tensorFields parameter must be non-empty list.'
-                                  ' If you want to use all tensor fields, do not define this parameter.')
-        return v
-
-
-class SearchContextDocuments(BaseModel):
-    ids: Optional[Dict[str, float]]
-    # If not provided, default parameters are created
-    parameters: Optional[SearchContextDocumentsParameters] = SearchContextDocumentsParameters()
-
-    @validator('ids', pre=True, always=True)
-    def check_ids_not_empty(cls, v):
-        if not v:
-            raise ValueError('context["documents"]["ids"] must be present and a non-empty dict of '
-                                  'document id to weight pairs.')
-        return v
-
-
 class SearchContext(BaseModel):
-    tensor: Optional[List[SearchContextTensor]] = Field(
-        min_items=1, max_items=64
-    )
-    documents: Optional[SearchContextDocuments]
+    tensor: List[SearchContextTensor]
 
     def __init__(self, **data):
         try:
@@ -104,16 +73,11 @@ class SearchContext(BaseModel):
         except ValidationError as e:
             raise InvalidArgError(message=e.json())
 
-    # Root validator to confirm either tensor or documents MUST exist
-    @root_validator(pre=False, skip_on_failure=True)
-    def validate_at_least_one_context_exists(cls, values):
-        tensor = values.get('tensor')
-        documents = values.get('documents')
-
-        if tensor is None and documents is None:
-            raise ValueError('At least 1 form of context (tensor or documents) must be provided')
-
-        return values
+    @validator('tensor', pre=True, always=True)
+    def check_vector_length(cls, v):
+        if not (1 <= len(v) <= 64):
+            raise InvalidArgError('The number of tensors must be between 1 and 64')
+        return v
 
 
 class QueryContent(BaseModel):

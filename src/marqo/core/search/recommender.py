@@ -7,14 +7,12 @@ from marqo.core.inference.api import Inference
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
-from marqo.core.utils.vector_interpolation import from_interpolation_method, AllZeroWeightsError, \
+from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
     ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.tensor_search import utils, validation
 
 
 class Recommender:
@@ -22,119 +20,6 @@ class Recommender:
         self.vespa_client = vespa_client
         self.index_management = index_management
         self.inference = inference
-
-    def get_doc_vectors_from_ids(self,
-                  index_name: str,
-                  documents: Union[List[str], Dict[str, float]],
-                  tensor_fields: Optional[List[str]] = None,
-                  concurrency: Optional[int] = None) -> Dict[str, List[List[float]]]:
-        """
-        This method gets documents from Vespa using their IDs, removes any unnecessary data, checks for
-        lack of vectors, then returns a list of document vectors. Can be used internally (in recommend)
-        or externally (in the search module).
-
-        Args:
-            index_name: Name of the index to search
-            documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
-            tensor_fields: List of tensor fields to use for recommendation (can include text, image, audio, and video fields)
-            concurrency: Max number of concurrent requests to use when fetching documents by batch
-
-        Returns:
-            A dictionary mapping document IDs to lists of vector embeddings. This is flattened to 1 list per document
-                ID (not separated by tensor field). Order of embeddings is not guaranteed.
-        """
-
-        # TODO - Extract search and get_docs from tensor_search and refactor this
-        from marqo import config
-        from marqo.tensor_search import tensor_search, index_meta_cache
-
-        if documents is None or len(documents) == 0:
-            raise InvalidArgumentError('No document IDs provided')
-
-        # Check for duplicate document IDs when documents is a list
-        if isinstance(documents, list):
-            unique_docs = set(documents)
-            if len(unique_docs) != len(documents):
-                duplicates = [doc for doc in unique_docs if documents.count(doc) > 1]
-                raise InvalidArgumentError(f'Duplicate document IDs found: {", ".join(duplicates)}')
-
-        # remove docs with zero weight
-        original_documents = documents
-        if isinstance(documents, dict):
-            documents = {k: v for k, v in documents.items() if v != 0}
-            document_ids = list(documents.keys())
-            all_document_ids = list(original_documents.keys())
-        else:
-            document_ids = documents
-            all_document_ids = original_documents
-
-        # Validate all IDS
-        document_ids = [validation.validate_id(id) for id in document_ids]
-
-        if len(documents) == 0:
-            raise InvalidArgumentError('No documents with non-zero weight provided')
-
-        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        if marqo_index.type == IndexType.Structured:
-            # Validate tensor field names
-            if tensor_fields is not None:
-                valid_tensor_fields = marqo_index.tensor_field_map.keys()
-                for tensor_field in tensor_fields:
-                    if tensor_field not in valid_tensor_fields:
-                        raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
-                                                    f'Available tensor fields: {", ".join(valid_tensor_fields)}')
-
-        # Use the new optimized method to get only embeddings
-        doc_embeddings_by_field = tensor_search.get_doc_vectors_per_tensor_field_by_ids(
-            config.Config(self.vespa_client, inference=self.inference),
-            index_name, 
-            document_ids, 
-            tensor_fields=tensor_fields,
-            concurrency=concurrency
-        )
-
-        # Check that all documents were found
-        not_found = []
-        for doc_id in document_ids:
-            if doc_id not in doc_embeddings_by_field:
-                not_found.append(doc_id)
-
-        if len(not_found) > 0:
-            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
-
-        # Flatten the embeddings structure to match the expected return format
-        # Convert from Dict[doc_id, Dict[field_name, List[List[float]]]] 
-        # to Dict[doc_id, List[List[float]]]
-        doc_vectors: Dict[str, List[List[float]]] = {}
-        docs_without_vectors = []
-        
-        for doc_id, field_embeddings in doc_embeddings_by_field.items():
-            vectors: List[List[float]] = []
-            
-            # Flatten all embeddings from all fields for this document
-            for field_name, embedding_list in field_embeddings.items():
-                # For legacy unstructured indices, field_name will be "marqo__embeddings"
-                # and we should include all embeddings regardless of tensor_fields filter
-                # since all embeddings are stored together in marqo__embeddings
-                if (tensor_fields is None or 
-                    field_name in tensor_fields or
-                    (marqo_index.type == IndexType.Unstructured and
-                     field_name == unstructured_common.VESPA_DOC_EMBEDDINGS)):
-                    vectors.extend(embedding_list)
-            
-            doc_vectors[doc_id] = vectors
-
-            if len(vectors) == 0:
-                docs_without_vectors.append(doc_id)
-
-        if len(docs_without_vectors) > 0:
-            raise InvalidArgumentError(
-                f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
-            )
-
-        return doc_vectors
-
 
     def recommend(self,
                   index_name: str,
@@ -177,31 +62,78 @@ class Recommender:
             score_modifiers: Score modifiers to apply
             rerank_depth: Rerank depth
         """
+        # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
         from marqo import config
-        from marqo.tensor_search import tensor_search, index_meta_cache
+        from marqo.tensor_search import tensor_search
+        from marqo.tensor_search import index_meta_cache
 
-        t0 = timer()
+        if documents is None or len(documents) == 0:
+            raise InvalidArgumentError('No document IDs provided')
+
+        # remove docs with zero weight
+        original_documents = documents
+        if isinstance(documents, dict):
+            documents = {k: v for k, v in documents.items() if v != 0}
+            document_ids = list(documents.keys())
+            all_document_ids = list(original_documents.keys())
+        else:
+            document_ids = documents
+            all_document_ids = original_documents
+
+        if len(documents) == 0:
+            raise InvalidArgumentError('No documents with non-zero weight provided')
 
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
         if interpolation_method is None:
-            interpolation_method = self.get_default_interpolation_method(marqo_index, documents)
+            interpolation_method = self._get_default_interpolation_method(marqo_index)
 
         vector_interpolation = from_interpolation_method(interpolation_method)
 
-        # Get document vectors using the helper method
-        doc_vectors = self.get_doc_vectors_from_ids(
-            index_name=index_name,
-            documents=documents,
-            tensor_fields=tensor_fields
-        )
+        if marqo_index.type == IndexType.Structured:
+            # Validate tensor field names
+            if tensor_fields is not None:
+                valid_tensor_fields = marqo_index.tensor_field_map.keys()
+                for tensor_field in tensor_fields:
+                    if tensor_field not in valid_tensor_fields:
+                        raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
+                                                    f'Available tensor fields: {", ".join(valid_tensor_fields)}')
 
-        # Save original document IDs for filtering
-        if isinstance(documents, dict):
-            all_document_ids = list(documents.keys())
-        else:
-            all_document_ids = documents
+        t0 = timer()
+
+        marqo_documents = tensor_search.get_documents_by_ids(
+            config.Config(self.vespa_client, inference=self.inference),
+            index_name, document_ids, show_vectors=True
+        ).dict(exclude_none=True, by_alias=True)
+
+        # Make sure all documents were found
+        not_found = []
+        for document in marqo_documents['results']:
+            if not document['_found']:
+                not_found.append(document['_id'])
+
+        if len(not_found) > 0:
+            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
+
+        doc_vectors: Dict[str, List[List[float]]] = {}
+        docs_without_vectors = []
+        for document in marqo_documents['results']:
+            vectors: List[List[float]] = []
+            for tensor_facet in document['_tensor_facets']:
+                field = list(tensor_facet.keys())[0]
+                if tensor_fields is None or field in tensor_fields:
+                    vectors.append(tensor_facet['_embedding'])
+
+            doc_vectors[document['_id']] = vectors
+
+            if len(vectors) == 0:
+                docs_without_vectors.append(document['_id'])
+
+        if len(docs_without_vectors) > 0:
+            raise InvalidArgumentError(
+                f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
+            )
 
         vectors: List[List[float]] = []
         weights: List[float] = []
@@ -218,11 +150,19 @@ class Recommender:
             interpolated_vector = vector_interpolation.interpolate(
                 vectors, weights
             )
-        except AllZeroWeightsError as e:
-            raise InvalidArgumentError(
-                f'Cannot interpolate vectors with all zero weights. '
-                'Please ensure at least one weight is non-zero.'
-            )
+        except ZeroSumWeightsError as e:
+            if interpolation_method == InterpolationMethod.SLERP:
+                raise InvalidArgumentError(
+                    'Sum of one or more consecutive weights is zero. '
+                    'SLERP cannot interpolate vectors with zero sum of weights. Such weight pairs are prone to causing '
+                    'this error depending on document embeddings, and should be avoided',
+                    cause=e
+                ) from e
+            else:  # lerp or nlerp
+                raise InvalidArgumentError(
+                    'Sum of weights is zero. LERP/NLERP requires non-zero sum of weights',
+                    cause=e
+                ) from e
         except ZeroMagnitudeVectorError as e:
             if interpolation_method == InterpolationMethod.NLERP:
                 raise InvalidArgumentError(
@@ -235,7 +175,7 @@ class Recommender:
 
         if exclude_input_documents:
             # Make sure to include zero-weight documents in this filter
-            recommend_filter = self.get_exclusion_filter(marqo_index, all_document_ids, filter)
+            recommend_filter = self._get_exclusion_filter(marqo_index, all_document_ids, filter)
         else:
             recommend_filter = filter
 
@@ -261,25 +201,13 @@ class Recommender:
 
         return results
 
-    def get_default_interpolation_method(self, marqo_index: MarqoIndex,
-                                         context_documents: Union[List[str], Dict[str, float]]) -> InterpolationMethod:
-        """
-        Returns the default interpolation method based on the index configuration and whether context documents
-        exist. For recommend endpoint, context documents always exist.
-
-        For indexes that normalize embeddings, SLERP is used if context documents are provided, NLERP is used
-        otherwise (None).
-        """
+    def _get_default_interpolation_method(self, marqo_index: MarqoIndex) -> InterpolationMethod:
         if marqo_index.normalize_embeddings:
-            if context_documents is not None:
-                return InterpolationMethod.SLERP
-            else:
-                # NLERP is used to preserve existing search behavior with no context docs.
-                return InterpolationMethod.NLERP
+            return InterpolationMethod.SLERP
         else:
             return InterpolationMethod.LERP
 
-    def get_exclusion_filter(self, marqo_index: MarqoIndex, documents: List[str], user_filter: Optional[str]) -> str:
+    def _get_exclusion_filter(self, marqo_index: MarqoIndex, documents: List[str], user_filter: Optional[str]) -> str:
         if marqo_index.type == IndexType.Structured:
             not_in = 'NOT _id IN (' + ', '.join([f'{doc}' for doc in documents]) + ')'
         else:
