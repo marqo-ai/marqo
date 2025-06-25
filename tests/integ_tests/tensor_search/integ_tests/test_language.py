@@ -8,7 +8,7 @@ import os
 import uuid
 from unittest import mock
 
-from marqo.core.exceptions import UnsupportedFeatureError
+from marqo.core.exceptions import UnsupportedFeatureError, AddDocumentsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, FieldType, FieldFeature
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -101,6 +101,22 @@ class TestLanguage(MarqoTestCase):
             tensor_fields=["title", "content"]
         )
         index_requests.append(cls.structured_index)
+
+        # 2.16 unstructured index -- must support language
+        cls.v216_unstructured_index = cls.unstructured_marqo_index_request(
+            name='test_v216_unstructured_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2'),
+            marqo_version='2.16.0',
+        )
+        index_requests.append(cls.v216_unstructured_index)
+
+        # 2.15 unstructured index -- must not support language
+        cls.v215_unstructured_index = cls.unstructured_marqo_index_request(
+            name='test_v215_unstructured_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2'),
+            marqo_version='2.15.0',
+        )
+        index_requests.append(cls.v215_unstructured_index)
 
         # Batch create all indexes
         cls.indexes = cls.create_indexes(index_requests)
@@ -601,3 +617,86 @@ class TestLanguage(MarqoTestCase):
 
                 # Verify we get an appropriate error
                 self.assertIn("language", str(cm.exception).lower())
+
+    def test_v216_unstructured_index_supports_language_mapping(self):
+        """Test that v2.16 unstructured index supports language mapping."""
+        docs = [
+            {"_id": "v216_doc1", "title": "Corriendo en el parque hermoso", "content": "El atleta corre rápidamente"},
+            {"_id": "v216_doc2", "title": "Nadando en el océano", "content": "Nadar es excelente ejercicio"},
+            {"_id": "v216_doc3", "title": "Leyendo libros interesantes",
+             "content": "Los libros proporcionan conocimiento"}
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "language": "es"},
+            "content": {"type": "text_field", "language": "es"}
+        }
+
+        # Add documents with language mapping
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.v216_unstructured_index.name,
+                docs=docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+
+        # Verify documents were added successfully
+        self.assertFalse(response.errors, "Failed to add documents with language mapping to v2.16 index")
+
+        # Test search with language parameter
+        result = tensor_search.search(
+            config=self.config,
+            index_name=self.v216_unstructured_index.name,
+            text="Corriendo",
+            search_method=SearchMethod.LEXICAL,
+            language="es"
+        )
+
+        # Verify we get hits
+        self.assertGreater(len(result["hits"]), 0, "Expected hits for Spanish search on v2.16 index")
+        hit_ids = [hit["_id"] for hit in result["hits"]]
+        self.assertIn("v216_doc1", hit_ids, "Expected v216_doc1 in search results")
+
+    def test_v215_unstructured_index_rejects_language_mapping(self):
+        """Test that v2.15 unstructured index rejects language mapping."""
+        docs = [
+            {"_id": "v215_doc1", "title": "Corriendo en el parque hermoso", "content": "El atleta corre rápidamente"},
+            {"_id": "v215_doc2", "title": "Nadando en el océano", "content": "Nadar es excelente ejercicio"}
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "language": "es"},
+            "content": {"type": "text_field", "language": "es"}
+        }
+
+        # Try to add documents with language mapping - this should fail
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.v215_unstructured_index.name,
+                docs=docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+
+        # Verify that adding documents with language mapping fails
+        self.assertTrue(
+            response.errors,
+            "Expected error when adding documents with language mapping to v2.15 index"
+        )
+
+        # Check the specific error message content in the response items
+        error_items = [item for item in response.items if item.error]
+        self.assertEqual(2, len(error_items), "Expected two errors items in response")
+
+        # Verify all items have the language version error
+        for error_item in error_items:
+            self.assertIn(
+                "Language is only supported for indexes created with Marqo version 2.16.0 or later",
+                error_item.error
+            )
+            self.assertIn("2.15.0", error_item.error)
