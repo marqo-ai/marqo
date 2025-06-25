@@ -1,6 +1,5 @@
 import functools
 import os
-import sys
 import unittest
 from unittest.mock import patch, Mock, AsyncMock
 
@@ -512,9 +511,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         
         # Verify connection limits are set correctly
         self.assertEqual(client.async_transport._pool._max_keepalive_connections, async_pool_size)
-        # When max_connections=None is passed to httpx, it gets converted to sys.maxsize
-
-        self.assertEqual(client.async_transport._pool._max_connections, sys.maxsize)
+        self.assertEqual(client.async_transport._pool._max_connections, async_pool_size)
         
         # Verify HTTP settings
         self.assertTrue(client.async_transport._pool._http1)
@@ -638,8 +635,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             
             # Verify default async_pool_size is used
             self.assertEqual(client.async_transport._pool._max_keepalive_connections, 10)
-            # When max_connections=None is passed to httpx, it gets converted to sys.maxsize
-            self.assertEqual(client.async_transport._pool._max_connections, sys.maxsize)
+            self.assertEqual(client.async_transport._pool._max_connections, 10)
             client.close()
         
         # Test 2: Set environment variable to custom value
@@ -652,8 +648,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 
                 # Verify the custom async_pool_size is used
                 self.assertEqual(vespa_client.async_transport._pool._max_keepalive_connections, 25)
-                # When max_connections=None is passed to httpx, it gets converted to sys.maxsize
-                self.assertEqual(vespa_client.async_transport._pool._max_connections, sys.maxsize)
+                self.assertEqual(vespa_client.async_transport._pool._max_connections, 25)
                 
                 vespa_client.close()
 
