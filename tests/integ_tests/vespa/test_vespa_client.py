@@ -1,16 +1,19 @@
 import functools
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock, AsyncMock
 
 import httpcore
 import httpx
 import pytest
 import vespa.application as pyvespa
 
+from marqo.tensor_search.api import generate_config
+from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import concurrency
 from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError
 from marqo.vespa.models import VespaDocument, QueryResult
+from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
 from tests.integ_tests.marqo_test import AsyncMarqoTestCase
@@ -490,3 +493,213 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         with self.assertRaises(VespaError) as e:
             vespa_client.wait_for_application_convergence(timeout=2)
         self.assertIn("Vespa application did not converge",str(e.exception))
+
+    def test_async_transport_initialization_and_closure(self):
+        """Test that async_transport is initialized once with correct connection limits and closed properly"""
+        async_pool_size = 15
+        client = VespaClient(
+            "http://localhost:19071", 
+            "http://localhost:8080",
+            "http://localhost:8080", 
+            "content_default",
+            async_pool_size=async_pool_size
+        )
+        
+        # Verify async_transport is initialized
+        self.assertIsNotNone(client.async_transport)
+        self.assertIsInstance(client.async_transport, httpx.AsyncHTTPTransport)
+        
+        # Verify connection limits are set correctly
+        self.assertEqual(client.async_transport._pool._max_keepalive_connections, async_pool_size)
+        self.assertEqual(client.async_transport._pool._max_connections, async_pool_size)
+        
+        # Verify HTTP settings
+        self.assertTrue(client.async_transport._pool._http1)
+        self.assertFalse(client.async_transport._pool._http2)
+        
+        # Test that close() calls aclose() on the transport
+        with patch.object(client.async_transport, 'aclose') as mock_aclose:
+            client.close()
+            mock_aclose.assert_called_once()
+
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_uses_persistent_transport(self, mock_async_client_class):
+        """Test that get_batch uses the persistent async_transport, not creating new ones"""
+        # Create a proper mock for the async client and response
+        mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
+        
+        # Mock the response object
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
+            'id': 'test::doc1',
+            'fields': {'title': 'Test'}
+        }
+        
+        # Make the async client's get method return the mock response
+        mock_async_client.get.return_value = mock_response
+        
+        # Feed a document first to ensure the schema exists
+        test_doc = VespaDocument(id="doc1", fields={"title": "Test Title"})
+        self.client.feed_document(test_doc, self.TEST_SCHEMA)
+        
+        # Call get_batch
+        self.client.get_batch(['doc1'], self.TEST_SCHEMA)
+        
+        # Verify AsyncClient was created with the persistent transport
+        mock_async_client_class.assert_called_once()
+        call_args = mock_async_client_class.call_args
+        self.assertEqual(call_args.kwargs['transport'], self.client.async_transport)
+
+    @patch('marqo.vespa.vespa_client.asyncio.Semaphore')
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_semaphore_uses_concurrency_parameter(self, mock_async_client_class, mock_semaphore_class):
+        """Test that get_batch creates semaphore with concurrency parameter, not async_pool_size"""
+        # Create a proper mock for the async client and response
+        mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
+        
+        # Mock the response object
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
+            'id': 'test::doc1',
+            'fields': {'title': 'Test'}
+        }
+        
+        # Make the async client's get method return the mock response
+        mock_async_client.get.return_value = mock_response
+        
+        # Create client with different async_pool_size and get_batch_concurrency_limit
+        async_pool_size = 20
+        concurrency_limit = 5
+        client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080", 
+            "http://localhost:8080",
+            "content_default",
+            async_pool_size=async_pool_size,
+            get_batch_concurrency_limit=concurrency_limit
+        )
+        
+        # Test 1: Use default concurrency (should use get_batch_concurrency_limit)
+        client.get_batch(['doc1'], self.TEST_SCHEMA)
+        mock_semaphore_class.assert_called_with(concurrency_limit)
+        
+        # Test 2: Use explicit concurrency parameter
+        custom_concurrency = 8
+        mock_semaphore_class.reset_mock()
+        client.get_batch(['doc1'], self.TEST_SCHEMA, concurrency=custom_concurrency)
+        mock_semaphore_class.assert_called_with(custom_concurrency)
+        
+        # Verify the semaphore value is NOT the async_pool_size
+        # (this ensures concurrency is independent of transport connection limits)
+        for call in mock_semaphore_class.call_args_list:
+            self.assertNotEqual(call[0][0], async_pool_size)
+        
+        client.close()
+
+    def test_vespa_client_close_calls_async_transport_aclose(self):
+        """Test that VespaClient.close() calls async_transport.aclose()"""
+        # Create a VespaClient with correct parameters
+        client = VespaClient(
+            config_url="http://localhost:19071",
+            document_url="http://localhost:8080",
+            query_url="http://localhost:8080",
+            content_cluster_name="test_cluster",
+            async_pool_size=10,
+            get_batch_concurrency_limit=5
+        )
+        
+        # Mock the async_transport.aclose method
+        client.async_transport.aclose = AsyncMock()
+        
+        # Call close method
+        client.close()
+        
+        # Verify that async_transport.aclose was called
+        client.async_transport.aclose.assert_called_once()
+
+    def test_vespa_async_pool_size_env_var(self):
+        """Test that VESPA_ASYNC_POOL_SIZE environment variable properly creates async_transport with correct connection size"""
+        
+        # Test 1: Default value (should be 10)
+        with self.subTest("default_async_pool_size"):
+            client = VespaClient(
+                "http://localhost:19071",
+                "http://localhost:8080",
+                "http://localhost:8080",
+                "content_default"
+            )
+            
+            # Verify default async_pool_size is used
+            self.assertEqual(client.async_transport._pool._max_keepalive_connections, 10)
+            self.assertEqual(client.async_transport._pool._max_connections, 10)
+            client.close()
+        
+        # Test 2: Set environment variable to custom value
+        with self.subTest("custom_async_pool_size"):
+            with patch.dict(os.environ, {EnvVars.VESPA_ASYNC_POOL_SIZE: "25"}):
+                # Import and call generate_config to create VespaClient with env var
+                
+                config = generate_config()
+                vespa_client = config.vespa_client
+                
+                # Verify the custom async_pool_size is used
+                self.assertEqual(vespa_client.async_transport._pool._max_keepalive_connections, 25)
+                self.assertEqual(vespa_client.async_transport._pool._max_connections, 25)
+                
+                vespa_client.close()
+
+    def test_marqo_concurrency_limit_per_get_request_env_var(self):
+        """Test that MARQO_CONCURRENCY_LIMIT_PER_GET_REQUEST sets get_batch_concurrency_limit and controls get_batch concurrency"""
+        
+        # Test 1: Default value (should be 10)
+        with self.subTest("default_concurrency_limit"):
+            
+            config = generate_config()
+            vespa_client = config.vespa_client
+            
+            # Verify default get_batch_concurrency_limit is set
+            self.assertEqual(vespa_client.get_batch_concurrency_limit, 10)
+            vespa_client.close()
+        
+        # Test 2: Verify get_batch uses the concurrency limit by default
+        with self.subTest("get_batch_uses_concurrency_limit"):
+            with patch.dict(os.environ, {EnvVars.MARQO_CONCURRENCY_LIMIT_PER_GET_REQUEST: "12"}):
+                
+                config = generate_config()
+                vespa_client = config.vespa_client
+
+                # Verify the custom get_batch_concurrency_limit is set
+                self.assertEqual(vespa_client.get_batch_concurrency_limit, 12)
+
+                # Mock _get_batch_async to capture the concurrency parameter
+                captured_concurrency = []
+                
+                async def mock_get_batch_async(ids, fields, schema, connections, timeout):
+                    captured_concurrency.append(connections)
+                    # Return a minimal valid response to avoid errors
+                    return GetBatchResponse(
+                        errors=False,
+                        responses=[
+                            GetBatchDocumentResponse(
+                                status=200,
+                                pathId=f"/document/v1/{schema}/{schema}/docid/{doc_id}",
+                                id=f"test::{doc_id}",
+                                message=None,
+                                document=Document(id=f"test::{doc_id}", fields={"title": "Test"})
+                            ) for doc_id in ids
+                        ]
+                    )
+                
+                with patch.object(vespa_client, '_get_batch_async', side_effect=mock_get_batch_async):
+                    # Call get_batch without explicit concurrency (should use default)
+                    vespa_client.get_batch(['doc1'], self.TEST_SCHEMA)
+                    
+                    # Verify _get_batch_async was called with the env var value
+                    self.assertEqual(len(captured_concurrency), 1)
+                    self.assertEqual(captured_concurrency[0], 12)
+                
+                vespa_client.close()

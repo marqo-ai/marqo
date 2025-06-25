@@ -13,11 +13,12 @@ from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
@@ -63,6 +64,7 @@ class SearchQuery(BaseMarqoModel):
     language: Optional[str] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
+    interpolationMethod: Optional[InterpolationMethod] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -323,6 +325,10 @@ class SearchQuery(BaseMarqoModel):
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
 
+    def get_context_documents(self) -> Optional[SearchContextDocuments]:
+        """Extract the documents from the context, if provided"""
+        return self.context.documents if self.context is not None else None
+    
     @root_validator(pre=False)
     def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
         """Validate that relevance cutoff is only provided for hybrid search"""
@@ -349,9 +355,9 @@ class SearchQuery(BaseMarqoModel):
         sort_by = values.get('sort_by')
         score_modifiers = values.get('scoreModifiers')
         if sort_by is not None and score_modifiers is not None:
-            raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in"
+            raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in "
                              "the same rerank phase. "
-                             "Please use sortBy only for sorting by fields and scoreModifiers only for modifying scores")
+                             "Please use sortBy only for sorting by fields, and scoreModifiers only for modifying scores")
         return values
 
     @root_validator(pre=False)
