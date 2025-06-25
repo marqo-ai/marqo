@@ -82,7 +82,7 @@ class VespaClient:
         self.async_transport = httpx.AsyncHTTPTransport(
             limits=httpx.Limits(
                 max_keepalive_connections=async_pool_size,
-                max_connections=None),
+                max_connections=async_pool_size),
             http1=True,
             http2=False  # Using http2 is slightly slower
         )
