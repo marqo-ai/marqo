@@ -7,9 +7,12 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
-        # Common
+        EnvVars.MARQO_MODE: "COMBINED",  # one of COMBINED, API, INFERENCE
+
+        # Common config applicable for all modes
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_LOG_FORMAT: "plain",
+        EnvVars.MARQO_METRICS_EXPORT_INTERVAL: 30,
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
