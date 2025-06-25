@@ -392,6 +392,88 @@ class TestLanguage(MarqoTestCase):
         hits_ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(['3', '2', '1'], hits_ids)
 
+    def test_lexical_hybrid_searchable_attributes(self):
+        """Test lexical and hybrid lexical/lexical search with searchable_attributes and hybridParameters.searchableAttributesLexical."""
+
+        # French documents from test_language_add_docs_and_search
+        french_docs = [
+            {"_id": "fr1", "title": "Courant dans le parc magnifique", "content": "L'athlète court rapidement"},
+            {"_id": "fr2", "title": "Nageant dans l'océan", "content": "La natation est un excellent exercice"},
+            {"_id": "fr3", "title": "Lisant des livres intéressants",
+             "content": "Les livres fournissent des connaissances"}
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "language": "fr"},
+            "content": {"type": "text_field", "language": "fr"}
+        }
+
+        # Add documents to French index
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.fr_index.name,
+                docs=french_docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+        self.assertFalse(response.errors, "Failed to add French documents")
+
+        # Test cases for searchable_attributes and hybridParameters.searchableAttributesLexical
+        test_cases = [
+            {
+                "name": "title_only",
+                "searchable_attributes": ["title"],
+                "hybrid_searchable_attributes": ["title"],
+                "query": "Courant",
+                "expected_ids": ["fr1"],
+                "description": "Search for 'Courant' only in title field"
+            },
+            {
+                "name": "content_only",
+                "searchable_attributes": ["content"],
+                "hybrid_searchable_attributes": ["content"],
+                "query": "rapidement",
+                "expected_ids": ["fr1"],
+                "description": "Search for 'rapidement' only in content field"
+            }
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case["name"]):
+                # Test lexical search with searchable_attributes
+                with self.subTest(search_method="lexical"):
+                    result = tensor_search.search(
+                        config=self.config,
+                        index_name=self.fr_index.name,
+                        text=case["query"],
+                        search_method=SearchMethod.LEXICAL,
+                        searchable_attributes=case["searchable_attributes"],
+                        language="fr"
+                    )
+
+                    hit_ids = [hit["_id"] for hit in result["hits"]]
+                    self.assertEqual(hit_ids, case["expected_ids"])
+
+                # Test hybrid lexical/lexical search with hybridParameters.searchableAttributesLexical
+                with self.subTest(search_method="hybrid_lexical_lexical"):
+                    result = tensor_search.search(
+                        config=self.config,
+                        index_name=self.fr_index.name,
+                        text=case["query"],
+                        search_method=SearchMethod.HYBRID,
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical,
+                            searchableAttributesLexical=case["hybrid_searchable_attributes"]
+                        ),
+                        language="fr"
+                    )
+
+                    hit_ids = [hit["_id"] for hit in result["hits"]]
+                    self.assertEqual(hit_ids, case["expected_ids"])
+
     def test_language_change_scenarios(self):
         """Test different language change scenarios."""
 
