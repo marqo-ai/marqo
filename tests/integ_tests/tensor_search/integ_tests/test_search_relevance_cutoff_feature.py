@@ -192,7 +192,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             }
         ).body.decode('utf-8'))
 
-        if relevance_cutoff:
+        if relevance_cutoff and query == "machine learning artificial intelligence algorithms":
             if result["_probeCandidates"] != cls.PROBE_CANDIDATES:
                 raise RuntimeError(
                     f"Expected 25 probe candidates, but got {result['_probeCandidates']}."
@@ -925,9 +925,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         higher because the _sortCandidates is a fusion of both lexical and tensor search results using retrieval
         size 10(_relevanceCandidates).
 
-        In this case, the first two pages should provide consistent results without any overlap. Starting from
-        the third page, you may see overlap as the _relevanceCandidates are not enough to fill the third page,
-        and we have to make the retrieval candidates as `limit + offset`.
+        In this case, the first two pages (with limit=4) should return 4 results each, and the third page only returns
+        3 results because there are only 11 sort candidates in total. The fourth page should return no results.
         """
         # Test with limit and offset
         page_1_results = self._search_helper(
@@ -960,15 +959,77 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         page_2_sort_candidates = page_2_results["_sortCandidates"]
         self.assertEqual(11, page_2_sort_candidates)
 
+
+        page_3_results = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.5}
+            },
+            limit=4,
+            offset= 8
+        )
+
+        self.assertEqual(11, page_3_results["_sortCandidates"])
+        self.assertEqual(10, page_3_results["_relevanceCandidates"])
+        self.assertEqual(3, len(page_3_results["hits"]))
+
+
         # We should see a consistent sort value order in both pages
         page_1_sort_values = [hit["sort_value"] for hit in page_1_results["hits"]]
         page_2_sort_values = [hit["sort_value"] for hit in page_2_results["hits"]]
+        page_3_sort_values = [hit["sort_value"] for hit in page_3_results["hits"]]
 
         self.assertEqual(page_1_sort_values, sorted(page_1_sort_values, reverse=True),
                          "Page 1 results should be sorted descending by sort_value")
         self.assertEqual(page_2_sort_values, sorted(page_2_sort_values, reverse=True))
+        self.assertEqual(page_3_sort_values, sorted(page_3_sort_values, reverse=True))
         self.assertEqual(
-            page_1_sort_values + page_2_sort_values,
-            sorted(page_1_sort_values + page_2_sort_values, reverse=True),
+            page_1_sort_values + page_2_sort_values + page_3_sort_values,
+            sorted(page_1_sort_values + page_2_sort_values + page_3_sort_values, reverse=True),
             "Combined pages should maintain overall descending sort order"
+        )
+
+        page_4_results = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.5}
+            },
+            limit=4,
+            offset=12
+        )
+
+        self.assertEqual(0, len(page_4_results["hits"]))
+
+    def test_relevance_cutoff_blocks_irrelevant_docs(self):
+        """Test that relevance cutoff effectively blocks irrelevant documents."""
+        # This test ensures that the relevance cutoff is working as expected
+        relevance_cutoff_result = self._search_helper(
+            query="Marqo is a search engine",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5},
+            },
+            limit=10
+        )
+        self.assertEqual(1, relevance_cutoff_result["_probeCandidates"])
+        self.assertEqual(1, relevance_cutoff_result["_relevanceCandidates"])
+        self.assertEqual(1, len(relevance_cutoff_result["hits"]))
+
+        regular_result = self._search_helper(
+            query="Marqo is a search engine",
+            limit=10
+        )
+
+        self.assertEqual(10, len(regular_result["hits"]))
+
+        self.assertEqual(
+            relevance_cutoff_result["hits"][0]["_id"],
+            regular_result["hits"][0]["_id"],
+            "Relevance cutoff should block irrelevant documents, keeping only the most relevant one."
         )
