@@ -283,8 +283,7 @@ class SortByTest {
                 .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
         doAnswer(inv -> inv.getArgument(0))
                 .when(spy)
-                .createSubQuery(
-                        any(Query.class), anyString(), anyString(), anyBoolean(), anyBoolean());
+                .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
 
         // 3) Stub extractTensorRankFeature to return:
         //    • null for "mult_weights_global" or "add_weights_global"
@@ -339,7 +338,7 @@ class SortByTest {
         HybridSearcher spy = spy(new HybridSearcher());
         doAnswer(inv -> inv.getArgument(0))
                 .when(spy)
-                .createSubQuery(any(), anyString(), anyString(), anyBoolean(), anyBoolean());
+                .createSubQuery(any(), anyString(), anyString(), anyBoolean());
         // simulate "has a global mult modifier" but no sortBy
         Tensor dummy = Tensor.from("tensor<float>(d0[1]):[1]");
         doReturn(dummy).when(spy).extractTensorRankFeature(any(), contains("mult_weights_global"));

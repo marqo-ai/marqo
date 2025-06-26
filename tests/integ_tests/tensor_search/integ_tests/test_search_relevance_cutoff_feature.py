@@ -292,12 +292,11 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         """Test that relevance cutoff works correctly with sorting.
 
         This is an example to show that without relevance cutoff, the results are sorted by sort_value in descending order
-        which leads low relevance documents to be at the top of the results, e.g., l4, m1, l1.
+        which leads low relevance documents to be at the top of the results, e.g., l4, l7, m1, l1, l9. These results
+        are possibly retrieved by the tensor search part of the hybrid search and further sorted by sort_value.
 
         In production, we wouldn't want to see these documents at the top of the results,
         so we would use relevance cutoff to filter them out.
-
-        Note that irrelevant documents (l6-l10) are not included in the results as they do not match the query.
         """
         result = self._search_helper(
             sort_by={
@@ -306,13 +305,10 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             limit=10
         )
         ids = [hit["_id"] for hit in result["hits"]]
-        expected_ids = [
-            "l4", "m1", "l1", "l5", "h4",
-            "h2", "h8", "h6", "h10", "h1"
-        ]
+        expected_ids = ['l4', 'l7', 'm1', 'l1', 'l5', 'l9', 'h4', 'h2', 'h8', 'h6']
         self.assertEqual(expected_ids, ids)
         # Check that the sort candidates are correct.
-        self.assertEqual(25, result["_sortCandidates"])
+        self.assertEqual(30, result["_sortCandidates"])
 
     def test_sort_results_with_relevance_cut_off_with_low_threshold(self):
         """A test to show that low relevance threshold does not chang the results."""
