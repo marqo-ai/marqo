@@ -99,6 +99,7 @@ public class HybridSearcher extends Searcher {
 
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
+    private static final Pattern TARGET_HITS_PATTERN = Pattern.compile("\\{\\s*targetHits\\s*:\\s*\\d+\\s*\\}");
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -184,7 +185,7 @@ public class HybridSearcher extends Searcher {
         // Execute probe lexical search for relevance cut-off if parameters are provided
         int relevanceCandidates = -1;
         int probeCandidates = -1;
-        boolean shouldOverwriteTargethits = false;
+        boolean shouldOverwriteTargetHits = false;
         if (relevanceCutoffMethod != null) {
             logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
             Query probeLexicalQuery =
@@ -197,9 +198,9 @@ public class HybridSearcher extends Searcher {
                             relevanceCutoffMethod,
                             relevanceCutoffParameter,
                             verbose);
-            query.setHits(Math.max(relevanceCandidates, limit + offset));
+            query.setHits(Math.min(relevanceCandidates, limit + offset));
             query.setOffset(0);
-            shouldOverwriteTargethits = true;
+            shouldOverwriteTargetHits = true;
         }
         // --- End relevance cut-off handling ---
 
@@ -217,7 +218,7 @@ public class HybridSearcher extends Searcher {
                 newLimit = Math.max(newLimit, limit + offset);
                 query.setHits(newLimit);
                 query.setOffset(0);
-                shouldOverwriteTargethits = true;
+                shouldOverwriteTargetHits = true;
             }
         }
 
@@ -230,14 +231,14 @@ public class HybridSearcher extends Searcher {
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             verbose,
-                            shouldOverwriteTargethits);
+                            shouldOverwriteTargetHits);
             Query queryTensor =
                     createSubQuery(
                             query,
                             MARQO_SEARCH_METHOD_TENSOR,
                             MARQO_SEARCH_METHOD_TENSOR,
                             verbose,
-                            shouldOverwriteTargethits);
+                            shouldOverwriteTargetHits);
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -285,7 +286,7 @@ public class HybridSearcher extends Searcher {
                                 retrievalMethod,
                                 rankingMethod,
                                 verbose,
-                                shouldOverwriteTargethits);
+                                shouldOverwriteTargetHits);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
@@ -807,15 +808,23 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private String overwriteTargethitsBasedOnHitsAndOffset(String yql, int hits, int offset) {
-        // Overwrite targethits in YQL based on hits and offset
-        if (yql.contains("targethits")) {
-            yql = yql.replaceAll("targethits:\\s*\\d+", "targethits:" + (hits + offset));
-        } else {
-            throw new RuntimeException(
-                    "YQL does not contain targethits clause, cannot overwrite it.");
+    private String overwriteTargetHitsBasedOnHitsAndOffset(String yql, int hits, int offset) {
+        // Validate input
+        int newTargetHits = hits + offset;
+        if (newTargetHits <= 0) {
+            throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
         }
-        return yql;
+        
+        // Use precompiled pattern for better performance
+        Matcher matcher = TARGET_HITS_PATTERN.matcher(yql);
+        
+        if (!matcher.find()) {
+            throw new RuntimeException(
+                    "YQL does not contain targetHits clause, cannot overwrite it.");
+        }
+        
+        // Replace only the first occurrence to be safe  
+        return matcher.replaceFirst("{targetHits:" + newTargetHits + "}");
     }
 
     public Query createSubQuery(
@@ -839,9 +848,9 @@ public class HybridSearcher extends Searcher {
             String retrievalMethod,
             String rankingMethod,
             boolean verbose,
-            boolean OverwriteTargethits) {
+            boolean OverwriteTargetHits) {
         return createSubQuery(
-                query, retrievalMethod, rankingMethod, verbose, "", OverwriteTargethits);
+                query, retrievalMethod, rankingMethod, verbose, "", OverwriteTargetHits);
     }
 
     /**
@@ -857,7 +866,7 @@ public class HybridSearcher extends Searcher {
      * @param rankingMethod
      * @param verbose
      * @param exactQuery
-     * @param overwriteTargethits
+     * @param overwriteTargetHits
      */
     Query createSubQuery(
             Query query,
@@ -865,7 +874,7 @@ public class HybridSearcher extends Searcher {
             String rankingMethod,
             boolean verbose,
             String exactQuery,
-            boolean overwriteTargethits) {
+            boolean overwriteTargetHits) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -881,9 +890,9 @@ public class HybridSearcher extends Searcher {
             yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
         }
 
-        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && overwriteTargethits) {
+        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && overwriteTargetHits) {
             yqlNew =
-                    overwriteTargethitsBasedOnHitsAndOffset(
+                    overwriteTargetHitsBasedOnHitsAndOffset(
                             yqlNew, query.getHits(), query.getOffset());
         }
 

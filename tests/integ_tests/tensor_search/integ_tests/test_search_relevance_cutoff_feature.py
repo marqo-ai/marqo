@@ -925,29 +925,16 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
     def test_sort_and_relevance_cutoff_pagination(self):
         """Test that sorting and relevance cutoff work correctly with pagination.
 
-        This test is carefully crafted with _relevanceCandidates=10. In this case, and limit=4, offset=0,4,8.
+        This test is carefully crafted with _relevanceCandidates=10, and _sortCandidates=11. The _sortCandidates is
+        higher because the _sortCandidates is a fusion of both lexical and tensor search results using retrieval
+        size 10(_relevanceCandidates).
 
         In this case, the first two pages should provide consistent results without any overlap. Starting from
         the third page, you may see overlap as the _relevanceCandidates are not enough to fill the third page,
         and we have to make the retrieval candidates as `limit + offset`.
         """
-        # # Test with limit and offset
-        # page_1_results = self._search_helper(
-        #     sort_by={
-        #         "fields": [{"field_name": "sort_value", "order": "desc"}]
-        #     },
-        #     relevance_cutoff={
-        #         "method": "mean_std_dev",
-        #         "parameters": {"stdDevFactor": 0.5}
-        #     },
-        #     limit=4,
-        #     offset=0
-        # )
-        #
-        # page_1_sort_candidates = page_1_results["_sortCandidates"]
-        # self.assertEqual(10, page_1_sort_candidates)
-
-        page_2_results = self._search_helper(
+        # Test with limit and offset
+        page_1_results = self._search_helper(
             sort_by={
                 "fields": [{"field_name": "sort_value", "order": "desc"}]
             },
@@ -959,19 +946,33 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             offset=0
         )
 
-        page_2_sort_candidates = page_2_results["_sortCandidates"]
-        print(page_2_results["_relevanceCandidates"])
-        # self.assertEqual(10, page_2_sort_candidates)
+        page_1_sort_candidates = page_1_results["_sortCandidates"]
+        self.assertEqual(11, page_1_sort_candidates)
 
-        # # We should see a consistent sort value order in both pages
-        # page_1_sort_values = [hit["sort_value"] for hit in page_1_results["hits"]]
-        # page_2_sort_values = [hit["sort_value"] for hit in page_2_results["hits"]]
-        #
-        # self.assertEqual(page_1_sort_values, sorted(page_1_sort_values, reverse=True),
-        #                  "Page 1 results should be sorted descending by sort_value")
-        # self.assertEqual(page_2_sort_values, sorted(page_2_sort_values, reverse=True))
-        # self.assertEqual(
-        #     page_1_sort_values + page_2_sort_values,
-        #     sorted(page_1_sort_values + page_2_sort_values, reverse=True),
-        #     "Combined pages should maintain overall descending sort order"
-        # )
+        page_2_results = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "desc"}]
+            },
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.5}
+            },
+            limit=4,
+            offset=4
+        )
+
+        page_2_sort_candidates = page_2_results["_sortCandidates"]
+        self.assertEqual(11, page_2_sort_candidates)
+
+        # We should see a consistent sort value order in both pages
+        page_1_sort_values = [hit["sort_value"] for hit in page_1_results["hits"]]
+        page_2_sort_values = [hit["sort_value"] for hit in page_2_results["hits"]]
+
+        self.assertEqual(page_1_sort_values, sorted(page_1_sort_values, reverse=True),
+                         "Page 1 results should be sorted descending by sort_value")
+        self.assertEqual(page_2_sort_values, sorted(page_2_sort_values, reverse=True))
+        self.assertEqual(
+            page_1_sort_values + page_2_sort_values,
+            sorted(page_1_sort_values + page_2_sort_values, reverse=True),
+            "Combined pages should maintain overall descending sort order"
+        )
