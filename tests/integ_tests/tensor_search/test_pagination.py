@@ -2,6 +2,7 @@ import math
 import os
 import random
 import string
+import time
 import unittest
 from unittest import mock
 import pytest
@@ -135,7 +136,6 @@ class TestPagination(MarqoTestCase):
                     text='my title',
                     result_count=400)
 
-                # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
                 for page_size in [100, 200]:
                     with self.subTest(f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
                         paginated_search_results = {"hits": []}
@@ -203,12 +203,14 @@ class TestPagination(MarqoTestCase):
                         text='my title',
                         result_count=num_docs)
 
-                    # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
-                    for page_size in [10, 100, 200]:
+                    for page_size in [5, 10, 100, 200]:
                         with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
                             paginated_search_results = {"hits": []}
 
                             for page_num in range(math.ceil(num_docs / page_size)):
+                                if retrieval_method == "disjunction":
+                                    # Pagination state does not save immediately, small delay to ensure state is saved
+                                    time.sleep(0.05)
                                 lim = page_size
                                 off = page_num * page_size
                                 page_res = tensor_search.search(
@@ -473,8 +475,7 @@ class TestPagination(MarqoTestCase):
                     # Compare paginated to full results (length only for now)
                     assert len(full_search_results["hits"]) == len(paginated_search_results["hits"])
 
-                    # TODO: re-add this assert when KNN inconsistency bug is fixed
-                    # assert full_search_results["hits"] == paginated_search_results["hits"]
+                    assert full_search_results["hits"] == paginated_search_results["hits"]
 
     @unittest.skip
     def test_pagination_break_limitations(self):
@@ -575,3 +576,56 @@ class TestPagination(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="extravagant",
             searchable_attributes=[], result_count=3, offset=1, search_method="LEXICAL")
         assert res["hits"] == []
+
+    def test_hybrid_rrf_pagination_pagination_results_are_unique(self):
+        num_docs = 400
+        batch_size = 100
+
+        for index in [self.index_structured, self.index_unstructured]:
+            # Create docs
+            static_title = "my title"
+            docs = []
+            for i in range(num_docs):
+                title =  static_title + " ".join(self.generate_unique_strings(i % batch_size)) # Doc has 0 to 99 unique words
+                doc = {"_id": str(i),
+                       "title": title,
+                       'desc': 'my description'}
+                docs.append(doc)
+
+            # Add them in batches
+            for j in range(0, num_docs, batch_size):
+                r = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(index_name=index.name,
+                                                  docs=docs[j:j + batch_size],
+                                                  device="cpu",
+                                                  tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
+                                                  else None)
+                ).dict(exclude_none=True, by_alias=True)
+                self.assertFalse(r['errors'], "Errors in add documents call")
+
+            for page_size in [5, 10, 100, 200]:
+                with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
+                    paginated_search_results_ids = set()
+
+                    for page_num in range(math.ceil(num_docs / page_size)):
+                        # Pagination state does not save immediately, small delay to ensure state is saved
+                        time.sleep(0.05)
+                        lim = page_size
+                        off = page_num * page_size
+                        page_res = tensor_search.search(
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(retrievalMethod="disjunction",
+                                                               rankingMethod="rrf",
+                                                               verbose=True),
+                            config=self.config,
+                            index_name=index.name,
+                            text='my title',
+                            result_count=lim, offset=off)
+
+                        for hit in page_res['hits']:
+                            # Ensure no duplicate IDs in paginated results
+                            if hit['_id'] in paginated_search_results_ids:
+                                raise AssertionError(f"Duplicate ID found in paginated results: {hit['_id']}")
+                        paginated_search_results_ids.update((hit['_id'] for hit in page_res['hits']))
+

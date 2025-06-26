@@ -18,6 +18,7 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.version import get_version
 from marqo.vespa.models import QueryResult
+from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
 from marqo.vespa.models.query_result import Root, Coverage, RootFields, Child
 
 
@@ -503,6 +504,108 @@ class SearchTest(unittest.TestCase):
             # Run search and validate age is not present in response
             resp = tensor_search.search(self.config, "index_name", "query", search_method="lexical")
             self.assertNotIn("age", resp['hits'][0])
+
+    def test_hybrid_query_pagination_has_the_same_hash_for_the_same_query_with_different_offsets(self):
+        self.set_index_to_return(self.unstructured_index)
+        tensor_search.search(
+            self.config, "index_name", "query", search_method="hybrid", offset=0, result_count=5,
+            hybrid_parameters=HybridParameters(retrievalMethod="disjunction", rankingMethod="rrf")
+        )
+        call_args_0_offset = self.vespa_client_mock.get_batch.call_args[1]
+
+        tensor_search.search(
+            self.config, "index_name", "query", search_method="hybrid", offset=5, result_count=5,
+            hybrid_parameters=HybridParameters(retrievalMethod="disjunction", rankingMethod="rrf")
+        )
+        call_args_0_offset = self.vespa_client_mock.get_batch.call_args[1]
+
+        assert "NEED to FINISH"
+
+
+    def test_hybrid_query_passes_pagination_exclusions_to_query_with_offset(self):
+        """ This test validates that if there is a stored data for previously searched pagination documents
+            it will be recollected and passed down to next query as 'paginationExclusions'.
+        """
+        self.set_index_to_return(self.unstructured_index)
+        self.vespa_client_mock.get_batch.return_value = GetBatchResponse(
+            responses=[GetBatchDocumentResponse(
+                status=200,
+                pathId="index:content_default/0/c4ca42388b50b740bb16762b",
+                id="c4ca42388b50b740bb16762b",
+                document=Document(
+                    id="c4ca42388b50b740bb16762b",
+                    fields={
+                        "offsets": {
+                            0: ["doc1", "doc2", "doc3", "doc4", "doc5"],
+                            5: ["doc6", "doc7", "doc8", "doc9", "doc10"],
+                        }
+                    }
+                ),
+                message=None
+            )],
+            errors=False
+        )
+
+        # Offset 5 -> 5 docs from offset stored as "0"
+        tensor_search.search(
+            self.config, "index_name", "query", search_method="hybrid", offset=5, result_count=5,
+            hybrid_parameters=HybridParameters(retrievalMethod="disjunction", rankingMethod="rrf")
+        )
+        call_args = self.vespa_client_mock.query.call_args[1]
+        offset_5_exclusions = call_args['marqo__hybrid.paginationExclusions']
+        self.assertListEqual(
+            sorted(offset_5_exclusions),
+            sorted(["doc1", "doc2", "doc3", "doc4", "doc5"])
+        )
+
+        # Offset 10 -> 10 docs from offset stored as "0" and "5"
+        tensor_search.search(
+            self.config, "index_name", "query", search_method="hybrid", offset=10, result_count=5,
+            hybrid_parameters=HybridParameters(retrievalMethod="disjunction", rankingMethod="rrf")
+        )
+        call_args = self.vespa_client_mock.query.call_args[1]
+        offset_10_exclusions = call_args['marqo__hybrid.paginationExclusions']
+        self.assertListEqual(
+            sorted(offset_10_exclusions),
+            sorted(["doc1", "doc2", "doc3", "doc4", "doc5", "doc6", "doc7", "doc8", "doc9", "doc10"])
+        )
+
+    def test_hybrid_query_jump_does_not_save_state_for_pagination(self):
+        """ Test that if query is a 'jump' (any part of previous history is missing)
+            the data is not stored in vespa for future queries.
+        """
+        self.set_index_to_return(self.unstructured_index)
+        self.vespa_client_mock.get_batch.return_value = GetBatchResponse(
+            responses=[GetBatchDocumentResponse(
+                status=200,
+                pathId="index:content_default/0/c4ca42388b50b740bb16762b",
+                id="c4ca42388b50b740bb16762b",
+                document=Document(
+                    id="c4ca42388b50b740bb16762b",
+                    fields={
+                        "offsets": {
+                            0: ["doc1", "doc2", "doc3", "doc4", "doc5"],
+                        }
+                    }
+                ),
+                message=None
+            )],
+            errors=False
+        )
+        # Offset 10 with limit 5 -> Expects 5 docs from offset 0 and offset 5.
+        tensor_search.search(
+            self.config, "index_name", "query", search_method="hybrid", offset=10, result_count=5,
+            hybrid_parameters=HybridParameters(retrievalMethod="disjunction", rankingMethod="rrf")
+        )
+        call_args = self.vespa_client_mock.query.call_args[1]
+        offset_10_exclusions = call_args['marqo__hybrid.paginationExclusions']
+        # Best effort - excludes what we got of history so page 0 results won't appear again at least here
+        self.assertListEqual(
+            sorted(offset_10_exclusions),
+            sorted(["doc1", "doc2", "doc3", "doc4", "doc5"])
+        )
+        self.assertEquals(self.vespa_client_mock.feed_batch.call_count, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

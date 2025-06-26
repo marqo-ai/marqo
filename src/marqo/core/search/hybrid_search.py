@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Union, Iterable, Dict
 
 from marqo.api import exceptions as api_exceptions
@@ -33,8 +34,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.vespa.models import VespaDocument
 from concurrent.futures import ThreadPoolExecutor
 
-pagination_executor = ThreadPoolExecutor(max_workers=16)
-
+pagination_executor = ThreadPoolExecutor(max_workers=os.environ.get("MARQO_PAGINATION_EXECUTOR_MAX_WORKERS", 10))
 
 
 class HybridSearch:

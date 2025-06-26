@@ -744,10 +744,13 @@ class VespaApplicationPackage:
         # Configure garbage collection for pagination documents
         documents_elem = self._service_xml._ensure_only_one('content/documents')
         documents_elem.set('garbage-collection', 'true')
-        documents_elem.set('garbage-collection-interval', '1800')
+        documents_elem.set(
+            'garbage-collection-interval',
+            os.environ.get('PAGINATION_GARBAGE_COLLECTION_INTERVAL', '1800')
+        )
         for doc in documents_elem.findall('document'):
             if doc.get('type') == 'marqo__pagination':
-                doc.set('selection', 'marqo__pagination.updated_at > now() - 1800')
+                doc.set('selection', f'marqo__pagination.updated_at > now() - {os.environ.get("PAGINATION_TTL", "1800")}')
 
     def _copy_components_jar(self) -> None:
         components_jar_file = 'marqo-custom-searchers-deploy.jar'

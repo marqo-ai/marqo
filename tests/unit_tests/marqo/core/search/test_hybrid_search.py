@@ -157,4 +157,43 @@ class TestHybridSearch(TestCase):
             self.assertIsNotNone(call_args['score_modifiers_tensor'])
             
             # Verify the search executed successfully
-            self.assertIsNotNone(result) 
+            self.assertIsNotNone(result)
+
+    def test_pagination_generates_unique_results(self):
+        """Test that pagination in HybridSearch generates unique results across multiple pages."""
+
+        # Setup mock index and search parameters
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.15.0")
+
+        hybrid_search = HybridSearch()
+
+        # Mock vespa index to return a fixed set of documents
+        mock_vespa_index = Mock(spec=SemiStructuredVespaIndex)
+        mock_vespa_index.to_vespa_query.return_value = {"query": "test"}
+        mock_vespa_index.gather_facets_from_response.return_value = {"facets": {"test_field": {}}}
+
+        # Simulate multiple pages of results
+        all_doc_ids = set()
+        for i in range(10):
+            # Mock the response to return unique documents for each page
+            mock_response = {
+                "hits": [{"_id": f"doc_{i * 10 + j}", "doc": {"field": f"value_{i * 10 + j}"}} for j in range(10)]
+            }
+            mock_vespa_index.query.return_value = mock_response
+
+            # Execute the search with pagination
+            result = hybrid_search.search(
+                config=Mock(),
+                marqo_index=marqo_index,
+                query="test query",
+                result_count=10,
+                offset=10 * i,
+                vespa_index=mock_vespa_index
+            )
+
+            # Collect all document IDs
+            all_doc_ids.update(hit['_id'] for hit in result['hits'])
+        # Verify all document IDs are unique
+        self.assertEqual(len(all_doc_ids), 100)

@@ -259,3 +259,57 @@ class TestMarqoHybridQuery(TestCase):
             "'searchableAttributes' cannot be used for hybrid search",
             str(context.exception)
         )
+
+    def test_marqo_hybrid_query_creates_the_same_hash_for_different_offset(self):
+        query_without_offset = MarqoHybridQuery(
+            index_name="test_index",
+            limit=60,
+            offset=0,
+            or_phrases=[""],
+            and_phrases=[""],
+            vector_query=None,
+            hybrid_parameters=HybridParameters(),
+        )
+
+        query_hash_before_offset = query_without_offset.get_query_hash_without_offset()
+
+        query_with_offset = MarqoHybridQuery(
+            index_name="test_index",
+            limit=60,
+            offset=60,
+            or_phrases=[""],
+            and_phrases=[""],
+            vector_query=None,
+            hybrid_parameters=HybridParameters(),
+        )
+
+        query_hash_after_offset = query_with_offset.get_query_hash_without_offset()
+
+        assert query_hash_before_offset == query_hash_after_offset
+
+    def test_marqo_hybrid_query_creates_different_hash_for_different_limit(self):
+        query_with_limit_30 = MarqoHybridQuery(
+            index_name="test_index",
+            limit=30,
+            offset=0,
+            or_phrases=[""],
+            and_phrases=[""],
+            vector_query=None,
+            hybrid_parameters=HybridParameters(),
+        )
+
+        query_hash_limit_30 = query_with_limit_30.get_query_hash_without_offset()
+
+        query_with_limit_60 = MarqoHybridQuery(
+            index_name="test_index",
+            limit=60,
+            offset=60,
+            or_phrases=[""],
+            and_phrases=[""],
+            vector_query=None,
+            hybrid_parameters=HybridParameters(),
+        )
+
+        query_hash_limit_60 = query_with_limit_60.get_query_hash_without_offset()
+
+        assert query_hash_limit_30 != query_hash_limit_60
