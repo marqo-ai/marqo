@@ -1,7 +1,8 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from marqo.api.exceptions import InvalidArgError
+from marqo.api.exceptions import InvalidArgError, InvalidFieldNameError
+from marqo.core.models import marqo_index
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
@@ -165,6 +166,168 @@ class TestValidateQuery(unittest.TestCase):
                     else:
                         with self.assertRaises(InvalidArgError):
                             validation.validate_query(query, search_method_str)
+
+
+class TestValidateMappingsObject(unittest.TestCase):
+    """Unit tests for the validate_mappings_object function."""
+
+    def test_validate_mappings_object_valid_cases(self):
+        """Test validation of valid mapping configurations."""
+        test_cases = [
+            {
+                "description": "multimodal combination",
+                "mapping": {
+                    "combined_field": {
+                        "type": "multimodal_combination",
+                        "weights": {"text": 0.7, "image": 0.3}
+                    }
+                }
+            },
+            {
+                "description": "custom vector",
+                "mapping": {
+                    "vector_field": {"type": "custom_vector"}
+                }
+            },
+            {
+                "description": "mixed field types",
+                "mapping": {
+                    "multimodal": {"type": "multimodal_combination", "weights": {"text": 1.0}},
+                    "vector": {"type": "custom_vector"},
+                }
+            },
+            {
+                "description": "empty multimodal weights",
+                "mapping": {
+                    "field": {"type": "multimodal_combination", "weights": {}}
+                }
+            }
+        ]
+
+        for case in test_cases:
+            with self.subTest(description=case["description"]):
+                result = validation.validate_mappings_object(case["mapping"])
+                self.assertEqual(result, case["mapping"])
+
+    def test_validate_mappings_object_invalid_cases(self):
+        """Test validation errors for invalid mapping configurations."""
+        test_cases = [
+            {
+                "description": "invalid field name - protected prefix",
+                "mapping": {"__vector_field": {"type": "custom_vector"}},
+                "expected_error": "can't start field name with protected prefix",
+                "exception_type": InvalidFieldNameError
+            },
+            {
+                "description": "invalid field name - protected field",
+                "mapping": {"_score": {"type": "custom_vector"}},
+                "expected_error": "field name can't be a protected field",
+                "exception_type": InvalidFieldNameError
+            },
+            {
+                "description": "multimodal missing weights",
+                "mapping": {"field": {"type": "multimodal_combination"}},
+                "expected_error": "'weights' is a required property",
+                "exception_type": InvalidArgError
+            },
+            {
+                "description": "multimodal non-numeric weight",
+                "mapping": {"field": {"type": "multimodal_combination", "weights": {"text": "invalid"}}},
+                "expected_error": "is not of type 'number'",
+                "exception_type": InvalidArgError
+            },
+            {
+                "description": "custom vector extra properties",
+                "mapping": {"field": {"type": "custom_vector", "extra": "not_allowed"}},
+                "expected_error": "Additional properties are not allowed",
+                "exception_type": InvalidArgError
+            },
+            {
+                "description": "unknown mapping type",
+                "mapping": {"field": {"type": "unknown_type"}},
+                "expected_error": "'unknown_type' is not one of",
+                "exception_type": InvalidArgError
+            }
+        ]
+
+        for case in test_cases:
+            with self.subTest(description=case["description"]):
+                with self.assertRaises(case["exception_type"]) as cm:
+                    validation.validate_mappings_object(case["mapping"])
+                self.assertIn(case["expected_error"], str(cm.exception))
+
+    def test_validate_mappings_object_with_structured_index(self):
+        """Test validation with a structured index parameter."""
+        test_cases = [
+            {
+                "description": "valid multimodal mapping with structured index",
+                "field_map": {
+                    "my_multimodal_field": {
+                        "type": marqo_index.FieldType.MultimodalCombination,
+                        "dependent_fields": {"text_field", "image_field"}
+                    }
+                },
+                "mapping": {
+                    "my_multimodal_field": {
+                        "type": "multimodal_combination",
+                        "weights": {"text_field": 0.5, "image_field": 0.5}
+                    }
+                },
+                "should_succeed": True,
+                "expected_error": None
+            },
+            {
+                "description": "field not in structured index",
+                "field_map": {},
+                "mapping": {
+                    "non_existent_field": {
+                        "type": "multimodal_combination",
+                        "weights": {"text": 1.0}
+                    }
+                },
+                "should_succeed": False,
+                "expected_error": "Index has no multimodal combination field"
+            },
+            {
+                "description": "dependent field not allowed",
+                "field_map": {
+                    "my_multimodal": {
+                        "type": marqo_index.FieldType.MultimodalCombination,
+                        "dependent_fields": {"allowed_field"}
+                    }
+                },
+                "mapping": {
+                    "my_multimodal": {
+                        "type": "multimodal_combination",
+                        "weights": {"not_allowed_field": 1.0}
+                    }
+                },
+                "should_succeed": False,
+                "expected_error": "is not a dependent field of"
+            }
+        ]
+
+        for case in test_cases:
+            with self.subTest(description=case["description"]):
+                # Create mock structured index
+                mock_index = MagicMock(spec=marqo_index.StructuredMarqoIndex)
+                mock_field_map = {}
+                
+                for field_name, field_config in case["field_map"].items():
+                    mock_field = MagicMock()
+                    mock_field.type = field_config["type"]
+                    mock_field.dependent_fields = field_config["dependent_fields"]
+                    mock_field_map[field_name] = mock_field
+                
+                mock_index.field_map = mock_field_map
+
+                if case["should_succeed"]:
+                    result = validation.validate_mappings_object(case["mapping"], mock_index)
+                    self.assertEqual(result, case["mapping"])
+                else:
+                    with self.assertRaises(InvalidArgError) as cm:
+                        validation.validate_mappings_object(case["mapping"], mock_index)
+                    self.assertIn(case["expected_error"], str(cm.exception))
 
 
 if __name__ == '__main__':

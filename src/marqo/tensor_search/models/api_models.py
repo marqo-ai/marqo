@@ -61,6 +61,7 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
+    language: Optional[str] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
@@ -304,6 +305,20 @@ class SearchQuery(BaseMarqoModel):
             if approximate_threshold < 0 or approximate_threshold > 1:
                 raise ValueError(f"'approximateThreshold' must be between 0 and 1, got {approximate_threshold}.")
 
+        return values
+
+    @root_validator(pre=False)
+    def validate_language_only_for_lexical_hybrid(cls, values):
+        """Validate that language is only provided for lexical/hybrid search"""
+        language = values.get('language')
+        search_method = values.get('searchMethod')
+        
+        if language:
+            if search_method == SearchMethod.TENSOR:
+                raise ValueError(
+                    "language parameter is not supported for TENSOR search method. "
+                    "Language specification only applies to lexical and hybrid search."
+                )
         return values
 
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:

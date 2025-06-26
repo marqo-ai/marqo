@@ -18,7 +18,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "COMBINED",
             "MARQO_INFERENCE_CACHE_SIZE": "10",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
             inference = api.get_config().inference
@@ -29,7 +29,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "COMBINED",
             "MARQO_INFERENCE_CACHE_SIZE": "0",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
             inference = api.get_config().inference
@@ -39,7 +39,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "API",
             "MARQO_API_INFERENCE_CACHE_SIZE": "10",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
             inference = api.get_config().inference
@@ -50,7 +50,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "API",
             "MARQO_API_INFERENCE_CACHE_SIZE": "0",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
             inference = api.get_config().inference
@@ -60,7 +60,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "INFERENCE",
             "MARQO_INFERENCE_CACHE_SIZE": "10",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.inference.native_inference.remote.server.inference_api'])
 
             inference = inference_api.get_config().local_inference
@@ -71,7 +71,7 @@ class TestInferenceCacheEnvVars(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_MODE": "INFERENCE",
             "MARQO_INFERENCE_CACHE_SIZE": "0",
-        }):
+        }, clear=True):
             importlib.reload(sys.modules['marqo.inference.native_inference.remote.server.inference_api'])
 
             inference = inference_api.get_config().local_inference

@@ -93,6 +93,7 @@ class EnvVars:
     MARQO_ENABLE_VIDEO_GPU_ACCELERATION = "MARQO_ENABLE_VIDEO_GPU_ACCELERATION"
     MARQO_INFERENCE_TIMEOUT = "MARQO_INFERENCE_TIMEOUT"
     MARQO_INFERENCE_POOL_SIZE = "MARQO_INFERENCE_POOL_SIZE"
+    MARQO_METRICS_EXPORT_INTERVAL = "MARQO_METRICS_EXPORT_INTERVAL"
 
 
 class RequestType:
@@ -106,6 +107,7 @@ class RequestType:
 class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
     custom_vector = "custom_vector"
+    text_field = "text_field"
 
 
 class SearchDb:
