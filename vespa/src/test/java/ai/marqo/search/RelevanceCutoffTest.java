@@ -272,4 +272,152 @@ class RelevanceCutoffTest {
             }
         }
     }
+
+    @Nested
+    class TargetHitsRegexTest {
+
+        @Test
+        void shouldExtractTargetHitsFromValidYql() {
+            String yql = "select * from sources * where {targetHits: 100}";
+
+            Integer result = callExtractCurrentTargetHits(yql);
+            assertThat(result).isEqualTo(100);
+        }
+
+        @Test
+        void shouldExtractTargetHitsWithWhitespace() {
+            String yql = "select * from sources * where { targetHits : 500 }";
+
+            Integer result = callExtractCurrentTargetHits(yql);
+            assertThat(result).isEqualTo(500);
+        }
+
+        @Test
+        void shouldExtractTargetHitsFromComplexYql() {
+            String yql =
+                    "select * from sources * where {param1: 'value', targetHits: 250, param2:"
+                            + " true}";
+
+            Integer result = callExtractCurrentTargetHits(yql);
+            assertThat(result).isEqualTo(250);
+        }
+
+        @Test
+        void shouldThrowExceptionWhenTargetHitsNotFound() {
+            String yql = "select * from sources * where {param1: 'value', param2: 100}";
+
+            RuntimeException exception =
+                    assertThrows(RuntimeException.class, () -> callExtractCurrentTargetHits(yql));
+            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
+        }
+
+        @Test
+        void shouldThrowExceptionForInvalidTargetHitsValue() {
+            String yql = "select * from sources * where {targetHits: invalid}";
+
+            RuntimeException exception =
+                    assertThrows(RuntimeException.class, () -> callExtractCurrentTargetHits(yql));
+            // The regex doesn't match "invalid" as a number, so it throws "YQL does not contain
+            // targetHits clause"
+            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
+        }
+
+        @Test
+        void shouldOverwriteTargetHitsInYql() {
+            String originalYql = "select * from sources * where {targetHits: 100}";
+
+            String result = callOverwriteTargetHits(originalYql, 200);
+            assertThat(result).contains("targetHits: 200");
+            assertThat(result).doesNotContain("targetHits: 100");
+        }
+
+        @Test
+        void shouldOverwriteTargetHitsWithWhitespace() {
+            String originalYql = "select * from sources * where { targetHits : 150 }";
+
+            String result = callOverwriteTargetHits(originalYql, 300);
+            assertThat(result).contains("targetHits : 300");
+            assertThat(result).doesNotContain("targetHits : 150");
+        }
+
+        @Test
+        void shouldOverwriteTargetHitsInComplexYql() {
+            String originalYql =
+                    "select * from sources * where {param1: 'value', targetHits: 75, param2: true}";
+
+            String result = callOverwriteTargetHits(originalYql, 125);
+            assertThat(result).contains("targetHits: 125");
+            assertThat(result).doesNotContain("targetHits: 75");
+            assertThat(result).contains("param1: 'value'");
+            assertThat(result).contains("param2: true");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenOverwritingNonExistentTargetHits() {
+            String yql = "select * from sources * where {param1: 'value'}";
+
+            RuntimeException exception =
+                    assertThrows(RuntimeException.class, () -> callOverwriteTargetHits(yql, 100));
+            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
+        }
+
+        @Test
+        void shouldThrowExceptionForNegativeTargetHits() {
+            String yql = "select * from sources * where {targetHits: 100}";
+
+            RuntimeException exception =
+                    assertThrows(RuntimeException.class, () -> callOverwriteTargetHits(yql, -1));
+            assertThat(exception.getMessage()).contains("targetHits value must be positive");
+        }
+
+        @Test
+        void shouldConvertZeroTargetHitsToOne() {
+            String originalYql = "select * from sources * where {targetHits: 100}";
+
+            String result = callOverwriteTargetHits(originalYql, 0);
+            assertThat(result).contains("targetHits: 1");
+        }
+
+        @Test
+        void shouldHandleMultipleTargetHitsOccurrences() {
+            // Test with multiple targetHits - should replace only the first occurrence
+            String originalYql =
+                    "select * from sources * where {targetHits: 100} and {targetHits: 200}";
+
+            String result = callOverwriteTargetHits(originalYql, 50);
+            assertThat(result).contains("targetHits: 50");
+            // Should still contain the second occurrence unchanged
+            assertThat(result).contains("targetHits: 200");
+        }
+
+        private Integer callExtractCurrentTargetHits(String yql) {
+            try {
+                java.lang.reflect.Method method =
+                        HybridSearcher.class.getDeclaredMethod(
+                                "extractCurrentTargetHits", String.class);
+                method.setAccessible(true);
+                return (Integer) method.invoke(hybridSearcher, yql);
+            } catch (Exception e) {
+                if (e.getCause() instanceof RuntimeException) {
+                    throw (RuntimeException) e.getCause();
+                }
+                throw new RuntimeException(e);
+            }
+        }
+
+        private String callOverwriteTargetHits(String yql, int newTargetHits) {
+            try {
+                java.lang.reflect.Method method =
+                        HybridSearcher.class.getDeclaredMethod(
+                                "overwriteTargetHits", String.class, int.class);
+                method.setAccessible(true);
+                return (String) method.invoke(hybridSearcher, yql, newTargetHits);
+            } catch (Exception e) {
+                if (e.getCause() instanceof RuntimeException) {
+                    throw (RuntimeException) e.getCause();
+                }
+                throw new RuntimeException(e);
+            }
+        }
+    }
 }
