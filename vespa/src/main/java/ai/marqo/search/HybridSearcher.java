@@ -184,6 +184,7 @@ public class HybridSearcher extends Searcher {
         // Execute probe lexical search for relevance cut-off if parameters are provided
         int relevanceCandidates = -1;
         int probeCandidates = -1;
+        boolean shouldOverwriteTargethits = false;
         if (relevanceCutoffMethod != null) {
             logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
             Query probeLexicalQuery =
@@ -198,6 +199,7 @@ public class HybridSearcher extends Searcher {
                             verbose);
             query.setHits(Math.max(relevanceCandidates, limit + offset));
             query.setOffset(0);
+            shouldOverwriteTargethits = true;
         }
         // --- End relevance cut-off handling ---
 
@@ -215,6 +217,7 @@ public class HybridSearcher extends Searcher {
                 newLimit = Math.max(newLimit, limit + offset);
                 query.setHits(newLimit);
                 query.setOffset(0);
+                shouldOverwriteTargethits = true;
             }
         }
 
@@ -226,10 +229,15 @@ public class HybridSearcher extends Searcher {
                             query,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
-                            verbose);
+                            verbose,
+                            shouldOverwriteTargethits);
             Query queryTensor =
                     createSubQuery(
-                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                            query,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            verbose,
+                            shouldOverwriteTargethits);
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -272,7 +280,12 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(
+                                query,
+                                retrievalMethod,
+                                rankingMethod,
+                                verbose,
+                                shouldOverwriteTargethits);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
@@ -794,10 +807,41 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    private String overwriteTargethitsBasedOnHitsAndOffset(String yql, int hits, int offset) {
+        // Overwrite targethits in YQL based on hits and offset
+        if (yql.contains("targethits")) {
+            yql = yql.replaceAll("targethits:\\s*\\d+", "targethits:" + (hits + offset));
+        } else {
+            throw new RuntimeException(
+                    "YQL does not contain targethits clause, cannot overwrite it.");
+        }
+        return yql;
+    }
+
     public Query createSubQuery(
             Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
         // Default exactQuery to an empty string (or any default value you prefer)
-        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "");
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "", false);
+    }
+
+    public Query createSubQuery(
+            Query query,
+            String retrievalMethod,
+            String rankingMethod,
+            boolean verbose,
+            String exactQuery) {
+        // Default exactQuery to an empty string (or any default value you prefer)
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, exactQuery, false);
+    }
+
+    public Query createSubQuery(
+            Query query,
+            String retrievalMethod,
+            String rankingMethod,
+            boolean verbose,
+            boolean OverwriteTargethits) {
+        return createSubQuery(
+                query, retrievalMethod, rankingMethod, verbose, "", OverwriteTargethits);
     }
 
     /**
@@ -812,13 +856,16 @@ public class HybridSearcher extends Searcher {
      * @param retrievalMethod
      * @param rankingMethod
      * @param verbose
+     * @param exactQuery
+     * @param overwriteTargethits
      */
     Query createSubQuery(
             Query query,
             String retrievalMethod,
             String rankingMethod,
             boolean verbose,
-            String exactQuery) {
+            String exactQuery,
+            boolean overwriteTargethits) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -833,6 +880,13 @@ public class HybridSearcher extends Searcher {
         } else {
             yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
         }
+
+        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && overwriteTargethits) {
+            yqlNew =
+                    overwriteTargethitsBasedOnHitsAndOffset(
+                            yqlNew, query.getHits(), query.getOffset());
+        }
+
         // Rank Profile uses RETRIEVAL + RANKING method
         String rankProfileNew =
                 query.properties()
