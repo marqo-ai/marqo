@@ -87,7 +87,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 logger = get_logger(__name__)
 
 
-def _sanitize_query_for_response(query):
+def _sanitize_query_for_response(query: str):
     """
     Replace base64 image content in queries with 'data:image/[omitted]' for response.
     
