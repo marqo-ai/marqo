@@ -87,7 +87,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 logger = get_logger(__name__)
 
 
-def _sanitize_query_for_response(query: str):
+def _sanitize_query_for_response(query: Optional[Union[str, dict]]):
     """
     Replace base64 image content in queries with 'data:image/[omitted]' for response.
     
@@ -113,10 +113,9 @@ def _sanitize_query_for_response(query: str):
             else:
                 sanitized_query[key] = value
         return sanitized_query
-    
-    # For CustomVectorQuery or other types, return as-is
-    return query
 
+    # Should not reach here
+    raise RuntimeError('Invalid query type')
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = _get_latest_index(config, index_name)
@@ -523,11 +522,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
-        response_query = text.dict()  # Make object JSON serializable
+        search_result["query"] = text.dict()  # Make object JSON serializable
     else:
-        response_query = text
-
-    search_result["query"] = _sanitize_query_for_response(response_query)
+        search_result["query"] = _sanitize_query_for_response(text)
 
     search_result["limit"] = result_count
     search_result["offset"] = offset
