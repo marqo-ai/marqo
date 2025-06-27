@@ -55,8 +55,8 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "The 'sortBy' feature is only supported for unstructured indexes created "
-                "with Marqo version",
+                "The 'sortBy' and 'relevanceCutoff' features are only supported for unstructured indexes "
+                "created with Marqo version 2.21.0 or later",
                 str(e.exception)
             )
 
