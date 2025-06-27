@@ -99,9 +99,7 @@ public class HybridSearcher extends Searcher {
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
     private static final Pattern TARGET_HITS_PATTERN =
-            Pattern.compile("\\{[^}]*targetHits\\s*:\\s*(\\d+)[^}]*\\}");
-    private static final Pattern TARGET_HITS_REPLACEMENT_PATTERN =
-            Pattern.compile("(targetHits\\s*:\\s*)\\d+");
+            Pattern.compile("(targetHits\\s*:\\s*)(\\d+)");
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -881,9 +879,9 @@ public class HybridSearcher extends Searcher {
         }
 
         try {
-            return Integer.parseInt(matcher.group(1));
+            return Integer.parseInt(matcher.group(2));
         } catch (NumberFormatException e) {
-            throw new RuntimeException("Invalid targetHits value in YQL: " + matcher.group(1), e);
+            throw new RuntimeException("Invalid targetHits value in YQL: " + matcher.group(2), e);
         }
     }
 
@@ -906,8 +904,7 @@ public class HybridSearcher extends Searcher {
         }
 
         // Replace only the targetHits value while preserving other parameters
-        Matcher replaceMatcher = TARGET_HITS_REPLACEMENT_PATTERN.matcher(yql);
-        return replaceMatcher.replaceFirst("$1" + newTargetHits);
+        return TARGET_HITS_PATTERN.matcher(yql).replaceFirst("$1" + newTargetHits);
     }
 
     public Query createSubQuery(
