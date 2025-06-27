@@ -15,6 +15,62 @@ from marqo.core.models.marqo_index import *
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
+class ChunkTimingGenerator:
+    """Generator class to emit (chunk_start, chunk_end) pairs for media processing."""
+    
+    def __init__(self, duration: float, chunk_duration: float, overlap_duration: float):
+        """
+        Initialize the chunk timing generator.
+        
+        Args:
+            duration: Total duration of the media in seconds
+            chunk_duration: Duration of each chunk in seconds
+            overlap_duration: Overlap duration between chunks in seconds
+        """
+        self.duration = duration
+        self.chunk_duration = chunk_duration
+        self.overlap_duration = overlap_duration
+        self.total_chunks = math.ceil((duration - overlap_duration) / (chunk_duration - overlap_duration))
+    
+    def __iter__(self):
+        """Return the iterator object."""
+        return self
+    
+    def __next__(self):
+        """Generate the next chunk timing pair."""
+        if not hasattr(self, '_current_chunk'):
+            self._current_chunk = 0
+        
+        if self._current_chunk >= self.total_chunks:
+            raise StopIteration
+        
+        i = self._current_chunk
+        self._current_chunk += 1
+        
+        # For the last chunk, ensure it captures the end of the media
+        if i == self.total_chunks - 1:
+            chunk_start = max(self.duration - self.chunk_duration, 0)
+            chunk_end = self.duration
+        else:
+            chunk_start = i * (self.chunk_duration - self.overlap_duration)
+            chunk_end = min([chunk_start + self.chunk_duration, self.duration])
+        
+        return chunk_start, chunk_end
+    
+    def generate_chunks(self):
+        """Generate all chunk timing pairs as a generator."""
+        for i in range(self.total_chunks):
+            # For the last chunk, ensure it captures the end of the media
+            if i == self.total_chunks - 1:
+                chunk_start = max(self.duration - self.chunk_duration, 0)
+                chunk_end = self.duration
+            else:
+                chunk_start = i * (self.chunk_duration - self.overlap_duration)
+                chunk_end = min([chunk_start + self.chunk_duration, self.duration])
+            
+            yield chunk_start, chunk_end
+
+
 class StreamingMediaProcessor:
 
     VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 10
@@ -158,18 +214,10 @@ class StreamingMediaProcessor:
         overlap_duration = self.split_overlap
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Calculate total number of chunks
-            total_chunks = math.ceil((self.duration - overlap_duration) / (chunk_duration - overlap_duration))
-
-            for i in range(total_chunks):
-                # For the last chunk, ensure it captures the end of the media
-                if i == total_chunks - 1:
-                    chunk_start = max(self.duration - chunk_duration, 0)
-                    chunk_end = self.duration
-                else:
-                    chunk_start = i * (chunk_duration - overlap_duration)
-                    chunk_end = min([chunk_start + chunk_duration, self.duration])
-
+            # Use the ChunkTimingGenerator to generate chunk timing pairs
+            chunk_generator = ChunkTimingGenerator(self.duration, chunk_duration, overlap_duration)
+            
+            for chunk_start, chunk_end in chunk_generator.generate_chunks():
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
                 try:
