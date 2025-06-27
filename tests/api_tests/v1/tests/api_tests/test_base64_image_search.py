@@ -3,7 +3,7 @@ import unittest
 
 import requests
 from marqo.errors import MarqoWebError
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestBase64ImageSearch(MarqoTestCase):
@@ -118,6 +118,12 @@ class TestBase64ImageSearch(MarqoTestCase):
                         self.assertAlmostEqual(
                             1.0, score, places=3,
                             msg=f"Score mismatch for {search_name} on {index_type} index"
+                        )
+
+                        # Verify query not returned in base64 search response
+                        self.assertEqual(
+                            'data:image/[omitted]', search_result.get('query'),
+                            'Base64 query should not be present in search response'
                         )
 
     def test_image_base64_search_large(self):
@@ -328,27 +334,35 @@ class TestBase64ImageSearch(MarqoTestCase):
                 self.assertFalse(add_result['errors'])
 
                 # Test tensor search with dict query: base64 image (weight 0.8) and text (weight 0.2)
-                with self.subTest(query_type="dict_mixed_weights"):
-                    search_params = {
-                        "q": {
-                            hippo_base64: 0.8,
-                            "sculpture art": 0.2  # Lower weight for text
-                        },
-                        "search_method": "TENSOR"
-                    }
+                search_params = {
+                    "q": {
+                        hippo_base64: 0.8,
+                        "sculpture art": 0.2  # Lower weight for text
+                    },
+                    "search_method": "TENSOR"
+                }
 
-                    search_result = self.client.index(index_name).search(**search_params)
+                search_result = self.client.index(index_name).search(**search_params)
 
-                    # Verify results
-                    self.assertIn('hits', search_result)
-                    self.assertGreater(len(search_result['hits']), 0)
+                # Verify results
+                self.assertIn('hits', search_result)
+                self.assertGreater(len(search_result['hits']), 0)
 
-                    # The hippo statue document should still be the first hit due to strong image match
-                    first_hit = search_result['hits'][0]
-                    self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
+                # The hippo statue document should still be the first hit due to strong image match
+                first_hit = search_result['hits'][0]
+                self.assertEqual(first_hit['_id'], 'hippo_statue_doc')
 
-                    # Score should still be high due to strong image component
-                    self.assertGreater(first_hit['_score'], 0.8)
+                # Score should still be high due to strong image component
+                self.assertGreater(first_hit['_score'], 0.8)
+
+                # Verify base64 string not returned
+                self.assertEqual(
+                    {
+                        'data:image/[omitted]': 0.8,
+                        "sculpture art": 0.2
+                    },
+                    search_result.get('query')
+                )
 
     def test_invalid_base64_image_search_returns_400_error(self):
         """Test that searching with invalid base64 images returns 400 error for tensor and hybrid search."""
@@ -398,7 +412,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                             )
                         assert e.exception.status_code == 400
 
-    def test_api_base64_images_rejected_in_add_documents(self):
+    def test_base64_images_rejected_in_add_documents(self):
         """Test that base64 images are properly rejected during document addition across all index types."""
 
         index_configs = [
