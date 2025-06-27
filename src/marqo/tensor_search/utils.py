@@ -359,7 +359,7 @@ def enable_batch_apis():
         def wrapper(*args, **kwargs):
             if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower() != 'true':
                 raise HTTPException(status_code=403,
-                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_API to true to enable it.")
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_APIS to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
