@@ -17,11 +17,11 @@ from marqo.inference.native_inference.embedding_models.languagebind_model import
 
 class ChunkTimingGenerator:
     """Generator class to emit (chunk_start, chunk_end) pairs for media processing."""
-    
+
     def __init__(self, duration: float, chunk_duration: float, overlap_duration: float):
         """
         Initialize the chunk timing generator.
-        
+
         Args:
             duration: Total duration of the media in seconds
             chunk_duration: Duration of each chunk in seconds
@@ -30,11 +30,15 @@ class ChunkTimingGenerator:
         self._duration = duration
         self._chunk_duration = chunk_duration
         self._overlap_duration = overlap_duration
-
         self._step = chunk_duration - overlap_duration
 
-        if self._duration <= 0 or self._step <= 0:
-            pass
+        if self._duration < 0:
+            raise ValueError(f'Duration of the media file is negative: {self._duration}')
+
+        if self._step <= 0:
+            # This is already verified in the ChunkConfig validation. We check it again to avoid an infinite loop
+            raise ValueError(f'Chunking error due to chunk size ({self._chunk_duration}) <= overlap '
+                             f'({self._overlap_duration})')
 
         self._current_position = 0.0
 
@@ -50,8 +54,10 @@ class ChunkTimingGenerator:
         chunk_start = max(chunk_end - self._chunk_duration, 0)
 
         if chunk_end == self._duration:
+            # already reaches the end, so move the current position to end
             self._current_position = chunk_end
         else:
+            # otherwise, we move the current position forward by the step size
             self._current_position = self._current_position + self._step
 
         return chunk_start, chunk_end
