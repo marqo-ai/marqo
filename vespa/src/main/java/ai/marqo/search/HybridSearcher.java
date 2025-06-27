@@ -91,10 +91,16 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    // Constants for relevance cut-off methods
-    private static final String RELATIVE_MAX_SCORE = "relative_max_score";
-    private static final String MEAN_STD_DEV = "mean_std_dev";
-    private static final String GAP_DETECTION = "gap_detection";
+    private enum RelevanceCutoffMethod {
+        RELATIVE_MAX_SCORE,
+        MEAN_STD_DEV,
+        GAP_DETECTION;
+
+        @JsonCreator
+        public static RelevanceCutoffMethod fromString(String value) {
+            return RelevanceCutoffMethod.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
 
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -538,10 +544,20 @@ public class HybridSearcher extends Searcher {
     /**
      * Read the relevance cutoff parameter based on the relevance cutoff method.
      **/
-    private Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethod) {
-        if (relevanceCutoffMethod == null) {
+    private Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethodString) {
+        if (relevanceCutoffMethodString == null) {
             return null;
         }
+
+        RelevanceCutoffMethod relevanceCutoffMethod;
+        try {
+            relevanceCutoffMethod =
+                    RelevanceCutoffMethod.valueOf(relevanceCutoffMethodString.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(
+                    "Unknown relevance cutoff method: " + relevanceCutoffMethodString);
+        }
+
         switch (relevanceCutoffMethod) {
             case RELATIVE_MAX_SCORE -> {
                 Double value =
@@ -569,11 +585,8 @@ public class HybridSearcher extends Searcher {
                 // no cutoff parameter for gap detection
                 return null;
             }
-            default -> {
-                throw new RuntimeException(
-                        "Unknown relevance cutoff method: " + relevanceCutoffMethod);
-            }
         }
+        return null;
     }
 
     /**
@@ -1133,14 +1146,14 @@ public class HybridSearcher extends Searcher {
     /**
      * Detects the cutoff count for relevance filtering based on the specified method
      * @param probeCandidates The lexical search results to analyze
-     * @param cutoffMethod The method to use for cutoff detection
+     * @param cutoffMethodString The method to use for cutoff detection
      * @param relevanceCutoffParameter The parameter for the cutoff method. It is unified across all methods.
      * @param verbose Whether to log verbose information
      * @return The number of relevant results to keep
      */
     private Integer detectCutoffCount(
             HitGroup probeCandidates,
-            String cutoffMethod,
+            String cutoffMethodString,
             Double relevanceCutoffParameter,
             boolean verbose) {
         List<Hit> lexicalHits = new ArrayList<>(probeCandidates.asList());
@@ -1148,6 +1161,13 @@ public class HybridSearcher extends Searcher {
         if (lexicalHits.isEmpty()) {
             logIfVerbose("No lexical hits found in probe pool, returning 0", verbose);
             return 0;
+        }
+
+        RelevanceCutoffMethod cutoffMethod;
+        try {
+            cutoffMethod = RelevanceCutoffMethod.valueOf(cutoffMethodString.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethodString);
         }
 
         switch (cutoffMethod) {
