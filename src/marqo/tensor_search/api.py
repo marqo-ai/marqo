@@ -48,7 +48,6 @@ from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
-marqo_query_logger = get_logger('marqo_query')
 
 
 def generate_config() -> config.Config:
@@ -395,6 +394,35 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     }
 
 
+# TODO move this inside QueryLogger class and find a way to test
+marqo_query_logger = get_logger('marqo_query')
+
+
+# TODO Move this class to a new file
+class QueryLogger:
+    def __init__(self, query_dict):
+        self.query_dict = query_dict
+        self.error_logged = False
+
+        # TODO find a way to move these two at class level and test it
+        self.slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
+        self.log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
+
+    @property
+    def sanitised_query(self):
+        return self.query_dict # TODO sanitise it
+
+    def log_error_query(self, error_message: str):
+        if self.log_query_details:
+            marqo_query_logger.error(f'Failed search query: Error: {error_message}. Query: {self.sanitised_query}')
+            self.error_logged = True  # Mark that error was logged
+
+    def log_slow_query(self, elapsed_time_ms: float):
+        if self.log_query_details and not self.error_logged and elapsed_time_ms >= self.slow_query_threshold_ms:
+            marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
+                                       f'Query: {self.sanitised_query}')
+
+
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
@@ -404,20 +432,9 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
 
-    # Get configuration for query logging (outside timing to avoid overhead)
-    slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
-    log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
-    
-    # Track if error was logged to avoid duplicate logging
-    error_logged = [False]  # Use list to make it mutable in nested function
-    
-    def log_if_slow_query(elapsed_time_ms: float):
-        """Log query details if it's slow and no error was already logged"""
-        if log_query_details and elapsed_time_ms >= slow_query_threshold_ms and not error_logged[0]:
-            marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
-                                       f'Query: {search_query_dict}')
+    query_logger = QueryLogger(search_query_dict)
 
-    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", log_if_slow_query):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", query_logger.log_slow_query):
         try:
             # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
             #  SearchQuery can be injected after migrated to v2
@@ -448,9 +465,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             )
             return ORJSONResponse(result)
         except Exception as e:
-            if log_query_details:
-                error_logged[0] = True  # Mark that error was logged
-                marqo_query_logger.error(f'Failed search query: Error: {str(e)}. Query: {search_query_dict}')
+            query_logger.log_error_query(str(e))
             raise
 
 
