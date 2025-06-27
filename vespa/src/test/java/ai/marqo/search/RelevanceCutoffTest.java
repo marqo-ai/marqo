@@ -384,10 +384,10 @@ class RelevanceCutoffTest {
             String originalYql =
                     "select * from sources * where {targetHits: 100} and {targetHits: 200}";
 
-            String result = callOverwriteTargetHits(originalYql, 50);
-            assertThat(result).contains("targetHits: 50");
-            // Should still contain the second occurrence unchanged
-            assertThat(result).contains("targetHits: 200");
+            RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                    callOverwriteTargetHits(originalYql, 50));
+            assertThat(exception.getMessage()).contains("YQL contains multiple targetHits clauses");
+
         }
 
         private Integer callExtractCurrentTargetHits(String yql) {

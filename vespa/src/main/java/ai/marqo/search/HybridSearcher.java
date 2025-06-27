@@ -896,14 +896,20 @@ public class HybridSearcher extends Searcher {
             newTargetHits = 1;
         }
 
-        // First check if targetHits exists in the YQL
-        Matcher checkMatcher = TARGET_HITS_PATTERN.matcher(yql);
-        if (!checkMatcher.find()) {
+        // Count targetHits occurrences
+        long count = TARGET_HITS_PATTERN.matcher(yql).results().count();
+        
+        if (count == 0) {
             throw new RuntimeException(
                     "YQL does not contain targetHits clause, cannot overwrite it.");
         }
 
-        // Replace only the targetHits value while preserving other parameters
+        if (count > 1) {
+            throw new RuntimeException(
+                    "YQL contains multiple targetHits clauses (" + count + "), expected exactly one.");
+        }
+
+        // Replace the targetHits value while preserving other parameters
         return TARGET_HITS_PATTERN.matcher(yql).replaceFirst("$1" + newTargetHits);
     }
 
