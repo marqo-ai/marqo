@@ -857,7 +857,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 50}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
@@ -866,6 +869,8 @@ class SortByTest {
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 15");
             assertThat(updatedYql).doesNotContain("targetHits: 50");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1985");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1950");
         }
 
         @Test
@@ -873,7 +878,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 50}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 60, false, true);
@@ -882,6 +890,8 @@ class SortByTest {
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 60");
             assertThat(updatedYql).doesNotContain("targetHits: 50");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1940");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1950");
         }
 
         @Test
@@ -889,7 +899,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 40}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 40,"
+                                    + " hnsw.exploreAdditionalHits: 1960}");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 35, true, true);
 
@@ -897,6 +910,7 @@ class SortByTest {
             // newTensorTargetHits = Math.max(35, 40) = 40
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 40");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1960");
             assertThat(result.getHits()).isEqualTo(35);
         }
 
@@ -905,7 +919,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 10}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 10,"
+                                    + " hnsw.exploreAdditionalHits: 1990}");
 
             assertThatThrownBy(
                             () ->
@@ -961,16 +978,18 @@ class SortByTest {
                     .set(
                             "marqo__yql.tensor",
                             "select * from sources * where {param1: 'value', targetHits: 100,"
-                                    + " param2: true}");
+                                    + " hnsw.exploreAdditionalHits: 1900, param2: true}");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 150, false, true);
 
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 150");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1850");
             assertThat(updatedYql).contains("param1: 'value'");
             assertThat(updatedYql).contains("param2: true");
             assertThat(updatedYql).doesNotContain("targetHits: 100");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1900");
         }
     }
 
@@ -1006,7 +1025,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=5&offset=2");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 60}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 60,"
+                                    + " hnsw.exploreAdditionalHits: 1940}");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
 
@@ -1015,6 +1037,7 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(45);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 60");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1940");
         }
 
         @Test
@@ -1022,7 +1045,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=5&offset=2");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 30}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 30,"
+                                    + " hnsw.exploreAdditionalHits: 1970}");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
 
@@ -1032,6 +1058,8 @@ class SortByTest {
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 45");
             assertThat(updatedYql).doesNotContain("targetHits: 30");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1955");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1970");
         }
 
         @Test
@@ -1052,7 +1080,10 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
             // targetHits (12) < limit + offset (15)
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 12}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 12,"
+                                    + " hnsw.exploreAdditionalHits: 1988}");
 
             assertThatThrownBy(
                             () ->
@@ -1072,7 +1103,7 @@ class SortByTest {
                     .set(
                             "marqo__yql.tensor",
                             "select * from sources * where {queryVector: [1,2,3], targetHits: 50,"
-                                    + " threshold: 0.8}");
+                                    + " hnsw.exploreAdditionalHits: 1950, threshold: 0.8}");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 35, 40, true, true);
 
@@ -1081,6 +1112,7 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(40);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 50");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1950");
             assertThat(updatedYql).contains("queryVector: [1,2,3]");
             assertThat(updatedYql).contains("threshold: 0.8");
         }
@@ -1102,7 +1134,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 1000}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 1000,"
+                                    + " hnsw.exploreAdditionalHits: 1000}");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, 500, 750, true, true);
@@ -1112,6 +1147,7 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(750);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 1000");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1000");
         }
 
         @Test
@@ -1120,7 +1156,10 @@ class SortByTest {
             query.setHits(50);
             query.setOffset(0);
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 50}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
 
             HybridSearcher searcher = new HybridSearcher();
 
@@ -1135,6 +1174,7 @@ class SortByTest {
             String updatedTensorYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedTensorYql).contains("targetHits: 1");
             assertThat(updatedTensorYql).doesNotContain("targetHits: 0");
+            assertThat(updatedTensorYql).contains("hnsw.exploreAdditionalHits: 1999");
         }
 
         @Test
@@ -1142,7 +1182,10 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
-                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 100}");
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 100,"
+                                    + " hnsw.exploreAdditionalHits: 1900}");
 
             // When both are enabled, relevanceCutoff logic changes:
             // - Uses Math.max instead of Math.min for determining newHits
@@ -1160,6 +1203,7 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(12);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 100"); // Math.max(12, 100) = 100
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1900");
         }
     }
 }

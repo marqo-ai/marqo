@@ -638,13 +638,13 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             lambda: self.parsed_marqo_version() >= constants.MARQO_LANGUAGE_MINIMUM_VERSION)
 
     @property
-    def index_supports_sorty_by(self) -> bool:
+    def index_supports_sorty_by_relevance_cutoff(self) -> bool:
         """
-        Check if the index supports sort by.
+        Check if the index supports sort by or relevance cutoff.
         """
         return self._cache_or_get(
-            'index_supports_sort_by',
-            lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_MINIMUM_VERSION)
+            'index_supports_sort_by_relevance_cutoff',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_RELEVANCE_CUTOFF_MINIMUM_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

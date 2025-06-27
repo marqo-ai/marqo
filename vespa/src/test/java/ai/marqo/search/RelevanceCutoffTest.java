@@ -324,30 +324,41 @@ class RelevanceCutoffTest {
 
         @Test
         void shouldOverwriteTargetHitsInYql() {
-            String originalYql = "select * from sources * where {targetHits: 100}";
+            String originalYql =
+                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
+                            + " 1900}";
 
             String result = callOverwriteTargetHits(originalYql, 200);
             assertThat(result).contains("targetHits: 200");
             assertThat(result).doesNotContain("targetHits: 100");
+            assertThat(result).contains("hnsw.exploreAdditionalHits: 1800");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1900");
         }
 
         @Test
         void shouldOverwriteTargetHitsWithWhitespace() {
-            String originalYql = "select * from sources * where { targetHits : 150 }";
+            String originalYql =
+                    "select * from sources * where { targetHits : 150, hnsw.exploreAdditionalHits :"
+                            + " 1850 }";
 
             String result = callOverwriteTargetHits(originalYql, 300);
             assertThat(result).contains("targetHits : 300");
             assertThat(result).doesNotContain("targetHits : 150");
+            assertThat(result).contains("hnsw.exploreAdditionalHits : 1700");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits : 1850");
         }
 
         @Test
         void shouldOverwriteTargetHitsInComplexYql() {
             String originalYql =
-                    "select * from sources * where {param1: 'value', targetHits: 75, param2: true}";
+                    "select * from sources * where {param1: 'value', targetHits: 75,"
+                            + " hnsw.exploreAdditionalHits: 1925, param2: true}";
 
             String result = callOverwriteTargetHits(originalYql, 125);
             assertThat(result).contains("targetHits: 125");
             assertThat(result).doesNotContain("targetHits: 75");
+            assertThat(result).contains("hnsw.exploreAdditionalHits: 1875");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1925");
             assertThat(result).contains("param1: 'value'");
             assertThat(result).contains("param2: true");
         }
@@ -372,22 +383,146 @@ class RelevanceCutoffTest {
 
         @Test
         void shouldConvertZeroTargetHitsToOne() {
-            String originalYql = "select * from sources * where {targetHits: 100}";
+            String originalYql =
+                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
+                            + " 1900}";
 
             String result = callOverwriteTargetHits(originalYql, 0);
             assertThat(result).contains("targetHits: 1");
+            assertThat(result).contains("hnsw.exploreAdditionalHits: 1999");
         }
 
         @Test
         void shouldHandleMultipleTargetHitsOccurrences() {
-            // Test with multiple targetHits - should replace only the first occurrence
+            // Test with multiple targetHits - should replace all occurrences
             String originalYql =
-                    "select * from sources * where {targetHits: 100} and {targetHits: 200}";
+                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
+                            + " 1900} and {targetHits: 200, hnsw.exploreAdditionalHits: 1800}";
+
+            String result = callOverwriteTargetHits(originalYql, 50);
+            assertThat(result).contains("targetHits: 50");
+            assertThat(result).doesNotContain("targetHits: 100");
+            assertThat(result).doesNotContain("targetHits: 200");
+            assertThat(result).contains("hnsw.exploreAdditionalHits: 1950");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1900");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1800");
+            // Should replace both occurrences
+            long targetHitsCount =
+                    result.chars()
+                                    .mapToObj(c -> (char) c)
+                                    .map(String::valueOf)
+                                    .collect(
+                                            StringBuilder::new,
+                                            StringBuilder::append,
+                                            StringBuilder::append)
+                                    .toString()
+                                    .split("targetHits: 50", -1)
+                                    .length
+                            - 1;
+            assertThat(targetHitsCount).isEqualTo(2);
+            long hnswCount = result.split("hnsw.exploreAdditionalHits: 1950", -1).length - 1;
+            assertThat(hnswCount).isEqualTo(2);
+        }
+
+        @Test
+        void shouldHandleComplexYqlWithMultipleTargetHitsAndHnswParameters() {
+            // Test with complex YQL containing multiple targetHits and hnsw.exploreAdditionalHits
+            String originalYql =
+                    "({targetHits:10, approximate:True,"
+                        + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title,"
+                        + " marqo__query_embedding)) OR ({targetHits:10, approximate:True,"
+                        + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_content,"
+                        + " marqo__query_embedding))";
+
+            String result = callOverwriteTargetHits(originalYql, 15);
+
+            // Verify targetHits are updated
+            assertThat(result).contains("targetHits:15");
+            assertThat(result).doesNotContain("targetHits:10");
+
+            // Verify hnsw.exploreAdditionalHits are updated to 2000-15=1985
+            assertThat(result).contains("hnsw.exploreAdditionalHits:1985");
+            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits:1990");
+
+            // Count occurrences to ensure both were replaced
+            long targetHitsCount = (result.split("targetHits:15", -1).length - 1);
+            long hnswCount = (result.split("hnsw.exploreAdditionalHits:1985", -1).length - 1);
+
+            assertThat(targetHitsCount).isEqualTo(2);
+            assertThat(hnswCount).isEqualTo(2);
+
+            // Verify other parameters are preserved
+            assertThat(result).contains("approximate:True");
+            assertThat(result)
+                    .contains("nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)");
+            assertThat(result)
+                    .contains("nearestNeighbor(marqo__embeddings_content, marqo__query_embedding)");
+        }
+
+        @Test
+        void shouldUpdateHnswExploreAdditionalHitsWithDifferentValues() {
+            // Test various newTargetHits values to verify the 2000-newTargetHits formula
+            String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
+
+            // Test with newTargetHits = 100, should result in hnsw.exploreAdditionalHits = 1900
+            String result1 = callOverwriteTargetHits(originalYql, 100);
+            assertThat(result1).contains("targetHits:100");
+            assertThat(result1).contains("hnsw.exploreAdditionalHits:1900");
+
+            // Test with newTargetHits = 1, should result in hnsw.exploreAdditionalHits = 1999
+            String result2 = callOverwriteTargetHits(originalYql, 1);
+            assertThat(result2).contains("targetHits:1");
+            assertThat(result2).contains("hnsw.exploreAdditionalHits:1999");
+        }
+
+        @Test
+        void shouldHandleEdgeCaseWhenTargetHitsEqualsTwo() {
+            // Test boundary condition where newTargetHits = 2000
+            String originalYql = "{targetHits:10, hnsw.exploreAdditionalHits:1990}";
+
+            String result = callOverwriteTargetHits(originalYql, 2000);
+            assertThat(result).contains("targetHits:2000");
+            assertThat(result).contains("hnsw.exploreAdditionalHits:0");
+        }
+
+        @Test
+        void shouldHandleHnswExploreAdditionalHitsWithWhitespace() {
+            // Test hnsw.exploreAdditionalHits with various whitespace patterns
+            String originalYql = "{targetHits: 25, hnsw.exploreAdditionalHits : 1975}";
+
+            String result = callOverwriteTargetHits(originalYql, 50);
+            assertThat(result).contains("targetHits: 50");
+            assertThat(result).contains("hnsw.exploreAdditionalHits : 1950");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenHnswExploreAdditionalHitsIsMissing() {
+            // Test that YQL without hnsw.exploreAdditionalHits throws an error
+            String originalYql = "{targetHits:100, approximate:True}";
 
             RuntimeException exception =
                     assertThrows(
-                            RuntimeException.class, () -> callOverwriteTargetHits(originalYql, 50));
-            assertThat(exception.getMessage()).contains("YQL contains multiple targetHits clauses");
+                            RuntimeException.class,
+                            () -> callOverwriteTargetHits(originalYql, 150));
+            assertThat(exception.getMessage())
+                    .contains(
+                            "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits"
+                                    + " is present");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenTargetHitsAndHnswCountMismatch() {
+            // Test with mismatched counts: 2 targetHits but 1 hnsw.exploreAdditionalHits
+            String originalYql =
+                    "{targetHits:10, hnsw.exploreAdditionalHits:1990} OR {targetHits:10}";
+
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class, () -> callOverwriteTargetHits(originalYql, 15));
+            assertThat(exception.getMessage())
+                    .contains(
+                            "YQL contains 2 targetHits occurrences but 1 hnsw.exploreAdditionalHits"
+                                    + " occurrences");
         }
 
         private Integer callExtractCurrentTargetHits(String yql) {

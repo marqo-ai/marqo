@@ -106,6 +106,8 @@ public class HybridSearcher extends Searcher {
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
     private static final Pattern TARGET_HITS_PATTERN =
             Pattern.compile("(targetHits\\s*:\\s*)(\\d+)");
+    private static final Pattern HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN =
+            Pattern.compile("(hnsw\\.exploreAdditionalHits\\s*:\\s*)(\\d+)");
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -910,22 +912,43 @@ public class HybridSearcher extends Searcher {
         }
 
         // Count targetHits occurrences
-        long count = TARGET_HITS_PATTERN.matcher(yql).results().count();
+        long targetHitsCount = TARGET_HITS_PATTERN.matcher(yql).results().count();
 
-        if (count == 0) {
+        if (targetHitsCount == 0) {
             throw new RuntimeException(
                     "YQL does not contain targetHits clause, cannot overwrite it.");
         }
 
-        if (count > 1) {
+        // Count hnsw.exploreAdditionalHits occurrences
+        long hnswCount = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql).results().count();
+
+        if (hnswCount == 0) {
             throw new RuntimeException(
-                    "YQL contains multiple targetHits clauses ("
-                            + count
-                            + "), expected exactly one.");
+                    "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits is"
+                            + " present. Both parameters must be present together.");
         }
 
-        // Replace the targetHits value while preserving other parameters
-        return TARGET_HITS_PATTERN.matcher(yql).replaceFirst("$1" + newTargetHits);
+        if (targetHitsCount != hnswCount) {
+            throw new RuntimeException(
+                    "YQL contains "
+                            + targetHitsCount
+                            + " targetHits occurrences but "
+                            + hnswCount
+                            + " hnsw.exploreAdditionalHits occurrences. Both must have the same"
+                            + " count.");
+        }
+
+        // Replace all targetHits occurrences
+        String updatedYql = TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
+
+        // Also update hnsw.exploreAdditionalHits to 2000-newTargetHits for all occurrences
+        int newExploreAdditionalHits = 2000 - newTargetHits;
+        updatedYql =
+                HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN
+                        .matcher(updatedYql)
+                        .replaceAll("$1" + newExploreAdditionalHits);
+
+        return updatedYql;
     }
 
     public Query createSubQuery(
