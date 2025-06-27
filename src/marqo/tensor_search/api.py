@@ -57,13 +57,10 @@ def generate_config() -> config.Config:
         query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
-        async_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_ASYNC_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
         default_search_timeout_ms=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_SEARCH_TIMEOUT_MS),
         feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),
-        get_batch_concurrency_limit=utils.read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_CONCURRENCY_LIMIT_PER_GET_REQUEST
-        ),
+        get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
@@ -406,6 +403,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
+
     # Get configuration for query logging (outside timing to avoid overhead)
     slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
     log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
@@ -447,7 +445,6 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 track_total_hits=search_query.trackTotalHits,
                 relevance_cutoff= search_query.relevance_cutoff,
                 sort_by = search_query.sort_by,
-                interpolation_method=search_query.interpolationMethod
             )
             return ORJSONResponse(result)
         except Exception as e:

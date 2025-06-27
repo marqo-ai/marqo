@@ -9,7 +9,7 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.exceptions import InternalError, InvalidArgumentError
 
 
-class AllZeroWeightsError(InvalidArgumentError):
+class ZeroSumWeightsError(InvalidArgumentError):
     pass
 
 
@@ -36,7 +36,6 @@ class VectorInterpolation(abc.ABC):
 
 
 def from_interpolation_method(method: InterpolationMethod):
-    method = method.lower()
     if method == InterpolationMethod.SLERP:
         return Slerp()
     elif method == InterpolationMethod.NLERP:
@@ -62,7 +61,7 @@ class Lerp(VectorInterpolation):
             The interpolated vector
 
         Raises:
-            AllZeroWeightsError: If all weights are zero
+            ZeroSumWeightsError: If the sum of the weights is zero
         """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
@@ -70,32 +69,23 @@ class Lerp(VectorInterpolation):
         if len(vectors) != len(weights):
             raise ValueError('Vectors and weights must have the same length')
 
-        # Check if all vectors have the same length BEFORE creating NumPy arrays
-        # This avoids the NumPy deprecation warning about ragged arrays
-        vector_lengths = [len(v) for v in vectors]
-        if len(set(vector_lengths)) != 1:
-            raise ValueError('Vectors must have the same length')
-
-        # Now safe to convert to NumPy arrays since all vectors have same length
-        np_vectors = np.array(vectors)
-        np_weights = np.array(weights)
-        
-        # Get sum of absolute values of weights
-        weight_sum = np.sum(np.abs(np_weights))
+        weight_sum = sum(weights)
 
         if weight_sum == 0:
-            raise AllZeroWeightsError(
-                'All weights are zero. LERP cannot interpolate vectors with all zero weights.'
+            raise ZeroSumWeightsError(
+                'Sum of weights is zero. LERP cannot interpolate vectors with zero sum of weights'
             )
 
-        # Calculate normalized weights (divide all by sum of absolute values)
-        normalized_weights = np_weights / weight_sum
-        
-        # Multiply each vector by its corresponding normalized weight, then sum (weighted average)
-        result = np.sum(np_vectors * normalized_weights[:, np.newaxis], axis=0)
-        
-        # Convert back to list for consistent return type
-        return result.tolist()
+        result = [0] * len(vectors[0])
+        current_length = len(vectors[0])
+        for vector, weight in zip(vectors, weights):
+            if len(vector) != current_length:
+                raise ValueError('Vectors must have the same length')
+            current_length = len(vector)
+
+            for i, value in enumerate(vector):
+                result[i] += (weight / weight_sum) * value
+        return result
 
 
 class Nlerp(Lerp):
@@ -114,26 +104,18 @@ class Nlerp(Lerp):
             The interpolated vector
 
         Raises:
-            AllZeroWeightsError: If all weights are zero
+            ZeroSumWeightsError: If the sum of the weights is zero
             ZeroMagnitudeVectorError: If the interpolated vector has zero magnitude
         """
         lerp_result = super().interpolate(vectors, weights)
-        
-        # Convert to NumPy array for efficient operations
-        np_result = np.array(lerp_result)
-        
-        # Calculate the norm using NumPy's faster norm function
-        norm = np.linalg.norm(np_result)
+        length = math.sqrt(sum(x ** 2 for x in lerp_result))
 
-        if norm == 0:
+        if length == 0:
             raise ZeroMagnitudeVectorError(
                 'Interpolated vector has zero magnitude. Cannot normalize a vector with zero magnitude'
             )
 
-        # Normalize the vector using NumPy's efficient division
-        normalized_result = np_result / norm
-        
-        return normalized_result.tolist()
+        return [x / length for x in lerp_result]
 
 
 class Slerp(VectorInterpolation):
@@ -158,7 +140,7 @@ class Slerp(VectorInterpolation):
             The interpolated vector
 
         Raises:
-            AllZeroWeightsError: If all weights are zero
+            ZeroSumWeightsError: If the sum of a consecutive pair of weights is zero
         """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
@@ -166,20 +148,10 @@ class Slerp(VectorInterpolation):
         if len(vectors) != len(weights):
             raise ValueError('Vectors and weights must have the same length')
 
-        # Check if all vectors have the same length
-        if len(set(len(v) for v in vectors)) != 1:
-            raise ValueError('Vectors must have the same length')
-
-        # Early validation: check if all weights are zero
-        np_weights = np.array(weights)
-        weight_sum = np.sum(np.abs(np_weights))
-        if weight_sum == 0:
-            raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate vectors with all zero weights.')
-
         if self.method == self.Method.Sequential:
-            return self._interpolate_sequential(vectors, weights, prenormalized)
+            return self._interpolate_sequential(vectors, weights)
         elif self.method == self.Method.Hierarchical:
-            return self._interpolate_hierarchical(vectors, weights, prenormalized)
+            return self._interpolate_hierarchical(vectors, weights)
         else:
             raise InternalError(f'Unknown interpolation method: {self.method}')
 
@@ -207,36 +179,36 @@ class Slerp(VectorInterpolation):
         # Ensure the dot product is within the range [-1, 1]
         cos = np.clip(cos, -1.0, 1.0)
 
-        theta = np.arccos(cos)
+        theta = math.acos(cos)
 
-        sin_theta = np.sin(theta)
+        sin_theta = math.sin(theta)
         if sin_theta == 0:
             # Co-linear vectors, return linear interpolation
             return ((1 - t) * v0 + t * v1).tolist()
 
-        slerp_v0 = np.sin((1 - t) * theta) / sin_theta * v0
-        slerp_v1 = np.sin(t * theta) / sin_theta * v1
+        slerp_v0 = math.sin((1 - t) * theta) / sin_theta * v0
+        slerp_v1 = math.sin(t * theta) / sin_theta * v1
 
         result = slerp_v0 + slerp_v1
         return result.tolist()
 
-    def _interpolate_sequential(self, vectors: List[List[float]], weights: List[float], prenormalized: bool) -> List[float]:
+    def _interpolate_sequential(self, vectors: List[List[float]], weights: List[float]) -> List[float]:
         weights_copy = weights.copy()
         result = vectors[0]
         for i in range(1, len(vectors)):
             w0 = weights_copy[i - 1]
             w1 = weights_copy[i]
-            sum = np.abs(w0) + np.abs(w1)
+            sum = w0 + w1
 
             if sum == 0:
-                raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate '
-                                          'vectors with all zero weights.')
+                raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                          'vectors with a sum weight of zero'.format(w0, w1))
 
-            result = self._slerp(result, vectors[i], w1 / sum, prenormalized)
+            result = self._slerp(result, vectors[i], w1 / sum)
             weights_copy[i] = sum / 2
         return result
 
-    def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float], prenormalized: bool) -> List[float]:
+    def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float]) -> List[float]:
         while len(vectors) > 1:
             result = []
             new_weights = []
@@ -249,14 +221,14 @@ class Slerp(VectorInterpolation):
 
                 w0 = weights[i]
                 w1 = weights[i + 1]
-                sum = np.abs(w0) + np.abs(w1)
+                sum = w0 + w1
 
                 if sum == 0:
-                    raise AllZeroWeightsError('All weights are zero. SLERP cannot interpolate '
-                                              'vectors with all zero weights.')
+                    raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                              'vectors with a sum weight of zero'.format(w0, w1))
 
                 result.append(
-                    self._slerp(vectors[i], vectors[i + 1], w1 / sum, prenormalized)
+                    self._slerp(vectors[i], vectors[i + 1], w1 / sum)
                 )
                 new_weights.append(sum / 2)
             vectors = result

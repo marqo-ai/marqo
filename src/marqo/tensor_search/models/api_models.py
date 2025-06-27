@@ -13,12 +13,11 @@ from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
-from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
@@ -61,9 +60,9 @@ class SearchQuery(BaseMarqoModel):
     hybridParameters: Optional[HybridParameters] = None
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
+    language: Optional[str] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
-    interpolationMethod: Optional[InterpolationMethod] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -306,14 +305,24 @@ class SearchQuery(BaseMarqoModel):
 
         return values
 
+    @root_validator(pre=False)
+    def validate_language_only_for_lexical_hybrid(cls, values):
+        """Validate that language is only provided for lexical/hybrid search"""
+        language = values.get('language')
+        search_method = values.get('searchMethod')
+        
+        if language:
+            if search_method == SearchMethod.TENSOR:
+                raise ValueError(
+                    "language parameter is not supported for TENSOR search method. "
+                    "Language specification only applies to lexical and hybrid search."
+                )
+        return values
+
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
 
-    def get_context_documents(self) -> Optional[SearchContextDocuments]:
-        """Extract the documents from the context, if provided"""
-        return self.context.documents if self.context is not None else None
-    
     @root_validator(pre=False)
     def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
         """Validate that relevance cutoff is only provided for hybrid search"""
