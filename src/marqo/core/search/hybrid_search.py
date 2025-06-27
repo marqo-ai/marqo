@@ -45,6 +45,7 @@ class HybridSearch:
             hybrid_parameters: HybridParameters = None,
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
+            language: Optional[str] = None,
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None
     ) -> Dict:
@@ -262,6 +263,7 @@ class HybridSearch:
             hybrid_parameters=hybrid_parameters,
             facets=facets,
             track_total_hits=track_total_hits,
+            language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by
         )

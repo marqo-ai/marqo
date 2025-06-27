@@ -26,7 +26,7 @@ class TestHybridSearch(TestCase):
     @patch('marqo.core.search.hybrid_search.gather_documents_from_response')
     @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
     def test_search_creates_correct_marqo_hybrid_query(
-        self, mock_metrics, mock_gather_docs, mock_parse_lexical, 
+        self, mock_metrics, mock_gather_docs, mock_parse_lexical,
         mock_vectorise, mock_vespa_factory
     ):
         """Test that HybridSearch.search creates MarqoHybridQuery with all relevant parameters."""
@@ -126,7 +126,8 @@ class TestHybridSearch(TestCase):
                 score_modifiers=score_modifiers,
                 hybrid_parameters=hybrid_parameters,
                 facets=facets,
-                track_total_hits=True
+                track_total_hits=True,
+                language="en"
             )
             
             # Verify MarqoHybridQuery was created with correct parameters
@@ -150,6 +151,7 @@ class TestHybridSearch(TestCase):
             self.assertEqual(call_args['hybrid_parameters'], hybrid_parameters)
             self.assertEqual(call_args['facets'], facets)
             self.assertTrue(call_args['track_total_hits'])
+            self.assertEqual(call_args['language'], "en")
             
             # Verify score_modifiers are processed correctly
             self.assertIsNotNone(call_args['score_modifiers'])

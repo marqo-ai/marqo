@@ -3,8 +3,11 @@ from typing import Dict, Optional, List
 import jsonschema
 
 from marqo.api import exceptions as errors
+from marqo.core.exceptions import InternalError
+from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, custom_vector_mappings_schema
+from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, \
+    custom_vector_mappings_schema, text_field_mappings_schema
 from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
 from marqo import marqo_docs
 
@@ -27,6 +30,13 @@ def validate_mappings_object_format(mappings: Dict) -> None:
             elif configuration["type"] == enums.MappingsObjectType.custom_vector:
                 # Add any other custom_vector field name validations if needed.
                 _validate_custom_vector_configuration_format(configuration)
+
+            elif configuration["type"] == enums.MappingsObjectType.text_field:
+                _validate_text_field_mappings_object(configuration)
+            else:
+                raise InternalError(
+                    f'Unknown mappings object type `{configuration["type"]}` for field `{field_name}`'
+                )
 
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
@@ -60,6 +70,34 @@ def _validate_custom_vector_configuration_format(configuration: Dict):
             f"Error validating custom vector mappings object. Reason: \n{str(e)}"
             f"\n Read about the mappings object here: {marqo_docs.mappings()}"
         )
+
+
+def _validate_text_field_mappings_object(mappings_object: Dict):
+    """Validates the text field mappings object
+
+    Args:
+        mappings_object: The mapping configuration for a text field with language
+
+    Returns:
+        The original object, if it passes validation
+
+    Raises InvalidArgError if the object is badly formatted
+
+    Example text field mappings must look like this:
+    "my_text_field": {
+        "type": "text_field",
+        "language": "es"
+    }
+    """
+    try:
+        jsonschema.validate(instance=mappings_object, schema=text_field_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgumentError(
+            f"Error validating text field mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
+        )
+
+    return mappings_object
 
 
 def validate_field_name(field_name: str) -> None:

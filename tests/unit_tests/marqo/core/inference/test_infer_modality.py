@@ -1,12 +1,15 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import base64
+from io import BytesIO
 
 import requests
+from PIL import Image
 
 from marqo.core.inference.api import Modality
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
-    get_url_file_extension
+    get_url_file_extension, is_base64_image
 
 
 class TestMultimodalUtils(unittest.TestCase):
@@ -157,3 +160,37 @@ class TestMultimodalUtils(unittest.TestCase):
             mock_fetch.assert_not_called()
             mock_magic.assert_called_once_with(bytes, mime=True)
             mock_infer_on_mime.assert_called_once_with("image/jpeg")
+
+    def test_is_base64_image_data_url_format(self):
+        """Test recognition of data URL format base64 images."""
+        # Create a small test image (1x1 red pixel PNG)
+        img = Image.new('RGB', (1, 1), color='red')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Test data URL format
+        data_url = f"data:image/png;base64,{base64_data}"
+        self.assertTrue(is_base64_image(data_url))
+        
+        # Test different image formats
+        data_url_jpeg = f"data:image/jpeg;base64,{base64_data}"
+        self.assertTrue(is_base64_image(data_url_jpeg))
+
+    def test_is_base64_image_invalid_cases(self):
+        """Test rejection of invalid base64 image cases."""
+        self.assertFalse(is_base64_image("short"))
+        self.assertFalse(is_base64_image("not_base64_at_all" * 10))
+        self.assertFalse(is_base64_image("data:text/plain;base64,VGVzdA=="))
+        
+    def test_infer_modality_base64_images(self):
+        """Test that infer_modality correctly identifies base64 images."""
+        # Create a small test image
+        img = Image.new('RGB', (1, 1), color='purple')
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Test data URL format
+        data_url = f"data:image/png;base64,{base64_data}"
+        self.assertEqual(infer_modality(data_url), Modality.IMAGE)
