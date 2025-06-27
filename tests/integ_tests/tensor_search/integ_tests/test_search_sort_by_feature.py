@@ -216,7 +216,16 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
     @classmethod
     def _help_sort_function(cls, query: Optional[str] = ' '.join([f"content{i}" for i in range(10)]),
-                            sort_by: Optional[dict] = None, limit=10, offset=0) -> dict:
+                            sort_by: Optional[dict] = None, limit=10, offset=0,
+                            hybrid_parameters: Optional[dict] = None
+                            ) -> dict:
+        if hybrid_parameters is None:
+            hybrid_parameters = {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0.5,
+            }
+
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
@@ -224,11 +233,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             search_query_dict={
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
-                "hybridParameters": {
-                    "retrievalMethod": "disjunction",
-                    "rankingMethod": "rrf",
-                    "alpha": 0.5,
-                },
+                "hybridParameters": hybrid_parameters,
                 "sortBy": sort_by,
                 "limit": limit,
                 "offset": offset
@@ -259,6 +264,110 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for _ in range(10):
             # We run it several times to ensure that the results are consistent
             res = self._help_sort_function(sort_by=sort_by)
+            self.assertEqual(10, res["_sortCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+                ids
+            )
+
+    def test_hybrid_sorting_with_lexical_tensor_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "lexical",
+            "rankingMethod": "tensor",
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+            self.assertEqual(10, res["_sortCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+                ids
+            )
+
+    def test_hybrid_sorting_with_lexical_lexical_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "lexical",
+            "rankingMethod": "lexical",
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+            self.assertEqual(10, res["_sortCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+                ids
+            )
+
+    def test_hybrid_sorting_with_tensor_lexical_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "tensor",
+            "rankingMethod": "lexical",
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+            self.assertEqual(10, res["_sortCandidates"])
+            hits = res["hits"]
+            self.assertEqual(10, len(hits))
+            ids = [hit["_id"] for hit in hits]
+            self.assertEqual(
+                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+                ids
+            )
+
+    def test_hybrid_sorting_with_tensor_tensor_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "tensor",
+            "rankingMethod": "tensor",
+        }
+
+        for _ in range(10):
+            # We run it several times to ensure that the results are consistent
+            res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
             self.assertEqual(10, res["_sortCandidates"])
             hits = res["hits"]
             self.assertEqual(10, len(hits))

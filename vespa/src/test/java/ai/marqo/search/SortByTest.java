@@ -1115,6 +1115,29 @@ class SortByTest {
         }
 
         @Test
+        void shouldConvertZeroTargetHitsToOneButKeepHitsZero() {
+            Query query = new Query("search/?query=test");
+            query.setHits(50);
+            query.setOffset(0);
+            query.properties()
+                    .set("marqo__yql.tensor", "select * from sources * where {targetHits: 50}");
+
+            HybridSearcher searcher = new HybridSearcher();
+
+            // Call with relevanceCandidates = 0, which should result in hits = 0 but targetHits = 1
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
+
+            // Verify hits is set to 0 (original relevanceCandidates value)
+            assertThat(result.getHits()).isEqualTo(0);
+
+            // Verify targetHits was converted from 0 to 1 in the tensor YQL
+            String updatedTensorYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedTensorYql).contains("targetHits: 1");
+            assertThat(updatedTensorYql).doesNotContain("targetHits: 0");
+        }
+
+        @Test
         void shouldHandleRelevanceCutoffLogicWithSortByPresent() {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");

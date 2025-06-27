@@ -340,7 +340,7 @@ public class HybridSearcher extends Searcher {
         // --- End facets attachment ---
         if (relevanceCutoffMethod != null) {
             // Add relevance cut-off information to the processed hits
-            processedHits.setField("marqo__relevanceCandidates", relevanceCandidates);
+            processedHits.setField("marqo__relevantCandidates", relevanceCandidates);
             processedHits.setField("marqo__probeCandidates", probeCandidates);
         }
 
@@ -898,7 +898,7 @@ public class HybridSearcher extends Searcher {
 
         // Count targetHits occurrences
         long count = TARGET_HITS_PATTERN.matcher(yql).results().count();
-        
+
         if (count == 0) {
             throw new RuntimeException(
                     "YQL does not contain targetHits clause, cannot overwrite it.");
@@ -906,7 +906,9 @@ public class HybridSearcher extends Searcher {
 
         if (count > 1) {
             throw new RuntimeException(
-                    "YQL contains multiple targetHits clauses (" + count + "), expected exactly one.");
+                    "YQL contains multiple targetHits clauses ("
+                            + count
+                            + "), expected exactly one.");
         }
 
         // Replace the targetHits value while preserving other parameters

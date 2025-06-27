@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class RootFields(BaseModel):
     total_count: Optional[int] = Field(None, alias='totalCount')
     sort_candidates: Optional[int] = Field(None, alias='marqo__sortCandidates')
-    relevance_candidates: Optional[int] = Field(None, alias='marqo__relevanceCandidates')
+    relevant_candidates: Optional[int] = Field(None, alias='marqo__relevantCandidates')
     probe_candidates: Optional[int] = Field(None, alias='marqo__probeCandidates')
 
 
