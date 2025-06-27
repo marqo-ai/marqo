@@ -48,7 +48,7 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
     AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
-from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.inference.modality_utils import infer_modality, is_base64_image
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
@@ -85,6 +85,37 @@ from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 logger = get_logger(__name__)
+
+
+def _sanitize_query_for_response(query):
+    """
+    Replace base64 image content in queries with 'data:image/[omitted]' for response.
+    
+    Args:
+        query: The query object which can be a string, dict, or CustomVectorQuery
+        
+    Returns:
+        The sanitized query object with base64 content replaced
+    """
+    if query is None:
+        return query
+    
+    if isinstance(query, str):
+        if is_base64_image(query):
+            return 'data:image/[omitted]'
+        return query
+    
+    if isinstance(query, dict):
+        sanitized_query = {}
+        for key, value in query.items():
+            if is_base64_image(key):
+                sanitized_query['data:image/[omitted]'] = value
+            else:
+                sanitized_query[key] = value
+        return sanitized_query
+    
+    # For CustomVectorQuery or other types, return as-is
+    return query
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
@@ -454,7 +485,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
                 rerank_depth=rerank_depth
             )
-        elif search_method.upper() == SearchMethod.HYBRID:
+        else:  # SearchMethod.HYBRID
             # TODO: Deal with circular import when all modules are refactored out.
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
@@ -492,9 +523,11 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
-        search_result["query"] = text.dict()  # Make object JSON serializable
+        response_query = text.dict()  # Make object JSON serializable
     else:
-        search_result["query"] = text
+        response_query = text
+
+    search_result["query"] = _sanitize_query_for_response(response_query)
 
     search_result["limit"] = result_count
     search_result["offset"] = offset

@@ -3,7 +3,7 @@ import unittest
 
 import requests
 from marqo.errors import MarqoWebError
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestBase64ImageSearch(MarqoTestCase):
