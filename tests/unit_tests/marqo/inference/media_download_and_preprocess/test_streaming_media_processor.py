@@ -355,14 +355,14 @@ class TestChunkTimingGenerator(unittest.TestCase):
         self.assertEqual([], chunks)
 
     def test_overlap_duration_larger_than_duration(self):
-        """Test behavior when overlap lager relative to chunk duration."""
+        """Test behavior when overlap larger relative to chunk duration."""
         generator = ChunkTimingGenerator(duration=5.0, chunk_duration=10.0, overlap_duration=6.0)
         chunks = list(generator)
         expected = [(0.0, 5.0)]
         self.assertEqual(expected, chunks)
 
     def test_overlap_duration_equals_to_duration(self):
-        """Test behavior when overlap lager relative to chunk duration."""
+        """Test behavior when overlap larger relative to chunk duration."""
         generator = ChunkTimingGenerator(duration=5.0, chunk_duration=10.0, overlap_duration=5.0)
         chunks = list(generator)
         expected = [(0.0, 5.0)]
