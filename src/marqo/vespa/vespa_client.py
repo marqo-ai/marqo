@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 import httpcore
 import httpx
 import orjson
+import ssl
+import certifi
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -78,21 +80,14 @@ class VespaClient:
         self.get_batch_concurrency_limit = get_batch_concurrency_limit
         self.partial_pool_size = partial_update_pool_size
 
-        # Persistent transport, so we don't keep initializing per request
-        self.async_transport = httpx.AsyncHTTPTransport(
-            limits=httpx.Limits(
-                max_keepalive_connections=async_pool_size,
-                max_connections=None),
-            http1=True,
-            http2=False  # Using http2 is slightly slower
-        )
+        # Persistent ssl context, so we don't keep initializing per request
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
 
     def close(self):
         """
         Close the VespaClient object.
         """
         self.http_client.close()
-        self.async_transport.aclose()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
@@ -957,7 +952,10 @@ class VespaClient:
                                fields: Optional[List[str]],
                                schema: str,
                                connections: int, timeout: int) -> GetBatchResponse:
-        async with httpx.AsyncClient(transport=self.async_transport) as async_client:
+        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
+                                                         max_connections=connections),
+                                     verify=self.ssl_context
+                                     ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
