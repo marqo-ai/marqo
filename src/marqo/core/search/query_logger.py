@@ -6,6 +6,8 @@ marqo_query_logger = get_logger('marqo_query')
 
 slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
 log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
+log_vectors_in_query = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
+log_query_max_length = int(utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_MAX_LENGTH))
 
 
 class QueryLogger:
