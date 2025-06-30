@@ -7,7 +7,8 @@ import torch
 
 from tests.integ_tests.marqo_test import TestAudioUrls, TestVideoUrls
 from marqo.core.inference.api import *
-from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor, \
+    ChunkTimingGenerator
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
@@ -152,7 +153,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             (20.0, 30.0) # Last chunk, note that it ends at 30.0 but starts at 20.0
         ]
 
-        self.assertEqual(len(processed_chunks), len(expected_chunk_times))
+        self.assertEqual(len(expected_chunk_times), len(processed_chunks))
 
         for (chunk_time_str, tensor), (expected_start, expected_end) in zip(processed_chunks, expected_chunk_times):
             # Validate chunk time format and values
@@ -308,3 +309,76 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             # Validate tensor correctness
             self.assertIsInstance(tensor, torch.Tensor)
             self.assertEqual(tensor.shape, torch.Size([1, 10, 10]))
+
+
+class TestChunkTimingGenerator(unittest.TestCase):
+    """Unit tests for ChunkTimingGenerator class."""
+
+    def test_basic_functionality_no_overlap(self):
+        """Test basic chunking without overlap."""
+        generator = ChunkTimingGenerator(duration=10.0, chunk_duration=3.0, overlap_duration=0.0)
+        chunks = list(generator)
+        expected = [(0.0, 3.0), (3.0, 6.0), (6.0, 9.0), (7.0, 10.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_basic_functionality_with_overlap(self):
+        """Test basic chunking with overlap."""
+        generator = ChunkTimingGenerator(duration=10.0, chunk_duration=3.0, overlap_duration=1.0)
+        chunks = list(generator)
+        expected = [(0.0, 3.0), (2.0, 5.0), (4.0, 7.0), (6.0, 9.0), (7.0, 10.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_single_chunk_when_duration_equals_chunk_duration(self):
+        """Test single chunk when duration equals chunk duration."""
+        generator = ChunkTimingGenerator(duration=5.0, chunk_duration=5.0, overlap_duration=1.0)
+        chunks = list(generator)
+        expected = [(0.0, 5.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_single_chunk_when_duration_less_than_chunk_duration(self):
+        """Test single chunk when duration is less than chunk duration."""
+        generator = ChunkTimingGenerator(duration=3.0, chunk_duration=5.0, overlap_duration=1.0)
+        chunks = list(generator)
+        expected = [(0.0, 3.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_exact_fit_no_overlap(self):
+        """Test when duration divides evenly into chunks with no overlap."""
+        generator = ChunkTimingGenerator(duration=10.0, chunk_duration=5.0, overlap_duration=0.0)
+        chunks = list(generator)
+        expected = [(0.0, 5.0), (5.0, 10.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_zero_duration_should_generate_empty_chunk_list(self):
+        generator = ChunkTimingGenerator(duration=0.0, chunk_duration=5.0, overlap_duration=0.0)
+        chunks = list(generator)
+        self.assertEqual([], chunks)
+
+    def test_overlap_duration_larger_than_duration(self):
+        """Test behavior when overlap larger relative to chunk duration."""
+        generator = ChunkTimingGenerator(duration=5.0, chunk_duration=10.0, overlap_duration=6.0)
+        chunks = list(generator)
+        expected = [(0.0, 5.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_overlap_duration_equals_to_duration(self):
+        """Test behavior when overlap larger relative to chunk duration."""
+        generator = ChunkTimingGenerator(duration=5.0, chunk_duration=10.0, overlap_duration=5.0)
+        chunks = list(generator)
+        expected = [(0.0, 5.0)]
+        self.assertEqual(expected, chunks)
+
+    def test_negative_duration_should_raise_error(self):
+        with self.assertRaises(ValueError) as context:
+            ChunkTimingGenerator(duration=-1.0, chunk_duration=10.0, overlap_duration=5.0)
+        self.assertEqual('Duration of the media file is negative: -1.0', str(context.exception))
+
+    def test_negative_step_should_raise_error(self):
+        with self.assertRaises(ValueError) as context:
+            ChunkTimingGenerator(duration=11.0, chunk_duration=4.0, overlap_duration=5.0)
+        self.assertEqual('Chunking error due to chunk size (4.0) <= overlap (5.0)', str(context.exception))
+
+    def test_zero_step_should_raise_error(self):
+        with self.assertRaises(ValueError) as context:
+            ChunkTimingGenerator(duration=11.0, chunk_duration=5.0, overlap_duration=5.0)
+        self.assertEqual('Chunking error due to chunk size (5.0) <= overlap (5.0)', str(context.exception))
