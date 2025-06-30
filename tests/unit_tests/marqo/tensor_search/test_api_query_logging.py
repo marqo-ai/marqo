@@ -30,7 +30,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_slow_query_logging_enabled_default_env_vars(self, mock_time, mock_marqo_query_logger):
         """Test that slow queries are logged when query details logging is enabled"""
@@ -53,7 +53,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         self.assertIn("Query:", warning_call)
         self.assertIn("test query", warning_call)
 
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_slow_query_logging_disabled(self, mock_time, mock_marqo_query_logger):
         """Test that slow queries are not logged when query details logging is disabled"""
@@ -74,7 +74,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_fast_query_no_logging(self, mock_time, mock_marqo_query_logger):
         """Test that fast queries are not logged"""
@@ -92,7 +92,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1000"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_custom_threshold_configuration(self, mock_time, mock_marqo_query_logger):
         """Test that the query uses the configured threshold from environment variables"""
@@ -110,7 +110,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1000"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_exceed_custom_threshold_configuration(self, mock_time, mock_marqo_query_logger):
         """Test that the query uses the configured threshold from environment variables"""
@@ -131,7 +131,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_search_error_logging_enabled(self, mock_time, mock_marqo_query_logger):
         """Test that search errors are logged with details when logging is enabled"""
@@ -159,7 +159,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.api.parse_request_object')
     @patch('marqo.tensor_search.telemetry.time')
     def test_validation_error_logging_enabled(self, mock_time, mock_parse_request, mock_marqo_query_logger):
@@ -182,7 +182,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         self.assertIn("Failed search query", error_call)
         self.assertIn("Query:", error_call)
 
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_search_error_logging_disabled(self, mock_time, mock_marqo_query_logger):
         """Test that search errors are logged without details when logging is disabled"""
@@ -205,7 +205,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     })
-    @patch('marqo.tensor_search.api.marqo_query_logger')
+    @patch('marqo.core.search.query_logger.marqo_query_logger')
     @patch('marqo.tensor_search.telemetry.time')
     def test_slow_and_error_query_logs_error_only(self, mock_time, mock_marqo_query_logger):
         """Test that queries that are both slow AND error out only log the error (not slow query)"""
