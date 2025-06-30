@@ -1,5 +1,7 @@
+import importlib
 import logging
 import os
+import sys
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -92,6 +94,10 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_slow_query_logging(self):
         """Integration test for slow query logging with details enabled"""
+
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
@@ -122,6 +128,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_fast_query_no_logging(self):
         """Integration test to verify fast queries are not logged"""
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
@@ -149,6 +158,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_slow_query_no_logging_when_disabled(self):
         """Integration test to verify fast queries are not logged"""
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
@@ -176,6 +188,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_search_error_logging(self):
         """Integration test for search error logging"""
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
@@ -206,6 +221,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_search_error_no_logging_when_disabled(self):
         """Integration test for search error logging"""
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
@@ -232,6 +250,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     } | default_env_vars)
     def test_search_error_logging_overrides_slow_query_logging(self):
         """Integration test for search error logging"""
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
         for search_method in SearchMethod:
             for index in self.indexes:
                 with self.subTest(search_method=search_method, index=index.type):
