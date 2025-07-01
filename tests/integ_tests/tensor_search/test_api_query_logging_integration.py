@@ -123,6 +123,208 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     self.assertIn(f"Query: {search_query}", warning_log)
 
     @patch.dict(os.environ, {
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    } | default_env_vars)
+    def test_slow_query_logging_all_fields_sanitised_excluding_secret_fields(self):
+        """Integration test for slow query logging with all fields for a hybrid query on semistructured index"""
+
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+        search_method = SearchMethod.HYBRID
+        index = self.indexes[0]
+
+        self._setup_log_capture()
+
+        search_query = {
+            "searchMethod": search_method.value,
+            "limit": 1,
+            "offset": 20,
+            "rerankDepth": 100,
+            "efSearch": 5000,
+            "approximate": True,
+            "approximateThreshold": 0.5,
+            "showHighlights": False,
+            "filter": "color:red AND brand:Marqo",
+            "mediaDownloadHeaders": {"Authorization": "<BEARER TOKEN TOP SECRET>"},
+            "modelAuth": {
+                "s3": {
+                    "aws_access_key_id": "<SOME ACCESS KEY ID>",
+                    "aws_secret_access_key": "<SOME SECRET ACCESS KEY>"
+                }
+            },
+            "context": {
+                "tensor": [
+                    {"vector": [0.2] * 384, "weight": 0.2},
+                    {"vector": [0.3] * 384, "weight": 0.8},
+                ],
+                # TODO add document ids when PR 1254 is merged
+            },
+            "hybridParameters": {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0.3,
+                "rrfK": 60,
+                "searchableAttributesLexical": ["text_field_1"],
+                "searchableAttributesTensor": ["text_field_1"],
+                "scoreModifiersLexical": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                "scoreModifiersTensor": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                "queryLexical": "short lexical",
+                "queryTensor": {
+                    "this is a long query with more than 20 characters": 0.3,
+                    "this is a short one": 0.2,
+                    "and this is another long one": 0.5
+                },
+            },
+            "facets": {
+                "fields": {
+                    "color": {"type": "string", "excludeTerms": ["color:red"]},
+                    "brand": {"type": "string", "maxResults": 10, "excludeTerms": ["brand:Marqo"]},
+                    "category": {"type": "string", "order": "asc", "maxResults": 5}
+                },
+                "maxDepth": 1000,
+                "maxResults": 3,
+                "order": "desc"
+            },
+            "trackTotalHits": True,
+            "language": "pt",
+            "sortBy": {
+                "fields": [
+                    {"fieldName": "price", "order": "desc", "missing": "last"}
+                ],
+                "sortDepth": 200,
+                "sortCandidates": 500
+            },
+            "relevanceCutoff": {
+                "method": "mean_std_dev",
+                "probeDepth": 500,
+                "parameters": {"stdDevFactor": 0.5}
+            }
+        }
+
+        # Execute
+        response = self.client.post(f"/indexes/{index.name}/search", json=search_query)
+
+        # Verify response is successful
+        self.assertEqual(response.status_code, 200)
+
+        # Verify slow query was logged with details
+        warning_logs = [msg for msg in self.log_messages if "Slow search query detected" in msg]
+        self.assertTrue(len(warning_logs) > 0,
+                        f"Expected slow query log, but got logs: {self.log_messages}")
+
+        expected_query = {
+            "searchMethod": "HYBRID",
+            "limit": 1,
+            "offset": 20,
+            "rerankDepth": 100,
+            "efSearch": 5000,
+            "approximate": True,
+            "approximateThreshold": 0.5,
+            "showHighlights": False,
+            "filter": "color:red AND brand:Marqo",
+            "context": {
+                "tensor": [
+                    {"vector": [], "weight": 0.2},
+                    {"vector": [], "weight": 0.8},
+                ]
+            },
+            "hybridParameters": {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0.3,
+                "rrfK": 60,
+                "searchableAttributesLexical": ["text_field_1"],
+                "searchableAttributesTensor": ["text_field_1"],
+                "scoreModifiersLexical": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                "scoreModifiersTensor": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                "queryLexical": "short lexical",
+                "queryTensor": {
+                    "this is a long query...[truncated:20/49]": 0.3,
+                    "this is a short one": 0.2,
+                    "and this is another ...[truncated:20/28]": 0.5
+                },
+            },
+            "facets": {
+                "fields": {
+                    "color": {"type": "string", "excludeTerms": ["color:red"]},
+                    "brand": {"type": "string", "maxResults": 10, "excludeTerms": ["brand:Marqo"]},
+                    "category": {"type": "string", "order": "asc", "maxResults": 5}
+                },
+                "maxDepth": 1000,
+                "maxResults": 3,
+                "order": "desc"
+            },
+            "trackTotalHits": True,
+            "language": "pt",
+            "sortBy": {
+                "fields": [
+                    {"fieldName": "price", "order": "desc", "missing": "last"}
+                ],
+                "sortDepth": 200,
+                "sortCandidates": 500
+            },
+            "relevanceCutoff": {
+                "method": "mean_std_dev",
+                "probeDepth": 500,
+                "parameters": {"stdDevFactor": 0.5}
+            }
+        }
+        query_index = warning_logs[0].find('Query: ')
+        self.assertNotEquals(-1, query_index)
+        self.assertEqual(f"Query: {expected_query}", warning_logs[0][query_index:])
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    } | default_env_vars)
+    def test_slow_query_logging_sanitised_custom_vector_fields(self):
+        """Integration test for slow query logging with all fields for a hybrid query on semistructured index"""
+
+        # reload the module to apply the env var change
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+        search_method = SearchMethod.HYBRID
+        index = self.indexes[0]
+
+        self._setup_log_capture()
+
+        search_query = {
+            "q": {
+                "customVector": {
+                    "content": "this is a long query with more than 20 characters",
+                    "vector": [0.1] * 384
+                }
+            },
+            "searchMethod": search_method.value,
+            "limit": 1,
+        }
+
+        # Execute
+        response = self.client.post(f"/indexes/{index.name}/search", json=search_query)
+
+        # Verify response is successful
+        self.assertEqual(response.status_code, 200)
+
+        # Verify slow query was logged with details
+        warning_logs = [msg for msg in self.log_messages if "Slow search query detected" in msg]
+        self.assertTrue(len(warning_logs) > 0,
+                        f"Expected slow query log, but got logs: {self.log_messages}")
+
+        expected_query = {
+            "q": {
+                "customVector": {
+                    "content": "this is a long query...[truncated:20/49]",
+                    "vector": []
+                }
+            },
+            "searchMethod": "HYBRID",
+            "limit": 1,
+        }
+        self.assertIn(f"Query: {expected_query}", warning_logs[0])
+
+    @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1000",  # High threshold
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
     } | default_env_vars)

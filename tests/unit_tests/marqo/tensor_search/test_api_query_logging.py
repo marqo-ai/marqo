@@ -612,5 +612,163 @@ class TestAPIQueryLogging(MarqoTestCase):
 
             self.assertIn(f"{expected_query}", warning_call)
 
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_combination_of_all_fields_hybrid(self, mock_time):
+        """Test that all non-secret fields are sanitised and logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "offset": 20,
+                "rerankDepth": 100,
+                "efSearch": 5000,
+                "approximate": True,
+                "approximateThreshold": 0.5,
+                "showHighlights": False,
+                "reRanker": "owl/ViT-B/32",
+                "filter": "color:red AND brand:Marqo",
+                "mediaDownloadHeaders": {"Authorization": "<BEARER TOKEN TOP SECRET>"},
+                "modelAuth": {
+                    "s3": {
+                        "aws_access_key_id": "<SOME ACCESS KEY ID>",
+                        "aws_secret_access_key": "<SOME SECRET ACCESS KEY>"
+                    }
+                },
+                "context": {
+                    "tensor": [
+                        {"vector": [0.2] * 384, "weight": 0.2},
+                        {"vector": [0.3] * 384, "weight": 0.8},
+                    ],
+                    # TODO add document ids when PR 1254 is merged
+                },
+                "textQueryPrefix": "prefix",
+                "hybridParameters": {
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                    "alpha": 0.3,
+                    "rrfK": 60,
+                    "searchableAttributesLexical": ["description"],
+                    "searchableAttributesTensor": ["description"],
+                    "scoreModifiersLexical": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                    "scoreModifiersTensor": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                    "queryLexical": "short lexical",
+                    "queryTensor": {
+                        "this is a long query with more than 20 characters": 0.3,
+                        "this is a short one": 0.2,
+                        "and this is another long one": 0.5
+                    },
+                },
+                "facets": {
+                    "fields": {
+                        "color": {"type": "string", "excludeTerms": ["color:red"]},
+                        "brand": {"type": "string", "maxResults": 10, "excludeTerms": ["brand:Marqo"]},
+                        "category": {"type": "string", "order": "asc", "maxResults": 5}
+                    },
+                    "maxDepth": 1000,
+                    "maxResults": 3,
+                    "order": "desc"
+                },
+                "trackTotalHits": True,
+                "language": "pt",
+                "sortBy": {
+                    "fields": [
+                        {"fieldName": "price", "order": "desc", "missing": "last"}
+                    ],
+                    "sort_depth": 200,
+                    "sort_candidates": 500
+                },
+                "relevanceCutoff": {
+                    "method": "mean_std_dev",
+                    "probe_depth": 500,
+                    "parameters": {"std_dev_factor": 0.5}
+                }
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            # Please note that the order of the field must be the same as defined in the pydantic model
+            # so we can compare the generated string
+            expected_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "offset": 20,
+                "rerankDepth": 100,
+                "efSearch": 5000,
+                "approximate": True,
+                "approximateThreshold": 0.5,
+                "showHighlights": False,
+                "reRanker": "owl/ViT-B/32",
+                "filter": "color:red AND brand:Marqo",
+                "context": {
+                    "tensor": [
+                        {"vector": [], "weight": 0.2},
+                        {"vector": [], "weight": 0.8},
+                    ]
+                },
+                "textQueryPrefix": "prefix",
+                "hybridParameters": {
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                    "alpha": 0.3,
+                    "rrfK": 60,
+                    "searchableAttributesLexical": ["description"],
+                    "searchableAttributesTensor": ["description"],
+                    "scoreModifiersLexical": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                    "scoreModifiersTensor": {"add_to_score": [{"field_name": "epoch_timestamp", "weight": 0.01}]},
+                    "queryLexical": "short lexical",
+                    "queryTensor": {
+                        "this is a long query...[truncated:20/49]": 0.3,
+                        "this is a short one": 0.2,
+                        "and this is another ...[truncated:20/28]": 0.5
+                    },
+                },
+                "facets": {
+                    "fields": {
+                        "color": {"type": "string", "excludeTerms": ["color:red"]},
+                        "brand": {"type": "string", "maxResults": 10, "excludeTerms": ["brand:Marqo"]},
+                        "category": {"type": "string", "order": "asc", "maxResults": 5}
+                    },
+                    "maxDepth": 1000,
+                    "maxResults": 3,
+                    "order": "desc"
+                },
+                "trackTotalHits": True,
+                "language": "pt",
+                "sortBy": {
+                    "fields": [
+                        {"fieldName": "price", "order": "desc", "missing": "last"}
+                    ],
+                    "sortDepth": 200,
+                    "sortCandidates": 500
+                },
+                "relevanceCutoff": {
+                    "method": "mean_std_dev",
+                    "probeDepth": 500,
+                    "parameters": {"stdDevFactor": 0.5}
+                }
+            }
+
+            query_index = warning_call.find('Query: ')
+            self.assertNotEquals(-1, query_index)
+            self.assertEqual(f"Query: {expected_query}", warning_call[query_index:])
+
 if __name__ == '__main__':
     unittest.main()

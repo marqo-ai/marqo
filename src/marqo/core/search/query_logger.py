@@ -1,4 +1,3 @@
-import copy
 from typing import Union
 
 from marqo.logging import get_logger
@@ -25,7 +24,7 @@ class QueryLogger:
         """
 
         """
-        query_dict = self.search_query.dict(exclude_none=True, skip_defaults=True, exclude=SECRET_FIELDS)
+        query_dict = self.search_query.dict(by_alias=True, exclude_none=True, skip_defaults=True, exclude=SECRET_FIELDS)
         q = self.search_query.q
 
         # Truncate long query strings
@@ -35,14 +34,13 @@ class QueryLogger:
             else:
                 return query_str
 
-        def _sanitise_str_or_dict_query(query: Union[str, dict]):
+        def _sanitise_str_or_dict_query(query: Union[str, dict]) -> Union[str, dict]:
             if isinstance(query, str):
                 return _truncate_if_long(query)
-
-            if isinstance(query, dict):
+            elif isinstance(query, dict):
                 return {_truncate_if_long(key): value for key, value in query.items()}
-
-            return query
+            else:
+                return query
 
         if isinstance(q, CustomVectorQuery):
             if q.customVector.content:
