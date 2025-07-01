@@ -3,7 +3,7 @@ import uuid
 from marqo.client import Client
 from marqo.errors import MarqoWebError
 
-from tests.marqo_test import MarqoTestCase
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
 
 
 class TestLanguage(MarqoTestCase):
@@ -53,7 +53,7 @@ class TestLanguage(MarqoTestCase):
             docs,
             tensor_fields=["title3"],
             mappings={
-                "title1": {"type": "text_field", "language": "pt-BR"},
+                "title1": {"type": "text_field", "language": "pt"},
                 "title2": {"type": "text_field", "language": "fr"},
                 "title3": {"type": "text_field", "language": "en"}
             }
@@ -67,7 +67,7 @@ class TestLanguage(MarqoTestCase):
 
         # Define language/query combinations
         language_configs = [
-            ("pt-BR", "mole", "title1"),  # Portuguese
+            ("pt", "mole", "title1"),  # Portuguese
             ("fr", "collections", "title2"),  # French
         ]
 
@@ -131,6 +131,48 @@ class TestLanguage(MarqoTestCase):
         # Verify exact order of hits
         hit_ids = [hit["_id"] for hit in res["hits"]]
         self.assertEqual(['2', '1', '3'], hit_ids)
+
+    def test_field_language_override(self):
+        # mole stems differently in Portuguese and English
+        docs = [
+            {
+                "_id": "1",
+                "title_pt": "mole",
+            },
+            {
+                "_id": "2",
+                "title_en": "mole",
+            },
+        ]
+
+        add_res = self.client.index(self.multilingual_index_name).add_documents(
+            docs,
+            tensor_fields=[],
+            mappings={
+                "title_pt": {"type": "text_field", "language": "pt"},
+                "title_en": {"type": "text_field", "language": "end"},
+            }
+        )
+
+        self.assertFalse(add_res['errors'], "Should not have errors when adding documents")
+
+        res_pt = self.client.index(self.multilingual_index_name).search(
+            q="mole",
+            search_method="LEXICAL",
+            language="pt"
+        )
+
+        res_en = self.client.index(self.multilingual_index_name).search(
+            q="mole",
+            search_method="LEXICAL",
+            language="en"
+        )
+
+        hits_pt = [hit["_id"] for hit in res_pt["hits"]]
+        hits_en = [hit["_id"] for hit in res_en["hits"]]
+
+        self.assertEqual(["1"], hits_pt, "Should find only the Portuguese doc")
+        self.assertEqual(["2"], hits_en, "Should find only the English doc")
 
     def test_tensor_search_with_language_error(self):
         """Test that specifying language for tensor search raises an error."""
