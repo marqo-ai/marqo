@@ -3,7 +3,7 @@ import uuid
 from marqo.client import Client
 from marqo.errors import MarqoWebError
 
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase
 
 
 class TestLanguage(MarqoTestCase):
@@ -133,6 +133,7 @@ class TestLanguage(MarqoTestCase):
         self.assertEqual(['2', '1', '3'], hit_ids)
 
     def test_field_language_override(self):
+        """Test that field language is set in the schema, as others test could pass with good automatic detection."""
         # mole stems differently in Portuguese and English
         docs = [
             {
