@@ -268,7 +268,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                     "tensor": [
                         {"vector": [0.2] * 768, "weight": 0.2},
                         {"vector": [0.3] * 768, "weight": 0.8},
-                    ]
+                    ],
+                    # TODO add document ids when PR 1254 is merged
                 }
             }
 
@@ -344,6 +345,50 @@ class TestAPIQueryLogging(MarqoTestCase):
         EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
     })
     @patch('marqo.tensor_search.telemetry.time')
+    def test_truncate_long_query_in_hybrid_parameter(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "hybridParameters": {
+                    "queryLexical": "this is a long lexical query with more than 20 characters",
+                    "queryTensor": "this is a long tensor query with more than 20 characters",
+                }
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "hybridParameters": {
+                    "queryLexical": "this is a long lexic...[truncated:20/57]",
+                    "queryTensor": "this is a long tenso...[truncated:20/56]",
+                }
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
     def test_truncate_long_query_in_dict(self, mock_time):
         """Test that vectors (custom vector and context) in the query are not logged"""
         # Reload the module to apply the env vars
@@ -381,6 +426,58 @@ class TestAPIQueryLogging(MarqoTestCase):
                 },
                 "searchMethod": "TENSOR",
                 "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_truncate_long_query_in_dict_in_hybrid_parameter(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "hybridParameters": {
+                    "queryLexical": "short lexical",
+                    "queryTensor": {
+                        "this is a long query with more than 20 characters": 0.3,
+                        "this is a short one": 0.2,
+                        "and this is another long one": 0.5
+                    },
+                }
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "searchMethod": "HYBRID",
+                "limit": 10,
+                "hybridParameters": {
+                    "queryLexical": "short lexical",
+                    "queryTensor": {
+                        "this is a long query...[truncated:20/49]": 0.3,
+                        "this is a short one": 0.2,
+                        "and this is another ...[truncated:20/28]": 0.5
+                    },
+                }
             }
 
             self.assertIn(f"{expected_query}", warning_call)

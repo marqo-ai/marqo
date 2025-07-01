@@ -1,4 +1,5 @@
 import copy
+from typing import Union
 
 from marqo.logging import get_logger
 from marqo.tensor_search import utils
@@ -28,22 +29,35 @@ class QueryLogger:
         q = self.search_query.q
 
         # Truncate long query strings
-        def _truncate_long_query(query_str: str):
-            return f'{query_str[:log_query_max_length]}...[truncated:{log_query_max_length}/{len(query_str)}]'
+        def _truncate_if_long(query_str: str) -> str:
+            if len(query_str) > log_query_max_length:
+                return f'{query_str[:log_query_max_length]}...[truncated:{log_query_max_length}/{len(query_str)}]'
+            else:
+                return query_str
 
-        if isinstance(q, str):
-            if len(q) > log_query_max_length:
-                query_dict['q'] = _truncate_long_query(q)
-        elif isinstance(q, dict):
-            has_long_query_string = any([len(key) > log_query_max_length for key in q])
-            if has_long_query_string:
-                query_dict['q'] = {_truncate_long_query(key) if len(key) > log_query_max_length else key: value
-                                   for key, value in q.items()}
-        elif isinstance(q, CustomVectorQuery):
-            if q.customVector.content and len(q.customVector.content) > log_query_max_length:
-                query_dict["q"]["customVector"]["content"] = _truncate_long_query(q.customVector.content)
+        def _sanitise_str_or_dict_query(query: Union[str, dict]):
+            if isinstance(query, str):
+                return _truncate_if_long(query)
+
+            if isinstance(query, dict):
+                return {_truncate_if_long(key): value for key, value in query.items()}
+
+            return query
+
+        if isinstance(q, CustomVectorQuery):
+            if q.customVector.content:
+                query_dict["q"]["customVector"]["content"] = _truncate_if_long(q.customVector.content)
             # remove custom vector
             query_dict["q"]["customVector"]["vector"] = []
+        elif isinstance(q, (str, dict)):
+            query_dict['q'] = _sanitise_str_or_dict_query(q)
+        else: # q is None, handle separate tensor and lexical q in hybrid parameter
+            if self.search_query.hybridParameters.queryTensor:
+                query_dict["hybridParameters"]["queryTensor"] = _sanitise_str_or_dict_query(
+                    self.search_query.hybridParameters.queryTensor)
+            if self.search_query.hybridParameters.queryLexical:
+                query_dict["hybridParameters"]["queryLexical"] = _sanitise_str_or_dict_query(
+                    self.search_query.hybridParameters.queryLexical)
 
         # remove context vector
         if self.search_query.context and self.search_query.context.tensor:
