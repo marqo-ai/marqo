@@ -17,6 +17,7 @@ import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
+import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -327,7 +328,8 @@ class SortByTest {
         verify(spy, times(1))
                 .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
         verify(spy, never())
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(
+                        any(), any(), any(), anyInt(), anyInt(), anySet(), anyBoolean());
     }
 
     /*
@@ -346,18 +348,22 @@ class SortByTest {
         doReturn(null).when(spy).extractTensorRankFeature(any(), contains("add_weights_global"));
         doReturn(new HitGroup())
                 .when(spy)
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(
+                        any(), any(), any(), anyInt(), anyInt(), anySet(), anyBoolean());
 
         Query q = new Query("?q");
         q.properties().set("hits", 1);
         q.properties().set("offset", 0);
         q.properties().set("marqo__hybrid.retrievalMethod", "lexical");
         q.properties().set("marqo__hybrid.rankingMethod", "lexical");
+        q.properties().set("marqo__hybrid.paginationExclusions", "[\"1\", \"2\"]");
         // no sortBy.fields
 
         spy.search(q, makeEmptyExec());
 
-        verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
+        verify(spy, times(1))
+                .postProcessResults(
+                        any(), eq(q), any(), eq(1), eq(0), eq(Set.of("1", "2")), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 

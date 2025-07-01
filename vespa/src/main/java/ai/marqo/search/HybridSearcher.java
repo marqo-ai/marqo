@@ -271,16 +271,6 @@ public class HybridSearcher extends Searcher {
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
 
-        // Post-process the main hits result list.
-        HitGroup processedHits =
-                postProcessResults(
-                        hitsForPostProcessing,
-                        query,
-                        rerankDepthGlobal,
-                        limit,
-                        offset,
-                        idsToExclude,
-                        verbose);
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
         if (sortByFields != null) {
@@ -292,14 +282,14 @@ public class HybridSearcher extends Searcher {
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
-                postProcessResults(
-                        hitsForPostProcessing,
-                        query,
-                        rerankDepthGlobal,
-                        limit,
-                        offset,
-                        idsToExclude,
-                        verbose);
+                    postProcessResults(
+                            hitsForPostProcessing,
+                            query,
+                            rerankDepthGlobal,
+                            limit,
+                            offset,
+                            idsToExclude,
+                            verbose);
         }
 
         // --- Attach facets results if available ---
@@ -352,7 +342,8 @@ public class HybridSearcher extends Searcher {
             }
         }
         return filtered;
-    
+    }
+
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
@@ -361,7 +352,7 @@ public class HybridSearcher extends Searcher {
             Integer offset) {
 
         List<SortField> parsedSortByFields;
-      
+
         try {
             parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
         } catch (JsonProcessingException e) {
