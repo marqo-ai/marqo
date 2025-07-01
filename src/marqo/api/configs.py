@@ -49,7 +49,6 @@ def default_env_vars() -> dict:
         # Query Logging
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: 500,
         EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
-        EnvVars.MARQO_LOG_VECTORS_IN_QUERY: "TRUE",
         EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: 10_000,
 
         # Throttling

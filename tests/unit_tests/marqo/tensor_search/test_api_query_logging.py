@@ -243,53 +243,10 @@ class TestAPIQueryLogging(MarqoTestCase):
             mock_marqo_query_logger.warning.assert_not_called()
 
     @patch.dict(os.environ, {
-        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
-    })
-    @patch('marqo.tensor_search.telemetry.time')
-    def test_logging_vectors_by_default(self, mock_time):
-        """Test that vectors (custom vector and context) in the query are logged"""
-        # Reload the module to apply the env vars
-        importlib.reload(sys.modules['marqo.core.search.query_logger'])
-
-        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            # the elapsed time is set to 0.5s = 500ms
-            mock_time.perf_counter.side_effect = [0.0, 0.5]
-
-            search_query = {
-                "q": {
-                    "customVector": {
-                        "content": "abc",
-                        "vector": [0.1] * 768
-                    }
-                },
-                "searchMethod": "TENSOR",
-                "limit": 10,
-                "context": {
-                    "tensor": [
-                        {"vector": [0.2] * 768, "weight": 0.2},
-                        {"vector": [0.3] * 768, "weight": 0.8},
-                    ]
-                }
-            }
-
-            # Execute
-            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
-
-            # Verify
-            self.assertEqual(response.status_code, 200)
-            mock_marqo_query_logger.warning.assert_called_once()
-            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 500.0ms", warning_call)
-            self.assertIn("Query:", warning_call)
-            self.assertIn(f"{search_query}", warning_call)
-
-    @unittest.skip('Not sure if we need to support')
-    @patch.dict(os.environ, {
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
-        EnvVars.MARQO_LOG_VECTORS_IN_QUERY: "FALSE"
     })
     @patch('marqo.tensor_search.telemetry.time')
-    def test_do_not_log_vectors_when_disabled(self, mock_time):
+    def test_do_not_log_vectors(self, mock_time):
         """Test that vectors (custom vector and context) in the query are not logged"""
         # Reload the module to apply the env vars
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
