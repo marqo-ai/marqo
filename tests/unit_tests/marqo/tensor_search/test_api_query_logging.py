@@ -301,6 +301,219 @@ class TestAPIQueryLogging(MarqoTestCase):
 
             self.assertIn(f"{expected_query}", warning_call)
 
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_truncate_long_query(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "q": "this is a long query with more than 20 characters",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "q": "this is a long query...[truncated:20/49]",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_truncate_long_query_in_dict(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "q": {
+                    "this is a long query with more than 20 characters": 0.3,
+                    "this is a short one": 0.2,
+                    "and this is another long one": 0.5
+                },
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "q": {
+                    "this is a long query...[truncated:20/49]": 0.3,
+                    "this is a short one": 0.2,
+                    "and this is another ...[truncated:20/28]": 0.5
+                },
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_truncate_long_custom_vector_query_content(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "q": {
+                    "customVector": {
+                        "content": "this is a long query with more than 20 characters",
+                        "vector": [0.1] * 768
+                    }
+                },
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "q": {
+                    "customVector": {
+                        "content": "this is a long query...[truncated:20/49]",
+                        "vector": []
+                    }
+                },
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_skip_fields_with_secrets(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "q": "do not put secrets",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+                "mediaDownloadHeaders": {"Authorization": "<BEARER TOKEN TOP SECRET>"},
+                "modelAuth": {
+                    "s3": {
+                        "aws_access_key_id": "<SOME ACCESS KEY ID>",
+                        "aws_secret_access_key": "<SOME SECRET ACCESS KEY>"
+                    }
+                }
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "q": "do not put secrets",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
+
+    @patch.dict(os.environ, {
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
+    })
+    @patch('marqo.tensor_search.telemetry.time')
+    def test_skip_image_download_headers(self, mock_time):
+        """Test that vectors (custom vector and context) in the query are not logged"""
+        # Reload the module to apply the env vars
+        importlib.reload(sys.modules['marqo.core.search.query_logger'])
+
+        with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
+            # the elapsed time is set to 0.5s = 500ms
+            mock_time.perf_counter.side_effect = [0.0, 0.5]
+
+            search_query = {
+                "q": "do not put secrets",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+                "image_download_headers": {"Authorization": "<BEARER TOKEN TOP SECRET>"},
+            }
+
+            # Execute
+            response = self.client.post(f"/indexes/{self.index_name}/search", json=search_query)
+
+            # Verify
+            self.assertEqual(response.status_code, 200)
+            mock_marqo_query_logger.warning.assert_called_once()
+            warning_call = mock_marqo_query_logger.warning.call_args[0][0]
+            self.assertIn("Slow search query detected: 500.0ms", warning_call)
+            self.assertIn("Query:", warning_call)
+
+            expected_query = {
+                "q": "do not put secrets",
+                "searchMethod": "TENSOR",
+                "limit": 10,
+            }
+
+            self.assertIn(f"{expected_query}", warning_call)
 
 if __name__ == '__main__':
     unittest.main()

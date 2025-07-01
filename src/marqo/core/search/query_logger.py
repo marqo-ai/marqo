@@ -7,7 +7,7 @@ from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 
 marqo_query_logger = get_logger('marqo_query')
 
-SECRET_FIELDS = ['imageDownloadHeaders', 'image_download_headers', 'mediaDownloadHeaders', 'modelAuth']
+SECRET_FIELDS = {'imageDownloadHeaders', 'mediaDownloadHeaders', 'modelAuth'}
 
 slow_query_threshold_ms = float(utils.read_env_vars_and_defaults(EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS))
 log_query_details = utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QUERY_DETAILS).upper() == "TRUE"
@@ -21,36 +21,31 @@ class QueryLogger:
 
     @property
     def sanitised_query(self) -> dict:
-        query_dict = self.search_query.dict(exclude_none=True, skip_defaults=True)
+        """
 
-        # query = self.query_dict.get('q', None)
-        #
-        # # Replace secret fields with empty dict
-        # for field in SECRET_FIELDS:
-        #     if field in self.query_dict:
-        #         query_updates[field] = {}
-        #
-        # # Truncate long query strings
-        # def _truncate_long_query(query_str: str):
-        #     return f'[truncated:{log_query_max_length}/{len(query_str)}] {query_str[:log_query_max_length]}'
-        #
-        # if isinstance(query, str):
-        #     if len(query) > log_query_max_length:
-        #         query_updates['q'] = _truncate_long_query(query)
-        # elif isinstance(query, dict):
-        #     if 'customVector' in query:
-        #         pass
-        #     else:
-        #         has_long_query_string = any([len(key) > log_query_max_length for key in query])
-        #         if has_long_query_string:
-        #             query_updates['q'] = {_truncate_long_query(key) if len(key) > log_query_max_length else key: value
-        #                                   for key, value in query.items()}
+        """
+        query_dict = self.search_query.dict(exclude_none=True, skip_defaults=True, exclude=SECRET_FIELDS)
+        q = self.search_query.q
 
-        # sanitise customer vector
-        if isinstance(self.search_query.q, CustomVectorQuery):
+        # Truncate long query strings
+        def _truncate_long_query(query_str: str):
+            return f'{query_str[:log_query_max_length]}...[truncated:{log_query_max_length}/{len(query_str)}]'
+
+        if isinstance(q, str):
+            if len(q) > log_query_max_length:
+                query_dict['q'] = _truncate_long_query(q)
+        elif isinstance(q, dict):
+            has_long_query_string = any([len(key) > log_query_max_length for key in q])
+            if has_long_query_string:
+                query_dict['q'] = {_truncate_long_query(key) if len(key) > log_query_max_length else key: value
+                                   for key, value in q.items()}
+        elif isinstance(q, CustomVectorQuery):
+            if q.customVector.content and len(q.customVector.content) > log_query_max_length:
+                query_dict["q"]["customVector"]["content"] = _truncate_long_query(q.customVector.content)
+            # remove custom vector
             query_dict["q"]["customVector"]["vector"] = []
 
-        # sanitise context tensor
+        # remove context vector
         if self.search_query.context and self.search_query.context.tensor:
             sanitised_context_tensor = [{"vector": [], "weight": tensor.weight} for tensor in self.search_query.context.tensor]
             query_dict["context"]["tensor"] = sanitised_context_tensor
