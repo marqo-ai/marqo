@@ -5,7 +5,7 @@ import numpy as np
 
 from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp, ZeroSumWeightsError, ZeroMagnitudeVectorError
 from marqo.exceptions import InternalError
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestLerp(unittest.TestCase):

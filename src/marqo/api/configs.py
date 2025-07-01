@@ -7,9 +7,12 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
-        # Common
+        EnvVars.MARQO_MODE: "COMBINED",  # one of COMBINED, API, INFERENCE
+
+        # Common config applicable for all modes
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_LOG_FORMAT: "plain",
+        EnvVars.MARQO_METRICS_EXPORT_INTERVAL: 30,
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
@@ -21,7 +24,6 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_GET_POOL_SIZE: 10,
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
-        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: 1,
 
         # Marqo index management
         EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED: 100,
@@ -32,10 +34,8 @@ def default_env_vars() -> dict:
         EnvVars.ZOOKEEPER_HOSTS: None,
 
         # Document (CRUD) limit
-        EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128,
-        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,
 
         # Search Limit
@@ -63,6 +63,9 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
         EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
+
+        EnvVars.MARQO_API_INFERENCE_CACHE_SIZE: 0,
+        EnvVars.MARQO_API_INFERENCE_CACHE_TYPE: "LRU",
 
         # 370 megabytes in bytes, read in API and passed to inference server
         EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,

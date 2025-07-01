@@ -5,7 +5,7 @@
 docker rm -f marqo &&
   DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 &&
   docker run --name marqo --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
-  -e "MARQO_MAX_INDEX_FIELDS=123" -e "MARQO_MAX_DOC_BYTES=12345" -e "MARQO_MAX_RETRIEVABLE_DOCS=21" marqo_docker_0
+  -e "MARQO_MAX_DOC_BYTES=12345" -e "MARQO_MAX_RETRIEVABLE_DOCS=21" marqo_docker_0
 ```
 3. In a Python terminal, running the following script:
 """

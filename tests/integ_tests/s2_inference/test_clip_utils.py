@@ -15,7 +15,7 @@ from marqo.s2_inference.errors import ImageDownloadError
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
-from integ_tests.marqo_test import TestImageUrls
+from tests.integ_tests.marqo_test import TestImageUrls
 
 
 class TestImageDownloading(unittest.TestCase):

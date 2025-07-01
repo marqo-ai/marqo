@@ -14,7 +14,7 @@ from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldT
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 import unittest
 
 

@@ -4,7 +4,7 @@ from unittest import mock
 
 import numpy as np
 
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldFeature

@@ -5,8 +5,8 @@ from unittest import mock
 import numpy as np
 import pytest
 
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.tensor_search.backwards_compat.resources import results_2_9
+from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.tensor_search.backwards_compat.resources import results_2_9
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest

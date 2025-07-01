@@ -1,6 +1,6 @@
 from unittest import mock
 
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import on_start_script
 
 

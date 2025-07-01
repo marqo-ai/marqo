@@ -61,7 +61,7 @@ jobs:
 
   Run-integration-tests:
     needs: Determine-changes
-    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/integration_tests_CI.yml
     with:
       number_of_shards: 1
@@ -70,13 +70,13 @@ jobs:
 
   Run-largemodel-integration-tests:
     needs: Determine-changes
-    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/largemodel_integration_tests_CI.yml
     secrets: inherit
 
   Run-unit-tests:
     needs: Determine-changes
-    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/unit_tests.yml
     secrets: inherit
 
@@ -86,22 +86,22 @@ jobs:
       - Run-integration-tests
       - Run-largemodel-integration-tests
       - Run-unit-tests
-    if: ${{ always() && needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/run_required_checks_coverage.yml
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
   Report-required-test-status:
-    needs: [Determine-changes, Run-integration-tests]
+    needs: [Determine-changes, Run-coverage-checks]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Set integration test status
         run: |
           if [[ "${{ needs.Determine-changes.outputs.non_documentation_changes_found }}" == "false" ]]; then
-            echo "Integration tests skipped due to markdown-only changes."
-          elif [[ "${{ needs.Run-integration-tests.result }}" == "success" ]]; then
-            echo "Integration tests completed successfully."
+            echo "Tests skipped due to markdown-only changes"
+          elif [[ "${{ needs.Run-coverage-checks.result }}" == "success" ]]; then
+            echo "Tests completed successfully"
           else
-            echo "Integration tests failed or did not run."
+            echo "Tests failed or did not run"
             exit 1
           fi

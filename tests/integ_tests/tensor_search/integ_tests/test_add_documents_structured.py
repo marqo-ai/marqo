@@ -13,7 +13,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import unittest
 
@@ -938,4 +938,4 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for item in r.items:
             self.assertEqual(400, item.status)
             # modality mismatch
-            self.assertIn("is not a local file or a valid url", item.message)
+            self.assertIn("is not a local file, a valid url, or a base64-encoded image", item.message)

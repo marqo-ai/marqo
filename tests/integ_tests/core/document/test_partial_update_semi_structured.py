@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from typing import Tuple
 
 import pytest
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.models.add_docs_params import AddDocsParams

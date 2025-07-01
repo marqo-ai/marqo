@@ -1,4 +1,4 @@
-import json
+import orjson
 import time
 from collections import defaultdict
 from contextlib import contextmanager
@@ -174,7 +174,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         async for chunk in response.body_iterator:
             body += chunk
 
-        return json.loads(body)
+        return orjson.loads(body)
 
     async def dispatch(self, request: Request, call_next: Callable[[], Any]):
         """Wraps the request chain for a given request.
@@ -195,8 +195,8 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             data = await self.get_response_json(response)
 
             # Inject telemetry and fix content-length header
+            telemetry = RequestMetricsStore.for_request(request).json()
             if isinstance(data, dict):
-                telemetry = RequestMetricsStore.for_request(request).json()
                 if len(telemetry["timesMs"]) == 0:
                     telemetry.pop("timesMs")
                 if len(telemetry["counter"]) == 0:
@@ -207,13 +207,13 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                     f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
                 )
                 get_logger(__name__).info(
-                    f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
+                    f"Telemetry data={orjson.dumps(telemetry).decode()}")
 
         finally:
             logger.debug('Clearing metrics for request')
             RequestMetricsStore.clear_metrics_for(request)
 
-        body = json.dumps(data).encode()
+        body = orjson.dumps(data)
         response.headers["content-length"] = str(len(body))
 
         return Response(

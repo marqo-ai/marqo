@@ -21,9 +21,9 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 from marqo.tensor_search import index_meta_cache
 
@@ -1274,3 +1274,81 @@ class TestSearchStructured(MarqoTestCase):
         # Assert that no characters fail
         self.assertEqual(failed_characters, [],
                          f"Expected no characters to fail, but got: {failed_characters}")
+
+    def test_lexical_search_with_required_terms_results(self):
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "term1 term2 term3 word1 word2",
+                "text_field_2": "term3 term4 term5 word3 word4",
+                "text_field_3": "term5 term6 term7 word5 word6"
+            },
+            {
+                "_id": "2",
+                "text_field_4": "term1 term2",
+                "text_field_5": "term3 term4",
+            },
+            {
+                "_id": "3",
+                "text_field_1": "term5 term6",
+                "text_field_2": "word5",
+            },
+            {
+                "_id": "4",
+                "text_field_1": "term7 term8",
+                "text_field_2": "word7 word8",
+            }
+        ]
+
+        test_cases = [
+            # ─── Phrase Matching ─────────────────────────────────────────────
+            ('"term1 term2"', None, ["1", "2"]),  # match phrase across fields
+            ('"term1 term2"', ["text_field_4"], ["2"]),  # phrase match restricted to field
+            ('"term7 term8"', ["text_field_1"], ["4"]),  # phrase match in single field
+            ('"term4 term3"', None, []),  # phrase order matters (should not match)
+
+            # ─── Token Matching ──────────────────────────────────────────────
+            ('"term1" "term2"', None, ["1", "2"]),  # terms in multiple fields
+            ('"term1" "term2"', ["text_field_1"], ["1"]),  # both in same field
+            ('"term1" "term4"', None, ["1", "2"]),  # terms spread across fields
+            ('"term5" "word5"', None, ["1", "3"]),  # match across or within fields
+            ('"word1" "word6"', None, ["1"]),  # span across different fields in one doc
+
+            # ─── Field Filtering ─────────────────────────────────────────────
+            ('"term5"', ["text_field_1", "text_field_2"], ["1", "3"]),
+            ('"term5"', ["text_field_4"], []),  # valid term excluded due to field filter
+            ('"term7"', ["text_field_2"], []),  # term exists but outside filtered field
+            ('"term7"', ["text_field_1"], ["4"]),  # valid in allowed field
+
+            # ─── Matching Logic ──────────────────────────────────────────────
+            ('"term5 term6 term7 word5"', None, ["1"]),  # all terms appear in one doc
+            ('"term5 term6"', ["text_field_1"], ["3"]),  # single field match
+            ('"term1 TERM2"', None, ["1", "2"]),  # mixed case — case-insensitive
+            ('"term5" "term5"', None, ["1", "3"]),  # duplicate terms
+            ('"term999"', None, []),  # nonexistent term
+            ('"the of and"', None, []),  # stopwords
+            ('', None, []),  # empty query
+
+            # ─── Control Cases ───────────────────────────────────────────────
+            ('"term1" "term2" word5', None, ["1"]),  # combo of phrase + token
+            ('"word5 term8"', None, []),  # required terms in diff docs
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+            )
+        )
+
+        for query, searchable_attributes, expected_docs_ids in test_cases:
+            with self.subTest(f"{query}, {searchable_attributes}, {expected_docs_ids}"):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index,
+                    text=query,
+                    searchable_attributes=searchable_attributes,
+                    search_method=SearchMethod.LEXICAL
+                )
+                self.assertEqual(set(expected_docs_ids), {hit["_id"] for hit in res["hits"]})

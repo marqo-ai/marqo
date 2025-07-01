@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from marqo import exceptions as base_exceptions
 from marqo.api import exceptions as api_exceptions
 from marqo.api.route import MarqoCustomRoute
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 app = FastAPI()
 app.router.route_class = MarqoCustomRoute
