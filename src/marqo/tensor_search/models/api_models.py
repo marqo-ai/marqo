@@ -37,6 +37,9 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
+    class Config(BaseMarqoModel.Config):
+        use_enum_values = True
+
     q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: SearchMethod = SearchMethod.TENSOR

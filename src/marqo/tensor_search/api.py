@@ -403,15 +403,14 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  SearchQuery can be injected after migrated to v2
+    search_query = parse_request_object(SearchQuery, search_query_dict)
 
-    query_logger = QueryLogger(search_query_dict)
+    query_logger = QueryLogger(search_query)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", query_logger.log_slow_query):
         try:
-            # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
-            #  SearchQuery can be injected after migrated to v2
-            search_query = parse_request_object(SearchQuery, search_query_dict)
-
             result = tensor_search.search(
                 config=marqo_config, text=search_query.q,
                 index_name=index_name, highlights=search_query.showHighlights,

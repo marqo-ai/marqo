@@ -105,8 +105,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
                     search_query = {
                         "q": "hello",
+                        "searchMethod": search_method.value,
                         "limit": 1,
-                        "searchMethod": search_method.value
                     }
 
                     # Execute
@@ -198,9 +198,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
                     search_query = {
                         "q": "hello",
-                        "filter": "error_filter",
+                        "searchMethod": search_method.value,
                         "limit": 1,
-                        "searchMethod": search_method.value
+                        "filter": "error_filter",
                     }
 
                     # Execute
@@ -231,9 +231,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
                     search_query = {
                         "q": "hello",
-                        "filter": "error_filter",
+                        "searchMethod": search_method.value,
                         "limit": 1,
-                        "searchMethod": search_method.value
+                        "filter": "error_filter",
                     }
 
                     # Execute
@@ -260,9 +260,9 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
                     search_query = {
                         "q": "hello",
-                        "filter": "error_filter",
+                        "searchMethod": search_method.value,
                         "limit": 1,
-                        "searchMethod": search_method.value
+                        "filter": "error_filter",
                     }
 
                     # Execute

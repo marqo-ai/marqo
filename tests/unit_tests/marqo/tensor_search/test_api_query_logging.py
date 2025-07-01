@@ -18,8 +18,8 @@ class TestAPIQueryLogging(MarqoTestCase):
         self.index_name = "test_index"
         self.search_query = {
             "q": "test query",
-            "limit": 10,
-            "searchMethod": "TENSOR"
+            "searchMethod": "TENSOR",
+            "limit": 10
         }
         
         self.mock_tensor_search_patcher = patch('marqo.tensor_search.api.tensor_search.search')
@@ -169,7 +169,7 @@ class TestAPIQueryLogging(MarqoTestCase):
     })
     @patch('marqo.tensor_search.api.parse_request_object')
     @patch('marqo.tensor_search.telemetry.time')
-    def test_validation_error_logging_enabled(self, mock_time, mock_parse_request):
+    def test_validation_error_when_parsing_request_body_are_not_logged(self, mock_time, mock_parse_request):
         """Test that validation errors are logged with details when logging is enabled"""
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
@@ -186,12 +186,7 @@ class TestAPIQueryLogging(MarqoTestCase):
 
             # Verify error response (should be 422 due to validation error)
             self.assertEqual(response.status_code, 422)
-
-            # Verify error was logged with details
-            mock_marqo_query_logger.error.assert_called_once()
-            error_call = mock_marqo_query_logger.error.call_args[0][0]
-            self.assertIn("Failed search query", error_call)
-            self.assertIn(f"{search_query}", error_call)
+            mock_marqo_query_logger.warning.assert_not_called()
 
     @patch('marqo.tensor_search.telemetry.time')
     def test_search_error_logging_disabled(self, mock_time):
@@ -267,8 +262,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                         "vector": [0.1] * 768
                     }
                 },
-                "limit": 10,
                 "searchMethod": "TENSOR",
+                "limit": 10,
                 "context": {
                     "tensor": [
                         {"vector": [0.2] * 768, "weight": 0.2},
@@ -310,8 +305,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                         "vector": [0.1] * 768
                     }
                 },
-                "limit": 10,
                 "searchMethod": "TENSOR",
+                "limit": 10,
                 "context": {
                     "tensor": [
                         {"vector": [0.2] * 768, "weight": 0.2},
@@ -337,8 +332,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                         "vector": []
                     }
                 },
-                "limit": 10,
                 "searchMethod": "TENSOR",
+                "limit": 10,
                 "context": {
                     "tensor": [
                         {"vector": [], "weight": 0.2},
