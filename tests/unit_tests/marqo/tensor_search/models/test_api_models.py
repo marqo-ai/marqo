@@ -18,24 +18,24 @@ class TestSearchQuery(unittest.TestCase):
                 vector=[0.1, 0.2, 0.3, 0.4]
             )
         )
-        
+
         hybrid_parameters = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
             alpha=0.7,
             rrfK=100
         )
-        
+
         facets = FacetsParameters(
             fields={
                 "category": FieldFacetsConfiguration(type="string", maxResults=10)
             }
         )
-        
+
         context = SearchContext(
             tensor=[SearchContextTensor(vector=[0.1, 0.2], weight=1.0)]
         )
-        
+
         search_query = SearchQuery(
             q=custom_vector_query,
             searchableAttributes=["title", "description"],
@@ -56,15 +56,17 @@ class TestSearchQuery(unittest.TestCase):
             textQueryPrefix="search:",
             hybridParameters=hybrid_parameters,
             facets=facets,
-            trackTotalHits=True
+            trackTotalHits=True,
+            language="en"
         )
-        
+
         # Verify key attributes
         self.assertEqual(search_query.searchMethod, SearchMethod.HYBRID)
         self.assertEqual(search_query.limit, 20)
         self.assertEqual(search_query.approximateThreshold, 0.85)
         self.assertIsNotNone(search_query.hybridParameters)
         self.assertIsNotNone(search_query.facets)
+        self.assertEqual(search_query.language, "en")
 
     def test_search_query_required_parameters_only(self):
         """Test SearchQuery with only required parameters."""
@@ -73,7 +75,7 @@ class TestSearchQuery(unittest.TestCase):
             q="test query",
             searchMethod=SearchMethod.TENSOR
         )
-        
+
         # Verify defaults
         self.assertEqual(search_query.searchMethod, SearchMethod.TENSOR)
         self.assertEqual(search_query.limit, 10)
@@ -87,7 +89,7 @@ class TestSearchQuery(unittest.TestCase):
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF
         )
-        
+
         # Should fail for tensor search
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
@@ -102,7 +104,7 @@ class TestSearchQuery(unittest.TestCase):
         facets = FacetsParameters(
             fields={"category": FieldFacetsConfiguration(type="string")}
         )
-        
+
         # Should fail for tensor search
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
@@ -132,8 +134,9 @@ class TestSearchQuery(unittest.TestCase):
                 searchMethod=SearchMethod.LEXICAL,
                 approximateThreshold=0.5
             )
-        self.assertIn("'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods", str(cm.exception))
-        
+        self.assertIn("'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods",
+                      str(cm.exception))
+
         # Should fail when approximate=False
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
@@ -143,7 +146,7 @@ class TestSearchQuery(unittest.TestCase):
                 approximateThreshold=0.5
             )
         self.assertIn("'approximateThreshold' cannot be set when 'approximate' is False", str(cm.exception))
-        
+
         # Should fail for invalid range
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
@@ -159,7 +162,7 @@ class TestSearchQuery(unittest.TestCase):
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(searchMethod=SearchMethod.LEXICAL)
         self.assertIn("Query(q) is required for lexical search", str(cm.exception))
-        
+
         # Tensor search requires either query or context
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(searchMethod=SearchMethod.TENSOR)
@@ -175,7 +178,7 @@ class TestSearchQuery(unittest.TestCase):
                 rerankDepth=10
             )
         self.assertIn("'rerankDepth' is currently not supported for 'LEXICAL' search method", str(cm.exception))
-        
+
         # Should fail for negative values
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
@@ -195,7 +198,7 @@ class TestSearchQuery(unittest.TestCase):
                 mediaDownloadHeaders={"header2": "value2"}
             )
         self.assertIn("Cannot set both imageDownloadHeaders", str(cm.exception))
-        
+
         # Should work when imageDownloadHeaders is set and mediaDownloadHeaders is copied
         search_query = SearchQuery(
             q="test",
@@ -203,6 +206,50 @@ class TestSearchQuery(unittest.TestCase):
         )
         self.assertEqual(search_query.mediaDownloadHeaders, {"Authorization": "Bearer token"})
 
+    def test_language_field_validation_with_all_search_modes(self):
+        """Test language field behavior across all search modes."""
+        
+        test_cases = [
+            {
+                "search_method": SearchMethod.TENSOR,
+                "language": "en",
+                "should_fail": True,
+                "expected_error": "language parameter is not supported for TENSOR search method"
+            },
+            {
+                "search_method": SearchMethod.LEXICAL,
+                "language": "fr",
+                "should_fail": False,
+                "expected_error": None
+            },
+            {
+                "search_method": SearchMethod.HYBRID,
+                "language": "es",
+                "should_fail": False,
+                "expected_error": None
+            }
+        ]
+        
+        for case in test_cases:
+            with self.subTest(search_method=case["search_method"]):
+                if case["should_fail"]:
+                    with self.assertRaises(ValidationError) as cm:
+                        SearchQuery(
+                            q="test query",
+                            searchMethod=case["search_method"],
+                            language=case["language"]
+                        )
+                    self.assertIn(case["expected_error"], str(cm.exception))
+                    self.assertIn("Language specification only applies to lexical and hybrid search", str(cm.exception))
+                else:
+                    search_query = SearchQuery(
+                        q="test query",
+                        searchMethod=case["search_method"],
+                        language=case["language"]
+                    )
+                    self.assertEqual(search_query.language, case["language"])
+                    self.assertEqual(search_query.searchMethod, case["search_method"])
+
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

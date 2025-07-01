@@ -1,7 +1,12 @@
 package ai.marqo.search;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Strings;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -22,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -44,6 +50,47 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
+
+    // Thread-safe ObjectReader for parsing SortField JSON
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectReader SORT_FIELD_READER =
+            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+
+    // A magic number used to represent missing sort field values in search results as we can only
+    // return numeric values in match-features.
+    // The value -1e50 is chosen as it is an extremely low number unlikely to occur in real data.
+    private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
+
+    /**
+     * Represents a field to sort by in the search results.
+     * Uses Java record for immutability and conciseness.
+     */
+    private record SortField(
+            @JsonProperty("field_name") String fieldName,
+            @JsonProperty("order") SortOrder order,
+            @JsonProperty("missing") MissingOrder missing) {}
+
+    /** Sort order enum for better type safety */
+    private enum SortOrder {
+        ASC,
+        DESC;
+
+        @JsonCreator
+        public static SortOrder fromString(String value) {
+            return SortOrder.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
+
+    /** Missing value handling enum */
+    private enum MissingOrder {
+        FIRST,
+        LAST;
+
+        @JsonCreator
+        public static MissingOrder fromString(String value) {
+            return MissingOrder.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
 
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -84,6 +131,14 @@ public class HybridSearcher extends Searcher {
                 logIfVerbose("Failed to parse paginationExclusions: " + e.getMessage(), verbose);
             }
         }
+        // Relevance Cut-off Parameters
+
+        // Sort by Parameters
+        String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
+        Integer sortBySortDepth =
+                query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
+        Integer sortBySortCandidates =
+                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", null);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -126,6 +181,12 @@ public class HybridSearcher extends Searcher {
             }
         }
         // --- End facets subquery handling ---
+
+        // --- Update the query limit if sort is used
+        if (!Strings.isNullOrEmpty(sortByFields)) {
+            query.setHits(sortBySortCandidates);
+            query.setOffset(0);
+        }
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -220,6 +281,26 @@ public class HybridSearcher extends Searcher {
                         offset,
                         idsToExclude,
                         verbose);
+        // Determine post-processing mode based on query parameters
+        HitGroup processedHits;
+        if (sortByFields != null) {
+            // If sortBy is set, we will sort the hits after post-processing
+            processedHits =
+                    postProcessBySort(
+                            hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
+            processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
+        } else {
+            // If sortBy is not set, we use the default post-processing
+            processedHits =
+                postProcessResults(
+                        hitsForPostProcessing,
+                        query,
+                        rerankDepthGlobal,
+                        limit,
+                        offset,
+                        idsToExclude,
+                        verbose);
+        }
 
         // --- Attach facets results if available ---
         if (!futureFacets.isEmpty()) {
@@ -271,6 +352,117 @@ public class HybridSearcher extends Searcher {
             }
         }
         return filtered;
+    
+    HitGroup postProcessBySort(
+            HitGroup hitsForPostProcessing,
+            String sortByFields,
+            Integer sortBySortDepth,
+            Integer limit,
+            Integer offset) {
+
+        List<SortField> parsedSortByFields;
+      
+        try {
+            parsedSortByFields = SORT_FIELD_READER.readValue(sortByFields);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                    "Invalid sort JSON format for marqo__hybrid.sortBy.fields", e);
+        }
+
+        // Validate sort fields requirements
+        if (parsedSortByFields.isEmpty()) {
+            throw new RuntimeException(
+                    "sortBy fields cannot be empty. Must contain 1 to 3 sort fields.");
+        }
+        if (parsedSortByFields.size() > 3) {
+            throw new RuntimeException(
+                    "sortBy fields cannot contain more than 3 sort fields. Found: "
+                            + parsedSortByFields.size());
+        }
+
+        // Validate that all required fields are provided
+        for (int i = 0; i < parsedSortByFields.size(); i++) {
+            SortField field = parsedSortByFields.get(i);
+            if (field.fieldName() == null || field.fieldName().trim().isEmpty()) {
+                throw new RuntimeException("fieldName is required for sort field at index " + i);
+            }
+            if (field.order() == null) {
+                throw new RuntimeException("order is required for sort field at index " + i);
+            }
+            if (field.missing() == null) {
+                throw new RuntimeException("missing is required for sort field at index " + i);
+            }
+        }
+
+        // Validate sortBySortDepth requirements
+        if (sortBySortDepth != null && sortBySortDepth < 1) {
+            throw new RuntimeException(
+                    "sortBySortDepth must be greater than or equal to 1. Found: "
+                            + sortBySortDepth);
+        }
+
+        List<Hit> allHits = new ArrayList<>(hitsForPostProcessing.asList());
+        int depth = (sortBySortDepth != null) ? sortBySortDepth : allHits.size();
+
+        List<Hit> hitsToSort = new ArrayList<>(allHits.subList(0, Math.min(depth, allHits.size())));
+        List<Hit> hitsAfterDepth =
+                (depth < allHits.size())
+                        ? new ArrayList<>(allHits.subList(depth, allHits.size()))
+                        : new ArrayList<>();
+
+        // Build comparator chain based on configured SortFields
+        Comparator<Hit> sortComparator = null;
+        for (int i = 0; i < parsedSortByFields.size(); i++) {
+            final int idx = i;
+            SortField sf = parsedSortByFields.get(i);
+            Function<Hit, Double> keyExtractor =
+                    hit -> {
+                        FeatureData mf = (FeatureData) hit.getField("matchfeatures");
+                        if (mf == null) return null;
+                        double v = mf.getDouble("sort_field_value_" + idx);
+                        return (v == MISSING_SORT_VALUE_SENTINEL) ? null : v;
+                    };
+            Comparator<Double> base = Comparator.naturalOrder();
+            if (sf.order() == SortOrder.DESC) {
+                base = base.reversed();
+            }
+            Comparator<Double> nullAware =
+                    sf.missing() == MissingOrder.LAST
+                            ? Comparator.nullsLast(base)
+                            : Comparator.nullsFirst(base);
+            Comparator<Hit> fieldComparator = Comparator.comparing(keyExtractor, nullAware);
+            sortComparator =
+                    (sortComparator == null)
+                            ? fieldComparator
+                            : sortComparator.thenComparing(fieldComparator);
+        }
+
+        // Append relevance as final tie-breaker (always descending)
+        Comparator<Hit> relevanceTie =
+                Comparator.comparingDouble((Hit h) -> h.getRelevance().getScore()).reversed();
+        // always combine with relevance tie-break
+        sortComparator =
+                (sortComparator == null)
+                        ? relevanceTie
+                        : sortComparator.thenComparing(relevanceTie);
+        hitsToSort.sort(sortComparator);
+
+        // Merge sorted slice with the remainder
+        List<Hit> combined = new ArrayList<>(hitsToSort);
+        combined.addAll(hitsAfterDepth);
+
+        // Reset relevance to reflect new positions
+        for (int i = 0; i < combined.size(); i++) {
+            combined.get(i).setRelevance(1.0 / (i + 1));
+        }
+        /*
+         * TODO - check HitGroup.setOrdered and HitGroup HitSortOrderer
+         *  for better performance and avoiding of sorting in the downstream code.
+         */
+        HitGroup result = new HitGroup();
+        result.addAll(combined);
+        result.trim(offset, limit);
+        return result;
     }
 
     /**

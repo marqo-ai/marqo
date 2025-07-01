@@ -59,6 +59,7 @@ class MarqoTensorQuery(MarqoQuery):
 class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]
     and_phrases: List[str]
+    language: Optional[str] = None
 
     # Both lists can be empty only if it's a MarqoHybridQuery and it's
     # retrieval_method & ranking_method are "TENSOR" (i.e. it's a pure tensor search)

@@ -15,6 +15,54 @@ from marqo.core.models.marqo_index import *
 from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
+class ChunkTimingGenerator:
+    """Generator class to emit (chunk_start, chunk_end) pairs for media processing."""
+
+    def __init__(self, duration: float, chunk_duration: float, overlap_duration: float):
+        """
+        Initialize the chunk timing generator.
+
+        Args:
+            duration: Total duration of the media in seconds
+            chunk_duration: Duration of each chunk in seconds
+            overlap_duration: Overlap duration between chunks in seconds
+        """
+        self._duration = duration
+        self._chunk_duration = chunk_duration
+        self._overlap_duration = overlap_duration
+        self._step = chunk_duration - overlap_duration
+
+        if self._duration < 0:
+            raise ValueError(f'Duration of the media file is negative: {self._duration}')
+
+        if self._step <= 0:
+            # This is already verified in the ChunkConfig validation. We check it again to avoid an infinite loop
+            raise ValueError(f'Chunking error due to chunk size ({self._chunk_duration}) <= overlap '
+                             f'({self._overlap_duration})')
+
+        self._current_position = 0.0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """Generate the next chunk timing pair."""
+        if self._current_position >= self._duration:
+            raise StopIteration
+
+        chunk_end = min(self._current_position + self._chunk_duration, self._duration)
+        chunk_start = max(chunk_end - self._chunk_duration, 0)
+
+        if chunk_end == self._duration:
+            # already reaches the end, so move the current position to end
+            self._current_position = chunk_end
+        else:
+            # otherwise, we move the current position forward by the step size
+            self._current_position = self._current_position + self._step
+
+        return chunk_start, chunk_end
+
+
 class StreamingMediaProcessor:
 
     VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 10
@@ -154,22 +202,8 @@ class StreamingMediaProcessor:
             MediaDownloadError: If there is an error downloading or processing the media file.
         """
         processed_chunks: list[Tuple[str, Tensor]] = []
-        chunk_duration = self.split_length
-        overlap_duration = self.split_overlap
-
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Calculate total number of chunks
-            total_chunks = math.ceil((self.duration - overlap_duration) / (chunk_duration - overlap_duration))
-
-            for i in range(total_chunks):
-                # For the last chunk, ensure it captures the end of the media
-                if i == total_chunks - 1:
-                    chunk_start = max(self.duration - chunk_duration, 0)
-                    chunk_end = self.duration
-                else:
-                    chunk_start = i * (chunk_duration - overlap_duration)
-                    chunk_end = min([chunk_start + chunk_duration, self.duration])
-
+            for chunk_start, chunk_end in ChunkTimingGenerator(self.duration, self.split_length, self.split_overlap):
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
                 try:
