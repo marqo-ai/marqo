@@ -1158,3 +1158,561 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             set(relevance_cutoff_result_ids).issubset(set(regular_result_ids)),
             "Relevance cutoff should still return relevant documents"
         )
+
+
+class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTestCase):
+    """
+    This is a test class that tests the interaction between relevance cutoff and sort in a real-world like index.
+    We will have a more complicated index with documents that have multiple fields and a more complex query.
+    Things that are included here:
+        - Documents with multiple fields
+        - Documents with multimodal fields
+        - Complex queries that include searchableAttributes,
+        - Complex queries with score modifiers
+        - Complex queries with filters
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            treat_urls_and_pointers_as_images=True
+        )
+        cls.create_indexes([index_request])
+        cls.index_name = index_request.name
+
+        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+
+        # 30 fashion documents with various fields, tags, and multimodal content
+        # We categorize them into 3 categories: Glasses, Hats, and Shoes.
+        documents = [
+            {
+                "_id": "0",
+                "filter_field_1": ["us", "ca"],
+                "tags": ["category:Glasses", "type:Aviator", "color:Black"],
+                "price": 19.99,
+                "title": "Midnight Aviator Sunglasses",
+                "aux_value": 0.45,
+                "image_url": image_url
+            },
+            {
+                "_id": "1",
+                "filter_field_1": ["eu", "us"],
+                "tags": ["category:Glasses", "type:Round", "color:Gold"],
+                "price": 22.50,
+                "title": "Golden Round Spectacles",
+                "aux_value": 1.12,
+                "image_url": image_url
+            },
+            {
+                "_id": "2",
+                "filter_field_1": ["us", "gb", "au"],
+                "tags": ["category:Glasses", "type:Wayfarer", "color:Tortoise"],
+                "price": 24.00,
+                "title": "Classic Tortoise Wayfarers",
+                "aux_value": 0.98,
+                "image_url": image_url
+            },
+            {
+                "_id": "3",
+                "filter_field_1": ["jp", "us"],
+                "tags": ["category:Glasses", "type:Rectangle", "color:Silver"],
+                "price": 18.75,
+                "title": "Silver Frame Rectangles",
+                "aux_value": 2.34,
+                "image_url": image_url
+            },
+            {
+                "_id": "4",
+                "filter_field_1": ["us", "ca", "mx"],
+                "tags": ["category:Glasses", "type:Cat Eye", "color:Pink"],
+                "price": 20.00,
+                "title": "Blush Cat Eye Glasses",
+                "aux_value": 3.10,
+                "image_url": image_url
+            },
+            {
+                "_id": "5",
+                "filter_field_1": ["eu", "us", "gb"],
+                "tags": ["category:Glasses", "type:Sport", "color:Blue"],
+                "price": 21.99,
+                "title": "Azure Sport Frames",
+                "aux_value": 0.67,
+                "image_url": image_url
+            },
+            {
+                "_id": "6",
+                "filter_field_1": ["us", "au"],
+                "tags": ["category:Glasses", "type:Shield", "color:Black"],
+                "price": 25.50,
+                "title": "Stealth Shield Visors",
+                "aux_value": 1.75,
+                "image_url": image_url
+            },
+            {
+                "_id": "7",
+                "filter_field_1": ["ca", "us"],
+                "tags": ["category:Glasses", "type:Clip-On", "color:Green"],
+                "price": 16.49,
+                "title": "Emerald Clip-On Shades",
+                "aux_value": 2.88,
+                "image_url": image_url
+            },
+            {
+                "_id": "8",
+                "filter_field_1": ["us", "gb", "eu"],
+                "tags": ["category:Glasses", "type:Mirrored", "color:Gold"],
+                "price": 23.99,
+                "title": "Mirrored Gold Lenses",
+                "aux_value": 0.53,
+                "image_url": image_url
+            },
+            {
+                "_id": "9",
+                "filter_field_1": ["us", "ca"],
+                "tags": ["category:Glasses", "type:Polarized", "color:Brown"],
+                "price": 27.00,
+                "title": "Polarized Brown Sunnies",
+                "aux_value": 1.40,
+                "image_url": image_url
+            },
+            {
+                "_id": "10",
+                "filter_field_1": ["us", "gb"],
+                "tags": ["category:Hat", "type:Fedora", "color:Beige"],
+                "price": 34.99,
+                "title": "Classic Beige Fedora",
+                "aux_value": 0.29,
+                "image_url": image_url
+            },
+            {
+                "_id": "11",
+                "filter_field_1": ["au", "us"],
+                "tags": ["category:Hat", "type:Baseball", "color:Red"],
+                "price": 18.00,
+                "title": "Scarlet Baseball Cap",
+                "aux_value": 2.05,
+                "image_url": image_url
+            },
+            {
+                "_id": "12",
+                "filter_field_1": ["eu", "us", "ca"],
+                "tags": ["category:Hat", "type:Beanie", "color:Gray"],
+                "price": 15.75,
+                "title": "Heather Gray Beanie",
+                "aux_value": 1.67,
+                "image_url": image_url
+            },
+            {
+                "_id": "13",
+                "filter_field_1": ["us", "mx"],
+                "tags": ["category:Hat", "type:Panama", "color:Natural"],
+                "price": 45.00,
+                "title": "Tropical Panama Hat",
+                "aux_value": 0.82,
+                "image_url": image_url
+            },
+            {
+                "_id": "14",
+                "filter_field_1": ["us", "gb"],
+                "tags": ["category:Hat", "type:Bucket", "color:Olive"],
+                "price": 20.49,
+                "title": "Olive Bucket Hat",
+                "aux_value": 2.13,
+                "image_url": image_url
+            },
+            {
+                "_id": "15",
+                "filter_field_1": ["ca", "us", "au"],
+                "tags": ["category:Hat", "type:Snapback", "color:Black"],
+                "price": 22.00,
+                "title": "Midnight Snapback",
+                "aux_value": 1.99,
+                "image_url": image_url
+            },
+            {
+                "_id": "16",
+                "filter_field_1": ["us", "eu"],
+                "tags": ["category:Hat", "type:Trucker", "color:Navy"],
+                "price": 19.25,
+                "title": "Navy Trucker Hat",
+                "aux_value": 0.76,
+                "image_url": image_url
+            },
+            {
+                "_id": "17",
+                "filter_field_1": ["us", "ca"],
+                "tags": ["category:Hat", "type:Sun", "color:Yellow"],
+                "price": 28.00,
+                "title": "Sunny Wide-Brim Hat",
+                "aux_value": 2.44,
+                "image_url": image_url
+            },
+            {
+                "_id": "18",
+                "filter_field_1": ["gb", "us"],
+                "tags": ["category:Hat", "type:Visor", "color:White"],
+                "price": 17.50,
+                "title": "White Sport Visor",
+                "aux_value": 1.11,
+                "image_url": image_url
+            },
+            {
+                "_id": "19",
+                "filter_field_1": ["us", "au"],
+                "tags": ["category:Hat", "type:Cloche", "color:Black"],
+                "price": 32.99,
+                "title": "Elegant Black Cloche",
+                "aux_value": 0.58,
+                "image_url": image_url
+            },
+            {
+                "_id": "20",
+                "filter_field_1": ["us", "ca", "mx"],
+                "tags": ["category:Hat", "type:Bowler", "color:Charcoal"],
+                "price": 38.00,
+                "title": "Charcoal Bowler Hat",
+                "aux_value": 1.90,
+                "image_url": image_url
+            },
+            {
+                "_id": "21",
+                "filter_field_1": ["us", "ca"],
+                "tags": ["category:Shoes", "type:Sneakers", "color:White"],
+                "price": 49.99,
+                "title": "Urban Runner Sneakers",
+                "aux_value": 0.34,
+                "image_url": image_url
+            },
+            {
+                "_id": "22",
+                "filter_field_1": ["eu", "us"],
+                "tags": ["category:Shoes", "type:Loafers", "color:Brown"],
+                "price": 65.00,
+                "title": "Mahogany Leather Loafers",
+                "aux_value": 2.22,
+                "image_url": image_url
+            },
+            {
+                "_id": "23",
+                "filter_field_1": ["us", "ca", "au"],
+                "tags": ["category:Shoes", "type:Boots", "color:Tan"],
+                "price": 79.50,
+                "title": "Desert Tan Boots",
+                "aux_value": 3.01,
+                "image_url": image_url
+            },
+            {
+                "_id": "24",
+                "filter_field_1": ["us", "gb"],
+                "tags": ["category:Shoes", "type:Sandals", "color:Black"],
+                "price": 29.25,
+                "title": "Black Slide Sandals",
+                "aux_value": 1.47,
+                "image_url": image_url
+            },
+            {
+                "_id": "25",
+                "filter_field_1": ["us", "eu"],
+                "tags": ["category:Shoes", "type:Heels", "color:Red"],
+                "price": 54.99,
+                "title": "Crimson Stiletto Heels",
+                "aux_value": 0.89,
+                "image_url": image_url
+            },
+            {
+                "_id": "26",
+                "filter_field_1": ["ca", "us"],
+                "tags": ["category:Shoes", "type:Flats", "color:Blush"],
+                "price": 39.00,
+                "title": "Blush Ballet Flats",
+                "aux_value": 2.73,
+                "image_url": image_url
+            },
+            {
+                "_id": "27",
+                "filter_field_1": ["us", "mx"],
+                "tags": ["category:Shoes", "type:Slip-On", "color:Navy"],
+                "price": 44.50,
+                "title": "Navy Slip-On Loafers",
+                "aux_value": 1.05,
+                "image_url": image_url
+            },
+            {
+                "_id": "28",
+                "filter_field_1": ["us", "gb", "au"],
+                "tags": ["category:Shoes", "type:Oxfords", "color:Black"],
+                "price": 70.00,
+                "title": "Classic Black Oxfords",
+                "aux_value": 2.68,
+                "image_url": image_url
+            },
+            {
+                "_id": "29",
+                "filter_field_1": ["eu", "us", "ca"],
+                "tags": ["category:Shoes", "type:Running", "color:Green"],
+                "price": 55.99,
+                "title": "Forest Trail Runners",
+                "aux_value": 3.14,
+                "image_url": image_url
+            }
+        ]
+
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=documents,
+                index_name=cls.index_name,
+                mappings = {
+                    "multimodal_combination": {
+                        "type": "multimodal_combination",
+                        "weights": {
+                            "title": 0.99,
+                            "image_url": 0.1 # Give it a low weight as it just a dummy image URL
+                        }
+                    },
+
+                },
+                tensor_fields=['title, multimodal_combination'],
+            )
+        )
+
+    def setUp(self):
+        """Ensure documents are not changed before each test."""
+        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
+            raise RuntimeError(
+                f"Expected 10 documents in index {self.index_name} for sorting tests"
+            )
+
+    def tearDown(self):
+        """Ensure documents are not changed after each test."""
+        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
+            raise RuntimeError(
+                f"Expected 10 documents in index {self.index_name} for sorting tests"
+            )
+
+    @classmethod
+    def _search_helper(
+            cls, query: str,
+            filter: Optional[str] = None,
+            relevance_cutoff: Optional[dict] = None,
+            sort_by: Optional[dict] = None,
+            limit: int = 10, offset: int = 0,
+            hybrid_parameters: Optional[dict] = None,
+            attributes_to_retrieve: Optional[list] = None
+    ) -> dict:
+        """Helper method to perform search with consistent parameters."""
+
+        if hybrid_parameters is None:
+            hybrid_parameters = {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0.5
+            }
+
+        result = json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict={
+                "q": query,
+                "searchMethod": SearchMethod.HYBRID,
+                "hybridParameters": hybrid_parameters,
+                "relevanceCutoff": relevance_cutoff,
+                "filter": filter,
+                "sortBy": sort_by,
+                "limit": limit,
+                "offset": offset,
+                "attributesToRetrieve": attributes_to_retrieve
+            }
+        ).body.decode('utf-8'))
+        return result
+
+    def test_relevance_cut_off_with_filters(self):
+        """Test relevance cutoff with filters applied."""
+        # Test with a filter that should exclude some documents
+        result = self._search_helper(
+            query="glasses and sunglasses",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "title",
+                ],
+                "alpha": 0.7
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5}
+            },
+            limit=10,
+            filter="filter_field_1:us"
+        )
+
+        hits = result["hits"]
+        for hit in hits:
+            # All hits should match the filter
+            self.assertIn(
+                "us", hit["filter_field_1"], "All hits should match the filter 'filter_field_1:us'"
+            )
+            self.assertIn(
+                hit["_id"],
+                ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+                "All hits should be from the expected set of documents"
+            )
+
+    def test_relevance_cut_off_with_incorrect_lexical_searchable_fields(self):
+        """It is expected that the relevance cutoff will return 0 results
+        if the searchableAttributesLexical is not set correctly."""
+
+        result = self._search_helper(
+            query="glasses and sunglasses",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "image_url",
+                ],
+                "alpha": 0.7
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5}
+            },
+            limit=10,
+        )
+
+        hits = result["hits"]
+        self.assertEqual(
+            0, len(hits),
+            "Relevance cutoff should return 0 results if searchableAttributesLexical is incorrect"
+        )
+        self.assertEqual(0, result["_relevantCandidates"])
+        self.assertEqual(0, result["_probeCandidates"])
+
+    def test_sort_fill_work_and_return_all_the_results(self):
+        result = self._search_helper(
+            query="fashion things",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "image_url",
+                ],
+                "alpha": 0.7
+            },
+            sort_by={
+                "fields": [{"field_name": "price", "order": "asc"}],
+            },
+            limit=10,
+        )
+
+        hits = result["hits"]
+        self.assertEqual(
+            10, len(hits),
+            "Relevance cutoff should return 0 results if searchableAttributesLexical is incorrect"
+        )
+        self.assertEqual(30, result["_sortCandidates"]) # 3 times the limit
+        self.assertEqual("12", hits[0]["_id"], "Cheapest item should be first")
+
+    def test_lexical_score_modifiers_should_work_with_relevance_cutoff(self):
+        """Test that lexical score modifiers work with relevance cutoff."""
+        result = self._search_helper(
+            query="women shoes",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "title",
+                ],
+                "alpha": 0.7,
+                "scoreModifiersLexical": {
+                    "add_to_score": [{
+                        "field_name": "aux_value",
+                        "weight": 0.001
+                    }]
+                }
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.7}
+            },
+            sort_by={
+                "fields": [{"field_name": "price", "order": "asc"}],
+            },
+            limit=10,
+        )
+
+        hits = result["hits"]
+        for hit in hits:
+            # All hits should match the filter
+            self.assertIn(
+                hit["_id"],
+                ["21", "22", "23", "24", "25", "26", "27", "28", "29"],
+                "All hits should be from the expected set of documents"
+            )
+        prices = [hit["price"] for hit in hits]
+        # Prices should be in ascending order
+        self.assertEqual(prices, sorted(prices), "Prices should be in ascending order")
+
+    def test_attributes_to_retrieve_works_as_expected(self):
+        """Test that attributes_to_retrieve works as expected with relevance cutoff."""
+        result = self._search_helper(
+            query="fashion things",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "image_url",
+                ],
+                "alpha": 0.7
+            },
+            sort_by={
+                "fields": [{"field_name": "price", "order": "asc"}],
+            },
+            limit=10,
+            attributes_to_retrieve=["_id", "title", "price"]
+        )
+
+        hits = result["hits"]
+        self.assertEqual(
+            10, len(hits),
+            "Relevance cutoff should return 10 results"
+        )
+        for hit in hits:
+            self.assertIn("_id", hit)
+            self.assertIn("title", hit)
+            self.assertIn("price", hit)
+            self.assertNotIn("tags", hit, "tags should not be retrieved")
+            self.assertNotIn("image_url", hit, "image_url should not be retrieved")
+            self.assertNotIn("aux_value", hit, "aux_value should not be retrieved")
+
+    def test_relevance_cutoff_with_sort_and_filter(self):
+        """Test relevance cutoff with sort and filter applied."""
+        # Test with a filter that should exclude some documents
+        result = self._search_helper(
+            query="glasses, shoes, and hats",
+            hybrid_parameters={
+                "rrfK": 60,
+                "searchableAttributesLexical": [
+                    "title",
+                ],
+                "alpha": 0.7
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.5}
+            },
+            sort_by={
+                "fields": [{"field_name": "price", "order": "desc"}],
+            },
+            limit=10,
+            filter="filter_field_1:us"
+        )
+
+        hits = result["hits"]
+        for hit in hits:
+            # All hits should match the filter
+            self.assertIn(
+                "us", hit["filter_field_1"], "All hits should match the filter 'filter_field_1:us'"
+            )
+        prices = [hit["price"] for hit in hits]
+        self.assertEqual(
+            prices, sorted(prices, reverse=True), "Prices after sorting should be in desc order"
+        )
