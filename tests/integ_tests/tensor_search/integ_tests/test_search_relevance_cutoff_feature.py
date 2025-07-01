@@ -141,16 +141,16 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             )
         )
 
-        # # Test results without relevance cutoff should return top 10 documents
-        # regular_search_results = cls._search_helper(limit=10)
-        # regular_search_results_ids = set(hit["_id"] for hit in regular_search_results["hits"])
-        # # All high relevance IDs should be present in the results
-        # expected_high_relevance_ids = set([f"h{i}" for i in range(1, 11)])
-        # if not expected_high_relevance_ids == regular_search_results_ids:
-        #     raise RuntimeError(
-        #         f"Expected high relevance IDs {expected_high_relevance_ids} but got {regular_search_results_ids}."
-        #     )
-        #
+        # Test results without relevance cutoff should return top 10 documents
+        regular_search_results = cls._search_helper(limit=10)
+        regular_search_results_ids = set(hit["_id"] for hit in regular_search_results["hits"])
+        # All high relevance IDs should be present in the results
+        expected_high_relevance_ids = set([f"h{i}" for i in range(1, 11)])
+        if not expected_high_relevance_ids == regular_search_results_ids:
+            raise RuntimeError(
+                f"Expected high relevance IDs {expected_high_relevance_ids} but got {regular_search_results_ids}."
+            )
+
         cls.PROBE_CANDIDATES = 25  # Expected number of probe candidates for relevance cutoff tests
 
     def setUp(self):
