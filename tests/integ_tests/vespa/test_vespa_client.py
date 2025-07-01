@@ -26,8 +26,8 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                   "http://localhost:8080", "content_default")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
-        self.test_document = VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})
-
+        self.test_document_1 = VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})
+        self.test_document_2 = VespaDocument(id="doc2", fields={"title": "Title 2", "contents": "Content 2"})
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
     def _base_test_feed_batch_successful(self, func, batch):
@@ -433,7 +433,7 @@ class TestVespaClient(AsyncMarqoTestCase):
     def test_get_vespa_version(self):
         expected_vespa_version = '8.513.17'
         version = self.client.get_vespa_version()
-        self.assertEqual(ANY, version)
+        self.assertEqual(expected_vespa_version, version)
 
     def test_translate_vespa_document_response_status(self):
         test_cases = [
@@ -487,7 +487,7 @@ class TestVespaClient(AsyncMarqoTestCase):
                 self.assertIn("Vespa application did not converge", str(e.exception))
 
     @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
-    def test_wait_for_application_timeout(self, mock_get_application_has_converged):
+    def test_application_convergence_timeout_fails(self, mock_get_application_has_converged):
         """If the total wait time is reached, the method should raise a VespaError"""
         vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
@@ -562,18 +562,18 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertIsInstance(metrics, ApplicationMetrics)
 
     def test_feed_documents(self):
-        self.client.feed_document(self.test_document, self.TEST_SCHEMA)
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
         get_response = self.client.get_document(
-            id=self.test_document.id,
+            id=self.test_document_1.id,
             schema=self.TEST_SCHEMA
         )
         document = get_response.document
-        self.assertEqual(document.id, f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document.id}')
-        self.assertEqual(document.fields, self.test_document.fields)
-        delete_response = self.client.delete_document(self.test_document.id, self.TEST_SCHEMA)
+        self.assertEqual(document.id, f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}')
+        self.assertEqual(document.fields, self.test_document_1.fields)
+        delete_response = self.client.delete_document(self.test_document_1.id, self.TEST_SCHEMA)
         self.assertEqual(
             delete_response.path_id,
-            f'/document/v1/{self.TEST_SCHEMA}/{self.TEST_SCHEMA}/docid/{self.test_document.id}'
+            f'/document/v1/{self.TEST_SCHEMA}/{self.TEST_SCHEMA}/docid/{self.test_document_1.id}'
         )
 
         get_all_docs = self.client.get_all_documents(self.TEST_SCHEMA)
@@ -582,19 +582,34 @@ class TestVespaClient(AsyncMarqoTestCase):
     def test_delete_all_documents(self):
         response = self.client.get_all_documents(self.TEST_SCHEMA)
         self.assertEqual(response.document_count, 0)
-        self.client.feed_document(self.test_document, self.TEST_SCHEMA)
+
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
+        self.client.feed_document(self.test_document_2, self.TEST_SCHEMA)
         response = self.client.delete_all_docs(self.TEST_SCHEMA)
-        self.assertEqual(response.document_count, 1)
+        self.assertEqual(response.document_count, 2)
+
+        # Check it was all deleted
+        response = self.client.get_all_documents(self.TEST_SCHEMA)
+        self.assertEqual(response.document_count, 0)
 
     def test_get_all_documents(self):
         get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA)
         self.assertEqual(get_documents_response.document_count, 0)
-        self.client.feed_document(self.test_document, self.TEST_SCHEMA)
-        get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA)
-        self.assertEqual(get_documents_response.document_count, 1)
+
+        # Feed 2 documents
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
+        self.client.feed_document(self.test_document_2, self.TEST_SCHEMA)
+        get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA, stream=True)
+
+        # Check retrieved documents match
+        self.assertEqual(get_documents_response.document_count, 2)
         self.assertEqual(
             get_documents_response.documents[0].id,
-            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document.id}'
+            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}'
+        )
+        self.assertEqual(
+            get_documents_response.documents[1].id,
+            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_2.id}'
         )
 
     def test_batch_index_requests(self):
