@@ -29,6 +29,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.statistics.descriptive.StandardDeviation;
+import org.apache.commons.statistics.descriptive.Mean;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +56,8 @@ public class HybridSearcher extends Searcher {
     // Thread-safe ObjectReader for parsing SortField JSON
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final ObjectReader SORT_FIELD_READER =
-            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {
+            });
 
     // A magic number used to represent missing sort field values in search results as we can only
     // return numeric values in match-features.
@@ -67,9 +71,12 @@ public class HybridSearcher extends Searcher {
     private record SortField(
             @JsonProperty("field_name") String fieldName,
             @JsonProperty("order") SortOrder order,
-            @JsonProperty("missing") MissingOrder missing) {}
+            @JsonProperty("missing") MissingOrder missing) {
+    }
 
-    /** Sort order enum for better type safety */
+    /**
+     * Sort order enum for better type safety
+     */
     private enum SortOrder {
         ASC,
         DESC;
@@ -80,7 +87,9 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    /** Missing value handling enum */
+    /**
+     * Missing value handling enum
+     */
     private enum MissingOrder {
         FIRST,
         LAST;
@@ -380,6 +389,7 @@ public class HybridSearcher extends Searcher {
                 query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "");
 
         Integer currentTensorTargetHits = null;
+        Integer currentExploreAdditionalHits = null;
         int currentLimit = query.getHits();
         int currentOffset = query.getOffset();
 
@@ -390,6 +400,7 @@ public class HybridSearcher extends Searcher {
                         "The targetHits in the tensor query should not be smaller than"
                                 + " limit+offset");
             }
+            currentExploreAdditionalHits = extractCurrentExploreAdditionalHits(tensorYQL);
         }
 
         Integer newHits = null;
@@ -424,8 +435,9 @@ public class HybridSearcher extends Searcher {
         query.setOffset(0);
 
         // Update tensor YQL targetHits if it exists
-        if (currentTensorTargetHits != null && newTensorTargetHits != null) {
-            String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits);
+        if (currentTensorTargetHits != newTensorTargetHits) {
+            int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
+            String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
         }
         return query;
@@ -593,6 +605,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Implement feature score scaling and normalization
+     *
      * @param hitsTensor
      * @param hitsLexical
      * @param k
@@ -861,6 +874,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
+     *
      * @param cell
      * @param query
      * @param verbose
@@ -880,7 +894,8 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extracts the current targetHits value from YQL string
+     * Extracts the current targetHits value from YQL string, if multiple targetHits are present, return the first one.
+     *
      * @param yql The YQL string containing targetHits
      * @return The current targetHits value as integer
      * @throws RuntimeException if targetHits is not found or invalid
@@ -900,7 +915,21 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private String overwriteTargetHits(String yql, int newTargetHits) {
+    private int extractCurrentExploreAdditionalHits(String yql) {
+        Matcher matcher = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql);
+        if (!matcher.find()) {
+            throw new RuntimeException(
+                    "YQL does not contain hnsw.exploreAdditionalHits clause, cannot extract it.");
+        }
+        try {
+            return Integer.parseInt(matcher.group(2));
+        } catch (
+                NumberFormatException e) {
+            throw new RuntimeException("Invalid exploreAdditionalHits value in YQL: " + matcher.group(2), e);
+        }
+    }
+
+    private String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
         // Validate input
         if (newTargetHits < 0) {
             throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
@@ -942,7 +971,7 @@ public class HybridSearcher extends Searcher {
         String updatedYql = TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
 
         // Also update hnsw.exploreAdditionalHits to 2000-newTargetHits for all occurrences
-        int newExploreAdditionalHits = 2000 - newTargetHits;
+        int newExploreAdditionalHits = efSearch - newTargetHits;
         updatedYql =
                 HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN
                         .matcher(updatedYql)
@@ -971,7 +1000,7 @@ public class HybridSearcher extends Searcher {
      * @param verbose
      * @param exactQuery
      */
-    public Query createSubQuery(
+    Query createSubQuery(
             Query query,
             String retrievalMethod,
             String rankingMethod,
@@ -1193,13 +1222,16 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethodString);
         }
 
+        double [] probeLexicalScores = lexicalHits.stream()
+                .mapToDouble(hit -> hit.getRelevance().getScore())
+                .toArray();
+
         switch (cutoffMethod) {
             case GAP_DETECTION -> {
                 logIfVerbose("Using gapDetection method for relevance cutoff", verbose);
                 // Find the elbow point in the lexical hits
                 double maxDelta = -1.0;
                 int bestIndex = lexicalHits.size(); // default: keep all
-
                 for (int i = 0; i < lexicalHits.size() - 1; i++) {
                     double score1 = lexicalHits.get(i).getRelevance().getScore();
                     double score2 = lexicalHits.get(i + 1).getRelevance().getScore();
@@ -1210,54 +1242,44 @@ public class HybridSearcher extends Searcher {
                         bestIndex = i + 1;
                     }
                 }
-
                 return bestIndex;
             }
             case MEAN_STD_DEV -> {
                 logIfVerbose("Using normalFit method for relevance cutoff", verbose);
-                // Calculate mean and standard deviation of scores
-                double sum = 0.0;
-                for (Hit hit : lexicalHits) {
-                    sum += hit.getRelevance().getScore();
-                }
-                double meanScore = sum / lexicalHits.size();
+                double mean = Mean.of(probeLexicalScores).getAsDouble();
+                double stdDev = StandardDeviation.of(probeLexicalScores).getAsDouble();
+                double threshold = mean + (relevanceCutoffParameter * stdDev);
+                return countGreaterOrEqual(probeLexicalScores, threshold);
 
-                // Calculate population standard deviation
-                double sumSquaredDiffs = 0.0;
-                for (Hit hit : lexicalHits) {
-                    double diff = hit.getRelevance().getScore() - meanScore;
-                    sumSquaredDiffs += diff * diff;
-                }
-                double stdScore = Math.sqrt(sumSquaredDiffs / lexicalHits.size());
-
-                double threshold = meanScore + (stdScore * relevanceCutoffParameter);
-
-                // Count relevant results
-                int relevantCount = 0;
-                for (Hit hit : lexicalHits) {
-                    if (hit.getRelevance().getScore() >= threshold) {
-                        relevantCount++;
-                    }
-                }
-                return relevantCount;
             }
             case RELATIVE_MAX_SCORE -> {
                 logIfVerbose("Using softCodedScoreCut method for relevance cutoff", verbose);
                 double topScore = lexicalHits.get(0).getRelevance().getScore();
                 double dynamicThreshold = topScore * relevanceCutoffParameter;
-
-                int matchedSize = 0;
-                for (Hit hit : lexicalHits) {
-                    if (hit.getRelevance().getScore() >= dynamicThreshold) {
-                        matchedSize++;
-                    }
-                }
-
-                return matchedSize;
+                return countGreaterOrEqual(probeLexicalScores, dynamicThreshold);
             }
             default -> {
                 throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethod);
             }
         }
+    }
+
+    /**
+     * Returns the number of elements in a descending-sorted array
+     * that are greater than or equal to the given threshold.
+     */
+    private static int countGreaterOrEqual(double[] descSorted, double threshold) {
+        int low = 0, high = descSorted.length;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (descSorted[mid] >= threshold) {
+                // still ≥ threshold → move low up
+                low = mid + 1;
+            } else {
+                // < threshold → shrink high
+                high = mid;
+            }
+        }
+        return low;
     }
 }
