@@ -1,7 +1,8 @@
+import asyncio
 import functools
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
 import httpcore
 import httpx
@@ -9,14 +10,15 @@ import pytest
 import vespa.application as pyvespa
 
 from marqo.vespa import concurrency
-from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError
+from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError, VespaNotConvergedError
 from marqo.vespa.models import VespaDocument, QueryResult
+from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from tests.integ_tests.marqo_test import AsyncMarqoTestCase
+from tests.integ_tests.marqo_test import AsyncMarqoTestCase, MarqoTestCase
 
 
-class TestFeedDocumentAsync(AsyncMarqoTestCase):
+class TestVespaClient(AsyncMarqoTestCase):
     TEST_SCHEMA = "test_vespa_client"
     TEST_CLUSTER = "content_default"
 
@@ -24,7 +26,8 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                   "http://localhost:8080", "content_default")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
-
+        self.test_document_1 = VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})
+        self.test_document_2 = VespaDocument(id="doc2", fields={"title": "Title 2", "contents": "Content 2"})
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
     def _base_test_feed_batch_successful(self, func, batch):
@@ -463,7 +466,11 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             self.client.translate_vespa_document_response(status, None)
         mock_log_error.assert_called_once()
 
-    @patch.object(VespaClient, 'get_application_has_converged')
+    @patch.object(
+        VespaClient,
+        'get_application_has_converged',
+        side_effect=httpx._exceptions.ReadTimeout("Read Timeout")
+    )
     def test_vespa_client_timeout_exception_handled(self, mock_get_application_has_converged):
         """If a timeout exception is raised, the method should retry until the total wait time is reached"""
         side_effects = [
@@ -472,21 +479,229 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ]
         for side_effect in side_effects:
             with self.subTest(side_effect=side_effect):
-                mock_get_application_has_converged.side_effect = httpx._exceptions.ReadTimeout("Read Timeout")
                 vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                            "http://localhost:8080", "content_default")
                 with self.assertRaises(VespaError) as e:
-                    vespa_client.wait_for_application_convergence(10)
+                    vespa_client.wait_for_application_convergence(0.1)
                 self.assertGreaterEqual(mock_get_application_has_converged.call_count, 5)
                 self.assertIn("Vespa application did not converge", str(e.exception))
 
-    @patch.object(VespaClient, 'get_application_has_converged')
-    def test_wait_for_application_timeout(self, mock_get_application_has_converged):
+    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
+    def test_application_convergence_timeout_fails(self, mock_get_application_has_converged):
         """If the total wait time is reached, the method should raise a VespaError"""
-        mock_get_application_has_converged.return_value = False
         vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
 
         with self.assertRaises(VespaError) as e:
-            vespa_client.wait_for_application_convergence(timeout=2)
+            vespa_client.wait_for_application_convergence(timeout=0.1)
         self.assertIn("Vespa application did not converge",str(e.exception))
+
+    def test_deploy_session(self):
+        """Test that create_deployment_session calls the correct methods"""
+        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+        # wait for vespa to get converged
+        vespa_client.wait_for_application_convergence(timeout=10)
+        generation_before_deployment = vespa_client.get_application_generation()
+        deployment_session = vespa_client.create_deployment_session()
+
+        prep = vespa_client.prepare(deployment_session[1], 10)
+        session_id = prep['session-id']
+        self.assertEqual(prep['message'], f"Session {session_id} for tenant 'default' prepared.")
+
+        activate = vespa_client.activate(prep['activate'], 10)
+        previous_expected_generation = activate['application']['previousActiveGeneration']
+        self.assertEqual(activate['message'], f"Session {session_id} for tenant 'default' activated.")
+
+        self.assertEqual(previous_expected_generation, generation_before_deployment)
+        base_expected_deploy_url = f"http://localhost:19071/application/v2/tenant/default/session/{session_id}/"
+        self.assertEqual(deployment_session[0], base_expected_deploy_url + 'content/')
+        self.assertEqual(deployment_session[1], base_expected_deploy_url + 'prepared')
+
+        vespa_client.wait_for_application_convergence(timeout=10)
+        generation_after_deployment = vespa_client.get_application_generation()
+        self.assertEqual(generation_after_deployment, int(session_id))
+
+    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
+    def test_check_for_application_convergence_not_converged(self, mock_get_application_has_converged):
+        """Test that check_for_application_convergence raises an error if the application has not converged"""
+        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+        with self.assertRaises(VespaNotConvergedError) as e:
+            vespa_client.check_for_application_convergence()
+        self.assertIn("Vespa application has not converged", str(e.exception))
+
+    def test_get_application_generation(self):
+        """Test that get_application_generation returns the current application generation"""
+        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+        application_generation = vespa_client.get_application_generation()
+        self.assertEqual(type(application_generation), int)
+
+    def test_manage_content(self):
+        deployment_session = self.client.create_deployment_session()
+        content_base_url = deployment_session[0]
+
+        self.client.put_content(content_base_url, "test", "test")
+
+        list_content = self.client.list_contents(content_base_url)
+        self.assertIn(f"{content_base_url}test", list_content)
+
+        text_content = self.client.get_text_content(content_base_url, "test")
+        self.assertEqual(text_content, "test")
+
+        binary_content = self.client.get_binary_content(content_base_url, "test")
+        self.assertEqual(binary_content, b"test")
+
+        self.client.delete_content(content_base_url, "test")
+        list_content = self.client.list_contents(content_base_url)
+        self.assertNotIn(f"{content_base_url}test", list_content)
+
+    def test_get_metrics(self):
+        metrics = self.client.get_metrics()
+        self.assertIsInstance(metrics, ApplicationMetrics)
+
+    def test_feed_documents(self):
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
+        get_response = self.client.get_document(
+            id=self.test_document_1.id,
+            schema=self.TEST_SCHEMA
+        )
+        document = get_response.document
+        self.assertEqual(document.id, f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}')
+        self.assertEqual(document.fields, self.test_document_1.fields)
+        delete_response = self.client.delete_document(self.test_document_1.id, self.TEST_SCHEMA)
+        self.assertEqual(
+            delete_response.path_id,
+            f'/document/v1/{self.TEST_SCHEMA}/{self.TEST_SCHEMA}/docid/{self.test_document_1.id}'
+        )
+
+        get_all_docs = self.client.get_all_documents(self.TEST_SCHEMA)
+        self.assertEqual(get_all_docs.document_count, 0) # validate that all documents were deleted
+
+    def test_delete_all_documents(self):
+        response = self.client.get_all_documents(self.TEST_SCHEMA)
+        self.assertEqual(response.document_count, 0)
+
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
+        self.client.feed_document(self.test_document_2, self.TEST_SCHEMA)
+        response = self.client.delete_all_docs(self.TEST_SCHEMA)
+        self.assertEqual(response.document_count, 2)
+
+        # Check it was all deleted
+        response = self.client.get_all_documents(self.TEST_SCHEMA)
+        self.assertEqual(response.document_count, 0)
+
+    def test_get_all_documents(self):
+        get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA)
+        self.assertEqual(get_documents_response.document_count, 0)
+
+        # Feed 2 documents
+        self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
+        self.client.feed_document(self.test_document_2, self.TEST_SCHEMA)
+        get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA, stream=True)
+
+        # Check retrieved documents match
+        self.assertEqual(get_documents_response.document_count, 2)
+        self.assertEqual(
+            get_documents_response.documents[0].id,
+            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}'
+        )
+        self.assertEqual(
+            get_documents_response.documents[1].id,
+            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_2.id}'
+        )
+
+    def test_batch_index_requests(self):
+        feed_batch_docs = [
+            VespaDocument(id="batch_doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="batch_doc2", fields={"title": "Title 2"}),
+        ]
+
+        batch_response = self.client.feed_batch(feed_batch_docs, self.TEST_SCHEMA)
+        self.assertEqual(batch_response.errors, False)
+
+        get_batch_response = self.client.get_batch(
+            ids=["batch_doc1", "batch_doc2"],
+            schema=self.TEST_SCHEMA
+        )
+        self.assertEqual(get_batch_response.errors, False)
+        self.assertEqual(len(get_batch_response.responses), 2)
+
+        get_batch_no_ids_response = self.client.get_batch(
+            ids=[],
+            schema=self.TEST_SCHEMA
+        )
+        self.assertEqual(get_batch_no_ids_response.errors, False)
+        self.assertEqual(get_batch_no_ids_response.responses, [])
+
+        delete_batch_response = self.client.delete_batch(
+            ids=["batch_doc1", "batch_doc2"],
+            schema=self.TEST_SCHEMA
+        )
+        self.assertEqual(delete_batch_response.errors, False)
+        self.assertEqual(len(delete_batch_response.responses), 2)
+
+        # Try getting documents after deletion
+        get_batch_response = self.client.get_batch(
+            ids=["batch_doc1", "batch_doc2"],
+            schema=self.TEST_SCHEMA
+        )
+        self.assertEqual(get_batch_response.errors, True)
+        self.assertEqual(len(get_batch_response.responses), 2)
+        self.assertEqual(get_batch_response.responses[0].status, 404)
+        self.assertEqual(get_batch_response.responses[1].status, 404)
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient.put", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    async def test_update_document_json_decode_error(self, mock_put):
+        """
+        Test that _update_document_async properly raises VespaError on JSONDecodeError for a 200 response.
+        """
+
+        document = VespaDocument(
+            id="doc1", fields={
+                "title": "Updated Title"
+            }
+            )
+
+        with pytest.raises(VespaError, match="Unexpected response from Vespa"):
+            await self.client._update_document_async(
+                asyncio.Semaphore(1), httpx.AsyncClient(), document, "test_schema", 60, "marqo__id"
+                )
+
+        assert mock_put.call_count == 1
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient.post", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    async def test_feed_document_json_decode_error(self, mock_post):
+        """
+        Test that feed_document properly raises VespaError on JSONDecodeError for a 200 response.
+        """
+
+        document = VespaDocument(
+            id="doc1", fields={
+                "title": "Updated Title"
+            }
+            )
+
+        with pytest.raises(VespaError, match="Unexpected response from Vespa"):
+            await self.client._feed_document_async(
+                asyncio.Semaphore(1), httpx.AsyncClient(), document, "test_schema", 60
+                )
+
+        assert mock_post.call_count == 1
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient.delete", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    async def test_delete_document_json_decode_error(self, mock_delete):
+        """
+        Test that delete_document properly raises VespaError on JSONDecodeError for a 200 response.
+        """
+
+        with pytest.raises(VespaError, match="Unexpected response: Invalid JSON"):
+            await self.client._delete_document_async(
+                asyncio.Semaphore(1), httpx.AsyncClient(), "doc1", "test_schema", 60
+                )
+
+        assert mock_delete.call_count == 1
