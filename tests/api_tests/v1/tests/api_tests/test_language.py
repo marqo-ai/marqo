@@ -151,7 +151,7 @@ class TestLanguage(MarqoTestCase):
             tensor_fields=[],
             mappings={
                 "title_pt": {"type": "text_field", "language": "pt"},
-                "title_en": {"type": "text_field", "language": "end"},
+                "title_en": {"type": "text_field", "language": "en"},
             }
         )
 
