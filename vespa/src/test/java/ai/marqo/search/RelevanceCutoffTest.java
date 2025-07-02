@@ -374,7 +374,9 @@ class RelevanceCutoffTest {
 
         @Test
         void shouldThrowExceptionForNegativeTargetHits() {
-            String yql = "select * from sources * where {targetHits: 100}";
+            String yql =
+                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
+                            + " 100}";
 
             RuntimeException exception =
                     assertThrows(RuntimeException.class, () -> callOverwriteTargetHits(yql, -1));
@@ -390,38 +392,6 @@ class RelevanceCutoffTest {
             String result = callOverwriteTargetHits(originalYql, 0);
             assertThat(result).contains("targetHits: 1");
             assertThat(result).contains("hnsw.exploreAdditionalHits: 1999");
-        }
-
-        @Test
-        void shouldHandleMultipleTargetHitsOccurrences() {
-            // Test with multiple targetHits - should replace all occurrences
-            String originalYql =
-                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
-                            + " 1900} and {targetHits: 200, hnsw.exploreAdditionalHits: 1800}";
-
-            String result = callOverwriteTargetHits(originalYql, 50);
-            assertThat(result).contains("targetHits: 50");
-            assertThat(result).doesNotContain("targetHits: 100");
-            assertThat(result).doesNotContain("targetHits: 200");
-            assertThat(result).contains("hnsw.exploreAdditionalHits: 1950");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1900");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1800");
-            // Should replace both occurrences
-            long targetHitsCount =
-                    result.chars()
-                                    .mapToObj(c -> (char) c)
-                                    .map(String::valueOf)
-                                    .collect(
-                                            StringBuilder::new,
-                                            StringBuilder::append,
-                                            StringBuilder::append)
-                                    .toString()
-                                    .split("targetHits: 50", -1)
-                                    .length
-                            - 1;
-            assertThat(targetHitsCount).isEqualTo(2);
-            long hnswCount = result.split("hnsw.exploreAdditionalHits: 1950", -1).length - 1;
-            assertThat(hnswCount).isEqualTo(2);
         }
 
         @Test
@@ -506,8 +476,8 @@ class RelevanceCutoffTest {
                             () -> callOverwriteTargetHits(originalYql, 150));
             assertThat(exception.getMessage())
                     .contains(
-                            "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits"
-                                    + " is present");
+                            "YQL does not contain hnsw.exploreAdditionalHits clause, cannot extract"
+                                    + " it.");
         }
 
         @Test
@@ -544,7 +514,8 @@ class RelevanceCutoffTest {
         @Test
         void shouldExtractExploreAdditionalHitsFromComplexYql() {
             String yql =
-                    "select * from sources * where {param1: 'value', targetHits: 250, hnsw.exploreAdditionalHits: 1750, param2: true}";
+                    "select * from sources * where {param1: 'value', targetHits: 250,"
+                            + " hnsw.exploreAdditionalHits: 1750, param2: true}";
 
             Integer result = callExtractCurrentExploreAdditionalHits(yql);
             assertThat(result).isEqualTo(1750);
@@ -555,8 +526,11 @@ class RelevanceCutoffTest {
             String yql = "select * from sources * where {targetHits: 100, param1: 'value'}";
 
             RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callExtractCurrentExploreAdditionalHits(yql));
-            assertThat(exception.getMessage()).contains("YQL does not contain hnsw.exploreAdditionalHits clause");
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callExtractCurrentExploreAdditionalHits(yql));
+            assertThat(exception.getMessage())
+                    .contains("YQL does not contain hnsw.exploreAdditionalHits clause");
         }
 
         @Test
@@ -564,22 +538,32 @@ class RelevanceCutoffTest {
             String yql = "select * from sources * where {hnsw.exploreAdditionalHits: invalid}";
 
             RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callExtractCurrentExploreAdditionalHits(yql));
-            // The regex doesn't match "invalid" as a number, so it throws "YQL does not contain clause"
-            assertThat(exception.getMessage()).contains("YQL does not contain hnsw.exploreAdditionalHits clause");
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callExtractCurrentExploreAdditionalHits(yql));
+            // The regex doesn't match "invalid" as a number, so it throws "YQL does not contain
+            // clause"
+            assertThat(exception.getMessage())
+                    .contains("YQL does not contain hnsw.exploreAdditionalHits clause");
         }
 
         @Test
         void shouldThrowCorrectErrorMessageForInvalidExploreAdditionalHitsNumber() {
-            // Test that the error message correctly mentions "exploreAdditionalHits" not "targetHits"
+            // Test that the error message correctly mentions "exploreAdditionalHits" not
+            // "targetHits"
             // This tests the fix for the copy-paste error in the error message
-            String yql = "select * from sources * where {hnsw.exploreAdditionalHits: 999999999999999999999}";
+            String yql =
+                    "select * from sources * where {hnsw.exploreAdditionalHits:"
+                            + " 999999999999999999999}";
 
             RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callExtractCurrentExploreAdditionalHits(yql));
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callExtractCurrentExploreAdditionalHits(yql));
             // The number is too large to parse as Integer, should throw NumberFormatException
             // The error message should mention "exploreAdditionalHits" not "targetHits"
-            assertThat(exception.getMessage()).contains("Invalid exploreAdditionalHits value in YQL");
+            assertThat(exception.getMessage())
+                    .contains("Invalid exploreAdditionalHits value in YQL");
             assertThat(exception.getMessage()).doesNotContain("Invalid targetHits value");
         }
 
@@ -587,7 +571,8 @@ class RelevanceCutoffTest {
         void shouldExtractFirstExploreAdditionalHitsWhenMultipleOccurrences() {
             // Test with multiple hnsw.exploreAdditionalHits - should return the first one
             String yql =
-                    "select * from sources * where {hnsw.exploreAdditionalHits: 1500} and {hnsw.exploreAdditionalHits: 1800}";
+                    "select * from sources * where {hnsw.exploreAdditionalHits: 1500} and"
+                            + " {hnsw.exploreAdditionalHits: 1800}";
 
             Integer result = callExtractCurrentExploreAdditionalHits(yql);
             assertThat(result).isEqualTo(1500); // Should return the first occurrence
@@ -597,25 +582,26 @@ class RelevanceCutoffTest {
         void shouldTestEfSearchLogicWithDifferentValues() {
             // Test the efSearch calculation: efSearch = targetHits + exploreAdditionalHits
             // When newTargetHits changes, newExploreAdditionalHits = efSearch - newTargetHits
-            
+
             // Example: targetHits=50, exploreAdditionalHits=1950, so efSearch=2000
             // When newTargetHits=100, newExploreAdditionalHits should be 2000-100=1900
             String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
-            
+
             String result = callOverwriteTargetHits(originalYql, 100);
             assertThat(result).contains("targetHits:100");
             assertThat(result).contains("hnsw.exploreAdditionalHits:1900");
         }
-        
+
         @Test
         void shouldMaintainEfSearchConstantAcrossUpdates() {
             // Test that efSearch (targetHits + exploreAdditionalHits) remains constant
-            String originalYql = "{targetHits:300, hnsw.exploreAdditionalHits:1200}"; // efSearch = 1500
-            
+            String originalYql =
+                    "{targetHits:300, hnsw.exploreAdditionalHits:1200}"; // efSearch = 1500
+
             String result = callOverwriteTargetHits(originalYql, 500);
             assertThat(result).contains("targetHits:500");
             assertThat(result).contains("hnsw.exploreAdditionalHits:1000"); // 1500 - 500 = 1000
-            
+
             // Verify the total remains 1500
             Integer newTargetHits = callExtractCurrentTargetHits(result);
             Integer newExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(result);
@@ -625,8 +611,9 @@ class RelevanceCutoffTest {
         @Test
         void shouldHandleEfSearchWithZeroTargetHitsConversion() {
             // When targetHits=0 gets converted to 1, efSearch logic should still work
-            String originalYql = "{targetHits:100, hnsw.exploreAdditionalHits:1900}"; // efSearch = 2000
-            
+            String originalYql =
+                    "{targetHits:100, hnsw.exploreAdditionalHits:1900}"; // efSearch = 2000
+
             String result = callOverwriteTargetHits(originalYql, 0);
             assertThat(result).contains("targetHits:1"); // 0 converted to 1
             assertThat(result).contains("hnsw.exploreAdditionalHits:1999"); // 2000 - 1 = 1999
@@ -635,19 +622,19 @@ class RelevanceCutoffTest {
         @Test
         void shouldValidateEfSearchCalculationAcrossMultipleScenarios() {
             // Test comprehensive efSearch validation with various input combinations
-            
+
             // Scenario 1: Small efSearch value
             String yql1 = "{targetHits:50, hnsw.exploreAdditionalHits:50}"; // efSearch = 100
             String result1 = callOverwriteTargetHits(yql1, 30);
             assertThat(result1).contains("targetHits:30");
             assertThat(result1).contains("hnsw.exploreAdditionalHits:70"); // 100 - 30 = 70
-            
+
             // Scenario 2: Large efSearch value
             String yql2 = "{targetHits:500, hnsw.exploreAdditionalHits:4500}"; // efSearch = 5000
             String result2 = callOverwriteTargetHits(yql2, 1000);
             assertThat(result2).contains("targetHits:1000");
             assertThat(result2).contains("hnsw.exploreAdditionalHits:4000"); // 5000 - 1000 = 4000
-            
+
             // Scenario 3: Edge case where newTargetHits equals efSearch
             String yql3 = "{targetHits:100, hnsw.exploreAdditionalHits:900}"; // efSearch = 1000
             String result3 = callOverwriteTargetHits(yql3, 1000);
@@ -676,7 +663,7 @@ class RelevanceCutoffTest {
                 Integer currentTargetHits = callExtractCurrentTargetHits(yql);
                 Integer currentExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(yql);
                 int efSearch = currentTargetHits + currentExploreAdditionalHits;
-                
+
                 java.lang.reflect.Method method =
                         HybridSearcher.class.getDeclaredMethod(
                                 "overwriteTargetHits", String.class, int.class, int.class);

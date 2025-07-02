@@ -29,9 +29,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.statistics.descriptive.StandardDeviation;
 import org.apache.commons.statistics.descriptive.Mean;
-
+import org.apache.commons.statistics.descriptive.StandardDeviation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +55,7 @@ public class HybridSearcher extends Searcher {
     // Thread-safe ObjectReader for parsing SortField JSON
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final ObjectReader SORT_FIELD_READER =
-            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {
-            });
+            OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
 
     // A magic number used to represent missing sort field values in search results as we can only
     // return numeric values in match-features.
@@ -71,8 +69,7 @@ public class HybridSearcher extends Searcher {
     private record SortField(
             @JsonProperty("field_name") String fieldName,
             @JsonProperty("order") SortOrder order,
-            @JsonProperty("missing") MissingOrder missing) {
-    }
+            @JsonProperty("missing") MissingOrder missing) {}
 
     /**
      * Sort order enum for better type safety
@@ -435,7 +432,7 @@ public class HybridSearcher extends Searcher {
         query.setOffset(0);
 
         // Update tensor YQL targetHits if it exists
-        if (currentTensorTargetHits != newTensorTargetHits) {
+        if (!Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
             int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
             String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
@@ -923,9 +920,9 @@ public class HybridSearcher extends Searcher {
         }
         try {
             return Integer.parseInt(matcher.group(2));
-        } catch (
-                NumberFormatException e) {
-            throw new RuntimeException("Invalid exploreAdditionalHits value in YQL: " + matcher.group(2), e);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException(
+                    "Invalid exploreAdditionalHits value in YQL: " + matcher.group(2), e);
         }
     }
 
@@ -1222,9 +1219,8 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethodString);
         }
 
-        double [] probeLexicalScores = lexicalHits.stream()
-                .mapToDouble(hit -> hit.getRelevance().getScore())
-                .toArray();
+        double[] probeLexicalScores =
+                lexicalHits.stream().mapToDouble(hit -> hit.getRelevance().getScore()).toArray();
 
         switch (cutoffMethod) {
             case GAP_DETECTION -> {
@@ -1250,7 +1246,6 @@ public class HybridSearcher extends Searcher {
                 double stdDev = StandardDeviation.of(probeLexicalScores).getAsDouble();
                 double threshold = mean + (relevanceCutoffParameter * stdDev);
                 return countGreaterOrEqual(probeLexicalScores, threshold);
-
             }
             case RELATIVE_MAX_SCORE -> {
                 logIfVerbose("Using softCodedScoreCut method for relevance cutoff", verbose);
