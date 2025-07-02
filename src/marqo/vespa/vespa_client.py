@@ -1126,3 +1126,4 @@ class VespaClient:
             raise exception(message=message, cause=cause) from cause
 
         raise VespaStatusError(message=f'{error_code}: {message}', cause=cause) from cause
+    
