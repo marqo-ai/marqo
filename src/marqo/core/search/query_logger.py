@@ -15,6 +15,10 @@ log_query_max_length = int(utils.read_env_vars_and_defaults(EnvVars.MARQO_LOG_QU
 
 
 class QueryLogger:
+    """
+    This class logs out sanitised the full search query of slow or failed search requests.
+    It logs the query to a dedicated logger so we can redirect the log later
+    """
     def __init__(self, search_query: SearchQuery):
         self.search_query = search_query
         self.error_logged = False
@@ -22,7 +26,12 @@ class QueryLogger:
     @property
     def sanitised_query(self) -> dict:
         """
-
+        This method sanitises the query object by
+        * Generating a dictionary from the search query object to avoid changing the original query
+        * Excluding None values and skip default values
+        * Excluding fields containing secrets like download headers and model auth
+        * Removing vectors from custom vector search and tensor context
+        * Truncating long query string
         """
         query_dict = self.search_query.dict(by_alias=True, exclude_none=True, skip_defaults=True, exclude=SECRET_FIELDS)
         q = self.search_query.q
@@ -73,4 +82,3 @@ class QueryLogger:
         if log_query_details and not self.error_logged and elapsed_time_ms >= slow_query_threshold_ms:
             marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
                                        f'Query: {self.sanitised_query}')
-

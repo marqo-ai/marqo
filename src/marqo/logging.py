@@ -102,6 +102,11 @@ LOGGING_CONFIG = {
             "handlers": ["default"],
             "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",  # mute verbose httpcore info level log
             "propagate": False,
+        },
+        "marqo_query": {
+            "handlers": ["default"],  # change this to a different handler if security is a concern
+            "level": "WARNING",  # slow query at warning level, failed query at error level
+            "propagate": False,
         }
     },
     "root": {
