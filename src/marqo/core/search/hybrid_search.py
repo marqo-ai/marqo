@@ -152,6 +152,23 @@ class HybridSearch:
                 "'hybridParameters.queryLexical' is provided"
             )
 
+        if sort_by and (
+                marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
+                not isinstance(marqo_index, SemiStructuredMarqoIndex)
+        ):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'sortBy' features is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
+            )
+
+        if (relevance_cutoff and isinstance(marqo_index, UnstructuredMarqoIndex) and
+                not isinstance(marqo_index, SemiStructuredMarqoIndex)):
+            # Legacy unstructured indexes do not support relevance cutoff
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later. "
+                f"This unstructured index was created with Marqo {marqo_index_version} "
+            )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)

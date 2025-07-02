@@ -58,7 +58,7 @@ class TestSortByFeature(MarqoTestCase):
             )
 
         self.assertIn(
-            "are only supported for unstructured indexes created with Marqo version",
+            "is only supported for unstructured indexes created with Marqo version 2.22.0 or later",
             str(cm.exception)
         )
 

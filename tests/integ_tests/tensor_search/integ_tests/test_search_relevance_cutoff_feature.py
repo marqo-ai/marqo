@@ -2,6 +2,7 @@ import json
 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
@@ -12,11 +13,24 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        index_request = cls.unstructured_marqo_index_request(
+        unstructured_index_request = cls.unstructured_marqo_index_request(
+            name="relevance_cutoff_unstructured_index",
             model=Model(name="hf/all-MiniLM-L6-v2")
         )
-        cls.create_indexes([index_request])
-        cls.index_name = index_request.name
+        
+        structured_index_request = cls.structured_marqo_index_request(
+            name="relevance_cutoff_structured_index",
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+            fields=[
+                FieldRequest(name="content", type="text", features=["lexical_search", "filter"]),
+                FieldRequest(name="sort_value", type="float"),
+            ],
+            tensor_fields=["content"]
+        )
+        cls.create_indexes([unstructured_index_request, structured_index_request])
+        
+        cls.unstructured_index_name = unstructured_index_request.name
+        cls.structured_index_name = structured_index_request.name
 
         # 30 documents designed for "machine learning artificial intelligence algorithms" query
         test_docs = [
@@ -136,10 +150,19 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             config=cls.config,
             add_docs_params=AddDocsParams(
                 docs=test_docs,
-                index_name=cls.index_name,
+                index_name=cls.unstructured_index_name,
                 tensor_fields=['content']
             )
         )
+        
+        res = cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=test_docs,
+                index_name=cls.structured_index_name,
+            )
+        )
+        print(res)
 
         # Test results without relevance cutoff should return top 10 documents
         regular_search_results = cls._search_helper(limit=10)
@@ -155,21 +178,25 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
 
     def setUp(self):
         """Ensure documents are not changed before each test."""
-        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
-            raise RuntimeError(
-                f"Expected 10 documents in index {self.index_name} for sorting tests"
-            )
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            if 30 !=self.monitoring.get_index_stats_by_name(index_name).number_of_documents:
+                raise RuntimeError(
+                    f"Expected 30 documents in index {index_name} for sorting tests"
+                )
 
     def tearDown(self):
         """Ensure documents are not changed after each test."""
-        if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
-            raise RuntimeError(
-                f"Expected 10 documents in index {self.index_name} for sorting tests"
-            )
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            if 30 !=self.monitoring.get_index_stats_by_name(index_name).number_of_documents:
+                raise RuntimeError(
+                    f"Expected 30 documents in index {index_name} for sorting tests"
+                )
 
     @classmethod
     def _search_helper(
-            cls, query: str = "machine learning artificial intelligence algorithms",
+            cls,
+            index_name: Optional[str] = None,
+            query: str = "machine learning artificial intelligence algorithms",
             relevance_cutoff: Optional[dict] = None,
             sort_by: Optional[dict] = None,
             limit: int = 10, offset: int = 0,
@@ -182,10 +209,13 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 "retrievalMethod": "disjunction",
                 "rankingMethod": "rrf",
                 "alpha": 0.5
-            }
 
+            }
+        if index_name is None:
+            index_name = cls.unstructured_index_name
+      
         result = json.loads(search(
-            index_name=cls.index_name,
+            index_name=index_name,
             marqo_config=cls.config,
             device="cpu",
             search_query_dict={
@@ -208,92 +238,115 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
 
     def test_relevance_cutoff_relative_max_score_low_threshold(self):
         """Test that relative_max_score cutoff with low threshold."""
-        result = self._search_helper(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "parameters": {"relativeScoreFactor": 0.1},
-            },
-        )
-        relevance_candidates = result["_relevantCandidates"]
-        self.assertGreater(relevance_candidates, 20, "Should have enough relevance candidates for filtering")
-
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                result = self._search_helper(
+                    index_name=index_name,
+                    relevance_cutoff={
+                        "method": "relative_max_score",
+                        "parameters": {"relativeScoreFactor": 0.01},
+                    },
+                )
+                relevance_candidates = result["_relevantCandidates"]
+                self.assertGreater(
+                    relevance_candidates, 20,
+                    "Should have enough relevance candidates for cutoff"
+                )
 
     def test_relevance_cutoff_relative_max_score_high_threshold(self):
         """Test that relative_max_score cutoff with high threshold."""
-        result = self._search_helper(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "parameters": {"relativeScoreFactor": 0.95},
-            },
-        )
-        relevance_candidates = result["_relevantCandidates"]
-        self.assertLess(relevance_candidates, 10, "Should have few relevance candidates for filtering")
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                result = self._search_helper(
+                    index_name=index_name,
+                    relevance_cutoff={
+                        "method": "relative_max_score",
+                        "parameters": {"relativeScoreFactor": 0.9},
+                    },
+                )
+                relevance_candidates = result["_relevantCandidates"]
+                self.assertLess(
+                    relevance_candidates, 20,
+                    "Should have few relevance candidates for filtering"
+                )
 
     def test_relevance_cutoff_relative_max_score_with_changing_threshold(self):
         """Test that relative_max_score cutoff with changing threshold.
         We vary the threshold from 0.1 to 0.9 and check that the number of relevance candidates
         """
-        previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
-        for threshold in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
+                for threshold in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
 
-            current_relevance_candidates = self._search_helper(
-                relevance_cutoff={
-                    "method": "relative_max_score",
-                    "parameters": {"relativeScoreFactor": threshold},
-                },
-            )["_relevantCandidates"]
+                    current_relevance_candidates = self._search_helper(
+                        index_name=index_name,
+                        relevance_cutoff={
+                            "method": "relative_max_score",
+                            "parameters": {"relativeScoreFactor": threshold},
+                        },
+                    )["_relevantCandidates"]
 
-            if current_relevance_candidates > previous_relevance_candidates:
-                raise RuntimeError(
-                    f"Expected relevance candidates to decrease with increasing threshold, "
-                    f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
-                )
-            previous_relevance_candidates = current_relevance_candidates
+                    if current_relevance_candidates > previous_relevance_candidates:
+                        raise RuntimeError(
+                            f"Expected relevance candidates to decrease with increasing threshold, "
+                            f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
+                        )
+                    previous_relevance_candidates = current_relevance_candidates
 
     def test_relevance_cutoff_gap_detection(self):
         """Test that gap_detection cutoff works as expected."""
-        result = self._search_helper(
-            relevance_cutoff={
-                "method": "gap_detection",
-            },
-        )
-        relevance_candidates = result["_relevantCandidates"]
-        self.assertLess(
-            relevance_candidates, 15,
-            "Expected less than 15 relevance candidates for gap detection, but got {relevant_candidates}."
-        )
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                result = self._search_helper(
+                    index_name=index_name,
+                    relevance_cutoff={
+                        "method": "gap_detection",
+                    },
+                )
+                relevance_candidates = result["_relevantCandidates"]
+                self.assertLess(
+                    relevance_candidates, 15,
+                    "Expected less than 15 relevance candidates for gap detection, but got {relevant_candidates}."
+                )
 
     def test_relevance_cutoff_mean_std_dev(self):
         """Test that mean_std_dev cutoff works as expected."""
-        result = self._search_helper(
-            relevance_cutoff={
-                "method": "mean_std_dev",
-                "parameters": {"stdDevFactor": 0.1},
-            },
-        )
-        relevance_candidates = result["_relevantCandidates"]
-        self.assertLess(
-            relevance_candidates, 15,
-            f"Expected less than 15 relevance candidates for mean_std_dev, but got {relevance_candidates}."
-        )
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                result = self._search_helper(
+                    index_name=index_name,
+                    relevance_cutoff={
+                        "method": "mean_std_dev",
+                        "parameters": {"stdDevFactor": 0.1},
+                    },
+                )
+                relevance_candidates = result["_relevantCandidates"]
+                self.assertLess(
+                    relevance_candidates, 15,
+                    f"Expected less than 15 relevance candidates for mean_std_dev, but got {relevance_candidates}."
+                )
 
     def test_relevance_cutoff_changing_mean_std_dev_threshold(self):
         """Test that mean_std_dev cutoff with changing stdDevFactor works as expected."""
-        previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
-        for std_dev_factor in [-1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6]:
-            current_relevance_candidates = self._search_helper(
-                relevance_cutoff={
-                    "method": "mean_std_dev",
-                    "parameters": {"stdDevFactor": std_dev_factor},
-                },
-            )["_relevantCandidates"]
+        for index_name in [self.unstructured_index_name, self.structured_index_name]:
+            with self.subTest(index=index_name):
+                previous_relevance_candidates = 100  # Start with a high number to ensure the first check passes
+                for std_dev_factor in [-1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6]:
+                    current_relevance_candidates = self._search_helper(
+                        index_name=index_name,
+                        relevance_cutoff={
+                            "method": "mean_std_dev",
+                            "parameters": {"stdDevFactor": std_dev_factor},
+                        },
+                    )["_relevantCandidates"]
 
-            if current_relevance_candidates > previous_relevance_candidates:
-                raise RuntimeError(
-                    f"Expected relevance candidates to decrease with increasing stdDevFactor, "
-                    f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
-                )
-            previous_relevance_candidates = current_relevance_candidates
+                    if current_relevance_candidates > previous_relevance_candidates:
+                        raise RuntimeError(
+                            f"Expected relevance candidates to decrease with increasing stdDevFactor, "
+                            f"but got {current_relevance_candidates} <= {previous_relevance_candidates}."
+                        )
+                    previous_relevance_candidates = current_relevance_candidates
 
     def test_simple_sort_results(self):
         """Test that relevance cutoff works correctly with sorting.
@@ -1482,14 +1535,14 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         """Ensure documents are not changed before each test."""
         if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
             raise RuntimeError(
-                f"Expected 10 documents in index {self.index_name} for sorting tests"
+                f"Expected 30 documents in index {self.index_name} for relevance cut-off and sorting tests"
             )
 
     def tearDown(self):
         """Ensure documents are not changed after each test."""
         if 30 !=self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents:
             raise RuntimeError(
-                f"Expected 10 documents in index {self.index_name} for sorting tests"
+                f"Expected 30 documents in index {self.index_name} for relevance cut-off and sorting tests"
             )
 
     @classmethod

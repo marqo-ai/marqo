@@ -355,8 +355,9 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def _set_sort_by_min_sort_candidates_parameters(cls, values):
-        """Set the value for min_sort_candidates in sortBy if it is not provided.
+    def _validate_and_set_sort_by_min_sort_candidates_parameters(cls, values):
+        """validate the value for min_sort_candidates in sortBy.
+        If it is not provided and relevanceCutoff is None, this function will set it to a default value.
 
         Logics:
         - If relevanceCutoff is provided, do not set min_sort_candidates, otherwise:
