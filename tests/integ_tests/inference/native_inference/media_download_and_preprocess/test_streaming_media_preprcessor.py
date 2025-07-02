@@ -281,6 +281,32 @@ class TestStreamingMediaProcessor(unittest.TestCase):
                     )
                 self.assertIn("Please check your media file and try again", str(e.exception))
 
+    def test_video_chunk_generated_when_duration_smaller_than_overlap(self):
+        audio_url = TestVideoUrls.VIDEO1.value  # duration is 10s
+        preprocessing_config = self.test_video_preprocessing_config.copy(
+            update={'chunk_config': ChunkConfig(split_length=20, split_overlap=11)})
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url=audio_url, preprocessors=self.test_preprocessor,
+            preprocessing_config=preprocessing_config
+        )
+
+        processed_chunks = streaming_media_processor_object.process_media()
+        self.assertEqual(1, len(processed_chunks))
+        self.assertEqual('[0.0, 10.0]', processed_chunks[0][0])
+
+    def test_audio_chunk_generated_when_duration_smaller_than_overlap(self):
+        audio_url = TestAudioUrls.AUDIO1.value  # duration is 5s
+        preprocessing_config = self.test_audio_preprocessing_config.copy(
+            update={'chunk_config': ChunkConfig(split_length=10, split_overlap=6)})
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url=audio_url, preprocessors=self.test_preprocessor,
+            preprocessing_config=preprocessing_config
+        )
+
+        processed_chunks = streaming_media_processor_object.process_media()
+        self.assertEqual(1, len(processed_chunks))
+        self.assertEqual('[0.0, 5.0]', processed_chunks[0][0])
+
 
 
 
