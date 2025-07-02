@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -555,7 +556,8 @@ public class HybridSearcher extends Searcher {
     /**
      * Read the relevance cutoff parameter based on the relevance cutoff method.
      **/
-    private Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethodString) {
+    @VisibleForTesting
+    Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethodString) {
         if (relevanceCutoffMethodString == null) {
             return null;
         }
@@ -897,7 +899,8 @@ public class HybridSearcher extends Searcher {
      * @return The current targetHits value as integer
      * @throws RuntimeException if targetHits is not found or invalid
      */
-    private int extractCurrentTargetHits(String yql) {
+    @VisibleForTesting
+    int extractCurrentTargetHits(String yql) {
         Matcher matcher = TARGET_HITS_PATTERN.matcher(yql);
 
         if (!matcher.find()) {
@@ -912,7 +915,8 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private int extractCurrentExploreAdditionalHits(String yql) {
+    @VisibleForTesting
+    int extractCurrentExploreAdditionalHits(String yql) {
         Matcher matcher = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql);
         if (!matcher.find()) {
             throw new RuntimeException(
@@ -926,7 +930,8 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
+    @VisibleForTesting
+    String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
         // Validate input
         if (newTargetHits < 0) {
             throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
@@ -1200,7 +1205,8 @@ public class HybridSearcher extends Searcher {
      * @param verbose Whether to log verbose information
      * @return The number of relevant results to keep
      */
-    private Integer detectCutoffCount(
+    @VisibleForTesting
+    Integer detectCutoffCount(
             HitGroup probeCandidates,
             String cutoffMethodString,
             Double relevanceCutoffParameter,
@@ -1263,7 +1269,8 @@ public class HybridSearcher extends Searcher {
      * Returns the number of elements in a descending-sorted array
      * that are greater than or equal to the given threshold.
      */
-    private static int countGreaterOrEqual(double[] descSorted, double threshold) {
+    @VisibleForTesting
+    static int countGreaterOrEqual(double[] descSorted, double threshold) {
         int low = 0, high = descSorted.length;
         while (low < high) {
             int mid = (low + high) >>> 1;

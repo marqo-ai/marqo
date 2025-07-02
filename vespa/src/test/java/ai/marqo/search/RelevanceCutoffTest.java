@@ -26,7 +26,6 @@ class RelevanceCutoffTest {
         @Test
         void shouldReturnNullWhenMethodIsNull() {
             Query query = new Query("search/?query=test");
-            // Use reflection to call private method
             Double result = callReadRelevanceCutoffParameter(query, null);
             assertThat(result).isNull();
         }
@@ -99,18 +98,7 @@ class RelevanceCutoffTest {
         }
 
         private Double callReadRelevanceCutoffParameter(Query query, String method) {
-            try {
-                java.lang.reflect.Method readMethod =
-                        HybridSearcher.class.getDeclaredMethod(
-                                "readRelevanceCutoffParameter", Query.class, String.class);
-                readMethod.setAccessible(true);
-                return (Double) readMethod.invoke(hybridSearcher, query, method);
-            } catch (Exception e) {
-                if (e.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getCause();
-                }
-                throw new RuntimeException(e);
-            }
+            return hybridSearcher.readRelevanceCutoffParameter(query, method);
         }
     }
 
@@ -253,23 +241,7 @@ class RelevanceCutoffTest {
 
         private Integer callDetectCutoffCount(
                 HitGroup hits, String method, Double parameter, boolean verbose) {
-            try {
-                java.lang.reflect.Method detectMethod =
-                        HybridSearcher.class.getDeclaredMethod(
-                                "detectCutoffCount",
-                                HitGroup.class,
-                                String.class,
-                                Double.class,
-                                boolean.class);
-                detectMethod.setAccessible(true);
-                return (Integer)
-                        detectMethod.invoke(hybridSearcher, hits, method, parameter, verbose);
-            } catch (Exception e) {
-                if (e.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getCause();
-                }
-                throw new RuntimeException(e);
-            }
+            return hybridSearcher.detectCutoffCount(hits, method, parameter, verbose);
         }
     }
 
@@ -643,53 +615,120 @@ class RelevanceCutoffTest {
         }
 
         private Integer callExtractCurrentTargetHits(String yql) {
-            try {
-                java.lang.reflect.Method method =
-                        HybridSearcher.class.getDeclaredMethod(
-                                "extractCurrentTargetHits", String.class);
-                method.setAccessible(true);
-                return (Integer) method.invoke(hybridSearcher, yql);
-            } catch (Exception e) {
-                if (e.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getCause();
-                }
-                throw new RuntimeException(e);
-            }
+            return hybridSearcher.extractCurrentTargetHits(yql);
         }
 
         private String callOverwriteTargetHits(String yql, int newTargetHits) {
-            try {
-                // First extract current values to calculate efSearch
-                Integer currentTargetHits = callExtractCurrentTargetHits(yql);
-                Integer currentExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(yql);
-                int efSearch = currentTargetHits + currentExploreAdditionalHits;
+            // First extract current values to calculate efSearch
+            Integer currentTargetHits = callExtractCurrentTargetHits(yql);
+            Integer currentExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(yql);
+            int efSearch = currentTargetHits + currentExploreAdditionalHits;
 
-                java.lang.reflect.Method method =
-                        HybridSearcher.class.getDeclaredMethod(
-                                "overwriteTargetHits", String.class, int.class, int.class);
-                method.setAccessible(true);
-                return (String) method.invoke(hybridSearcher, yql, newTargetHits, efSearch);
-            } catch (Exception e) {
-                if (e.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getCause();
-                }
-                throw new RuntimeException(e);
-            }
+            return hybridSearcher.overwriteTargetHits(yql, newTargetHits, efSearch);
         }
 
         private Integer callExtractCurrentExploreAdditionalHits(String yql) {
-            try {
-                java.lang.reflect.Method method =
-                        HybridSearcher.class.getDeclaredMethod(
-                                "extractCurrentExploreAdditionalHits", String.class);
-                method.setAccessible(true);
-                return (Integer) method.invoke(hybridSearcher, yql);
-            } catch (Exception e) {
-                if (e.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getCause();
-                }
-                throw new RuntimeException(e);
+            return hybridSearcher.extractCurrentExploreAdditionalHits(yql);
+        }
+    }
+
+    @Nested
+    class CountGreaterOrEqualTest {
+
+        @Test
+        void shouldReturnZeroForEmptyArray() {
+            double[] empty = {};
+            int result = HybridSearcher.countGreaterOrEqual(empty, 5.0);
+            assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void shouldReturnZeroWhenAllElementsBelowThreshold() {
+            double[] scores = {3.0, 2.0, 1.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void shouldReturnAllWhenAllElementsAboveThreshold() {
+            double[] scores = {10.0, 8.0, 6.0, 4.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, 2.0);
+            assertThat(result).isEqualTo(4);
+        }
+
+        @Test
+        void shouldReturnCorrectCountForMixedElements() {
+            double[] scores = {10.0, 8.0, 6.0, 4.0, 2.0, 1.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(3); // 10.0, 8.0, 6.0 are >= 5.0
+        }
+
+        @Test
+        void shouldHandleExactThresholdMatch() {
+            double[] scores = {10.0, 5.0, 5.0, 3.0, 1.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(3); // 10.0, 5.0, 5.0 are >= 5.0
+        }
+
+        @Test
+        void shouldHandleSingleElementArrayAboveThreshold() {
+            double[] scores = {7.0};
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(1);
+        }
+
+        @Test
+        void shouldHandleSingleElementArrayBelowThreshold() {
+            double[] scores = {3.0};
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void shouldHandleSingleElementArrayAtThreshold() {
+            double[] scores = {5.0};
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(1);
+        }
+
+        @Test
+        void shouldHandleAllElementsEqualToThreshold() {
+            double[] scores = {5.0, 5.0, 5.0, 5.0}; // all equal to threshold
+            int result = HybridSearcher.countGreaterOrEqual(scores, 5.0);
+            assertThat(result).isEqualTo(4);
+        }
+
+        @Test
+        void shouldHandleNegativeThreshold() {
+            double[] scores = {5.0, 0.0, -2.0, -5.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, -1.0);
+            assertThat(result).isEqualTo(2); // 5.0, 0.0 are >= -1.0
+        }
+
+        @Test
+        void shouldHandleNegativeScores() {
+            double[] scores = {-1.0, -3.0, -5.0, -7.0}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, -4.0);
+            assertThat(result).isEqualTo(2); // -1.0, -3.0 are >= -4.0
+        }
+
+        @Test
+        void shouldHandleFloatingPointPrecision() {
+            double[] scores = {1.1, 1.05, 1.0, 0.95, 0.9}; // descending order
+            int result = HybridSearcher.countGreaterOrEqual(scores, 1.0);
+            assertThat(result).isEqualTo(3); // 1.1, 1.05, 1.0 are >= 1.0
+        }
+
+        @Test
+        void shouldHandleLargeArray() {
+            // Create a large descending array: 1000, 999, 998, ..., 1
+            double[] scores = new double[1000];
+            for (int i = 0; i < 1000; i++) {
+                scores[i] = 1000 - i;
             }
+
+            int result = HybridSearcher.countGreaterOrEqual(scores, 750.0);
+            assertThat(result).isEqualTo(251); // 1000, 999, ..., 750 are >= 750
         }
     }
 }
