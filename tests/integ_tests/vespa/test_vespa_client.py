@@ -15,7 +15,7 @@ from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from integ_tests.marqo_test import AsyncMarqoTestCase, MarqoTestCase
+from tests.integ_tests.marqo_test import AsyncMarqoTestCase, MarqoTestCase
 
 
 class TestVespaClient(AsyncMarqoTestCase):
