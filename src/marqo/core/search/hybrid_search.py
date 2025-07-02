@@ -158,7 +158,7 @@ class HybridSearch:
         ):
             raise core_exceptions.UnsupportedFeatureError(
                 f"The 'sortBy' features is only supported for unstructured indexes created "
-                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
+                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
             )
 
         if (relevance_cutoff and isinstance(marqo_index, UnstructuredMarqoIndex) and

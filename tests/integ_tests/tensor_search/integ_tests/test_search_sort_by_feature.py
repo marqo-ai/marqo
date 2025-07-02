@@ -9,6 +9,7 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import UnsupportedFeatureError
 from unittest.mock import patch, MagicMock
 from marqo.core.models.marqo_index import MarqoIndex
+import semver
 
 
 class TestSearchSortByFeature(MarqoTestCase):
@@ -17,13 +18,13 @@ class TestSearchSortByFeature(MarqoTestCase):
     Functional tests are in other classes.
     """
 
-    def test_sort_by_is_blocked_if_the_index_version_is_prior_to_2_21(self):
+    def test_sort_by_is_blocked_if_the_index_version_is_prior_to_2_22(self):
         """
-        Test that sort_by is blocked if the index version is prior to 2.21.
+        Test that sort_by is blocked if the index version is prior to 2.22.
         """
         # Create an index with a version prior to 2.21
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.20.0"  # Version prior to 2.21
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.21.0')  # Version prior to 2.22
         mock_index.name = "test_index"
 
         with (patch("marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=mock_index)
@@ -55,14 +56,14 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "The 'sortBy' and 'relevanceCutoff' features are only supported for unstructured indexes "
-                "created with Marqo version 2.21.0 or later",
+                "The 'sortBy' features is only supported for unstructured indexes created with Marqo "
+                "version 2.22.0 or later",
                 str(e.exception)
             )
 
     def test_sort_by_is_block_if_the_search_is_on_a_structured_index(self):
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.21.0"
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.22.0')
         mock_index.name = "test_index"
         mock_index.type="structured" # Type set to 2.21
 
@@ -95,7 +96,8 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "Your index is either a structured index or an old unstructured index",
+                "The 'sortBy' features is only supported for unstructured indexes "
+                "created with Marqo version 2.22.0 or later",
                 str(e.exception)
             )
 
