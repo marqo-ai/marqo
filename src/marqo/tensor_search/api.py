@@ -437,6 +437,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             )
             return ORJSONResponse(result)
         except Exception as e:
+            # Please note that we treat VespaTimeoutError(504) as error not slow query
             query_logger.log_error_query(str(e))
             raise
 
