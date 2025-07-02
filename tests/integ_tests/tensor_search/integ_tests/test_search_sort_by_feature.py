@@ -103,7 +103,7 @@ class TestSearchSortByFeature(MarqoTestCase):
 
     def test_sort_by_is_blocked_if_the_index_is_a_legacy_index(self):
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.12.0"
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.12.0')
         mock_index.name = "test_index"
         mock_index.type="unstructured"
 
