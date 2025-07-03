@@ -79,6 +79,6 @@ class QueryLogger:
             self.error_logged = True  # Mark that error was logged
 
     def log_slow_query(self, elapsed_time_ms: float):
-        if log_query_details and not self.error_logged and elapsed_time_ms >= slow_query_threshold_ms:
+        if log_query_details and not self.error_logged and elapsed_time_ms > slow_query_threshold_ms:
             marqo_query_logger.warning(f'Slow search query detected: {elapsed_time_ms:.1f}ms. '
                                        f'Query: {self.sanitised_query}')

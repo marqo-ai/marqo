@@ -41,8 +41,8 @@ class TestAPIQueryLogging(MarqoTestCase):
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
             # this tests the default value for env vars
             # EnvVars.MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS: "900"
-            # the elapsed time is set to 0.9s = 900ms
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            # the elapsed time is set to 0.901s = 901ms
+            mock_time.perf_counter.side_effect = [0.0, 0.901]
 
             # Execute
             response = self.client.post(f"/indexes/{self.index_name}/search", json=self.search_query)
@@ -51,7 +51,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 901.0ms", warning_call)
             self.assertIn(f"{self.search_query}", warning_call)
 
     @patch('marqo.tensor_search.telemetry.time')
@@ -81,7 +81,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.899]  # 499ms
+            mock_time.perf_counter.side_effect = [0.0, 0.9]  # 900ms
 
             # Execute
             response = self.client.post(f"/indexes/{self.index_name}/search", json=self.search_query)
@@ -101,7 +101,7 @@ class TestAPIQueryLogging(MarqoTestCase):
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
             # Test with time just under threshold - should not log
-            mock_time.perf_counter.side_effect = [0.0, 0.999]  # 999ms
+            mock_time.perf_counter.side_effect = [0.0, 1.0]  # 1000ms
 
             # Execute
             response = self.client.post(f"/indexes/{self.index_name}/search", json=self.search_query)
@@ -122,7 +122,7 @@ class TestAPIQueryLogging(MarqoTestCase):
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
             # Test with time just under threshold - should not log
-            mock_time.perf_counter.side_effect = [0.0, 1.0]  # 1000ms
+            mock_time.perf_counter.side_effect = [0.0, 1.001]  # 1001ms
 
             # Execute
             response = self.client.post(f"/indexes/{self.index_name}/search", json=self.search_query)
@@ -131,7 +131,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1001.0ms", warning_call)
             self.assertIn(f"{self.search_query}", warning_call)
 
     @patch.dict(os.environ, {
@@ -252,7 +252,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": {
@@ -279,7 +279,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -312,7 +312,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": "this is a long query with more than 20 characters",
@@ -327,7 +327,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -349,7 +349,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "searchMethod": "HYBRID",
@@ -367,7 +367,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -392,7 +392,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": {
@@ -411,7 +411,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -437,7 +437,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "searchMethod": "HYBRID",
@@ -459,7 +459,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -488,7 +488,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": {
@@ -508,7 +508,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -534,7 +534,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": "do not put secrets",
@@ -556,7 +556,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -577,7 +577,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "q": "do not put secrets",
@@ -593,7 +593,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             expected_query = {
@@ -615,7 +615,7 @@ class TestAPIQueryLogging(MarqoTestCase):
         importlib.reload(sys.modules['marqo.core.search.query_logger'])
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
-            mock_time.perf_counter.side_effect = [0.0, 0.9]
+            mock_time.perf_counter.side_effect = [0.0, 1.0]
 
             search_query = {
                 "searchMethod": "HYBRID",
@@ -692,7 +692,7 @@ class TestAPIQueryLogging(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_marqo_query_logger.warning.assert_called_once()
             warning_call = mock_marqo_query_logger.warning.call_args[0][0]
-            self.assertIn("Slow search query detected: 900.0ms", warning_call)
+            self.assertIn("Slow search query detected: 1000.0ms", warning_call)
             self.assertIn("Query:", warning_call)
 
             # Please note that the order of the field must be the same as defined in the pydantic model
