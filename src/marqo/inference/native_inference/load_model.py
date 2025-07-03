@@ -1,9 +1,12 @@
 import datetime
+import random
 import threading
-from typing import Dict, Optional
-
+import time
 import torch
+from requests.exceptions import Timeout
 from torchvision.transforms import Compose
+from typing import Dict, Optional
+from urllib3.exceptions import ReadTimeoutError
 
 from marqo import marqo_docs
 from marqo.api.configs import EnvVars
@@ -318,7 +321,8 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 def _load_model(
         model_name: str, model_properties: dict, device: str,
-        calling_func: str = None, model_auth: Optional[ModelAuth] = None
+        calling_func: str = None, model_auth: Optional[ModelAuth] = None,
+        max_retries: int = 3, retry_delay: int = 5
 ) -> Any:
     """_summary_
 
@@ -327,6 +331,8 @@ def _load_model(
                         prefer passing it in the form of model_properties['name']
         device (str): Required. Should always be passed when loading model
         model_auth: Authorisation details for downloading a model (if required)
+        max_retries (int): Number of retry attempts before failing.
+        retry_delay (int): Delay (seconds) between retries.
 
     Returns:
         Any: _description_
@@ -351,6 +357,40 @@ def _load_model(
         )
 
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
+
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            print(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
+
+            # Load the model
+            if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
+                model = loader(
+                    device=device,
+                    model_properties=model_properties,
+                    model_auth=model_auth,
+                )
+            else:
+                model = loader(
+                    device=device,
+                    model_properties=model_properties,
+                    model_auth=model_auth,
+                )
+            model.load()  # Load the model
+            print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
+            return model  # ✅ Success, return the model
+
+        except (ReadTimeoutError, Timeout, OSError, RuntimeError) as e:
+            print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
+            attempt += 1
+
+            if attempt >= max_retries:
+                raise e
+
+            # Wait before retrying (randomized to avoid collisions)
+            sleep_time = retry_delay + random.uniform(1, 3)
+            print(f"🔄 Retrying in {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
 
     model = loader(
         device=device,
