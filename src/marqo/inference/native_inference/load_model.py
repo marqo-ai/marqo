@@ -361,27 +361,19 @@ def _load_model(
     attempt = 0
     while attempt < max_retries:
         try:
-            print(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
+            logger.info(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
+            model = loader(
+                device=device,
+                model_properties=model_properties,
+                model_auth=model_auth,
+            )
 
-            # Load the model
-            if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
-                model = loader(
-                    device=device,
-                    model_properties=model_properties,
-                    model_auth=model_auth,
-                )
-            else:
-                model = loader(
-                    device=device,
-                    model_properties=model_properties,
-                    model_auth=model_auth,
-                )
-            model.load()  # Load the model
-            print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
+            model.load()
+            logger.info(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
             return model  # ✅ Success, return the model
 
         except (ReadTimeoutError, Timeout, OSError, RuntimeError) as e:
-            print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
+            logger.info(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
             attempt += 1
 
             if attempt >= max_retries:
@@ -389,17 +381,8 @@ def _load_model(
 
             # Wait before retrying (randomized to avoid collisions)
             sleep_time = retry_delay + random.uniform(1, 3)
-            print(f"🔄 Retrying in {sleep_time:.2f} seconds...")
+            logger.info(f"🔄 Retrying in {sleep_time:.2f} seconds...")
             time.sleep(sleep_time)
-
-    model = loader(
-        device=device,
-        model_properties=model_properties,
-        model_auth=model_auth,
-    )
-
-    model.load()
-    return model
 
 
 def clear_loaded_models() -> None:
