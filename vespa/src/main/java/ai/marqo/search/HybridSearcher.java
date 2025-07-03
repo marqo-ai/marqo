@@ -451,16 +451,15 @@ public class HybridSearcher extends Searcher {
         return query;
     }
 
-
     /**
-        * Post processes the hits by sorting them based on the provided sortByFields.
-        * @param hitsForPostProcessing the hits to be sorted.
-        * @param sortByFields the JSON string representing the fields to sort by.
-        * @param sortBySortDepth the depth to sort by, or null to sort all hits.
-        * @param limit the maximum number of hits to return.
-        * @param offset the offset for pagination.
-        * @return a HitGroup containing the sorted hits.
-    */
+     * Post processes the hits by sorting them based on the provided sortByFields.
+     * @param hitsForPostProcessing the hits to be sorted.
+     * @param sortByFields the JSON string representing the fields to sort by.
+     * @param sortBySortDepth the depth to sort by, or null to sort all hits.
+     * @param limit the maximum number of hits to return.
+     * @param offset the offset for pagination.
+     * @return a HitGroup containing the sorted hits.
+     */
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
