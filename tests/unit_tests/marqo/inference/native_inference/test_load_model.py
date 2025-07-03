@@ -49,13 +49,17 @@ class TestLoadModel(TestCase):
                 mock_get_model_loader.assert_not_called()
 
     def test_retry_mechanism_for_model_loading(self):
-        with (patch("marqo.inference.native_inference.embedding_models.hugging_face_model.HuggingFaceModel.load")
+        with (patch("marqo.inference.native_inference.embedding_models.hugging_face_model.AutoModel.from_pretrained")
               as mock_load_model, \
-             patch("time.sleep") as mock_sleep):
-            mock_load_model.side_effect = InvalidModelPropertiesError("Can't load model")
+              patch("time.sleep") as mock_sleep):
+            mock_load_model.side_effect = OSError(
+                "We couldn't connect to 'https://huggingface.co' to load this file, "
+                "couldn't find it in the cached files and "
+                "it looks like sentence-transformers/all-MiniLM-L6-v2 is not the path to a directory containing a file named config.json."
+            )  # Simulate an error during model loading
             with self.assertRaises(ModelLoadError):
                 _ = load_model(
-                    model_name= "hf/all-MiniLM-L6-v2",
+                    model_name="hf/all-MiniLM-L6-v2",
                     model_properties={
                         "name": "sentence-transformers/all-MiniLM-L6-v2",
                         "dimensions": 384,
