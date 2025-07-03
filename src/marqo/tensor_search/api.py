@@ -10,10 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
-from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -42,6 +39,7 @@ from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
@@ -127,6 +125,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(TelemetryMiddleware)
+app.add_middleware(StatsDMiddleware)
 app.router.route_class = MarqoCustomRoute
 
 
