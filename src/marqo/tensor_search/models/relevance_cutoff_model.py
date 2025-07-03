@@ -26,11 +26,11 @@ class RelevanceCutoffModel(StrictBaseModel):
     Attributes:
         method (RelevanceCutoffMethod): The method to use for relevance cutoff.
         probe_depth (int): The number of documents to probe for relevance cutoff. Defaults to 1000. We use
-            a lexical search as a probe search. Check Vespa Customer Searcher for more details.
+            a lexical search as a probe search. Check Vespa Custom Searcher for more details.
         parameters (Union[RelativeMaxScoreParameters, MeanStdParameters]): The parameters for the relevance cutoff method.
             If the method is RelativeMaxScore, you must provide 'relativeScoreFactor' as a parameter.
             If the method is MeanStd, you must provide 'stdDevFactor' as a parameter.
-            Check Vespa Customer Searcher for more details.
+            Check Vespa Custom Searcher for more details.
     """
     method: RelevanceCutoffMethod
     probe_depth: int = Field(1000, ge=1, alias="probeDepth")
