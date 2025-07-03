@@ -770,7 +770,7 @@ class SortByTest {
                                             query, null, null, true, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
-                            "Either relevanceCandidates or sortByMinSortCandidates must be"
+                            "Either relevantCandidates or sortByMinSortCandidates must be"
                                     + " provided");
         }
 
@@ -782,20 +782,20 @@ class SortByTest {
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
 
-            // Should use Math.min(relevanceCandidates, limit+offset) = Math.min(20, 15) = 15
+            // Should use Math.min(relevantCandidates, limit+offset) = Math.min(20, 15) = 15
             assertThat(result.getHits()).isEqualTo(15);
             assertThat(result.getOffset()).isEqualTo(0);
         }
 
         @Test
-        void shouldUpdateHitsWhenRelevanceCandidatesLowerThanLimitOffset() {
+        void shouldUpdateHitsWhenRelevantCandidatesLowerThanLimitOffset() {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false);
 
-            // Should use Math.min(relevanceCandidates, limit+offset) = Math.min(8, 15) = 8
+            // Should use Math.min(relevantCandidates, limit+offset) = Math.min(8, 15) = 8
             assertThat(result.getHits()).isEqualTo(8);
             assertThat(result.getOffset()).isEqualTo(0);
         }
@@ -833,7 +833,7 @@ class SortByTest {
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 25, true, true);
 
-            // Should use Math.max(relevanceCandidates, sortByMinSortCandidates) = Math.max(30, 25)
+            // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(30, 25)
             // = 30
             assertThat(result.getHits()).isEqualTo(30);
             assertThat(result.getOffset()).isEqualTo(0);
@@ -846,7 +846,7 @@ class SortByTest {
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 25, 30, true, true);
 
-            // Should use Math.max(relevanceCandidates, sortByMinSortCandidates) = Math.max(25, 30)
+            // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(25, 30)
             // = 30
             assertThat(result.getHits()).isEqualTo(30);
             assertThat(result.getOffset()).isEqualTo(0);
@@ -939,7 +939,7 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
 
-            // Test with null relevanceCandidates
+            // Test with null relevantCandidates
             Query result1 =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 20, false, true);
             assertThat(result1.getHits()).isEqualTo(20);
@@ -1163,11 +1163,11 @@ class SortByTest {
 
             HybridSearcher searcher = new HybridSearcher();
 
-            // Call with relevanceCandidates = 0, which should result in hits = 0 but targetHits = 1
+            // Call with relevantCandidates = 0, which should result in hits = 0 but targetHits = 1
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
 
-            // Verify hits is set to 0 (original relevanceCandidates value)
+            // Verify hits is set to 0 (original relevantCandidates value)
             assertThat(result.getHits()).isEqualTo(0);
 
             // Verify targetHits was converted from 0 to 1 in the tensor YQL
@@ -1196,7 +1196,7 @@ class SortByTest {
                             8,
                             12,
                             true,
-                            true // relevanceCandidates < limit+offset, but with sortBy enabled
+                            true // relevantCandidates < limit+offset, but with sortBy enabled
                             );
 
             // Should use Math.max(8, 12) = 12 (not Math.min like pure relevance cutoff)

@@ -199,7 +199,7 @@ public class HybridSearcher extends Searcher {
 
         // --- Begin relevance cut-off handling ---
         // Execute probe lexical search for relevance cut-off if parameters are provided
-        Integer relevanceCandidates = null;
+        Integer relevantCandidates = null;
         Integer probeCandidates = null;
         if (relevanceCutoffMethod != null) {
             logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
@@ -207,7 +207,7 @@ public class HybridSearcher extends Searcher {
                     createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
             Result probeLexicalResult = execution.search(probeLexicalQuery);
             probeCandidates = probeLexicalResult.hits().size();
-            relevanceCandidates =
+            relevantCandidates =
                     detectCutoffCount(
                             probeLexicalResult.hits(),
                             relevanceCutoffMethod,
@@ -223,7 +223,7 @@ public class HybridSearcher extends Searcher {
         query =
                 updateQueryHitsOffsetsAndTargetHits(
                         query,
-                        relevanceCandidates,
+                        relevantCandidates,
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled);
@@ -356,7 +356,7 @@ public class HybridSearcher extends Searcher {
         // --- End facets attachment ---
         if (relevanceCutoffMethod != null) {
             // Add relevance cut-off information to the processed hits
-            processedHits.setField("marqo__relevantCandidates", relevanceCandidates);
+            processedHits.setField("marqo__relevantCandidates", relevantCandidates);
             processedHits.setField("marqo__probeCandidates", probeCandidates);
         }
 
@@ -365,7 +365,7 @@ public class HybridSearcher extends Searcher {
 
     public Query updateQueryHitsOffsetsAndTargetHits(
             Query query,
-            Integer relevanceCandidates,
+            Integer relevantCandidates,
             Integer sortByMinSortCandidates,
             boolean isRelevanceCutoffEnabled,
             boolean isSortByEnabled) {
@@ -375,13 +375,13 @@ public class HybridSearcher extends Searcher {
             return query;
         }
 
-        if (relevanceCandidates == null && sortByMinSortCandidates == null) {
+        if (relevantCandidates == null && sortByMinSortCandidates == null) {
             throw new RuntimeException(
-                    "Either relevanceCandidates or sortByMinSortCandidates must be provided");
+                    "Either relevantCandidates or sortByMinSortCandidates must be provided");
         }
 
         sortByMinSortCandidates = (sortByMinSortCandidates == null) ? -1 : sortByMinSortCandidates;
-        relevanceCandidates = (relevanceCandidates == null) ? -1 : relevanceCandidates;
+        relevantCandidates = (relevantCandidates == null) ? -1 : relevantCandidates;
 
         // Extract current tensor YQL for potential targetHits update
         String tensorYQL =
@@ -409,15 +409,15 @@ public class HybridSearcher extends Searcher {
             // Both sort and relevance cut-off enabled: use the higher one as new limits.
             // Note that sortByMinSortCandidates is guaranteed to be larger than limit+offset so no
             // check is required
-            newHits = Math.max(relevanceCandidates, sortByMinSortCandidates);
+            newHits = Math.max(relevantCandidates, sortByMinSortCandidates);
             if (currentTensorTargetHits != null) {
                 newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
             }
         } else if (isRelevanceCutoffEnabled) {
             // Only relevance cut-off enabled:
-            // - If relevanceCandidates < limit+offset: reduce to relevanceCandidates
-            // - If relevanceCandidates >= limit+offset: keep existing behavior (limit+offset)
-            newHits = Math.min(relevanceCandidates, (currentLimit + currentOffset));
+            // - If relevantCandidates < limit+offset: reduce to relevantCandidates
+            // - If relevantCandidates >= limit+offset: keep existing behavior (limit+offset)
+            newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
             if (currentTensorTargetHits != null) {
                 newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
             }
