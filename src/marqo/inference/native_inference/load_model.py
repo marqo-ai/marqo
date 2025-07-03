@@ -372,7 +372,7 @@ def _load_model(
             logger.info(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
             return model  # ✅ Success, return the model
 
-        except (ReadTimeoutError, Timeout, OSError, RuntimeError) as e:
+        except InvalidModelPropertiesError as e:
             logger.info(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
             attempt += 1
 
