@@ -110,7 +110,8 @@ public class HybridSearcher extends Searcher {
     }
 
     // Compile the regex pattern once and store it as a static final variable
-    private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
+    private static final Pattern DOC_ID_PATTERN =
+            Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
     private static final Pattern TARGET_HITS_PATTERN =
             Pattern.compile("(targetHits\\s*:\\s*)(\\d+)");
     private static final Pattern HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN =
@@ -1137,7 +1138,7 @@ public class HybridSearcher extends Searcher {
      */
     static String extractDocIdFromHitId(String fullPath) {
         // Create a matcher for the input string using the precompiled pattern
-        Matcher matcher = PATTERN.matcher(fullPath);
+        Matcher matcher = DOC_ID_PATTERN.matcher(fullPath);
 
         // Check if the pattern matches and extract the document ID
         if (matcher.find()) {
