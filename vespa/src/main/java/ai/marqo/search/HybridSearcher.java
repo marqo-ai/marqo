@@ -363,6 +363,15 @@ public class HybridSearcher extends Searcher {
         return new Result(query, processedHits);
     }
 
+    /**
+     * Updates the query hits, offsets, and targetHits based on the provided parameters.
+     * @param query the query to update.
+     * @param relevantCandidates the number of relevant candidates found in the probe search.
+     * @param sortByMinSortCandidates the minimum number of candidates required for sorting, from Marqo
+     * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
+     * @param isSortByEnabled whether sorting is enabled.
+     * @return The updated query with new hits, offsets, and targetHits.
+     */
     public Query updateQueryHitsOffsetsAndTargetHits(
             Query query,
             Integer relevantCandidates,
@@ -442,6 +451,16 @@ public class HybridSearcher extends Searcher {
         return query;
     }
 
+
+    /**
+        * Post processes the hits by sorting them based on the provided sortByFields.
+        * @param hitsForPostProcessing the hits to be sorted.
+        * @param sortByFields the JSON string representing the fields to sort by.
+        * @param sortBySortDepth the depth to sort by, or null to sort all hits.
+        * @param limit the maximum number of hits to return.
+        * @param offset the offset for pagination.
+        * @return a HitGroup containing the sorted hits.
+    */
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
@@ -847,6 +866,16 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    /**
+     * Creates a probe lexical query for relevance cut-off.
+     * This query is used to determine the number of relevant candidates based on the specified
+     * relevance cutoff method and parameter.
+     *
+     * @param query The original query to base the probe query on.
+     * @param probeDepth The number of hits to retrieve in the probe query.
+     * @param verbose Whether to log detailed information about the created query.
+     * @return A new Query object configured for probe lexical search.
+     */
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
         Query probeLexicalQuery =
                 createSubQuery(
@@ -916,6 +945,14 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    /**
+     * Extracts the current exploreAdditionalHits value from YQL string, if multiple exploreAdditionalHits are present,
+     * return the first one.
+     *
+     * @param yql The YQL string containing hnsw.exploreAdditionalHits
+     * @return The current exploreAdditionalHits value as integer
+     * @throws RuntimeException if hnsw.exploreAdditionalHits is not found or invalid
+     */
     @VisibleForTesting
     int extractCurrentExploreAdditionalHits(String yql) {
         Matcher matcher = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql);
@@ -931,6 +968,13 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    /**
+     * Overwrites the targetHits and hnsw.exploreAdditionalHits in the YQL string.
+     * @param yql The original YQL string containing targetHits and hnsw.exploreAdditionalHits.
+     * @param newTargetHits The new targetHits value to set in the YQL string.
+     * @param efSearch The efSearch value, which is used to calculate the new hnsw.exploreAdditionalHits
+     * @return Updated YQL string with new targetHits and hnsw.exploreAdditionalHits values.
+     */
     @VisibleForTesting
     String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
         // Validate input
@@ -1269,6 +1313,9 @@ public class HybridSearcher extends Searcher {
     /**
      * Returns the number of elements in a descending-sorted array
      * that are greater than or equal to the given threshold.
+     *
+     * @param descSorted A descending-sorted array of scores.
+     * @param threshold The threshold value to compare against.
      */
     @VisibleForTesting
     static int countGreaterOrEqual(double[] descSorted, double threshold) {
