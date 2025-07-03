@@ -403,7 +403,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             filter=None,
             limit=10,
             offset=0,
-            attributes_to_retrieve=["title", "description", "price"],
+            attributes_to_retrieve=None,
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF
@@ -412,7 +412,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             score_modifiers_tensor=None,
             or_phrases=[],
             and_phrases=[],
-            sort_by=None
+            sort_by=None,
         )
 
     def test_sort_by_multiple_fields_desc_and_asc(self):
@@ -426,7 +426,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             minSortCandidates=50
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         sort_fields = r['marqo__hybrid.sortBy.fields']
 
         self.assertEqual(2, len(sort_fields))
@@ -446,7 +446,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             minSortCandidates=30
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         sort_fields = r['marqo__hybrid.sortBy.fields']
         sort_depth = r["marqo__hybrid.sortBy.sortDepth"]
         sort_candidates = r["marqo__hybrid.sortBy.minSortCandidates"]
@@ -467,7 +467,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             minSortCandidates=20
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         sort_fields = r['marqo__hybrid.sortBy.fields']
 
         self.assertEqual(1, len(sort_fields))
@@ -480,7 +480,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
     def test_sort_by_none(self):
         """Test that no sort_by results in no sort fields present."""
         self.hybrid_query.sort_by = None
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
 
         self.assertNotIn("marqo__hybrid.sortBy.fields", r)
         self.assertNotIn("marqo__hybrid.sortBy.sortDepth", r)
@@ -498,7 +498,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             minSortCandidates=100
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         fields = r["marqo__hybrid.sortBy.fields"]
 
         self.assertEqual(3, len(fields))
@@ -530,7 +530,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
                 fields=test_fields
             )
 
-            r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+            r = self.index.to_vespa_query(self.hybrid_query)
             query_features = r["query_features"]
             for i, field in enumerate(self.hybrid_query.sort_by.fields):
                 field_name = field.field_name
@@ -550,7 +550,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
                 fields=test_fields
             )
 
-            r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+            r = self.index.to_vespa_query(self.hybrid_query)
             query_features = r["query_features"]
             for i, field in enumerate(self.hybrid_query.sort_by.fields):
                 field_name = field.field_name
@@ -569,7 +569,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
             fields=test_fields
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         query_features = r["query_features"]
 
         self.assertEqual({"alpha": 1}, query_features[f"marqo__sort_field_weights_{0}"])
@@ -580,7 +580,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
         """A fuzzy test to ensure that query_features are correctly populated with sort field weights."""
         self.hybrid_query.sort_by = None
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         query_features = r["query_features"]
 
         for i in range(3):
@@ -604,7 +604,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             filter=None,
             limit=10,
             offset=0,
-            attributes_to_retrieve=["title", "description", "price"],
+            attributes_to_retrieve=None,
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF
@@ -619,7 +619,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
 
     def test_no_relevance_cutoff(self):
         """If relevance_cutoff is None, no cutoff keys should appear."""
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         for key in [
             "marqo__hybrid.relevanceCutoff.method",
             "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor",
@@ -636,7 +636,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             parameters=params
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
 
         self.assertEqual(RelevanceCutoffMethod.RelativeMaxScore,
                          r["marqo__hybrid.relevanceCutoff.method"])
@@ -656,7 +656,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             probe_depth=5
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(5, r["marqo__hybrid.relevanceCutoff.probeDepth"])
 
     def test_mean_std_dev_default_probeDepth(self):
@@ -667,7 +667,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             parameters=params
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
 
         self.assertEqual(RelevanceCutoffMethod.MeanStdDev,
                          r["marqo__hybrid.relevanceCutoff.method"])
@@ -686,7 +686,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             probe_depth=7
         )
 
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(7, r["marqo__hybrid.relevanceCutoff.probeDepth"])
 
     def test_gap_detection_default_and_custom_probeDepth(self):
@@ -695,7 +695,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection
         )
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(RelevanceCutoffMethod.GapDetection,
                          r["marqo__hybrid.relevanceCutoff.method"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
@@ -707,7 +707,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             method=RelevanceCutoffMethod.GapDetection,
             probe_depth=42
         )
-        r2 = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r2 = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(42, r2["marqo__hybrid.relevanceCutoff.probeDepth"])
 
     def test_relevance_cutoff_edge_case_values(self):
@@ -720,7 +720,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             probe_depth=1  # minimum probe depth
         )
         
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertAlmostEqual(0.001,
                                r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
         self.assertEqual(1, r["marqo__hybrid.relevanceCutoff.probeDepth"])
@@ -733,7 +733,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             probe_depth=10000  # large probe depth
         )
         
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertAlmostEqual(1.0,
                                r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
         self.assertEqual(10000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
@@ -748,7 +748,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             probe_depth=50
         )
         
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(RelevanceCutoffMethod.MeanStdDev,
                          r["marqo__hybrid.relevanceCutoff.method"])
         self.assertAlmostEqual(0.1,
@@ -762,7 +762,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             parameters=params
         )
         
-        r = self.index._to_vespa_hybrid_query(self.hybrid_query)
+        r = self.index.to_vespa_query(self.hybrid_query)
         self.assertAlmostEqual(10.0,
                                r["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])  # default
