@@ -1,7 +1,7 @@
 # Release 2.21.1
 
 ## Bug fixes and minor changes
-- Omit base64 image strings in the search response to avoid returning unnecessarily large responses(https://github.com/marqo-ai/marqo/pull/1256).
+- Omit base64 image strings in the search response to avoid returning unnecessarily large responses ([#1256](https://github.com/marqo-ai/marqo/pull/1256)).
 
 # Release 2.21.0
 
