@@ -721,7 +721,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         )
         
         r = self.index.to_vespa_query(self.hybrid_query)
-        self.assertAlmostEqual(0.001,
+        self.assertEqual(0.001,
                                r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
         self.assertEqual(1, r["marqo__hybrid.relevanceCutoff.probeDepth"])
         
