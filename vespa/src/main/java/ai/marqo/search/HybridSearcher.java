@@ -30,8 +30,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.statistics.descriptive.Mean;
-import org.apache.commons.statistics.descriptive.StandardDeviation;
+import org.apache.commons.statistics.descriptive.DoubleStatistics;
+import org.apache.commons.statistics.descriptive.Statistic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -443,7 +443,8 @@ public class HybridSearcher extends Searcher {
         query.setOffset(0);
 
         // Update tensor YQL targetHits if it exists
-        if (!Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
+        if (currentTensorTargetHits != null
+                && !Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
             int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
             String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
@@ -580,11 +581,9 @@ public class HybridSearcher extends Searcher {
         if (relevanceCutoffMethodString == null) {
             return null;
         }
-
         RelevanceCutoffMethod relevanceCutoffMethod;
         try {
-            relevanceCutoffMethod =
-                    RelevanceCutoffMethod.valueOf(relevanceCutoffMethodString.toUpperCase());
+            relevanceCutoffMethod = RelevanceCutoffMethod.fromString(relevanceCutoffMethodString);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException(
                     "Unknown relevance cutoff method: " + relevanceCutoffMethodString);
@@ -1016,8 +1015,8 @@ public class HybridSearcher extends Searcher {
         // Replace all targetHits occurrences
         String updatedYql = TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
 
-        // Also update hnsw.exploreAdditionalHits to 2000-newTargetHits for all occurrences
-        int newExploreAdditionalHits = efSearch - newTargetHits;
+        // Also update hnsw.exploreAdditionalHits to max(efSearch - newTargetHits, 0)
+        int newExploreAdditionalHits = Math.max(efSearch - newTargetHits, 0);
         updatedYql =
                 HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN
                         .matcher(updatedYql)
@@ -1040,11 +1039,11 @@ public class HybridSearcher extends Searcher {
      * 'ranking.features'
      *      fields to search  (based on ??? method)
      *      score modifiers (based on RANKING method)
-     * @param query
-     * @param retrievalMethod
-     * @param rankingMethod
-     * @param verbose
-     * @param exactQuery
+     * @param query The original query to base the sub-query on.
+     * @param retrievalMethod The retrieval method to use for the sub-query
+     * @param rankingMethod The ranking method to use for the sub-query
+     * @param verbose Whether to log detailed information about the created sub-query.
+     * @param exactQuery An YQL string to use instead of the retrieval method's YQL.
      */
     Query createSubQuery(
             Query query,
@@ -1194,8 +1193,8 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
-     * @param hits
-     * @param verbose
+     * @param hits The hit group to apply global score modifiers to.
+     * @param verbose Whether to log detailed information about the score modification process.
      */
     HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
         FeatureData hitMatchFeatures;
@@ -1250,7 +1249,7 @@ public class HybridSearcher extends Searcher {
      * @return The number of relevant results to keep
      */
     @VisibleForTesting
-    Integer detectCutoffCount(
+    int detectCutoffCount(
             HitGroup probeCandidates,
             String cutoffMethodString,
             Double relevanceCutoffParameter,
@@ -1264,7 +1263,7 @@ public class HybridSearcher extends Searcher {
 
         RelevanceCutoffMethod cutoffMethod;
         try {
-            cutoffMethod = RelevanceCutoffMethod.valueOf(cutoffMethodString.toUpperCase());
+            cutoffMethod = RelevanceCutoffMethod.fromString(cutoffMethodString);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethodString);
         }
@@ -1279,8 +1278,8 @@ public class HybridSearcher extends Searcher {
                 double maxDelta = -1.0;
                 int bestIndex = lexicalHits.size(); // default: keep all
                 for (int i = 0; i < lexicalHits.size() - 1; i++) {
-                    double score1 = lexicalHits.get(i).getRelevance().getScore();
-                    double score2 = lexicalHits.get(i + 1).getRelevance().getScore();
+                    double score1 = probeLexicalScores[i];
+                    double score2 = probeLexicalScores[i + 1];
                     double delta = score1 - score2;
 
                     if (delta > maxDelta) {
@@ -1292,8 +1291,12 @@ public class HybridSearcher extends Searcher {
             }
             case MEAN_STD_DEV -> {
                 logIfVerbose("Using normalFit method for relevance cutoff", verbose);
-                double mean = Mean.of(probeLexicalScores).getAsDouble();
-                double stdDev = StandardDeviation.of(probeLexicalScores).getAsDouble();
+                DoubleStatistics stats =
+                        DoubleStatistics.of(
+                                EnumSet.of(Statistic.MEAN, Statistic.STANDARD_DEVIATION),
+                                probeLexicalScores);
+                double mean = stats.getAsDouble(Statistic.MEAN);
+                double stdDev = stats.getAsDouble(Statistic.STANDARD_DEVIATION);
                 double threshold = mean + (relevanceCutoffParameter * stdDev);
                 return countGreaterOrEqual(probeLexicalScores, threshold);
             }
@@ -1322,10 +1325,10 @@ public class HybridSearcher extends Searcher {
         while (low < high) {
             int mid = (low + high) >>> 1;
             if (descSorted[mid] >= threshold) {
-                // still ≥ threshold → move low up
+                // move low up
                 low = mid + 1;
             } else {
-                // < threshold → shrink high
+                // shrink high down
                 high = mid;
             }
         }

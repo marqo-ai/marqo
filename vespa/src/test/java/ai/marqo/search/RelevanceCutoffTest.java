@@ -203,6 +203,15 @@ class RelevanceCutoffTest {
             }
 
             @Test
+            void shouldCountHitsAboveRelativeThresholdEvenIfMaxScoreIsHigh() {
+                HitGroup hits = createHitGroupWithScores(100.3, 93.2, 80.1, 50.0, 30.0);
+                // With factor 0.8: threshold = 100.3 * 0.8 = 80.24
+                // Hits above 80.24: 100.3, 93.2 (80.1 is below threshold)
+                Integer result = callDetectCutoffCount(hits, "relative_max_score", 0.8, false);
+                assertThat(result).isEqualTo(2);
+            }
+
+            @Test
             void shouldCountAllHitsWithLowThreshold() {
                 HitGroup hits = createHitGroupWithScores(1.0, 0.8, 0.6, 0.4, 0.2);
 
@@ -300,11 +309,12 @@ class RelevanceCutoffTest {
                     "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
                             + " 1900}";
 
-            String result = callOverwriteTargetHits(originalYql, 200);
-            assertThat(result).contains("targetHits: 200");
-            assertThat(result).doesNotContain("targetHits: 100");
-            assertThat(result).contains("hnsw.exploreAdditionalHits: 1800");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1900");
+            String result = callOverwriteTargetHits(originalYql, 200, 2000);
+
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 200,"
+                                    + " hnsw.exploreAdditionalHits: 1800}");
         }
 
         @Test
@@ -313,11 +323,11 @@ class RelevanceCutoffTest {
                     "select * from sources * where { targetHits : 150, hnsw.exploreAdditionalHits :"
                             + " 1850 }";
 
-            String result = callOverwriteTargetHits(originalYql, 300);
-            assertThat(result).contains("targetHits : 300");
-            assertThat(result).doesNotContain("targetHits : 150");
-            assertThat(result).contains("hnsw.exploreAdditionalHits : 1700");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits : 1850");
+            String result = callOverwriteTargetHits(originalYql, 300, 2000);
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from sources * where { targetHits : 300,"
+                                    + " hnsw.exploreAdditionalHits : 1700 }");
         }
 
         @Test
@@ -326,13 +336,11 @@ class RelevanceCutoffTest {
                     "select * from sources * where {param1: 'value', targetHits: 75,"
                             + " hnsw.exploreAdditionalHits: 1925, param2: true}";
 
-            String result = callOverwriteTargetHits(originalYql, 125);
-            assertThat(result).contains("targetHits: 125");
-            assertThat(result).doesNotContain("targetHits: 75");
-            assertThat(result).contains("hnsw.exploreAdditionalHits: 1875");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits: 1925");
-            assertThat(result).contains("param1: 'value'");
-            assertThat(result).contains("param2: true");
+            String result = callOverwriteTargetHits(originalYql, 125, 2000);
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from sources * where {param1: 'value', targetHits: 125,"
+                                    + " hnsw.exploreAdditionalHits: 1875, param2: true}");
         }
 
         @Test
@@ -340,7 +348,8 @@ class RelevanceCutoffTest {
             String yql = "select * from sources * where {param1: 'value'}";
 
             RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callOverwriteTargetHits(yql, 100));
+                    assertThrows(
+                            RuntimeException.class, () -> callOverwriteTargetHits(yql, 100, 2000));
             assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
         }
 
@@ -351,7 +360,8 @@ class RelevanceCutoffTest {
                             + " 100}";
 
             RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callOverwriteTargetHits(yql, -1));
+                    assertThrows(
+                            RuntimeException.class, () -> callOverwriteTargetHits(yql, -1, 2000));
             assertThat(exception.getMessage()).contains("targetHits value must be positive");
         }
 
@@ -361,9 +371,11 @@ class RelevanceCutoffTest {
                     "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
                             + " 1900}";
 
-            String result = callOverwriteTargetHits(originalYql, 0);
-            assertThat(result).contains("targetHits: 1");
-            assertThat(result).contains("hnsw.exploreAdditionalHits: 1999");
+            String result = callOverwriteTargetHits(originalYql, 0, 2000);
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 1,"
+                                    + " hnsw.exploreAdditionalHits: 1999}");
         }
 
         @Test
@@ -376,29 +388,15 @@ class RelevanceCutoffTest {
                         + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_content,"
                         + " marqo__query_embedding))";
 
-            String result = callOverwriteTargetHits(originalYql, 15);
+            String result = callOverwriteTargetHits(originalYql, 15, 2000);
 
-            // Verify targetHits are updated
-            assertThat(result).contains("targetHits:15");
-            assertThat(result).doesNotContain("targetHits:10");
-
-            // Verify hnsw.exploreAdditionalHits are updated to 2000-15=1985
-            assertThat(result).contains("hnsw.exploreAdditionalHits:1985");
-            assertThat(result).doesNotContain("hnsw.exploreAdditionalHits:1990");
-
-            // Count occurrences to ensure both were replaced
-            long targetHitsCount = (result.split("targetHits:15", -1).length - 1);
-            long hnswCount = (result.split("hnsw.exploreAdditionalHits:1985", -1).length - 1);
-
-            assertThat(targetHitsCount).isEqualTo(2);
-            assertThat(hnswCount).isEqualTo(2);
-
-            // Verify other parameters are preserved
-            assertThat(result).contains("approximate:True");
             assertThat(result)
-                    .contains("nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)");
-            assertThat(result)
-                    .contains("nearestNeighbor(marqo__embeddings_content, marqo__query_embedding)");
+                    .isEqualTo(
+                            "({targetHits:15, approximate:True,"
+                                + " hnsw.exploreAdditionalHits:1985}nearestNeighbor(marqo__embeddings_title,"
+                                + " marqo__query_embedding)) OR ({targetHits:15, approximate:True,"
+                                + " hnsw.exploreAdditionalHits:1985}nearestNeighbor(marqo__embeddings_content,"
+                                + " marqo__query_embedding))");
         }
 
         @Test
@@ -407,14 +405,12 @@ class RelevanceCutoffTest {
             String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
 
             // Test with newTargetHits = 100, should result in hnsw.exploreAdditionalHits = 1900
-            String result1 = callOverwriteTargetHits(originalYql, 100);
-            assertThat(result1).contains("targetHits:100");
-            assertThat(result1).contains("hnsw.exploreAdditionalHits:1900");
+            String result1 = callOverwriteTargetHits(originalYql, 100, 2000);
+            assertThat(result1).isEqualTo("{targetHits:100, hnsw.exploreAdditionalHits:1900}");
 
             // Test with newTargetHits = 1, should result in hnsw.exploreAdditionalHits = 1999
-            String result2 = callOverwriteTargetHits(originalYql, 1);
-            assertThat(result2).contains("targetHits:1");
-            assertThat(result2).contains("hnsw.exploreAdditionalHits:1999");
+            String result2 = callOverwriteTargetHits(originalYql, 1, 2000);
+            assertThat(result2).isEqualTo("{targetHits:1, hnsw.exploreAdditionalHits:1999}");
         }
 
         @Test
@@ -422,9 +418,8 @@ class RelevanceCutoffTest {
             // Test boundary condition where newTargetHits = 2000
             String originalYql = "{targetHits:10, hnsw.exploreAdditionalHits:1990}";
 
-            String result = callOverwriteTargetHits(originalYql, 2000);
-            assertThat(result).contains("targetHits:2000");
-            assertThat(result).contains("hnsw.exploreAdditionalHits:0");
+            String result = callOverwriteTargetHits(originalYql, 2000, 2000);
+            assertThat(result).isEqualTo("{targetHits:2000, hnsw.exploreAdditionalHits:0}");
         }
 
         @Test
@@ -432,9 +427,8 @@ class RelevanceCutoffTest {
             // Test hnsw.exploreAdditionalHits with various whitespace patterns
             String originalYql = "{targetHits: 25, hnsw.exploreAdditionalHits : 1975}";
 
-            String result = callOverwriteTargetHits(originalYql, 50);
-            assertThat(result).contains("targetHits: 50");
-            assertThat(result).contains("hnsw.exploreAdditionalHits : 1950");
+            String result = callOverwriteTargetHits(originalYql, 50, 2000);
+            assertThat(result).isEqualTo("{targetHits: 50, hnsw.exploreAdditionalHits : 1950}");
         }
 
         @Test
@@ -445,11 +439,11 @@ class RelevanceCutoffTest {
             RuntimeException exception =
                     assertThrows(
                             RuntimeException.class,
-                            () -> callOverwriteTargetHits(originalYql, 150));
+                            () -> callOverwriteTargetHits(originalYql, 150, 2000));
             assertThat(exception.getMessage())
                     .contains(
-                            "YQL does not contain hnsw.exploreAdditionalHits clause, cannot extract"
-                                    + " it.");
+                            "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits"
+                                    + " is present. Both parameters must be present together.");
         }
 
         @Test
@@ -460,7 +454,8 @@ class RelevanceCutoffTest {
 
             RuntimeException exception =
                     assertThrows(
-                            RuntimeException.class, () -> callOverwriteTargetHits(originalYql, 15));
+                            RuntimeException.class,
+                            () -> callOverwriteTargetHits(originalYql, 15, 2000));
             assertThat(exception.getMessage())
                     .contains(
                             "YQL contains 2 targetHits occurrences but 1 hnsw.exploreAdditionalHits"
@@ -559,9 +554,8 @@ class RelevanceCutoffTest {
             // When newTargetHits=100, newExploreAdditionalHits should be 2000-100=1900
             String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
 
-            String result = callOverwriteTargetHits(originalYql, 100);
-            assertThat(result).contains("targetHits:100");
-            assertThat(result).contains("hnsw.exploreAdditionalHits:1900");
+            String result = callOverwriteTargetHits(originalYql, 100, 2000);
+            assertThat(result).isEqualTo("{targetHits:100, hnsw.exploreAdditionalHits:1900}");
         }
 
         @Test
@@ -570,9 +564,8 @@ class RelevanceCutoffTest {
             String originalYql =
                     "{targetHits:300, hnsw.exploreAdditionalHits:1200}"; // efSearch = 1500
 
-            String result = callOverwriteTargetHits(originalYql, 500);
-            assertThat(result).contains("targetHits:500");
-            assertThat(result).contains("hnsw.exploreAdditionalHits:1000"); // 1500 - 500 = 1000
+            String result = callOverwriteTargetHits(originalYql, 500, 1500);
+            assertThat(result).isEqualTo("{targetHits:500, hnsw.exploreAdditionalHits:1000}");
 
             // Verify the total remains 1500
             Integer newTargetHits = callExtractCurrentTargetHits(result);
@@ -586,9 +579,10 @@ class RelevanceCutoffTest {
             String originalYql =
                     "{targetHits:100, hnsw.exploreAdditionalHits:1900}"; // efSearch = 2000
 
-            String result = callOverwriteTargetHits(originalYql, 0);
-            assertThat(result).contains("targetHits:1"); // 0 converted to 1
-            assertThat(result).contains("hnsw.exploreAdditionalHits:1999"); // 2000 - 1 = 1999
+            String result = callOverwriteTargetHits(originalYql, 0, 2000);
+            assertThat(result)
+                    .isEqualTo(
+                            "{targetHits:1, hnsw.exploreAdditionalHits:1999}"); // 0 converted to 1
         }
 
         @Test
@@ -597,33 +591,44 @@ class RelevanceCutoffTest {
 
             // Scenario 1: Small efSearch value
             String yql1 = "{targetHits:50, hnsw.exploreAdditionalHits:50}"; // efSearch = 100
-            String result1 = callOverwriteTargetHits(yql1, 30);
-            assertThat(result1).contains("targetHits:30");
-            assertThat(result1).contains("hnsw.exploreAdditionalHits:70"); // 100 - 30 = 70
+            String result1 = callOverwriteTargetHits(yql1, 30, 100);
+            assertThat(result1).isEqualTo("{targetHits:30, hnsw.exploreAdditionalHits:70}");
 
             // Scenario 2: Large efSearch value
             String yql2 = "{targetHits:500, hnsw.exploreAdditionalHits:4500}"; // efSearch = 5000
-            String result2 = callOverwriteTargetHits(yql2, 1000);
-            assertThat(result2).contains("targetHits:1000");
-            assertThat(result2).contains("hnsw.exploreAdditionalHits:4000"); // 5000 - 1000 = 4000
+            String result2 = callOverwriteTargetHits(yql2, 1000, 5000);
+            assertThat(result2).isEqualTo("{targetHits:1000, hnsw.exploreAdditionalHits:4000}");
 
             // Scenario 3: Edge case where newTargetHits equals efSearch
             String yql3 = "{targetHits:100, hnsw.exploreAdditionalHits:900}"; // efSearch = 1000
-            String result3 = callOverwriteTargetHits(yql3, 1000);
-            assertThat(result3).contains("targetHits:1000");
-            assertThat(result3).contains("hnsw.exploreAdditionalHits:0"); // 1000 - 1000 = 0
+            String result3 = callOverwriteTargetHits(yql3, 1000, 1000);
+            assertThat(result3).isEqualTo("{targetHits:1000, hnsw.exploreAdditionalHits:0}");
+        }
+
+        @Test
+        void shouldSetExploreAdditionalHitsToZeroWhenNewTargetHitsExceedsEfSearch() {
+            // Test that when newTargetHits > efSearch, exploreAdditionalHits is set to 0
+            String originalYql =
+                    "{targetHits:100, hnsw.exploreAdditionalHits:400}"; // efSearch = 500
+
+            // Case 1: newTargetHits slightly larger than efSearch
+            String result1 = callOverwriteTargetHits(originalYql, 600, 500);
+            assertThat(result1).isEqualTo("{targetHits:600, hnsw.exploreAdditionalHits:0}");
+
+            // Case 2: newTargetHits much larger than efSearch
+            String result2 = callOverwriteTargetHits(originalYql, 1500, 500);
+            assertThat(result2).isEqualTo("{targetHits:1500, hnsw.exploreAdditionalHits:0}");
+
+            // Case 3: newTargetHits way larger than efSearch
+            String result3 = callOverwriteTargetHits(originalYql, 10000, 500);
+            assertThat(result3).isEqualTo("{targetHits:10000, hnsw.exploreAdditionalHits:0}");
         }
 
         private Integer callExtractCurrentTargetHits(String yql) {
             return hybridSearcher.extractCurrentTargetHits(yql);
         }
 
-        private String callOverwriteTargetHits(String yql, int newTargetHits) {
-            // First extract current values to calculate efSearch
-            Integer currentTargetHits = callExtractCurrentTargetHits(yql);
-            Integer currentExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(yql);
-            int efSearch = currentTargetHits + currentExploreAdditionalHits;
-
+        private String callOverwriteTargetHits(String yql, int newTargetHits, int efSearch) {
             return hybridSearcher.overwriteTargetHits(yql, newTargetHits, efSearch);
         }
 
