@@ -9,7 +9,8 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex, \
+    IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -154,20 +155,18 @@ class HybridSearch:
 
         if sort_by and (
                 marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
-                not isinstance(marqo_index, SemiStructuredMarqoIndex)
+                not marqo_index.type == IndexType.SemiStructured
         ):
             raise core_exceptions.UnsupportedFeatureError(
                 f"The 'sortBy' features is only supported for unstructured indexes created "
                 f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
             )
 
-        if (relevance_cutoff and isinstance(marqo_index, UnstructuredMarqoIndex) and
-                not isinstance(marqo_index, SemiStructuredMarqoIndex)):
-            # Legacy unstructured indexes do not support relevance cutoff
+        if (relevance_cutoff and not marqo_index.type == IndexType.SemiStructured):
+            # Legacy unstructured indexes and structured indexes do not support relevance cutoff
             raise core_exceptions.UnsupportedFeatureError(
                 f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
-                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later. "
-                f"This unstructured index was created with Marqo {marqo_index_version} "
+                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
             )
 
         # Determine the text query prefix

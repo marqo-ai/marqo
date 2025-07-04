@@ -41,124 +41,118 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
     def setUp(self) -> None:
         self.clear_indexes([self.unstructured_index_name, self.structured_index_name])
 
+    def test_structured_index_relevance_cutoff_not_supported(self):
+        """
+        Tests that relevance cutoff is not supported on structured indexes.
+        """
+        with self.assertRaises(MarqoWebError) as cm:
+            self.client.index(self.structured_index_name).search(
+                q="test",
+                search_method="HYBRID",
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "parameters": {"relativeScoreFactor": 0.5}
+                }
+            )
+        self.assertIn(
+            "is only supported for unstructured indexes created with Marqo version 2.13.0 or later",
+            str(cm.exception)
+        )
+
     def test_relevance_cutoff_basic_relative_max_score(self):
         """
         Tests basic relevance cutoff with relative_max_score method.
         """
         # Add documents with varying relevance
-        test_indexes = [self.structured_index_name, self.unstructured_index_name]
-        for index_name in test_indexes:
-            if index_name == self.structured_index_name:
-                tensor_fields = None
-            else:
-                tensor_fields = ["content"]
-            with self.subTest(index_name):
-                docs = [
-                    {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence", "score": 1.0},
-                    {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms", "score": 0.9},
-                    {"_id": "m1", "content": "Machine learning processes data efficiently", "score": 0.5},
-                    {"_id": "l1", "content": "Engineers use machine tools for cutting", "score": 0.2},
-                    {"_id": "l2", "content": "Bright morning sunlight streams through the room", "score": 0.1},
-                ]
-                self.client.index(index_name).add_documents(
-                    docs, tensor_fields=tensor_fields
-                )
+        docs = [
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence"},
+            {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms"},
+            {"_id": "m1", "content": "Machine learning processes data efficiently"},
+            {"_id": "l1", "content": "Engineers use machine tools for cutting"},
+            {"_id": "l2", "content": "Bright morning sunlight streams through the room"},
+        ]
+        self.client.index(self.unstructured_index_name).add_documents(
+            docs, tensor_fields=["content"]
+        )
 
-                response = self.client.index(index_name).search(
-                    q="machine learning artificial intelligence",
-                    search_method="HYBRID",
-                    relevance_cutoff={
-                        "method": "relative_max_score",
-                        "parameters": {"relativeScoreFactor": 0.6}
-                    },
-                    limit=10
-                )
+        response = self.client.index(self.unstructured_index_name).search(
+            q="machine learning artificial intelligence",
+            search_method="HYBRID",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.6}
+            },
+            limit=10
+        )
 
-                # Should filter out low relevance documents
-                self.assertIn("_relevantCandidates", response)
-                self.assertLess(response["_relevantCandidates"], len(docs))
-                self.assertGreater(response["_relevantCandidates"], 0)
-
-                # High relevance docs should be present
-                result_ids = [hit["_id"] for hit in response["hits"]]
-                self.assertIn("h1", result_ids)
-                self.assertIn("h2", result_ids)
+        # Assert on exact metadata values
+        self.assertEqual(2, response["_relevantCandidates"])
+        self.assertEqual(4, response["_probeCandidates"])
+        
+        # Assert on exact document IDs returned
+        ids = [hit["_id"] for hit in response["hits"]]
+        self.assertEqual({'h1', 'h2'}, set(ids))
 
     def test_relevance_cutoff_gap_detection_method(self):
         """
         Tests relevance cutoff with gap_detection method.
         """
-        test_indexes = [self.structured_index_name, self.unstructured_index_name]
-        for index_name in test_indexes:
-            if index_name == self.structured_index_name:
-                tensor_fields = None
-            else:
-                tensor_fields = ["content"]
-            with self.subTest(index_name):
-                docs = [
-                    {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence enable systems", "score": 1.0},
-                    {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms", "score": 0.9},
-                    {"_id": "h3", "content": "Researchers develop artificial intelligence machine learning", "score": 0.8},
-                    {"_id": "m1", "content": "Machine learning processes data efficiently", "score": 0.3},
-                    {"_id": "l1", "content": "Engineers use machine tools", "score": 0.2},
-                    {"_id": "l2", "content": "Bright morning sunlight", "score": 0.1},
-                ]
-                self.client.index(index_name).add_documents(
-                    docs, tensor_fields=tensor_fields
-                )
+        docs = [
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence enable systems"},
+            {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms"},
+            {"_id": "h3", "content": "Researchers develop artificial intelligence machine learning"},
+            {"_id": "m1", "content": "Machine learning processes data efficiently"},
+            {"_id": "l1", "content": "Engineers use machine tools"},
+            {"_id": "l2", "content": "Bright morning sunlight"},
+        ]
+        self.client.index(self.unstructured_index_name).add_documents(
+            docs, tensor_fields=["content"]
+        )
 
-                response = self.client.index(index_name).search(
-                    q="machine learning artificial intelligence",
-                    search_method="HYBRID",
-                    relevance_cutoff={
-                        "method": "gap_detection"
-                    },
-                    limit=10
-                )
+        response = self.client.index(self.unstructured_index_name).search(
+            q="machine learning artificial intelligence",
+            search_method="HYBRID",
+            relevance_cutoff={
+                "method": "gap_detection"
+            },
+            limit=10
+        )
+        ids = [hit["_id"] for hit in response["hits"]]
 
-                # Should detect gap and filter appropriately
-                self.assertIn("_relevantCandidates", response)
-                self.assertLess(response["_relevantCandidates"], 6)
-                self.assertGreater(response["_relevantCandidates"], 0)
+        self.assertEqual(5, response["_probeCandidates"])
+        self.assertEqual(3, response["_relevantCandidates"])
+        self.assertEqual({'h1', 'h3', 'h2'}, set(ids))
 
     def test_relevance_cutoff_mean_std_dev_method(self):
         """
         Tests relevance cutoff with mean_std_dev method.
         """
-        test_indexes = [self.structured_index_name, self.unstructured_index_name]
-        for index_name in test_indexes:
-            if index_name == self.structured_index_name:
-                tensor_fields = None
-            else:
-                tensor_fields = ["content"]
+        docs = [
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence systems"},
+            {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms"},
+            {"_id": "h3", "content": "Researchers develop artificial intelligence machine learning"},
+            {"_id": "m1", "content": "Machine learning processes financial data"},
+            {"_id": "l1", "content": "Engineers use machine tools"},
+            {"_id": "l2", "content": "Bright morning sunlight streams"},
+        ]
+        self.client.index(self.unstructured_index_name).add_documents(
+            docs, tensor_fields=["content"]
+        )
 
-            with self.subTest(index_name):
-                docs = [
-                    {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence systems", "rating": 5.0},
-                    {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms", "rating": 4.8},
-                    {"_id": "h3", "content": "Researchers develop artificial intelligence machine learning", "rating": 4.5},
-                    {"_id": "m1", "content": "Machine learning processes financial data", "rating": 3.0},
-                    {"_id": "l1", "content": "Engineers use machine tools", "rating": 2.0},
-                    {"_id": "l2", "content": "Bright morning sunlight streams", "rating": 1.0},
-                ]
-                self.client.index(index_name).add_documents(
-                    docs, tensor_fields=tensor_fields
-                )
-        
-                response = self.client.index(index_name).search(
-                    q="machine learning artificial intelligence",
-                    search_method="HYBRID",
-                    relevance_cutoff={
-                        "method": "mean_std_dev",
-                        "parameters": {"stdDevFactor": 0.3}
-                    },
-                    limit=10
-                )
-        
-                # Should filter based on mean + std deviation
-                self.assertIn("_relevantCandidates", response)
-                self.assertLess(response["_relevantCandidates"], 6)
-                self.assertGreater(response["_relevantCandidates"], 0)
+        response = self.client.index(self.unstructured_index_name).search(
+            q="machine learning artificial intelligence",
+            search_method="HYBRID",
+            relevance_cutoff={
+                "method": "mean_std_dev",
+                "parameters": {"stdDevFactor": 0.3}
+            },
+            limit=10
+        )
+
+        ids = [hit["_id"] for hit in response["hits"]]
+        self.assertEqual(5, response["_probeCandidates"])
+        self.assertEqual(3, response["_relevantCandidates"])
+        self.assertEqual({'h1', 'h3', 'h2'}, set(ids))
 
     def test_relevance_cutoff_with_sorting_integration(self):
         """
@@ -186,7 +180,7 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         )
         ids_no_cutoff = [hit["_id"] for hit in response_no_cutoff["hits"]]
         # Should include low relevance docs with high sort values
-        self.assertIn("l1", ids_no_cutoff[:3])  # Should be in top 3 due to high sort value
+        self.assertEqual(["l1", "l2", "h2", "h1", "h3"], ids_no_cutoff)
 
         # With relevance cutoff - should filter out low relevance docs despite high sort values
         response_with_cutoff = self.client.index(self.unstructured_index_name).search(
@@ -201,57 +195,12 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=5
         )
-        
-        # Should have cutoff metadata
-        self.assertIn("_relevantCandidates", response_with_cutoff)
-        self.assertIn("_sortCandidates", response_with_cutoff)
-        
-        # Should filter out low relevance docs
+
+        self.assertEqual(4, response_with_cutoff["_probeCandidates"])
+        self.assertEqual(3, response_with_cutoff["_relevantCandidates"])
+        self.assertEqual(3, response_with_cutoff["_sortCandidates"])
         ids_with_cutoff = [hit["_id"] for hit in response_with_cutoff["hits"]]
-        self.assertNotIn("l1", ids_with_cutoff)  # Should be filtered out
-        self.assertNotIn("l2", ids_with_cutoff)  # Should be filtered out
-        
-        # Should still include high relevance docs
-        self.assertIn("h1", ids_with_cutoff)
-        self.assertIn("h2", ids_with_cutoff)
-        self.assertIn("h3", ids_with_cutoff)
-
-    def test_structured_index_blocks_relevance_cutoff_with_sorting(self):
-        """
-        Tests that the structured index blocks relevance cutoff when sorting is applied.
-        """
-        docs = [
-            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence", "sort_value": 8.1},
-            {"_id": "h2", "content": "Artificial intelligence relies on machine learning algorithms",
-             "sort_value": 9.2},
-            {"_id": "h3", "content": "Researchers develop artificial intelligence machine learning", "sort_value": 7.4},
-            {"_id": "l1", "content": "Engineers use machine tools for cutting", "sort_value": 10.0},
-            # High sort, low relevance
-            {"_id": "l2", "content": "Bright morning sunlight streams through", "sort_value": 9.5},
-            # High sort, low relevance
-        ]
-        self.client.index(self.structured_index_name).add_documents(
-            docs
-        )
-
-        with self.assertRaises(MarqoWebError) as cm:
-            # Attempt to use relevance cutoff with sorting on structured index
-            self.client.index(self.structured_index_name).search(
-                q="machine learning artificial intelligence",
-                search_method="HYBRID",
-                relevance_cutoff={
-                    "method": "relative_max_score",
-                    "parameters": {"relativeScoreFactor": 0.7}
-                },
-                sort_by={
-                    "fields": [{"fieldName": "sort_value", "order": "desc", "missing": "last"}]
-                },
-                limit=5
-            )
-        self.assertIn(
-            "is only supported for unstructured indexes created with Marqo version 2.22.0",
-            str(cm.exception)
-        )
+        self.assertEqual(["h2", "h1", "h3"], ids_with_cutoff)
 
     def test_relevance_cutoff_with_min_sort_candidates(self):
         """
@@ -283,26 +232,21 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
             limit=5
         )
 
-        # Should have metadata
-        self.assertIn("_relevantCandidates", response)
-        self.assertIn("_sortCandidates", response)
-        
-        # minSortCandidates should override relevance filtering
-        self.assertEqual(response["_sortCandidates"], 5)
-        
-        # Should include low relevance docs due to override
+        self.assertEqual(3, response["_probeCandidates"])
+        self.assertEqual(2, response["_relevantCandidates"])
+        self.assertEqual(5, response["_sortCandidates"])
         ids = [hit["_id"] for hit in response["hits"]]
-        self.assertIn("l1", ids)  # Should be included due to minSortCandidates override
+        self.assertEqual(['l1', 'l2', 'h2', 'l3', 'h1'], ids)
 
     def test_relevance_cutoff_extreme_parameter_values(self):
         """
         Tests relevance cutoff with extreme parameter values.
         """
         docs = [
-            {"_id": "h1", "content": "Machine learning algorithms artificial intelligence", "score": 1.0},
-            {"_id": "h2", "content": "Artificial intelligence machine learning", "score": 0.9},
-            {"_id": "m1", "content": "Machine learning processes", "score": 0.5},
-            {"_id": "l1", "content": "Engineers use tools", "score": 0.1},
+            {"_id": "h1", "content": "Machine learning algorithms artificial intelligence"},
+            {"_id": "h2", "content": "Artificial intelligence machine learning"},
+            {"_id": "m1", "content": "Machine learning processes"},
+            {"_id": "l1", "content": "Engineers use tools"}
         ]
         self.client.index(self.unstructured_index_name).add_documents(
             docs, tensor_fields=["content"]
@@ -318,7 +262,10 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=10
         )
-        self.assertLessEqual(response_max["_relevantCandidates"], 2)
+        self.assertEqual(3, response_max["_probeCandidates"])
+        self.assertEqual(1, response_max["_relevantCandidates"])
+        ids_max = [hit["_id"] for hit in response_max["hits"]]
+        self.assertEqual(['h2'], ids_max)
 
         # Test with factor = 0.0 (least restrictive)
         response_min = self.client.index(self.unstructured_index_name).search(
@@ -330,7 +277,10 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=10
         )
-        self.assertGreaterEqual(response_min["_relevantCandidates"], 0)
+        self.assertEqual(3, response_min["_probeCandidates"])
+        self.assertEqual(3, response_min["_relevantCandidates"])
+        ids_min = [hit["_id"] for hit in response_min["hits"]]
+        self.assertEqual(['h2', 'h1', 'm1'], ids_min)
 
     def test_relevance_cutoff_with_pagination(self):
         """
@@ -381,8 +331,8 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         self.assertEqual(page1["_sortCandidates"], page2["_sortCandidates"])
 
         # Should respect limit
-        self.assertLessEqual(len(page1["hits"]), 3)
-        self.assertLessEqual(len(page2["hits"]), 3)
+        self.assertEqual(3, len(page1["hits"]), 3)
+        self.assertEqual(3, len(page2["hits"]), 3)
 
         # Combined results should maintain sort order
         all_sort_values = []
@@ -472,10 +422,10 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         Tests that identical relevance cutoff calls return consistent results.
         """
         docs = [
-            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence", "score": 1.0},
-            {"_id": "h2", "content": "Artificial intelligence relies on machine learning", "score": 0.9},
-            {"_id": "m1", "content": "Machine learning processes data", "score": 0.5},
-            {"_id": "l1", "content": "Engineers use tools", "score": 0.1},
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence"},
+            {"_id": "h2", "content": "Artificial intelligence relies on machine learning"},
+            {"_id": "m1", "content": "Machine learning processes data"},
+            {"_id": "l1", "content": "Engineers use tools"},
         ]
         self.client.index(self.unstructured_index_name).add_documents(
             docs, tensor_fields=["content"]
@@ -515,10 +465,10 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         Tests relevance cutoff with different hybrid search configurations.
         """
         docs = [
-            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence", "score": 1.0},
-            {"_id": "h2", "content": "Artificial intelligence relies on machine learning", "score": 0.9},
-            {"_id": "m1", "content": "Machine learning processes data", "score": 0.5},
-            {"_id": "l1", "content": "Engineers use tools", "score": 0.1},
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence"},
+            {"_id": "h2", "content": "Artificial intelligence relies on machine learning"},
+            {"_id": "m1", "content": "Machine learning processes data"},
+            {"_id": "l1", "content": "Engineers use tools"},
         ]
         self.client.index(self.unstructured_index_name).add_documents(
             docs, tensor_fields=["content"]
@@ -545,72 +495,10 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
                 limit=10
             )
 
-            # All should have cutoff metadata
-            self.assertIn("_relevantCandidates", response)
-            self.assertIn("_probeCandidates", response)
-            self.assertLess(response["_relevantCandidates"], len(docs))
-
-    def test_relevance_cutoff_preserves_document_structure(self):
-        """
-        Tests that relevance cutoff preserves document structure and metadata.
-        """
-        docs = [
-            {"_id": "h1", "content": "Machine learning algorithms", "metadata": {"category": "AI"}, "score": 1.0},
-            {"_id": "h2", "content": "Artificial intelligence systems", "metadata": {"category": "AI"}, "score": 0.9},
-        ]
-        self.client.index(self.unstructured_index_name).add_documents(
-            docs, tensor_fields=["content"]
-        )
-
-        response = self.client.index(self.unstructured_index_name).search(
-            q="machine learning artificial intelligence",
-            search_method="HYBRID",
-            relevance_cutoff={
-                "method": "gap_detection"
-            },
-            limit=10
-        )
-
-        # Verify basic structure
-        self.assertIn("hits", response)
-        self.assertIn("_relevantCandidates", response)
-        self.assertIn("_probeCandidates", response)
-
-        # Verify each hit has required fields
-        for hit in response["hits"]:
-            self.assertIn("_id", hit)
-            self.assertIn("_score", hit)
-            self.assertIn("content", hit)
-            self.assertIn("metadata", hit)
-            self.assertIsInstance(hit["_score"], (int, float))
-            self.assertGreater(hit["_score"], 0)
-
-    def test_relevance_cutoff_blocks_irrelevant_documents(self):
-        """
-        Tests that relevance cutoff effectively blocks completely irrelevant documents.
-        """
-        docs = [
-            {"_id": "relevant", "content": "Machine learning algorithms in artificial intelligence", "score": 1.0},
-            {"_id": "irrelevant1", "content": "Bright morning sunlight streams through windows", "score": 0.1},
-            {"_id": "irrelevant2", "content": "Weather patterns emerge across the landscape", "score": 0.1},
-            {"_id": "irrelevant3", "content": "Ancient manuscripts reveal historical secrets", "score": 0.1},
-        ]
-        self.client.index(self.unstructured_index_name).add_documents(
-            docs, tensor_fields=["content"]
-        )
-
-        # Search with completely unrelated query
-        response = self.client.index(self.unstructured_index_name).search(
-            q="completely unrelated search query that matches nothing",
-            search_method="HYBRID",
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "parameters": {"relativeScoreFactor": 0.5}
-            },
-            limit=10
-        )
-
-        # Should have very few or no results due to low relevance
-        self.assertLessEqual(len(response["hits"]), 2)
-        self.assertIn("_relevantCandidates", response)
-        self.assertLessEqual(response["_relevantCandidates"], 2)
+            # Assert exact metadata values
+            self.assertEqual(2, response["_relevantCandidates"])
+            self.assertEqual(3, response["_probeCandidates"])
+            
+            # Assert exact document IDs
+            ids = [hit["_id"] for hit in response["hits"]]
+            self.assertEqual({"h1", "h2"}, set(ids))
