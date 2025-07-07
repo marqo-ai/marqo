@@ -283,25 +283,30 @@ class HybridSearch:
             query_hash_without_offset = None
 
         if query_hash_without_offset is not None:
-            existing_pagination_document = config.vespa_client.get_batch(
-                [query_hash_without_offset], constants.MARQO_PAGINATION_SCHEMA_NAME
-            ).responses[0].document
-            if not (offset != 0 and existing_pagination_document is None):
-                offsets = {}
-                if existing_pagination_document is not None:
-                    offsets = existing_pagination_document.fields['offsets']
-                    # If offsets are present collect unique document ids for
-                    # offsets < offset to exclude them from the next search
-                    documents_to_exclude = set()
-                    for existing_offset in offsets.keys():
-                        if int(existing_offset) < offset:
-                            documents_to_exclude.update(offsets[existing_offset])
-                    marqo_query.pagination_exclusions = list(documents_to_exclude)
-            else:
-                logger.warning(
-                    f"Pagination offset {offset} not found in existing pagination document for hash "
-                    f"{query_hash_without_offset}. This may indicate a jump in pagination."
-                )
+            try:
+                existing_pagination_document = config.vespa_client.get_document(
+                    query_hash_without_offset, constants.MARQO_PAGINATION_SCHEMA_NAME
+                ).document
+                if not (offset != 0 and existing_pagination_document is None):
+                    offsets = {}
+                    if existing_pagination_document is not None:
+                        offsets = existing_pagination_document.fields['offsets']
+                        # If offsets are present collect unique document ids for
+                        # offsets < offset to exclude them from the next search
+                        documents_to_exclude = set()
+                        for existing_offset in offsets.keys():
+                            if int(existing_offset) < offset:
+                                documents_to_exclude.update(offsets[existing_offset])
+                        marqo_query.pagination_exclusions = list(documents_to_exclude)
+                else:
+                    logger.warning(
+                        f"Pagination offset {offset} not found in existing pagination document for hash "
+                        f"{query_hash_without_offset}. This may indicate a jump in pagination."
+                    )
+            except VespaStatusError as e:
+                if e.status_code == 404:
+                    # No existing pagination document, page 0
+                    offsets = {}
 
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)
