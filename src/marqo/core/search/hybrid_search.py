@@ -153,21 +153,21 @@ class HybridSearch:
                 "'hybridParameters.queryLexical' is provided"
             )
 
-        if sort_by and (
-                marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
-                not marqo_index.type == IndexType.SemiStructured
-        ):
-            raise core_exceptions.UnsupportedFeatureError(
-                f"The 'sortBy' features is only supported for unstructured indexes created "
-                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
-            )
-
-        if (relevance_cutoff and not marqo_index.type == IndexType.SemiStructured):
-            # Legacy unstructured indexes and structured indexes do not support relevance cutoff
-            raise core_exceptions.UnsupportedFeatureError(
-                f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
-                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
-            )
+        # if sort_by and (
+        #         marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
+        #         not marqo_index.type == IndexType.SemiStructured
+        # ):
+        #     raise core_exceptions.UnsupportedFeatureError(
+        #         f"The 'sortBy' features is only supported for unstructured indexes created "
+        #         f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
+        #     )
+        #
+        # if (relevance_cutoff and not marqo_index.type == IndexType.SemiStructured):
+        #     # Legacy unstructured indexes and structured indexes do not support relevance cutoff
+        #     raise core_exceptions.UnsupportedFeatureError(
+        #         f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
+        #         f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
+        #     )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
