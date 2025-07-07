@@ -685,6 +685,9 @@ class StructuredVespaIndex(VespaIndex):
             for index, field in enumerate(marqo_query.sort_by.fields):
                 query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
 
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+
         return query
 
     def _get_tensor_fields_to_search(

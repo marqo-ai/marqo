@@ -384,6 +384,9 @@ class UnstructuredVespaIndex(VespaIndex):
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+
         return query
 
     def get_vector_count_query(self) -> Dict[str, Any]:
