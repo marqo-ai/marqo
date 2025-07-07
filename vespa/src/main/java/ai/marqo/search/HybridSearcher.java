@@ -304,7 +304,7 @@ public class HybridSearcher extends Searcher {
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
-            processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
+            processedHits.setField("marqo__fields.sortCandidates", hitsForPostProcessing.size());
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -356,8 +356,8 @@ public class HybridSearcher extends Searcher {
         // --- End facets attachment ---
         if (relevanceCutoffMethod != null) {
             // Add relevance cut-off information to the processed hits
-            processedHits.setField("marqo__relevantCandidates", relevantCandidates);
-            processedHits.setField("marqo__probeCandidates", probeCandidates);
+            processedHits.setField("marqo__fields.relevantCandidates", relevantCandidates);
+            processedHits.setField("marqo__fields.probeCandidates", probeCandidates);
         }
 
         return new Result(query, processedHits);
