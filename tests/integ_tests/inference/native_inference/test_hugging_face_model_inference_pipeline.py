@@ -136,4 +136,3 @@ class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
         self.assertTrue(isinstance(results_1[0][1], np.ndarray))
         self.assertEqual((1024, ), results_1[0][1].shape)
         self.assertEqual(TestImageUrls.IMAGE1.value, results_1[0][0])
-

@@ -52,7 +52,10 @@ class VespaLocal:
         return textwrap.dedent("""
             schema test_vespa_client {
                 document test_vespa_client {
-
+                    field marqo__id type string {
+                        indexing: summary | attribute
+                    }
+                
                     field id type string {
                         indexing: summary | attribute
                     }
