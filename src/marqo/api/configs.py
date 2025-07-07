@@ -59,6 +59,11 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        # StatsD
+        EnvVars.STATSD_HOST: "127.0.0.1",
+        EnvVars.STATSD_PORT: 8125,
+        EnvVars.STATSD_COMMON_TAGS: "",
+
         # Inference Client config (In API)
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config

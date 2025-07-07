@@ -1,24 +1,12 @@
-import os
+import logging
 import socket
 from typing import Dict, Optional
 
+import marqo.logging
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints, read_env_vars_and_defaults
 
-def _parse_common_tags(raw: Optional[str]) -> Dict[str, str]:
-    """
-    Convert 'k1:v1,k2:v2' into {'k1': 'v1', 'k2': 'v2'}.
-    Ignores empty or malformed pairs so mis-configuration can’t break metrics.
-    """
-    if not raw:
-        return {}
-
-    tags: Dict[str, str] = {}
-    for pair in raw.split(","):
-        if ":" in pair:
-            key, value = pair.split(":", 1)
-            key, value = key.strip(), value.strip()
-            if key and value:
-                tags[key] = value
-    return tags
+logger = marqo.logging.get_logger(__name__)
 
 
 class StatsDClient:
@@ -37,15 +25,15 @@ class StatsDClient:
         prefix: str = "",
     ) -> None:
         self.addr = (
-            host or os.getenv("STATSD_HOST", "127.0.0.1"),
-            int(port or os.getenv("STATSD_PORT", 8125)),
+            host or read_env_vars_and_defaults(EnvVars.STATSD_HOST),
+            int(port or read_env_vars_and_defaults_ints(EnvVars.STATSD_PORT)),
         )
         self.prefix = prefix
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setblocking(False)
 
         # Parse once; reused for every metric
-        self._common_tags = _parse_common_tags(os.getenv("STATSD_COMMON_TAGS"))
+        self._common_tags = self._parse_common_tags(read_env_vars_and_defaults(EnvVars.STATSD_COMMON_TAGS))
 
     def increment(
         self,
@@ -81,6 +69,25 @@ class StatsDClient:
         msg = f"{self.prefix}{metric}:{value_ms}|ms{self._encode_tags(merged)}"
         self._send(msg)
 
+
+    @staticmethod
+    def _parse_common_tags(raw: Optional[str]) -> Dict[str, str]:
+        """
+        Convert 'k1:v1,k2:v2' into {'k1': 'v1', 'k2': 'v2'}.
+        Ignores empty or malformed pairs so mis-configuration can’t break metrics.
+        """
+        if not raw:
+            return {}
+
+        tags: Dict[str, str] = {}
+        for pair in raw.split(","):
+            if ":" in pair:
+                key, value = pair.split(":", 1)
+                key, value = key.strip(), value.strip()
+                if key and value:
+                    tags[key] = value
+        return tags
+
     @staticmethod
     def _encode_tags(tags: Optional[Dict[str, str]]) -> str:
         """
@@ -104,15 +111,6 @@ class StatsDClient:
         try:
             # UDP – fire and forget
             self._sock.sendto(msg.encode("utf-8"), self.addr)
-        except Exception:
+        except Exception as exc:
             # Metrics must never break request handling
-            pass
-
-
-# Module-level singleton – keeps one UDP socket open per process         #
-_default_client = StatsDClient(prefix=os.getenv("STATSD_PREFIX", ""))
-
-
-def get_client() -> StatsDClient:
-    """Return the process-wide StatsD client instance."""
-    return _default_client
+            logging.debug(f"Failed to send StatsD message: {exc}")

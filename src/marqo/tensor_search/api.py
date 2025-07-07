@@ -39,6 +39,7 @@ from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+from marqo.core.monitoring.statsd_client import StatsDClient
 from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
@@ -124,8 +125,10 @@ app = FastAPI(
     version=version.get_version(),
     lifespan=lifespan,
 )
+
+statsd_client = StatsDClient()
 app.add_middleware(TelemetryMiddleware)
-app.add_middleware(StatsDMiddleware)
+app.add_middleware(StatsDMiddleware, statsd_client=statsd_client)
 app.router.route_class = MarqoCustomRoute
 
 
