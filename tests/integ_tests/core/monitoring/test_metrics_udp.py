@@ -139,6 +139,8 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
             r"search_processing_time:\d+\|ms",
             r"index_processing_time:\d+\|ms",
             r"x-count-success:\d+\|c",
+            r"x-count-failure:\d+\|c",
+            r"x-count-error:\d+\|c",
             r"requests\.completed:1\|c\|#path:/indexes/foo/documents/<document_id>,method:GET,status_code:\dXX",
         ]
 

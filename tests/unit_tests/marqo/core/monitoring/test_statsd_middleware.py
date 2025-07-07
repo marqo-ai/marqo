@@ -99,13 +99,15 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertFalse(any(m.startswith("marqo_processing_time") for _, m in self.stub.sent))
 
     def test_search_metrics(self):
-        self.client.post("/indexes/foo/search")
+        resp = self.client.post("/indexes/foo/search")
+        self.assertEqual(resp.status_code, 200)
 
         self.assertTrue(any(m.startswith("search_processing_time") for _, m in self.stub.sent))
         self.assertTrue(any(
             "path:/indexes/foo/search" in m and "method:POST" in m
             for m in _extract(self.stub, "increment", "requests.completed")
         ))
+        self.assertTrue(any("status_code:2XX" in m for m in _extract(self.stub, "increment", "requests.completed")))
 
     def test_index_docs_metrics_and_headers(self):
         self.client.post("/indexes/foo/documents")
@@ -159,3 +161,10 @@ class TestStatsDMiddleware(unittest.TestCase):
 
         self.assertTrue(any(k == "timing" and m.startswith("index_processing_time") for k, m in self.stub.sent))
         self.assertFalse(any(m.startswith("x-count-success") for k, m in self.stub.sent))
+
+    def test_requests_completed_4xx(self):
+        resp = self.client.get("/nonexistent/path")
+        self.assertEqual(resp.status_code, 404)
+
+        msgs = _extract(self.stub, "increment", "requests.completed")
+        self.assertTrue(any("status_code:4XX" in m for m in msgs))
