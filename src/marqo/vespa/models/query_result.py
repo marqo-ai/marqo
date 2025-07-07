@@ -8,7 +8,7 @@ class RootFields(BaseModel):
     total_count: Optional[int] = Field(None, alias='totalCount')
     sort_candidates: Optional[int] = Field(None, alias='marqo__fields.sortCandidates')
     relevant_candidates: Optional[int] = Field(None, alias='marqo__fields.relevantCandidates')
-    probe_candidates: Optional[int] = Field(None, alias='marqo__probeCandidates')
+    probe_candidates: Optional[int] = Field(None, alias='marqo__fields.probeCandidates')
 
 
 class Degraded(BaseModel):
