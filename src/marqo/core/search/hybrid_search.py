@@ -349,7 +349,8 @@ class HybridSearch:
                 or responses.root.fields.marqo_fields.relevant_candidates is None \
                 or responses.root.fields.marqo_fields.probe_candidates is None:
                 raise core_exceptions.InternalError(
-                    f"'relevanceCutoff' feature is enabled, but Vespa did not return _relevantCandidates in the response "
+                    f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
+                    f"probeCandidates in the response "
                 )
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
