@@ -337,7 +337,7 @@ class HybridSearch:
 
         # Collect metadata for sort by
         if sort_by is not None:
-            if responses.root.fields.marqo_fields.sort_candidates is None:
+            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None:
                 raise core_exceptions.InternalError(
                     f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
                 )
@@ -345,7 +345,9 @@ class HybridSearch:
 
         # Collect metadata for relevance cutoff
         if relevance_cutoff is not None:
-            if responses.root.fields.marqo_fields.relevant_candidates is None:
+            if responses.root.fields.marqo_fields is None \
+                or responses.root.fields.marqo_fields.relevant_candidates is None \
+                or responses.root.fields.marqo_fields.probe_candidates is None:
                 raise core_exceptions.InternalError(
                     f"'relevanceCutoff' feature is enabled, but Vespa did not return _relevantCandidates in the response "
                 )
