@@ -26,6 +26,9 @@ class SortByField(StrictBaseModel):
         order (SortOrder): The order of sorting, either asc(ascending) or desc(descending). Defaults to desc.
         missing (SortMissingPolicy): Defines how to handle missing values in the sort field. Defaults to last.
     """
+    class Config(StrictBaseModel.Config):
+        use_enum_values = True
+
     field_name: str = Field(alias="fieldName")
     order: SortOrder = SortOrder.Desc
     missing: SortMissingPolicy = SortMissingPolicy.Last

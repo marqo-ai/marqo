@@ -46,6 +46,11 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_SEARCH_OFFSET: 10000,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
 
+        # Query Logging
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: 900,
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: 10_000,
+
         # Throttling
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
         EnvVars.MARQO_MAX_CONCURRENT_INDEX: 8,
