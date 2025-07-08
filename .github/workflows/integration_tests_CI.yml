@@ -74,13 +74,13 @@ jobs:
           fi
 
   Test-Marqo:
-    name: Run Integration Tests (Part ${{ matrix.part }}/1)
+    name: Run Integration Tests (Part ${{ matrix.part }}/2)
     needs:
       - Determine-Vespa-Setup
     strategy:
       fail-fast: false
       matrix:
-        part: [ 0, 1 ] # Zero-based index for JSON list access
+        part: [ 0, 1, 2 ] # Zero-based index for JSON list access
     runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     
     timeout-minutes: 60
@@ -167,7 +167,7 @@ jobs:
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
-            tests/integ_tests --retries 3 --split-n 2 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+            tests/integ_tests --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
