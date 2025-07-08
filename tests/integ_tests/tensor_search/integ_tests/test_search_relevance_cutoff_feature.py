@@ -2,9 +2,11 @@ import json
 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
+from marqo.core.exceptions import UnsupportedFeatureError
 
 
 class TestSearchRelevanceCutoffFeature(MarqoTestCase):
@@ -16,10 +18,23 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             name="relevance_cutoff_unstructured_index",
             model=Model(name="hf/all-MiniLM-L6-v2")
         )
+
+        structured_index_request = cls.structured_marqo_index_request(
+            name="relevance_cutoff_structured_index",
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+            fields=[
+                FieldRequest(
+                    name="content",
+                    type="text"
+                )
+            ],
+            tensor_fields=["content"]
+        )
         
-        cls.create_indexes([unstructured_index_request])
+        cls.create_indexes([unstructured_index_request, structured_index_request])
         
         cls.unstructured_index_name = unstructured_index_request.name
+        cls.structured_marqo_index_name = structured_index_request.name
 
         # 30 documents designed for "machine learning artificial intelligence algorithms" query
         test_docs = [
@@ -203,6 +218,19 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                     f"Expected 25 probe candidates, but got {result['_probeCandidates']}."
                 )
         return result
+
+    def test_relevance_cutoff_is_blocked_by_structured_index(self):
+        """Test that relevance cutoff is blocked for structured index."""
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self._search_helper(
+                index_name=self.structured_marqo_index_name,
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "parameters": {"relativeScoreFactor": 0.5},
+                },
+            )
+        self.assertIn("The 'relevanceCutoff' feature is only supported for unstructured indexes created",
+                      str(context.exception))
 
     def test_relevance_cutoff_relative_max_score_low_threshold(self):
         """Test that relative_max_score cutoff with low threshold."""

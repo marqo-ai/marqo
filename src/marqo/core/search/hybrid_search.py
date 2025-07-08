@@ -162,7 +162,7 @@ class HybridSearch:
                 f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
             )
 
-        if (relevance_cutoff and not marqo_index.type == IndexType.SemiStructured):
+        if relevance_cutoff and not marqo_index.type == IndexType.SemiStructured:
             # Legacy unstructured indexes and structured indexes do not support relevance cutoff
             raise core_exceptions.UnsupportedFeatureError(
                 f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
@@ -337,7 +337,7 @@ class HybridSearch:
 
         # Collect metadata for sort by
         if sort_by is not None:
-            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None:
+            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None: # pragma: no cover
                 raise core_exceptions.InternalError(
                     f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
                 )
@@ -347,7 +347,7 @@ class HybridSearch:
         if relevance_cutoff is not None:
             if responses.root.fields.marqo_fields is None \
                 or responses.root.fields.marqo_fields.relevant_candidates is None \
-                or responses.root.fields.marqo_fields.probe_candidates is None:
+                or responses.root.fields.marqo_fields.probe_candidates is None: # pragma: no cover
                 raise core_exceptions.InternalError(
                     f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
                     f"probeCandidates in the response "
