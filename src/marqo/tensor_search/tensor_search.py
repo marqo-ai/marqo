@@ -115,7 +115,7 @@ def _sanitize_query_for_response(query: Optional[Union[str, dict]]):
         return sanitized_query
 
     # Should not reach here
-    raise RuntimeError('Invalid query type')
+    raise RuntimeError('Invalid query type')  # pragma: no cover
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = _get_latest_index(config, index_name)
