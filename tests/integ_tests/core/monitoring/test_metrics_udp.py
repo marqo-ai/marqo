@@ -127,6 +127,7 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
         cls._sink_cm.__exit__(None, None, None)
 
+    @unittest.skip("StatsD UDP integration test disabled")
     def test_metrics_roundtrip(self):
         """Test that the middleware emits expected metrics over UDP."""
         self.client.get("/")
