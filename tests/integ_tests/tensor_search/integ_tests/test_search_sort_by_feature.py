@@ -9,6 +9,7 @@ from marqo.core.exceptions import UnsupportedFeatureError
 from unittest.mock import patch, MagicMock
 from marqo.core.models.marqo_index import MarqoIndex
 import semver
+import pytest
 
 
 class TestSearchSortByFeature(MarqoTestCase):
@@ -443,6 +444,9 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             ids
         )
 
+    @pytest.mark.skip_for_multinode(
+        "The lexical score can differ between nodes so the results may not consistently match"
+    )
     def test_sort_by_when_fields_does_not_exist(self):
         """
         Test sorting by a field that does not exist in the index.
@@ -760,6 +764,8 @@ class TestSearchSortByFeatureSort2Fields(MarqoTestCase):
         # missing primary first (7,5,6), then field1 asc, then field2 asc tie-break
         self.assertEqual(['7', '5', '6', '8', '0', '9', '3', '4', '1', '2'], ids)
 
+    @pytest.mark.skip_for_multinode(
+        "The lexical score can differ between nodes so the results may not consistently match")
     def test_sort_by_when_fields_do_not_exist_two_fields(self):
         """
         Sorting with non-existent fields should return documents in the same order as if no sort was applied, with
