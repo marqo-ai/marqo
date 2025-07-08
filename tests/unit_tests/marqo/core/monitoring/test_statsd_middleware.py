@@ -31,6 +31,7 @@ def _extract(stub: _StubStatsD, kind: str, prefix: str = "") -> List[str]:
 
 
 def _build_basic_app(statsd_stub: _StubStatsD) -> FastAPI:
+    """Build a basic FastAPI app with StatsDMiddleware for testing."""
     app = FastAPI()
     app.add_middleware(sm.StatsDMiddleware, statsd_client=statsd_stub)
 
@@ -53,6 +54,7 @@ def _build_basic_app(statsd_stub: _StubStatsD) -> FastAPI:
 
 
 def _app_with_docs_and_fail(statsd_stub: _StubStatsD) -> FastAPI:
+    """App with a GET endpoint that sanitises document IDs and a failing endpoint."""
     app = FastAPI()
     app.add_middleware(sm.StatsDMiddleware, statsd_client=statsd_stub)
 
@@ -68,6 +70,7 @@ def _app_with_docs_and_fail(statsd_stub: _StubStatsD) -> FastAPI:
 
 
 def _app_with_patch_and_bad_headers(statsd_stub: _StubStatsD) -> FastAPI:
+    """App with a PATCH endpoint that returns malformed headers."""
     app = FastAPI()
     app.add_middleware(sm.StatsDMiddleware, statsd_client=statsd_stub)
 
@@ -82,6 +85,7 @@ def _app_with_patch_and_bad_headers(statsd_stub: _StubStatsD) -> FastAPI:
 
 
 class TestStatsDMiddleware(unittest.TestCase):
+    """Unit tests for StatsDMiddleware to ensure it emits expected metrics."""
     def setUp(self):
         self.stub = _StubStatsD()
         self.client_ctx = TestClient(_build_basic_app(self.stub))
@@ -89,6 +93,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.stub.sent.clear()
 
     def tearDown(self):
+        """Clean up the client context and reset the stub."""
         self.client_ctx.__exit__(None, None, None)
         self.stub.sent.clear()
 
@@ -99,6 +104,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertFalse(any(m.startswith("marqo_processing_time") for _, m in self.stub.sent))
 
     def test_search_metrics(self):
+        """Test that search requests emit the correct metrics."""
         resp = self.client.post("/indexes/foo/search")
         self.assertEqual(resp.status_code, 200)
 
@@ -110,6 +116,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertTrue(any("status_code:2XX" in m for m in _extract(self.stub, "increment", "requests.completed")))
 
     def test_index_docs_metrics_and_headers(self):
+        """Test that document indexing requests emit the correct metrics and headers."""
         self.client.post("/indexes/foo/documents")
 
         self.assertTrue(any(m.startswith("index_processing_time") for _, m in self.stub.sent))
@@ -119,7 +126,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertTrue(any(m.startswith("x-count-error:0") for m in incs))
 
     def test_requests_completed_path_sanitised(self):
-        # Change app context to include document GET
+        """Test that requests.completed metrics sanitise document IDs."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_docs_and_fail(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -131,6 +138,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertFalse(any("abc123" in m for m in msgs))
 
     def test_requests_completed_5xx(self):
+        """Test that requests.completed metrics capture 5XX errors."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_docs_and_fail(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -141,6 +149,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertTrue(any("status_code:5XX" in m for m in msgs))
 
     def test_patch_docs_metrics_and_malformed_headers(self):
+        """Test that patch requests emit the correct metrics and handle malformed headers."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_patch_and_bad_headers(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -152,6 +161,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertFalse(any(m.startswith("x-count-success") for k, m in self.stub.sent))
 
     def test_headers_with_empty_strings_dont_crash(self):
+        """Test that patch requests with empty string headers do not crash."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_patch_and_bad_headers(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -163,6 +173,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         self.assertFalse(any(m.startswith("x-count-success") for k, m in self.stub.sent))
 
     def test_requests_completed_4xx(self):
+        """Test that requests.completed metrics capture 4XX errors."""
         resp = self.client.get("/nonexistent/path")
         self.assertEqual(resp.status_code, 404)
 

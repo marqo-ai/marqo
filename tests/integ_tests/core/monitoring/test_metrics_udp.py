@@ -70,6 +70,7 @@ def udp_sink():
 
 
 def _has(pkt: List[str], pattern: str) -> bool:
+    """Check if any packet matches the given regex pattern."""
     return any(re.search(pattern, p) for p in pkt)
 
 
@@ -81,12 +82,12 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # -------- set up sink ------------------------------------------------
+        """Set up a UDP sink and a FastAPI client for testing."""
         cls._sink_cm = udp_sink()
         cls.sink = cls._sink_cm.__enter__()
 
-        # -------- stub FastAPI app wired to StatsD that talks to sink --------
         def _build_stub_app():
+            """Build a FastAPI app with StatsDMiddleware for testing."""
             app = FastAPI()
             statsd = sc.StatsDClient(host="127.0.0.1", port=cls.sink.port)
             app.add_middleware(sm.StatsDMiddleware, statsd_client=statsd)
@@ -126,8 +127,8 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
         cls._sink_cm.__exit__(None, None, None)
 
-    # exercise all code‑paths the middleware cares about
     def test_metrics_roundtrip(self):
+        """Test that the middleware emits expected metrics over UDP."""
         self.client.get("/")
         self.client.get("/indexes/foo/search")  # search timing
         self.client.post("/indexes/foo/documents")  # index timing + headers

@@ -16,6 +16,7 @@ class CaptureStatsDClient(sc.StatsDClient):
 
 
 class TestStatsDClient:
+    """Tests for the StatsDClient class."""
     def test_encode_tags_none(self):
         assert sc.StatsDClient._encode_tags(None) == ""
 
@@ -56,5 +57,6 @@ class TestStatsDClient:
         ]
 
     def test_parse_common_tags_empty_and_malformed(self):
+        """Test that _parse_common_tags handles empty and malformed strings."""
         assert sc.StatsDClient._parse_common_tags("") == {}
         assert sc.StatsDClient._parse_common_tags("foo:bar,,baz:") == {"foo": "bar"}
