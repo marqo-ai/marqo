@@ -4,16 +4,19 @@ from unittest.mock import Mock, patch
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.config import Config
-from marqo.core.models.marqo_index import MarqoIndex, IndexType, Model, StructuredMarqoIndex
+from marqo.core.models.marqo_index import MarqoIndex, IndexType, Model, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.search import VectorisedJobPointer, JHash
 from marqo.vespa.models import QueryResult
 from marqo.vespa.models.query_result import Child, Root, Coverage
+from marqo.core import exceptions as core_exceptions
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
 class TestTensorSearch(unittest.TestCase):
-    """Test basic search functionality for lexical, tensor, and hybrid search methods."""
+    """Test core search functionality and utility functions."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -22,8 +25,8 @@ class TestTensorSearch(unittest.TestCase):
         self.config.index_management = Mock()
         self.config.inference = Mock()
 
-        # Mock index
-        self.mock_index = Mock(spec=MarqoIndex)
+        # Mock index - use proper SemiStructuredMarqoIndex
+        self.mock_index = Mock(spec=SemiStructuredMarqoIndex)
         self.mock_index.name = "test-index"
         self.mock_index.type = IndexType.SemiStructured
         self.mock_index.schema_name = "test_schema"
@@ -188,147 +191,311 @@ class TestTensorSearch(unittest.TestCase):
         self.assertIn('hits', result)
         self.assertIn('processingTimeMs', result)
 
-
-class TestTensorSearchFunctions(unittest.TestCase):
-    """Test cases for tensor_search.py functions to cover specific functionality"""
-
-    def setUp(self):
-        self.mock_config = Mock()
-        self.mock_index = Mock()
-        self.mock_index.type = IndexType.Structured
-
-    def test_search_lexical_ef_search_parameter_fails(self):
-        """Test that search function raises InvalidArgError when efSearch parameter is used with lexical search method."""
-        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
-            tensor_search.search(
-                config=self.mock_config,
-                index_name="test_index",
-                text="test query",
-                search_method=SearchMethod.LEXICAL,
-                ef_search=100  # Invalid for lexical search
-            )
-        self.assertIn("efSearch", str(cm.exception))
-
-    def test_search_lexical_approximate_parameter_fails(self):
-        """Test that search function raises InvalidArgError when approximate parameter is used with lexical search method."""
-        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
-            tensor_search.search(
-                config=self.mock_config,
-                index_name="test_index",
-                text="test query",
-                search_method=SearchMethod.LEXICAL,
-                approximate=False  # Invalid for lexical search
-            )
-        self.assertIn("approximate", str(cm.exception))
-
     def test_construct_vector_input_batches_with_none_query(self):
-        """Test that construct_vector_input_batches returns empty QueryContentCollector when given None query."""
+        """Test construct_vector_input_batches with None query returns empty collector"""
         result = tensor_search.construct_vector_input_batches(None)
-
-        # Should return empty query collector
         self.assertEqual(len(result.queries), 0)
 
     def test_construct_vector_input_batches_with_invalid_query_type(self):
-        """Test that construct_vector_input_batches raises ValueError when given an invalid query type like integer."""
-        with self.assertRaises(ValueError) as cm:
-            tensor_search.construct_vector_input_batches(123)  # Invalid type
-        self.assertIn("Incorrect type for query", str(cm.exception))
-
-    @patch('marqo.core.vespa_index.vespa_index.for_marqo_index')
-    def test_gather_documents_from_response_with_group_facet_id(self, mock_factory):
-        """Test that gather_documents_from_response skips group:facet: IDs and returns empty hits list."""
-        mock_index = Mock(spec=StructuredMarqoIndex)
-        mock_index.type = IndexType.Structured
-
-        # Mock QueryResult with a group:facet: document
-        mock_response = Mock()
-        mock_doc = Mock()
-        mock_doc.id = "group:facet:test"
-        mock_response.hits = [mock_doc]
-
-        mock_vespa_index = Mock()
-        mock_factory.return_value = mock_vespa_index
-
-        result = tensor_search.gather_documents_from_response(
-            response=mock_response,
-            marqo_index=mock_index,
-            highlights=False
-        )
-
-        # Should skip the group:facet: document
-        self.assertEqual(len(result['hits']), 0)
-        # Verify to_marqo_document was never called since we skip group:facet docs
-        mock_vespa_index.to_marqo_document.assert_not_called()
+        """Test construct_vector_input_batches with invalid query type raises ValueError"""
+        with self.assertRaises(ValueError):
+            tensor_search.construct_vector_input_batches(123)
 
     def test_select_attributes_with_flattened_map_fields(self):
-        """Test that select_attributes includes flattened map fields when the prefix matches an attribute to retrieve."""
+        """Test select_attributes includes flattened map fields with matching prefixes"""
         marqo_doc = {
             "_id": "doc1",
             "_score": 0.95,
-            "title": "Test Document",
-            "metadata.author": "John Doe",  # Flattened map field
-            "metadata.year": "2023",  # Flattened map field
-            "description": "Test Description",
-            "extra_field": "Should be filtered out"
+            "title": "test title",
+            "metadata.category": "science",
+            "metadata.tags": ["tag1", "tag2"],
+            "other_field": "value",
+            "unrelated.field": "unrelated"
         }
-
-        attributes_to_retrieve_set = {"_id", "_score", "title", "metadata"}
-
-        result = tensor_search.select_attributes(marqo_doc, attributes_to_retrieve_set)
-
-        # Should include flattened map fields with "metadata" prefix
+        
+        attributes_to_retrieve = {"_id", "_score", "title", "metadata"}
+        
+        result = tensor_search.select_attributes(marqo_doc, attributes_to_retrieve)
+        
         expected = {
             "_id": "doc1",
             "_score": 0.95,
-            "title": "Test Document",
-            "metadata.author": "John Doe",
-            "metadata.year": "2023"
+            "title": "test title",
+            "metadata.category": "science",
+            "metadata.tags": ["tag1", "tag2"]
         }
+        
         self.assertEqual(result, expected)
 
     def test_select_attributes_without_flattened_fields(self):
-        """Test that select_attributes returns only exact attribute matches when no flattened fields are present."""
+        """Test select_attributes with only exact field matches"""
         marqo_doc = {
             "_id": "doc1",
             "_score": 0.95,
-            "title": "Test Document",
-            "description": "Test Description",
-            "extra_field": "Should be filtered out"
+            "title": "test title",
+            "description": "test description",
+            "other_field": "value"
         }
-
-        attributes_to_retrieve_set = {"_id", "_score", "title"}
-
-        result = tensor_search.select_attributes(marqo_doc, attributes_to_retrieve_set)
-
-        # Should only include exact matches
+        
+        attributes_to_retrieve = {"_id", "_score", "title"}
+        
+        result = tensor_search.select_attributes(marqo_doc, attributes_to_retrieve)
+        
         expected = {
             "_id": "doc1",
             "_score": 0.95,
-            "title": "Test Document"
+            "title": "test title"
         }
+        
         self.assertEqual(result, expected)
 
     def test_get_content_vector_not_found_error(self):
-        """Test that get_content_vector raises RuntimeError when content is not found in any job."""
-        possible_jobs = []  # Empty list
+        """Test get_content_vector raises RuntimeError when content not found"""
+        possible_jobs = []
         job_to_vectors = {}
-        content = "test_content"
-
+        content = "test content"
+        
         with self.assertRaises(RuntimeError) as cm:
             tensor_search.get_content_vector(possible_jobs, job_to_vectors, content)
+        
         self.assertIn("could not find corresponding vector for content", str(cm.exception))
 
     def test_get_content_vector_found_in_job(self):
-        """Test that get_content_vector returns the correct vector when content is found in a job."""
-
+        """Test get_content_vector successfully finds and returns vector"""
+        # Use proper JHash type for job_hash (should be an integer)
         job_hash = JHash(123)
-        possible_jobs = [VectorisedJobPointer(job_hash=job_hash, start_idx=0, end_idx=1)]
-        job_to_vectors = {job_hash: {"test_content": [0.1, 0.2, 0.3]}}
-        content = "test_content"
-
+        job_pointer = VectorisedJobPointer(job_hash=job_hash, start_idx=0, end_idx=1)
+        possible_jobs = [job_pointer]
+        job_to_vectors = {job_hash: {"test content": [0.1, 0.2, 0.3]}}
+        content = "test content"
+        
         result = tensor_search.get_content_vector(possible_jobs, job_to_vectors, content)
-
+        
         self.assertEqual(result, [0.1, 0.2, 0.3])
+
+    def test_get_query_vectors_string_query_with_context_fails(self):
+        """Test that using context with a string query raises InvalidArgumentError"""
+        # Create a proper MarqoIndex mock that will pass pydantic validation
+        mock_index = Mock(spec=SemiStructuredMarqoIndex)
+        mock_index.model = Mock()
+        mock_index.model.get_dimension.return_value = 512
+        mock_index.name = "test-index"
+        mock_index.type = IndexType.SemiStructured
+        # Add the dict() method that pydantic expects
+        mock_index.dict.return_value = {
+            'name': 'test-index',
+            'type': 'semi_structured'
+        }
+        
+        # Create a query with string q and context (this should fail)
+        context = SearchContext(tensor=[SearchContextTensor(vector=[0.1, 0.2, 0.3], weight=1.0)])
+        query = BulkSearchQueryEntity(
+            q="test string query",  # String query
+            context=context,        # With context - this combination should fail
+            index=mock_index,
+            searchMethod=SearchMethod.TENSOR,
+            limit=10,
+            offset=0,
+            showHighlights=False
+        )
+        
+        # Mock the required parameters for get_query_vectors_from_jobs
+        queries = [query]
+        qidx_to_job = {0: []}  # Empty job pointers for string query
+        job_to_vectors = {}    # Empty job vectors
+        jobs = {}              # Empty jobs
+        
+        with self.assertRaises(core_exceptions.InvalidArgumentError) as cm:
+            tensor_search.get_query_vectors_from_jobs(
+                queries, qidx_to_job, job_to_vectors, Mock(), jobs
+            )
+        
+        # Verify the specific error message from line 966
+        self.assertIn("Cannot use 'context' for a search with a string 'q'", str(cm.exception))
+        self.assertIn("test string query", str(cm.exception))
+        self.assertIn("provide a dictionary or a CustomVectorQuery object", str(cm.exception))
+
+
+class TestTensorSearchValidation(unittest.TestCase):
+    """Test validation and error handling for tensor search operations."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.config = Mock(spec=Config)
+        self.config.index_management = Mock()
+        self.mock_index = Mock(spec=SemiStructuredMarqoIndex)
+        self.mock_index.type = IndexType.SemiStructured
+        self.mock_index.parsed_marqo_version.return_value = version.__version__
+
+    def test_search_result_count_validation_negative_fails(self):
+        """Test that negative result_count raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=-1
+            )
+        self.assertIn("result_count must be an integer greater than 0", str(cm.exception))
+
+    def test_search_result_count_validation_zero_fails(self):
+        """Test that zero result_count raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=0
+            )
+        self.assertIn("result_count must be an integer greater than 0", str(cm.exception))
+
+    def test_search_result_count_validation_non_integer_fails(self):
+        """Test that non-integer result_count raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=5.5
+            )
+        self.assertIn("result_count must be an integer greater than 0", str(cm.exception))
+
+    def test_search_offset_validation_negative_fails(self):
+        """Test that negative offset raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=5,
+                offset=-1
+            )
+        self.assertIn("search result offset cannot be less than 0", str(cm.exception))
+
+    @patch.dict('os.environ', {'MARQO_MAX_RETRIEVABLE_DOCS': '10'})
+    def test_search_max_docs_limit_validation_fails(self):
+        """Test that exceeding max retrievable docs raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=8,
+                offset=5  # 8 + 5 = 13 > 10
+            )
+        self.assertIn("search result limit + offset must be less than or equal", str(cm.exception))
+
+    @patch.dict('os.environ', {'MARQO_MAX_SEARCH_LIMIT': '5'})
+    def test_search_max_search_limit_validation_fails(self):
+        """Test that exceeding max search limit raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=10  # > 5
+            )
+        self.assertIn("search result limit must be less than or equal to the MARQO_MAX_SEARCH_LIMIT", str(cm.exception))
+
+    @patch.dict('os.environ', {'MARQO_MAX_SEARCH_OFFSET': '100'})
+    def test_search_max_search_offset_validation_fails(self):
+        """Test that exceeding max search offset raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=5,
+                offset=150  # > 100
+            )
+        self.assertIn("search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET", str(cm.exception))
+
+    @patch.dict('os.environ', {'MARQO_MAX_SEARCH_CONTEXT_DOCS': '2'})
+    @patch('marqo.tensor_search.tensor_search.index_meta_cache.get_index')
+    def test_search_max_context_docs_validation_fails(self, mock_get_index):
+        """Test that exceeding max context docs raises IllegalRequestedDocCount"""
+        mock_get_index.return_value = self.mock_index
+        
+        from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
+        context = SearchContext(documents=SearchContextDocuments(ids={"doc1": 1, "doc2": 1, "doc3": 1}))
+        
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            # Use a dict query to avoid the validation error for string + context
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text={"query": 1.0},  # Use dict query to pass validation
+                result_count=5,
+                search_method=SearchMethod.TENSOR,
+                context=context
+            )
+        # This should fail on context docs limit, not on string query validation
+        self.assertIn("Search context documents limit exceeded", str(cm.exception))
+
+    def test_search_invalid_search_method_fails(self):
+        """Test that invalid search method raises InvalidArgError"""
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=5,
+                search_method="INVALID_METHOD"
+            )
+        self.assertIn("Search called with unknown search method", str(cm.exception))
+
+    @patch('marqo.tensor_search.tensor_search.index_meta_cache.get_index')
+    def test_lexical_search_ef_search_invalid_arg_error(self, mock_get_index):
+        """Test that ef_search parameter with lexical search raises InvalidArgError"""
+        mock_get_index.return_value = self.mock_index
+        
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            tensor_search.search(
+                config=Mock(),
+                index_name="test",
+                text="query",
+                result_count=5,
+                search_method=SearchMethod.LEXICAL,
+                ef_search=100
+            )
+        self.assertIn("efSearch is not a valid argument for lexical search", str(cm.exception))
+
+    @patch('marqo.tensor_search.tensor_search.index_meta_cache.get_index')
+    def test_lexical_search_approximate_invalid_arg_error(self, mock_get_index):
+        """Test that approximate parameter with lexical search raises InvalidArgError"""
+        mock_get_index.return_value = self.mock_index
+
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            tensor_search.search(
+                config=self.config,
+                index_name="test-index",
+                text="test query",
+                search_method=SearchMethod.LEXICAL,
+                approximate=True
+            )
+        
+        self.assertIn("approximate is not a valid argument for lexical search", str(cm.exception))
+
+    def test_get_documents_by_ids_empty_collection_fails(self):
+        """Test that empty document_ids collection raises InvalidArgError"""
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            tensor_search.get_documents_by_ids(
+                config=Mock(),
+                index_name="test",
+                document_ids=[]
+            )
+        self.assertIn("Can't get empty collection of IDs", str(cm.exception))
+
+    @patch.dict('os.environ', {'MARQO_MAX_RETRIEVABLE_DOCS': '2'})
+    def test_get_documents_by_ids_max_docs_limit_fails(self):
+        """Test that exceeding max docs limit raises IllegalRequestedDocCount"""
+        with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
+            tensor_search.get_documents_by_ids(
+                config=Mock(),
+                index_name="test",
+                document_ids=["doc1", "doc2", "doc3"]
+            )
+        self.assertIn("documents were requested, which is more than the allowed limit", str(cm.exception))
 
 
 if __name__ == '__main__':

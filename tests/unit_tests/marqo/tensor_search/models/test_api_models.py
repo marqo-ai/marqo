@@ -11,8 +11,10 @@ from marqo.tensor_search.models.search import (
     SearchContext, 
     SearchContextTensor, 
     SearchContextDocuments,
-    SearchContextDocumentsParameters
+    SearchContextDocumentsParameters,
+    QueryContent
 )
+from marqo.core.inference.api import Modality
 
 
 class TestSearchQuery(unittest.TestCase):
@@ -641,6 +643,25 @@ class TestSearchContext(unittest.TestCase):
         with self.assertRaises(api_exceptions.InvalidArgError):
             # Pass invalid tensor data that will cause ValidationError
             SearchContext(tensor="invalid_tensor_data")
+
+
+class TestQueryContent(unittest.TestCase):
+    """Test QueryContent model"""
+
+    def test_query_content_modality_field_with_text(self):
+        """Test QueryContent modality field access with text modality"""
+        query_content = QueryContent(content="test content", modality=Modality.TEXT)
+        
+        # Test that modality field is accessible and has correct value
+        self.assertEqual(query_content.modality, Modality.TEXT)
+        self.assertEqual(query_content.content, "test content")
+
+    def test_query_content_modality_field_with_image(self):
+        """Test QueryContent modality field access with image modality"""
+        query_content = QueryContent(content="http://example.com/image.jpg", modality=Modality.IMAGE)
+        
+        self.assertEqual(query_content.modality, Modality.IMAGE)
+        self.assertEqual(query_content.content, "http://example.com/image.jpg")
 
 
 if __name__ == '__main__':

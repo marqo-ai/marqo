@@ -283,6 +283,30 @@ class TestSlerpInternalMethods(unittest.TestCase):
         self.assertIsInstance(result[0], float)
         self.assertIsInstance(result[1], float)
 
+    def test_slerp_invalid_method_raises_internal_error(self):
+        """Test Slerp with invalid method enum value raises InternalError"""
+        slerp = Slerp()
+        # Manually set an invalid method to trigger the else branch
+        slerp.method = 999  # Invalid enum value
+        
+        vectors = [[1, 0], [0, 1]]
+        weights = [1, 1]
+        
+        with self.assertRaises(InternalError) as cm:
+            slerp.interpolate(vectors, weights)
+        self.assertIn('Unknown interpolation method', str(cm.exception))
+
+    def test_slerp_hierarchical_single_vector_final_return(self):
+        """Test Slerp hierarchical method returns final vector when only one remains"""
+        slerp = Slerp(method=Slerp.Method.Hierarchical)
+        
+        # Single vector case to test the final return statement
+        vectors = [[2, 3]]
+        weights = [1]
+        
+        result = slerp.interpolate(vectors, weights)
+        self.assertEqual(result, [2, 3])
+
 
 if __name__ == '__main__':
     unittest.main() 
