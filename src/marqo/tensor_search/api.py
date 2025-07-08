@@ -10,10 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
-from starlette.middleware import Middleware
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
@@ -32,10 +29,12 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
+from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
 from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
+from marqo.otel import bootstrap_otel
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
@@ -48,7 +47,6 @@ from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
-from marqo.otel import bootstrap_otel
 
 logger = get_logger(__name__)
 
@@ -405,36 +403,43 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
-    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
-        #  SearchQuery can be injected after migrated to v2
-        search_query = parse_request_object(SearchQuery, search_query_dict)
+    # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
+    #  SearchQuery can be injected after migrated to v2
+    search_query = parse_request_object(SearchQuery, search_query_dict)
 
-        result = tensor_search.search(
-            config=marqo_config, text=search_query.q,
-            index_name=index_name, highlights=search_query.showHighlights,
-            searchable_attributes=search_query.searchableAttributes,
-            search_method=search_query.searchMethod,
-            result_count=search_query.limit, offset=search_query.offset,
-            rerank_depth=search_query.rerankDepth,
-            ef_search=search_query.efSearch, approximate=search_query.approximate,
-            approximate_threshold=search_query.approximateThreshold,
-            reranker=search_query.reRanker,
-            filter=search_query.filter, device=device,
-            attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            media_download_headers=search_query.mediaDownloadHeaders,
-            context=search_query.context,
-            score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth,
-            text_query_prefix=search_query.textQueryPrefix,
-            hybrid_parameters=search_query.hybridParameters,
-            facets=search_query.facets,
-            track_total_hits=search_query.trackTotalHits,
-            language=search_query.language,
-            relevance_cutoff= search_query.relevance_cutoff,
-            sort_by = search_query.sort_by,
-        )
-        return ORJSONResponse(result)
+    query_logger = QueryLogger(search_query)
+
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", query_logger.log_slow_query):
+        try:
+            result = tensor_search.search(
+                config=marqo_config, text=search_query.q,
+                index_name=index_name, highlights=search_query.showHighlights,
+                searchable_attributes=search_query.searchableAttributes,
+                search_method=search_query.searchMethod,
+                result_count=search_query.limit, offset=search_query.offset,
+                rerank_depth=search_query.rerankDepth,
+                ef_search=search_query.efSearch, approximate=search_query.approximate,
+                approximate_threshold=search_query.approximateThreshold,
+                reranker=search_query.reRanker,
+                filter=search_query.filter, device=device,
+                attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
+                media_download_headers=search_query.mediaDownloadHeaders,
+                context=search_query.context,
+                score_modifiers=search_query.scoreModifiers,
+                model_auth=search_query.modelAuth,
+                text_query_prefix=search_query.textQueryPrefix,
+                hybrid_parameters=search_query.hybridParameters,
+                facets=search_query.facets,
+                track_total_hits=search_query.trackTotalHits,
+                language=search_query.language,
+                relevance_cutoff= search_query.relevance_cutoff,
+                sort_by = search_query.sort_by,
+            )
+            return ORJSONResponse(result)
+        except Exception as e:
+            # Please note that we treat VespaTimeoutError(504) as error not slow query
+            query_logger.log_error_query(str(e))
+            raise
 
 
 @app.post("/indexes/{index_name}/recommend")
