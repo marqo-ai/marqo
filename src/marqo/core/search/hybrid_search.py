@@ -276,7 +276,9 @@ class HybridSearch:
 
         # Create query hash without offset
         if offset % result_count == 0 and hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
-            query_hash_without_offset = marqo_query.get_query_hash_without_offset()
+            with RequestMetricsStore.for_request().time(f"search.hybrid.get_query_hash_without_offset"):
+                query_hash_without_offset = marqo_query.get_query_hash_without_offset()
+            print(query_hash_without_offset)
         else:
             if hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
                 logger.warning("Offset is not a multiple of limit. This is a wrong usage of pagination.")
@@ -284,9 +286,10 @@ class HybridSearch:
 
         if query_hash_without_offset is not None:
             try:
-                existing_pagination_document = config.vespa_client.get_document(
-                    query_hash_without_offset, constants.MARQO_PAGINATION_SCHEMA_NAME
-                ).document
+                with RequestMetricsStore.for_request().time(f"search.hybrid.get_pagination_state"):
+                    existing_pagination_document = config.vespa_client.get_document(
+                        query_hash_without_offset, constants.MARQO_PAGINATION_SCHEMA_NAME
+                    ).document
                 if not (offset != 0 and existing_pagination_document is None):
                     offsets = {}
                     if existing_pagination_document is not None:

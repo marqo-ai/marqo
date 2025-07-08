@@ -98,9 +98,10 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
         return values
 
     def get_query_hash_without_offset(self):
-        query_copy = self.copy(deep=True)
-        query_copy.offset = None
-        normalized_json = query_copy.json(
+        normalized_json = self.json(
+            exclude={
+                'offset'
+            },
             sort_keys=True,
             exclude_unset=False,
             exclude_none=True,
