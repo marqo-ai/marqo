@@ -296,7 +296,7 @@ class SortByTest {
                                 return null;
                             }
                             // non-null so createSubQuery and co. won't blow up
-                            return Tensor.from("tensor<float>()");
+                            return Tensor.from("tensor(p{}):{}");
                         })
                 .when(spy)
                 .extractTensorRankFeature(any(Query.class), anyString());
@@ -1154,6 +1154,66 @@ class SortByTest {
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 100"); // Math.max(12, 100) = 100
             assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1900");
+        }
+    }
+
+    @Nested
+    class MarqoMetadataFieldsTest {
+
+        @Test
+        void shouldExcludeNullValuesFromJsonSerialization() {
+            // Create metadata with some null values
+            HybridSearcher.MarqoMetadataFields metadataWithNulls =
+                    new HybridSearcher.MarqoMetadataFields(5, null, 10);
+
+            // Test JSON serialization excludes nulls
+            StringBuilder json = new StringBuilder();
+            metadataWithNulls.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should contain non-null values
+            assertThat(jsonString).contains("\"sortCandidates\":5");
+            assertThat(jsonString).contains("\"relevantCandidates\":10");
+
+            // Should not contain null field
+            assertThat(jsonString).doesNotContain("probeCandidates");
+            assertThat(jsonString).doesNotContain("null");
+        }
+
+        @Test
+        void shouldIncludeAllNonNullValuesInJsonSerialization() {
+            // Create metadata with all non-null values
+            HybridSearcher.MarqoMetadataFields metadataComplete =
+                    new HybridSearcher.MarqoMetadataFields(8, 12, 6);
+
+            // Test JSON serialization includes all values
+            StringBuilder json = new StringBuilder();
+            metadataComplete.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should contain all values
+            assertThat(jsonString).contains("\"sortCandidates\":8");
+            assertThat(jsonString).contains("\"probeCandidates\":12");
+            assertThat(jsonString).contains("\"relevantCandidates\":6");
+
+            // Should not contain null
+            assertThat(jsonString).doesNotContain("null");
+        }
+
+        @Test
+        void shouldHandleAllNullValuesInJsonSerialization() {
+            // Create metadata with all null values
+            HybridSearcher.MarqoMetadataFields metadataAllNulls =
+                    new HybridSearcher.MarqoMetadataFields(null, null, null);
+
+            // Test JSON serialization with all nulls
+            StringBuilder json = new StringBuilder();
+            metadataAllNulls.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should be empty JSON object (no fields included due to
+            // @JsonInclude(Include.NON_NULL))
+            assertThat(jsonString).isEqualTo("{}");
         }
     }
 }

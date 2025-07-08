@@ -3,12 +3,19 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 
+class MarqoFields(BaseModel):
+    """
+    Fields that collect the metadata from the Custom Searcher.
+    """
+    sort_candidates: Optional[int] = Field(None, alias='sortCandidates')
+    relevant_candidates: Optional[int] = Field(None, alias='relevantCandidates')
+    probe_candidates: Optional[int] = Field(None, alias='probeCandidates')
+
+
 # See https://docs.vespa.ai/en/reference/default-result-format.html
 class RootFields(BaseModel):
     total_count: Optional[int] = Field(None, alias='totalCount')
-    sort_candidates: Optional[int] = Field(None, alias='marqo__fields.sortCandidates')
-    relevant_candidates: Optional[int] = Field(None, alias='marqo__fields.relevantCandidates')
-    probe_candidates: Optional[int] = Field(None, alias='marqo__fields.probeCandidates')
+    marqo_fields: Optional[MarqoFields] = Field(None, alias='marqo__fields')
 
 
 class Degraded(BaseModel):

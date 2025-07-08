@@ -1,6 +1,8 @@
 package ai.marqo.search;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -10,6 +12,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
@@ -57,11 +60,31 @@ public class HybridSearcher extends Searcher {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final ObjectReader SORT_FIELD_READER =
             OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+    private static final ObjectMapper MARQO_METADATA_FIELDS_MAPPER = new ObjectMapper();
 
     // A magic number used to represent missing sort field values in search results as we can only
     // return numeric values in match-features.
     // The value -1e50 is chosen as it is an extremely low number unlikely to occur in real data.
     private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
+
+    private static final String MARQO_METADATA_FIELDS = "marqo__fields";
+
+    @VisibleForTesting
+    @JsonInclude(Include.NON_NULL)
+    record MarqoMetadataFields(
+            Integer sortCandidates, Integer probeCandidates, Integer relevantCandidates)
+            implements JsonProducer {
+
+        @Override
+        public StringBuilder writeJson(StringBuilder target) {
+            try {
+                target.append(MARQO_METADATA_FIELDS_MAPPER.writeValueAsString(this));
+                return target;
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     /**
      * Represents a field to sort by in the search results.
@@ -299,12 +322,13 @@ public class HybridSearcher extends Searcher {
 
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
+        Integer sortCandidates = null;
         if (sortByFields != null) {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
-            processedHits.setField("marqo__fields.sortCandidates", hitsForPostProcessing.size());
+            sortCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -354,12 +378,10 @@ public class HybridSearcher extends Searcher {
             }
         }
         // --- End facets attachment ---
-        if (relevanceCutoffMethod != null) {
-            // Add relevance cut-off information to the processed hits
-            processedHits.setField("marqo__fields.relevantCandidates", relevantCandidates);
-            processedHits.setField("marqo__fields.probeCandidates", probeCandidates);
-        }
+        MarqoMetadataFields marqoMetadataFields =
+                new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
+        processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);
     }
 
