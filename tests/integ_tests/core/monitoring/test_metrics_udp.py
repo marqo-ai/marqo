@@ -18,6 +18,8 @@ class _UDPSink:
     """A UDP sink that captures packets sent to it, thread-safe via _lock."""
     def __init__(self, host: str = "127.0.0.1", port: int = 0):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # ensure recvfrom() wakes up regularly so stop()/join() can’t hang
+        self._sock.settimeout(0.2)
         self._sock.bind((host, port))
         self.port = self._sock.getsockname()[1]
 
@@ -35,16 +37,23 @@ class _UDPSink:
                 data, _ = self._sock.recvfrom(4096)
                 with self._lock:
                     self.packets.append(data)
+            except socket.timeout:
+                continue  # polling tick
             except OSError:
                 break
 
     def stop(self):
         """Stop the UDP sink and close the socket."""
         self._running = False
+        # poke the socket so recvfrom() unblocks on stubborn kernels
+        try:
+            self._sock.sendto(b"", ("127.0.0.1", self.port))
+        except OSError:
+            pass
         self._sock.close()
         self._thread.join()
 
-    def wait(self, n: int, timeout: float = 2.0):
+    def wait(self, n: int, timeout: float = 5.0):
         """Block until >= n packets captured or timeout."""
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -77,7 +86,6 @@ def _has(pkt: List[str], pattern: str) -> bool:
 # --------------------------------------------------------------------------- #
 #                              Test case class                                #
 # --------------------------------------------------------------------------- #
-@unittest.skip("StatsD integration test disabled")
 class TestStatsDMiddlewareUDP(unittest.TestCase):
     """End-to-end: StatsDMiddleware emits expected packets over UDP."""
 
@@ -128,7 +136,6 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
         cls._sink_cm.__exit__(None, None, None)
 
-    @unittest.skip("StatsD UDP integration test disabled")
     def test_metrics_roundtrip(self):
         """Test that the middleware emits expected metrics over UDP."""
         self.client.get("/")

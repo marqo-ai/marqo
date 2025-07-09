@@ -166,7 +166,6 @@ jobs:
           COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
-            -o log_cli=true -v \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
             tests/integ_tests --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
 
