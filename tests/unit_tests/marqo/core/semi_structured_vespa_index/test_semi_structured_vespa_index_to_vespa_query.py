@@ -431,9 +431,9 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
 
         self.assertEqual(2, len(sort_fields))
         self.assertEqual("price", sort_fields[0]["field_name"])
-        self.assertEqual("desc", sort_fields[0]["order"].value)
+        self.assertEqual("desc", sort_fields[0]["order"])
         self.assertEqual("rating", sort_fields[1]["field_name"])
-        self.assertEqual("asc", sort_fields[1]["order"].value)
+        self.assertEqual("asc", sort_fields[1]["order"])
         self.assertEqual(3, r['marqo__hybrid.sortBy.sortDepth'])
         self.assertEqual(50, r['marqo__hybrid.sortBy.minSortCandidates'])
 
@@ -453,7 +453,7 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
 
         self.assertEqual(1, len(sort_fields))
         self.assertEqual("title", sort_fields[0]["field_name"])
-        self.assertEqual("asc", sort_fields[0]["order"].value)
+        self.assertEqual("asc", sort_fields[0]["order"])
         self.assertEqual(None, sort_depth)
         self.assertEqual(30, sort_candidates)
 
@@ -472,8 +472,8 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
 
         self.assertEqual(1, len(sort_fields))
         self.assertEqual("description", sort_fields[0]["field_name"])
-        self.assertEqual("asc", sort_fields[0]["order"].value)
-        self.assertEqual("first", sort_fields[0]["missing"].value)
+        self.assertEqual("asc", sort_fields[0]["order"])
+        self.assertEqual("first", sort_fields[0]["missing"])
         self.assertEqual(2, r['marqo__hybrid.sortBy.sortDepth'])
         self.assertEqual(20, r['marqo__hybrid.sortBy.minSortCandidates'])
 
@@ -503,16 +503,16 @@ class TestSemiStructuredIndexToVespaQuerySortBy(TestCase):
 
         self.assertEqual(3, len(fields))
         self.assertEqual("price", fields[0]["field_name"])
-        self.assertEqual("desc", fields[0]["order"].value)
-        self.assertEqual("last", fields[0]["missing"].value)
+        self.assertEqual("desc", fields[0]["order"])
+        self.assertEqual("last", fields[0]["missing"])
 
         self.assertEqual("rating", fields[1]["field_name"])
-        self.assertEqual("asc", fields[1]["order"].value)
-        self.assertEqual("last", fields[1]["missing"].value)  # Default missing policy
+        self.assertEqual("asc", fields[1]["order"])
+        self.assertEqual("last", fields[1]["missing"])  # Default missing policy
 
         self.assertEqual("stock", fields[2]["field_name"])
-        self.assertEqual("desc", fields[2]["order"].value)
-        self.assertEqual("first", fields[2]["missing"].value)
+        self.assertEqual("desc", fields[2]["order"])
+        self.assertEqual("first", fields[2]["missing"])
 
         self.assertEqual(4, r["marqo__hybrid.sortBy.sortDepth"])
         self.assertEqual(100, r["marqo__hybrid.sortBy.minSortCandidates"])

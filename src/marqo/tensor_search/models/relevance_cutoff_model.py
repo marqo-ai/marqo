@@ -32,6 +32,9 @@ class RelevanceCutoffModel(StrictBaseModel):
             If the method is MeanStd, you must provide 'stdDevFactor' as a parameter.
             Check Vespa Custom Searcher for more details.
     """
+    class Config(StrictBaseModel.Config):
+        use_enum_values = True
+
     method: RelevanceCutoffMethod
     probe_depth: int = Field(1000, ge=1, alias="probeDepth")
     parameters: Union[RelativeMaxScoreParameters, MeanStdParameters, None] = None
