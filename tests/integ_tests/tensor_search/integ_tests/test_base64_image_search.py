@@ -155,6 +155,12 @@ class TestBase64ImageSearch(MarqoTestCase):
                             msg=f"Score mismatch for {search_name} on {index_type} index"
                         )
 
+                        # Verify query not returned in base64 search response
+                        self.assertEqual(
+                            'data:image/[omitted]', search_result.get('query'),
+                            'Base64 query should not be present in search response'
+                        )
+
     def test_hybrid_search_with_base64_query_tensor_and_query_lexical(self):
         """Test hybrid search with base64 image in queryTensor and text in queryLexical across all index types."""
         # Convert real image URL to base64 for search query
@@ -238,6 +244,9 @@ class TestBase64ImageSearch(MarqoTestCase):
                     # Tensor score should be 1.0 for perfect match
                     self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=3)
 
+                    # Verify query field is None since text=None was passed
+                    self.assertIsNone(search_result.get('query'))
+
                 # Test 2: Dict queryTensor with base64 (weight 1) and text (weight 0)
                 with self.subTest(query_type="dict_base64_and_text"):
                     hybrid_params = HybridParameters(
@@ -269,6 +278,9 @@ class TestBase64ImageSearch(MarqoTestCase):
 
                     # Tensor score should be 1.0 for perfect match (text with weight 0 shouldn't affect this)
                     self.assertAlmostEqual(1.0, first_hit['_tensor_score'], places=3)
+
+                    # Verify query field is None since text=None was passed
+                    self.assertIsNone(search_result.get('query'))
 
     def test_tensor_search_with_base64_dict_query(self):
         """Test tensor search with dict query containing base64 image and text with weights across all index types."""
@@ -345,6 +357,15 @@ class TestBase64ImageSearch(MarqoTestCase):
 
                     # Score should still be high due to strong image component
                     self.assertGreater(first_hit['_score'], 0.8)
+
+                    # Verify base64 string not returned
+                    self.assertEqual(
+                        {
+                            'data:image/[omitted]': 0.8,
+                            "sculpture art": 0.2
+                        },
+                        search_result.get('query')
+                    )
 
     def test_invalid_base64_image_search_raises_error(self):
         """Test that searching with invalid base64 images raises InvalidArgError for tensor and hybrid search."""
