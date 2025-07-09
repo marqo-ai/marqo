@@ -1,14 +1,16 @@
 import json
+import pytest
 
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import UnsupportedFeatureError
 
 
+@pytest.mark.skip_for_multinode("Multi-nodes will return different lexical results so we can not assert on the results.")
 class TestSearchRelevanceCutoffFeature(MarqoTestCase):
 
     @classmethod
