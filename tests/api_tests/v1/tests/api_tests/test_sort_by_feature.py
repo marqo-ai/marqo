@@ -1,12 +1,10 @@
 import uuid
 
-import pytest
 from marqo.errors import MarqoWebError
 
 from tests.marqo_test import MarqoTestCase
 
 
-@pytest.mark.skip(reason="Sort by feature is not supported in the current version of Marqo yet.")
 class TestSortByFeature(MarqoTestCase):
 
     unstructured_index_name = f"test_sort_by_feature_unstructured_{uuid.uuid4()}"
@@ -60,7 +58,7 @@ class TestSortByFeature(MarqoTestCase):
             )
 
         self.assertIn(
-            "feature is only supported for unstructured indexes created with Marqo version",
+            "is only supported for unstructured indexes created with Marqo version 2.22.0 or later",
             str(cm.exception)
         )
 
@@ -195,7 +193,7 @@ class TestSortByFeature(MarqoTestCase):
                         "missing": "last"
                     }
                 ],
-                "sortCandidates": 3
+                "minSortCandidates": 3
             }
         )
         ids = [doc["_id"] for doc in response["hits"]]
@@ -274,12 +272,12 @@ class TestSortByFeature(MarqoTestCase):
                             "missing": "last"
                         },
                     ],
-                    "sortCandidates": 2
+                    "minSortCandidates": 2
                 }
             )
 
         self.assertIn(
-            "sortCandidates must be at least as large as offset + limit",
+            "minSortCandidates must be at least as large as offset + limit",
             str(cm.exception)
         )
 
