@@ -1,8 +1,6 @@
-from typing import List, Dict
-from typing import Optional, Any, Sequence
+from typing import List, Dict, Optional, Any, Sequence
 
-from pydantic.v1 import BaseModel, root_validator
-from pydantic.v1 import Field
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -10,10 +8,11 @@ from marqo.tensor_search.models.private_models import ModelAuth
 class AddDocsBodyParams(BaseModel):
     """The parameters of the body parameters of tensor_search_add_documents() function"""
 
-    class Config:
-        arbitrary_types_allowed = True
-        allow_mutation = False
-        extra = "forbid"  # Raise error on unknown fields
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        frozen=True,
+        extra="forbid"
+    )
 
     tensorFields: Optional[List] = None
     useExistingTensors: bool = False
@@ -26,7 +25,7 @@ class AddDocsBodyParams(BaseModel):
     mediaDownloadThreadCount: Optional[int] = None
     textChunkPrefix: Optional[str] = None
 
-    @root_validator(skip_on_failure=True)
+    @model_validator(mode='before')
     def _validate_image_download_headers_and_media_download_headers(cls, values):
         """Validate imageDownloadHeaders and mediaDownloadHeaders. Raise an error if both are set.
 
@@ -35,12 +34,13 @@ class AddDocsBodyParams(BaseModel):
 
         imageDownloadHeaders is deprecated and will be removed in the future.
         """
-        image_download_headers = values.get('imageDownloadHeaders')
-        media_download_headers = values.get('mediaDownloadHeaders')
-        if image_download_headers and media_download_headers:
-            raise ValueError("Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
-                             "'imageDownloadHeaders' is deprecated and will be removed in the future. "
-                             "Use mediaDownloadHeaders instead.")
-        if image_download_headers:
-            values['mediaDownloadHeaders'] = image_download_headers
+        if isinstance(values, dict):
+            image_download_headers = values.get('imageDownloadHeaders')
+            media_download_headers = values.get('mediaDownloadHeaders')
+            if image_download_headers and media_download_headers:
+                raise ValueError("Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
+                                 "'imageDownloadHeaders' is deprecated and will be removed in the future. "
+                                 "Use mediaDownloadHeaders instead.")
+            if image_download_headers:
+                values['mediaDownloadHeaders'] = image_download_headers
         return values
