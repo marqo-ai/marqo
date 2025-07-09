@@ -75,7 +75,6 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     global_rerank_depth: Optional[int] = None
     facets: Optional[FacetsParameters] = None
     track_total_hits: Optional[bool] = None
-    pagination_exclusions: Optional[List[str]] = None
     relevance_cutoff: Optional[RelevanceCutoffModel] = None
     sort_by: Optional[SortByModel] = None
 

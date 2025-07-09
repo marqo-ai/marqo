@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
+import com.yahoo.documentapi.DocumentAccess;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
@@ -36,9 +37,12 @@ class HybridSearcherTest {
 
     private Searcher downstreamSearcher;
 
+    private DocumentAccess documentAccess;
+
     @BeforeEach
     void setUp() {
-        hybridSearcher = new HybridSearcher();
+        documentAccess = mock(DocumentAccess.class);
+        hybridSearcher = new HybridSearcher(documentAccess);
         downstreamSearcher = mock(Searcher.class);
     }
 
@@ -503,7 +507,7 @@ class HybridSearcherTest {
         void shouldHandleFacetsInResults() {
             // Create a custom searcher that handles facets differently
             HybridSearcher customSearcher =
-                    new HybridSearcher() {
+                    new HybridSearcher(documentAccess) {
                         @Override
                         public Result search(Query query, Execution execution) {
                             // Check if this is a facet query (used in our test scenario)

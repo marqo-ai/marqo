@@ -274,43 +274,6 @@ class HybridSearch:
             sort_by=sort_by
         )
 
-        # Create query hash without offset
-        if offset % result_count == 0 and hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
-            with RequestMetricsStore.for_request().time(f"search.hybrid.get_query_hash_without_offset"):
-                query_hash_without_offset = marqo_query.get_query_hash_without_offset()
-            print(query_hash_without_offset)
-        else:
-            if hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
-                logger.warning("Offset is not a multiple of limit. This is a wrong usage of pagination.")
-            query_hash_without_offset = None
-
-        if query_hash_without_offset is not None:
-            try:
-                with RequestMetricsStore.for_request().time(f"search.hybrid.get_pagination_state"):
-                    existing_pagination_document = config.vespa_client.get_document(
-                        query_hash_without_offset, constants.MARQO_PAGINATION_SCHEMA_NAME
-                    ).document
-                if not (offset != 0 and existing_pagination_document is None):
-                    offsets = {}
-                    if existing_pagination_document is not None:
-                        offsets = existing_pagination_document.fields['offsets']
-                        # If offsets are present collect unique document ids for
-                        # offsets < offset to exclude them from the next search
-                        documents_to_exclude = set()
-                        for existing_offset in offsets.keys():
-                            if int(existing_offset) < offset:
-                                documents_to_exclude.update(offsets[existing_offset])
-                        marqo_query.pagination_exclusions = list(documents_to_exclude)
-                else:
-                    logger.warning(
-                        f"Pagination offset {offset} not found in existing pagination document for hash "
-                        f"{query_hash_without_offset}. This may indicate a jump in pagination."
-                    )
-            except VespaStatusError as e:
-                if e.status_code == 404:
-                    # No existing pagination document, page 0
-                    offsets = {}
-
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)
 
@@ -355,37 +318,6 @@ class HybridSearch:
                         gathered_results.get("facets", {}).update({facet_field_name: {}})
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
-
-
-        # Update state of Pagination in a separate thread if vespa_query["marqo__hybrid.paginationHash'] is not None
-        if query_hash_without_offset is not None:
-            def update_pagination_state():
-                try:
-                    if str(offset - result_count) in offsets or offset == 0:
-                        # We need vespa ids specifically here for filtering, as custom searcher
-                        # cannot access marqo ids at runtime
-                        gathered_vespa_ids = [doc.id.split('/')[-1] for doc in responses.hits if not doc.id.startswith("group:facet:")]
-                        if gathered_vespa_ids:
-                            offsets[offset] = gathered_vespa_ids
-                        pagination_document = VespaDocument(
-                            id=query_hash_without_offset,
-                            fields={
-                                'offsets': offsets,
-                                "updated_at": utils.get_current_timestamp_as_long()
-                            },
-                            field_types=None,
-                            version_uuid=None,
-                        )
-                        config.vespa_client.feed_batch([pagination_document], constants.MARQO_PAGINATION_SCHEMA_NAME)
-                    else:
-                        logger.warning(
-                            f"Pagination offset {offset - result_count} not found in existing pagination document for hash "
-                            f"{query_hash_without_offset}. This may indicate a jump in pagination."
-                        )
-                except Exception as e:
-                    logger.error(f"Error updating pagination state: {str(e)}")
-
-            pagination_executor.submit(update_pagination_state)
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(

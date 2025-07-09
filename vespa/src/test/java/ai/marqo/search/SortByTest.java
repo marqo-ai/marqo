@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.yahoo.documentapi.DocumentAccess;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.result.FeatureData;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.Test;
  * Test for sortBy feature in HybridSearcher.
  */
 class SortByTest {
+
+    private DocumentAccess documentAccess;
 
     /**
      * Test that verifies sorting of results based on a single sort field.
@@ -103,7 +106,7 @@ class SortByTest {
         // build 10 distinct docs by hand
 
         HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
-        HybridSearcher searcher = new HybridSearcher();
+        HybridSearcher searcher = new HybridSearcher(documentAccess);
         String sortJson =
                 "[{"
                         + "\"field_name\":\"ignored\","
@@ -132,7 +135,7 @@ class SortByTest {
     @Test
     void sort1FieldWithDescOrderAndFirstMissingPolicy() {
         HitGroup hitsToSort = helpGenerateHitGroupWithOnlySortFieldValue0();
-        HybridSearcher searcher = new HybridSearcher();
+        HybridSearcher searcher = new HybridSearcher(documentAccess);
         String sortJson =
                 "[{"
                         + "\"field_name\":\"ignored\","
@@ -188,7 +191,7 @@ class SortByTest {
     @Test
     void sort2FieldsWithAscOrderAndLastMissingPolicy() {
         HitGroup hitsToSort = helpGenerateHitGroupWithTwoSortFieldValues();
-        HybridSearcher searcher = new HybridSearcher();
+        HybridSearcher searcher = new HybridSearcher(documentAccess);
         // first sort_field_value_0 asc, missing last
         // then sort_field_value_1 asc, missing last
         String sortJson =
@@ -240,7 +243,7 @@ class SortByTest {
     @Test
     void sort3FieldsWithAscOrderAndFirstMissingPolicy() {
         HitGroup hitsToSort = helpGenerateHitGroupWithThreeSortFieldValues();
-        HybridSearcher searcher = new HybridSearcher();
+        HybridSearcher searcher = new HybridSearcher(documentAccess);
         // all three ascending, missing first
         String sortJson =
                 "[{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
@@ -276,7 +279,7 @@ class SortByTest {
     @Test
     void whenSortByFields_set_postProcessBySortIsCalled() {
         // 1) Create a Mockito spy on the real HybridSearcher
-        HybridSearcher spy = spy(new HybridSearcher());
+        HybridSearcher spy = spy(new HybridSearcher(documentAccess));
 
         // 2) Stub out createSubQuery (both overloads) so we never NPE inside it
         doAnswer(inv -> inv.getArgument(0))
@@ -338,7 +341,7 @@ class SortByTest {
     */
     @Test
     void whenOnlyModifiersExist_postProcessResultsIsCalled() {
-        HybridSearcher spy = spy(new HybridSearcher());
+        HybridSearcher spy = spy(new HybridSearcher(documentAccess));
         doAnswer(inv -> inv.getArgument(0))
                 .when(spy)
                 .createSubQuery(any(), anyString(), anyString(), anyBoolean());
@@ -356,14 +359,13 @@ class SortByTest {
         q.properties().set("offset", 0);
         q.properties().set("marqo__hybrid.retrievalMethod", "lexical");
         q.properties().set("marqo__hybrid.rankingMethod", "lexical");
-        q.properties().set("marqo__hybrid.paginationExclusions", "[\"1\", \"2\"]");
         // no sortBy.fields
 
         spy.search(q, makeEmptyExec());
 
         verify(spy, times(1))
                 .postProcessResults(
-                        any(), eq(q), any(), eq(1), eq(0), eq(Set.of("1", "2")), eq(false));
+                any(), eq(q), any(), eq(1), eq(0), any(), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 
@@ -386,7 +388,7 @@ class SortByTest {
 
         @Test
         void shouldParseValidSortJsonWith1Field() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String sortJson = "[{\"field_name\":\"score\",\"order\":\"asc\",\"missing\":\"last\"}]";
@@ -399,7 +401,7 @@ class SortByTest {
 
         @Test
         void shouldParseValidSortJsonWith2Fields() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String sortJson =
@@ -414,7 +416,7 @@ class SortByTest {
 
         @Test
         void shouldParseValidSortJsonWith3Fields() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String sortJson =
@@ -430,7 +432,7 @@ class SortByTest {
 
         @Test
         void shouldParseVariousMissingAndOrderValues() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test different combinations of order and missing values
@@ -452,7 +454,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForNullOrderAndMissing() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test with null order value
@@ -476,7 +478,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForInvalidJson() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String invalidJson = "{invalid json}";
@@ -489,7 +491,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForMalformedJsonArray() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String malformedJson =
@@ -504,7 +506,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForEmptyArray() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String emptySortJson = "[]";
@@ -518,7 +520,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForTooManyFields() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Build JSON with more than 3 fields (4 fields)
@@ -556,7 +558,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForUnsupportedSortOrderValues() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             String[] unsupportedOrders = {"ascending", "descending", "up", "down", "invalid", ""};
@@ -576,7 +578,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionsForUnsupportedMissingValues() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test unsupported missing values - should default to FIRST
@@ -597,7 +599,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForMissingRequiredFields() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test JSON missing field_name
@@ -639,7 +641,7 @@ class SortByTest {
 
         @Test
         void shouldAcceptValidSortFieldCounts() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test with exactly 1 field (should work)
@@ -668,7 +670,7 @@ class SortByTest {
 
         @Test
         void shouldThrowWhenSortFieldJsonIsMissingOrderOrFieldNameAtCorrectIndex() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
 
             // Test that validation works for fields at different indices
@@ -696,7 +698,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionForInvalidSortDepth() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
             String validSortJson =
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
@@ -722,7 +724,7 @@ class SortByTest {
 
         @Test
         void shouldAcceptValidSortDepth() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             HitGroup hits = createDummyHitGroup();
             String validSortJson =
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";

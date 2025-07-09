@@ -8,8 +8,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
 import com.sun.jdi.InternalException;
+import com.yahoo.component.annotation.Inject;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.document.*;
+import com.yahoo.document.datatypes.Array;
+import com.yahoo.document.datatypes.MapFieldValue;
+import com.yahoo.document.datatypes.StringFieldValue;
+import com.yahoo.document.fieldpathupdate.AssignFieldPathUpdate;
+import com.yahoo.document.update.FieldUpdate;
+import com.yahoo.documentapi.AsyncParameters;
+import com.yahoo.documentapi.AsyncSession;
+import com.yahoo.documentapi.DocumentAccess;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
@@ -42,6 +52,8 @@ import org.slf4j.LoggerFactory;
 @Provides("HybridReRanking")
 public class HybridSearcher extends Searcher {
 
+    private final DocumentAccess documentAccess;
+
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
@@ -50,6 +62,11 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
+
+    @Inject
+    public HybridSearcher(DocumentAccess documentAccess) {
+        this.documentAccess = documentAccess;
+    }
 
     // Thread-safe ObjectReader for parsing SortField JSON
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -118,17 +135,32 @@ public class HybridSearcher extends Searcher {
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
 
-        // Pagination exclusion logic: parse paginationExclusions JSON set of doc IDs
+        // Pagination exclusion via DocumentAccess
         Set<String> idsToExclude = new HashSet<>();
-        String exclusionsJson =
-                query.properties().getString("marqo__hybrid.paginationExclusions", null);
-        if (exclusionsJson != null) {
+        String paginationSchema =
+                query.properties().getString("marqo__hybrid.pagination_schema", null);
+        String paginationHash = query.properties().getString("marqo__hybrid.pagination_hash", null);
+
+        AsyncSession docAccess = null;
+        com.yahoo.documentapi.Result paginationDocResult = null;
+        com.yahoo.document.Document paginationDocument = null;
+        DocumentId docId = null;
+        if (paginationSchema != null && paginationHash != null) {
             try {
-                ObjectMapper mapper = new ObjectMapper();
-                idsToExclude =
-                        mapper.readValue(exclusionsJson, new TypeReference<Set<String>>() {});
+                docId =
+                        new DocumentId(
+                                "id:"
+                                        + paginationSchema
+                                        + ":"
+                                        + paginationSchema
+                                        + "::"
+                                        + paginationHash);
+                AsyncParameters asyncParameters = new AsyncParameters();
+                docAccess = documentAccess.createAsyncSession(asyncParameters);
+                paginationDocResult = docAccess.get(docId);
+                logIfVerbose("Search for pagination document: " + docId, verbose);
             } catch (Exception e) {
-                logIfVerbose("Failed to parse paginationExclusions: " + e.getMessage(), verbose);
+                logIfVerbose("Failed to fetch pagination document: " + e.getMessage(), verbose);
             }
         }
         // Relevance Cut-off Parameters
@@ -235,13 +267,61 @@ public class HybridSearcher extends Searcher {
                             + " || TENSOR RESULTS: "
                             + resultTensor.toString(),
                     verbose);
+            if (paginationSchema != null && paginationHash != null) {
+                if (paginationDocResult != null && paginationDocResult.isSuccess()) {
+                    // Get the Document from the Result
+                    // Extract IDs list from the document
+                    com.yahoo.documentapi.DocumentResponse paginationDocumentResponse =
+                            (com.yahoo.documentapi.DocumentResponse) docAccess.getNext();
+                    if (paginationDocumentResponse != null) {
+                        paginationDocument = paginationDocumentResponse.getDocument();
+                        if (paginationDocument != null) {
+                            MapFieldValue<StringFieldValue, Array<StringFieldValue>>
+                                    paginationStateMap =
+                                            (MapFieldValue<
+                                                            StringFieldValue,
+                                                            Array<StringFieldValue>>)
+                                                    paginationDocument.getFieldValue("offsets");
 
-            // Filter out excluded IDs before fusion
-            if (!idsToExclude.isEmpty()) {
-                resultLexical =
-                        new Result(queryLexical, filterHits(resultLexical.hits(), idsToExclude));
-                resultTensor =
-                        new Result(queryTensor, filterHits(resultTensor.hits(), idsToExclude));
+                            // Collect IDs to exclude from all previous offset pages
+                            for (Map.Entry<StringFieldValue, Array<StringFieldValue>> entry :
+                                    paginationStateMap.entrySet()) {
+                                int pageOffset = Integer.parseInt(entry.getKey().getString());
+                                // Only collect IDs from pages with offsets less than or equal to
+                                // current offset
+                                if (pageOffset < offset) {
+                                    Array<StringFieldValue> idsArray = entry.getValue();
+                                    for (StringFieldValue idValue : idsArray) {
+                                        idsToExclude.add(idValue.getString());
+                                    }
+                                }
+                            }
+
+                            logIfVerbose(
+                                    "Collected "
+                                            + idsToExclude.size()
+                                            + " IDs to exclude from pagination",
+                                    verbose);
+
+                            // Filter out excluded IDs before fusion
+                            if (!idsToExclude.isEmpty()) {
+                                resultLexical =
+                                        new Result(
+                                                queryLexical,
+                                                filterHits(resultLexical.hits(), idsToExclude));
+                                resultTensor =
+                                        new Result(
+                                                queryTensor,
+                                                filterHits(resultTensor.hits(), idsToExclude));
+                            }
+                        }
+                    } else {
+                        logIfVerbose(
+                                "Failed to retrieve pagination document: "
+                                        + paginationDocResult.error().getMessage(),
+                                verbose);
+                    }
+                }
             }
 
             // Execute fusion ranking on the two result sets.
@@ -290,6 +370,35 @@ public class HybridSearcher extends Searcher {
                             offset,
                             idsToExclude,
                             verbose);
+        }
+        // Save pagination state if the performed request is not a jump (offset - limit is present
+        // in pagination document)
+        if (paginationSchema != null && paginationHash != null) {
+            try {
+                // Get Document Ids of processed hits
+                Array<StringFieldValue> processedHitIds =
+                        new Array<>(DataType.getArray(DataType.STRING));
+                for (Hit hit : processedHits.asList()) {
+                    String processedDocId = extractDocIdFromHitId(hit.getId().toString());
+                    processedHitIds.add(new StringFieldValue(processedDocId));
+                }
+                DocumentType docType =
+                        documentAccess.getDocumentTypeManager().getDocumentType(paginationSchema);
+                MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap;
+                DocumentUpdate docUpd = new DocumentUpdate(docType, docId);
+                docUpd.addFieldPathUpdate(
+                        new AssignFieldPathUpdate(
+                                docType, "offsets{" + offset + "}", processedHitIds));
+                docUpd.addFieldUpdate(
+                        FieldUpdate.createAssign(
+                                docType.getField("updated_at"),
+                                new com.yahoo.document.datatypes.LongFieldValue(
+                                        System.currentTimeMillis())));
+                docUpd.setCreateIfNonExistent(true);
+                docAccess.update(docUpd);
+            } catch (Exception e) {
+                logIfVerbose("Failed to save pagination state: " + e.getMessage(), verbose);
+            }
         }
 
         // --- Attach facets results if available ---
