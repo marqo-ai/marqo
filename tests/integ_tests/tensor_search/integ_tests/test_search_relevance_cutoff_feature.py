@@ -1397,6 +1397,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(['12', '7', '18', '11', '3', '16', '0', '4', '14', '5'], ids)
 
+    @pytest.mark.skip_for_multinode("Multi-node will not return the same results as single-node for relevance cutoff")
     def test_lexical_score_modifiers_should_work_with_relevance_cutoff(self):
         """Test that lexical score modifiers work with relevance cutoff."""
         result = self._search_helper(
@@ -1460,6 +1461,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
             self.assertNotIn("image_url", hit, "image_url should not be retrieved")
             self.assertNotIn("aux_value", hit, "aux_value should not be retrieved")
 
+    @pytest.mark.skip_for_multinode("Multi-node will not return the same results as single-node for relevance cutoff")
     def test_relevance_cutoff_with_sort_and_filter(self):
         """Test relevance cutoff with sort and filter applied."""
         # Test with a filter that should exclude some documents
