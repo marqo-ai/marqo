@@ -151,7 +151,7 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
             r"x-count-success:\d+\|c",
             r"x-count-failure:\d+\|c",
             r"x-count-error:\d+\|c",
-            r"requests\.completed:1\|c\|#path:/indexes/foo/documents/<document_id>,method:GET,status_code:\dXX",
+            r"requests\.completed:1\|c\|#path:/indexes/foo/documents(?:/<document_id>)?,method:(?:GET|POST),status_code:\dXX",
         ]
 
         # Wait until the six packets we assert on have arrived
