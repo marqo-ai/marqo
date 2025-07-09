@@ -18,7 +18,6 @@ import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
-import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -364,8 +363,7 @@ class SortByTest {
         spy.search(q, makeEmptyExec());
 
         verify(spy, times(1))
-                .postProcessResults(
-                any(), eq(q), any(), eq(1), eq(0), any(), eq(false));
+                .postProcessResults(any(), eq(q), any(), eq(1), eq(0), any(), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 
