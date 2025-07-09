@@ -194,7 +194,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     {"fieldName": "price", "order": "desc", "missing": "last"}
                 ],
                 "sortDepth": 200,
-                "sortCandidates": 500
+                "minSortCandidates": 500
             },
             "relevanceCutoff": {
                 "method": "mean_std_dev",
@@ -263,7 +263,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     {"fieldName": "price", "order": "desc", "missing": "last"}
                 ],
                 "sortDepth": 200,
-                "sortCandidates": 500
+                "minSortCandidates": 500
             },
             "relevanceCutoff": {
                 "method": "mean_std_dev",

@@ -9,7 +9,8 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex, \
+    IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -152,6 +153,21 @@ class HybridSearch:
                 "'hybridParameters.queryLexical' is provided"
             )
 
+        if sort_by and (
+                marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
+                not marqo_index.type == IndexType.SemiStructured
+        ):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'sortBy' features is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
+            )
+
+        if relevance_cutoff and not marqo_index.type == IndexType.SemiStructured:
+            # Legacy unstructured indexes and structured indexes do not support relevance cutoff
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
+            )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -319,7 +335,24 @@ class HybridSearch:
             f"{total_results} results from Vespa."
         )
 
+        # Collect metadata for sort by
         if sort_by is not None:
-            gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
+            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None: # pragma: no cover
+                raise core_exceptions.InternalError(
+                    f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
+                )
+            gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.sort_candidates
+
+        # Collect metadata for relevance cutoff
+        if relevance_cutoff is not None:
+            if responses.root.fields.marqo_fields is None \
+                or responses.root.fields.marqo_fields.relevant_candidates is None \
+                or responses.root.fields.marqo_fields.probe_candidates is None: # pragma: no cover
+                raise core_exceptions.InternalError(
+                    f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
+                    f"probeCandidates in the response "
+                )
+            gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
+            gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
         return gathered_results
