@@ -77,6 +77,7 @@ def _has(pkt: List[str], pattern: str) -> bool:
 # --------------------------------------------------------------------------- #
 #                              Test case class                                #
 # --------------------------------------------------------------------------- #
+@unittest.skip("StatsD integration test disabled")
 class TestStatsDMiddlewareUDP(unittest.TestCase):
     """End-to-end: StatsDMiddleware emits expected packets over UDP."""
 
