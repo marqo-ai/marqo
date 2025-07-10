@@ -1,3 +1,6 @@
-Run the API test test_hybrid_non_approximate let me know if it passes or fails. Don't make any changes
+Run the API test test_hybrid_non_approximate let me know if it passes or fails. Fix the issue so this test passes.
 
-Fix the issue so this test passes
+No changes to the test itself
+
+Follow-up prompt: I do need coverage to be checked so can you change the java custom searcher that handles hybrid search to actually        │
+│   return the required values rather than skip the check

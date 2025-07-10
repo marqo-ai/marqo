@@ -307,7 +307,8 @@ class HybridSearch:
                     )
                 raise e
 
-        if not approximate and (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
+        if not approximate and responses and responses.root and responses.root.coverage is not None and \
+                (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
             raise errors.InternalError(
                 f'Graceful degradation detected for non-approximate search. '
                 f'Coverage is not 100%: {responses.root.coverage}'

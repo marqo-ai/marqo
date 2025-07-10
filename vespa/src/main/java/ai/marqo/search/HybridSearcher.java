@@ -16,6 +16,7 @@ import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.Coverage;
 import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
@@ -224,6 +225,7 @@ public class HybridSearcher extends Searcher {
         // Execute probe lexical search for relevance cut-off if parameters are provided
         Integer relevantCandidates = null;
         Integer probeCandidates = null;
+        Coverage originalCoverage = null;
         if (relevanceCutoffMethod != null) {
             logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
             Query probeLexicalQuery =
@@ -236,6 +238,8 @@ public class HybridSearcher extends Searcher {
                             relevanceCutoffMethod,
                             relevanceCutoffParameter,
                             verbose);
+            // Preserve coverage from probe query
+            originalCoverage = probeLexicalResult.getCoverage(false);
         }
         // --- End relevance cut-off handling ---
 
@@ -297,6 +301,23 @@ public class HybridSearcher extends Searcher {
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
                         rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
+                // Preserve coverage information - combine both coverages
+                if (resultTensor.getCoverage(false) != null
+                        || resultLexical.getCoverage(false) != null) {
+                    Coverage tensorCoverage = resultTensor.getCoverage(false);
+                    Coverage lexicalCoverage = resultLexical.getCoverage(false);
+                    // Use the more restrictive coverage (lower coverage percentage)
+                    if (tensorCoverage != null && lexicalCoverage != null) {
+                        originalCoverage =
+                                (tensorCoverage.getResultPercentage()
+                                                <= lexicalCoverage.getResultPercentage())
+                                        ? tensorCoverage
+                                        : lexicalCoverage;
+                    } else {
+                        originalCoverage =
+                                (tensorCoverage != null) ? tensorCoverage : lexicalCoverage;
+                    }
+                }
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
@@ -308,6 +329,8 @@ public class HybridSearcher extends Searcher {
                         createSubQuery(query, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
+                // Preserve coverage information from the single search
+                originalCoverage = result.getCoverage(false);
                 logIfVerbose("Unprocessed results: ", verbose);
                 logHitGroup(hitsForPostProcessing, verbose);
             } else {
@@ -382,7 +405,13 @@ public class HybridSearcher extends Searcher {
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
-        return new Result(query, processedHits);
+
+        // Create result and preserve coverage information
+        Result finalResult = new Result(query, processedHits);
+        if (originalCoverage != null) {
+            finalResult.setCoverage(originalCoverage);
+        }
+        return finalResult;
     }
 
     /**
