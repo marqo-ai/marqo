@@ -1,4 +1,4 @@
-import pytest
+import unittest
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
@@ -15,10 +15,10 @@ from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.api.exceptions import InvalidDocumentIdError
 
 
-class TestRecommenderGetDocVectorsFromIds:
+class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
     """Test cases for the updated Recommender.get_doc_vectors_from_ids method"""
     
-    def setup_method(self):
+    def setUp(self):
         """Set up common test fixtures"""
         self.mock_vespa_client = Mock()
         self.mock_index_management = Mock()
@@ -73,7 +73,7 @@ class TestRecommenderGetDocVectorsFromIds:
             "doc1": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]],
             "doc2": [[1.1, 1.2, 1.3], [1.7, 1.8, 1.9]]
         }
-        assert result == expected
+        self.assertEqual(result, expected)
         
         # Verify tensor_search function was called correctly
         mock_get_vectors.assert_called_once_with(
@@ -113,7 +113,7 @@ class TestRecommenderGetDocVectorsFromIds:
             "doc1": [[0.1, 0.2, 0.3]],
             "doc3": [[1.1, 1.2, 1.3]]
         }
-        assert result == expected
+        self.assertEqual(result, expected)
         
         # Verify tensor_search function was called with non-zero weight docs only
         mock_get_vectors.assert_called_once_with(
@@ -151,7 +151,7 @@ class TestRecommenderGetDocVectorsFromIds:
         expected = {
             "doc1": [[0.1, 0.2, 0.3], [1.1, 1.2, 1.3]]  # Only title and content
         }
-        assert result == expected
+        self.assertEqual(result, expected)
         
         # Verify tensor_search function was called with specific fields
         mock_get_vectors.assert_called_once_with(
@@ -165,15 +165,15 @@ class TestRecommenderGetDocVectorsFromIds:
         mock_get_index.return_value = self.mock_structured_index
         
         # Try to use invalid tensor field
-        with pytest.raises(InvalidFieldNameError) as exc_info:
+        with self.assertRaises(InvalidFieldNameError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1"],
                 tensor_fields=["invalid_field"]
             )
         
-        assert "invalid_field" in str(exc_info.value)
-        assert "Available tensor fields" in str(exc_info.value)
+        self.assertIn("invalid_field", str(cm.exception))
+        self.assertIn("Available tensor fields", str(cm.exception))
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
@@ -193,14 +193,14 @@ class TestRecommenderGetDocVectorsFromIds:
         }
         
         # Should raise error for missing document
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2"]
             )
         
-        assert "not found" in str(exc_info.value)
-        assert "doc2" in str(exc_info.value)
+        self.assertIn("not found", str(cm.exception))
+        self.assertIn("doc2", str(cm.exception))
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
@@ -220,57 +220,57 @@ class TestRecommenderGetDocVectorsFromIds:
         }
         
         # Should raise error for document without vectors
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2"]
             )
         
-        assert "do not have embeddings" in str(exc_info.value)
-        assert "doc2" in str(exc_info.value)
+        self.assertIn("do not have embeddings", str(cm.exception))
+        self.assertIn("doc2", str(cm.exception))
     
     def test_empty_documents_list(self):
         """Test with empty documents list"""
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=[]
             )
         
-        assert "No document IDs provided" in str(exc_info.value)
+        self.assertIn("No document IDs provided", str(cm.exception))
 
     def test_non_string_ids_fails(self):
         """Test that document id validation catches non string IDs and errors out"""
-        with pytest.raises(InvalidDocumentIdError) as exc_info:
+        with self.assertRaises(InvalidDocumentIdError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=[123, 456]
             )
 
-        assert "Document _id must be a string type" in str(exc_info.value)
+        self.assertIn("Document _id must be a string type", str(cm.exception))
     
     def test_none_documents(self):
         """Test with None documents"""
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=None
             )
         
-        assert "No document IDs provided" in str(exc_info.value)
+        self.assertIn("No document IDs provided", str(cm.exception))
     
     def test_all_zero_weight_documents(self):
         """Test with all documents having zero weight"""
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents={"doc1": 0.0, "doc2": 0.0}
             )
         
-        assert "No documents with non-zero weight provided" in str(exc_info.value)
+        self.assertIn("No documents with non-zero weight provided", str(cm.exception))
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.config.Config')
@@ -358,7 +358,7 @@ class TestRecommenderGetDocVectorsFromIds:
                 mock_get_filter.assert_called_once()
                 args = mock_get_filter.call_args[0]
                 all_document_ids = args[1]  # Second argument should be all_document_ids
-                assert set(all_document_ids) == {"doc1", "doc2", "doc3"}
+                self.assertEqual(set(all_document_ids), {"doc1", "doc2", "doc3"})
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.config.Config')
@@ -388,7 +388,7 @@ class TestRecommenderGetDocVectorsFromIds:
                 mock_from_interp.return_value = mock_interpolation
                 
                 # Test SLERP error handling
-                with pytest.raises(InvalidArgumentError) as exc_info:
+                with self.assertRaises(InvalidArgumentError) as cm:
                     self.recommender.recommend(
                         index_name="test_index",
                         documents={"doc1": 0.0},  # Zero weight to trigger error
@@ -396,7 +396,7 @@ class TestRecommenderGetDocVectorsFromIds:
                     )
                 
                 # Verify generic error message (same for all interpolation methods)
-                assert "Cannot interpolate vectors with all zero weights" in str(exc_info.value)
+                self.assertIn("Cannot interpolate vectors with all zero weights", str(cm.exception))
 
     def test_get_default_interpolation_method_normalize_embeddings_with_context(self):
         """Test get_default_interpolation_method with normalize_embeddings=True and context docs"""
@@ -409,7 +409,7 @@ class TestRecommenderGetDocVectorsFromIds:
         result = self.recommender.get_default_interpolation_method(mock_index, ["doc1"])
         
         # Should return SLERP for normalized embeddings with context docs
-        assert result == InterpolationMethod.SLERP
+        self.assertEqual(result, InterpolationMethod.SLERP)
 
     def test_get_default_interpolation_method_normalize_embeddings_no_context(self):
         """Test get_default_interpolation_method with normalize_embeddings=True and no context docs"""
@@ -422,7 +422,7 @@ class TestRecommenderGetDocVectorsFromIds:
         result = self.recommender.get_default_interpolation_method(mock_index, None)
         
         # Should return NLERP for normalized embeddings without context docs
-        assert result == InterpolationMethod.NLERP
+        self.assertEqual(result, InterpolationMethod.NLERP)
 
     def test_get_default_interpolation_method_no_normalize_embeddings(self):
         """Test get_default_interpolation_method with normalize_embeddings=False"""
@@ -435,14 +435,14 @@ class TestRecommenderGetDocVectorsFromIds:
         result = self.recommender.get_default_interpolation_method(mock_index, ["doc1"])
         
         # Should return LERP for non-normalized embeddings
-        assert result == InterpolationMethod.LERP
+        self.assertEqual(result, InterpolationMethod.LERP)
 
     # Error scenario tests
     def test_get_doc_vectors_from_ids_with_invalid_document_ids_fails(self):
         """Test get_doc_vectors_from_ids with invalid document IDs"""
         
         # Test with invalid document ID format (should be caught by validation elsewhere)
-        with pytest.raises(Exception):  # Specific exception depends on validation layer
+        with self.assertRaises(Exception):  # Specific exception depends on validation layer
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=[""]  # Empty string ID
@@ -456,7 +456,7 @@ class TestRecommenderGetDocVectorsFromIds:
         from marqo.core.exceptions import IndexNotFoundError
         mock_get_index.side_effect = IndexNotFoundError("Index not found")
         
-        with pytest.raises(IndexNotFoundError):
+        with self.assertRaises(IndexNotFoundError):
             self.recommender.get_doc_vectors_from_ids(
                 index_name="nonexistent_index",
                 documents=["doc1"]
@@ -472,13 +472,13 @@ class TestRecommenderGetDocVectorsFromIds:
         mock_structured_index.tensor_field_map = {"valid_field": "some_config"}
         mock_get_index.return_value = mock_structured_index
         
-        with pytest.raises(InvalidFieldNameError) as exc_info:
+        with self.assertRaises(InvalidFieldNameError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1"],
                 tensor_fields=["invalid_field"]
             )
-        assert "Tensor field \"invalid_field\" not found" in str(exc_info.value)
+        self.assertIn("Tensor field \"invalid_field\" not found", str(cm.exception))
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
@@ -500,12 +500,12 @@ class TestRecommenderGetDocVectorsFromIds:
             # doc2 is missing
         }
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2"]  # doc2 will be missing
             )
-        assert "The following document IDs were not found: doc2" in str(exc_info.value)
+        self.assertIn("The following document IDs were not found: doc2", str(cm.exception))
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
@@ -527,12 +527,12 @@ class TestRecommenderGetDocVectorsFromIds:
             "doc2": {"field1": [[0.1, 0.2]]}  # Has embeddings
         }
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2"]
             )
-        assert "The following documents do not have embeddings: doc1" in str(exc_info.value)
+        self.assertIn("The following documents do not have embeddings: doc1", str(cm.exception))
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.config.Config')
@@ -563,7 +563,7 @@ class TestRecommenderGetDocVectorsFromIds:
                 mock_from_interp.return_value = mock_interpolation
                 
                 # Test LERP/NLERP error handling (non-SLERP case)
-                with pytest.raises(InvalidArgumentError) as exc_info:
+                with self.assertRaises(InvalidArgumentError) as cm:
                     self.recommender.recommend(
                         index_name="test_index",
                         documents={"doc1": 0.0},  # Zero weight to trigger error
@@ -571,7 +571,7 @@ class TestRecommenderGetDocVectorsFromIds:
                     )
                 
                 # Verify generic error message (same for all interpolation methods)
-                assert "Cannot interpolate vectors with all zero weights" in str(exc_info.value)
+                self.assertIn("Cannot interpolate vectors with all zero weights", str(cm.exception))
 
     def test_get_exclusion_filter_for_structured_index(self):
         """Test get_exclusion_filter for structured index format"""
@@ -587,7 +587,7 @@ class TestRecommenderGetDocVectorsFromIds:
             None
         )
         expected = "NOT _id IN (doc1, doc2)"
-        assert result == expected
+        self.assertEqual(result, expected)
 
     def test_get_exclusion_filter_for_unstructured_index(self):
         """Test get_exclusion_filter for unstructured index format"""
@@ -603,7 +603,7 @@ class TestRecommenderGetDocVectorsFromIds:
             None
         )
         expected = "NOT (_id:(doc1) OR _id:(doc2))"
-        assert result == expected
+        self.assertEqual(result, expected)
 
     def test_get_exclusion_filter_with_user_filter(self):
         """Test get_exclusion_filter combined with user filter"""
@@ -619,7 +619,7 @@ class TestRecommenderGetDocVectorsFromIds:
             "category:books"
         )
         expected = "(category:books) AND NOT _id IN (doc1)"
-        assert result == expected
+        self.assertEqual(result, expected)
 
     def test_get_exclusion_filter_with_empty_user_filter(self):
         """Test get_exclusion_filter with empty user filter"""
@@ -635,46 +635,46 @@ class TestRecommenderGetDocVectorsFromIds:
             "   "  # Empty/whitespace filter
         )
         expected = "NOT _id IN (doc1)"
-        assert result == expected
+        self.assertEqual(result, expected)
 
     def test_duplicate_document_ids_in_list_fails(self):
         """Test that duplicate document IDs in a list raise InvalidArgumentError
         for get_doc_vectors_from_ids"""
 
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2", "doc1", "doc3", "doc2"]
             )
 
-        error_message = str(exc_info.value)
-        assert "Duplicate document IDs found" in error_message
+        error_message = str(cm.exception)
+        self.assertIn("Duplicate document IDs found", error_message)
         # Should mention both duplicate IDs
-        assert "doc1" in error_message
-        assert "doc2" in error_message
+        self.assertIn("doc1", error_message)
+        self.assertIn("doc2", error_message)
 
     def test_single_duplicate_document_id_in_list_fails(self):
         """Test that a single duplicate document ID in a list raises InvalidArgumentError"""
 
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.get_doc_vectors_from_ids(
                 index_name="test_index",
                 documents=["doc1", "doc2", "doc3", "doc1"]
             )
 
-        error_message = str(exc_info.value)
-        assert "Duplicate document IDs found" in error_message
-        assert "doc1" in error_message
+        error_message = str(cm.exception)
+        self.assertIn("Duplicate document IDs found", error_message)
+        self.assertIn("doc1", error_message)
 
     def test_recommend_with_duplicate_document_ids_fails(self):
         """Test that recommend method also catches duplicate document IDs"""
         
-        with pytest.raises(InvalidArgumentError) as exc_info:
+        with self.assertRaises(InvalidArgumentError) as cm:
             self.recommender.recommend(
                 index_name="test_index",
                 documents=["doc1", "doc2", "doc1"]
             )
         
-        error_message = str(exc_info.value)
-        assert "Duplicate document IDs found" in error_message
-        assert "doc1" in error_message 
+        error_message = str(cm.exception)
+        self.assertIn("Duplicate document IDs found", error_message)
+        self.assertIn("doc1", error_message) 
