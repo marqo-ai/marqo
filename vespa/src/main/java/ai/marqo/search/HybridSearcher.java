@@ -386,6 +386,11 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets attachment ---
 
+        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)
+                && docAccess != null) {
+            docAccess.destroy();
+        }
+
         return new Result(query, processedHits);
     }
 
