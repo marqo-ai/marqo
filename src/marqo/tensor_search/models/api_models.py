@@ -38,6 +38,9 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
+    class Config(BaseMarqoModel.Config):
+        use_enum_values = True
+
     q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: SearchMethod = SearchMethod.TENSOR
@@ -361,32 +364,33 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def _set_sort_by_sortCandidates_parameters(cls, values):
-        """Set the value for sortCandidates in sortBy if it is not provided.
+    def _validate_and_set_sort_by_min_sort_candidates_parameters(cls, values):
+        """validate the value for min_sort_candidates in sortBy.
+        If it is not provided and relevanceCutoff is None, this function will set it to a default value.
 
         Logics:
-        - If relevanceCutoff is provided, do not set sortCandidates, otherwise:
-        - If sortBy.sortCandidates is None, set it to the maximum of:
+        - If relevanceCutoff is provided, do not set min_sort_candidates, otherwise:
+        - If sortBy.min_sort_candidates is None, set it to the maximum of:
             - _DEFAULT_SORT_CANDIDATES_MULTIPLIER * limit
             - offset + limit
-        - If sortBy.sortCandidates is provided, ensure it is at least as large as offset + limit.
+        - If sortBy.min_sort_candidates is provided, ensure it is at least as large as offset + limit.
         """
         sort_by = values.get('sort_by')
         relevance_cutoff = values.get('relevance_cutoff')
         if sort_by is None or relevance_cutoff is not None:
             return values
 
-        if sort_by.sort_candidates is None:
-            sort_by.sort_candidates = max(
+        if sort_by.min_sort_candidates is None:
+            sort_by.min_sort_candidates = max(
                 cls._DEFAULT_SORT_CANDIDATES_MULTIPLIER * values.get('limit'),
                 values.get('offset') + values.get('limit')
             )
         else:
-            # If sortCandidates is provided, ensure it is at least as large as offset + limit
-            if sort_by.sort_candidates < (values.get('offset') + values.get('limit')):
+            # If min_sort_candidates is provided, ensure it is at least as large as offset + limit
+            if sort_by.min_sort_candidates < (values.get('offset') + values.get('limit')):
                 raise ValueError(
-                    f"sortCandidates must be at least as large as offset + limit. Received "
-                    f" sortCandidates={sort_by.sort_candidates}, limit={values.get('limit')}, "
+                    f" minSortCandidates must be at least as large as offset + limit. Received "
+                    f" minSortCandidates={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
                     f" offset={values.get('offset')} "
                 )
         return values

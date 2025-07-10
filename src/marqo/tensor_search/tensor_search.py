@@ -47,7 +47,7 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
-from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.inference.modality_utils import infer_modality, is_base64_image
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
@@ -91,6 +91,36 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 
 logger = get_logger(__name__)
 
+
+def _sanitize_query_for_response(query: Optional[Union[str, dict]]):
+    """
+    Replace base64 image content in queries with 'data:image/[omitted]' for response.
+    
+    Args:
+        query: The query object which can be a string, dict, or CustomVectorQuery
+        
+    Returns:
+        The sanitized query object with base64 content replaced
+    """
+    if query is None:
+        return query
+    
+    if isinstance(query, str):
+        if is_base64_image(query):
+            return 'data:image/[omitted]'
+        return query
+    
+    if isinstance(query, dict):
+        sanitized_query = {}
+        for key, value in query.items():
+            if is_base64_image(key):
+                sanitized_query['data:image/[omitted]'] = value
+            else:
+                sanitized_query[key] = value
+        return sanitized_query
+
+    # Should not reach here
+    raise RuntimeError('Invalid query type')  # pragma: no cover
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = _get_latest_index(config, index_name)
@@ -431,21 +461,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             f"{str(constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION)} or later. "
             f"This index was created with Marqo {marqo_index_version}."
         )
-
-    if sort_by:
-        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
-            raise core_exceptions.UnsupportedFeatureError(
-                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version "
-                f"{constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
-                f"Your index is either a structured index or an old unstructured index"
-            )
-        if not marqo_index.index_supports_sorty_by:
-            raise core_exceptions.UnsupportedFeatureError(
-                f"The 'sortBy' feature is only supported for unstructured indexes created with Marqo version "
-                f"{constants.MARQO_SORT_BY_MINIMUM_VERSION} or later. "
-                f"This unstructured index was created with Marqo {marqo_index_version} "
-            )
-
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
@@ -481,7 +496,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, 
                 rerank_depth=rerank_depth, interpolation_method=interpolation_method
             )
-        elif search_method.upper() == SearchMethod.HYBRID:
+        else:  # SearchMethod.HYBRID
             # TODO: Deal with circular import when all modules are refactored out.
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
@@ -522,7 +537,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if isinstance(text, CustomVectorQuery):
         search_result["query"] = text.dict()  # Make object JSON serializable
     else:
-        search_result["query"] = text
+        search_result["query"] = _sanitize_query_for_response(text)
 
     search_result["limit"] = result_count
     search_result["offset"] = offset

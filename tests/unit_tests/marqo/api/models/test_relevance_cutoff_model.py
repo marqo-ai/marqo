@@ -85,13 +85,13 @@ class TestRelevanceCutoffModel(TestCase):
             )
 
     def test_relative_score_parameter_constraints(self):
-        # relativeScoreFactor must be >0 and <=1
+        # relativeScoreFactor must be >=0 and <=1
         with self.assertRaises(ValidationError):
-            RelativeMaxScoreParameters(relativeScoreFactor=0)
+            RelativeMaxScoreParameters(relativeScoreFactor=-1)
         with self.assertRaises(ValidationError):
             RelativeMaxScoreParameters(relativeScoreFactor=1.5)
 
     def test_std_dev_parameter_constraints(self):
-        # stdDevFactor must be >0
+        # stdDevFactor must be a numeric value
         with self.assertRaises(ValidationError):
-            MeanStdParameters(stdDevFactor=0)
+            MeanStdParameters(stdDevFactor="test")

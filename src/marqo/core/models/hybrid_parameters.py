@@ -21,6 +21,9 @@ class RankingMethod(str, Enum):
 
 
 class HybridParameters(StrictBaseModel):
+    class Config(StrictBaseModel.Config):
+        use_enum_values = True
+
     retrievalMethod: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
     rankingMethod: Optional[RankingMethod] = RankingMethod.RRF
     alpha: Optional[float] = None

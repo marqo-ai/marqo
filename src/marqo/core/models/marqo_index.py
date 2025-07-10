@@ -640,7 +640,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     @property
     def index_supports_sorty_by(self) -> bool:
         """
-        Check if the index supports sort by.
+        Check if the index supports sort by or relevance cutoff.
         """
         return self._cache_or_get(
             'index_supports_sort_by',
