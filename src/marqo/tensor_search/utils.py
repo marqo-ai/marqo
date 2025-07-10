@@ -68,10 +68,6 @@ def format_timestamp(timestamp: datetime.datetime):
     """
     return f"{timestamp.isoformat()}Z"
 
-def get_current_timestamp_as_long() -> int:
-    """Returns the current timestamp as a string in milliseconds since epoch. """
-    return int(datetime.datetime.now().timestamp())
-
 
 def construct_authorized_url(url_base: str, username: str, password: str) -> str:
     """
