@@ -213,39 +213,6 @@ class TestSearch(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
-    def _populate_index_orchids(self, index):
-        """Helper method to populate an index with orchid and related test documents.
-        
-        This method adds a standardized set of test documents including orchids, flowers,
-        and continents that can be used for testing context document functionality.
-        
-        Args:
-            index: The index to populate (structured or unstructured)
-            
-        Returns:
-            List of added document dictionaries
-        """
-        docs = [
-            {"_id": "orchid1", "text_field_1": "Anacamptis laxiflora is a species of orchid found in wet meadows with alkaline soil.", "tags": ["flower", "orchid"]},
-            {"_id": "orchid2", "text_field_1": "Cephalanthera longifolia reaches on average 20-60 centimetres in height and is a type of orchid.", "tags": ["flower", "orchid"]},
-            {"_id": "orchid3", "text_field_1": "Anacamptis morio subsp. longicornu is a subspecies of orchid found in the Mediterranean region.", "tags": ["flower", "orchid"]},
-            {"_id": "flower1", "text_field_1": "Red rose is a popular flower known for its beauty and fragrance.", "tags": ["flower", "rose"]},
-            {"_id": "continent1", "text_field_1": "Europe is a continent located entirely in the Northern Hemisphere and mostly in the Eastern Hemisphere.", "tags": ["continent"]},
-            {"_id": "continent2", "text_field_1": "Asia is Earth's largest and most populous continent, located primarily in the Eastern and Northern Hemispheres.", "tags": ["continent"]},
-            {"_id": "continent3", "text_field_1": "Africa is the world's second-largest and second-most populous continent, after Asia in both cases.", "tags": ["continent"]},
-        ]
-        
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=index.name,
-                docs=docs,
-                tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-            )
-        )
-        
-        return docs
-
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False,
                         reason="We skip the large model test if we don't have cuda support")
