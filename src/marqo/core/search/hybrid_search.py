@@ -266,9 +266,6 @@ class HybridSearch:
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by
         )
-        if marqo_query.offset % marqo_query.limit == 0:
-            if marqo_query.hybrid_parameters.retrievalMethod.lower() == RetrievalMethod.Disjunction:
-                marqo_query.get_query_hash_without_offset(non_blocking=True)
 
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)

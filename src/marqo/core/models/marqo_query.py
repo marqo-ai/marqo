@@ -1,9 +1,5 @@
 import hashlib
-import threading
 from abc import ABC
-from collections import defaultdict
-from dataclasses import field
-from enum import Enum
 from typing import List, Optional, Dict, Set
 
 from pydantic.v1 import validator, root_validator, PrivateAttr
@@ -15,6 +11,28 @@ from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParse
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+import orjson
+
+def orjson_dumps(v, *, default, **kwargs):
+    """
+    Serialize a Pydantic model or dict using orjson, supporting exclude, sort_keys, exclude_unset, and exclude_none.
+    """
+    # Let Pydantic generate the dict with proper exclusions, etc.
+    if hasattr(v, "dict"):
+        obj_dict = v.dict(
+            exclude=kwargs.get("exclude", None),
+            exclude_unset=kwargs.get("exclude_unset", None),
+            exclude_none=kwargs.get("exclude_none", None),
+        )
+    else:
+        obj_dict = dict(v)
+
+    opts = 0
+    if kwargs.get("sort_keys", None):
+        opts = orjson.OPT_SORT_KEYS
+
+    # orjson always outputs compact JSON (no need for separators arg)
+    return orjson.dumps(obj_dict, option=opts, default=default).decode("utf-8")
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -23,6 +41,7 @@ class MarqoQuery(StrictBaseModel, ABC):
         json_encoders = {
             SearchFilter: lambda v: str(v) if isinstance(v, SearchFilter) else v,
         }
+        json_dumps = orjson_dumps
 
     index_name: str
     limit: int
@@ -69,7 +88,6 @@ class MarqoLexicalQuery(MarqoQuery):
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
-
     hybrid_parameters: HybridParameters
     vector_query: Optional[List[float]] # overrides tensor parameter to allow None value.
 
@@ -81,12 +99,6 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     track_total_hits: Optional[bool] = None
     relevance_cutoff: Optional[RelevanceCutoffModel] = None
     sort_by: Optional[SortByModel] = None
-
-    hash: Optional[str] = None
-
-    # Private attributes for hash calculation
-    _hash_thread: threading.Thread = PrivateAttr(None)
-    _hash_completed_event: threading.Event = PrivateAttr(None)
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
@@ -106,52 +118,12 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
 
         return values
 
-    def _calculate_hash(self, offset_excluded=True):
-        exclude_fields = {'hash', '_hash_completed_event'}
-        if offset_excluded:
-            exclude_fields.add('offset')
+    def get_query_hash_without_offset(self):
         normalized_json = self.json(
-            exclude=exclude_fields,
+            exclude={'offset'},
             sort_keys=True,
             exclude_unset=False,
             exclude_none=True,
-            separators=(',', ':')
         )
         hash_value = hashlib.sha256(normalized_json.encode('utf-8')).hexdigest()
-        self.hash = hash_value
-        self._hash_completed_event.set()
         return hash_value
-
-    def get_query_hash_without_offset(self, non_blocking=False):
-        """Get the hash of the query without considering the offset parameter.
-
-        Args:
-            non_blocking: If True, calculate the hash in a separate thread.
-
-        Returns:
-            The hash value, or None if calculating in a non-blocking way.
-        """
-        # 1) If we already have the hash, return it.
-        if self.hash is not None:
-            print("WE HAVE A HASH", self.hash)
-            return self.hash
-
-        # 2) Blocking call: if a background thread is running, wait and return its result.
-        if not non_blocking and self._hash_thread and self._hash_thread.is_alive():
-            self._hash_completed_event.wait()
-            print("BLOCKING HASH", self.hash)
-            return self.hash
-
-        # 3) Non-blocking call: start the background thread once and return immediately.
-        if non_blocking:
-            if self._hash_thread and self._hash_thread.is_alive():
-                return None  # already in progress
-
-            self._hash_completed_event = threading.Event()
-            self._hash_thread = threading.Thread(target=self._calculate_hash)
-            self._hash_thread.start()
-            return None
-
-        # 4) Fallback for blocking calls with no worker: compute synchronously.
-        print("FALLBACK")
-        return self._calculate_hash()
