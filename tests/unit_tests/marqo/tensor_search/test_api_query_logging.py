@@ -7,6 +7,7 @@ from unittest.mock import patch
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.api import app
 from marqo.tensor_search.enums import EnvVars
 from tests.unit_tests.marqo_test import MarqoTestCase
@@ -640,7 +641,17 @@ class TestAPIQueryLogging(MarqoTestCase):
                         {"vector": [0.2] * 384, "weight": 0.2},
                         {"vector": [0.3] * 384, "weight": 0.8},
                     ],
-                    # TODO add document ids when PR 1254 is merged
+                    "documents": {
+                        "ids": {
+                            "doc1": -1.5,
+                            "doc2": 0.5
+                        },
+                        "parameters": {
+                            "tensorFields": ["description"],
+                            "excludeInputDocuments": False,
+                            "concurrency": 5,
+                        }
+                    }
                 },
                 "textQueryPrefix": "prefix",
                 "hybridParameters": {
@@ -682,7 +693,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                     "method": "mean_std_dev",
                     "probe_depth": 500,
                     "parameters": {"std_dev_factor": 0.5}
-                }
+                },
+                "interpolationMethod": InterpolationMethod.NLERP
             }
 
             # Execute
@@ -712,7 +724,18 @@ class TestAPIQueryLogging(MarqoTestCase):
                     "tensor": [
                         {"vector": [], "weight": 0.2},
                         {"vector": [], "weight": 0.8},
-                    ]
+                    ],
+                    "documents": {
+                        "ids": {
+                            "doc1": -1.5,
+                            "doc2": 0.5
+                        },
+                        "parameters": {
+                            "tensorFields": ["description"],
+                            "excludeInputDocuments": False,
+                            "concurrency": 5,
+                        }
+                    }
                 },
                 "textQueryPrefix": "prefix",
                 "hybridParameters": {
@@ -754,7 +777,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                     "method": "mean_std_dev",
                     "probeDepth": 500,
                     "parameters": {"stdDevFactor": 0.5}
-                }
+                },
+                "interpolationMethod": "nlerp"
             }
 
             query_index = warning_call.find('Query: ')
