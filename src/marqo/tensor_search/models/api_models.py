@@ -11,7 +11,7 @@ from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
@@ -361,6 +361,35 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in "
                              "the same rerank phase. "
                              "Please use sortBy only for sorting by fields, and scoreModifiers only for modifying scores")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_context_documents_not_supported_for_lexical_search(cls, values):
+        """Validate that context.documents is not supported for lexical search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        
+        if context is not None and context.documents is not None:
+            if search_method == SearchMethod.LEXICAL:
+                raise ValueError("Context is not supported for lexical search")
+        
+        return values
+
+    @root_validator(pre=False)
+    def _validate_context_documents_not_supported_for_lexical_lexical_hybrid_search(cls, values):
+        """Validate that context.documents is not supported for lexical/lexical hybrid search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        hybrid_parameters = values.get('hybridParameters')
+        
+        if (context is not None and context.documents is not None and 
+            search_method == SearchMethod.HYBRID and hybrid_parameters is not None):
+            
+            # Check if both retrievalMethod and rankingMethod are lexical
+            if (hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and 
+                hybrid_parameters.rankingMethod == RankingMethod.Lexical):
+                raise ValueError("Context is not supported for lexical/lexical hybrid search")
+        
         return values
 
     @root_validator(pre=False)

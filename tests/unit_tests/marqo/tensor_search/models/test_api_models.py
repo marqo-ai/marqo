@@ -352,7 +352,7 @@ class TestSearchQuery(unittest.TestCase):
 
     def test_language_field_validation_with_all_search_modes(self):
         """Test language field behavior across all search modes."""
-        
+
         test_cases = [
             {
                 "search_method": SearchMethod.TENSOR,
@@ -373,7 +373,7 @@ class TestSearchQuery(unittest.TestCase):
                 "expected_error": None
             }
         ]
-        
+
         for case in test_cases:
             with self.subTest(search_method=case["search_method"]):
                 if case["should_fail"]:
@@ -393,6 +393,46 @@ class TestSearchQuery(unittest.TestCase):
                     )
                     self.assertEqual(search_query.language, case["language"])
                     self.assertEqual(search_query.searchMethod, case["search_method"])
+
+    def test_context_documents_with_lexical_search_fails(self):
+        """Test that context.documents is not supported for lexical search"""
+        context = SearchContext(
+            documents=SearchContextDocuments(
+                ids={"doc1": 1.0, "doc2": 0.5}
+            )
+        )
+        
+        # Should fail for lexical search
+        with self.assertRaises(ValidationError) as cm:
+            SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.LEXICAL,
+                context=context
+            )
+        self.assertIn("Context is not supported for lexical search", str(cm.exception))
+
+    def test_context_documents_lexical_lexical_hybrid_search_fails(self):
+        """Test that context.documents is not supported for lexical/lexical hybrid search"""
+        context = SearchContext(
+            documents=SearchContextDocuments(
+                ids={"doc1": 1.0, "doc2": 0.5}
+            )
+        )
+        
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Lexical,
+            rankingMethod=RankingMethod.Lexical
+        )
+        
+        # Should fail for lexical/lexical hybrid search
+        with self.assertRaises(ValidationError) as cm:
+            SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=hybrid_params,
+                context=context
+            )
+        self.assertIn("Context is not supported for lexical/lexical hybrid search", str(cm.exception))
 
 
 class TestCustomVectorQuery(unittest.TestCase):
