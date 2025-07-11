@@ -430,6 +430,10 @@ class TestSearchCommon(MarqoTestCase):
                     self.assertEqual(res["hits"][0]["_id"], "d1")
 
     def test_hybrid_search_with_context_documents(self):
+        """
+        Tests all valid combinations of retrieval and ranking methods for hybrid search with context documents.
+        Shows the search runs without errors and correctly retrieves the expected document.
+        """
         for index_name in [self.unstructured_text_index_name, self.structured_text_index_name]:
             with self.subTest(index=index_name):
                 self.client.index(index_name=index_name).add_documents(
@@ -720,3 +724,88 @@ class TestSearchCommon(MarqoTestCase):
                                         # Verify query field matches expected value
                                         self.assertEqual(result["query"], expected_query,
                                                        f"Query field mismatch for {search_method} {query_desc}")
+
+    def test_context_documents_only_lexical_fails(self):
+        """
+        Tests that Lexical search or hybrid search with lexical/lexical cannot have context docs.
+        Test context documents validation with different search methods via API.
+        """
+        # Test documents
+        docs = [
+            {"_id": "doc1", "title": "red apple fruit", "content": "sweet taste"},
+            {"_id": "doc2", "title": "green apple fruit", "content": "sour taste"},
+            {"_id": "context_doc", "title": "apple context", "content": "fruit context"}
+        ]
+        
+        # Context for testing
+        context = {
+            "documents": {
+                "ids": {"context_doc": 1.0},
+                "parameters": {
+                    "tensorFields": ["title"],
+                    "excludeInputDocuments": True
+                }
+            }
+        }
+        
+        # Test both index types
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index=index_name):
+                # Add documents
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_text_index_name else None
+                res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                print(res)
+                self.assertFalse(res["errors"])
+                
+                # Test 1: Lexical search with context.documents should fail
+                with self.subTest("Lexical with context fails"):
+                    with self.assertRaises(MarqoWebError) as cm:
+                        self.client.index(index_name).search(
+                            q="apple",
+                            search_method="LEXICAL",
+                            context=context
+                        )
+                    self.assertEqual(cm.exception.status_code, 422)
+                    self.assertIn("Context is not supported for lexical search", str(cm.exception))
+                
+                # Test 2: Lexical/Lexical hybrid search with context.documents should fail
+                with self.subTest("Hybrid lexical/lexical with context fails"):
+                    with self.assertRaises(MarqoWebError) as cm:
+                        self.client.index(index_name).search(
+                            q="apple",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "retrievalMethod": "lexical",
+                                "rankingMethod": "lexical"
+                            },
+                            context=context
+                        )
+                    self.assertEqual(cm.exception.status_code, 422)
+                    self.assertIn("Context is not supported for lexical/lexical hybrid search", str(cm.exception))
+                
+                # Test 3: Tensor search with context.documents should work
+                with self.subTest("Tensor with context works"):
+                    result = self.client.index(index_name).search(
+                        q={"apple": 1.0},  # Use dict format for tensor search with context
+                        search_method="TENSOR",
+                        context=context
+                    )
+                    self.assertIsNotNone(result)
+                    self.assertIn("hits", result)
+                
+                # Test 4: Disjunction/RRF hybrid search with context.documents should work
+                with self.subTest("Hybrid disjunction/RRF with context works"):
+                    result = self.client.index(index_name).search(
+                        q=None,
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "queryTensor": {"apple": 1.0},
+                            "queryLexical": "apple"
+                        },
+                        context=context
+                    )
+                    self.assertIsNotNone(result)
+                    self.assertIn("hits", result)
+
