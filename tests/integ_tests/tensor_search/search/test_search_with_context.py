@@ -17,6 +17,7 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 from tests.integ_tests.utils.transition import *
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.tensor_search.models.api_models import CustomVectorQuery
+from marqo.core import exceptions as core_exceptions
 
 class TestSearchWithContext(MarqoTestCase):
 
@@ -1089,38 +1090,252 @@ class TestSearchWithContext(MarqoTestCase):
                 self.assertIn("but got 12", error_message)
 
     def test_search_with_context_documents_fails_for_legacy_unstructured_index(self):
-        """Test that search with context documents fails for legacy unstructured indexes."""
-        # Add some documents to the legacy index first
-        docs = [
-            {"_id": "doc1", "text_field_1": "machine learning algorithms"},
-            {"_id": "doc2", "text_field_1": "deep neural networks"},
-        ]
+        """Test that search with context documents fails for legacy unstructured index."""
+        docs = self._populate_index_orchids(self.legacy_unstructured_default_text_index)
         
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.legacy_unstructured_default_text_index.name,
-                docs=docs,
-                tensor_fields=["text_field_1"]
-            )
+        context_documents = SearchContextDocuments(
+            ids={"orchid1": 1.0, "orchid2": 1.0}
         )
-
-        # Create search context with documents
-        search_context = SearchContext(
-            documents=SearchContextDocuments(
-                ids={"doc1": 1.0, "doc2": 0.5}
-            )
-        )
-
-        # Should raise UnsupportedFeatureError for legacy unstructured index
+        
         with self.assertRaises(UnsupportedFeatureError) as cm:
             tensor_search.search(
                 config=self.config,
                 index_name=self.legacy_unstructured_default_text_index.name,
                 text=None,
-                context=search_context,
-                search_method="tensor"
+                context=SearchContext(documents=context_documents)
             )
+        
+        self.assertIn("Search context is not supported for unstructured indexes created with Marqo version", str(cm.exception))
 
-        self.assertIn("Search context is not supported for unstructured indexes", str(cm.exception))
-        self.assertIn("2.13.0", str(cm.exception))
+    def test_context_tensors_cancel_out_zero_magnitude_error(self):
+        """Test that context tensors that cancel each other out raise ZeroMagnitudeVectorError with NLERP."""
+        for index_name in [self.structured_index_basic, self.unstructured_index_basic]:
+            with self.subTest(msg=index_name):
+                # Create two identical tensors with opposite weights that will cancel out
+                # This should result in a zero magnitude vector when using NLERP
+                context_tensors = [
+                    SearchContextTensor(vector=[1.0] * self.DIMENSION, weight=1.0),
+                    SearchContextTensor(vector=[1.0] * self.DIMENSION, weight=-1.0)
+                ]
+                
+                with self.assertRaises(ZeroMagnitudeVectorError) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index_name,
+                        text=None,
+                        context=SearchContext(tensor=context_tensors),
+                        interpolation_method=InterpolationMethod.NLERP
+                    )
+                
+                self.assertIn("zero magnitude", str(cm.exception))
+
+    def test_context_tensors_all_zero_weights_error(self):
+        """Test that context tensors with all zero weights raise AllZeroWeightsError."""
+        for index_name in [self.structured_index_basic, self.unstructured_index_basic]:
+            with self.subTest(msg=index_name):
+                # Create context tensors with all zero weights
+                context_tensors = [
+                    SearchContextTensor(vector=[1.0] * self.DIMENSION, weight=0.0),
+                    SearchContextTensor(vector=[2.0] * self.DIMENSION, weight=0.0)
+                ]
+                
+                with self.assertRaises(AllZeroWeightsError) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index_name,
+                        text=None,
+                        context=SearchContext(tensor=context_tensors)
+                    )
+                
+                self.assertIn("All weights are zero", str(cm.exception))
+
+    def test_context_documents_all_zero_weights_error(self):
+        """Test that context documents with all zero weights raise InvalidArgumentError."""
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            with self.subTest(type=index.type):
+                # Populate the index with test documents
+                docs = self._populate_index_orchids(index)
+                
+                # Create context documents with all zero weights
+                context_documents = SearchContextDocuments(
+                    ids={"orchid1": 0.0, "orchid2": 0.0}
+                )
+                
+                with self.assertRaises(InvalidArgumentError) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=SearchContext(documents=context_documents),
+                        result_count=3
+                    )
+                self.assertIn("No documents with non-zero weight provided", str(cm.exception))
+
+    def test_context_documents_uses_different_tensor_fields(self):
+        """Test that context documents produce different results when using different tensor fields.
+        
+        This test demonstrates that specifying different tensor fields in context search
+        produces different results, proving that each field is being used independently.
+        """
+        # This test only works with structured index since it has defined tensor fields
+        index = self.structured_default_text_index
+        
+        # Create documents with clear differences between tensor fields
+        docs = [
+            {
+                "_id": "doc1",
+                "text_field_1": "shirts clothing apparel",  # General shirts
+                "text_field_2": "red color bright vibrant",  # Red color
+                "non_vector_text_field": "Document 1",
+                "score_field": 1.0,
+            },
+            {
+                "_id": "doc2", 
+                "text_field_1": "pants trousers clothing",  # Different clothing type
+                "text_field_2": "black color dark clothing",  # Black color
+                "non_vector_text_field": "Document 2",
+                "score_field": 2.0,
+            },
+            {
+                "_id": "context_doc",
+                "text_field_1": "shirts apparel fashion",  # Similar to doc1 field1
+                "text_field_2": "black dark clothing",  # Similar to doc2 field2
+                "non_vector_text_field": "Context document",
+                "score_field": 3.0,
+            }
+        ]
+        
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name,
+                docs=docs
+            )
+        )
+        
+        # Test 1: Search using only text_field_1 in context
+        # Should favor doc1 since context has "shirts" similar to doc1's "shirts"
+        results_field1 = tensor_search.search(
+            config=self.config,
+            index_name=index.name,
+            text=None,
+            context=SearchContext(
+                documents=SearchContextDocuments(
+                    ids={"context_doc": 1.0},
+                    parameters=SearchContextDocumentsParameters(
+                        tensorFields=["text_field_1"],
+                        excludeInputDocuments=True
+                    )
+                )
+            ),
+            result_count=2
+        )
+        
+        # Test 2: Search using only text_field_2 in context  
+        # Should favor doc2 since context has "black" similar to doc2's "black"
+        results_field2 = tensor_search.search(
+            config=self.config,
+            index_name=index.name,
+            text=None,
+            context=SearchContext(
+                documents=SearchContextDocuments(
+                    ids={"context_doc": 1.0},
+                    parameters=SearchContextDocumentsParameters(
+                        tensorFields=["text_field_2"],
+                        excludeInputDocuments=True
+                    )
+                )
+            ),
+            result_count=2
+        )
+        
+        # Extract results
+        field1_ids = [hit["_id"] for hit in results_field1["hits"]]
+        field2_ids = [hit["_id"] for hit in results_field2["hits"]]
+        
+        # The key assertion: Different tensor fields should produce different top results
+        self.assertEqual(field1_ids[0], "doc1", 
+                        f"text_field_1 should favor doc1 due to 'shirts' similarity. Got: {field1_ids}")
+        self.assertEqual(field2_ids[0], "doc2",
+                        f"text_field_2 should favor doc2 due to 'black' similarity. Got: {field2_ids}")
+
+    def test_hybrid_search_with_context_documents(self):
+        """
+        Integration test for all valid combinations of retrieval and ranking methods for hybrid search with context documents.
+        Shows the search runs without errors and correctly retrieves the expected document.
+        
+        Tests for invalid methods (lexical/lexical) are in API and unit tests instead of here.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add test documents
+                docs = [
+                    {
+                        "text_field_1": "A comparison of the best pets",
+                        "text_field_2": "Animals",
+                        "_id": "d1"
+                    },
+                    {
+                        "text_field_1": "The history of dogs",
+                        "text_field_2": "A history of household pets",
+                        "_id": "d2"
+                    }
+                ]
+                
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=["text_field_1", "text_field_2"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                test_cases = [
+                    ("disjunction", "rrf", {"best pets": 1}, "animals"),
+                    ("tensor", "tensor", {"best pets": 1}, None),
+                    ("tensor", "lexical", {"best pets": 1}, "animals"),
+                    ("lexical", "tensor", {"best pets": 1}, "animals")
+                ]
+
+                for interpolation_method in [InterpolationMethod.LERP, InterpolationMethod.NLERP, InterpolationMethod.SLERP]:
+                    context = SearchContext(
+                        documents=SearchContextDocuments(
+                            parameters=SearchContextDocumentsParameters(
+                                excludeInputDocuments=False,
+                                tensorFields=["text_field_1", "text_field_2"]
+                            ),
+                            ids={"d1": 1}
+                        )
+                    )
+
+                    for retrieval_method, ranking_method, query_tensor, query_lexical in test_cases:
+                        with self.subTest(
+                            retrieval_method=retrieval_method, 
+                            ranking_method=ranking_method,
+                            interpolation_method=interpolation_method.value
+                        ):
+                            # Convert string values to enum values for HybridParameters
+                            retrieval_enum = RetrievalMethod(retrieval_method)
+                            ranking_enum = RankingMethod(ranking_method)
+                            
+                            hybrid_parameters = HybridParameters(
+                                queryTensor=query_tensor,
+                                queryLexical=query_lexical,
+                                retrievalMethod=retrieval_enum,
+                                rankingMethod=ranking_enum
+                            )
+                            
+                            res = tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text=None,
+                                context=context,
+                                search_method="HYBRID",
+                                hybrid_parameters=hybrid_parameters,
+                                interpolation_method=interpolation_method
+                            )
+                            
+                            # Verify the expected document is returned as the top result
+                            self.assertEqual(res["hits"][0]["_id"], "d1")
+
