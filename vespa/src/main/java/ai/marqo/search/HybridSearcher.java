@@ -145,13 +145,19 @@ public class HybridSearcher extends Searcher {
         com.yahoo.documentapi.Result paginationDocResult = null;
         DocumentId docId = null;
         Set<Integer> paginationStateOffsets = null;
+        // Get the pagination document if paginationHash and paginationSchema are set and
+        // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
             try {
                 docId = getPaginationDocumentId(paginationSchema, paginationHash);
                 AsyncParameters asyncParameters = new AsyncParameters();
                 docAccess = documentAccess.createAsyncSession(asyncParameters);
-                paginationDocResult = docAccess.get(docId);
-                logIfVerbose("Search for pagination document: " + docId, verbose);
+                // Do not get document is offset is 0, as we do not need to exclude any IDs in this
+                // case.
+                if (offset != 0) {
+                    paginationDocResult = docAccess.get(docId);
+                    logIfVerbose("Search for pagination document: " + docId, verbose);
+                }
             } catch (Exception e) {
                 logIfVerbose("Failed to fetch pagination document: " + e.getMessage(), verbose);
             }
@@ -283,7 +289,7 @@ public class HybridSearcher extends Searcher {
                                 new Result(
                                         queryTensor, filterHits(resultTensor.hits(), idsToExclude));
                     }
-                } else {
+                } else if (paginationDocResult != null) {
                     logIfVerbose(
                             "Failed to retrieve pagination document: "
                                     + paginationDocResult.error().getMessage(),
@@ -389,6 +395,7 @@ public class HybridSearcher extends Searcher {
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)
                 && docAccess != null) {
             docAccess.destroy();
+            documentAccess.shutdown();
         }
 
         return new Result(query, processedHits);
