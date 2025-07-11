@@ -51,7 +51,11 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         for index in cls.indexes:
             cls.add_documents(cls.config, add_docs_params=AddDocsParams(
                 index_name=index.name,
-                docs=[{'_id': '1', 'text_field_1': 'hello'}],
+                docs=[
+                    {'_id': 'doc1', 'text_field_1': 'hello'},
+                    {'_id': 'doc2', 'text_field_1': 'world'},
+                    {'_id': 'doc3', 'text_field_1': 'hello world'},
+                ],
                 tensor_fields=None if index.type == IndexType.Structured else ["text_field_1"]
             ))
 
@@ -159,7 +163,17 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                     {"vector": [0.2] * 384, "weight": 0.2},
                     {"vector": [0.3] * 384, "weight": 0.8},
                 ],
-                # TODO add document ids when PR 1254 is merged
+                "documents": {
+                    "ids": {
+                        "doc1": -1.5,
+                        "doc2": 0.5
+                    },
+                    "parameters": {
+                        "tensorFields": ["text_field_1"],
+                        "excludeInputDocuments": False,
+                        "concurrency": 5,
+                    }
+                }
             },
             "hybridParameters": {
                 "retrievalMethod": "disjunction",
@@ -200,7 +214,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                 "method": "mean_std_dev",
                 "probeDepth": 500,
                 "parameters": {"stdDevFactor": 0.5}
-            }
+            },
+            "interpolationMethod": "nlerp"
         }
 
         # Execute
@@ -228,7 +243,18 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                 "tensor": [
                     {"vector": [], "weight": 0.2},
                     {"vector": [], "weight": 0.8},
-                ]
+                ],
+                "documents": {
+                    "ids": {
+                        "doc1": -1.5,
+                        "doc2": 0.5
+                    },
+                    "parameters": {
+                        "tensorFields": ["text_field_1"],
+                        "excludeInputDocuments": False,
+                        "concurrency": 5,
+                    }
+                }
             },
             "hybridParameters": {
                 "retrievalMethod": "disjunction",
@@ -269,7 +295,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
                 "method": "mean_std_dev",
                 "probeDepth": 500,
                 "parameters": {"stdDevFactor": 0.5}
-            }
+            },
+            "interpolationMethod": "nlerp"
         }
         query_index = warning_logs[0].find('Query: ')
         self.assertNotEquals(-1, query_index)

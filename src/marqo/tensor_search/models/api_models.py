@@ -11,13 +11,14 @@ from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
@@ -66,6 +67,7 @@ class SearchQuery(BaseMarqoModel):
     language: Optional[str] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
+    interpolationMethod: Optional[InterpolationMethod] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -326,6 +328,10 @@ class SearchQuery(BaseMarqoModel):
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
 
+    def get_context_documents(self) -> Optional[SearchContextDocuments]:
+        """Extract the documents from the context, if provided"""
+        return self.context.documents if self.context is not None else None
+    
     @root_validator(pre=False)
     def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
         """Validate that relevance cutoff is only provided for hybrid search"""
@@ -355,6 +361,35 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError("'sortBy' cannot be used with 'scoreModifiers' in hybrid search as they are working in "
                              "the same rerank phase. "
                              "Please use sortBy only for sorting by fields, and scoreModifiers only for modifying scores")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_context_documents_not_supported_for_lexical_search(cls, values):
+        """Validate that context.documents is not supported for lexical search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        
+        if context is not None and context.documents is not None:
+            if search_method == SearchMethod.LEXICAL:
+                raise ValueError("Context is not supported for lexical search")
+        
+        return values
+
+    @root_validator(pre=False)
+    def _validate_context_documents_not_supported_for_lexical_lexical_hybrid_search(cls, values):
+        """Validate that context.documents is not supported for lexical/lexical hybrid search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        hybrid_parameters = values.get('hybridParameters')
+        
+        if (context is not None and context.documents is not None and 
+            search_method == SearchMethod.HYBRID and hybrid_parameters is not None):
+            
+            # Check if both retrievalMethod and rankingMethod are lexical
+            if (hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and 
+                hybrid_parameters.rankingMethod == RankingMethod.Lexical):
+                raise ValueError("Context is not supported for lexical/lexical hybrid search")
+        
         return values
 
     @root_validator(pre=False)
