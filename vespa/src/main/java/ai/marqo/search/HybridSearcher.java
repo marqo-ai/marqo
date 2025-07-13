@@ -33,10 +33,7 @@ import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -350,8 +347,22 @@ public class HybridSearcher extends Searcher {
                 && (offset == 0
                         || (paginationStateOffsets != null
                                 && paginationStateOffsets.contains(offset - limit)))) {
-            createOrUpdatePaginationState(
-                    docAccess, docId, paginationSchema, processedHits, offset);
+            // Execute pagination state update asynchronously to avoid blocking
+            AsyncSession finalDocAccess = docAccess;
+            DocumentId finalDocId = docId;
+            CompletableFuture.runAsync(
+                    () -> {
+                        try {
+                            createOrUpdatePaginationState(
+                                    finalDocAccess,
+                                    finalDocId,
+                                    paginationSchema,
+                                    processedHits,
+                                    offset);
+                        } catch (Exception e) {
+                            logger.error("Failed to update pagination state asynchronously", e);
+                        }
+                    });
         }
 
         // --- Attach facets results if available ---
@@ -392,11 +403,6 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets attachment ---
 
-        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)
-                && docAccess != null) {
-            docAccess.destroy();
-            documentAccess.shutdown();
-        }
 
         return new Result(query, processedHits);
     }
