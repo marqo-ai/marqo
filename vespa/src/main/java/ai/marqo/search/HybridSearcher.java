@@ -403,7 +403,6 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets attachment ---
 
-
         return new Result(query, processedHits);
     }
 
