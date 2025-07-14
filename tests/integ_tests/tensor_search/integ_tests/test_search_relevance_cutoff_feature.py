@@ -1,6 +1,8 @@
 import json
 import pytest
 
+from fastapi.exceptions import RequestValidationError
+
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
@@ -233,6 +235,42 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             )
         self.assertIn("The 'relevanceCutoff' feature is only supported for unstructured indexes created",
                       str(context.exception))
+
+    def test_relevance_cutoff_is_blocked_by_tensor_search(self):
+        """Test that relevance cutoff is blocked for tensor or lexical search."""
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.unstructured_index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.TENSOR,
+                    "relevanceCutoff": {
+                        "method": "relative_max_score",
+                        "parameters": {"relativeScoreFactor": 0.5},
+                    },
+                }
+            )
+        self.assertIn("relevanceCutoff can only be provided for", str(context.exception.errors()))
+
+    def test_relevance_cutoff_is_blocked_by_lexical_search(self):
+        """Test that relevance cutoff is blocked for lexical search."""
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.unstructured_index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.LEXICAL,
+                    "relevanceCutoff": {
+                        "method": "relative_max_score",
+                        "parameters": {"relativeScoreFactor": 0.5},
+                    },
+                }
+            )
+        self.assertIn("relevanceCutoff can only be provided for", str(context.exception.errors()))
 
     def test_relevance_cutoff_relative_max_score_low_threshold(self):
         """Test that relative_max_score cutoff with low threshold."""
