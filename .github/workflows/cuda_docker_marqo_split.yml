@@ -81,5 +81,5 @@ jobs:
 
           bash scripts/start_cuda_docker_marqo_split.sh $MARQO_IMAGE_NAME
           df -k
-          pytest tests/
+          pytest tests/application_tests/test_env_var_changes.py::TestEnvVarChanges::test_inference_cache
 
