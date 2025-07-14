@@ -1,6 +1,6 @@
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
-                                   InvalidDataRangeError, MarqoDocumentParsingError)
+                                   InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import *
@@ -358,6 +358,12 @@ class StructuredVespaIndex(VespaIndex):
         # TODO - There is some inefficiency here, as we are retrieving chunks even if highlights are false,
         # and also for lexical search. This applies to both with and without attributes_to_retrieve
 
+        # Structured indexes don't support language
+        if isinstance(marqo_query, MarqoLexicalQuery) and marqo_query.language is not None:
+            raise UnsupportedFeatureError(
+                f'Language is not supported for structured indexes'
+                )
+
         # Verify attributes to retrieve, if defined
         if marqo_query.attributes_to_retrieve is not None:
             chunk_field_names = []
@@ -486,8 +492,10 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
+            'language': marqo_query.language
         }
+        
         query = {k: v for k, v in query.items() if v is not None}
 
         return query
@@ -620,6 +628,7 @@ class StructuredVespaIndex(VespaIndex):
             'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
             'query_features': query_inputs,
             'presentation.summary': summary,
+            'language': marqo_query.language,
 
             # Custom searcher parameters
             'marqo__yql.tensor': None if (
@@ -639,7 +648,7 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
-
+            
         query = {k: v for k, v in query.items() if v is not None}
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
@@ -656,7 +665,7 @@ class StructuredVespaIndex(VespaIndex):
                 query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
                     marqo_query.relevance_cutoff.parameters.relative_score_factor
             elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
-                query["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"] = \
+                query["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"] = \
                     marqo_query.relevance_cutoff.parameters.std_dev_factor
             else:
                 # No parameters for other methods
@@ -667,7 +676,7 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
             query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sort_depth
-            query["marqo__hybrid.sortBy.sortCandidates"] = marqo_query.sort_by.sort_candidates
+            query["marqo__hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.min_sort_candidates
 
             query["query_features"]["marqo__sort_field_weights_0"] = {}
             query["query_features"]["marqo__sort_field_weights_1"] = {}

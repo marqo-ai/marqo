@@ -11,7 +11,8 @@ from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchD
 from marqo.vespa.models import VespaDocument
 from marqo.core.structured_vespa_index import common as structured_common
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-
+from marqo.exceptions import InternalError
+from marqo.core import exceptions as core_exceptions
 
 class TestGetEmbeddingFieldNames(unittest.TestCase):
     """Test cases for get_embedding_field_names function"""
@@ -97,6 +98,21 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
             get_embedding_field_names(mock_index)
         
         assert "has no tensor fields" in str(exc_info.value)
+
+    def test_get_embedding_field_names_tensor_field_not_found_fails(self):
+        """Test that requesting non-existent tensor field raises InvalidArgumentError"""
+
+        mock_tensor_field = Mock()
+        mock_tensor_field.name = "existing_field"
+
+        mock_index = Mock()
+        mock_index.type = IndexType.Structured
+        mock_index.name = "test_index"
+        mock_index.tensor_fields = [mock_tensor_field]
+
+        with self.assertRaises(core_exceptions.InvalidArgumentError) as cm:
+            get_embedding_field_names(mock_index, ["non_existent_field"])
+        self.assertIn("Tensor field 'non_existent_field' not found in index", str(cm.exception))
 
 
 class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):

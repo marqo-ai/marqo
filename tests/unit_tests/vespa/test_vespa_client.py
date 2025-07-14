@@ -15,21 +15,16 @@ class TestVespaClient(unittest.TestCase):
             content_cluster_name="test_cluster"
         )
 
-    def test_vespa_client_close_calls_async_transport_aclose(self):
-        """Test that VespaClient.close calls async_transport.aclose()"""
+    def test_vespa_client_close_calls_http_client_close(self):
+        """Test that VespaClient.close calls http_client.close()"""
         
-        # Mock the async_transport with aclose method
-        mock_async_transport = Mock()
-        mock_async_transport.aclose = Mock()
-        
-        # Set the mock as the async_transport attribute
-        self.vespa_client.async_transport = mock_async_transport
-        
-        # Call the close method
-        self.vespa_client.close()
-        
-        # Verify that aclose was called
-        mock_async_transport.aclose.assert_called_once()
+        # Mock the http_client.close method
+        with patch.object(self.vespa_client.http_client, 'close') as mock_close:
+            # Call the close method
+            self.vespa_client.close()
+            
+            # Verify that close was called
+            mock_close.assert_called_once()
 
 
 
@@ -89,7 +84,7 @@ class TestVespaClient(unittest.TestCase):
         )
         
         self.assertEqual(client.default_search_timeout_ms, 5000)
-        # Note: pool_size and async_pool_size are not stored as instance attributes
+        # Note: pool_size and get_pool_size are stored as instance attributes
 
     def test_vespa_client_initialization_missing_required_params_fails(self):
         """Test VespaClient initialization fails with missing required parameters"""

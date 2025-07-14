@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 import httpcore
 import httpx
 import orjson
+import ssl
+import certifi
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -46,9 +48,8 @@ class VespaClient:
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
                  content_cluster_name: str, default_search_timeout_ms: int = 1000,
-                 pool_size: int = 10, async_pool_size: int = 10, feed_pool_size: int = 10,
-                 delete_pool_size: int = 10, get_batch_concurrency_limit: int = 10,
-                 partial_update_pool_size: int = 10
+                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10,
+                 delete_pool_size: int = 10, partial_update_pool_size: int = 10
                  ):
         """
         Create a VespaClient object.
@@ -57,10 +58,9 @@ class VespaClient:
             document_url: Vespa Document API base URL
             query_url: Vespa Query API base URL
             pool_size: Number of connections to keep in the connection pool
-            async_pool_size: Number of connections to keep in the async connection pool
             feed_pool_size: Number of connections to keep in batch feed requests connection pool to Vespa
+            get_pool_size: Number of connections to keep in batch get requests connection pool to Vespa
             delete_pool_size: Number of connections to keep batch delete requests connection pool to Vespa
-            get_batch_concurrency_limit: Number of concurrent connections allowed by the semaphore per get_batch call
             partial_update_pool_size: Number of connections to keep batch partial update requests connection pool to Vespa
             default_search_timeout_ms: Default timeout for search queries in milliseconds
             content_cluster_name: Name of the Vespa content cluster to use for document operations
@@ -74,25 +74,18 @@ class VespaClient:
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
+        self.get_pool_size = get_pool_size
         self.delete_pool_size = delete_pool_size
-        self.get_batch_concurrency_limit = get_batch_concurrency_limit
         self.partial_pool_size = partial_update_pool_size
 
-        # Persistent transport, so we don't keep initializing per request
-        self.async_transport = httpx.AsyncHTTPTransport(
-            limits=httpx.Limits(
-                max_keepalive_connections=async_pool_size,
-                max_connections=None),
-            http1=True,
-            http2=False  # Using http2 is slightly slower
-        )
+        # Persistent ssl context, so we don't keep initializing per request
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
 
     def close(self):
         """
         Close the VespaClient object.
         """
         self.http_client.close()
-        self.async_transport.aclose()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
@@ -455,8 +448,7 @@ class VespaClient:
             return GetBatchResponse(responses=[], errors=False)
 
         if concurrency is None:
-            # Controls semaphore connections. Client connections initialized in constructor.
-            concurrency = self.get_batch_concurrency_limit
+            concurrency = self.get_pool_size
 
         batch_response = conc.run_coroutine(
             self._get_batch_async(ids, fields, schema, concurrency, timeout)
@@ -957,7 +949,10 @@ class VespaClient:
                                fields: Optional[List[str]],
                                schema: str,
                                connections: int, timeout: int) -> GetBatchResponse:
-        async with httpx.AsyncClient(transport=self.async_transport) as async_client:
+        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
+                                                         max_connections=connections),
+                                     verify=self.ssl_context
+                                     ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(

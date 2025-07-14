@@ -20,8 +20,8 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
-        EnvVars.VESPA_ASYNC_POOL_SIZE: 10,      # TODO: Decide default async pool size
         EnvVars.VESPA_FEED_POOL_SIZE: 10,
+        EnvVars.VESPA_GET_POOL_SIZE: 10,
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
 
@@ -47,6 +47,11 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: 10,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
 
+        # Query Logging
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: 900,
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: 10_000,
+
         # Throttling
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
         EnvVars.MARQO_MAX_CONCURRENT_INDEX: 8,
@@ -60,6 +65,11 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        # StatsD
+        EnvVars.STATSD_HOST: "127.0.0.1",
+        EnvVars.STATSD_PORT: 8125,
+        EnvVars.STATSD_COMMON_TAGS: "",
+
         # Inference Client config (In API)
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
@@ -68,7 +78,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_API_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_API_INFERENCE_CACHE_TYPE: "LRU",
 
-        EnvVars.MARQO_CONCURRENCY_LIMIT_PER_GET_REQUEST: 10,  # Used in get and search
         # 370 megabytes in bytes, read in API and passed to inference server
         EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,
         # 370 megabytes in bytes, read in API and passed to inference server
