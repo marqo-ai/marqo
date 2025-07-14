@@ -496,6 +496,8 @@ public class HybridSearcher extends Searcher {
                                     System.currentTimeMillis())));
             docUpd.setCreateIfNonExistent(true);
             docAccess.update(docUpd);
+            docAccess.destroy();
+            documentAccess.shutdown();
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
