@@ -3,7 +3,7 @@ import traceback
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
-
+import time
 
 @pytest.mark.marqo_version('2.15.0')
 class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
@@ -163,6 +163,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                                      result.get("hits"))
                 except Exception as e:
                     test_failures.append((index_name, traceback.format_exc()))
+                    time.sleep(10800)  # Sleep for 3 hours to avoid rate limiting issues
 
         if test_failures:
             failure_message = "\n".join([
