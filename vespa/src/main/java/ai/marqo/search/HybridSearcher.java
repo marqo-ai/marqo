@@ -48,6 +48,8 @@ import org.slf4j.LoggerFactory;
 public class HybridSearcher extends Searcher {
 
     private final DocumentAccess documentAccess;
+    private final AsyncSession docAccess;
+    private final AsyncSession docUpdateAccess;
 
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
@@ -61,6 +63,8 @@ public class HybridSearcher extends Searcher {
     @Inject
     public HybridSearcher(DocumentAccess documentAccess) {
         this.documentAccess = documentAccess;
+        this.docAccess = documentAccess.createAsyncSession(new AsyncParameters());
+        this.docUpdateAccess = documentAccess.createAsyncSession(new AsyncParameters());
     }
 
     // Thread-safe ObjectReader for parsing SortField JSON
@@ -143,13 +147,11 @@ public class HybridSearcher extends Searcher {
         Set<Integer> paginationStateOffsets = null;
         MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap;
         LongFieldValue paginationUpdatedAt;
-        AsyncSession docAccess = null;
         // Get the pagination document if paginationHash and paginationSchema are set and
         // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
             try {
                 paginationDocId = getPaginationDocumentId(paginationSchema, paginationHash);
-                docAccess = documentAccess.createAsyncSession(new AsyncParameters());
                 // Do not get document is offset is 0, as we do not need to exclude any IDs in this
                 // case.
                 if (offset != 0) {
@@ -425,17 +427,6 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets attachment ---
 
-        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
-            // destroy the document access session
-            if (docAccess != null) {
-                try {
-                    docAccess.destroy();
-                } catch (Exception e) {
-                    logger.error("Failed to destroy document access session: " + e.getMessage());
-                }
-            }
-        }
-
         return new Result(query, processedHits);
     }
 
@@ -554,9 +545,8 @@ public class HybridSearcher extends Searcher {
                             new LongFieldValue(System.currentTimeMillis())));
 
             docUpd.setCreateIfNonExistent(true);
-            AsyncSession docAccess = documentAccess.createAsyncSession(new AsyncParameters());
-            docAccess.update(docUpd);
-            docAccess.destroy();
+            docUpdateAccess.update(docUpd);
+            docUpdateAccess.getNext();
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
@@ -1177,5 +1167,12 @@ public class HybridSearcher extends Searcher {
             }
         }
         return hits;
+    }
+
+    @Override
+    public void deconstruct() {
+        super.deconstruct();
+        docAccess.destroy();
+        docUpdateAccess.destroy();
     }
 }
