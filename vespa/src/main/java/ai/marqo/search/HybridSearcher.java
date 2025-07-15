@@ -143,8 +143,8 @@ public class HybridSearcher extends Searcher {
         com.yahoo.documentapi.Result paginationDocResult = null;
         DocumentId paginationDocId = null;
         Set<Integer> paginationStateOffsets = null;
-        MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap;
-        LongFieldValue paginationUpdatedAt;
+        MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap = null;
+        LongFieldValue paginationUpdatedAt = null;
         // Get the pagination document if paginationHash and paginationSchema are set and
         // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
@@ -289,8 +289,6 @@ public class HybridSearcher extends Searcher {
                                         queryTensor, filterHits(resultTensor.hits(), idsToExclude));
                     }
                 } else {
-                    paginationUpdatedAt = null;
-                    paginationStateMap = null;
                     if (paginationDocResult != null) {
                         logIfVerbose(
                                 "Failed to retrieve pagination document: "
@@ -298,9 +296,6 @@ public class HybridSearcher extends Searcher {
                                 verbose);
                     }
                 }
-            } else {
-                paginationUpdatedAt = null;
-                paginationStateMap = null;
             }
 
             // Execute fusion ranking on the two result sets.
@@ -313,8 +308,6 @@ public class HybridSearcher extends Searcher {
             }
 
         } else {
-            paginationUpdatedAt = null;
-            paginationStateMap = null;
             if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
                 if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                     Query combinedQuery =
@@ -362,21 +355,13 @@ public class HybridSearcher extends Searcher {
                     || (paginationStateOffsets != null
                             && paginationStateOffsets.contains(offset - limit))) {
                 // Execute pagination state update asynchronously to avoid blocking
-                DocumentId finalPaginationDocId = paginationDocId;
-                CompletableFuture.runAsync(
-                        () -> {
-                            try {
-                                createOrUpdatePaginationState(
-                                        finalPaginationDocId,
-                                        paginationSchema,
-                                        processedHits,
-                                        paginationStateMap,
-                                        paginationUpdatedAt,
-                                        offset);
-                            } catch (Exception e) {
-                                logger.error("Failed to update pagination state asynchronously", e);
-                            }
-                        });
+                createOrUpdatePaginationState(
+                        paginationDocId,
+                        paginationSchema,
+                        processedHits,
+                        paginationStateMap,
+                        paginationUpdatedAt,
+                        offset);
             } else {
                 // add metadata hit to hits marqo__noCache:marqo__isPaginationJump
                 Hit isJumpMetadataHit = getNoCacheHit("marqo__isPaginationJump");
