@@ -1,4 +1,4 @@
-__version__ = "2.22.12"
+__version__ = "2.22.13"
 
 def get_version() -> str:
     return f"{__version__}"

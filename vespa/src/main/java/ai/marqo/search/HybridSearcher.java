@@ -12,7 +12,9 @@ import com.yahoo.component.annotation.Inject;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.document.*;
-import com.yahoo.document.datatypes.*;
+import com.yahoo.document.datatypes.Array;
+import com.yahoo.document.datatypes.MapFieldValue;
+import com.yahoo.document.datatypes.StringFieldValue;
 import com.yahoo.document.fieldpathupdate.AssignFieldPathUpdate;
 import com.yahoo.document.update.FieldUpdate;
 import com.yahoo.documentapi.AsyncParameters;
@@ -48,7 +50,6 @@ import org.slf4j.LoggerFactory;
 public class HybridSearcher extends Searcher {
 
     private final DocumentAccess documentAccess;
-    private final AsyncSession docAccess;
 
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
@@ -62,7 +63,6 @@ public class HybridSearcher extends Searcher {
     @Inject
     public HybridSearcher(DocumentAccess documentAccess) {
         this.documentAccess = documentAccess;
-        this.docAccess = documentAccess.createAsyncSession(new AsyncParameters());
     }
 
     // Thread-safe ObjectReader for parsing SortField JSON
@@ -136,26 +136,24 @@ public class HybridSearcher extends Searcher {
         String paginationSchema =
                 query.properties().getString("marqo__hybrid.pagination_schema", null);
         String paginationHash = query.properties().getString("marqo__hybrid.pagination_hash", null);
-        Integer paginationLimitCutoff =
-                query.properties().getInteger("marqo__hybrid.pagination_limit_cutoff", 600);
 
         Set<String> idsToExclude = new HashSet<>();
+        AsyncSession docAccess = null;
         com.yahoo.documentapi.Result paginationDocResult = null;
-        DocumentId paginationDocId = null;
+        DocumentId docId = null;
         Set<Integer> paginationStateOffsets = null;
-        MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap = null;
-        LongFieldValue paginationUpdatedAt = null;
         // Get the pagination document if paginationHash and paginationSchema are set and
         // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
             try {
-                paginationDocId = getPaginationDocumentId(paginationSchema, paginationHash);
+                docId = getPaginationDocumentId(paginationSchema, paginationHash);
+                AsyncParameters asyncParameters = new AsyncParameters();
+                docAccess = documentAccess.createAsyncSession(asyncParameters);
                 // Do not get document is offset is 0, as we do not need to exclude any IDs in this
                 // case.
                 if (offset != 0) {
-                    flushResponseQueue();
-                    paginationDocResult = docAccess.get(paginationDocId);
-                    logIfVerbose("Search for pagination document: " + paginationDocId, verbose);
+                    paginationDocResult = docAccess.get(docId);
+                    logIfVerbose("Search for pagination document: " + docId, verbose);
                 }
             } catch (Exception e) {
                 logIfVerbose("Failed to fetch pagination document: " + e.getMessage(), verbose);
@@ -271,8 +269,8 @@ public class HybridSearcher extends Searcher {
                     // Extract IDs list from the document
                     com.yahoo.documentapi.DocumentResponse paginationDocumentResponse =
                             (com.yahoo.documentapi.DocumentResponse) docAccess.getNext();
-                    paginationStateMap = getPaginationStateMap(paginationDocumentResponse);
-                    paginationUpdatedAt = getPaginationUpdatedAt(paginationDocumentResponse);
+                    MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap =
+                            getPaginationStateMap(paginationDocumentResponse);
                     idsToExclude = getIdsToExclude(paginationStateMap, offset);
                     paginationStateOffsets = getExistingPaginationStateOffsets(paginationStateMap);
                     logIfVerbose(
@@ -288,13 +286,11 @@ public class HybridSearcher extends Searcher {
                                 new Result(
                                         queryTensor, filterHits(resultTensor.hits(), idsToExclude));
                     }
-                } else {
-                    if (paginationDocResult != null) {
-                        logIfVerbose(
-                                "Failed to retrieve pagination document: "
-                                        + paginationDocResult.error().getMessage(),
-                                verbose);
-                    }
+                } else if (paginationDocResult != null) {
+                    logIfVerbose(
+                            "Failed to retrieve pagination document: "
+                                    + paginationDocResult.error().getMessage(),
+                            verbose);
                 }
             }
 
@@ -307,24 +303,22 @@ public class HybridSearcher extends Searcher {
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
             }
 
-        } else {
-            if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
-                if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
-                    Query combinedQuery =
-                            createSubQuery(query, retrievalMethod, rankingMethod, verbose);
-                    Result result = execution.search(combinedQuery);
-                    hitsForPostProcessing = result.hits();
-                    logIfVerbose("Unprocessed results: ", verbose);
-                    logHitGroup(hitsForPostProcessing, verbose);
-                } else {
-                    throw new RuntimeException(
-                            "If retrievalMethod is 'lexical' or 'tensor', rankingMethod can only be"
-                                    + " 'lexical' or 'tensor'.");
-                }
+        } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
+            if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
+                Query combinedQuery =
+                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                Result result = execution.search(combinedQuery);
+                hitsForPostProcessing = result.hits();
+                logIfVerbose("Unprocessed results: ", verbose);
+                logHitGroup(hitsForPostProcessing, verbose);
             } else {
                 throw new RuntimeException(
-                        "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
+                        "If retrievalMethod is 'lexical' or 'tensor', rankingMethod can only be"
+                                + " 'lexical' or 'tensor'.");
             }
+        } else {
+            throw new RuntimeException(
+                    "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
 
         // Determine post-processing mode based on query parameters
@@ -349,19 +343,26 @@ public class HybridSearcher extends Searcher {
         }
         // Save pagination state if the performed request is not a jump (offset - limit is present
         // in pagination document)
-        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)
-                && offset + limit <= paginationLimitCutoff) {
+        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
             if (offset == 0
                     || (paginationStateOffsets != null
                             && paginationStateOffsets.contains(offset - limit))) {
                 // Execute pagination state update asynchronously to avoid blocking
-                createOrUpdatePaginationState(
-                        paginationDocId,
-                        paginationSchema,
-                        processedHits,
-                        paginationStateMap,
-                        paginationUpdatedAt,
-                        offset);
+                AsyncSession finalDocAccess = docAccess;
+                DocumentId finalDocId = docId;
+                CompletableFuture.runAsync(
+                        () -> {
+                            try {
+                                createOrUpdatePaginationState(
+                                        finalDocAccess,
+                                        finalDocId,
+                                        paginationSchema,
+                                        processedHits,
+                                        offset);
+                            } catch (Exception e) {
+                                logger.error("Failed to update pagination state asynchronously", e);
+                            }
+                        });
             } else {
                 // add metadata hit to hits marqo__noCache:marqo__isPaginationJump
                 Hit isJumpMetadataHit = getNoCacheHit("marqo__isPaginationJump");
@@ -414,6 +415,12 @@ public class HybridSearcher extends Searcher {
         return new Result(query, processedHits);
     }
 
+    private Hit getNoCacheHit(String noCacheReason) {
+        Hit noCacheHit = new Hit("marqo__noCache:" + noCacheReason);
+        noCacheHit.setField("marqo__noCache", true);
+        return noCacheHit;
+    }
+
     private Boolean shouldUsePagination(
             String paginationHash, String paginationSchema, String retrievalMethod) {
         return paginationHash != null
@@ -436,17 +443,6 @@ public class HybridSearcher extends Searcher {
                     paginationDocumentResponse.getDocument();
             return (MapFieldValue<StringFieldValue, Array<StringFieldValue>>)
                     paginationDocument.getFieldValue("offsets");
-        }
-        return null;
-    }
-
-    private LongFieldValue getPaginationUpdatedAt(
-            com.yahoo.documentapi.DocumentResponse paginationDocumentResponse) {
-        if (paginationDocumentResponse != null
-                && paginationDocumentResponse.getDocument() != null) {
-            com.yahoo.document.Document paginationDocument =
-                    paginationDocumentResponse.getDocument();
-            return (LongFieldValue) paginationDocument.getFieldValue("updated_at");
         }
         return null;
     }
@@ -489,11 +485,10 @@ public class HybridSearcher extends Searcher {
     }
 
     private void createOrUpdatePaginationState(
+            AsyncSession docAccess,
             DocumentId docId,
             String paginationSchema,
             HitGroup processedHits,
-            MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap,
-            LongFieldValue paginationUpdatedAt,
             Integer offset) {
         try {
             // Create or update the pagination state document
@@ -507,52 +502,19 @@ public class HybridSearcher extends Searcher {
                 String processedDocId = extractDocIdFromHitId(hit.getId().toString());
                 processedHitIds.add(new StringFieldValue(processedDocId));
             }
-            if (paginationStateMap != null
-                    && paginationStateMap.containsKey(new StringFieldValue(String.valueOf(offset)))
-                    && paginationStateMap
-                            .get(new StringFieldValue(String.valueOf(offset)))
-                            .equals(processedHitIds)) {
-                if (paginationUpdatedAt != null
-                        && paginationUpdatedAt.getLong() > System.currentTimeMillis() - 30000) {
-                    // If the pagination state is already up-to-date, skip the update
-                    return;
-                }
-            } else {
-                // If the pagination state is not present or different, update it
-                docUpd.addFieldPathUpdate(
-                        new AssignFieldPathUpdate(
-                                docType, "offsets{" + offset + "}", processedHitIds));
-            }
+            docUpd.addFieldPathUpdate(
+                    new AssignFieldPathUpdate(docType, "offsets{" + offset + "}", processedHitIds));
             docUpd.addFieldUpdate(
                     FieldUpdate.createAssign(
                             docType.getField("updated_at"),
-                            new LongFieldValue(System.currentTimeMillis())));
-
+                            new com.yahoo.document.datatypes.LongFieldValue(
+                                    System.currentTimeMillis())));
             docUpd.setCreateIfNonExistent(true);
             docAccess.update(docUpd);
+            docAccess.getNext(0);
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
-    }
-
-    void flushResponseQueue() {
-        while (processNext(0)) {
-            // empty
-        }
-    }
-
-    boolean processNext(int timeout) {
-        com.yahoo.documentapi.Response res;
-        try {
-            res = docAccess.getNext(timeout);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            return false;
-        }
-        if (res == null) {
-            return false;
-        }
-        return res.isSuccess();
     }
 
     private HitGroup filterHits(HitGroup originalHits, Set<String> idsToExclude) {
@@ -564,12 +526,6 @@ public class HybridSearcher extends Searcher {
             }
         }
         return filtered;
-    }
-
-    private Hit getNoCacheHit(String noCacheReason) {
-        Hit noCacheHit = new Hit("marqo__noCache:" + noCacheReason);
-        noCacheHit.setField("marqo__noCache", true);
-        return noCacheHit;
     }
 
     HitGroup postProcessBySort(
