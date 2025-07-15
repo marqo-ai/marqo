@@ -546,7 +546,7 @@ public class HybridSearcher extends Searcher {
 
             docUpd.setCreateIfNonExistent(true);
             docUpdateAccess.update(docUpd);
-            docUpdateAccess.getNext();
+            docUpdateAccess.getNext(0);
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
@@ -1167,12 +1167,5 @@ public class HybridSearcher extends Searcher {
             }
         }
         return hits;
-    }
-
-    @Override
-    public void deconstruct() {
-        super.deconstruct();
-        docAccess.destroy();
-        docUpdateAccess.destroy();
     }
 }
