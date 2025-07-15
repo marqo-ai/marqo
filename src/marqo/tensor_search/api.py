@@ -434,7 +434,10 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
             relevance_cutoff= search_query.relevance_cutoff,
             sort_by = search_query.sort_by,
         )
-        return ORJSONResponse(result)
+        result_exclusions = {'marqo__headers'}
+        return ORJSONResponse(
+            {k: v for k, v in result.items() if k not in result_exclusions}, headers=result.get('marqo__headers')
+        )
 
 
 @app.post("/indexes/{index_name}/recommend")

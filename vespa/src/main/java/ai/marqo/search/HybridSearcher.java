@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class HybridSearcher extends Searcher {
 
     private final DocumentAccess documentAccess;
+    private final AsyncSession docAccess;
 
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
@@ -63,6 +64,7 @@ public class HybridSearcher extends Searcher {
     @Inject
     public HybridSearcher(DocumentAccess documentAccess) {
         this.documentAccess = documentAccess;
+        this.docAccess = documentAccess.createAsyncSession(new AsyncParameters());
     }
 
     // Thread-safe ObjectReader for parsing SortField JSON
@@ -138,22 +140,19 @@ public class HybridSearcher extends Searcher {
         String paginationHash = query.properties().getString("marqo__hybrid.pagination_hash", null);
 
         Set<String> idsToExclude = new HashSet<>();
-        AsyncSession docAccess = null;
         com.yahoo.documentapi.Result paginationDocResult = null;
-        DocumentId docId = null;
+        DocumentId paginationDocId = null;
         Set<Integer> paginationStateOffsets = null;
         // Get the pagination document if paginationHash and paginationSchema are set and
         // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
             try {
-                docId = getPaginationDocumentId(paginationSchema, paginationHash);
-                AsyncParameters asyncParameters = new AsyncParameters();
-                docAccess = documentAccess.createAsyncSession(asyncParameters);
+                paginationDocId = getPaginationDocumentId(paginationSchema, paginationHash);
                 // Do not get document is offset is 0, as we do not need to exclude any IDs in this
                 // case.
                 if (offset != 0) {
-                    paginationDocResult = docAccess.get(docId);
-                    logIfVerbose("Search for pagination document: " + docId, verbose);
+                    paginationDocResult = docAccess.get(paginationDocId);
+                    logIfVerbose("Search for pagination document: " + paginationDocId, verbose);
                 }
             } catch (Exception e) {
                 logIfVerbose("Failed to fetch pagination document: " + e.getMessage(), verbose);
@@ -343,26 +342,33 @@ public class HybridSearcher extends Searcher {
         }
         // Save pagination state if the performed request is not a jump (offset - limit is present
         // in pagination document)
-        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)
-                && (offset == 0
-                        || (paginationStateOffsets != null
-                                && paginationStateOffsets.contains(offset - limit)))) {
-            // Execute pagination state update asynchronously to avoid blocking
-            AsyncSession finalDocAccess = docAccess;
-            DocumentId finalDocId = docId;
-            CompletableFuture.runAsync(
-                    () -> {
-                        try {
-                            createOrUpdatePaginationState(
-                                    finalDocAccess,
-                                    finalDocId,
-                                    paginationSchema,
-                                    processedHits,
-                                    offset);
-                        } catch (Exception e) {
-                            logger.error("Failed to update pagination state asynchronously", e);
-                        }
-                    });
+        if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
+            if (offset == 0
+                    || (paginationStateOffsets != null
+                            && paginationStateOffsets.contains(offset - limit))) {
+                // Execute pagination state update asynchronously to avoid blocking
+                DocumentId finalPaginationDocId = paginationDocId;
+                CompletableFuture.runAsync(
+                        () -> {
+                            try {
+                                createOrUpdatePaginationState(
+                                        finalPaginationDocId,
+                                        paginationSchema,
+                                        processedHits,
+                                        offset);
+                            } catch (Exception e) {
+                                logger.error("Failed to update pagination state asynchronously", e);
+                            }
+                        });
+            } else {
+                // add metadata hit to hits marqo__noCache:marqo__isPaginationJump
+                Hit isJumpMetadataHit = getNoCacheHit("marqo__isPaginationJump");
+                processedHits.add(isJumpMetadataHit);
+                logIfVerbose(
+                        "Pagination jump detected, not updating pagination state for offset: "
+                                + offset,
+                        verbose);
+            }
         }
 
         // --- Attach facets results if available ---
@@ -470,11 +476,7 @@ public class HybridSearcher extends Searcher {
     }
 
     private void createOrUpdatePaginationState(
-            AsyncSession docAccess,
-            DocumentId docId,
-            String paginationSchema,
-            HitGroup processedHits,
-            Integer offset) {
+            DocumentId docId, String paginationSchema, HitGroup processedHits, Integer offset) {
         try {
             // Create or update the pagination state document
             DocumentType docType =
@@ -496,8 +498,6 @@ public class HybridSearcher extends Searcher {
                                     System.currentTimeMillis())));
             docUpd.setCreateIfNonExistent(true);
             docAccess.update(docUpd);
-            docAccess.destroy();
-            documentAccess.shutdown();
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
@@ -512,6 +512,12 @@ public class HybridSearcher extends Searcher {
             }
         }
         return filtered;
+    }
+
+    private Hit getNoCacheHit(String noCacheReason) {
+        Hit noCacheHit = new Hit("marqo__noCache:" + noCacheReason);
+        noCacheHit.setField("marqo__noCache", true);
+        return noCacheHit;
     }
 
     HitGroup postProcessBySort(
@@ -1112,5 +1118,10 @@ public class HybridSearcher extends Searcher {
             }
         }
         return hits;
+    }
+
+    @Override
+    public void deconstruct() {
+        docAccess.destroy();
     }
 }

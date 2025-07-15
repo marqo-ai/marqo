@@ -323,7 +323,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            language: Optional[str] = None,
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
-
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -650,7 +649,7 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        if doc.id.startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
+        if doc.id.startswith("group:facet:") or doc.id.startswith("marqo__"):  # Not an actual document id but group's id returned by vespa
             continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance

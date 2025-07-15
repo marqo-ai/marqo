@@ -18,6 +18,7 @@ import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.tensor.Tensor;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,11 @@ import org.junit.jupiter.api.Test;
 class SortByTest {
 
     private DocumentAccess documentAccess;
+
+    @BeforeEach
+    void setUp() {
+        documentAccess = mock(DocumentAccess.class);
+    }
 
     /**
      * Test that verifies sorting of results based on a single sort field.
