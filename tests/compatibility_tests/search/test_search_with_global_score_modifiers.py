@@ -164,7 +164,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                     self.assertEqual(stored_results[index_name][retrieval_method][ranking_method].get("hits"),
                                      result.get("hits"))
                 except Exception as e:
-                    time.sleep(7200)  # Sleep for an hour to allow the user to see the error
+                    time.sleep(3600 * 10)  # Sleep for 10 hours to allow the user to see the error
                     self.logger.error(f"Error in index {index_name} with retrieval method {retrieval_method} "
                                       f"and ranking method {ranking_method}: {e}")
                     test_failures.append((index_name, traceback.format_exc()))
