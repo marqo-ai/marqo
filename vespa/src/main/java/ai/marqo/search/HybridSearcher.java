@@ -49,7 +49,6 @@ public class HybridSearcher extends Searcher {
 
     private final DocumentAccess documentAccess;
     private final AsyncSession docAccess;
-    private final AsyncSession docUpdateAccess;
 
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
@@ -64,7 +63,6 @@ public class HybridSearcher extends Searcher {
     public HybridSearcher(DocumentAccess documentAccess) {
         this.documentAccess = documentAccess;
         this.docAccess = documentAccess.createAsyncSession(new AsyncParameters());
-        this.docUpdateAccess = documentAccess.createAsyncSession(new AsyncParameters());
     }
 
     // Thread-safe ObjectReader for parsing SortField JSON
@@ -155,6 +153,7 @@ public class HybridSearcher extends Searcher {
                 // Do not get document is offset is 0, as we do not need to exclude any IDs in this
                 // case.
                 if (offset != 0) {
+                    flushResponseQueue();
                     paginationDocResult = docAccess.get(paginationDocId);
                     logIfVerbose("Search for pagination document: " + paginationDocId, verbose);
                 }
@@ -545,11 +544,30 @@ public class HybridSearcher extends Searcher {
                             new LongFieldValue(System.currentTimeMillis())));
 
             docUpd.setCreateIfNonExistent(true);
-            docUpdateAccess.update(docUpd);
-            docUpdateAccess.getNext(0);
+            docAccess.update(docUpd);
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
+    }
+
+    void flushResponseQueue() {
+        while (processNext(0)) {
+            // empty
+        }
+    }
+
+    boolean processNext(int timeout) {
+        com.yahoo.documentapi.Response res;
+        try {
+            res = docAccess.getNext(timeout);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
+        if (res == null) {
+            return false;
+        }
+        return res.isSuccess();
     }
 
     private HitGroup filterHits(HitGroup originalHits, Set<String> idsToExclude) {
