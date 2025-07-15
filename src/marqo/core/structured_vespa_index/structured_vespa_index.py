@@ -1,3 +1,5 @@
+import os
+
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
@@ -653,6 +655,7 @@ class StructuredVespaIndex(VespaIndex):
 
             "marqo__hybrid.pagination_schema": constants.MARQO_PAGINATION_SCHEMA_NAME,
             "marqo__hybrid.pagination_hash": query_hash_without_offset,
+            "marqo__hybrid.pagination_limit_cutoff": os.environ.get("MARQO_PAGINATION_LIMIT_CUTOFF", 600),
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
