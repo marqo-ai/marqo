@@ -522,7 +522,6 @@ public class HybridSearcher extends Searcher {
             Integer offset) {
         try {
             // Create or update the pagination state document
-            AsyncSession docAccess = documentAccess.createAsyncSession(new AsyncParameters());
             DocumentType docType =
                     documentAccess.getDocumentTypeManager().getDocumentType(paginationSchema);
             DocumentUpdate docUpd = new DocumentUpdate(docType, docId);
@@ -555,6 +554,7 @@ public class HybridSearcher extends Searcher {
                             new LongFieldValue(System.currentTimeMillis())));
 
             docUpd.setCreateIfNonExistent(true);
+            AsyncSession docAccess = documentAccess.createAsyncSession(new AsyncParameters());
             docAccess.update(docUpd);
             docAccess.destroy();
         } catch (Exception e) {
