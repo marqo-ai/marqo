@@ -136,6 +136,8 @@ public class HybridSearcher extends Searcher {
         String paginationSchema =
                 query.properties().getString("marqo__hybrid.pagination_schema", null);
         String paginationHash = query.properties().getString("marqo__hybrid.pagination_hash", null);
+        Integer paginationLimitCutoff =
+                query.properties().getInteger("marqo__hybrid.pagination_limit_cutoff", 600);
 
         Set<String> idsToExclude = new HashSet<>();
         AsyncSession docAccess = null;
@@ -344,9 +346,10 @@ public class HybridSearcher extends Searcher {
         // Save pagination state if the performed request is not a jump (offset - limit is present
         // in pagination document)
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
-            if (offset == 0
-                    || (paginationStateOffsets != null
-                            && paginationStateOffsets.contains(offset - limit))) {
+            if ((offset == 0
+                            || (paginationStateOffsets != null
+                                    && paginationStateOffsets.contains(offset - limit)))
+                    && offset + limit <= paginationLimitCutoff) {
                 // Execute pagination state update asynchronously to avoid blocking
                 AsyncSession finalDocAccess = docAccess;
                 DocumentId finalDocId = docId;
