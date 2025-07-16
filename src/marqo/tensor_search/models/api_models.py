@@ -11,13 +11,14 @@ from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
@@ -37,6 +38,9 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
+    class Config(BaseMarqoModel.Config):
+        use_enum_values = True
+
     q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: SearchMethod = SearchMethod.TENSOR
@@ -63,6 +67,7 @@ class SearchQuery(BaseMarqoModel):
     language: Optional[str] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
+    interpolationMethod: Optional[InterpolationMethod] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -323,6 +328,10 @@ class SearchQuery(BaseMarqoModel):
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
 
+    def get_context_documents(self) -> Optional[SearchContextDocuments]:
+        """Extract the documents from the context, if provided"""
+        return self.context.documents if self.context is not None else None
+    
     @root_validator(pre=False)
     def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
         """Validate that relevance cutoff is only provided for hybrid search"""
@@ -355,32 +364,62 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def _set_sort_by_sortCandidates_parameters(cls, values):
-        """Set the value for sortCandidates in sortBy if it is not provided.
+    def _validate_context_documents_not_supported_for_lexical_search(cls, values):
+        """Validate that context.documents is not supported for lexical search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        
+        if context is not None and context.documents is not None:
+            if search_method == SearchMethod.LEXICAL:
+                raise ValueError("Context is not supported for lexical search")
+        
+        return values
+
+    @root_validator(pre=False)
+    def _validate_context_documents_not_supported_for_lexical_lexical_hybrid_search(cls, values):
+        """Validate that context.documents is not supported for lexical/lexical hybrid search"""
+        search_method = values.get('searchMethod')
+        context = values.get('context')
+        hybrid_parameters = values.get('hybridParameters')
+        
+        if (context is not None and context.documents is not None and 
+            search_method == SearchMethod.HYBRID and hybrid_parameters is not None):
+            
+            # Check if both retrievalMethod and rankingMethod are lexical
+            if (hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and 
+                hybrid_parameters.rankingMethod == RankingMethod.Lexical):
+                raise ValueError("Context is not supported for lexical/lexical hybrid search")
+        
+        return values
+
+    @root_validator(pre=False)
+    def _validate_and_set_sort_by_min_sort_candidates_parameters(cls, values):
+        """validate the value for min_sort_candidates in sortBy.
+        If it is not provided and relevanceCutoff is None, this function will set it to a default value.
 
         Logics:
-        - If relevanceCutoff is provided, do not set sortCandidates, otherwise:
-        - If sortBy.sortCandidates is None, set it to the maximum of:
+        - If relevanceCutoff is provided, do not set min_sort_candidates, otherwise:
+        - If sortBy.min_sort_candidates is None, set it to the maximum of:
             - _DEFAULT_SORT_CANDIDATES_MULTIPLIER * limit
             - offset + limit
-        - If sortBy.sortCandidates is provided, ensure it is at least as large as offset + limit.
+        - If sortBy.min_sort_candidates is provided, ensure it is at least as large as offset + limit.
         """
         sort_by = values.get('sort_by')
         relevance_cutoff = values.get('relevance_cutoff')
         if sort_by is None or relevance_cutoff is not None:
             return values
 
-        if sort_by.sort_candidates is None:
-            sort_by.sort_candidates = max(
+        if sort_by.min_sort_candidates is None:
+            sort_by.min_sort_candidates = max(
                 cls._DEFAULT_SORT_CANDIDATES_MULTIPLIER * values.get('limit'),
                 values.get('offset') + values.get('limit')
             )
         else:
-            # If sortCandidates is provided, ensure it is at least as large as offset + limit
-            if sort_by.sort_candidates < (values.get('offset') + values.get('limit')):
+            # If min_sort_candidates is provided, ensure it is at least as large as offset + limit
+            if sort_by.min_sort_candidates < (values.get('offset') + values.get('limit')):
                 raise ValueError(
-                    f"sortCandidates must be at least as large as offset + limit. Received "
-                    f" sortCandidates={sort_by.sort_candidates}, limit={values.get('limit')}, "
+                    f" minSortCandidates must be at least as large as offset + limit. Received "
+                    f" minSortCandidates={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
                     f" offset={values.get('offset')} "
                 )
         return values

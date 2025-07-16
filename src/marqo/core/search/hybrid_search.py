@@ -9,11 +9,13 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex, \
+    IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
@@ -47,7 +49,8 @@ class HybridSearch:
             track_total_hits: Optional[bool] = None,
             language: Optional[str] = None,
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
-            sort_by: Optional[SortByModel] = None
+            sort_by: Optional[SortByModel] = None,
+            interpolation_method: Optional[InterpolationMethod] = None
     ) -> Dict:
         """
 
@@ -73,8 +76,11 @@ class HybridSearch:
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
                 facets: FacetsParameters object to specify facets for the search. If not provided, no facets will be returned.
+                track_total_hits: if True, total hits before reranking will be returned. For disjunction, this will be
+                the number of tensor OR lexical hits.
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
+                interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
             Returns:
 
             Output format:
@@ -152,6 +158,21 @@ class HybridSearch:
                 "'hybridParameters.queryLexical' is provided"
             )
 
+        if sort_by and (
+                marqo_index_version < constants.MARQO_SORT_BY_MINIMUM_VERSION or
+                not marqo_index.type == IndexType.SemiStructured
+        ):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'sortBy' features is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SORT_BY_MINIMUM_VERSION} or later "
+            )
+
+        if relevance_cutoff and not marqo_index.type == IndexType.SemiStructured:
+            # Legacy unstructured indexes and structured indexes do not support relevance cutoff
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
+                f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
+            )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -180,8 +201,8 @@ class HybridSearch:
         if (tensor_query is None) != (lexical_query is None):
             if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 raise core_exceptions.InvalidArgumentError(
-                    "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when "
-                    "'disjunction' retrieval method is used."
+                    "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor' or just 'q'"
+                    "must be present when 'disjunction' retrieval method is used."
                 )
 
         # Edge cases for q data type
@@ -190,10 +211,15 @@ class HybridSearch:
             query_text_search = lexical_query
 
             if context is None:
+                # If no context, create it with a tensor component
                 context = SearchContext(
                     tensor=[SearchContextTensor(vector=tensor_query, weight=1)]
                 )
+            elif context.tensor is None:
+                # If no context.tensor, create it
+                context.tensor = [SearchContextTensor(vector=tensor_query, weight=1)]
             else:
+                # If context.tensor exists, append the tensor query to it
                 context.tensor.append(SearchContextTensor(vector=tensor_query, weight=1))
         elif tensor_query is None and lexical_query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
@@ -201,8 +227,9 @@ class HybridSearch:
             if not (hybrid_parameters.retrievalMethod.upper() == SearchMethod.TENSOR and
                     hybrid_parameters.rankingMethod.upper() == SearchMethod.TENSOR):
                 raise core_exceptions.InvalidArgumentError(
-                    "Query cannot be 'None' for hybrid search unless retrieval_method and ranking_method "
-                    "are both 'tensor'.")
+                    "Query cannot be 'None' for hybrid search unless: (1) retrievalMethod and rankingMethod "
+                    "are both 'tensor' and 'context' is given or (2) One or both of queryLexical and queryTensor "
+                    "are provided (depending on retrievalMethod and rankingMethod) instead.")
             if context is None:
                 raise core_exceptions.InvalidArgumentError(
                     "Query cannot be 'None' for hybrid search unless 'context' is provided.")
@@ -228,7 +255,7 @@ class HybridSearch:
                 hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
         ):
             with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
-                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
             vectorised_text = list(qidx_to_vectors.values())[0]
         else:
             vectorised_text = None
@@ -319,7 +346,24 @@ class HybridSearch:
             f"{total_results} results from Vespa."
         )
 
+        # Collect metadata for sort by
         if sort_by is not None:
-            gathered_results["_sortCandidates"] = responses.root.fields.sort_candidates
+            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None: # pragma: no cover
+                raise core_exceptions.InternalError(
+                    f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
+                )
+            gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.sort_candidates
+
+        # Collect metadata for relevance cutoff
+        if relevance_cutoff is not None:
+            if responses.root.fields.marqo_fields is None \
+                or responses.root.fields.marqo_fields.relevant_candidates is None \
+                or responses.root.fields.marqo_fields.probe_candidates is None: # pragma: no cover
+                raise core_exceptions.InternalError(
+                    f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
+                    f"probeCandidates in the response "
+                )
+            gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
+            gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
         return gathered_results

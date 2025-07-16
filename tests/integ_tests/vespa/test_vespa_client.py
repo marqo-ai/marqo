@@ -1,17 +1,21 @@
 import asyncio
 import functools
 import os
+import sys
 import unittest
-from unittest.mock import patch, ANY
+from unittest.mock import patch, Mock, AsyncMock, ANY
 
 import httpcore
 import httpx
 import pytest
 import vespa.application as pyvespa
 
+from marqo.tensor_search.api import generate_config
+from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import concurrency
 from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError, VespaNotConvergedError
 from marqo.vespa.models import VespaDocument, QueryResult
+from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
@@ -495,6 +499,135 @@ class TestVespaClient(AsyncMarqoTestCase):
         with self.assertRaises(VespaError) as e:
             vespa_client.wait_for_application_convergence(timeout=0.1)
         self.assertIn("Vespa application did not converge",str(e.exception))
+
+    def test_get_pool_size_initialization(self):
+        """Test that get_pool_size is properly set and used as default concurrency"""
+        get_pool_size = 15
+        client = VespaClient(
+            "http://localhost:19071", 
+            "http://localhost:8080",
+            "http://localhost:8080", 
+            "content_default",
+            get_pool_size=get_pool_size
+        )
+        
+        # Verify get_pool_size is set correctly
+        self.assertEqual(client.get_pool_size, get_pool_size)
+        
+        client.close()
+
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_uses_correct_concurrency(self, mock_async_client_class):
+        """Test that get_batch uses get_pool_size as default concurrency"""
+        # Create a proper mock for the async client and response
+        mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
+        
+        # Mock the response object
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
+            'id': 'test::doc1',
+            'fields': {'title': 'Test'}
+        }
+        
+        # Make the async client's get method return the mock response
+        mock_async_client.get.return_value = mock_response
+        
+        # Feed a document first to ensure the schema exists
+        test_doc = VespaDocument(id="doc1", fields={"title": "Test Title"})
+        self.client.feed_document(test_doc, self.TEST_SCHEMA)
+        
+        # Call get_batch
+        self.client.get_batch(['doc1'], self.TEST_SCHEMA)
+        
+        # Verify AsyncClient was created
+        mock_async_client_class.assert_called_once()
+
+    @patch('marqo.vespa.vespa_client.asyncio.Semaphore')
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_semaphore_uses_concurrency_parameter(self, mock_async_client_class, mock_semaphore_class):
+        """Test that get_batch creates semaphore with concurrency parameter, using get_pool_size as default"""
+        # Create a proper mock for the async client and response
+        mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
+        
+        # Mock the response object
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
+            'id': 'test::doc1',
+            'fields': {'title': 'Test'}
+        }
+        
+        # Make the async client's get method return the mock response
+        mock_async_client.get.return_value = mock_response
+        
+        # Create client with specific get_pool_size
+        get_pool_size = 20
+        client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080", 
+            "http://localhost:8080",
+            "content_default",
+            get_pool_size=get_pool_size
+        )
+        
+        # Test 1: Use default concurrency (should use get_pool_size)
+        client.get_batch(['doc1'], self.TEST_SCHEMA)
+        mock_semaphore_class.assert_called_with(get_pool_size)
+        
+        # Test 2: Use explicit concurrency parameter
+        custom_concurrency = 8
+        mock_semaphore_class.reset_mock()
+        client.get_batch(['doc1'], self.TEST_SCHEMA, concurrency=custom_concurrency)
+        mock_semaphore_class.assert_called_with(custom_concurrency)
+        
+        client.close()
+
+    def test_vespa_client_close_calls_http_client_close(self):
+        """Test that VespaClient.close() calls http_client.close()"""
+        # Create a VespaClient with correct parameters
+        client = VespaClient(
+            config_url="http://localhost:19071",
+            document_url="http://localhost:8080",
+            query_url="http://localhost:8080",
+            content_cluster_name="test_cluster",
+            get_pool_size=10
+        )
+        
+        # Mock the http_client.close method
+        with patch.object(client.http_client, 'close') as mock_close:
+            # Call close method
+            client.close()
+            
+            # Verify that http_client.close was called
+            mock_close.assert_called_once()
+
+    def test_vespa_get_pool_size_env_var(self):
+        """Test that VESPA_GET_POOL_SIZE environment variable properly sets get_pool_size"""
+        
+        # Test 1: Default value (should be 10)
+        with self.subTest("default_get_pool_size"):
+            config = generate_config()
+            vespa_client = config.vespa_client
+            
+            # Verify default get_pool_size is used
+            self.assertEqual(vespa_client.get_pool_size, 10)
+            vespa_client.close()
+        
+        # Test 2: Set environment variable to custom value
+        with self.subTest("custom_get_pool_size"):
+            with patch.dict(os.environ, {EnvVars.VESPA_GET_POOL_SIZE: "25"}):
+                # Import and call generate_config to create VespaClient with env var
+                
+                config = generate_config()
+                vespa_client = config.vespa_client
+                
+                # Verify the custom get_pool_size is used
+                self.assertEqual(vespa_client.get_pool_size, 25)
+                
+                vespa_client.close()
 
     def test_deploy_session(self):
         """Test that create_deployment_session calls the correct methods"""

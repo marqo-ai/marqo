@@ -578,6 +578,61 @@ class TestLanguage(MarqoTestCase):
                             self.assertEqual(doc1["title"], scenario["first_docs"][0]["title"])
                             self.assertEqual(doc2["title"], scenario["second_docs"][0]["title"])
 
+    def test_field_language_override(self):
+        """Test that field language is set in the schema, as others test could pass with good automatic detection."""
+        # mole stems differently in Portuguese and English
+        docs = [
+            {
+                "_id": "1",
+                "title_pt": "mole",
+            },
+            {
+                "_id": "2",
+                "title_en": "mole",
+            },
+        ]
+
+        mappings = {
+            "title_pt": {"type": "text_field", "language": "pt"},
+            "title_en": {"type": "text_field", "language": "en"},
+        }
+
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.three_fields_index.name,
+                docs=docs,
+                tensor_fields=[],
+                mappings=mappings
+            )
+        )
+
+        self.assertFalse(response.errors, "Should not have errors when adding documents")
+
+        # Test Portuguese search
+        res_pt = tensor_search.search(
+            config=self.config,
+            index_name=self.three_fields_index.name,
+            text="mole",
+            search_method=SearchMethod.LEXICAL,
+            language="pt"
+        )
+
+        # Test English search
+        res_en = tensor_search.search(
+            config=self.config,
+            index_name=self.three_fields_index.name,
+            text="mole",
+            search_method=SearchMethod.LEXICAL,
+            language="en"
+        )
+
+        hits_pt = [hit["_id"] for hit in res_pt["hits"]]
+        hits_en = [hit["_id"] for hit in res_en["hits"]]
+
+        self.assertEqual(["1"], hits_pt, "Should find only the Portuguese doc")
+        self.assertEqual(["2"], hits_en, "Should find only the English doc")
+
     def test_structured_index_language_search_fails(self):
         """Test that searching with language parameter fails for structured indexes."""
 
