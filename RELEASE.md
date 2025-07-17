@@ -1,3 +1,18 @@
+# Release 2.22.0
+
+## New features
+- Search result sorting and relevance cutoff ([#1246](https://github.com/marqo-ai/marqo/pull/1246)). You can now sort search results by up to 3 fields with the `sortBy` parameter. Customize further with field sort `order` and `missing`, which determines placement of documents without said fields. You can also exclude results that do not meet a certain relevance threshhold with `relevanceCutoff`. Check [here](https://docs.marqo.ai/latest/other-resources/cookbook/tips-and-tricks/sort-and-relevance-cutoff/) for detailed usage.
+- Personalization with context documents ([#1254](https://github.com/marqo-ai/marqo/pull/1254)). You can now search using existing documents in your index in combination with a query by using `documents` in the `context` search parameter. Marqo will interpolate all vectors from your query, context tensors (if any), and context documents using `interpolationMethod`. This is a more robust form of the `recommend` endpoint. Check [here](https://docs.marqo.ai/latest/reference/api/search/search/#using-context-documents) for detailed usage.
+- Query logging for slow or failed queries ([#1247](https://github.com/marqo-ai/marqo/pull/1247)). Marqo now logs the sanitized query and E2E latency for slow queries (configurable with `MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS`). Failed queries are also logged along with the exception that caused it.
+
+## Bug Fixes and Minor Changes
+- Fixed bug where no chunks are generated when `split_overlap` is larger than the duration of the media file ([#1255](https://github.com/marqo-ai/marqo/pull/1255)).
+- Upgraded `cachetools` to 6.1.0 which fixes the LFU cache eviction efficiency issue ([#1262](https://github.com/marqo-ai/marqo/pull/1262)).
+- Emit `StatsD` metrics from Marqo ([#1260](https://github.com/marqo-ai/marqo/pull/1260)).
+
+## Performance Improvements
+- Optimized `recommend` endpoint, resulting in up to 34.9% improvement in latency ([#1254](https://github.com/marqo-ai/marqo/pull/1254)).
+
 # Release 2.21.1
 
 ## Bug fixes and minor changes
@@ -9,6 +24,7 @@
 - Search with base64-encoded images ([#1236](https://github.com/marqo-ai/marqo/pull/1236)). You can now submit image data as a Base64 string (starting with `"data:image/…"`) when querying any image-compatible index. Marqo will decode and vectorize the image on the fly. This an alternative to supplying an external image URL for search. Check [here](https://docs.marqo.ai/2.21/reference/api/search/search/#query-q) for detailed usage.
 
 - Set language for lexical fields and search ([#1242](https://github.com/marqo-ai/marqo/pull/1242)). When you add a new text field or send a query, you can specify its language to optimize tokenization and parsing. Lexical searches over that field will honour your language setting, delivering more accurate search results. This feature is available for unstructured indexes created with Marqo 2.16 or later. Check [here](https://docs.marqo.ai/2.21/reference/api/documents/add-or-replace-documents/#example-language-mappings) for adding documents and [here](https://docs.marqo.ai/2.21/reference/api/search/search/#language) for searching.
+
 
 # Release 2.20.0
 
