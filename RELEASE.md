@@ -13,6 +13,19 @@
 ## Performance Improvements
 - Optimized `recommend` endpoint, resulting in up to 34.9% improvement in latency ([#1254](https://github.com/marqo-ai/marqo/pull/1254)).
 
+# Release 2.21.1
+
+## Bug fixes and minor changes
+- Omit base64 image strings in the search response to avoid returning unnecessarily large responses ([#1256](https://github.com/marqo-ai/marqo/pull/1256)).
+
+# Release 2.21.0
+
+## New features
+- Search with base64-encoded images ([#1236](https://github.com/marqo-ai/marqo/pull/1236)). You can now submit image data as a Base64 string (starting with `"data:image/…"`) when querying any image-compatible index. Marqo will decode and vectorize the image on the fly. This an alternative to supplying an external image URL for search. Check [here](https://docs.marqo.ai/2.21/reference/api/search/search/#query-q) for detailed usage.
+
+- Set language for lexical fields and search ([#1242](https://github.com/marqo-ai/marqo/pull/1242)). When you add a new text field or send a query, you can specify its language to optimize tokenization and parsing. Lexical searches over that field will honour your language setting, delivering more accurate search results. This feature is available for unstructured indexes created with Marqo 2.16 or later. Check [here](https://docs.marqo.ai/2.21/reference/api/documents/add-or-replace-documents/#example-language-mappings) for adding documents and [here](https://docs.marqo.ai/2.21/reference/api/search/search/#language) for searching.
+
+
 # Release 2.20.0
 
 ## New features
