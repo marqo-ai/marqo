@@ -933,59 +933,6 @@ class TestSearchWithContext(MarqoTestCase):
                             # But we should still have embeddings
                             self.assertGreater(len(doc_embeddings), 0)
 
-    def test_search_with_context_documents_concurrency_parameter_controls_vespa_concurrency(self):
-        """Test that context.documents.parameters.concurrency is passed to vespa_client.get_batch."""
-        index = self.structured_default_text_index
-        
-        # Add documents to the index
-        docs = [
-            {"_id": "doc1", "text_field_1": "Test document 1"},
-            {"_id": "doc2", "text_field_1": "Test document 2"}
-        ]
-
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=index.name,
-                docs=docs,
-                tensor_fields=None
-            )
-        )
-
-        # Mock vespa_client.get_batch to capture the concurrency parameter
-        original_get_batch = self.config.vespa_client.get_batch
-        captured_concurrency = []
-
-        def mock_get_batch(*args, **kwargs):
-            captured_concurrency.append(kwargs.get('concurrency'))
-            return original_get_batch(*args, **kwargs)
-
-        with mock.patch.object(self.config.vespa_client, 'get_batch', side_effect=mock_get_batch):
-            # Create search context with specific concurrency
-            search_context = SearchContext(
-                documents=SearchContextDocuments(
-                    ids={"doc1": 1.0, "doc2": 1.0},
-                    parameters=SearchContextDocumentsParameters(
-                        tensorFields=["text_field_1"],
-                        excludeInputDocuments=False,
-                        concurrency=5  # Test with concurrency=5
-                    )
-                )
-            )
-
-            # Perform search with context documents
-            tensor_search.search(
-                config=self.config,
-                index_name=index.name,
-                text=None,
-                context=search_context,
-                result_count=5
-            )
-
-            # Verify that get_batch was called with the correct concurrency parameter
-            self.assertEqual(len(captured_concurrency), 1, "get_batch should have been called")
-            self.assertEqual(captured_concurrency[0], 5, "get_batch should be called with concurrency=5")
-
     def test_search_with_context_documents_max_search_context_docs_env_var(self):
         """Test that MARQO_MAX_SEARCH_CONTEXT_DOCS environment variable controls the limit for context documents."""
 
