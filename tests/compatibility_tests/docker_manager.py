@@ -393,7 +393,7 @@ class DockerManager:
             container = self.docker_client.containers.get(container_name)
 
             # Stop the container
-            container.stop()
+            container.stop(timeout=60)  # Increase the timeout from default 10 seconds to 60 seconds
             self.logger.debug(f"Successfully stopped container {container_name}")
 
         except NotFound:
