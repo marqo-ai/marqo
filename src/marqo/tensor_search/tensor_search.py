@@ -22,12 +22,12 @@ Notes on search behaviour with caching and searchable attributes:
         - Searching an existing but uncached field will return the best result
             (the uncached field will be searched)
         - Searching all fields will return a poor result
-            (the uncached field won’t be searched)
+            (the uncached field won't be searched)
     Vector search:
         - Searching an existing but uncached field will return no results (the
-            uncached field won’t be searched)
+            uncached field won't be searched)
         - Searching all fields will return a poor result (the uncached field
-            won’t be searched)
+            won't be searched)
 
 """
 import typing
@@ -45,21 +45,22 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
-    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
+from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
     ModelError, InferenceErrorModel
-from marqo.core.inference.modality_utils import infer_modality
+from marqo.core.inference.modality_utils import infer_modality, is_base64_image
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
-from marqo.core.models.marqo_index import IndexType
+from marqo.core.models.interpolation_method import InterpolationMethod
+from marqo.core.utils.vector_interpolation import from_interpolation_method
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
+from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.reranking import rerank
@@ -78,12 +79,48 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.logging import get_logger
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
+from marqo.core.models.marqo_index import IndexType
+from marqo.core.structured_vespa_index import common as structured_common
+from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.vespa_index.vespa_schema import MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
+from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
 logger = get_logger(__name__)
 
+
+def _sanitize_query_for_response(query: Optional[Union[str, dict]]):
+    """
+    Replace base64 image content in queries with 'data:image/[omitted]' for response.
+    
+    Args:
+        query: The query object which can be a string, dict, or CustomVectorQuery
+        
+    Returns:
+        The sanitized query object with base64 content replaced
+    """
+    if query is None:
+        return query
+    
+    if isinstance(query, str):
+        if is_base64_image(query):
+            return 'data:image/[omitted]'
+        return query
+    
+    if isinstance(query, dict):
+        sanitized_query = {}
+        for key, value in query.items():
+            if is_base64_image(key):
+                sanitized_query['data:image/[omitted]'] = value
+            else:
+                sanitized_query[key] = value
+        return sanitized_query
+
+    # Should not reach here
+    raise RuntimeError('Invalid query type')  # pragma: no cover
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = _get_latest_index(config, index_name)
@@ -182,11 +219,11 @@ def get_documents_by_ids(
                 unsuccessful_docs.append(
                     (
                         loc, MarqoGetDocumentsByIdsItem(
-                            # Invalid IDs are not returned in the response
-                            id=doc_id,
-                            message=e.message,
-                            status=int(e.status_code)
-                        )
+                        # Invalid IDs are not returned in the response
+                        id=doc_id,
+                        message=e.message,
+                        status=int(e.status_code)
+                    )
                     )
                 )
             else:
@@ -196,7 +233,8 @@ def get_documents_by_ids(
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
     marqo_index = _get_latest_index(config, index_name)
-    batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
+    with RequestMetricsStore.for_request().time(f"get_documents.vespa"):
+        batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
     results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
@@ -303,7 +341,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
            result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
-           approximate: Optional[bool] = None,
+           approximate: Optional[bool] = None, approximate_threshold: Optional[float] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
            reranker: Union[str, Dict] = None, filter: Optional[str] = None,
@@ -318,6 +356,10 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            hybrid_parameters: Optional[HybridParameters] = None,
            facets: Optional[FacetsParameters] = None,
            track_total_hits: Optional[bool] = None,
+           language: Optional[str] = None,
+           relevance_cutoff: Optional[RelevanceCutoffModel] = None,
+           sort_by: Optional[SortByModel] = None,
+           interpolation_method: Optional[InterpolationMethod] = None
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -348,6 +390,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
         facets: Parameters for facets
+        track_total_hits: Whether to track total hits for the search
+        interpolation_method: The interpolation method to use for the combining of vectors
     Returns:
 
     """
@@ -369,6 +413,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
     max_search_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_LIMIT)
     max_search_offset = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_OFFSET)
+    max_search_context_docs = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS)
 
     check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
     check_limit = True if max_search_limit is None else result_count <= int(max_search_limit)
@@ -400,8 +445,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if searchable_attributes is not None:
         [validation.validate_field_name(attribute) for attribute in searchable_attributes]
     if attributes_to_retrieve is not None:
-        if not isinstance(attributes_to_retrieve, (List, typing.Tuple)):
-            raise api_exceptions.InvalidArgError("attributes_to_retrieve must be a sequence!")
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
@@ -418,34 +461,57 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             f"{str(constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION)} or later. "
             f"This index was created with Marqo {marqo_index_version}."
         )
-
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
         if approximate is None:
             approximate = True
 
+        # Add context.documents exclusion filter to exclude input docs (only applicable for tensor & hybrid)
+        if context is not None and context.documents is not None:
+            # Disallow context docs for legacy unstructured indexes
+            if marqo_index.type == IndexType.Unstructured:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"Search context is not supported for unstructured indexes created with Marqo version "
+                    f"{MINIMUM_SEMI_STRUCTURED_INDEX_VERSION} or later. "
+                    f"This index was created with Marqo {marqo_index_version}."
+                )
+            if len(context.documents.ids) > int(max_search_context_docs):
+                raise api_exceptions.IllegalRequestedDocCount(
+                    f"Search context documents limit exceeded. "
+                    f"Maximum allowed is {max_search_context_docs}, but got {len(context.documents.ids)}. "
+                    f"To increase, set the environment variable '{EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS}'"
+                )
+            if context.documents.parameters.exclude_input_documents:
+                filter = config.recommender.get_exclusion_filter(marqo_index, list(context.documents.ids.keys()), filter)
+
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                ef_search=ef_search, approximate=approximate, approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, 
+                rerank_depth=rerank_depth, interpolation_method=interpolation_method
             )
-        elif search_method.upper() == SearchMethod.HYBRID:
+        else:  # SearchMethod.HYBRID
             # TODO: Deal with circular import when all modules are refactored out.
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 rerank_depth=rerank_depth,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                ef_search=ef_search, approximate=approximate, approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits
+                hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
+                language=language,
+                relevance_cutoff=relevance_cutoff, sort_by=sort_by,
+                interpolation_method=interpolation_method
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -460,7 +526,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers
+            score_modifiers=score_modifiers, language=language
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -469,9 +535,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         raise api_exceptions.InvalidArgError(f"Reranker is no longer supported in Marqo version 2.17 and later")
 
     if isinstance(text, CustomVectorQuery):
-        search_result["query"] = text.dict()    # Make object JSON serializable
+        search_result["query"] = text.dict()  # Make object JSON serializable
     else:
-        search_result["query"] = text
+        search_result["query"] = _sanitize_query_for_response(text)
 
     search_result["limit"] = result_count
     search_result["offset"] = offset
@@ -487,7 +553,7 @@ def _lexical_search(
         config: Config, marqo_index: MarqoIndex, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
-        score_modifiers: Optional[ScoreModifierLists] = None):
+        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None):
     """
 
     Args:
@@ -530,7 +596,8 @@ def _lexical_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None,
+        language=language
     )
 
     vespa_index = vespa_index_factory(marqo_index)
@@ -603,7 +670,7 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], media_down
         pass
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
-    return QueryContentCollector(queries = query_content_list)
+    return QueryContentCollector(queries=query_content_list)
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -626,7 +693,7 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        if doc.id.startswith("group:facet:"): # Not an actual document id but group's id returned by vespa
+        if doc.id.startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
             continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
@@ -654,6 +721,7 @@ def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set
     """
     return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve_set or
             '.' in k and k.split('.', maxsplit=1)[0] in attributes_to_retrieve_set}
+
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs],
@@ -735,14 +803,23 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
 
 
 def _get_preprocessing_config(modality: Modality, media_download_headers: Optional[Dict[str, str]]):
+    """
+    Get the preprocessing config for the given modality used for searching.
+    """
     if modality == Modality.TEXT:
-        return TextPreprocessingConfig()   # the prefix has been added to the query, so we don't need to specify it here
+        return TextPreprocessingConfig()  # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
         return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
     elif modality == Modality.AUDIO:
-        return AudioPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return AudioPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     elif modality == Modality.VIDEO:
-        return VideoPreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return VideoPreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        )
     else:
         raise InferenceError(f'Unsupported modality: {modality}')
 
@@ -806,7 +883,7 @@ def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHa
 def get_query_vectors_from_jobs(
         queries: List[BulkSearchQueryEntity], qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]],
         job_to_vectors: Dict[JHash, Dict[str, List[float]]], config: Config,
-        jobs: Dict[JHash, VectorisedJobs]
+        jobs: Dict[JHash, VectorisedJobs], interpolation_method: Optional[InterpolationMethod] = None,
 ) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
@@ -829,28 +906,59 @@ def get_query_vectors_from_jobs(
 
         if isinstance(q.q, dict) or q.q is None:
             ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-            weighted_vectors = []
+            # Store weights and vectors separately for use in interpolation
+            collected_weights: List[List[float]] = []
+            collected_vectors: List[float] = []
+
             if ordered_queries:
                 # multiple queries. We have to weight and combine them:
                 vectorised_ordered_queries = [
                     (
                         get_content_vector(
-                        possible_jobs=qidx_to_job[qidx],
-                        job_to_vectors=job_to_vectors,
-                        content=content
+                            possible_jobs=qidx_to_job[qidx],
+                            job_to_vectors=job_to_vectors,
+                            content=content
                         ),
-                     weight,
-                     content
+                        weight,
+                        content
                     ) for content, weight in ordered_queries
                 ]
                 # TODO how do we ensure order?
-                weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+                collected_weights = [weight for _, weight, _ in vectorised_ordered_queries]
+                collected_vectors = [vec for vec, _, _ in vectorised_ordered_queries]
 
+            # Add context tensors
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
+                collected_weights += [v.weight for v in context_tensors]
+                collected_vectors += [v.vector for v in context_tensors]
 
-            for vector in weighted_vectors:
+            # Add context document vectors
+            context_documents = q.get_context_documents()
+            if interpolation_method is None:
+                interpolation_method = config.recommender.get_default_interpolation_method(q.index, context_documents)
+
+            if context_documents:
+                with RequestMetricsStore.for_request().time(f"search.vectorise.get_doc_vectors_from_ids"):
+                                            context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
+                            index_name=q.index.name,
+                            documents=context_documents.ids,
+                            tensor_fields=context_documents.parameters.tensor_fields,
+                            concurrency=context_documents.parameters.concurrency
+                        )
+
+                # Update weights and vectors list
+                for document_id, vector_list in context_doc_vectors.items():
+                    weight = context_documents.ids[document_id]
+                    # Per doc, add whole list of vectors, copy the doc weight for each
+                    collected_vectors.extend(vector_list)
+                    collected_weights.extend([weight] * len(vector_list))
+
+                # Save original doc ids for exclusion filtering
+                all_document_ids = list(context_documents.ids.keys())
+
+            # Make sure all vectors are the same size
+            for vector in collected_vectors:
                 if not q.index.model.get_dimension() == len(vector):
                     raise api_exceptions.InvalidArgError(
                         f"The dimension of the vectors returned by the model or given by the context vectors "
@@ -858,15 +966,22 @@ def get_query_vectors_from_jobs(
                         f"Expected dimension {q.index.model.get_dimension()} but got {len(vector)}"
                     )
 
-            merged_vector = np.mean(weighted_vectors, axis=0)
+            # Use interpolation to combine all vectors
+            vector_interpolation = from_interpolation_method(interpolation_method)
+            with RequestMetricsStore.for_request().time(f"search.vectorise.interpolate_vectors"):
+                merged_vector = vector_interpolation.interpolate(
+                    vectors=collected_vectors,
+                    weights=collected_weights
+                )
 
-            if q.index.normalize_embeddings:
-                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-                if norm > 0:
-                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
+
         elif isinstance(q.q, str):
-            # result[qidx] = vectors[0]
+            if q.context:
+                raise core_exceptions.InvalidArgumentError(
+                    f"Cannot use 'context' for a search with a string 'q' (or queryTensor): '{q.q}'. "
+                    f"To use 'context', please provide a dictionary or a CustomVectorQuery object as the query instead."
+                )
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 job_to_vectors=job_to_vectors,
@@ -952,7 +1067,8 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
     return prefixed_queries
 
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str],
+                           interpolation_method: InterpolationMethod = None) -> Dict[
     Qidx, List[float]]:
     """Run the query vectorisation process
 
@@ -976,11 +1092,13 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # 2. Vectorise in batches against all queries
     ## TODO: To ensure that we are vectorising in batches, we can mock vectorise (), and see if the number of calls is as expected (if batch_size = 16, and number of docs = 32, and all args are the same, then number of calls = 2)
     # TODO: we need to enable str/PIL image structure:
-    job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
+    with RequestMetricsStore.for_request().time(f"search.vector.inference.vectorise_jobs"):
+        job_ptr_to_vectors: Dict[JHash, Dict[str, List[float]]] = vectorise_jobs(config.inference, list(jobs.values()))
 
     # 3. For each query, get associated vectors
+    # Combination of context tensors & documents is also done here
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs, interpolation_method
     )
     return qidx_to_vectors
 
@@ -989,15 +1107,16 @@ def _vector_text_search(
         config: Config, marqo_index: MarqoIndex,
         query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5,
         offset: int = 0,
-        ef_search: Optional[int] = None, approximate: bool = True,
+        ef_search: Optional[int] = None, approximate: bool = True, approximate_threshold: Optional[float] = None,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None,
+        interpolation_method: Optional[InterpolationMethod] = None
 ) -> Dict:
     """
-    
+
     Args:
         config:
         marqo_index: index object fetched by calling function
@@ -1017,6 +1136,7 @@ def _vector_text_search(
         highlights: if True, highlights will be returned
         text_query_prefix: prefix to add to text queries
         rerank_depth: the number of hits per shard during retrieval
+        interpolation_method: the method to use for combining vectors
     Returns:
 
     Note:
@@ -1063,7 +1183,7 @@ def _vector_text_search(
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     marqo_query = MarqoTensorQuery(
@@ -1073,6 +1193,7 @@ def _vector_text_search(
         limit=result_count,
         ef_search=ef_search,
         approximate=approximate,
+        approximate_threshold=approximate_threshold,
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
@@ -1173,5 +1294,138 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
+
+
+def get_embedding_field_names(marqo_index: MarqoIndex, tensor_field_names: Optional[List[str]] = None) \
+        -> (Tuple)[List[str], List[str]]:
+    """
+    Get the Vespa field names for embeddings based on the index type.
+    
+    Args:
+        marqo_index: The Marqo index object
+        tensor_field_names: Specific tensor fields to get embeddings for. If None, get all.
+    
+    Returns:
+        List of Marqo tensor field names and Vespa field names for embeddings
+        marqo_field_names, vespa_field_names
+
+        For structured/semistructured: returned marqo_field_names can never be None.
+        For unstructured: returned marqo_field_names can be None if no tensor fields are specified.
+    """
+    
+    if marqo_index.type in {IndexType.Structured, IndexType.SemiStructured}:
+        # For structured indexes, embeddings are stored per field
+        if hasattr(marqo_index, 'tensor_fields'):
+            if tensor_field_names:
+                index_tensor_field_names = [tf.name for tf in marqo_index.tensor_fields]
+                requested_tensor_fields = []
+                for tf_name in tensor_field_names:
+                    if tf_name in index_tensor_field_names:
+                        # If tf_name is in index_tensor_field_names, append the corresponding item
+                        # in marqo_index.tensor_fields that has that name
+                        requested_tensor_fields.append(
+                            next(tf for tf in marqo_index.tensor_fields if tf.name == tf_name)
+                        )
+                    else:
+                        raise core_exceptions.InvalidArgumentError(
+                            f"Tensor field '{tf_name}' not found in index '{marqo_index.name}'. "
+                            f"Available tensor fields: {index_tensor_field_names}"
+                        )
+            else:
+                requested_tensor_fields = marqo_index.tensor_fields
+            
+            return ([tf.name for tf in requested_tensor_fields],
+                    [tf.embeddings_field_name for tf in requested_tensor_fields])
+        else:
+            # Index has no tensor fields at all
+            raise core_exceptions.InvalidArgumentError(
+                f"Index '{marqo_index.name}' has no tensor fields, cannot retrieve embeddings"
+                f" for {tensor_field_names}"
+            )
+    else:
+        raise InternalError(
+            f"Attempting to retrieve only embeddings for unstructured index '{marqo_index.name}'"
+            f" which was created before {MINIMUM_SEMI_STRUCTURED_INDEX_VERSION}. This functionality should be disabled."
+        )
+
+
+def get_doc_vectors_per_tensor_field_by_ids(
+    config: Config, 
+    index_name: str, 
+    document_ids: List[str],
+    tensor_fields: Optional[List[str]] = None,
+    concurrency: Optional[int] = None
+) -> Dict[str, Dict[str, List[List[float]]]]:
+    """
+    Get only the embeddings for documents by their IDs.
+    
+    Args:
+        config: Marqo config
+        index_name: Name of the index
+        document_ids: List of document IDs to fetch
+        tensor_fields: Specific tensor fields to get. If None, get all tensor fields.
+    
+    Returns:
+        Dict mapping document_id to field_name to list of embedding vectors
+    """
+
+    # We can just use the cache here since we refresh every 1s.
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
+    
+    # Get the embedding field names we want to retrieve
+    viable_tensor_fields, embedding_fields = get_embedding_field_names(marqo_index, tensor_fields)
+    
+    # Add the document ID field so we can identify the documents (structured and unstructured are the same here)
+    fields_to_retrieve = [structured_common.FIELD_ID] + embedding_fields
+    
+    # Get documents with only embedding fields
+    with RequestMetricsStore.for_request().time(f"get_document_vectors.vespa"):
+        batch_get = config.vespa_client.get_batch(
+            document_ids,
+            marqo_index.schema_name,
+            fields=fields_to_retrieve,
+            concurrency=concurrency
+        )
+    
+    vespa_index = vespa_index_factory(marqo_index)
+    result = {}
+
+    # Using index so correct document_id can be fetched for error message if needed
+    for res_idx in range(len(batch_get.responses)):
+        response = batch_get.responses[res_idx]
+
+        if response.status == 200:
+            # Extract vectors directly (for structured and semi-structured)
+            # Skip turning into marqo document
+            raw_response_dict = response.document.fields
+            doc_id = raw_response_dict["marqo__id"]
+
+            # Initialize the result for this document ID
+            result[doc_id] = {}
+            for tf_idx in range(len(viable_tensor_fields)):
+                # Get marqo tensor field name from vespa field name
+                marqo_tensor_field_name = viable_tensor_fields[tf_idx]
+                retrieved_embedding_field_name = embedding_fields[tf_idx]
+
+                if retrieved_embedding_field_name in raw_response_dict:
+                    try:
+                        # If the field exists, add all the tensors to the result
+                        result[doc_id][marqo_tensor_field_name] = list(raw_response_dict
+                                                                       [retrieved_embedding_field_name]["blocks"].values())
+                    except (KeyError, AttributeError, TypeError) as e:
+                        raise core_exceptions.VespaDocumentParsingError(
+                            f'Cannot parse Vespa doc embeddings field {retrieved_embedding_field_name} '
+                            f'with value {raw_response_dict[retrieved_embedding_field_name]}'
+                        ) from e
+                else:
+                    # Otherwise, field is empty list
+                    result[doc_id][marqo_tensor_field_name] = []
+        else:
+            # If the response is not successful, error out
+            raise core_exceptions.InvalidArgumentError(
+                f"Failed to retrieve document {document_ids[res_idx]} from index {index_name}. "
+                f"Response status: {response.status}, message: {response.message}"
+            )
+    return result
 
 

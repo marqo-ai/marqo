@@ -5,7 +5,7 @@ from typing import Optional
 
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
-from pydantic import Field, validator, root_validator
+from pydantic.v1 import Field, validator, root_validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties

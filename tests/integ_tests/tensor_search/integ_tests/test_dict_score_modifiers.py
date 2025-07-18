@@ -10,7 +10,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 import unittest
 
@@ -321,7 +321,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 r = update_documents(
                     marqo_config=self.config,
                     index_name=index.name,
-                    body=UpdateDocumentsBodyParams(documents=[updated_doc])
+                    body_dict={"documents": [updated_doc]}
                 )
 
                 # Get updated document and assert that the score modifier is 1.5

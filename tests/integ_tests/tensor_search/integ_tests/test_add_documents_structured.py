@@ -13,7 +13,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import unittest
 
@@ -125,7 +125,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field', 'image_field_2'],
-            model=Model(name='ViT-B/16')
+            model=Model(name='open_clip/ViT-B-16/openai')
         )
         index_request_img_chunking = cls.structured_marqo_index_request(
             fields=[
@@ -141,7 +141,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field'],
-            model=Model(name='ViT-B/16'),
+            model=Model(name='open_clip/ViT-B-16/openai'),
             normalize_embeddings=True,
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn)
         )
@@ -938,5 +938,4 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for item in r.items:
             self.assertEqual(400, item.status)
             # modality mismatch
-            self.assertIn("Error processing image_field, detected as language, "
-                          "but expected field type is image_pointer", item.message)
+            self.assertIn("is not a local file, a valid url, or a base64-encoded image", item.message)

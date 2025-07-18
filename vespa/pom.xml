@@ -26,6 +26,17 @@
             <artifactId>jackson-core</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-statistics-descriptive</artifactId>
+            <version>1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>32.1.3-jre</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- Start: Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -143,6 +154,7 @@
         is first introduced in Marqo 2.10.0. Vespa minor versions are backward compatible, but not forward compatible.
         Pin to this version to make sure we don't accidentally bring in dependencies that are missing in this version
         of Vespa.
+        TODO upgrade this to 8.513.17 after Marqo Cloud has upgraded to this version
         -->
         <version>8.332.5</version>
         <relativePath/>

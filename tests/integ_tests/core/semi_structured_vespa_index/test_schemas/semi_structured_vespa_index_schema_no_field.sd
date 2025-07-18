@@ -82,6 +82,9 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__add_weights_tensor) tensor<double>(p{})
             query(marqo__mult_weights_global) tensor<double>(p{})
             query(marqo__add_weights_global) tensor<double>(p{})
+            query(marqo__sort_field_weights_0) tensor<double>(p{})
+            query(marqo__sort_field_weights_1) tensor<double>(p{})
+            query(marqo__sort_field_weights_2) tensor<double>(p{})
         }
 
         function mult_modifier(mult_weights) {
@@ -104,7 +107,23 @@ schema marqo__test_00semi_00structured_00schema {
             expression: 0
         }
 
-        match-features: global_mult_modifier global_add_modifier
+        function sort_field_value(sort_weights) {
+            expression: if (count(sort_weights * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(sort_weights * attribute(marqo__score_modifiers), prod))
+        }
+
+        function sort_field_value_0() {
+            expression: sort_field_value(query(marqo__sort_field_weights_0))
+        }
+
+        function sort_field_value_1() {
+            expression: sort_field_value(query(marqo__sort_field_weights_1))
+        }
+
+        function sort_field_value_2() {
+            expression: sort_field_value(query(marqo__sort_field_weights_2))
+        }
+
+        match-features: global_mult_modifier global_add_modifier sort_field_value_0  sort_field_value_1 sort_field_value_2
     }
 
     rank-profile embedding_similarity inherits base_rank_profile {

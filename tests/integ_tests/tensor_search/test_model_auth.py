@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 from unittest import mock
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 from transformers import AutoModel, AutoTokenizer
 
 from marqo.api.exceptions import BadRequestError, ModelNotInCacheError
@@ -26,7 +26,7 @@ from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQue
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 def fake_vectorise(*args, **_kwargs):

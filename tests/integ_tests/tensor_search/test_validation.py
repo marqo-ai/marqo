@@ -13,7 +13,7 @@ from marqo.tensor_search import validation
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 
 class TestValidation(unittest.TestCase):
@@ -544,7 +544,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_multimodal_combination_mappings_object(d)
+            assert d == validation._validate_multimodal_combination_mappings_object(d)
 
     def test_invalid_multimodal_combination_mappings_object(self):
         mappings = [
@@ -600,7 +600,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for mapping, error_message in mappings:
             try:
-                validation.validate_multimodal_combination_mappings_object(mapping)
+                validation._validate_multimodal_combination_mappings_object(mapping)
                 raise AssertionError
             except InvalidArgError as e:
                 assert error_message in e.message
@@ -613,7 +613,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             }
         ]
         for d in mappings:
-            assert d == validation.validate_custom_vector_mappings_object(d)
+            assert d == validation._validate_custom_vector_mappings_object(d)
 
     def test_invalid_custom_vector_mappings_object(self):
         mappings = [
@@ -635,7 +635,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for mapping, error_message in mappings:
             try:
-                validation.validate_custom_vector_mappings_object(mapping)
+                validation._validate_custom_vector_mappings_object(mapping)
                 raise AssertionError
             except InvalidArgError as e:
                 assert error_message in e.message

@@ -613,7 +613,31 @@ def _get_open_clip_properties() -> Dict:
             "dimensions": 1152,
             "note": "A multilingual CLIP model",
             "type": "open_clip"
-        }
+        },
+        "timm/ViT-B-16-SigLIP2": {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP2",
+            "dimensions": 768,
+            "note": "A SigLIP 2 Vision-Language model trained on WebLI with image size 224",
+            "type": "open_clip",
+        },
+        "timm/ViT-B-16-SigLIP2-256": {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP2-256",
+            "dimensions": 768,
+            "note": "A SigLIP 2 Vision-Language model trained on WebLI with image size 256",
+            "type": "open_clip",
+        },
+        "timm/ViT-B-16-SigLIP2-512": {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP2-512",
+            "dimensions": 768,
+            "note": "A SigLIP 2 Vision-Language model trained on WebLI with image size 512",
+            "type": "open_clip",
+        },
+        "timm/ViT-L-16-SigLIP2-256": {
+            "name": "hf-hub:timm/ViT-L-16-SigLIP2-256",
+            "dimensions": 1024,
+            "note": "A SigLIP 2 Vision-Language model trained on WebLI with image size 256",
+            "type": "open_clip",
+        },
     }
     return OPEN_CLIP_MODEL_PROPERTIES
 

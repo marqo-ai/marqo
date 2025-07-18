@@ -4,8 +4,8 @@ import uuid
 from unittest import mock
 from unittest.mock import patch
 
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.utils.transition import *
+from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.utils.transition import *
 
 from marqo.api.exceptions import (
     InvalidArgError,
@@ -18,6 +18,10 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 
 import unittest
+import threading
+
+from unittest.mock import patch
+from contextlib import nullcontext
 
 
 class TestGetDocuments(MarqoTestCase):
@@ -316,6 +320,245 @@ class TestGetDocuments(MarqoTestCase):
                             ).dict(exclude_none=True, by_alias=True)
                         return True
                 assert run()
+
+    def test_get_documents_concurrent_succeeds(self):
+        """
+        Run concurrent get document requests and ensure that they all work successfully.
+        If a thread hangs (lasts more than 60s), we error out
+        Telemetry is mocked out because it is not thread-safe
+        """
+        # Structured index
+        index = self.indexes[0]
+
+        docs = [
+            {"_id": "1", "title1": "content 1",
+             "int_field": 1, "int_array_field": [1, 2], "int_map_field": {"a": 1},
+             "float_field": 2.9, "float_array_field": [1.0, 2.0], "float_map_field": {"b": 2.9},
+             "long_field": 10, "long_array_field": [10, 20], "long_map_field": {"a": 10},
+             "double_field": 3.9, "double_array_field": [3.0, 5.0], "double_map_field": {"b": 5.9},
+             "bool_field": True, "string_array_field": ["a", "b", "c"]},
+            {"_id": "2", "title1": "content 2", "custom_vector_field": {"content": "a", "vector": [1.0] * 384}},
+            {"_id": "3", "title1": "content 3"}
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name, docs=docs, device="cpu"
+            )
+        )
+
+        results = []
+        exceptions = []
+
+        def get_documents_thread(document_ids, thread_id):
+            try:
+                r = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index.name, document_ids=document_ids,
+                    show_vectors=True).dict(exclude_none=True, by_alias=True)
+                results.append((thread_id, r))
+                return r
+            except Exception as e:
+                exceptions.append((thread_id, e))
+                raise
+
+        # Mock the telemetry context manager to avoid thread-local storage issues
+        with patch('marqo.tensor_search.telemetry.RequestMetricsStore.for_request') as mock_metrics:
+            # Make the time() method return a no-op context manager
+            mock_metrics.return_value.time.return_value = nullcontext()
+            
+            # Create 10 threads for concurrent requests
+            threads = []
+            for i in range(10):
+                t = threading.Thread(target=get_documents_thread, kwargs={"document_ids": ["1", "2", "3"], "thread_id": i})
+                threads.append(t)
+
+            # Start each thread
+            for t in threads:
+                t.start()
+
+            # Wait for all threads to finish with timeout
+            for i, t in enumerate(threads):
+                t.join(timeout=60)  # 1 minute timeout
+                if t.is_alive():
+                    raise AssertionError(f"get documents thread hung (thread {i})")
+
+        # Check for any exceptions in threads - fail immediately if found
+        if exceptions:
+            raise AssertionError(f"Thread exceptions occurred: {exceptions}")
+
+        # Verify we got results from all threads
+        self.assertEqual(len(results), 10, "Not all threads completed successfully")
+
+        # Verify the content of documents returned by each thread
+        for thread_id, res in results:
+            with self.subTest(f"Thread {thread_id}"):
+                # Should have 3 documents
+                self.assertEqual(len(res['results']), 3)
+                
+                # Check that the documents are found and have the correct content
+                for i in range(3):
+                    self.assertEqual(res['results'][i]['_found'], True)
+
+                    for field_name, value in res['results'][i].items():
+                        if field_name in [enums.TensorField.tensor_facets, "_found"]:
+                            # ignore meta fields
+                            continue
+                        if field_name == "custom_vector_field":
+                            expected_value = docs[i]["custom_vector_field"]["content"]
+                        else:
+                            expected_value = docs[i][field_name]
+
+                        self.assertEqual(expected_value, value)
+
+                    self.assertIn(enums.TensorField.tensor_facets, res['results'][i])
+                    self.assertIn(enums.TensorField.embedding, res['results'][i][enums.TensorField.tensor_facets][0])
+
+    def test_get_documents_concurrent_resilient_when_some_fail(self):
+        """
+        Test that when some threads fail (e.g., due to invalid index name), 
+        the successful threads still complete normally and return correct results.
+        This demonstrates that thread failures don't affect other concurrent requests.
+        """
+        # Structured index
+        index = self.indexes[0]
+
+        docs = [
+            {"_id": "valid1", "title1": "content 1",
+             "int_field": 1, "int_array_field": [1, 2], "int_map_field": {"a": 1},
+             "float_field": 2.9, "float_array_field": [1.0, 2.0], "float_map_field": {"b": 2.9},
+             "long_field": 10, "long_array_field": [10, 20], "long_map_field": {"a": 10},
+             "double_field": 3.9, "double_array_field": [3.0, 5.0], "double_map_field": {"b": 5.9},
+             "bool_field": True, "string_array_field": ["a", "b", "c"]},
+            {"_id": "valid2", "title1": "content 2", "custom_vector_field": {"content": "a", "vector": [1.0] * 384}},
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name, docs=docs, device="cpu"
+            )
+        )
+
+        successful_results = []
+        failed_results = []
+        all_exceptions = []
+
+        def get_documents_thread(index_name, document_ids, thread_id, should_fail=False):
+            try:
+                r = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index_name, document_ids=document_ids,
+                    show_vectors=True).dict(exclude_none=True, by_alias=True)
+                if should_fail:
+                    failed_results.append((thread_id, r, "Expected to fail but succeeded"))
+                else:
+                    successful_results.append((thread_id, r))
+                return r
+            except Exception as e:
+                all_exceptions.append((thread_id, e, should_fail))
+                if not should_fail:
+                    # This is an unexpected failure
+                    raise
+
+        # Mock the telemetry context manager to avoid thread-local storage issues
+        with patch('marqo.tensor_search.telemetry.RequestMetricsStore.for_request') as mock_metrics:
+            # Make the time() method return a no-op context manager
+            mock_metrics.return_value.time.return_value = nullcontext()
+            
+            threads = []
+            
+            # Create 5 threads that should succeed (using valid index name and document IDs)
+            for i in range(5):
+                t = threading.Thread(
+                    target=get_documents_thread, 
+                    kwargs={
+                        "index_name": index.name,  # Valid index name
+                        "document_ids": ["valid1", "valid2"], 
+                        "thread_id": f"success_{i}",
+                        "should_fail": False
+                    }
+                )
+                threads.append(t)
+            
+            # Create 3 threads that should fail (using invalid index name)
+            for i in range(3):
+                t = threading.Thread(
+                    target=get_documents_thread, 
+                    kwargs={
+                        "index_name": "nonexistent_index_name_that_will_cause_error",  # Invalid index name
+                        "document_ids": ["valid1", "valid2"],
+                        "thread_id": f"fail_{i}",
+                        "should_fail": True
+                    }
+                )
+                threads.append(t)
+
+            # Start all threads
+            for t in threads:
+                t.start()
+
+            # Wait for all threads to finish with timeout
+            for i, t in enumerate(threads):
+                t.join(timeout=60)  # 1 minute timeout
+                if t.is_alive():
+                    raise AssertionError(f"get documents thread hung (thread {i})")
+
+        # Verify that we got the expected number of successful results
+        self.assertEqual(len(successful_results), 5, f"Expected 5 successful results, got {len(successful_results)}")
+        
+        # Verify that we got the expected number of failed results (exceptions)
+        expected_failures = [exc for thread_id, exc, should_fail in all_exceptions if should_fail]
+        self.assertEqual(len(expected_failures), 3, f"Expected 3 failures, got {len(expected_failures)}")
+        
+        # Verify that all expected failures are due to index not found
+        for exception in expected_failures:
+            # The exception type might vary (IndexNotFoundError, etc.) but should be related to missing index
+            self.assertIn("nonexistent_index_name_that_will_cause_error", str(exception))
+
+        # Verify that no unexpected failures occurred
+        unexpected_failures = [exc for thread_id, exc, should_fail in all_exceptions if not should_fail]
+        self.assertEqual(len(unexpected_failures), 0, f"Unexpected failures occurred: {unexpected_failures}")
+
+        # Verify the content of successful results
+        for thread_id, res in successful_results:
+            with self.subTest(f"Successful thread {thread_id}"):
+                # Should have 2 documents
+                self.assertEqual(len(res['results']), 2)
+                
+                # Check that the documents are found and have the correct content
+                for i in range(2):
+                    self.assertEqual(res['results'][i]['_found'], True)
+                    
+                    for field_name, value in res['results'][i].items():
+                        if field_name in [enums.TensorField.tensor_facets, "_found"]:
+                            # ignore meta fields
+                            continue
+                        if field_name == "custom_vector_field":
+                            expected_value = docs[i]["custom_vector_field"]["content"]
+                        else:
+                            expected_value = docs[i][field_name]
+
+                        self.assertEqual(expected_value, value)
+
+                    self.assertIn(enums.TensorField.tensor_facets, res['results'][i])
+                    self.assertIn(enums.TensorField.embedding, res['results'][i][enums.TensorField.tensor_facets][0])
+
+        # Additional verification: ensure that successful threads weren't affected by failing ones
+        # All successful results should be identical (same documents, same content)
+        if len(successful_results) > 1:
+            first_result = successful_results[0][1]
+            for thread_id, result in successful_results[1:]:
+                with self.subTest(f"Comparing thread {thread_id} with first successful thread"):
+                    # Results should be identical (excluding any timing-sensitive fields)
+                    self.assertEqual(len(result['results']), len(first_result['results']))
+                    for i in range(len(result['results'])):
+                        # Compare document content (excluding meta fields that might vary)
+                        result_doc = {k: v for k, v in result['results'][i].items() 
+                                    if k not in [enums.TensorField.tensor_facets]}
+                        first_doc = {k: v for k, v in first_result['results'][i].items() 
+                                   if k not in [enums.TensorField.tensor_facets]}
+                        self.assertEqual(result_doc, first_doc)
+
 
     def test_limit_results_none(self):
         """if env var isn't set or is None"""

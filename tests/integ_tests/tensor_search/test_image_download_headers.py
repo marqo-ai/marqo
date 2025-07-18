@@ -14,7 +14,7 @@ from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQuery
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 @unittest.skip

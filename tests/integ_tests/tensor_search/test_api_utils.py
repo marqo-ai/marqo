@@ -7,7 +7,7 @@ from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
 from marqo.tensor_search.web import api_utils
 from marqo.api.exceptions import InvalidArgError, InternalError, BadRequestError
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 import unittest
 
 
@@ -79,7 +79,7 @@ class TestDecodeQueryStringModelAuth(MarqoTestCase):
         self.assertEqual(result.hf, None)
 
     def test_decode_query_string_model_auth_invalid(self):
-        with self.assertRaises(pydantic.ValidationError):
+        with self.assertRaises(pydantic.v1.ValidationError):
             api_utils.decode_query_string_model_auth("invalid_url_encoded_string")
 
 @unittest.skip

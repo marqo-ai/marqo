@@ -4,7 +4,7 @@ import json
 import pydantic
 
 from marqo.core.models.marqo_index import FieldType, FieldFeature, Field, MarqoIndex
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @pytest.mark.unittest
@@ -103,5 +103,5 @@ class TestStructuredMarqoIndex(MarqoTestCase):
                     self.assertEqual("value", parsed_index.random_field)
                     # assert that the extra field is kept after serialization
                     self.assertTrue("random_field" in parsed_index.json())
-                except pydantic.error_wrappers.ValidationError as e:
+                except pydantic.v1.error_wrappers.ValidationError as e:
                     self.fail(f"Pydantic validation failed: {e}")

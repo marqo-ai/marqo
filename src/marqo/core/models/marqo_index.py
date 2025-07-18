@@ -2,13 +2,13 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
-
-import pydantic
 import semver
-from pydantic import PrivateAttr, root_validator
-from pydantic import ValidationError, validator
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.utils import ROOT_KEY
+
+import pydantic.v1 as pydantic
+from pydantic.v1 import PrivateAttr, root_validator
+from pydantic.v1 import ValidationError, validator
+from pydantic.v1.error_wrappers import ErrorWrapper
+from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
@@ -18,6 +18,7 @@ from marqo.logging import get_logger
 # TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
+import marqo.core.constants as constants
 
 logger = get_logger(__name__)
 
@@ -46,7 +47,7 @@ class FieldType(str, Enum):
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
     MapInt = 'map<text, int>'
-    MapLong = 'map<text, long>'  
+    MapLong = 'map<text, long>'
     MapFloat = 'map<text, float>'
     MapDouble = 'map<text, double>'
 
@@ -93,12 +94,14 @@ class Field(ImmutableStrictBaseModel):
     lexical_field_name: Optional[str]
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
+    language: Optional[str] = None
 
     @root_validator
     def check_all_fields(cls, values):
         validate_structured_field(values, marqo_index=True)
 
         return values
+
 
 class StringArrayField(ImmutableStrictBaseModel):
     name: str
@@ -128,13 +131,16 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
+
 class VideoPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+
 class AudioPreProcessing(ImmutableStrictBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
@@ -212,7 +218,7 @@ class Model(StrictBaseModel):
                 raise InvalidArgumentError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'
                 )
-            
+
     def get_text_query_prefix(self, request_level_prefix: Optional[str] = None) -> str:
         if request_level_prefix is not None:
             return request_level_prefix
@@ -240,7 +246,7 @@ class Model(StrictBaseModel):
 
         # Else return the model default as populated during initialization
         return self.text_chunk_prefix
-    
+
     def get_default_text_query_prefix(self) -> Optional[str]:
         return self._get_default_prefix("text_query_prefix")
 
@@ -276,6 +282,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)
 
@@ -343,8 +350,6 @@ class MarqoIndex(ImmutableBaseModel, ABC):
         if key not in self._cache:
             self._cache[key] = func()
         return self._cache[key]
-
-    
 
 
 class UnstructuredMarqoIndex(MarqoIndex):
@@ -510,13 +515,11 @@ class StructuredMarqoIndex(MarqoIndex):
 
 
 class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
-
-    _PARTIAL_UPDATE_SUPPORTED_VERSION = semver.VersionInfo.parse("2.16.0")
-
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
-    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    string_array_fields: Optional[List[
+        StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -543,7 +546,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
 
         return self._cache_or_get('name_to_string_array_field_map',
-                                  lambda : {} if self.string_array_fields is None 
+                                  lambda: {} if self.string_array_fields is None
                                   else {field.name: field for field in self.string_array_fields})
 
     @property
@@ -555,7 +558,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         Returns an empty dict if string_array_fields is None.
         """
         return self._cache_or_get('string_array_field_map',
-                                  lambda : {} if self.string_array_fields is None 
+                                  lambda: {} if self.string_array_fields is None
                                   else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
@@ -621,7 +624,27 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         Check if the index supports partial updates.
         """
-        return self.parsed_marqo_version() >= self._PARTIAL_UPDATE_SUPPORTED_VERSION
+        return self._cache_or_get(
+            'index_supports_partial_updates',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_PARTIAL_UPDATE_MINIMUM_VERSION)
+
+    @property
+    def index_supports_language(self) -> bool:
+        """
+        Check if the index supports language.
+        """
+        return self._cache_or_get(
+            'index_supports_language',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_LANGUAGE_MINIMUM_VERSION)
+
+    @property
+    def index_supports_sorty_by(self) -> bool:
+        """
+        Check if the index supports sort by or relevance cutoff.
+        """
+        return self._cache_or_get(
+            'index_supports_sort_by',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_MINIMUM_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
@@ -686,6 +709,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     name: str = values['name']
     type: FieldType = values['type']
     features: List[FieldFeature] = values['features']
+    language: str = values.get('language')
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
     validate_field_name(name)
@@ -709,15 +733,21 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
         )
 
-    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int, 
-                                                               FieldType.Double, FieldType.MapFloat, 
+    if language is not None and FieldFeature.LexicalSearch not in features:
+        raise ValueError(
+            f'{name}: language can only be populated when {FieldFeature.LexicalSearch.value} '
+            f'feature is present'
+        )
+
+    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int,
+                                                               FieldType.Double, FieldType.MapFloat,
                                                                FieldType.MapInt, FieldType.MapDouble,
                                                                FieldType.Long, FieldType.MapLong]:
         raise ValueError(
-             f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-             f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
-             f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
-         )
+            f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+            f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
+            f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
+        )
 
     # These validations are specific to marqo_index.Field
     if marqo_index:

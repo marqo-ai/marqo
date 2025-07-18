@@ -2,7 +2,7 @@ from enum import Enum
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import validator, root_validator
+from pydantic.v1 import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
@@ -21,6 +21,9 @@ class RankingMethod(str, Enum):
 
 
 class HybridParameters(StrictBaseModel):
+    class Config(StrictBaseModel.Config):
+        use_enum_values = True
+
     retrievalMethod: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
     rankingMethod: Optional[RankingMethod] = RankingMethod.RRF
     alpha: Optional[float] = None
@@ -100,7 +103,7 @@ class HybridParameters(StrictBaseModel):
         if isinstance(values.get('queryTensor'), dict):
             if not len(values.get('queryTensor')):
                 raise ValueError(
-                    "Multi-query search for queryTensor requires at least one query! Received empty dictionary. "
+                    "Multi-term query for queryTensor requires at least one query. Received empty dictionary"
                 )
 
 

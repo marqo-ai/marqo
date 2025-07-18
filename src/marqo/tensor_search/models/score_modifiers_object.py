@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any, Optional
 
-from pydantic import BaseModel, validator, ValidationError
+from pydantic.v1 import BaseModel, validator, ValidationError
 
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.api.exceptions import InvalidArgError

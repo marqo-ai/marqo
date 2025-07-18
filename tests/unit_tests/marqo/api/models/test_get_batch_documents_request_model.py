@@ -1,6 +1,7 @@
 from marqo.api.models.get_batch_documents_request import GetBatchDocumentsRequest
 from unittest import TestCase
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
+
 
 class TestGetBatchDocumentsRequestModel(TestCase):
 

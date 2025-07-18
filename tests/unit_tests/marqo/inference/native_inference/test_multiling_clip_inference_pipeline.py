@@ -17,7 +17,7 @@ from marqo.inference.type import Modality
 class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_image")
+    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media")
     def test_content_preprocessing_text(self, mock_download, mock_split):
         model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
@@ -38,7 +38,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         self.assertEqual(result, [[("original text", "preprocessed text")]])
 
     @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_image")
+    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media")
     def test_content_preprocessing_image(self, mock_download, mock_split):
         model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
@@ -196,7 +196,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         tokenizer_wrapper.tokenize.assert_called_once_with("This is a test sentence.")
         self.assertEqual(result[0][0][1], "tokenized_text")
 
-    def test_download_and_preprocess_image_preprocessor_called(self):
+    def test_download_and_preprocess_media_preprocessor_called(self):
         """
         Ensure that the image preprocessor is called during image preprocessing.
         """
@@ -218,7 +218,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
         with patch(
                 "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline."
-                "download_and_preprocess_image"
+                "download_and_preprocess_media"
         ) as mock_download:
             mock_download.side_effect = lambda contents, preprocessor, config, return_individual_error: [
                 [(contents[0], preprocessor._preprocess_image(contents[0]))]]

@@ -156,9 +156,8 @@ class TestOnStartScript(unittest.TestCase):
     
     def test_SetEnableVideoGPUAcceleration_none_input_check_fails(self):
         """Test when the env variable is None(not set by the users) and the check fails, the env var is set to 'FALSE'."""
-        with mock.patch.dict('marqo.inference.native_inference.remote.server.on_start_script.os.environ',
-                             {}), \
-        mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+        with mock.patch.dict('os.environ', {}, clear=True), \
+                mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
             mock_check_gpu_acceleration.side_effect = exceptions.StartupSanityCheckError('GPU not available')
 
             # Create instance of the class
@@ -173,9 +172,8 @@ class TestOnStartScript(unittest.TestCase):
 
     def test_SetEnableVideoGPUAcceleration_none_input_check_pass(self):
         """Test when the env variable is None(not set by the users) and the check pass, the env var is set to 'TRUE'."""
-        with mock.patch.dict('marqo.inference.native_inference.remote.server.on_start_script.os.environ',
-                             {}), \
-        mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+        with mock.patch.dict('os.environ', {}, clear=True), \
+                mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
             mock_check_gpu_acceleration.return_value = None
 
             # Create instance of the class
@@ -190,8 +188,7 @@ class TestOnStartScript(unittest.TestCase):
 
     def test_SetEnableVideoGPUAccelerationTrueButCheckFails(self):
         """Test when the env variable is TRUE and the check fails, an error raised."""
-        with mock.patch.dict('marqo.inference.native_inference.remote.server.on_start_script.os.environ',
-                             {EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: "TRUE"}), \
+        with mock.patch.dict('os.environ', {EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: "TRUE"}, clear=True), \
         mock.patch('marqo.inference.native_inference.remote.server.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
             mock_check_gpu_acceleration.side_effect = exceptions.StartupSanityCheckError('GPU not available')
 
@@ -217,3 +214,32 @@ class TestOnStartScript(unittest.TestCase):
                 with self.assertRaises(StartupSanityCheckError):
                     checker.run()
                 mock_nltk_download.assert_any_call("punkt_tab")
+
+    def test_models_only_load_to_one_device(self):
+        """
+        Ensure models are only loaded to one device (cuda if available, else cpu) when warming up,
+        not to all devices.
+        """
+        with mock.patch("marqo.inference.native_inference.remote.server.on_start_script.torch.cuda.is_available") as mock_cuda_available, \
+             mock.patch("os.environ", {
+                 enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps(["LanguageBind/Video_V1.5_FT_Audio_FT_Image"])
+             }):
+
+            for cuda_available in [True, False]:
+                expected_device = "cuda" if cuda_available else "cpu"
+                mock_cuda_available.return_value = cuda_available
+
+                cache_model_module = on_start_script.CacheModels(self.mock_config)
+                self.assertEqual(cache_model_module.default_devices, [expected_device])
+
+                with mock.patch.object(cache_model_module, "_preload_model") as mock_preload_model:
+                    cache_model_module.run()
+                    mock_preload_model.assert_called_with(
+                        model="LanguageBind/Video_V1.5_FT_Audio_FT_Image",
+                        content="this is a test string",
+                        device=expected_device
+                    )
+
+                    # Ensure the other device is not used
+                    other_device = "cpu" if expected_device == "cuda" else "cuda"
+                    self.assertNotIn(other_device, mock_preload_model.call_args[1]["device"])

@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Dict, Set
 
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
 

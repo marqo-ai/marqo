@@ -2,7 +2,7 @@ import unittest
 from unittest import mock
 from marqo import config
 import torch
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import enums
 from marqo.tensor_search.api import generate_config
 import os

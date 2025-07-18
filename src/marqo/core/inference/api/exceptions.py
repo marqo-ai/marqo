@@ -24,3 +24,13 @@ class MediaDownloadError(InferenceError):
 class UnsupportedModalityError(InferenceError):
     """Raises if a modality is not supported by a specific model"""
     pass
+
+
+class MediaExceedsMaxSizeError(InferenceError):
+    """Raised when the media exceeds the maximum size limit"""
+    pass
+
+
+class MediaMismatchError(InferenceError):
+    """Raised when the media does not match the expected type"""
+    pass

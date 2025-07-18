@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import List, Dict, Set, Optional, Any, cast, Callable
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID

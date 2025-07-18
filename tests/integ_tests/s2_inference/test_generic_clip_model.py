@@ -11,7 +11,7 @@ from marqo.s2_inference.s2_inference import (
     vectorise
 )
 
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from unittest import mock
 
 @unittest.skip

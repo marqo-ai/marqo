@@ -11,7 +11,7 @@ from marqo.tensor_search import tensor_search, constants, index_meta_cache
 from marqo.tensor_search.throttling.redis_throttle import throttle
 
 import copy
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 import requests
 import random
 

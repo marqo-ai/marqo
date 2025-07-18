@@ -7,9 +7,12 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
-        # Common
+        EnvVars.MARQO_MODE: "COMBINED",  # one of COMBINED, API, INFERENCE
+
+        # Common config applicable for all modes
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_LOG_FORMAT: "plain",
+        EnvVars.MARQO_METRICS_EXPORT_INTERVAL: 30,
 
         # Vespa common
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
@@ -21,7 +24,6 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_GET_POOL_SIZE: 10,
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
-        EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: 1,
 
         # Marqo index management
         EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED: 100,
@@ -32,10 +34,8 @@ def default_env_vars() -> dict:
         EnvVars.ZOOKEEPER_HOSTS: None,
 
         # Document (CRUD) limit
-        EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128,
-        EnvVars.MARQO_EF_CONSTRUCTION_MAX_VALUE: 4096,
         EnvVars.MARQO_MAX_DELETE_DOCS_COUNT: 10000,
 
         # Search Limit
@@ -44,7 +44,13 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
         EnvVars.MARQO_MAX_SEARCH_LIMIT: 1000,
         EnvVars.MARQO_MAX_SEARCH_OFFSET: 10000,
+        EnvVars.MARQO_MAX_SEARCH_CONTEXT_DOCS: 10,
         EnvVars.MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES: None,
+
+        # Query Logging
+        EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: 900,
+        EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
+        EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: 10_000,
 
         # Throttling
         EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
@@ -59,22 +65,33 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_ENABLE_OPS_API: "FALSE",
 
+        # StatsD
+        EnvVars.STATSD_HOST: "127.0.0.1",
+        EnvVars.STATSD_PORT: 8125,
+        EnvVars.STATSD_COMMON_TAGS: "",
+
         # Inference Client config (In API)
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
         EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
 
+        EnvVars.MARQO_API_INFERENCE_CACHE_SIZE: 0,
+        EnvVars.MARQO_API_INFERENCE_CACHE_TYPE: "LRU",
 
+        # 370 megabytes in bytes, read in API and passed to inference server
+        EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,
+        # 370 megabytes in bytes, read in API and passed to inference server
+        EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE: 387973120,
+
+        # Read in API and passed to inference server
+        EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 5,
+        EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 20,
+
+        ##########################################
         # Inference Server config (In Inference)
         EnvVars.MARQO_MODELS_TO_PRELOAD: [],
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
-
-        EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 5,
-        EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 20,
-
-        EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE: 387973120,  # 370 megabytes in bytes
-        EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE: 387973120,  # 370 megabytes in bytes
 
         EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE: 16,  # static inference batching
         EnvVars.MARQO_INFERENCE_CACHE_SIZE: 0,

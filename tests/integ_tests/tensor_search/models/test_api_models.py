@@ -1,5 +1,5 @@
-from integ_tests.marqo_test import MarqoTestCase
-from pydantic import ValidationError
+from tests.integ_tests.marqo_test import MarqoTestCase
+from pydantic.v1 import ValidationError
 
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod, HybridParameters
 from marqo.tensor_search.enums import SearchMethod

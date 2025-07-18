@@ -18,7 +18,7 @@ from marqo.tensor_search.api import embed
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
 from marqo.vespa.models import QueryResult
 from marqo.vespa.models.query_result import Root, Child, RootFields
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.api.exceptions import InvalidArgError
 
 import unittest
@@ -265,7 +265,6 @@ class TestEmbed(MarqoTestCase):
                     self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
                                         msg=f"Mismatch at index {i} for {index.type}")
 
-    @unittest.skip(reason="Temporarily skipped due to no support for languagebind model")
     @pytest.mark.largemodel
     @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_embed_languagebind(self):

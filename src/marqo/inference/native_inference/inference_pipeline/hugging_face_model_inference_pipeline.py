@@ -58,6 +58,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
                 TextPreprocessingConfig() # Use a default TextPreprocessingConfig
             )
         else:
+            # TODO - Raise an unsupported modality error
             raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
         return results
 

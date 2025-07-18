@@ -2,7 +2,9 @@
 
 Pass its settings to local_marqo_settings.
 """
-from typing import List, Dict
+import uuid
+from enum import Enum
+from typing import List, Dict, Optional
 import json
 import time
 
@@ -40,6 +42,10 @@ class MarqoTestCase(unittest.TestCase):
     def setUp(self) -> None:
         if self.indexes_to_delete:
             self.clear_indexes(self.indexes_to_delete)
+
+    @classmethod
+    def random_index_name(cls, prefix: Optional[str] = 'a') -> str:
+        return prefix + str(uuid.uuid4()).replace('-', '')
 
     @classmethod
     def create_indexes(cls, index_settings_with_name: List[Dict]):
@@ -88,6 +94,19 @@ class MarqoTestCase(unittest.TestCase):
                     client.index(index_name).eject_model(model_name=model["model_name"], model_device=model["model_device"])
                 except MarqoWebError:
                     pass
+
+
+class TestImageUrls(str, Enum):
+    __test__ = False  # Prevent pytest from collecting this class as a test
+    IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
+    IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
+    IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
+    IMAGE3 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg'
+    IMAGE4 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg'
+    COCO = 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg'
+    HIPPO_REALISTIC = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png'
+    HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+    HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
 
 
 EXAMPLE_FASHION_DOCUMENTS = [
