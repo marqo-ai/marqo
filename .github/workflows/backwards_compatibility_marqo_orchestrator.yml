@@ -17,9 +17,9 @@ on:
         description: 'Max versions to test'
         required: false
       path_to_test:
-        description: 'Path sent to pytest for running test mode'
+        description: 'Path sent to pytest for running test mode (leave blank to test everything in tests/compatibility_tests/).'
         required: false
-        default: 'tests/compatibility_tests'
+        default: ''
       existing_marqo_image_github_sha:
         description: 'Github SHA of an existing Marqo image (pushed to ECR) to be used for testing.'
         required: false
