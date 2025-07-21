@@ -6,7 +6,7 @@ from typing import List, Dict
 import json
 
 import unittest
-from marqo.utils import construct_authorized_url
+from marqo.tensor_search.utils import construct_authorized_url
 from marqo import Client
 from marqo.errors import MarqoWebError
 import requests

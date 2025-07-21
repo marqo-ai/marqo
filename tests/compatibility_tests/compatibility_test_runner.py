@@ -24,7 +24,7 @@ marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 # Global set to track imported modules
 _imported_modules = set()
 
-_PREPARED_CLASSES = None
+_CLASSES_TO_PREPARE = None
 
 class Mode(Enum):
     PREPARE = "prepare"
@@ -37,6 +37,22 @@ volumes_to_cleanup: Set[str] = set()
 logger = get_logger(__name__)
 
 docker_manager = DockerManager()
+
+def split_and_prefix_path_to_test(path_to_test: str) -> list:
+    """
+    Split a string of class names separated by spaces and prefix each with 'tests/compatibility_tests/'.
+
+    Args:
+        path_to_test (str): A string of class names separated by spaces.
+
+    Returns:
+        list: A list of fully qualified class names.
+    """
+    if not path_to_test:
+        # By default, test this whole dir
+        return ["tests/compatibility_tests"]
+    return [f"tests/compatibility_tests/{cls.strip()}" for cls in path_to_test.split()]
+
 
 def load_all_subclasses(package_name):
     """
@@ -66,39 +82,14 @@ def load_all_subclasses(package_name):
 def run_prepare_mode(version_to_test_against: str, test_classes_to_prepare: list):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
-    logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
+    logger.debug(f"Printing all test cases to prepare: {test_classes_to_prepare}")
     errors = []
 
     # Skip any tests that have already been prepared
     seen_classes = set()
-    for test_class in BaseCompatibilityTestCase.__subclasses__():
-        if test_class.__name__ in seen_classes:
-            logger.info(f"Skipping duplicate test class {test_class.__name__} as it has already been processed")
-            continue
-
-        # TODO: remove this
-        # Manually remove test classes that are not in a predefined list.
-        #test_classes_to_prepare = [
-        #    'TestSearchWithGlobalScoreModifiers',
-        #    'TestSearch', 'TestSearchWithScoreModifiers',
-        #    'TestHybridSearchUnstructured', 'TestHybridSearchStructured',
-            #'TestCreateIndex', 'TestCreateIndexBringYourOwnModel', 'TestCreateIndexWithNoModel',
-        #    'TestCreateStructuredIndexv2_0', 'TestCreateStructuredIndexv2_2', 'TestCreateStructuredIndexv2_9',
-        #    'TestCreateStructuredIndexv2_12',
-        #    'TestAddDocumentsv2_2', 'TestAddDocumentsv2_9', 'TestAddDocumentsv2_12',
-        #    'TestAddDocumentsMultiModal', 'TestAddDocumentsWithCustomVector', 'TestDocumentAPIv2_0',
-        #    'TestDeleteDocuments',
-            #'TestEmbed',
-            #'TestRecommend',
-        #    'TestUpdateDocuments', 'TestUpdateDocumentsUnstructured2_16'
-        #]
-        if test_class.__name__ not in test_classes_to_prepare:
-            logger.info(f"Skipping test class {test_class.__name__} as it is not in the predefined list")
-            continue
-
+    for test_class in test_classes_to_prepare:
         # Log to confirm no duplicates
         logger.info(f"{test_class.__name__} has NOT been processed yet. Processing now.")
-        seen_classes.add(test_class.__name__)
         
         logger.info(f"========================================================================================")
         markers = getattr(test_class, "pytestmark", [])
@@ -132,7 +123,7 @@ def run_prepare_mode(version_to_test_against: str, test_classes_to_prepare: list
             )
             continue
 
-        # TODO: Raname this to minimal version
+        # TODO: Rename this to minimal version
         marqo_version = marqo_version_marker.args[0]
         logger.info(f"Detected marqo_version '{marqo_version}' for testcase: {test_class.__name__}")
         try:
@@ -158,9 +149,7 @@ def construct_pytest_arguments(version_to_test_against, path_to_test):
         "-s"
     ]
 
-    # If path has multiple arguments, split them by space
-    list_paths = path_to_test.split()
-    pytest_args += list_paths
+    pytest_args += split_and_prefix_path_to_test(path_to_test)
 
     return pytest_args
 
@@ -178,43 +167,116 @@ def trigger_rollback_endpoint():
         logger.info("Rollback endpoint triggered successfully")
 
 def determine_test_classes_to_prepare(path_to_test: str = None) -> list:
-    global _PREPARED_CLASSES
-    if _PREPARED_CLASSES is not None:
-        return _PREPARED_CLASSES
-        
-    _PREPARED_CLASSES = []
-    search_paths = path_to_test.split()
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+    """
+    Determine a list of test classes to run prepare mode on, given a string-separated path to test files
+    or directories. This function will:
+    1. Search all python files or classes in the specified path(s)
+    2. Import each file as a module
+    3. Find all subclasses of `unittest.TestCase` that start with 'Test'
+    4. Return a list of these classes
+    """
+    global _CLASSES_TO_PREPARE
+    if _CLASSES_TO_PREPARE is not None:
+        return _CLASSES_TO_PREPARE
 
-    for raw_path in search_paths:
-        abs_path = os.path.normpath(os.path.join(project_root, raw_path))
-        
-        if os.path.isdir(abs_path):
-            py_files = glob.glob(os.path.join(abs_path, "**", "test_*.py"), recursive=True)
-        elif os.path.isfile(abs_path) and abs_path.endswith('.py'):
-            py_files = [abs_path]
-        else:
-            continue
-
-        for py_file in py_files:
-            rel_path = os.path.relpath(py_file, project_root)
-            module_name = rel_path.replace(os.path.sep, '.').replace('.py', '')
-            
-            try:
-                logger.info(f"Attempting to import module: {module_name}")
-                module = importlib.import_module(module_name)
-                test_classes = [
-                    cls for _, cls in inspect.getmembers(module,
-                        lambda obj: inspect.isclass(obj) and
-                                    issubclass(obj, unittest.TestCase) and
-                                    obj.__name__.startswith('Test')
-                    )
-                ]
-                _PREPARED_CLASSES.extend(test_classes)
-            except Exception as e:
-                logger.warning(f"Module import failed: {module_name} - {str(e)}")
+    dirs_to_check = split_and_prefix_path_to_test(path_to_test)
+    test_classes = []
     
-    return _PREPARED_CLASSES
+    for path_item in dirs_to_check:
+        logger.debug(f"Processing path: {path_item}")
+        
+        # Check if path contains specific test class (format: file.py::TestClassName)
+        specific_class = None
+        if "::" in path_item:
+            path_item, specific_class = path_item.split("::", 1)
+            logger.debug(f"Specific class requested: {specific_class}")
+        
+        # Determine if path is a file or directory
+        if os.path.isfile(path_item):
+            if path_item.endswith('.py'):
+                test_classes.extend(_import_and_find_test_classes(path_item, specific_class))
+        elif os.path.isdir(path_item):
+            # Search for all Python files in the directory recursively
+            python_files = glob.glob(os.path.join(path_item, "**", "*.py"), recursive=True)
+            for py_file in python_files:
+                test_classes.extend(_import_and_find_test_classes(py_file, specific_class))
+        else:
+            logger.warning(f"Path does not exist or is not a file/directory: {path_item}")
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_classes = []
+    for cls in test_classes:
+        if cls not in seen:
+            seen.add(cls)
+            unique_classes.append(cls)
+    
+    _CLASSES_TO_PREPARE = unique_classes
+    logger.debug(f"Found {len(unique_classes)} test classes: {[cls.__name__ for cls in unique_classes]}")
+    return _CLASSES_TO_PREPARE
+
+
+def _import_and_find_test_classes(file_path: str, specific_class: str = None) -> list:
+    """
+    Import a Python file as a module and find test classes in it.
+    
+    Args:
+        file_path: Path to the Python file
+        specific_class: If provided, only return this specific class
+    
+    Returns:
+        List of test class objects
+    """
+    global _imported_modules
+    test_classes = []
+    
+    try:
+        # Convert file path to module name
+        # Remove .py extension and convert path separators to dots
+        module_name = file_path.replace('/', '.').replace('\\', '.')
+        if module_name.endswith('.py'):
+            module_name = module_name[:-3]
+        
+        # Skip if already imported
+        if module_name in _imported_modules:
+            logger.debug(f"Module {module_name} already imported, skipping")
+            # Still need to get classes from the already imported module
+            module = sys.modules.get(module_name)
+        else:
+            logger.debug(f"Importing module: {module_name}")
+            module = importlib.import_module(module_name)
+            _imported_modules.add(module_name)
+        
+        if module is None:
+            logger.warning(f"Could not import or find module: {module_name}")
+            return test_classes
+        
+        # Find all classes in the module that are test classes
+        for name, obj in inspect.getmembers(module, inspect.isclass):
+            # Check if it's a test class
+            if (name.startswith('Test') and 
+                issubclass(obj, BaseCompatibilityTestCase) and 
+                obj != BaseCompatibilityTestCase):
+                
+                # If specific class is requested, only return that one
+                if specific_class:
+                    if name == specific_class:
+                        test_classes.append(obj)
+                        logger.debug(f"Found specific test class: {name}")
+                        break
+                else:
+                    test_classes.append(obj)
+                    logger.debug(f"Found test class: {name}")
+        
+        if specific_class and not test_classes:
+            logger.warning(f"Specific test class '{specific_class}' not found in {file_path}")
+            
+    except ImportError as e:
+        logger.error(f"Could not import module from {file_path}: {e}")
+    except Exception as e:
+        logger.error(f"Error processing file {file_path}: {e}")
+    
+    return test_classes
 
 def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str, path_to_test: str):
     """
@@ -341,7 +403,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str, pat
 
         # Step 8: Run prepare and test mode again, on the from_version container.
         logger.info(f"Step 8: Running prepare and test mode on the same from_version: {from_version} container")
-        run_prepare_mode(from_version)
+        run_prepare_mode(from_version, test_classes_to_prepare)
         run_test_mode(from_version, path_to_test) # This will validate results by creating newer indexes and adding documents to them. This is required just so that we know that even after transferring state from an older version, we are able to create new indexes in the older state seamlessly.
 
         # Only execute the following if Marqo version >= 2.13.0. This is because the rollback endpoint is only
@@ -354,7 +416,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str, pat
             # Step 10: Run full test suite again after Vespa rollback
             try:
                 logger.info(f"Running full test suite with from_version: {from_version}")
-                run_prepare_mode(from_version)
+                run_prepare_mode(from_version, test_classes_to_prepare)
                 run_test_mode(from_version, path_to_test)
             except Exception as e:
                 raise RuntimeError(
@@ -403,7 +465,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
     parser.add_argument("--to_image", required=True)
-    parser.add_argument("--path_to_test", required=True, default="tests/compatibility_tests")
+    parser.add_argument("--path_to_test", required=True, default="")
     args = parser.parse_args()
     try:
         from_version = semver.VersionInfo.parse(args.from_version)
