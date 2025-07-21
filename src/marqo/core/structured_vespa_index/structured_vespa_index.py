@@ -677,7 +677,7 @@ class StructuredVespaIndex(VespaIndex):
                 query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
                     marqo_query.relevance_cutoff.parameters.relative_score_factor
             elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
-                query["marqo__hybrid.relevanceCutoff.parameters.meanStdDevFactor"] = \
+                query["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"] = \
                     marqo_query.relevance_cutoff.parameters.std_dev_factor
             else:
                 # No parameters for other methods
@@ -688,7 +688,7 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
             query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sort_depth
-            query["marqo__hybrid.sortBy.sortCandidates"] = marqo_query.sort_by.sort_candidates
+            query["marqo__hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.min_sort_candidates
 
             query["query_features"]["marqo__sort_field_weights_0"] = {}
             query["query_features"]["marqo__sort_field_weights_1"] = {}

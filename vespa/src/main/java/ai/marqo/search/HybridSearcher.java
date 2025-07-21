@@ -1,12 +1,14 @@
 package ai.marqo.search;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.google.common.base.Strings;
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.annotation.Inject;
 import com.yahoo.component.chain.dependencies.Before;
@@ -20,6 +22,7 @@ import com.yahoo.document.update.FieldUpdate;
 import com.yahoo.documentapi.AsyncParameters;
 import com.yahoo.documentapi.AsyncSession;
 import com.yahoo.documentapi.DocumentAccess;
+import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
@@ -37,6 +40,8 @@ import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.statistics.descriptive.DoubleStatistics;
+import org.apache.commons.statistics.descriptive.Statistic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,11 +74,31 @@ public class HybridSearcher extends Searcher {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final ObjectReader SORT_FIELD_READER =
             OBJECT_MAPPER.readerFor(new TypeReference<List<SortField>>() {});
+    private static final ObjectMapper MARQO_METADATA_FIELDS_MAPPER = new ObjectMapper();
 
     // A magic number used to represent missing sort field values in search results as we can only
     // return numeric values in match-features.
     // The value -1e50 is chosen as it is an extremely low number unlikely to occur in real data.
     private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
+
+    private static final String MARQO_METADATA_FIELDS = "marqo__fields";
+
+    @VisibleForTesting
+    @JsonInclude(Include.NON_NULL)
+    record MarqoMetadataFields(
+            Integer sortCandidates, Integer probeCandidates, Integer relevantCandidates)
+            implements JsonProducer {
+
+        @Override
+        public StringBuilder writeJson(StringBuilder target) {
+            try {
+                target.append(MARQO_METADATA_FIELDS_MAPPER.writeValueAsString(this));
+                return target;
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     /**
      * Represents a field to sort by in the search results.
@@ -84,7 +109,9 @@ public class HybridSearcher extends Searcher {
             @JsonProperty("order") SortOrder order,
             @JsonProperty("missing") MissingOrder missing) {}
 
-    /** Sort order enum for better type safety */
+    /**
+     * Sort order enum for better type safety
+     */
     private enum SortOrder {
         ASC,
         DESC;
@@ -95,7 +122,9 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    /** Missing value handling enum */
+    /**
+     * Missing value handling enum
+     */
     private enum MissingOrder {
         FIRST,
         LAST;
@@ -106,8 +135,24 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    private enum RelevanceCutoffMethod {
+        RELATIVE_MAX_SCORE,
+        MEAN_STD_DEV,
+        GAP_DETECTION;
+
+        @JsonCreator
+        public static RelevanceCutoffMethod fromString(String value) {
+            return RelevanceCutoffMethod.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
+
     // Compile the regex pattern once and store it as a static final variable
-    private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
+    private static final Pattern DOC_ID_PATTERN =
+            Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
+    private static final Pattern TARGET_HITS_PATTERN =
+            Pattern.compile("(targetHits\\s*:\\s*)(\\d+)");
+    private static final Pattern HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN =
+            Pattern.compile("(hnsw\\.exploreAdditionalHits\\s*:\\s*)(\\d+)");
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -162,13 +207,19 @@ public class HybridSearcher extends Searcher {
             }
         }
         // Relevance Cut-off Parameters
+        String relevanceCutoffMethod =
+                query.properties().getString("marqo__hybrid.relevanceCutoff.method", null);
+        Integer relevanceCutoffProbeDepth =
+                query.properties().getInteger("marqo__hybrid.relevanceCutoff.probeDepth", null);
+        Double relevanceCutoffParameter =
+                readRelevanceCutoffParameter(query, relevanceCutoffMethod);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
         Integer sortBySortDepth =
                 query.properties().getInteger("marqo__hybrid.sortBy.sortDepth", null);
-        Integer sortBySortCandidates =
-                query.properties().getInteger("marqo__hybrid.sortBy.sortCandidates", null);
+        Integer sortByMinSortCandidates =
+                query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", null);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
@@ -212,11 +263,36 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets subquery handling ---
 
-        // --- Update the query limit if sort is used
-        if (!Strings.isNullOrEmpty(sortByFields)) {
-            query.setHits(sortBySortCandidates);
-            query.setOffset(0);
+        // --- Begin relevance cut-off handling ---
+        // Execute probe lexical search for relevance cut-off if parameters are provided
+        Integer relevantCandidates = null;
+        Integer probeCandidates = null;
+        if (relevanceCutoffMethod != null) {
+            logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
+            Query probeLexicalQuery =
+                    createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
+            Result probeLexicalResult = execution.search(probeLexicalQuery);
+            probeCandidates = probeLexicalResult.hits().size();
+            relevantCandidates =
+                    detectCutoffCount(
+                            probeLexicalResult.hits(),
+                            relevanceCutoffMethod,
+                            relevanceCutoffParameter,
+                            verbose);
         }
+        // --- End relevance cut-off handling ---
+
+        // --- Update the query hits, offset and targetHits, if sort or relevance cut-off is used
+        boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
+        boolean isSortByEnabled = sortByFields != null;
+
+        query =
+                updateQueryHitsOffsetsAndTargetHits(
+                        query,
+                        relevantCandidates,
+                        sortByMinSortCandidates,
+                        isRelevanceCutoffMethodEnabled,
+                        isSortByEnabled);
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -325,12 +401,13 @@ public class HybridSearcher extends Searcher {
 
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
+        Integer sortCandidates = null;
         if (sortByFields != null) {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
-            processedHits.setField("marqo__sortCandidates", hitsForPostProcessing.size());
+            sortCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -414,7 +491,10 @@ public class HybridSearcher extends Searcher {
             }
         }
         // --- End facets attachment ---
+        MarqoMetadataFields marqoMetadataFields =
+                new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
+        processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);
     }
 
@@ -541,6 +621,104 @@ public class HybridSearcher extends Searcher {
         return filtered;
     }
 
+    /**
+     * Updates the query hits, offsets, and targetHits based on the provided parameters.
+     * @param query the query to update.
+     * @param relevantCandidates the number of relevant candidates found in the probe search.
+     * @param sortByMinSortCandidates the minimum number of candidates required for sorting, from Marqo
+     * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
+     * @param isSortByEnabled whether sorting is enabled.
+     * @return The updated query with new hits, offsets, and targetHits.
+     */
+    public Query updateQueryHitsOffsetsAndTargetHits(
+            Query query,
+            Integer relevantCandidates,
+            Integer sortByMinSortCandidates,
+            boolean isRelevanceCutoffEnabled,
+            boolean isSortByEnabled) {
+
+        // Validate input parameters
+        if (!isRelevanceCutoffEnabled && !isSortByEnabled) {
+            return query;
+        }
+
+        if (relevantCandidates == null && sortByMinSortCandidates == null) {
+            throw new RuntimeException(
+                    "Either relevantCandidates or sortByMinSortCandidates must be provided");
+        }
+
+        sortByMinSortCandidates = (sortByMinSortCandidates == null) ? -1 : sortByMinSortCandidates;
+        relevantCandidates = (relevantCandidates == null) ? -1 : relevantCandidates;
+
+        // Extract current tensor YQL for potential targetHits update
+        String tensorYQL =
+                query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "");
+
+        Integer currentTensorTargetHits = null;
+        Integer currentExploreAdditionalHits = null;
+        int currentLimit = query.getHits();
+        int currentOffset = query.getOffset();
+
+        if (!tensorYQL.isEmpty()) {
+            currentTensorTargetHits = extractCurrentTargetHits(tensorYQL);
+            if (currentTensorTargetHits < (currentLimit + currentOffset)) {
+                throw new RuntimeException(
+                        "The targetHits in the tensor query should not be smaller than"
+                                + " limit+offset");
+            }
+            currentExploreAdditionalHits = extractCurrentExploreAdditionalHits(tensorYQL);
+        }
+
+        Integer newHits = null;
+        Integer newTensorTargetHits = null;
+
+        if (isRelevanceCutoffEnabled && isSortByEnabled) {
+            // Both sort and relevance cut-off enabled: use the higher one as new limits.
+            // Note that sortByMinSortCandidates is guaranteed to be larger than limit+offset so no
+            // check is required
+            newHits = Math.max(relevantCandidates, sortByMinSortCandidates);
+            if (currentTensorTargetHits != null) {
+                newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+            }
+        } else if (isRelevanceCutoffEnabled) {
+            // Only relevance cut-off enabled:
+            // - If relevantCandidates < limit+offset: reduce to relevantCandidates
+            // - If relevantCandidates >= limit+offset: keep existing behavior (limit+offset)
+            newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
+            if (currentTensorTargetHits != null) {
+                newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
+            }
+        } else {
+            // Only sortByMinSortCandidates provided
+            newHits = Math.max(sortByMinSortCandidates, (currentLimit + currentOffset));
+            if (currentTensorTargetHits != null) {
+                newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+            }
+        }
+
+        // Update query hits and offset
+        query.setHits(newHits);
+        query.setOffset(0);
+
+        // Update tensor YQL targetHits if it exists
+        if (currentTensorTargetHits != null
+                && !Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
+            int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
+            String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
+            query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
+        }
+        return query;
+    }
+
+    /**
+     * Post processes the hits by sorting them based on the provided sortByFields.
+     * @param hitsForPostProcessing the hits to be sorted.
+     * @param sortByFields the JSON string representing the fields to sort by.
+     * @param sortBySortDepth the depth to sort by, or null to sort all hits.
+     * @param limit the maximum number of hits to return.
+     * @param offset the offset for pagination.
+     * @return a HitGroup containing the sorted hits.
+     */
     HitGroup postProcessBySort(
             HitGroup hitsForPostProcessing,
             String sortByFields,
@@ -654,7 +832,55 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
+     * Read the relevance cutoff parameter based on the relevance cutoff method.
+     **/
+    @VisibleForTesting
+    Double readRelevanceCutoffParameter(Query query, String relevanceCutoffMethodString) {
+        if (relevanceCutoffMethodString == null) {
+            return null;
+        }
+        RelevanceCutoffMethod relevanceCutoffMethod;
+        try {
+            relevanceCutoffMethod = RelevanceCutoffMethod.fromString(relevanceCutoffMethodString);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(
+                    "Unknown relevance cutoff method: " + relevanceCutoffMethodString);
+        }
+
+        switch (relevanceCutoffMethod) {
+            case RELATIVE_MAX_SCORE -> {
+                Double value =
+                        query.properties()
+                                .getDouble(
+                                        "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor");
+                if (value == null) {
+                    throw new RuntimeException(
+                            "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor is"
+                                    + " missing");
+                }
+                return value;
+            }
+            case MEAN_STD_DEV -> {
+                Double value =
+                        query.properties()
+                                .getDouble("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor");
+                if (value == null) {
+                    throw new RuntimeException(
+                            "marqo__hybrid.relevanceCutoff.parameters.stdDevFactor is missing");
+                }
+                return value;
+            }
+            case GAP_DETECTION -> {
+                // no cutoff parameter for gap detection
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Implement feature score scaling and normalization
+     *
      * @param hitsTensor
      * @param hitsLexical
      * @param k
@@ -909,7 +1135,43 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
+     * Creates a probe lexical query for relevance cut-off.
+     * This query is used to determine the number of relevant candidates based on the specified
+     * relevance cutoff method and parameter.
+     *
+     * @param query The original query to base the probe query on.
+     * @param probeDepth The number of hits to retrieve in the probe query.
+     * @param verbose Whether to log detailed information about the created query.
+     * @return A new Query object configured for probe lexical search.
+     */
+    Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
+        Query probeLexicalQuery =
+                createSubQuery(
+                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+
+        // Overwrite the lexical score modifiers in the probe query
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__mult_weights_lexical)", Tensor.from("tensor(p{}):{}"));
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__add_weights_lexical)", Tensor.from("tensor(p{}):{}"));
+
+        probeLexicalQuery.setHits(probeDepth);
+        probeLexicalQuery.setOffset(0);
+
+        logIfVerbose(
+                String.format(
+                        "Created probe lexical query as: %s", probeLexicalQuery.toDetailString()),
+                verbose);
+        return probeLexicalQuery;
+    }
+
+    /**
      * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
+     *
      * @param cell
      * @param query
      * @param verbose
@@ -928,6 +1190,111 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    /**
+     * Extracts the current targetHits value from YQL string, if multiple targetHits are present, return the first one.
+     *
+     * @param yql The YQL string containing targetHits
+     * @return The current targetHits value as integer
+     * @throws RuntimeException if targetHits is not found or invalid
+     */
+    @VisibleForTesting
+    int extractCurrentTargetHits(String yql) {
+        Matcher matcher = TARGET_HITS_PATTERN.matcher(yql);
+
+        if (!matcher.find()) {
+            throw new RuntimeException(
+                    "YQL does not contain targetHits clause, cannot extract it.");
+        }
+
+        try {
+            return Integer.parseInt(matcher.group(2));
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Invalid targetHits value in YQL: " + matcher.group(2), e);
+        }
+    }
+
+    /**
+     * Extracts the current exploreAdditionalHits value from YQL string, if multiple exploreAdditionalHits are present,
+     * return the first one.
+     *
+     * @param yql The YQL string containing hnsw.exploreAdditionalHits
+     * @return The current exploreAdditionalHits value as integer
+     * @throws RuntimeException if hnsw.exploreAdditionalHits is not found or invalid
+     */
+    @VisibleForTesting
+    int extractCurrentExploreAdditionalHits(String yql) {
+        Matcher matcher = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql);
+        if (!matcher.find()) {
+            throw new RuntimeException(
+                    "YQL does not contain hnsw.exploreAdditionalHits clause, cannot extract it.");
+        }
+        try {
+            return Integer.parseInt(matcher.group(2));
+        } catch (NumberFormatException e) {
+            throw new RuntimeException(
+                    "Invalid exploreAdditionalHits value in YQL: " + matcher.group(2), e);
+        }
+    }
+
+    /**
+     * Overwrites the targetHits and hnsw.exploreAdditionalHits in the YQL string.
+     * @param yql The original YQL string containing targetHits and hnsw.exploreAdditionalHits.
+     * @param newTargetHits The new targetHits value to set in the YQL string.
+     * @param efSearch The efSearch value, which is used to calculate the new hnsw.exploreAdditionalHits
+     * @return Updated YQL string with new targetHits and hnsw.exploreAdditionalHits values.
+     */
+    @VisibleForTesting
+    String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
+        // Validate input
+        if (newTargetHits < 0) {
+            throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
+        }
+
+        if (newTargetHits == 0) {
+            // If targetHits is set to 0, we can set it to 1 to avoid error from Vespa
+            newTargetHits = 1;
+        }
+
+        // Count targetHits occurrences
+        long targetHitsCount = TARGET_HITS_PATTERN.matcher(yql).results().count();
+
+        if (targetHitsCount == 0) {
+            throw new RuntimeException(
+                    "YQL does not contain targetHits clause, cannot overwrite it.");
+        }
+
+        // Count hnsw.exploreAdditionalHits occurrences
+        long hnswCount = HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN.matcher(yql).results().count();
+
+        if (hnswCount == 0) {
+            throw new RuntimeException(
+                    "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits is"
+                            + " present. Both parameters must be present together.");
+        }
+
+        if (targetHitsCount != hnswCount) {
+            throw new RuntimeException(
+                    "YQL contains "
+                            + targetHitsCount
+                            + " targetHits occurrences but "
+                            + hnswCount
+                            + " hnsw.exploreAdditionalHits occurrences. Both must have the same"
+                            + " count.");
+        }
+
+        // Replace all targetHits occurrences
+        String updatedYql = TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
+
+        // Also update hnsw.exploreAdditionalHits to max(efSearch - newTargetHits, 0)
+        int newExploreAdditionalHits = Math.max(efSearch - newTargetHits, 0);
+        updatedYql =
+                HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN
+                        .matcher(updatedYql)
+                        .replaceAll("$1" + newExploreAdditionalHits);
+
+        return updatedYql;
+    }
+
     public Query createSubQuery(
             Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
         // Default exactQuery to an empty string (or any default value you prefer)
@@ -942,10 +1309,11 @@ public class HybridSearcher extends Searcher {
      * 'ranking.features'
      *      fields to search  (based on ??? method)
      *      score modifiers (based on RANKING method)
-     * @param query
-     * @param retrievalMethod
-     * @param rankingMethod
-     * @param verbose
+     * @param query The original query to base the sub-query on.
+     * @param retrievalMethod The retrieval method to use for the sub-query
+     * @param rankingMethod The ranking method to use for the sub-query
+     * @param verbose Whether to log detailed information about the created sub-query.
+     * @param exactQuery An YQL string to use instead of the retrieval method's YQL.
      */
     Query createSubQuery(
             Query query,
@@ -967,6 +1335,7 @@ public class HybridSearcher extends Searcher {
         } else {
             yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
         }
+
         // Rank Profile uses RETRIEVAL + RANKING method
         String rankProfileNew =
                 query.properties()
@@ -1081,7 +1450,7 @@ public class HybridSearcher extends Searcher {
      */
     static String extractDocIdFromHitId(String fullPath) {
         // Create a matcher for the input string using the precompiled pattern
-        Matcher matcher = PATTERN.matcher(fullPath);
+        Matcher matcher = DOC_ID_PATTERN.matcher(fullPath);
 
         // Check if the pattern matches and extract the document ID
         if (matcher.find()) {
@@ -1094,8 +1463,8 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
-     * @param hits
-     * @param verbose
+     * @param hits The hit group to apply global score modifiers to.
+     * @param verbose Whether to log detailed information about the score modification process.
      */
     HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
         FeatureData hitMatchFeatures;
@@ -1139,5 +1508,100 @@ public class HybridSearcher extends Searcher {
             }
         }
         return hits;
+    }
+
+    /**
+     * Detects the cutoff count for relevance filtering based on the specified method
+     * @param probeCandidates The lexical search results to analyze
+     * @param cutoffMethodString The method to use for cutoff detection
+     * @param relevanceCutoffParameter The parameter for the cutoff method. It is unified across all methods.
+     * @param verbose Whether to log verbose information
+     * @return The number of relevant results to keep
+     */
+    @VisibleForTesting
+    int detectCutoffCount(
+            HitGroup probeCandidates,
+            String cutoffMethodString,
+            Double relevanceCutoffParameter,
+            boolean verbose) {
+        List<Hit> lexicalHits = new ArrayList<>(probeCandidates.asList());
+
+        if (lexicalHits.isEmpty()) {
+            logIfVerbose("No lexical hits found in probe pool, returning 0", verbose);
+            return 0;
+        }
+
+        RelevanceCutoffMethod cutoffMethod;
+        try {
+            cutoffMethod = RelevanceCutoffMethod.fromString(cutoffMethodString);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethodString);
+        }
+
+        double[] probeLexicalScores =
+                lexicalHits.stream().mapToDouble(hit -> hit.getRelevance().getScore()).toArray();
+
+        switch (cutoffMethod) {
+            case GAP_DETECTION -> {
+                logIfVerbose("Using gapDetection method for relevance cutoff", verbose);
+                // Find the elbow point in the lexical hits
+                double maxDelta = -1.0;
+                int bestIndex = lexicalHits.size(); // default: keep all
+                for (int i = 0; i < lexicalHits.size() - 1; i++) {
+                    double score1 = probeLexicalScores[i];
+                    double score2 = probeLexicalScores[i + 1];
+                    double delta = score1 - score2;
+
+                    if (delta > maxDelta) {
+                        maxDelta = delta;
+                        bestIndex = i + 1;
+                    }
+                }
+                return bestIndex;
+            }
+            case MEAN_STD_DEV -> {
+                logIfVerbose("Using normalFit method for relevance cutoff", verbose);
+                DoubleStatistics stats =
+                        DoubleStatistics.of(
+                                EnumSet.of(Statistic.MEAN, Statistic.STANDARD_DEVIATION),
+                                probeLexicalScores);
+                double mean = stats.getAsDouble(Statistic.MEAN);
+                double stdDev = stats.getAsDouble(Statistic.STANDARD_DEVIATION);
+                double threshold = mean + (relevanceCutoffParameter * stdDev);
+                return countGreaterOrEqual(probeLexicalScores, threshold);
+            }
+            case RELATIVE_MAX_SCORE -> {
+                logIfVerbose("Using softCodedScoreCut method for relevance cutoff", verbose);
+                double topScore = lexicalHits.get(0).getRelevance().getScore();
+                double dynamicThreshold = topScore * relevanceCutoffParameter;
+                return countGreaterOrEqual(probeLexicalScores, dynamicThreshold);
+            }
+            default -> {
+                throw new RuntimeException("Unknown relevance cutoff method: " + cutoffMethod);
+            }
+        }
+    }
+
+    /**
+     * Returns the number of elements in a descending-sorted array
+     * that are greater than or equal to the given threshold.
+     *
+     * @param descSorted A descending-sorted array of scores.
+     * @param threshold The threshold value to compare against.
+     */
+    @VisibleForTesting
+    static int countGreaterOrEqual(double[] descSorted, double threshold) {
+        int low = 0, high = descSorted.length;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (descSorted[mid] >= threshold) {
+                // move low up
+                low = mid + 1;
+            } else {
+                // shrink high down
+                high = mid;
+            }
+        }
+        return low;
     }
 }

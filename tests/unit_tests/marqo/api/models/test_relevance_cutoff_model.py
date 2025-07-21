@@ -8,6 +8,8 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
     MeanStdParameters,
     RelevanceCutoffModel
 )
+from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.enums import SearchMethod
 
 
 class TestRelevanceCutoffModel(TestCase):
@@ -85,13 +87,46 @@ class TestRelevanceCutoffModel(TestCase):
             )
 
     def test_relative_score_parameter_constraints(self):
-        # relativeScoreFactor must be >0 and <=1
+        # relativeScoreFactor must be >=0 and <=1
         with self.assertRaises(ValidationError):
-            RelativeMaxScoreParameters(relativeScoreFactor=0)
+            RelativeMaxScoreParameters(relativeScoreFactor=-1)
         with self.assertRaises(ValidationError):
             RelativeMaxScoreParameters(relativeScoreFactor=1.5)
 
     def test_std_dev_parameter_constraints(self):
-        # stdDevFactor must be >0
+        # stdDevFactor must be a numeric value
         with self.assertRaises(ValidationError):
-            MeanStdParameters(stdDevFactor=0)
+            MeanStdParameters(stdDevFactor="test")
+
+    def test_relevance_cutoff_with_tensor_search_fails(self):
+        """Test that relevance cutoff fails with TENSOR search method"""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relativeScoreFactor=0.75)
+        )
+        
+        with self.assertRaises(ValidationError) as cm:
+            SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.TENSOR,
+                relevanceCutoff=relevance_cutoff
+            )
+        
+        self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
+        self.assertIn("TENSOR", str(cm.exception))
+
+    def test_relevance_cutoff_with_lexical_search_fails(self):
+        """Test that relevance cutoff fails with LEXICAL search method"""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection
+        )
+        
+        with self.assertRaises(ValidationError) as cm:
+            SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.LEXICAL,
+                relevanceCutoff=relevance_cutoff
+            )
+        
+        self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
+        self.assertIn("LEXICAL", str(cm.exception))

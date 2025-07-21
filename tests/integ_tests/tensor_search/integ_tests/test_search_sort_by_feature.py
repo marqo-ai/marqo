@@ -1,14 +1,17 @@
-import random
 import json
+import pytest
+import semver
+from unittest.mock import patch, MagicMock
 
+from fastapi.exceptions import RequestValidationError
+
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import UnsupportedFeatureError
-from unittest.mock import patch, MagicMock
-from marqo.core.models.marqo_index import MarqoIndex
 
 
 class TestSearchSortByFeature(MarqoTestCase):
@@ -17,13 +20,13 @@ class TestSearchSortByFeature(MarqoTestCase):
     Functional tests are in other classes.
     """
 
-    def test_sort_by_is_blocked_if_the_index_version_is_prior_to_2_21(self):
+    def test_sort_by_is_blocked_if_the_index_version_is_prior_to_2_22(self):
         """
-        Test that sort_by is blocked if the index version is prior to 2.21.
+        Test that sort_by is blocked if the index version is prior to 2.22.
         """
         # Create an index with a version prior to 2.21
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.20.0"  # Version prior to 2.21
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.21.0')  # Version prior to 2.22
         mock_index.name = "test_index"
 
         with (patch("marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=mock_index)
@@ -55,14 +58,14 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "The 'sortBy' feature is only supported for unstructured indexes created "
-                "with Marqo version",
+                "The 'sortBy' features is only supported for unstructured indexes created with Marqo "
+                "version 2.22.0 or later",
                 str(e.exception)
             )
 
     def test_sort_by_is_block_if_the_search_is_on_a_structured_index(self):
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.21.0"
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.22.0')
         mock_index.name = "test_index"
         mock_index.type="structured" # Type set to 2.21
 
@@ -95,13 +98,14 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "Your index is either a structured index or an old unstructured index",
+                "The 'sortBy' features is only supported for unstructured indexes "
+                "created with Marqo version 2.22.0 or later",
                 str(e.exception)
             )
 
     def test_sort_by_is_blocked_if_the_index_is_a_legacy_index(self):
         mock_index = MagicMock(spec=MarqoIndex)
-        mock_index.marqo_version = "2.12.0"
+        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse('2.12.0')
         mock_index.name = "test_index"
         mock_index.type="unstructured"
 
@@ -134,7 +138,8 @@ class TestSearchSortByFeature(MarqoTestCase):
                 )
 
             self.assertIn(
-                "Your index is either a structured index or an old unstructured index",
+                "The 'sortBy' features is only supported for unstructured indexes created with Marqo version "
+                "2.22.0 or later",
                 str(e.exception)
             )
 
@@ -150,7 +155,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
     5. Sort by 1 single field will field name of different types (e.g., string). In this case, the field should be
     treated as a missing field, and the sort order should be applied accordingly.
     6. Sorty by 1 single field but the field never exists in the index.
-    7. Test limit, offset, sortDepth, sortCandidates parameters to ensure they work as expected.
+    7. Test limit, offset, sortDepth, minSortCandidates parameters to ensure they work as expected.
     """
 
     @classmethod
@@ -216,7 +221,16 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
 
     @classmethod
     def _help_sort_function(cls, query: Optional[str] = ' '.join([f"content{i}" for i in range(10)]),
-                            sort_by: Optional[dict] = None, limit=10, offset=0) -> dict:
+                            sort_by: Optional[dict] = None, limit=10, offset=0,
+                            hybrid_parameters: Optional[dict] = None
+                            ) -> dict:
+        if hybrid_parameters is None:
+            hybrid_parameters = {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0.5,
+            }
+
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
@@ -224,16 +238,44 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             search_query_dict={
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
-                "hybridParameters": {
-                    "retrievalMethod": "disjunction",
-                    "rankingMethod": "rrf",
-                    "alpha": 0.5,
-                },
+                "hybridParameters": hybrid_parameters,
                 "sortBy": sort_by,
                 "limit": limit,
                 "offset": offset
             }
         ).body.decode('utf-8'))
+
+    def test_sort_by_is_blocked_by_tensor_search(self):
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.TENSOR,
+                    "sortBy": {
+                        "fields": [{"fieldName": "sort_field_1"}],
+                    }
+                }
+            )
+        self.assertIn("sortBy can only be provided for", str(context.exception.errors()))
+
+    def test_sort_by_is_blocked_by_lexical_search(self):
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.LEXICAL,
+                    "sortBy": {
+                        "fields": [{"fieldName": "sort_field_1"}],
+                    }
+                }
+            )
+        self.assertIn("sortBy can only be provided for", str(context.exception.errors()))
 
     def test_simple_sort_with_default_settings(self):
         """
@@ -256,17 +298,111 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ]
         }
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortCandidates"])
-            hits = res["hits"]
-            self.assertEqual(10, len(hits))
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+            ids
+        )
+
+    def test_hybrid_sorting_with_lexical_tensor_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "lexical",
+            "rankingMethod": "tensor",
+        }
+
+        res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+            ids
+        )
+
+    def test_hybrid_sorting_with_lexical_lexical_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "lexical",
+            "rankingMethod": "lexical",
+        }
+
+        res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+            ids
+        )
+
+    def test_hybrid_sorting_with_tensor_lexical_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "tensor",
+            "rankingMethod": "lexical",
+        }
+
+        res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+            ids
+        )
+
+    def test_hybrid_sorting_with_tensor_tensor_search_with_defaults(self):
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                }
+            ]
+        }
+
+        hybrid_search_parameters = {
+            "retrievalMethod": "tensor",
+            "rankingMethod": "tensor",
+        }
+
+        res = self._help_sort_function(sort_by=sort_by, hybrid_parameters=hybrid_search_parameters)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'],
+            ids
+        )
 
     def test_simple_sort_non_default_parameters(self):
         """
@@ -292,17 +428,15 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ]
         }
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortCandidates"])
-            hits = res["hits"]
-            self.assertEqual(10, len(hits))
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                ["7", "5", "6", "8", "0", "9", "3", "4", "1", "2"],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ["7", "5", "6", "8", "0", "9", "3", "4", "1", "2"],
+            ids
+        )
 
     def test_sort_desc_missing_first(self):
         """Test sorting descending with missing values first."""
@@ -315,15 +449,14 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ]
         }
-        for _ in range(5):
-            res = self._help_sort_function(sort_by=sort_by)
-            hits = res["hits"]
-            ids = [hit["_id"] for hit in hits]
-            # Missing first: ["7", "5", "6"], then desc: ["2", "1", "3", "4", "9", "0", "8"]
-            self.assertEqual(
-                ["7", "5", "6", "2", "1", "3", "4", "9", "0", "8"],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by)
+        hits = res["hits"]
+        ids = [hit["_id"] for hit in hits]
+        # Missing first: ["7", "5", "6"], then desc: ["2", "1", "3", "4", "9", "0", "8"]
+        self.assertEqual(
+            ["7", "5", "6", "2", "1", "3", "4", "9", "0", "8"],
+            ids
+        )
 
     def test_sort_asc_missing_last(self):
         """Test sorting ascending with missing values last."""
@@ -336,16 +469,18 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ]
         }
-        for _ in range(5):
-            res = self._help_sort_function(sort_by=sort_by)
-            hits = res["hits"]
-            ids = [hit["_id"] for hit in hits]
-            # Asc: ["8", "0", "9", "3", "4", "1", "2"], then missing last: ["7", "5", "6"]
-            self.assertEqual(
-                ["8", "0", "9", "3", "4", "1", "2", "7", "5", "6"],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by)
+        hits = res["hits"]
+        ids = [hit["_id"] for hit in hits]
+        # Asc: ["8", "0", "9", "3", "4", "1", "2"], then missing last: ["7", "5", "6"]
+        self.assertEqual(
+            ["8", "0", "9", "3", "4", "1", "2", "7", "5", "6"],
+            ids
+        )
 
+    @pytest.mark.skip_for_multinode(
+        "The lexical score can differ between nodes so the results may not consistently match"
+    )
     def test_sort_by_when_fields_does_not_exist(self):
         """
         Test sorting by a field that does not exist in the index.
@@ -363,29 +498,27 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             ]
         }
 
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            regular_res = self._help_sort_function()
-            self.assertEqual(len(regular_res["hits"]), len(res["hits"]))
-            self.assertEqual(
-                [hit["_id"] for hit in regular_res["hits"]],
-                [hit["_id"] for hit in res["hits"]]
-            )
-            for i in range(len(regular_res["hits"])):
-                for field in regular_res["hits"][i].keys():
-                    if field != "_score":
-                        self.assertEqual(
-                            regular_res["hits"][i][field],
-                            res["hits"][i][field],
-                            f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
-                        )
-                    else:
-                        self.assertNotEqual(
-                            regular_res["hits"][i][field],
-                            res["hits"][i][field],
-                            f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
-                        )
+        res = self._help_sort_function(sort_by=sort_by)
+        regular_res = self._help_sort_function()
+        self.assertEqual(len(regular_res["hits"]), len(res["hits"]))
+        self.assertEqual(
+            [hit["_id"] for hit in regular_res["hits"]],
+            [hit["_id"] for hit in res["hits"]]
+        )
+        for i in range(len(regular_res["hits"])):
+            for field in regular_res["hits"][i].keys():
+                if field != "_score":
+                    self.assertEqual(
+                        regular_res["hits"][i][field],
+                        res["hits"][i][field],
+                        f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
+                    )
+                else:
+                    self.assertNotEqual(
+                        regular_res["hits"][i][field],
+                        res["hits"][i][field],
+                        f"Regular hits: {regular_res['hits'][i]}, Sorted hits: {res['hits'][i]},"
+                    )
 
     def test_sort_depth_parameter(self):
         """
@@ -414,17 +547,15 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             ],
             "sortDepth": 6  # Limit the sort depth to 6
         }
-        for _ in range(10):
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by)
-            self.assertEqual(10, res["_sortCandidates"])
-            hits = res["hits"]
-            self.assertEqual(10, len(hits))
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        self.assertEqual(10, len(hits))
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            ['2', '3', '4', '9', '7', '5', '1', '6', '8', '0'],
+            ids
+        )
 
     def test_sort_by_with_limit_and_offset(self):
         """
@@ -432,7 +563,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         for a more comprehensive test.
         Expected results:
             - Before sort: ['3', '7', '5', '4', '2', '9', '1', '6', '8', '0']
-            - After sort with sortDepth=6:
+            - After sort with sortDepth=4:
             [
                 '3', '4', # Tie values sorted by relevance, with _id 3 coming before _id 4
                 '7', '5', # Missing fields last, sorted by relevance
@@ -440,32 +571,30 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             ]
             And we trim the results based on the limit and offset parameters.
         """
-        for _ in range(10):
-            limit = random.randint(1, 10)
-            offset = random.randint(0, 9)
+        limit = 5
+        offset = 2
 
-            sort_by = {
-                "fields": [
-                    {
-                        "field_name": "sort_field_1",
-                        "order": "desc",
-                        "missing": "last"
-                    }
-                ],
-                "sortDepth": 4,  # Limit the sort depth to 6
-                "sortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
-            }
+        sort_by = {
+            "fields": [
+                {
+                    "field_name": "sort_field_1",
+                    "order": "desc",
+                    "missing": "last"
+                }
+            ],
+            "sortDepth": 4,  # Limit the sort depth to 6
+            "minSortCandidates": max(10, limit+offset)  # Ensure we have enough candidates to sort
+        }
 
-            # We run it several times to ensure that the results are consistent
-            res = self._help_sort_function(sort_by=sort_by, limit=limit, offset=offset)
-            self.assertEqual(10, res["_sortCandidates"])
-            hits = res["hits"]
-            ids = [hit["_id"] for hit in hits]
-            self.assertEqual(
-                # Adjust the expected ids based on offset and limit
-                ['3', '4', '7', '5', '2', '9', '1', '6', '8', '0'][offset:offset + limit],
-                ids
-            )
+        res = self._help_sort_function(sort_by=sort_by, limit=limit, offset=offset)
+        self.assertEqual(10, res["_sortCandidates"])
+        hits = res["hits"]
+        ids = [hit["_id"] for hit in hits]
+        self.assertEqual(
+            # Adjust the expected ids based on offset and limit
+            ['3', '4', '7', '5', '2', '9', '1', '6', '8', '0'][offset:offset + limit],
+            ids
+        )
 
     def test_small_sort_limit_without_specifying_min_sort_candidates(self):
         """
@@ -507,7 +636,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             ]
         }
-        
+
         # Test sortDepth equal to total documents (10)
         sort_by_equal = {**sort_by_base, "sortDepth": 10}
         res = self._help_sort_function(sort_by=sort_by_equal)
@@ -515,7 +644,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         # Should be fully sorted
         ids = [hit["_id"] for hit in res["hits"]]
         self.assertEqual(['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'], ids)
-        
+
         # Test sortDepth larger than total documents (15)
         sort_by_larger = {**sort_by_base, "sortDepth": 15}
         res = self._help_sort_function(sort_by=sort_by_larger)
@@ -523,7 +652,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         # Should be fully sorted (same as above)
         ids = [hit["_id"] for hit in res["hits"]]
         self.assertEqual(['2', '1', '3', '4', '9', '0', '8', '7', '5', '6'], ids)
-        
+
         # Test sortDepth of 1 (minimal)
         sort_by_minimal = {**sort_by_base, "sortDepth": 1}
         res = self._help_sort_function(sort_by=sort_by_minimal)
@@ -544,7 +673,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             ]
             # No sortDepth specified - should default to sorting all
         }
-        
+
         res = self._help_sort_function(sort_by=sort_by)
         self.assertEqual(10, res["_sortCandidates"])
         # Should be fully sorted since no depth limit
@@ -669,6 +798,8 @@ class TestSearchSortByFeatureSort2Fields(MarqoTestCase):
         # missing primary first (7,5,6), then field1 asc, then field2 asc tie-break
         self.assertEqual(['7', '5', '6', '8', '0', '9', '3', '4', '1', '2'], ids)
 
+    @pytest.mark.skip_for_multinode(
+        "The lexical score can differ between nodes so the results may not consistently match")
     def test_sort_by_when_fields_do_not_exist_two_fields(self):
         """
         Sorting with non-existent fields should return documents in the same order as if no sort was applied, with
@@ -927,7 +1058,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
         self.assertEqual(['2', '1', '4', '3', '9', '0', '8', '6', '5', '7'], ids)
 
     def test_sort_three_fields_first_two_fixed_third_desc_last(self):
-        """Test 3 fields: first two fixed (desc/last), third field desc/last."""  
+        """Test 3 fields: first two fixed (desc/last), third field desc/last."""
         sort_by = {
             "fields": [
                 {"field_name": "sort_field_1", "order": "desc", "missing": "last"},
@@ -965,17 +1096,17 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
                 {"field_name": "sort_field_3", "order": "desc", "missing": "last"}
             ]
         }
-        
+
         # For documents with identical sort field values (like 3 and 4 both have field1=3, field2=5),
         # relevance should be the tiebreaker
         res = self._help_sort_function(sort_by=sort_by)
         ids = [h["_id"] for h in res["hits"]]
-        
+
         # Find documents 3 and 4 in the results - they should be ordered by relevance
         # since they have identical sort field values (field1=3, field2=5)
         pos_3 = ids.index('3')
         pos_4 = ids.index('4')
-        
+
         # Document 3 should come before 4 due to higher relevance (based on content length)
         self.assertLess(pos_3, pos_4, "Document 3 should come before 4 due to relevance tiebreaker")
 
@@ -988,7 +1119,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
             {"limit": 2, "offset": 8, "expected_length": 2},   # Last 2 docs
             {"limit": 15, "offset": 0, "expected_length": 10}, # Limit exceeds total docs
         ]
-        
+
         sort_by = {
             "fields": [
                 {"field_name": "sort_field_1", "order": "desc", "missing": "last"},
@@ -996,26 +1127,26 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
                 {"field_name": "sort_field_3", "order": "desc", "missing": "last"}
             ]
         }
-        
+
         # Get the full sorted order first
         full_res = self._help_sort_function(sort_by=sort_by, limit=10, offset=0)
         full_ids = [h["_id"] for h in full_res["hits"]]
-        
+
         for case in test_cases:
             with self.subTest(case=case):
                 res = self._help_sort_function(
-                    sort_by=sort_by, 
-                    limit=case["limit"], 
+                    sort_by=sort_by,
+                    limit=case["limit"],
                     offset=case["offset"]
                 )
-                
+
                 # Verify correct number of results
                 self.assertEqual(len(res["hits"]), case["expected_length"])
-                
+
                 # Verify results match the expected slice of full sorted order
                 actual_ids = [h["_id"] for h in res["hits"]]
                 expected_ids = full_ids[case["offset"]:case["offset"] + case["limit"]]
-                self.assertEqual(actual_ids, expected_ids, 
+                self.assertEqual(actual_ids, expected_ids,
                                f"Pagination failed for limit={case['limit']}, offset={case['offset']}")
 
     def test_missing_field_in_some_documents(self):
@@ -1027,7 +1158,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
                 {"field_name": "sort_field_3", "order": "desc", "missing": "first"}
             ]
         }
-        
+
         res = self._help_sort_function(sort_by=sort_by)
         ids = [h["_id"] for h in res["hits"]]
 

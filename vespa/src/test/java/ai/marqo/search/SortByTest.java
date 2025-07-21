@@ -292,8 +292,7 @@ class SortByTest {
                 .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
         doAnswer(inv -> inv.getArgument(0))
                 .when(spy)
-                .createSubQuery(
-                        any(Query.class), anyString(), anyString(), anyBoolean(), anyString());
+                .createSubQuery(any(Query.class), anyString(), anyString(), anyBoolean());
 
         // 3) Stub extractTensorRankFeature to return:
         //    • null for "mult_weights_global" or "add_weights_global"
@@ -306,7 +305,7 @@ class SortByTest {
                                 return null;
                             }
                             // non-null so createSubQuery and co. won't blow up
-                            return Tensor.from("tensor<float>()");
+                            return Tensor.from("tensor(p{}):{}");
                         })
                 .when(spy)
                 .extractTensorRankFeature(any(Query.class), anyString());
@@ -327,7 +326,7 @@ class SortByTest {
                         "marqo__hybrid.sortBy.fields",
                         "[{\"field_name\":\"foo\",\"order\":\"asc\",\"missing\":\"last\"}]");
         // MUST set this to avoid the NPE you saw
-        q.properties().set("marqo__hybrid.sortBy.sortCandidates", 10);
+        q.properties().set("marqo__hybrid.sortBy.minSortCandidates", 10);
 
         // 6) Call search()
         spy.search(q, makeEmptyExec());
@@ -752,6 +751,481 @@ class SortByTest {
             HitGroup result4 = searcher.postProcessBySort(hits, validSortJson, 100, 10, 0);
             assertThat((Object) result4).isNotNull();
             assertThat(result4.asList()).hasSize(1);
+        }
+    }
+
+    @Nested
+    class UpdateQueryHitsOffsetsAndTargetHitsTest {
+
+        @Test
+        void shouldReturnOriginalQueryWhenNeitherFeatureEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query originalQuery = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            originalQuery, 100, 200, false, false);
+
+            assertThat(result).isSameAs(originalQuery);
+            assertThat(result.getHits()).isEqualTo(10);
+            assertThat(result.getOffset()).isEqualTo(5);
+        }
+
+        @Test
+        void shouldThrowExceptionWhenBothCandidatesAreNull() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+
+            assertThatThrownBy(
+                            () ->
+                                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                                            query, null, null, true, false))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "Either relevantCandidates or sortByMinSortCandidates must be"
+                                    + " provided");
+        }
+
+        @Test
+        void shouldUpdateHitsWhenOnlyRelevanceCutoffEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+
+            // Should use Math.min(relevantCandidates, limit+offset) = Math.min(20, 15) = 15
+            assertThat(result.getHits()).isEqualTo(15);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateHitsWhenRelevantCandidatesLowerThanLimitOffset() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false);
+
+            // Should use Math.min(relevantCandidates, limit+offset) = Math.min(8, 15) = 8
+            assertThat(result.getHits()).isEqualTo(8);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateHitsWhenOnlySortByEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 20, false, true);
+
+            // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(20, 15) = 20
+            assertThat(result.getHits()).isEqualTo(20);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateHitsWhenSortByCandidatesLargerThanLimitOffset() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 30, false, true);
+
+            // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(30, 15) = 15
+            assertThat(result.getHits()).isEqualTo(30);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldNotUpdateHitsWhenSortByCandidatesLowerThanLimitOffset() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 8, false, true);
+
+            // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(8, 15) = 15
+            assertThat(result.getHits()).isEqualTo(15);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateHitsWhenBothFeaturesEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 25, true, true);
+
+            // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(30, 25)
+            // = 30
+            assertThat(result.getHits()).isEqualTo(30);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateHitsWhenBothFeaturesEnabledReversed() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 25, 30, true, true);
+
+            // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(25, 30)
+            // = 30
+            assertThat(result.getHits()).isEqualTo(30);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateTensorTargetHitsWhenRelevanceCutoffEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+
+            // Should use Math.min(newHits, currentTensorTargetHits) = Math.min(15, 50) = 15
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 15");
+            assertThat(updatedYql).doesNotContain("targetHits: 50");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1985");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1950");
+        }
+
+        @Test
+        void shouldUpdateTensorTargetHitsWhenSortByEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 60, false, true);
+
+            // Should use Math.max(newHits, currentTensorTargetHits) = Math.max(60, 50) = 60
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 60");
+            assertThat(updatedYql).doesNotContain("targetHits: 50");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1940");
+            assertThat(updatedYql).doesNotContain("hnsw.exploreAdditionalHits: 1950");
+        }
+
+        @Test
+        void shouldUpdateTensorTargetHitsWhenBothFeaturesEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 40,"
+                                    + " hnsw.exploreAdditionalHits: 1960}");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 35, true, true);
+
+            // newHits = Math.max(30, 35) = 35
+            // newTensorTargetHits = Math.max(35, 40) = 40
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 40");
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1960");
+            assertThat(result.getHits()).isEqualTo(35);
+        }
+
+        @Test
+        void shouldThrowExceptionWhenTensorTargetHitsLowerThanLimitOffset() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 10,"
+                                    + " hnsw.exploreAdditionalHits: 1990}");
+
+            assertThatThrownBy(
+                            () ->
+                                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                                            query, 20, null, true, false))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining(
+                            "The targetHits in the tensor query should not be smaller than"
+                                    + " limit+offset");
+        }
+
+        @Test
+        void shouldHandleEmptyTensorYqlCorrectly() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            // Empty tensor YQL should be handled gracefully
+            query.properties().set("marqo__yql.tensor", "");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+
+            assertThat(result.getHits()).isEqualTo(15);
+            assertThat(result.getOffset()).isEqualTo(0);
+            // Empty YQL should remain empty
+            assertThat(result.properties().getString("marqo__yql.tensor")).isEmpty();
+        }
+
+        @Test
+        void shouldPreserveTensorYqlStructureWhenUpdatingTargetHits() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {param1: 'value', targetHits: 100,"
+                                    + " hnsw.exploreAdditionalHits: 1900, param2: true}");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 150, false, true);
+
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where {param1: 'value', targetHits: 150,"
+                                    + " hnsw.exploreAdditionalHits: 1850, param2: true}");
+        }
+    }
+
+    @Nested
+    class IntegrationRelevanceCutoffAndSortByTest {
+        @Test
+        void shouldHandleTensorTargetHitsWithBothFeaturesEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=5&offset=2");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 60,"
+                                    + " hnsw.exploreAdditionalHits: 1940}");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
+
+            // newHits = Math.max(40, 45) = 45
+            // newTensorTargetHits = Math.max(45, 60) = 60 (keeps existing higher value)
+            assertThat(result.getHits()).isEqualTo(45);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 60,"
+                                    + " hnsw.exploreAdditionalHits: 1940}");
+        }
+
+        @Test
+        void shouldUpdateTensorTargetHitsWhenNewValueHigher() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=5&offset=2");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 30,"
+                                    + " hnsw.exploreAdditionalHits: 1970}");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
+
+            // newHits = Math.max(40, 45) = 45
+            // newTensorTargetHits = Math.max(45, 30) = 45 (uses new higher value)
+            assertThat(result.getHits()).isEqualTo(45);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 45, "
+                                    + "hnsw.exploreAdditionalHits: 1955}");
+        }
+
+        @Test
+        void shouldHandleEqualCandidatesInBothFeatures() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=5&offset=2");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 40, true, true);
+
+            // Should use Math.max(40, 40) = 40
+            assertThat(result.getHits()).isEqualTo(40);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldHandleComplexTensorYqlWithBothFeatures() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=5&offset=2");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {queryVector: [1,2,3], targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950, threshold: 0.8}");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 35, 40, true, true);
+
+            // newHits = Math.max(35, 40) = 40
+            // newTensorTargetHits = Math.max(40, 50) = 50
+            assertThat(result.getHits()).isEqualTo(40);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where {queryVector: [1,2,3], targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950, threshold: 0.8}");
+        }
+
+        @Test
+        void shouldHandleBoundaryConditionsWithBothFeatures() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=1&offset=0");
+
+            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 1, 1, true, true);
+
+            // Should use Math.max(1, 1) = 1
+            assertThat(result.getHits()).isEqualTo(1);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldHandleLargeCandidateValuesWithBothFeatures() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 1000,"
+                                    + " hnsw.exploreAdditionalHits: 1000}");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 500, 750, true, true);
+
+            // newHits = Math.max(500, 750) = 750
+            // newTensorTargetHits = Math.max(750, 1000) = 1000
+            assertThat(result.getHits()).isEqualTo(750);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 1000,"
+                                    + " hnsw.exploreAdditionalHits: 1000}");
+        }
+
+        @Test
+        void shouldConvertZeroTargetHitsToOneButKeepHitsZero() {
+            Query query = new Query("search/?query=test");
+            query.setHits(50);
+            query.setOffset(0);
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}");
+
+            HybridSearcher searcher = new HybridSearcher();
+
+            // Call with relevantCandidates = 0, which should result in hits = 0 but targetHits = 1
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
+
+            // Verify hits is set to 0 (original relevantCandidates value)
+            assertThat(result.getHits()).isEqualTo(0);
+
+            // Verify targetHits was converted from 0 to 1 in the tensor YQL
+            String updatedTensorYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedTensorYql)
+                    .isEqualTo(
+                            "select * from sources * where {targetHits: 1,"
+                                    + " hnsw.exploreAdditionalHits: 1999}");
+        }
+
+        @Test
+        void shouldHandleRelevanceCutoffLogicWithSortByPresent() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where {targetHits: 100,"
+                                    + " hnsw.exploreAdditionalHits: 1900}");
+
+            // When both are enabled, relevanceCutoff logic changes:
+            // - Uses Math.max instead of Math.min for determining newHits
+            // - Uses Math.max instead of Math.min for tensorTargetHits
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query,
+                            8,
+                            12,
+                            true,
+                            true // relevantCandidates < limit+offset, but with sortBy enabled
+                            );
+
+            // Should use Math.max(8, 12) = 12 (not Math.min like pure relevance cutoff)
+            assertThat(result.getHits()).isEqualTo(12);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 100"); // Math.max(12, 100) = 100
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1900");
+        }
+    }
+
+    @Nested
+    class MarqoMetadataFieldsTest {
+
+        @Test
+        void shouldExcludeNullValuesFromJsonSerialization() {
+            // Create metadata with some null values
+            HybridSearcher.MarqoMetadataFields metadataWithNulls =
+                    new HybridSearcher.MarqoMetadataFields(5, null, 10);
+
+            // Test JSON serialization excludes nulls
+            StringBuilder json = new StringBuilder();
+            metadataWithNulls.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should contain non-null values
+            assertThat(jsonString).contains("\"sortCandidates\":5");
+            assertThat(jsonString).contains("\"relevantCandidates\":10");
+
+            // Should not contain null field
+            assertThat(jsonString).doesNotContain("probeCandidates");
+            assertThat(jsonString).doesNotContain("null");
+        }
+
+        @Test
+        void shouldIncludeAllNonNullValuesInJsonSerialization() {
+            // Create metadata with all non-null values
+            HybridSearcher.MarqoMetadataFields metadataComplete =
+                    new HybridSearcher.MarqoMetadataFields(8, 12, 6);
+
+            // Test JSON serialization includes all values
+            StringBuilder json = new StringBuilder();
+            metadataComplete.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should contain all values
+            assertThat(jsonString).contains("\"sortCandidates\":8");
+            assertThat(jsonString).contains("\"probeCandidates\":12");
+            assertThat(jsonString).contains("\"relevantCandidates\":6");
+
+            // Should not contain null
+            assertThat(jsonString).doesNotContain("null");
+        }
+
+        @Test
+        void shouldHandleAllNullValuesInJsonSerialization() {
+            // Create metadata with all null values
+            HybridSearcher.MarqoMetadataFields metadataAllNulls =
+                    new HybridSearcher.MarqoMetadataFields(null, null, null);
+
+            // Test JSON serialization with all nulls
+            StringBuilder json = new StringBuilder();
+            metadataAllNulls.writeJson(json);
+            String jsonString = json.toString();
+
+            // Should be empty JSON object (no fields included due to
+            // @JsonInclude(Include.NON_NULL))
+            assertThat(jsonString).isEqualTo("{}");
         }
     }
 }
