@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://bit.ly/marqo-community-slack">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
+<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://bit.ly/marqo-community-slack">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
 </b>
 </p>
 
@@ -496,7 +496,6 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 ## Support
 
-- Ask questions and share your creations with the community on our [Discourse forum](https://community.marqo.ai).
 - Join our [Slack community](https://bit.ly/marqo-community-slack) and chat with other community members about ideas.
 
 
