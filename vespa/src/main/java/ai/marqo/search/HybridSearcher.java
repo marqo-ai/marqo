@@ -471,7 +471,7 @@ public class HybridSearcher extends Searcher {
         return idsToExclude;
     }
 
-    private Set<Integer> getExistingPaginationStateOffsets(
+    Set<Integer> getExistingPaginationStateOffsets(
             MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap) {
         Set<Integer> existingOffsets = new HashSet<>();
         if (paginationStateMap != null) {
@@ -513,8 +513,18 @@ public class HybridSearcher extends Searcher {
                             new com.yahoo.document.datatypes.LongFieldValue(
                                     System.currentTimeMillis())));
             docUpd.setCreateIfNonExistent(true);
-            docAccess.update(docUpd);
+            com.yahoo.documentapi.Result res = docAccess.update(docUpd);
             docAccess.getNext(0);
+            // raise an error if the update failed
+            if (!res.isSuccess()) {
+            } else if (res.type() == com.yahoo.documentapi.Result.ResultType.TRANSIENT_ERROR) {
+                System.out.println("send queue full, waiting for some response");
+                docAccess.getNext(0);
+            } else {
+                // raise an error if the update failed
+                throw new InternalException(
+                        "Failed to create or update pagination state: " + res.error().getMessage());
+            }
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
