@@ -338,7 +338,7 @@ class HybridSearch:
                         gathered_results.get("facets", {}).update({facet_field_name: {}})
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
-        if any([hit.id.startswith("marqo__noCache") for hit in responses.hits]):
+        if responses.hits is not None and any([hit.id.startswith("marqo__noCache") for hit in responses.hits]):
             if gathered_results.get('marqo__headers') is None:
                 gathered_results['marqo__headers'] = {}
             gathered_results['marqo__headers']["cache-control"] = "no-cache"
