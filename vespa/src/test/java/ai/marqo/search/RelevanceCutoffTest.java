@@ -2,7 +2,9 @@ package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
+import com.yahoo.documentapi.DocumentAccess;
 import com.yahoo.search.Query;
 import com.yahoo.search.Searcher;
 import com.yahoo.search.result.Hit;
@@ -17,7 +19,7 @@ class RelevanceCutoffTest {
 
     @BeforeEach
     void setUp() {
-        hybridSearcher = new HybridSearcher();
+        hybridSearcher = new HybridSearcher(mock(DocumentAccess.class));
     }
 
     @Nested

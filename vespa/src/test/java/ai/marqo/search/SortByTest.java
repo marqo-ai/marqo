@@ -759,7 +759,7 @@ class SortByTest {
 
         @Test
         void shouldReturnOriginalQueryWhenNeitherFeatureEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query originalQuery = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -773,7 +773,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionWhenBothCandidatesAreNull() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=0");
 
             assertThatThrownBy(
@@ -788,7 +788,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenOnlyRelevanceCutoffEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -801,7 +801,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenRelevantCandidatesLowerThanLimitOffset() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -814,7 +814,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenOnlySortByEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -827,7 +827,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenSortByCandidatesLargerThanLimitOffset() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -840,7 +840,7 @@ class SortByTest {
 
         @Test
         void shouldNotUpdateHitsWhenSortByCandidatesLowerThanLimitOffset() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
@@ -853,7 +853,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenBothFeaturesEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 25, true, true);
@@ -866,7 +866,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateHitsWhenBothFeaturesEnabledReversed() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 25, 30, true, true);
@@ -879,7 +879,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateTensorTargetHitsWhenRelevanceCutoffEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -900,7 +900,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateTensorTargetHitsWhenSortByEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -921,7 +921,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateTensorTargetHitsWhenBothFeaturesEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -941,7 +941,7 @@ class SortByTest {
 
         @Test
         void shouldThrowExceptionWhenTensorTargetHitsLowerThanLimitOffset() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -961,7 +961,7 @@ class SortByTest {
 
         @Test
         void shouldHandleEmptyTensorYqlCorrectly() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             // Empty tensor YQL should be handled gracefully
             query.properties().set("marqo__yql.tensor", "");
@@ -977,7 +977,7 @@ class SortByTest {
 
         @Test
         void shouldPreserveTensorYqlStructureWhenUpdatingTargetHits() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -1000,7 +1000,7 @@ class SortByTest {
     class IntegrationRelevanceCutoffAndSortByTest {
         @Test
         void shouldHandleTensorTargetHitsWithBothFeaturesEnabled() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=5&offset=2");
             query.properties()
                     .set(
@@ -1022,7 +1022,7 @@ class SortByTest {
 
         @Test
         void shouldUpdateTensorTargetHitsWhenNewValueHigher() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=5&offset=2");
             query.properties()
                     .set(
@@ -1044,7 +1044,7 @@ class SortByTest {
 
         @Test
         void shouldHandleEqualCandidatesInBothFeatures() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=5&offset=2");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 40, true, true);
@@ -1056,7 +1056,7 @@ class SortByTest {
 
         @Test
         void shouldHandleComplexTensorYqlWithBothFeatures() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=5&offset=2");
             query.properties()
                     .set(
@@ -1078,7 +1078,7 @@ class SortByTest {
 
         @Test
         void shouldHandleBoundaryConditionsWithBothFeatures() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=1&offset=0");
 
             Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 1, 1, true, true);
@@ -1090,7 +1090,7 @@ class SortByTest {
 
         @Test
         void shouldHandleLargeCandidateValuesWithBothFeatures() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
@@ -1122,7 +1122,7 @@ class SortByTest {
                             "select * from sources * where {targetHits: 50,"
                                     + " hnsw.exploreAdditionalHits: 1950}");
 
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
 
             // Call with relevantCandidates = 0, which should result in hits = 0 but targetHits = 1
             Query result =
@@ -1141,7 +1141,7 @@ class SortByTest {
 
         @Test
         void shouldHandleRelevanceCutoffLogicWithSortByPresent() {
-            HybridSearcher searcher = new HybridSearcher();
+            HybridSearcher searcher = new HybridSearcher(documentAccess);
             Query query = new Query("?q=test&hits=10&offset=5");
             query.properties()
                     .set(
