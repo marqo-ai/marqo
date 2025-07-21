@@ -335,10 +335,10 @@ class SearchQuery(BaseMarqoModel):
     @root_validator(pre=False)
     def _validate_relevance_cutoff_only_works_for_hybrid_search(cls, values):
         """Validate that relevance cutoff is only provided for hybrid search"""
-        relevance_cutoff = values.get('relevanceCutoff')
+        relevance_cutoff = values.get('relevance_cutoff')
         search_method = values.get('searchMethod')
         if relevance_cutoff is not None and search_method.upper() != SearchMethod.HYBRID:
-            raise ValueError(f"RelevanceCutoff can only be provided for 'HYBRID' search, but "
+            raise ValueError(f"relevanceCutoff can only be provided for 'HYBRID' search, but "
                              f"received search method '{search_method}'")
         return values
 
