@@ -56,7 +56,7 @@ def split_and_prefix_path_to_test(path_to_test: str) -> list:
 def run_prepare_mode(version_to_test_against: str, test_classes_to_prepare: list):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
-    logger.info(f"Printing all test cases to prepare: {test_classes_to_prepare}")
+    logger.info(f"Printing all {len(test_classes_to_prepare)} test cases to prepare: {test_classes_to_prepare}")
     errors = []
 
     # Skip any tests that have already been prepared
@@ -123,11 +123,15 @@ def construct_pytest_arguments(version_to_test_against, path_to_test):
         "-s"
     ]
 
+    # Split and add base directory to path_to_test string
     pytest_args += split_and_prefix_path_to_test(path_to_test)
 
     return pytest_args
 
 def run_test_mode(version_to_test_against, path_to_test):
+    """
+    Run test mode on only the paths in path_to_test
+    """
     logger.info(f"TEST MODE START all test cases for version: {version_to_test_against}")
     pytest_args = construct_pytest_arguments(version_to_test_against, path_to_test)
     cmd = [sys.executable, "-m", "pytest", *pytest_args]
