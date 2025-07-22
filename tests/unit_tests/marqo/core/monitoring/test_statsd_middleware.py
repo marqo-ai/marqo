@@ -100,56 +100,52 @@ class TestStatsDMiddleware(unittest.TestCase):
     def test_root_request_metrics(self):
         """Health-check path ‘/’ should NOT emit metrics."""
         self.client.get("/")
-        self.assertEqual(_extract(self.stub, "increment", "requests.completed"), [])
-        self.assertFalse(any(m.startswith("marqo_processing_time") for _, m in self.stub.sent))
+        self.assertEqual(self.stub.sent, [])
 
     def test_search_metrics(self):
-        """Test that search requests emit the correct metrics."""
+        """Search emits request.duration_ms with proper tags."""
         resp = self.client.post("/indexes/foo/search")
         self.assertEqual(resp.status_code, 200)
 
-        self.assertTrue(any(m.startswith("search_processing_time") for _, m in self.stub.sent))
-        self.assertTrue(any(
-            "path:/indexes/foo/search" in m and "method:POST" in m
-            for m in _extract(self.stub, "increment", "requests.completed")
-        ))
-        self.assertTrue(any("status_code:2XX" in m for m in _extract(self.stub, "increment", "requests.completed")))
+        timings = _extract(self.stub, "timing", "request.duration_ms")
+        self.assertTrue(any("path:/indexes/foo/search" in m and "method:POST" in m for m in timings))
+        self.assertTrue(any("status_code:200" in m for m in timings))
 
     def test_index_docs_metrics_and_headers(self):
-        """Test that document indexing requests emit the correct metrics and headers."""
+        """Indexing documents emits request.duration_ms and batch.* counters."""
         self.client.post("/indexes/foo/documents")
 
-        self.assertTrue(any(m.startswith("index_processing_time") for _, m in self.stub.sent))
+        self.assertTrue(any(m.startswith("request.duration_ms") for k, m in self.stub.sent if k == "timing"))
         incs = _extract(self.stub, "increment")
-        self.assertTrue(any(m.startswith("x-count-success:5") for m in incs))
-        self.assertTrue(any(m.startswith("x-count-failure:1") for m in incs))
-        self.assertTrue(any(m.startswith("x-count-error:0") for m in incs))
+        self.assertTrue(any("batch.success:5" in m for m in incs))
+        self.assertTrue(any("batch.failure:1" in m for m in incs))
+        self.assertTrue(any("batch.error:0" in m for m in incs))
 
-    def test_requests_completed_path_sanitised(self):
-        """Test that requests.completed metrics sanitise document IDs."""
+    def test_path_sanitisation(self):
+        """Ensure document ID is redacted in request.duration_ms tags."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_docs_and_fail(self.stub))
         self.client = self.client_ctx.__enter__()
         self.stub.sent.clear()
 
         self.client.get("/indexes/foo/documents/abc123")
-        msgs = _extract(self.stub, "increment", "requests.completed")
-        self.assertTrue(any("path:/indexes/foo/documents/<document_id>" in m for m in msgs))
-        self.assertFalse(any("abc123" in m for m in msgs))
+        timings = _extract(self.stub, "timing", "request.duration_ms")
+        self.assertTrue(any("path:/indexes/foo/documents/<document_id>" in m for m in timings))
+        self.assertFalse(any("abc123" in m for m in timings))
 
-    def test_requests_completed_5xx(self):
-        """Test that requests.completed metrics capture 5XX errors."""
+    def test_duration_metrics_on_5xx(self):
+        """Ensure 5XX responses emit duration_ms with correct tag."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_docs_and_fail(self.stub))
         self.client = self.client_ctx.__enter__()
         self.stub.sent.clear()
 
         self.client.get("/fail")
-        msgs = _extract(self.stub, "increment", "requests.completed")
-        self.assertTrue(any("status_code:5XX" in m for m in msgs))
+        timings = _extract(self.stub, "timing", "request.duration_ms")
+        self.assertTrue(any("status_code:503" in m for m in timings))
 
-    def test_patch_docs_metrics_and_malformed_headers(self):
-        """Test that patch requests emit the correct metrics and handle malformed headers."""
+    def test_patch_docs_malformed_headers(self):
+        """PATCH requests emit duration, malformed x-count headers are ignored."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_patch_and_bad_headers(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -157,11 +153,12 @@ class TestStatsDMiddleware(unittest.TestCase):
 
         self.client.patch("/indexes/foo/documents")
 
-        self.assertTrue(any(k == "timing" and m.startswith("index_processing_time") for k, m in self.stub.sent))
-        self.assertFalse(any(m.startswith("x-count-success") for k, m in self.stub.sent))
+        self.assertTrue(any(m.startswith("request.duration_ms") for k, m in self.stub.sent if k == "timing"))
+        self.assertFalse(any("batch.success" in m or "batch.failure" in m or "batch.error" in m
+                             for k, m in self.stub.sent if k == "increment"))
 
-    def test_headers_with_empty_strings_dont_crash(self):
-        """Test that patch requests with empty string headers do not crash."""
+    def test_empty_headers_dont_crash(self):
+        """PATCH requests with empty headers should not raise exceptions or send bad metrics."""
         self.client_ctx.__exit__(None, None, None)
         self.client_ctx = TestClient(_app_with_patch_and_bad_headers(self.stub))
         self.client = self.client_ctx.__enter__()
@@ -169,13 +166,13 @@ class TestStatsDMiddleware(unittest.TestCase):
 
         self.client.patch("/indexes/foo/documents")
 
-        self.assertTrue(any(k == "timing" and m.startswith("index_processing_time") for k, m in self.stub.sent))
-        self.assertFalse(any(m.startswith("x-count-success") for k, m in self.stub.sent))
+        self.assertTrue(any(k == "timing" and m.startswith("request.duration_ms") for k, m in self.stub.sent))
+        self.assertFalse(any("batch." in m for k, m in self.stub.sent if k == "increment"))
 
-    def test_requests_completed_4xx(self):
-        """Test that requests.completed metrics capture 4XX errors."""
+    def test_duration_metrics_on_4xx(self):
+        """404s and other client errors still emit duration metric."""
         resp = self.client.get("/nonexistent/path")
         self.assertEqual(resp.status_code, 404)
 
-        msgs = _extract(self.stub, "increment", "requests.completed")
-        self.assertTrue(any("status_code:4XX" in m for m in msgs))
+        timings = _extract(self.stub, "timing", "request.duration_ms")
+        self.assertTrue(any("status_code:404" in m for m in timings))
