@@ -6,9 +6,12 @@ from typing import List, Dict
 import json
 
 import unittest
-from marqo.tensor_search.utils import construct_authorized_url
+
+# These marqo imports are from py-marqo (should be installed), not from src/marqo
+from marqo.utils import construct_authorized_url
 from marqo import Client
 from marqo.errors import MarqoWebError
+
 import requests
 from tests.compatibility_tests.compatibility_test_logger import get_logger
 
