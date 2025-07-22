@@ -10,7 +10,7 @@ from marqo.core.index_management.vespa_application_package import ServicesXml
 
 
 @pytest.mark.unittest
-class TestIndexSettingStore(unittest.TestCase):
+class TestServicesXml(unittest.TestCase):
 
     _TEMPLATE = Template(textwrap.dedent("""<?xml version="1.0" encoding="utf-8" ?>
             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
@@ -263,6 +263,129 @@ class TestIndexSettingStore(unittest.TestCase):
                                 </content>
                             </services>
                         """
+        self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
+
+    def test_config_components_should_preserve_document_operation_executor_config(self):
+        """
+        Test that config name="com.yahoo.document.restapi.document-operation-executor" is preserved
+        during component configuration cleanup, as required by the Cloud team.
+        """
+        xml = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <document-api/>
+                            <search/>
+                            <config name="com.yahoo.document.restapi.document-operation-executor">
+                                <maxThrottled>0</maxThrottled>
+                            </config>
+                            <component id="ai.marqo.RandomComponent" bundle="marqo-custom-searchers"/>
+                            <random-element/>
+                            <nodes>
+                                <node hostalias="node1"/>
+                            </nodes>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                        </content>
+                    </services>
+                """
+
+        service_xml = ServicesXml(xml)
+        service_xml.config_components()
+
+        # The document-operation-executor config should be preserved along with its children
+        # while other custom components and random elements are removed
+        expected_xml = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <document-api/>
+                            <search>
+                                <chain id="marqo" inherits="vespa">
+                                    <searcher id="ai.marqo.search.HybridSearcher" bundle="marqo-custom-searchers"/>
+                                </chain>
+                            </search>
+                            <config name="com.yahoo.document.restapi.document-operation-executor">
+                                <maxThrottled>0</maxThrottled>
+                            </config>
+                            <nodes>
+                                <node hostalias="node1"/>
+                            </nodes>
+                            <handler id="ai.marqo.index.IndexSettingRequestHandler" bundle="marqo-custom-searchers">
+                                <binding>http://*/index-settings/*</binding>
+                                <binding>http://*/index-settings</binding>
+                            </handler>
+                            <component id="ai.marqo.index.IndexSettings" bundle="marqo-custom-searchers">
+                                <config name="ai.marqo.index.index-settings">
+                                    <indexSettingsFile>marqo_index_settings.json</indexSettingsFile>
+                                    <indexSettingsHistoryFile>marqo_index_settings_history.json</indexSettingsHistoryFile>
+                                </config>
+                            </component>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                        </content>
+                    </services>
+                """
+        self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
+
+    def test_config_components_should_remove_other_config_elements(self):
+        """
+        Test that other config elements (not document-operation-executor) are still removed
+        during component configuration cleanup.
+        """
+        xml = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <document-api/>
+                            <search/>
+                            <config name="some.other.config">
+                                <somevalue>test</somevalue>
+                            </config>
+                            <config name="another.random.config">
+                                <anothervalue>value</anothervalue>
+                            </config>
+                            <nodes>
+                                <node hostalias="node1"/>
+                            </nodes>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                        </content>
+                    </services>
+                """
+
+        service_xml = ServicesXml(xml)
+        service_xml.config_components()
+
+        # Other config elements should be removed, only Marqo components should remain
+        expected_xml = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <document-api/>
+                            <search>
+                                <chain id="marqo" inherits="vespa">
+                                    <searcher id="ai.marqo.search.HybridSearcher" bundle="marqo-custom-searchers"/>
+                                </chain>
+                            </search>
+                            <nodes>
+                                <node hostalias="node1"/>
+                            </nodes>
+                            <handler id="ai.marqo.index.IndexSettingRequestHandler" bundle="marqo-custom-searchers">
+                                <binding>http://*/index-settings/*</binding>
+                                <binding>http://*/index-settings</binding>
+                            </handler>
+                            <component id="ai.marqo.index.IndexSettings" bundle="marqo-custom-searchers">
+                                <config name="ai.marqo.index.index-settings">
+                                    <indexSettingsFile>marqo_index_settings.json</indexSettingsFile>
+                                    <indexSettingsHistoryFile>marqo_index_settings_history.json</indexSettingsHistoryFile>
+                                </config>
+                            </component>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                        </content>
+                    </services>
+                """
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
 
     def _assertStringsEqualIgnoringWhitespace(self, s1: str, s2: str):
