@@ -66,6 +66,7 @@ jobs:
   compatibility_tests:
     # This job runs on the newly created runner
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    timeout-minutes: 60
     steps:
       # Step to check out the Marqo repository
       - name: checkout marqo repo
