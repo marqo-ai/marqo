@@ -29,11 +29,6 @@ class TestCreateIndexWithNoModel(BaseCompatibilityTestCase):
     def prepare(self):
 
         all_results = {}
-        # TODO: remove this deletion
-        try:
-            self.client.delete_index(index_name=self.index_name)
-        except Exception as e:
-            self.logger.debug(f"Exception when deleting index with name {self.index_name}: {e}")
 
         try:
             self.logger.debug(f"Creating index {self.index_name}")

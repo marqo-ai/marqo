@@ -60,12 +60,6 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
         all_results = {}
         errors = [] # To store errors in case of failure
         for index_name, settings in [(self.load_from_hf_index_name, self.load_from_hf_index_settings), (self.load_from_public_url_index_name, self.load_from_public_url_settings), (self.load_from_public_url_with_custom_configurations_index_name, self.load_from_public_url_with_custom_configurations)]:
-            # TODO: remove this deletion
-            try:
-                self.client.delete_index(index_name=index_name)
-            except Exception as e:
-                self.logger.debug(f"Exception when deleting index with name {index_name}: {e}")
-
             try:
                 self.logger.debug(f"Creating index {index_name}")
                 self.client.create_index(index_name = index_name, settings_dict = settings)

@@ -53,36 +53,10 @@ def split_and_prefix_path_to_test(path_to_test: str) -> list:
         return ["tests/compatibility_tests"]
     return [f"tests/compatibility_tests/{cls.strip()}" for cls in path_to_test.split()]
 
-
-def load_all_subclasses(package_name):
-    """
-    Dynamically load all subclasses within a specified package,
-    including those in its subdirectories.
-
-    Args:
-        package_name (str): The top-level package name to search for subclasses.
-    """
-    # TODO: Delete if determine test classes to prepare works
-    global _imported_modules
-    package = importlib.import_module(package_name)
-    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, f"{package_name}."):
-        logger.debug(f"Processing subclass: {name}, is package? -> {is_pkg}")
-        if is_pkg:
-            continue
-        if name in _imported_modules:
-            logger.debug(f"Skipping already imported module: {name}")
-            continue
-        try:
-            importlib.import_module(name)
-            _imported_modules.add(name)
-            logger.debug(f"Imported module with name {name}")
-        except ImportError as e:
-            logger.error(f"Could not import module with {name}")
-
 def run_prepare_mode(version_to_test_against: str, test_classes_to_prepare: list):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
-    logger.debug(f"Printing all test cases to prepare: {test_classes_to_prepare}")
+    logger.info(f"Printing all test cases to prepare: {test_classes_to_prepare}")
     errors = []
 
     # Skip any tests that have already been prepared
@@ -328,9 +302,13 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
             run_test_mode(from_version, path_to_test)
         except Exception as e:
             raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
-        logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
+        logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS "
+                    "TWO CONTAINERS WITH DIFFERENT VERSIONS")
         # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
         try:
+            logger.info(
+                "Running final prepare then test mode on the same (to_version) container."
+            )
             run_prepare_mode(to_version, test_classes_to_prepare)
             run_test_mode(to_version, path_to_test)
         except Exception as e:
