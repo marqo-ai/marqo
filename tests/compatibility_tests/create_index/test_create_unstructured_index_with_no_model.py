@@ -29,7 +29,6 @@ class TestCreateIndexWithNoModel(BaseCompatibilityTestCase):
     def prepare(self):
 
         all_results = {}
-
         try:
             self.logger.debug(f"Creating index {self.index_name}")
             self.client.create_index(index_name = self.index_name, settings_dict = self.settings)

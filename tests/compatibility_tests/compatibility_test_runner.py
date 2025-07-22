@@ -341,7 +341,6 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str, pat
     """
     logger.info(f"Starting Marqo rollback tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
     try:
-        # load_all_subclasses("tests.compatibility_tests")
         # Step 0: Generate a volume name to be used with the "from_version" Marqo container for state transfer.
         from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
         logger.info(f"Generated volume name: {from_version_volume} for from_version: {from_version}")

@@ -60,7 +60,6 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
-        self.maxDiff = None
         self.logger.debug(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
         errors = []  # Collect errors to report them at the end
@@ -130,7 +129,6 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
     def test_search_with_global_score_modifiers(self):
         """Run search queries and compare the results with the stored results."""
         self.logger.info(f"Running test_search on {self.__class__.__name__}")
-        self.maxDiff = None
         stored_results = self.load_results_from_file()
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions.
 
