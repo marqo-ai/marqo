@@ -582,8 +582,11 @@ public class HybridSearcher extends Searcher {
             Array<StringFieldValue> processedHitIds =
                     new Array<>(DataType.getArray(DataType.STRING));
             for (Hit hit : processedHits.asList()) {
-                String processedDocId = extractDocIdFromHitId(hit.getId().toString());
-                processedHitIds.add(new StringFieldValue(processedDocId));
+                String stringId = hit.getId().toString();
+                if (!stringId.startsWith("group:facet:")) {
+                    String processedDocId = extractDocIdFromHitId(hit.getId().toString());
+                    processedHitIds.add(new StringFieldValue(processedDocId));
+                }
             }
             docUpd.addFieldPathUpdate(
                     new AssignFieldPathUpdate(docType, "offsets{" + offset + "}", processedHitIds));
@@ -596,15 +599,16 @@ public class HybridSearcher extends Searcher {
             com.yahoo.documentapi.Result res = docAccess.update(docUpd);
             docAccess.getNext(0);
             // raise an error if the update failed
-            if (!res.isSuccess()) {
-            } else if (res.type() == com.yahoo.documentapi.Result.ResultType.TRANSIENT_ERROR) {
-                System.out.println("send queue full, waiting for some response");
-                docAccess.getNext(0);
-            } else {
-                // raise an error if the update failed
-                throw new InternalException(
-                        "Failed to create or update pagination state: " + res.error().getMessage());
-            }
+            if (!res.isSuccess())
+                if (res.type() == com.yahoo.documentapi.Result.ResultType.TRANSIENT_ERROR) {
+                    System.out.println("send queue full, waiting for some response");
+                    docAccess.getNext(0);
+                } else {
+                    // raise an error if the update failed
+                    throw new InternalException(
+                            "Failed to create or update pagination state: "
+                                    + res.error().getMessage());
+                }
         } catch (Exception e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
