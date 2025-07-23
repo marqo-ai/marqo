@@ -196,7 +196,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         # Verify get_batch was called with correct fields
         expected_fields = [structured_common.FIELD_ID, "emb_title", "emb_desc"]
         self.mock_vespa_client.get_batch.assert_called_once_with(
-            ["doc1"], "test_schema", fields=expected_fields, concurrency=None
+            ["doc1"], "test_schema", fields=expected_fields
         )
     
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
@@ -350,7 +350,7 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         # Verify get_batch was called with empty document list
         expected_fields = [structured_common.FIELD_ID, "emb_title"]
         self.mock_vespa_client.get_batch.assert_called_once_with(
-            [], "test_schema", fields=expected_fields, concurrency=None
+            [], "test_schema", fields=expected_fields
         )
 
     @patch('marqo.tensor_search.tensor_search.RequestMetricsStore')
@@ -567,5 +567,5 @@ class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
         # Verify get_batch was called with correct fields
         expected_fields = [structured_common.FIELD_ID, "emb_field1", "emb_field2", "emb_field3"]
         self.mock_config.vespa_client.get_batch.assert_called_once_with(
-            ["doc1", "doc2", "doc3"], "test_schema", fields=expected_fields, concurrency=None
+            ["doc1", "doc2", "doc3"], "test_schema", fields=expected_fields
         )
