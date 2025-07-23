@@ -220,7 +220,7 @@ class TestPagination(MarqoTestCase):
                                                                        verbose=True),
                                     config=self.config,
                                     index_name=index.name,
-                                    text='my title',
+                                    text='title',
                                     result_count=lim, offset=off)
 
                                 paginated_search_results["hits"].extend(page_res["hits"])
@@ -604,23 +604,21 @@ class TestPagination(MarqoTestCase):
                 ).dict(exclude_none=True, by_alias=True)
                 self.assertFalse(r['errors'], "Errors in add documents call")
 
-            for page_size in [5, 10, 100, 200]:
+            for page_size in [5, 10, 50, 100, 200]:
                 with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
                     paginated_search_results_ids = set()
 
                     for page_num in range(math.ceil(num_docs / page_size)):
                         # Pagination state does not save immediately, small delay to ensure state is saved
-                        time.sleep(0.05)
                         lim = page_size
                         off = page_num * page_size
                         page_res = tensor_search.search(
                             search_method="HYBRID",
                             hybrid_parameters=HybridParameters(retrievalMethod="disjunction",
-                                                               rankingMethod="rrf",
-                                                               verbose=True),
+                                                               rankingMethod="rrf"),
                             config=self.config,
                             index_name=index.name,
-                            text='my title',
+                            text='title',
                             result_count=lim, offset=off)
 
                         for hit in page_res['hits']:

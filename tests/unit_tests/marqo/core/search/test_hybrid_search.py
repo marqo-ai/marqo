@@ -180,6 +180,7 @@ class TestHybridSearch(TestCase):
         mock_response = Mock()
         mock_response.root.coverage.coverage = 100
         mock_response.root.coverage.degraded = None
+        mock_response.hits = []
         config.vespa_client.query.return_value = mock_response
         
         # Mock marqo_index
@@ -266,6 +267,7 @@ class TestHybridSearch(TestCase):
         mock_response = Mock()
         mock_response.root.coverage.coverage = 100
         mock_response.root.coverage.degraded = None
+        mock_response.hits = []
         config.vespa_client.query.return_value = mock_response
         
         # Mock marqo_index
