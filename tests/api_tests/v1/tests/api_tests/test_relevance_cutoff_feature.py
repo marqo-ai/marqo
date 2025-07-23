@@ -353,9 +353,9 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
             offset=3
         )
 
-        # Both pages should have consistent metadata
+        # metadata is adjusted based on pagination
         self.assertEqual(page1["_relevantCandidates"], page2["_relevantCandidates"])
-        self.assertEqual(page1["_sortCandidates"], page2["_sortCandidates"])
+        self.assertEqual(page1["_sortCandidates"], page2["_sortCandidates"] + 3)
 
         # Should respect limit
         self.assertEqual(3, len(page1["hits"]), 3)

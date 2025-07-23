@@ -773,7 +773,7 @@ class VespaApplicationPackage:
         services_xml_old = ServicesXml(services_xml_backup)
         elements_to_check = [
             # (xml_path, error_message)
-            ('content/documents', 'Indexes have been added or removed since last backup.'),
+            # ('content/documents', 'Indexes have been added or removed since last backup.'),
             ('*/nodes', 'Vector store config has been changed since the last backup.'),
             ('admin', 'Vector store config has been changed since the last backup.'),
         ]

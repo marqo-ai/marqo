@@ -208,22 +208,30 @@ class TestPagination(MarqoTestCase):
                             paginated_search_results = {"hits": []}
 
                             for page_num in range(math.ceil(num_docs / page_size)):
-                                if retrieval_method == "disjunction":
-                                    # Pagination state does not save immediately, small delay to ensure state is saved
-                                    time.sleep(0.05)
                                 lim = page_size
                                 off = page_num * page_size
-                                page_res = tensor_search.search(
-                                    search_method="HYBRID",
-                                    hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
-                                                                       rankingMethod=ranking_method,
-                                                                       verbose=True),
-                                    config=self.config,
-                                    index_name=index.name,
-                                    text='my title',
-                                    result_count=lim, offset=off)
+                                page_res = {"marqo__headers": {"cache-control": "no-cache"}}
+                                for i in range(4):
+                                    if i == 3:
+                                        raise Exception("Too many jumps, pagination state is failing to save")
+                                    if page_res.get("marqo__headers", {}).get("cache-control") == "no-cache":
+                                        if i != 0:
+                                            print(
+                                                "Jump detected - pagination state didn't save in time, retrying search"
+                                            )
+                                        page_res = tensor_search.search(
+                                            search_method="HYBRID",
+                                            hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
+                                                                               rankingMethod=ranking_method,
+                                                                               verbose=True),
+                                            config=self.config,
+                                            index_name=index.name,
+                                            text='my title',
+                                            result_count=lim, offset=off)
+                                    else:
+                                        paginated_search_results["hits"].extend(page_res["hits"])
+                                        break
 
-                                paginated_search_results["hits"].extend(page_res["hits"])
 
                             # Compare paginated to full results (length only for now)
                             self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
@@ -609,22 +617,32 @@ class TestPagination(MarqoTestCase):
                     paginated_search_results_ids = set()
 
                     for page_num in range(math.ceil(num_docs / page_size)):
-                        # Pagination state does not save immediately, small delay to ensure state is saved
-                        time.sleep(0.05)
                         lim = page_size
                         off = page_num * page_size
-                        page_res = tensor_search.search(
-                            search_method="HYBRID",
-                            hybrid_parameters=HybridParameters(retrievalMethod="disjunction",
-                                                               rankingMethod="rrf"),
-                            config=self.config,
-                            index_name=index.name,
-                            text='title',
-                            result_count=lim, offset=off)
-
-                        for hit in page_res['hits']:
-                            # Ensure no duplicate IDs in paginated results
-                            if hit['_id'] in paginated_search_results_ids:
-                                raise AssertionError(f"Duplicate ID found in paginated results: {hit['_id']}")
-                        paginated_search_results_ids.update((hit['_id'] for hit in page_res['hits']))
+                        page_res = {"marqo__headers": {"cache-control": "no-cache"}}
+                        for i in range(4):
+                            if i == 3:
+                                raise Exception("Too many jumps, pagination state is failing to save")
+                            # Retry search if pagination state is not saved in time
+                            if page_res.get("marqo__headers", {}).get("cache-control") == "no-cache":
+                                if i != 0:
+                                    print(page_res)
+                                    print(
+                                        "Jump detected - pagination state didn't save in time, retrying search"
+                                    )
+                                page_res = tensor_search.search(
+                                    search_method="HYBRID",
+                                    hybrid_parameters=HybridParameters(retrievalMethod="disjunction",
+                                                                       rankingMethod="rrf", verbose=True),
+                                    config=self.config,
+                                    index_name=index.name,
+                                    text='title',
+                                    result_count=lim, offset=off)
+                            else:
+                                for hit in page_res['hits']:
+                                    # Ensure no duplicate IDs in paginated results
+                                    if hit['_id'] in paginated_search_results_ids:
+                                        raise AssertionError(f"Duplicate ID found in paginated results: {hit['_id']}")
+                                paginated_search_results_ids.update((hit['_id'] for hit in page_res['hits']))
+                                break
 

@@ -86,7 +86,10 @@ public class HybridSearcher extends Searcher {
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
-            Integer sortCandidates, Integer probeCandidates, Integer relevantCandidates)
+            Integer sortCandidates,
+            Integer probeCandidates,
+            Integer relevantCandidates,
+            Boolean noCache)
             implements JsonProducer {
 
         @Override
@@ -189,6 +192,7 @@ public class HybridSearcher extends Searcher {
         com.yahoo.documentapi.Result paginationDocResult = null;
         DocumentId docId = null;
         Set<Integer> paginationStateOffsets = null;
+        Boolean noCache = null;
         // Get the pagination document if paginationHash and paginationSchema are set and
         // retrievalMethod is disjunction
         if (shouldUsePagination(paginationHash, paginationSchema, retrievalMethod)) {
@@ -449,9 +453,7 @@ public class HybridSearcher extends Searcher {
                             }
                         });
             } else {
-                // add metadata hit to hits marqo__noCache:marqo__isPaginationJump
-                Hit isJumpMetadataHit = getNoCacheHit("marqo__isPaginationJump");
-                processedHits.add(isJumpMetadataHit);
+                noCache = true;
                 logIfVerbose(
                         "Pagination jump detected, not updating pagination state for offset: "
                                 + offset,
@@ -497,17 +499,11 @@ public class HybridSearcher extends Searcher {
         }
         // --- End facets attachment ---
         MarqoMetadataFields marqoMetadataFields =
-                new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
+                new MarqoMetadataFields(
+                        sortCandidates, probeCandidates, relevantCandidates, noCache);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);
-    }
-
-    // Creates a no-cache hit with a specific reason.
-    private Hit getNoCacheHit(String noCacheReason) {
-        Hit noCacheHit = new Hit("marqo__noCache:" + noCacheReason);
-        noCacheHit.setField("marqo__noCache", true);
-        return noCacheHit;
     }
 
     // Checks if pagination should be used based on the provided parameters.

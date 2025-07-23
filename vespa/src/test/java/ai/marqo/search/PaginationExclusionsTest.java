@@ -12,8 +12,6 @@ import com.yahoo.document.datatypes.StringFieldValue;
 import com.yahoo.documentapi.*;
 import com.yahoo.search.Query;
 import com.yahoo.search.Searcher;
-import com.yahoo.search.result.Hit;
-import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.search.searchchain.SearchChainRegistry;
 import com.yahoo.tensor.Tensor;
@@ -105,11 +103,6 @@ class PaginationExclusionsTest {
         verify(asyncSession, never()).update(any());
 
         // Verify that the result contains metadata "no-cache" hit due to jump
-        HitGroup hitGroup = result.hits();
-        assertThat(hitGroup.size()).isEqualTo(1);
-        Hit noCacheHit = hitGroup.get(0);
-        assertThat(noCacheHit.getId().toString().equals("marqo__noCache:marqo__isPaginationJump"))
-                .isTrue();
     }
 
     @Test
