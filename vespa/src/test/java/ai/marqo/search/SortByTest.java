@@ -125,7 +125,7 @@ class SortByTest {
         // 2) doc3 & doc4 both 2.0 → tie by original relevance: doc4(0.85) before doc3(0.75)
         // 3) doc6(5),doc7(6),doc8(7),doc9(8),doc10(9)
         // 4) missing last: doc1,doc5
-        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0, null, false);
         assertThat(out.asList())
                 .extracting(hit -> hit.getId().toString())
                 .containsExactly(
@@ -148,7 +148,7 @@ class SortByTest {
                         + "\"missing\":\"first\""
                         + "}]";
 
-        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0, null, false);
         assertThat(out.asList())
                 .extracting(hit -> hit.getId().toString())
                 .containsExactly(
@@ -205,7 +205,7 @@ class SortByTest {
                         + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"last\"}"
                         + "]";
 
-        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0, null, false);
         // Expected:
         // 1) doc2 (1.0,5.0) before doc1 (1.0,10.0)
         // 2) doc3 (2.0,3.0) before doc4 (2.0,7.0)
@@ -255,7 +255,7 @@ class SortByTest {
                         + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"},"
                         + "{\"field_name\":\"ignored\",\"order\":\"asc\",\"missing\":\"first\"}]";
 
-        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0);
+        HitGroup out = searcher.postProcessBySort(hitsToSort, sortJson, null, 10, 0, null, false);
         // Expected:
         // 1) missing first: docD
         // 2) among the rest, field0 ties=1.0 → use field1:
@@ -313,7 +313,14 @@ class SortByTest {
         // 4) Stub postProcessBySort so it just returns an empty HitGroup
         doReturn(new HitGroup())
                 .when(spy)
-                .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
+                .postProcessBySort(
+                        any(HitGroup.class),
+                        anyString(),
+                        any(),
+                        anyInt(),
+                        anyInt(),
+                        any(),
+                        anyBoolean());
 
         // 5) Build a Query that triggers the sortBy branch
         Query q = new Query("?q");
@@ -333,7 +340,14 @@ class SortByTest {
 
         // 7) Verify that only postProcessBySort() ran
         verify(spy, times(1))
-                .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
+                .postProcessBySort(
+                        any(HitGroup.class),
+                        anyString(),
+                        any(),
+                        anyInt(),
+                        anyInt(),
+                        any(),
+                        anyBoolean());
         verify(spy, never())
                 .postProcessResults(
                         any(), any(), any(), anyInt(), anyInt(), anySet(), anyBoolean());
@@ -369,7 +383,9 @@ class SortByTest {
 
         verify(spy, times(1))
                 .postProcessResults(any(), eq(q), any(), eq(1), eq(0), any(), eq(false));
-        verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
+        verify(spy, never())
+                .postProcessBySort(
+                        any(), anyString(), any(), anyInt(), anyInt(), any(), anyBoolean());
     }
 
     @Nested
@@ -397,7 +413,7 @@ class SortByTest {
             String sortJson = "[{\"field_name\":\"score\",\"order\":\"asc\",\"missing\":\"last\"}]";
 
             // Should not throw exception
-            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0, null, false);
             assertThat((Object) result).isNotNull();
             assertThat(result.asList()).hasSize(1);
         }
@@ -412,7 +428,7 @@ class SortByTest {
                         + "{\"field_name\":\"timestamp\",\"order\":\"asc\",\"missing\":\"last\"}]";
 
             // Should not throw exception
-            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0, null, false);
             assertThat((Object) result).isNotNull();
             assertThat(result.asList()).hasSize(1);
         }
@@ -428,7 +444,7 @@ class SortByTest {
                         + "{\"field_name\":\"category\",\"order\":\"desc\",\"missing\":\"first\"}]";
 
             // Should not throw exception
-            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+            HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0, null, false);
             assertThat((Object) result).isNotNull();
             assertThat(result.asList()).hasSize(1);
         }
@@ -450,7 +466,8 @@ class SortByTest {
 
             for (String sortJson : testCases) {
                 // Should not throw exception for any of these cases
-                HitGroup result = searcher.postProcessBySort(hits, sortJson, null, 10, 0);
+                HitGroup result =
+                        searcher.postProcessBySort(hits, sortJson, null, 10, 0, null, false);
                 assertThat((Object) result).isNotNull();
             }
         }
@@ -464,7 +481,9 @@ class SortByTest {
             String sortJsonNullOrder =
                     "[{\"field_name\":\"f1\",\"order\":null,\"missing\":\"last\"}]";
             assertThatThrownBy(
-                            () -> searcher.postProcessBySort(hits, sortJsonNullOrder, null, 10, 0))
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, sortJsonNullOrder, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("order is required for sort field at index 0");
 
@@ -474,7 +493,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.postProcessBySort(
-                                            hits, sortJsonNullMissing, null, 10, 0))
+                                            hits, sortJsonNullMissing, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("missing is required for sort field at index 0");
         }
@@ -486,7 +505,10 @@ class SortByTest {
 
             String invalidJson = "{invalid json}";
 
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, invalidJson, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, invalidJson, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
@@ -501,7 +523,10 @@ class SortByTest {
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\",}]"; // trailing
             // comma
 
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, malformedJson, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, malformedJson, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
@@ -515,7 +540,10 @@ class SortByTest {
             String emptySortJson = "[]";
 
             // Should throw exception for empty sort fields
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, emptySortJson, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, emptySortJson, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBy fields cannot be empty. Must contain 1 to 3 sort fields.");
@@ -537,7 +565,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.postProcessBySort(
-                                            hits, sortJsonWith4Fields, null, 10, 0))
+                                            hits, sortJsonWith4Fields, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBy fields cannot contain more than 3 sort fields. Found: 4");
@@ -553,7 +581,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.postProcessBySort(
-                                            hits, sortJsonWith5Fields, null, 10, 0))
+                                            hits, sortJsonWith5Fields, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBy fields cannot contain more than 3 sort fields. Found: 5");
@@ -572,7 +600,10 @@ class SortByTest {
                                 + order
                                 + "\",\"missing\":\"last\"}]";
                 // Should throw exception for unsupported order values
-                assertThatThrownBy(() -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                assertThatThrownBy(
+                                () ->
+                                        searcher.postProcessBySort(
+                                                hits, sortJson, null, 10, 0, null, false))
                         .isInstanceOf(RuntimeException.class)
                         .hasMessageContaining(
                                 "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
@@ -593,7 +624,10 @@ class SortByTest {
                                 + missing
                                 + "\"}]";
                 // Should throw exception for unsupported missing values
-                assertThatThrownBy(() -> searcher.postProcessBySort(hits, sortJson, null, 10, 0))
+                assertThatThrownBy(
+                                () ->
+                                        searcher.postProcessBySort(
+                                                hits, sortJson, null, 10, 0, null, false))
                         .isInstanceOf(RuntimeException.class)
                         .hasMessageContaining(
                                 "Invalid sort JSON format for marqo__hybrid.sortBy.fields");
@@ -608,26 +642,37 @@ class SortByTest {
             // Test JSON missing field_name
             String missingFieldName = "[{\"order\":\"asc\",\"missing\":\"last\"}]";
             assertThatThrownBy(
-                            () -> searcher.postProcessBySort(hits, missingFieldName, null, 10, 0))
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, missingFieldName, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("fieldName is required for sort field at index 0");
 
             // Test JSON missing order
             String missingOrder = "[{\"field_name\":\"f1\",\"missing\":\"last\"}]";
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, missingOrder, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, missingOrder, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("order is required for sort field at index 0");
 
             // Test JSON missing missing
             String missingMissing = "[{\"field_name\":\"f1\",\"order\":\"asc\"}]";
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, missingMissing, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, missingMissing, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("missing is required for sort field at index 0");
 
             // Test empty field_name
             String emptyFieldName =
                     "[{\"field_name\":\"\",\"order\":\"asc\",\"missing\":\"last\"}]";
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, emptyFieldName, null, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, emptyFieldName, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("fieldName is required for sort field at index 0");
 
@@ -637,7 +682,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.postProcessBySort(
-                                            hits, whitespaceFieldName, null, 10, 0))
+                                            hits, whitespaceFieldName, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("fieldName is required for sort field at index 0");
         }
@@ -649,7 +694,7 @@ class SortByTest {
 
             // Test with exactly 1 field (should work)
             String oneField = "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
-            HitGroup result1 = searcher.postProcessBySort(hits, oneField, null, 10, 0);
+            HitGroup result1 = searcher.postProcessBySort(hits, oneField, null, 10, 0, null, false);
             assertThat((Object) result1).isNotNull();
             assertThat(result1.asList()).hasSize(1);
 
@@ -657,7 +702,8 @@ class SortByTest {
             String twoFields =
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
                             + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"}]";
-            HitGroup result2 = searcher.postProcessBySort(hits, twoFields, null, 10, 0);
+            HitGroup result2 =
+                    searcher.postProcessBySort(hits, twoFields, null, 10, 0, null, false);
             assertThat((Object) result2).isNotNull();
             assertThat(result2.asList()).hasSize(1);
 
@@ -666,7 +712,8 @@ class SortByTest {
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"},"
                             + "{\"field_name\":\"f2\",\"order\":\"desc\",\"missing\":\"first\"},"
                             + "{\"field_name\":\"f3\",\"order\":\"asc\",\"missing\":\"last\"}]";
-            HitGroup result3 = searcher.postProcessBySort(hits, threeFields, null, 10, 0);
+            HitGroup result3 =
+                    searcher.postProcessBySort(hits, threeFields, null, 10, 0, null, false);
             assertThat((Object) result3).isNotNull();
             assertThat(result3.asList()).hasSize(1);
         }
@@ -683,7 +730,9 @@ class SortByTest {
             // 2nd field
 
             assertThatThrownBy(
-                            () -> searcher.postProcessBySort(hits, invalidSecondField, null, 10, 0))
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, invalidSecondField, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("order is required for sort field at index 1");
 
@@ -694,7 +743,9 @@ class SortByTest {
             // 3rd field
 
             assertThatThrownBy(
-                            () -> searcher.postProcessBySort(hits, invalidThirdField, null, 10, 0))
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, invalidThirdField, null, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("fieldName is required for sort field at index 2");
         }
@@ -707,19 +758,28 @@ class SortByTest {
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
 
             // Test sortBySortDepth = 0
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, 0, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, validSortJson, 0, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBySortDepth must be greater than or equal to 1. Found: 0");
 
             // Test sortBySortDepth = -1
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, -1, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, validSortJson, -1, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBySortDepth must be greater than or equal to 1. Found: -1");
 
             // Test sortBySortDepth = -10 (more negative)
-            assertThatThrownBy(() -> searcher.postProcessBySort(hits, validSortJson, -10, 10, 0))
+            assertThatThrownBy(
+                            () ->
+                                    searcher.postProcessBySort(
+                                            hits, validSortJson, -10, 10, 0, null, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "sortBySortDepth must be greater than or equal to 1. Found: -10");
@@ -733,22 +793,26 @@ class SortByTest {
                     "[{\"field_name\":\"f1\",\"order\":\"asc\",\"missing\":\"last\"}]";
 
             // Test sortBySortDepth = null (should work - uses default)
-            HitGroup result1 = searcher.postProcessBySort(hits, validSortJson, null, 10, 0);
+            HitGroup result1 =
+                    searcher.postProcessBySort(hits, validSortJson, null, 10, 0, null, false);
             assertThat((Object) result1).isNotNull();
             assertThat(result1.asList()).hasSize(1);
 
             // Test sortBySortDepth = 1 (should work)
-            HitGroup result2 = searcher.postProcessBySort(hits, validSortJson, 1, 10, 0);
+            HitGroup result2 =
+                    searcher.postProcessBySort(hits, validSortJson, 1, 10, 0, null, false);
             assertThat((Object) result2).isNotNull();
             assertThat(result2.asList()).hasSize(1);
 
             // Test sortBySortDepth = 5 (should work)
-            HitGroup result3 = searcher.postProcessBySort(hits, validSortJson, 5, 10, 0);
+            HitGroup result3 =
+                    searcher.postProcessBySort(hits, validSortJson, 5, 10, 0, null, false);
             assertThat((Object) result3).isNotNull();
             assertThat(result3.asList()).hasSize(1);
 
             // Test sortBySortDepth = 100 (larger than hit count, should work)
-            HitGroup result4 = searcher.postProcessBySort(hits, validSortJson, 100, 10, 0);
+            HitGroup result4 =
+                    searcher.postProcessBySort(hits, validSortJson, 100, 10, 0, null, false);
             assertThat((Object) result4).isNotNull();
             assertThat(result4.asList()).hasSize(1);
         }

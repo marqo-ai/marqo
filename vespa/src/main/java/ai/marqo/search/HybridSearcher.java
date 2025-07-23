@@ -303,15 +303,25 @@ public class HybridSearcher extends Searcher {
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             verbose);
-            // Set offset to 0 and limit to offset + limit
+            // Set offset to 0 and limit to maximum between offset + limit and query's limit that
+            // could be higher if sorting is used
             queryLexical.properties().set("offset", 0);
-            queryLexical.properties().set("hits", offset + limit);
+            queryLexical
+                    .properties()
+                    .set(
+                            "hits",
+                            Integer.max(offset + limit, query.properties().getInteger("hits", 0)));
             Query queryTensor =
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
-            // Set offset to 0 and limit to offset + limit
+            // Set offset to 0 and limit to maximum between offset + limit and query's limit that
+            // could be higher if sorting is used
             queryTensor.properties().set("offset", 0);
-            queryTensor.properties().set("hits", offset + limit);
+            queryTensor
+                    .properties()
+                    .set(
+                            "hits",
+                            Integer.max(offset + limit, query.properties().getInteger("hits", 0)));
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -406,7 +416,13 @@ public class HybridSearcher extends Searcher {
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
-                            hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
+                            hitsForPostProcessing,
+                            sortByFields,
+                            sortBySortDepth,
+                            limit,
+                            offset,
+                            idsToExclude,
+                            verbose);
             sortCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
@@ -498,12 +514,14 @@ public class HybridSearcher extends Searcher {
         return new Result(query, processedHits);
     }
 
+    // Creates a no-cache hit with a specific reason.
     private Hit getNoCacheHit(String noCacheReason) {
         Hit noCacheHit = new Hit("marqo__noCache:" + noCacheReason);
         noCacheHit.setField("marqo__noCache", true);
         return noCacheHit;
     }
 
+    // Checks if pagination should be used based on the provided parameters.
     private Boolean shouldUsePagination(
             String paginationHash, String paginationSchema, String retrievalMethod) {
         return paginationHash != null
@@ -513,11 +531,13 @@ public class HybridSearcher extends Searcher {
                 && retrievalMethod.equals("disjunction");
     }
 
+    // Generates a DocumentId for the pagination state document.
     private DocumentId getPaginationDocumentId(String paginationSchema, String paginationHash) {
         return new DocumentId(
                 "id:" + paginationSchema + ":" + paginationSchema + "::" + paginationHash);
     }
 
+    // extracts pagination state map from the pagination document response.
     private MapFieldValue<StringFieldValue, Array<StringFieldValue>> getPaginationStateMap(
             com.yahoo.documentapi.DocumentResponse paginationDocumentResponse) {
         if (paginationDocumentResponse != null
@@ -530,6 +550,7 @@ public class HybridSearcher extends Searcher {
         return null;
     }
 
+    // gets Ids to exclude based on the pagination state map and current offset.
     private Set<String> getIdsToExclude(
             MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap,
             Integer offset) {
@@ -551,6 +572,7 @@ public class HybridSearcher extends Searcher {
         return idsToExclude;
     }
 
+    // Collects existing pagination state offsets from the pagination state map into a single set.
     Set<Integer> getExistingPaginationStateOffsets(
             MapFieldValue<StringFieldValue, Array<StringFieldValue>> paginationStateMap) {
         Set<Integer> existingOffsets = new HashSet<>();
@@ -567,6 +589,16 @@ public class HybridSearcher extends Searcher {
         return existingOffsets;
     }
 
+    // Creates or updates the pagination state document with processed hits and offset.
+    /**
+     * Creates or updates the pagination state document with processed hits and offset.
+     *
+     * @param docAccess the DocumentAccess session to use for the update.
+     * @param docId the DocumentId of the pagination state document.
+     * @param paginationSchema the schema name for pagination state.
+     * @param processedHits the HitGroup containing processed hits to store in the document.
+     * @param offset the current offset for pagination.
+     */
     private void createOrUpdatePaginationState(
             AsyncSession docAccess,
             DocumentId docId,
@@ -721,6 +753,8 @@ public class HybridSearcher extends Searcher {
      * @param sortBySortDepth the depth to sort by, or null to sort all hits.
      * @param limit the maximum number of hits to return.
      * @param offset the offset for pagination.
+     *               @param idsToExclude a set of IDs to exclude from the results.
+     *                                   @param verbose whether to log verbose messages.
      * @return a HitGroup containing the sorted hits.
      */
     HitGroup postProcessBySort(
@@ -728,7 +762,9 @@ public class HybridSearcher extends Searcher {
             String sortByFields,
             Integer sortBySortDepth,
             Integer limit,
-            Integer offset) {
+            Integer offset,
+            Set<String> idsToExclude,
+            boolean verbose) {
 
         List<SortField> parsedSortByFields;
 
@@ -831,7 +867,19 @@ public class HybridSearcher extends Searcher {
          */
         HitGroup result = new HitGroup();
         result.addAll(combined);
-        result.trim(offset, limit);
+        if (idsToExclude != null && !idsToExclude.isEmpty()) {
+            logIfVerbose(
+                    String.format(
+                            "Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                    verbose);
+            int totalExclusions = idsToExclude.size();
+            result.trim(
+                    Math.max(0, offset - totalExclusions),
+                    Math.max(0, (limit + offset) - totalExclusions));
+        } else {
+            logIfVerbose(String.format("Trimming result list. " + "limit: %d", limit), verbose);
+            result.trim(offset, limit);
+        }
         return result;
     }
 

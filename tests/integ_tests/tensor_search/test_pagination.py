@@ -610,6 +610,7 @@ class TestPagination(MarqoTestCase):
 
                     for page_num in range(math.ceil(num_docs / page_size)):
                         # Pagination state does not save immediately, small delay to ensure state is saved
+                        time.sleep(0.05)
                         lim = page_size
                         off = page_num * page_size
                         page_res = tensor_search.search(
