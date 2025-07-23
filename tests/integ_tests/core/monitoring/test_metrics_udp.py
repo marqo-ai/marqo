@@ -144,14 +144,12 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         self.client.get("/indexes/foo/documents/abc123")  # redaction
 
         patterns = [
-            r"marqo_processing_time:\d+\|ms",
-            r"requests\.completed:1\|c\|#status_code:\dXX",
-            r"search_processing_time:\d+\|ms",
-            r"index_processing_time:\d+\|ms",
-            r"x-count-success:\d+\|c",
-            r"x-count-failure:\d+\|c",
-            r"x-count-error:\d+\|c",
-            r"requests\.completed:1\|c\|#path:/indexes/foo/documents(?:/<document_id>)?,method:(?:GET|POST),status_code:\dXX",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/search,method:GET,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200",
+            r"batch\.success:1\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
+            r"batch\.failure:0\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
+            r"batch\.error:0\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
         ]
 
         # Wait until the six packets we assert on have arrived
