@@ -220,7 +220,7 @@ class TestPagination(MarqoTestCase):
                                                                        verbose=True),
                                     config=self.config,
                                     index_name=index.name,
-                                    text='title',
+                                    text='my title',
                                     result_count=lim, offset=off)
 
                                 paginated_search_results["hits"].extend(page_res["hits"])

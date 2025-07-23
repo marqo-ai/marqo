@@ -297,31 +297,20 @@ public class HybridSearcher extends Searcher {
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
+            if (!isRelevanceCutoffMethodEnabled && !isSortByEnabled) {
+                // Set offset to 0 and limit to offset + limit
+                query.setOffset(0);
+                query.setHits(offset + limit);
+            }
             Query queryLexical =
                     createSubQuery(
                             query,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             verbose);
-            // Set offset to 0 and limit to maximum between offset + limit and query's limit that
-            // could be higher if sorting is used
-            queryLexical.properties().set("offset", 0);
-            queryLexical
-                    .properties()
-                    .set(
-                            "hits",
-                            Integer.max(offset + limit, query.properties().getInteger("hits", 0)));
             Query queryTensor =
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
-            // Set offset to 0 and limit to maximum between offset + limit and query's limit that
-            // could be higher if sorting is used
-            queryTensor.properties().set("offset", 0);
-            queryTensor
-                    .properties()
-                    .set(
-                            "hits",
-                            Integer.max(offset + limit, query.properties().getInteger("hits", 0)));
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -1146,17 +1135,13 @@ public class HybridSearcher extends Searcher {
 
         // Paginate and/or trim for rrf
         // Result list should always have limit length (if possible)
-        if (query.properties()
-                .getString("marqo__hybrid.retrievalMethod", "")
-                .equals("disjunction")) {
+        if (idsToExclude != null && !idsToExclude.isEmpty()) {
             logIfVerbose(
                     String.format(
                             "Trimming result list. " + "limit: %d, offset: %d", limit, offset),
                     verbose);
             int totalExclusions = idsToExclude.size();
-            resultToRerank.trim(
-                    Math.max(0, offset - totalExclusions),
-                    Math.max(0, (limit + offset) - totalExclusions));
+            resultToRerank.trim(Math.max(0, offset - totalExclusions), limit);
         } else {
             logIfVerbose(String.format("Trimming result list. " + "limit: %d", limit), verbose);
             resultToRerank.trim(0, limit);
