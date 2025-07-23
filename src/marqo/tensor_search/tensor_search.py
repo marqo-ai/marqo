@@ -359,7 +359,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            language: Optional[str] = None,
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
-           interpolation_method: Optional[InterpolationMethod] = None
+           interpolation_method: Optional[InterpolationMethod] = None,
+           debugging_parameters: Optional[Dict] = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -526,7 +527,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers, language=language
+            score_modifiers=score_modifiers, language=language, debugging_parameters=debugging_parameters,
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -553,7 +554,8 @@ def _lexical_search(
         config: Config, marqo_index: MarqoIndex, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
-        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None):
+        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None,
+        debugging_parameters: Optional[Dict] = None):
     """
 
     Args:
@@ -597,7 +599,8 @@ def _lexical_search(
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None,
-        language=language
+        language=language,
+        debugging_parameters=debugging_parameters,
     )
 
     vespa_index = vespa_index_factory(marqo_index)
@@ -628,6 +631,9 @@ def _lexical_search(
     if highlights:
         for docs in gathered_docs['hits']:
             docs['_highlights'] = []
+
+    if debugging_parameters and responses.trace:
+        gathered_docs['trace'] = responses.trace
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(

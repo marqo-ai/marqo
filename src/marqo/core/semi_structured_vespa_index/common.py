@@ -33,6 +33,7 @@ VESPA_DOC_CHUNKS = "marqo__chunks"
 VESPA_DOC_EMBEDDINGS = "marqo__embeddings"
 
 VESPA_DOC_MATCH_FEATURES = 'matchfeatures'
+VESPA_DOC_RANK_FEATURES = 'rankfeatures'
 
 # TODO: Reorganize these later
 RANK_PROFILE_BASE = 'base_rank_profile'

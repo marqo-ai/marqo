@@ -495,6 +495,9 @@ class StructuredVespaIndex(VespaIndex):
             'ranking': ranking,
             'language': marqo_query.language
         }
+
+        if marqo_query.debugging_parameters:
+            query = {**query, **marqo_query.debugging_parameters}
         
         query = {k: v for k, v in query.items() if v is not None}
 

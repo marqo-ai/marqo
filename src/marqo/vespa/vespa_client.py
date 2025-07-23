@@ -248,7 +248,7 @@ class VespaClient:
 
         query = {key: value for key, value in query.items() if value is not None}
 
-        logger.debug(f'Query: {query}')
+        logger.info(f'Vespa Query: {query}')
 
         try:
             resp = self.http_client.post(f'{self.query_url}/search/', json=query)
@@ -257,7 +257,17 @@ class VespaClient:
 
         self._query_raise_for_status(resp)
 
-        return QueryResult(**orjson.loads(resp.text))
+        resp_dict = orjson.loads(resp.text)
+        self._sanitise_rank_features(resp_dict)
+        # logger.info(f'Vespa Resp: {orjson.dumps(resp_dict)}')
+        return QueryResult(**resp_dict)
+
+    def _sanitise_rank_features(self, resp_dict):
+        for doc in resp_dict['root']['children']:
+            if 'rankfeatures' in doc['fields']:
+                doc['fields']['rankfeatures'] = {name: value for name, value
+                                                 in doc['fields']['rankfeatures'].items() if value != 0.0}
+
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

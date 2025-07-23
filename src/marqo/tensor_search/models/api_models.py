@@ -68,6 +68,7 @@ class SearchQuery(BaseMarqoModel):
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
+    debugging_parameters: Optional[Dict] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3

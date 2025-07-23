@@ -41,6 +41,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
 
     # Only in search result
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=common.VESPA_DOC_MATCH_FEATURES)
+    rank_features: Optional[Dict[str, Any]] = Field(default=None, alias=common.VESPA_DOC_RANK_FEATURES)
     raw_tensor_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE)
     raw_lexical_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE)
 
@@ -393,6 +394,11 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             marqo_document[index_constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = self.fixed_fields.raw_tensor_score
         if self.fixed_fields.raw_lexical_score is not None:
             marqo_document[index_constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = self.fixed_fields.raw_lexical_score
+
+
+        # marqo_document['_matchfeatures'] = self.fixed_fields.match_features
+        if self.fixed_fields.rank_features:
+            marqo_document['_rankfeatures'] = self.fixed_fields.rank_features
 
         return marqo_document
 
