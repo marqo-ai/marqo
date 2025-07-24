@@ -93,6 +93,33 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         ids = [hit["_id"] for hit in response["hits"]]
         self.assertEqual({'h1', 'h2'}, set(ids))
 
+    def test_relevance_cutoff_feature_is_blocked_for_lexical_or_tensor_search(self):
+        """
+        Tests that relevance cutoff feature is blocked for lexical or tensor search.
+        """
+        docs = [
+            {"_id": "h1", "content": "Machine learning algorithms in artificial intelligence enable systems"},
+        ]
+        self.client.index(self.unstructured_index_name).add_documents(
+            docs, tensor_fields=["content"]
+        )
+
+        for search_method in ["LEXICAL", "TENSOR"]:
+            with self.subTest(f"Test sort by with search method {search_method}"):
+                with self.assertRaises(MarqoWebError) as cm:
+                    self.client.index(self.unstructured_index_name).search(
+                        q="test",
+                        search_method=search_method,
+                        relevance_cutoff={
+                            "method": "gap_detection"
+                        },
+                    )
+
+            self.assertIn(
+                f"relevanceCutoff can only be provided for",
+                str(cm.exception)
+            )
+
     def test_relevance_cutoff_gap_detection_method(self):
         """
         Tests relevance cutoff with gap_detection method.
