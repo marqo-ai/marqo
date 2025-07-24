@@ -1,8 +1,9 @@
+import random
 from unittest import TestCase
 from pydantic.v1 import ValidationError
 
 from marqo.core.models.marqo_query import (
-    MarqoTensorQuery, MarqoQuery, MarqoHybridQuery, MarqoLexicalQuery
+    MarqoTensorQuery, MarqoQuery, MarqoHybridQuery, MarqoLexicalQuery, orjson_dumps
 )
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.search.search_filter import SearchFilter, EqualityTerm
@@ -406,3 +407,17 @@ class TestMarqoHybridQuery(TestCase):
         query_hash_limit_60 = query_with_limit_60.get_query_hash_without_offset()
 
         assert query_hash_limit_30 != query_hash_limit_60
+
+    def test_orjson_dumps_model(self):
+        query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            offset=random.randint(0,1000),
+            or_phrases=[""],
+            and_phrases=[""],
+            vector_query=None,
+            hybrid_parameters=HybridParameters(),
+        )
+        dumped_model = orjson_dumps(query, default=None, exclude={"offset"}, exclude_none=True, exclude_unset=True, sort_keys=True)
+        expected_model = '{"and_phrases":[""],"hybrid_parameters":{},"index_name":"test_index","limit":10,"or_phrases":[""]}'
+        self.assertEqual(expected_model, dumped_model)
