@@ -50,70 +50,11 @@ See https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/ for more in
   exit 1
 
 elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
-  # Start local vespa
-  echo "External vector store not configured. Using local vector store"
-  chown -R vespa:vespa /opt/vespa/var/
-  tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
-
-  echo "Waiting for vector store to start"
-  for i in {1..5}; do
-    if [ $i -eq 1 ]; then
-      suffix="second"
-    else
-      suffix="seconds"
-    fi
-    echo -ne "Waiting... $i $suffix\r"
-    sleep 1
-  done
-
-  # Try to deploy the application and branch on the output
-  END_POINT="http://localhost:19071/application/v2/tenant/default/application/default"
-  MAX_RETRIES=10
-  RETRY_COUNT=0
-
-  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Make the curl request and capture the output
-    RESPONSE=$(curl -s -X GET "$END_POINT")
-
-    # Check for the specific "not found" error response which indicates there is no application package deployed
-    if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
-      echo "Marqo did not find an existing vector store. Setting up vector store..."
-
-      # Generate and deploy the application package
-      # Set log level to WARNING to skip logging
-      python3 /app/scripts/vespa_local/vespa_local.py generate-and-deploy --LogLevel WARNING
-
-      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
-        echo "  Waiting for vector store to be available..."
-        sleep 10
-      done
-      echo "  Vector store is available. Vector store setup complete"
-      break
-
-    # Check for the "generation" success response which indicates there is an existing application package deployed
-    elif echo "$RESPONSE" | grep -q '"generation":'; then
-      echo "Marqo found an existing vector store. Waiting for vector store to be available..."
-
-      until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
-        echo "  Waiting for vector store to be available..."
-        sleep 10
-      done
-      echo "  Vector store is available. Vector store setup complete"
-      break
-    fi
-    ((RETRY_COUNT++))
-    sleep 5
-  done
-
-  if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo "Warning: Failed to configure local vector store. Marqo may not function correctly"
-  fi
-
-  export VESPA_QUERY_URL="http://localhost:8080"
-  export VESPA_DOCUMENT_URL="http://localhost:8080"
-  export VESPA_CONFIG_URL="http://localhost:19071"
-  export ZOOKEEPER_HOSTS="localhost:2181"
-  export VESPA_IS_INTERNAL=True
+  # Error out, since we do not support internal Vespa.
+  echo "Error: No external vector store configured. Marqo does not contain an internal vector store (since 2.23.0).
+  Please provide VESPA_QUERY_URL, VESPA_DOCUMENT_URL, and VESPA_CONFIG_URL to connect your external vector store to
+  Marqo."
+  exit 1
 
 else
   echo "External vector store configured. Using external vector store"
