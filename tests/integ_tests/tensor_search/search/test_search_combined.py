@@ -12,18 +12,24 @@ import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
+from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
+from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, AllZeroWeightsError, ZeroMagnitudeVectorError
+from marqo.exceptions import InvalidArgumentError
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextDocumentsParameters
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 
 
 class TestSearch(MarqoTestCase):
@@ -1246,7 +1252,7 @@ class TestSearch(MarqoTestCase):
             CustomVectorQuery(
                 customVector=CustomVectorQuery.CustomVector(
                     content="hello",
-                    vector=[0 for _ in range(384)]
+                    vector=[1 for _ in range(384)]
                 )
             )
         ]

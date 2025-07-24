@@ -1,6 +1,6 @@
 import unittest
 from typing import Callable
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import opentelemetry.metrics as metrics
 from fastapi import FastAPI
@@ -11,6 +11,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME
 from opentelemetry.test.globals_test import reset_metrics_globals
 
 from marqo.otel import LoggingMetricExporter, bootstrap_otel
+from marqo.tensor_search.enums import EnvVars
 
 
 class TestLoggingMetricExporter(unittest.TestCase):
@@ -56,7 +57,7 @@ class TestBootstrapOtel(unittest.TestCase):
         reader = readers[0]
         self.assertIsInstance(reader, PeriodicExportingMetricReader)
         # Export interval should match updated value
-        self.assertEqual(reader._export_interval_millis, 10000)
+        self.assertEqual(reader._export_interval_millis, 30000)
         # Exporter instance
         self.assertIsInstance(reader._exporter, LoggingMetricExporter)
 
@@ -68,3 +69,23 @@ class TestBootstrapOtel(unittest.TestCase):
 
         provider = metrics.get_meter_provider()
         self.assertTrue(provider._shutdown)
+
+    def test_export_interval_millis_is_configurable(self):
+        with patch.dict('os.environ', {EnvVars.MARQO_METRICS_EXPORT_INTERVAL: "10"}):
+            bootstrap_otel(self.app, 'test_service')
+            provider = metrics.get_meter_provider()
+            reader = provider._sdk_config.metric_readers[0]
+            self.assertEqual(reader._export_interval_millis, 10000)
+
+    def test_otel_export_is_disabled_if_env_var_set_to_zero(self):
+        with patch.dict('os.environ', {EnvVars.MARQO_METRICS_EXPORT_INTERVAL: "0"}):
+            shutdown_hook = bootstrap_otel(self.app, 'test_service')
+
+            # assert that meter provider is not configured when disabled
+            provider = metrics.get_meter_provider()
+            self.assertIsNone(provider._real_meter_provider)
+            self.assertFalse(hasattr(provider, '_sdk_config'))
+
+            self.assertIsInstance(shutdown_hook, Callable)
+            # assert that the shutdown_hook is no_op when disabled
+            self.assertEqual(shutdown_hook.__code__.co_code, (lambda: None).__code__.co_code)

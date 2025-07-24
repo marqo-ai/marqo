@@ -9,6 +9,7 @@ from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, Mar
 from marqo.core.inference.api import Modality, InferenceRequest, TextPreprocessingConfig, \
     TextChunkConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, ChunkConfig, \
     Inference, ModelConfig, InferenceErrorModel
+from marqo.core.inference.modality_utils import is_base64_image
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.core.models import MarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -303,6 +304,13 @@ class AddDocumentsHandler(ABC):
                 continue
 
             try:
+                # Reject base64 images during document addition - they should only be used in search
+                if isinstance(field.field_content, str) and is_base64_image(field.field_content):
+                    raise AddDocumentsError(
+                        f"Field '{field.field_name}' contains base64 image data. "
+                        f"Base64 images can only be used in search queries."
+                    )
+
                 modality = self._infer_modality(field)
                 field.modality = modality
                 all_modalities.add(modality)

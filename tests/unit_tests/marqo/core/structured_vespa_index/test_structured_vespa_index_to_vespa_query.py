@@ -21,20 +21,20 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
         # Create a structured index with both tensor and lexical fields
         marqo_index = self._create_structured_marqo_index(
             name='test_index',
-            text_field_names=['title', 'description'], 
+            text_field_names=['title', 'description'],
             tensor_field_names=['title', 'description']
         )
         self.vespa_index = StructuredVespaIndex(marqo_index)
 
     def _create_structured_marqo_index(
-        self, 
-        name: str,
-        text_field_names: List[str] = [],
-        tensor_field_names: List[str] = []
+            self,
+            name: str,
+            text_field_names: List[str] = [],
+            tensor_field_names: List[str] = []
     ) -> StructuredMarqoIndex:
         """Helper method to create a structured Marqo index for testing."""
         fields = []
-        
+
         # Add text fields with lexical search and filter capabilities
         for field_name in text_field_names:
             fields.append(
@@ -84,7 +84,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
     def test_to_vespa_query_tensor_mode_approximate_threshold(self):
         """Test that to_vespa_query correctly sets approximate threshold for tensor queries."""
         threshold_values = [0.75, 0.85, 0.95, None]
-        
+
         for threshold in threshold_values:
             with self.subTest(approximate_threshold=threshold):
                 marqo_query = MarqoTensorQuery(
@@ -104,7 +104,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 else:
                     # When threshold is None, it should not be included in the query
                     self.assertNotIn('ranking.matching.approximateThreshold', vespa_query)
-                
+
                 # Verify other key fields are present
                 self.assertIn('yql', vespa_query)
                 self.assertIn('ranking', vespa_query)
@@ -113,7 +113,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
     def test_to_vespa_query_hybrid_mode_approximate_threshold(self):
         """Test that to_vespa_query correctly sets approximate threshold for hybrid queries."""
         threshold_values = [0.70, 0.80, 0.90, None]
-        
+
         for threshold in threshold_values:
             with self.subTest(approximate_threshold=threshold):
                 hybrid_parameters = HybridParameters(
@@ -122,7 +122,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     alpha=0.7,
                     rrfK=100
                 )
-                
+
                 marqo_query = MarqoHybridQuery(
                     index_name='test_index',
                     limit=15,
@@ -143,7 +143,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 else:
                     # When threshold is None, it should not be included in the query
                     self.assertNotIn('ranking.matching.approximateThreshold', vespa_query)
-                
+
                 # Verify hybrid-specific fields are present
                 self.assertEqual(vespa_query['hits'], 15)
                 self.assertIn('searchChain', vespa_query)
@@ -153,4 +153,4 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

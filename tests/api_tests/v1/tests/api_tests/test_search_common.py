@@ -3,7 +3,9 @@ import uuid
 from marqo.client import Client
 from marqo.errors import MarqoWebError
 
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
+import base64
+import requests
 
 
 class TestSearchCommon(MarqoTestCase):
@@ -322,8 +324,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(
-                        e.exception)
+                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -332,8 +333,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Both 'hybridParameters.queryLexical' and 'hybridParameters.queryLexical' or 'q' must be present when 'disjunction' retrieval method is used." in str(
-                        e.exception)
+                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
 
                 with self.subTest(
                         "Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
@@ -388,8 +388,105 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(
-                        e.exception)
+                    assert "'hybridParameters.queryTensor' cannot be provided when 'retrievalMethod' and 'rankingMethod' are both 'lexical'." in str(e.exception)
+
+    def test_search_with_context_documents(self):
+        for index_name in [self.unstructured_text_index_name, self.structured_text_index_name]:
+            with self.subTest(index=index_name):
+                self.client.index(index_name=index_name).add_documents(
+                    [
+                        {
+                            "title": "A comparison of the best pets",
+                            "content": "Animals",
+                            "_id": "d1"
+                        },
+                        {
+                            "title": "The history of dogs",
+                            "content": "A history of household pets",
+                            "_id": "d2"
+                        }
+                    ],
+                    tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+
+                for interpolation_method in ["lerp", "nlerp", "slerp"]:
+                    context = {
+                        "documents": {
+                            "parameters": {
+                                "excludeInputDocuments": False,
+                                "tensorFields": ["title", "content"]
+                            },
+                            "ids": {
+                                "d1": 1
+                            }
+                        }
+                    }
+
+                    res = self.client.index(index_name).search(q={"best pets": 1},
+                                                                context=context,
+                                                                search_method="TENSOR",
+                                                                interpolation_method=interpolation_method
+                                                                )
+                    self.assertEqual(res["hits"][0]["_id"], "d1")
+
+    def test_hybrid_search_with_context_documents(self):
+        """
+        Tests all valid combinations of retrieval and ranking methods for hybrid search with context documents.
+        Shows the search runs without errors and correctly retrieves the expected document.
+        """
+        for index_name in [self.unstructured_text_index_name, self.structured_text_index_name]:
+            with self.subTest(index=index_name):
+                self.client.index(index_name=index_name).add_documents(
+                    [
+                        {
+                            "title": "A comparison of the best pets",
+                            "content": "Animals",
+                            "_id": "d1"
+                        },
+                        {
+                            "title": "The history of dogs",
+                            "content": "A history of household pets",
+                            "_id": "d2"
+                        }
+                    ],
+                    tensor_fields=["title", "content"] if index_name == self.unstructured_text_index_name else None
+                )
+
+                test_cases = [
+                    ("disjunction", "rrf", {"best pets": 1}, "animals"),
+                    ("tensor", "tensor", {"best pets": 1}, None),
+                    ("tensor", "lexical", {"best pets": 1}, "animals"),
+                    ("lexical", "tensor", {"best pets": 1}, "animals")
+                ]
+
+                for interpolation_method in ["lerp", "nlerp", "slerp"]:
+                    context = {
+                        "documents": {
+                            "parameters": {
+                                "excludeInputDocuments": False,
+                                "tensorFields": ["title", "content"]
+                            },
+                            "ids": {
+                                "d1": 1
+                            }
+                        }
+                    }
+
+                    for retrieval_method, ranking_method, query_tensor, query_lexical in test_cases:
+                        with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                            res = self.client.index(index_name).search(
+                                q=None,
+                                context=context,
+                                search_method="HYBRID",
+                                hybrid_parameters={
+                                    "queryTensor": query_tensor,
+                                    "queryLexical": query_lexical,
+                                    "retrievalMethod": retrieval_method,
+                                    "rankingMethod": ranking_method
+                                },
+                                interpolation_method=interpolation_method
+                            )
+                            self.assertEqual(res["hits"][0]["_id"], "d1")
 
     def test_approximate_threshold_success(self):
         """Test approximate threshold parameter success cases with result comparison."""
@@ -532,3 +629,183 @@ class TestSearchCommon(MarqoTestCase):
                     self.assertIn("'approximateThreshold'", error_msg)
                     self.assertIn("HYBRID", error_msg)
                     self.assertIn("TENSOR", error_msg)
+
+    def test_query_field_returned_and_base64_omitted_all_search_modes(self):
+        """Test that query field is returned for all search modes and base64 content is properly omitted."""
+
+        # Create base64 image data from real image URL
+        def url_to_base64(url: str):
+            """Convert an image URL to base64 data URL format."""
+            response = requests.get(url)
+            response.raise_for_status()
+            base64_data = base64.b64encode(response.content).decode('utf-8')
+            # Determine content type from response headers or default to png
+            content_type = response.headers.get('content-type', 'image/png')
+            return f"data:{content_type};base64,{base64_data}"
+        
+        base64_image = url_to_base64(TestImageUrls.HIPPO_STATUE.value)
+        
+        # Test data setup - add some documents first
+        documents = [
+            {"title": "test document", "content": "sample text content", "_id": "doc1"},
+            {"title": "another document", "content": "more text here", "_id": "doc2"}
+        ]
+        
+        # Define test cases covering all search modes and query types
+        test_cases = [
+            # (search_method, hybrid_parameters, query_types, description)
+            ("TENSOR", None, ["string", "dict"], "tensor_default"),
+            ("LEXICAL", None, ["string"], "lexical_default"),  # Lexical only supports string queries
+            ("HYBRID", {"retrievalMethod": "disjunction", "rankingMethod": "rrf"}, ["string"], "hybrid_disjunction_rrf"),  # Hybrid only supports string in q parameter
+            ("HYBRID", {"retrievalMethod": "lexical", "rankingMethod": "lexical"}, ["string"], "hybrid_lexical_lexical"),
+            ("HYBRID", {"retrievalMethod": "lexical", "rankingMethod": "tensor"}, ["string"], "hybrid_lexical_tensor"),
+            ("HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "lexical"}, ["string"], "hybrid_tensor_lexical"),
+            ("HYBRID", {"retrievalMethod": "tensor", "rankingMethod": "tensor"}, ["string"], "hybrid_tensor_tensor"),
+        ]
+        
+        # Test on both structured and unstructured indexes
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index=index_name):
+                # Add documents
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_text_index_name else None
+                res = self.client.index(index_name).add_documents(documents, tensor_fields=tensor_fields)
+                self.assertFalse(res["errors"])
+                
+                for search_method, hybrid_params, query_types, description in test_cases:
+                    with self.subTest(search_method=search_method, description=description):
+                        
+                        # Test different query types
+                        for query_type in query_types:
+                            with self.subTest(query_type=query_type):
+                                
+                                if query_type == "string":
+                                    # Test normal string query
+                                    normal_query = "sample text"
+                                    base64_query = base64_image
+                                    
+                                    queries_to_test = [
+                                        (normal_query, normal_query, "normal_string"),
+                                        (base64_query, "data:image/[omitted]", "base64_string")
+                                    ]
+                                    
+                                elif query_type == "dict":
+                                    # Test dict queries
+                                    normal_dict_query = {"sample": 0.7, "text": 0.3}
+                                    base64_dict_query = {base64_image: 0.8, "text": 0.2}
+                                    mixed_dict_query = {base64_image: 0.5, "sample": 0.3, "text": 0.2}
+                                    
+                                    queries_to_test = [
+                                        (normal_dict_query, normal_dict_query, "normal_dict"),
+                                        (base64_dict_query, {"data:image/[omitted]": 0.8, "text": 0.2}, "base64_dict"),
+                                        (mixed_dict_query, {"data:image/[omitted]": 0.5, "sample": 0.3, "text": 0.2}, "mixed_dict")
+                                    ]
+                                    
+                                
+                                # Test each query
+                                for input_query, expected_query, query_desc in queries_to_test:
+                                    with self.subTest(query_desc=query_desc):
+                                        # Skip base64 queries for lexical search (images not supported)
+                                        if search_method == "LEXICAL" and query_desc.startswith("base64"):
+                                            continue
+                                        
+                                        # Prepare search parameters
+                                        search_params = {
+                                            "q": input_query,
+                                            "search_method": search_method,
+                                            "limit": 5
+                                        }
+                                        
+                                        if hybrid_params:
+                                            search_params["hybrid_parameters"] = hybrid_params
+                                        
+                                        # Execute search
+                                        result = self.client.index(index_name).search(**search_params)
+
+                                        # Verify query field matches expected value
+                                        self.assertEqual(result["query"], expected_query,
+                                                       f"Query field mismatch for {search_method} {query_desc}")
+
+    def test_context_documents_only_lexical_fails(self):
+        """
+        Tests that Lexical search or hybrid search with lexical/lexical cannot have context docs.
+        Test context documents validation with different search methods via API.
+        """
+        # Test documents
+        docs = [
+            {"_id": "doc1", "title": "red apple fruit", "content": "sweet taste"},
+            {"_id": "doc2", "title": "green apple fruit", "content": "sour taste"},
+            {"_id": "context_doc", "title": "apple context", "content": "fruit context"}
+        ]
+        
+        # Context for testing
+        context = {
+            "documents": {
+                "ids": {"context_doc": 1.0},
+                "parameters": {
+                    "tensorFields": ["title"],
+                    "excludeInputDocuments": True
+                }
+            }
+        }
+        
+        # Test both index types
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index=index_name):
+                # Add documents
+                tensor_fields = ["title", "content"] if index_name == self.unstructured_text_index_name else None
+                res = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                print(res)
+                self.assertFalse(res["errors"])
+                
+                # Test 1: Lexical search with context.documents should fail
+                with self.subTest("Lexical with context fails"):
+                    with self.assertRaises(MarqoWebError) as cm:
+                        self.client.index(index_name).search(
+                            q="apple",
+                            search_method="LEXICAL",
+                            context=context
+                        )
+                    self.assertEqual(cm.exception.status_code, 422)
+                    self.assertIn("Context is not supported for lexical search", str(cm.exception))
+                
+                # Test 2: Lexical/Lexical hybrid search with context.documents should fail
+                with self.subTest("Hybrid lexical/lexical with context fails"):
+                    with self.assertRaises(MarqoWebError) as cm:
+                        self.client.index(index_name).search(
+                            q="apple",
+                            search_method="HYBRID",
+                            hybrid_parameters={
+                                "retrievalMethod": "lexical",
+                                "rankingMethod": "lexical"
+                            },
+                            context=context
+                        )
+                    self.assertEqual(cm.exception.status_code, 422)
+                    self.assertIn("Context is not supported for lexical/lexical hybrid search", str(cm.exception))
+                
+                # Test 3: Tensor search with context.documents should work
+                with self.subTest("Tensor with context works"):
+                    result = self.client.index(index_name).search(
+                        q={"apple": 1.0},  # Use dict format for tensor search with context
+                        search_method="TENSOR",
+                        context=context
+                    )
+                    self.assertIsNotNone(result)
+                    self.assertIn("hits", result)
+                
+                # Test 4: Disjunction/RRF hybrid search with context.documents should work
+                with self.subTest("Hybrid disjunction/RRF with context works"):
+                    result = self.client.index(index_name).search(
+                        q=None,
+                        search_method="HYBRID",
+                        hybrid_parameters={
+                            "retrievalMethod": "disjunction",
+                            "rankingMethod": "rrf",
+                            "queryTensor": {"apple": 1.0},
+                            "queryLexical": "apple"
+                        },
+                        context=context
+                    )
+                    self.assertIsNotNone(result)
+                    self.assertIn("hits", result)
+

@@ -11,6 +11,8 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 
 from marqo import logging
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 
 
 class LoggingMetricExporter(ConsoleMetricExporter):
@@ -25,8 +27,13 @@ class LoggingMetricExporter(ConsoleMetricExporter):
 
 
 def bootstrap_otel(app: FastAPI, service_name: str) -> Callable[[], None]:
+    export_interval_seconds = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_METRICS_EXPORT_INTERVAL)
+    if export_interval_seconds == 0:
+        # disable metrics export, and return no_op as shutdown hook
+        return lambda: None
+
     exporter = LoggingMetricExporter()
-    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10_000)
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=export_interval_seconds * 1000)
 
     resource = Resource({SERVICE_NAME: service_name})
     meter_provider = MeterProvider(resource=resource, metric_readers=[reader])

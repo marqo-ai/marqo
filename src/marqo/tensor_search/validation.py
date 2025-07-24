@@ -6,7 +6,7 @@ import jsonschema
 import marqo.core.models.marqo_index as marqo_index
 from marqo import marqo_docs
 from marqo.api.exceptions import (
-    InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
+    InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError, InternalError)
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search import constants as tensor_search_constants
 from marqo.tensor_search import enums, utils
@@ -16,7 +16,7 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
-    custom_vector_mappings_schema,
+    custom_vector_mappings_schema, text_field_mappings_schema,
 )
 from marqo.tensor_search.models.search import SearchContext
 
@@ -544,7 +544,7 @@ def validate_mappings_object(
         for field_name, config in mappings_object.items():
             validate_field_name(field_name)
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_mappings_object(config)
+                _validate_multimodal_combination_mappings_object(config)
                 if structured_marqo_index is not None:
                     if (
                             field_name not in structured_marqo_index.field_map or
@@ -565,8 +565,13 @@ def validate_mappings_object(
                             )
 
             elif config["type"] == enums.MappingsObjectType.custom_vector:
-                validate_custom_vector_mappings_object(config)
+                _validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
+
+            else:
+                raise InternalError(
+                    f'Unknown mappings object type `{config["type"]}` for field `{field_name}`'
+                )
 
         return mappings_object
     except jsonschema.ValidationError as e:
@@ -576,7 +581,7 @@ def validate_mappings_object(
         )
 
 
-def validate_multimodal_combination_mappings_object(mappings_object: Dict):
+def _validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 
     Args:
@@ -615,7 +620,7 @@ def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     return mappings_object
 
 
-def validate_custom_vector_mappings_object(mappings_object: Dict):
+def _validate_custom_vector_mappings_object(mappings_object: Dict):
     """Validates the custom vector mappings object
     Args:
         mappings_object:
@@ -636,6 +641,8 @@ def validate_custom_vector_mappings_object(mappings_object: Dict):
         )
 
     return mappings_object
+
+
 
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):
