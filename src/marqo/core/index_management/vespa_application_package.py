@@ -125,14 +125,23 @@ class ServicesXml:
     def compare_element(self, other: 'ServicesXml', xml_path: str) -> bool:
         def normalize(elem: ET.Element):
             # Sort attributes and child elements to normalize
+            exclude_types = ["marqo__pagination"]
+            if hasattr(elem, "attrib") and elem.attrib.get('type') in exclude_types:
+                return None
             normalized = ET.Element(elem.tag, dict(sorted(elem.attrib.items())))
             children = [normalize(child) for child in elem.findall('*')]
+            children = [child for child in children if child is not None]
             for child in sorted(children, key=lambda x: str((x.tag, x.attrib))):
                 normalized.append(child)
             return normalized
 
         elements_self = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in self._root.findall(xml_path)])
         elements_other = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in other._root.findall(xml_path)])
+        if xml_path == "content/documents":
+            # Ignore 'documents' which is always the first element, only compare 'document' objects
+            elements_self[0] = elements_self[0][elements_self[0].find('>'):]
+            elements_other[0] = elements_other[0][elements_other[0].find('>'):]
+        print(elements_self, elements_other)
 
         return len(elements_self) == len(elements_other) and all(x == y for x, y in zip(elements_self, elements_other))
 
@@ -773,7 +782,7 @@ class VespaApplicationPackage:
         services_xml_old = ServicesXml(services_xml_backup)
         elements_to_check = [
             # (xml_path, error_message)
-            # ('content/documents', 'Indexes have been added or removed since last backup.'),
+            ('content/documents', 'Indexes have been added or removed since last backup.'),
             ('*/nodes', 'Vector store config has been changed since the last backup.'),
             ('admin', 'Vector store config has been changed since the last backup.'),
         ]
