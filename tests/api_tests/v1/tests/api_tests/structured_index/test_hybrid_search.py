@@ -3,6 +3,7 @@ import uuid
 from unittest import mock
 
 import marqo
+import requests
 from marqo import enums
 from marqo.client import Client
 from marqo.enums import SearchMethods
@@ -669,6 +670,37 @@ class TestStructuredHybridSearch(MarqoTestCase):
                 for i in range(len(default_hybrid_res["hits"])):
                     self.assertEqual(default_hybrid_res["hits"][i]["_id"], disjunction_res["hits"][i]["_id"])
                     self.assertEqual(default_hybrid_res["hits"][i]["_score"], disjunction_res["hits"][i]["_score"])
+
+    def test_pagination_jump_returns_no_cache_header(self):
+        """
+        Tests that pagination jump returns cache-control: no-cache header.
+        """
+        hybrid_search_body = {
+            "searchMethod": "HYBRID",
+            "q": "JUMP SEARCH REQUEST TEST",
+            "limit": 10,
+            "offset": 50,
+            "hybridParameters": {
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            }
+        }
+        for index_name in [self.text_index_name, self.unstructured_text_index_name]:
+            with self.subTest(index=index_name):
+                self.client.index(index_name).add_documents(
+                    self.docs_list,
+                    tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                        if "unstructured" in index_name else None
+                )
+
+                response = requests.post(
+                    f"http://localhost:8882/indexes/{index_name}/search",
+                    json=hybrid_search_body,
+                    headers={"Content-Type": "application/json"}
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("no-cache", response.headers.get("cache-control", ""))
 
     # TODO: test_hybrid_search_with_images
     # TODO: test_hybrid_search_opposite_retrieval_and_ranking
