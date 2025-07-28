@@ -57,7 +57,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         # Add lexical field if content is a string
         if isinstance(marqo_doc[field_name], str):
             language = self._get_field_language(field_name)
-            self._add_lexical_field_to_index(field_name, language)
+            stemming = self._get_field_stemming(field_name)
+            self._add_lexical_field_to_index(field_name, language, stemming)
 
         # Add string array field if content is list of strings and index version supports it
         is_string_array = (
@@ -114,17 +115,41 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         return None
 
+    def _get_field_stemming(self, field_name):
+        """Extract stemming specification for a field from mappings and validate."""
+        if not self.add_docs_params.mappings:
+            return None
 
-    def _add_lexical_field_to_index(self, field_name, language=None):
+        field_mapping = self.add_docs_params.mappings.get(field_name)
+        if not field_mapping:
+            return None
+
+        if field_mapping.get('type') == 'text_field':
+            if not self.marqo_index.index_supports_stemming:
+                raise AddDocumentsError(
+                    f'Stemming is only supported for indexes created with Marqo version '
+                    f'{constants.MARQO_STEMMING_MINIMUM_VERSION} or later. This index was created with  '
+                    f'Marqo {self.marqo_index.marqo_version}.'
+                )
+            return field_mapping.get('stemming')
+
+        return None
+
+    def _add_lexical_field_to_index(self, field_name, language=None, stemming=None):
         if field_name in self.marqo_index.field_map:
-            if language is not None:
-                existing_field = self.marqo_index.field_map[field_name]
-                if existing_field.language != language:
-                    raise AddDocumentsError(
-                        f"Field '{field_name}' already exists with a different language configuration. "
-                        f"Cannot change language from '{existing_field.language}' to '{language}' "
-                        f"for existing field."
-                    )
+            existing_field = self.marqo_index.field_map[field_name]
+            if language is not None and existing_field.language != language:
+                raise AddDocumentsError(
+                    f"Field '{field_name}' already exists with a different language configuration. "
+                    f"Cannot change language from '{existing_field.language}' to '{language}' "
+                    f"for existing field."
+                )
+            if stemming is not None and existing_field.stemming != stemming:
+                raise AddDocumentsError(
+                    f"Field '{field_name}' already exists with a different stemming configuration. "
+                    f"Cannot change stemming from '{existing_field.stemming}' to '{stemming}' "
+                    f"for existing field."
+                )
             return
 
         max_lexical_field_count = self.field_count_config.max_lexical_field_count
@@ -135,14 +160,18 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                                      f'limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing lexical fields to marqo index
-        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}' +
-                    (f' with language {language}' if language else ''))
+        debug_parts = [f'Adding lexical field {field_name} to index {self.marqo_index.name}']
+        if language:
+            debug_parts.append(f'with language {language}')
+        if stemming:
+            debug_parts.append(f'with stemming {stemming}')
+        logger.debug(' '.join(debug_parts))
 
         self.marqo_index.lexical_fields.append(
             Field(name=field_name, type=FieldType.Text,
                   features=[FieldFeature.LexicalSearch],
                   lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}',
-                  language=language)
+                  language=language, stemming=stemming)
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

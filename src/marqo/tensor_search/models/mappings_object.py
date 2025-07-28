@@ -70,6 +70,10 @@ text_field_mappings_schema = {
         "language": {
             "type": "string",
             "minLength": 1
+        },
+        "stemming": {
+            "type": "string",
+            "enum": ["none", "best", "shortest", "multiple"]
         }
     },
     "required": ["type", "language"],

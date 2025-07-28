@@ -26,6 +26,7 @@ MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0'
 MARQO_RERANK_DEPTH_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0')
 MARQO_SORT_BY_MINIMUM_VERSION = semver.VersionInfo.parse('2.22.0')
 MARQO_LANGUAGE_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
+MARQO_STEMMING_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 MARQO_PARTIAL_UPDATE_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 
 # For score modifiers
@@ -38,3 +39,6 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR = 'marqo__add_weights_tensor'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL = 'marqo__mult_weights_global'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL = 'marqo__add_weights_global'
 MARQO_GLOBAL_SCORE_MODIFIERS = 'global'
+
+# Valid stemming algorithm values for Vespa
+VALID_STEMMING_VALUES = {'none', 'best', 'shortest', 'multiple'}

@@ -95,6 +95,7 @@ class Field(ImmutableStrictBaseModel):
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
     language: Optional[str] = None
+    stemming: Optional[str] = None
 
     @root_validator
     def check_all_fields(cls, values):
@@ -638,6 +639,15 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             lambda: self.parsed_marqo_version() >= constants.MARQO_LANGUAGE_MINIMUM_VERSION)
 
     @property
+    def index_supports_stemming(self) -> bool:
+        """
+        Check if the index supports stemming.
+        """
+        return self._cache_or_get(
+            'index_supports_stemming',
+            lambda: self.parsed_marqo_version() >= constants.MARQO_STEMMING_MINIMUM_VERSION)
+
+    @property
     def index_supports_sorty_by(self) -> bool:
         """
         Check if the index supports sort by or relevance cutoff.
@@ -710,6 +720,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
     type: FieldType = values['type']
     features: List[FieldFeature] = values['features']
     language: str = values.get('language')
+    stemming: str = values.get('stemming')
     dependent_fields: Optional[Dict[str, float]] = values['dependent_fields']
 
     validate_field_name(name)
@@ -737,6 +748,17 @@ def validate_structured_field(values, marqo_index: bool) -> None:
         raise ValueError(
             f'{name}: language can only be populated when {FieldFeature.LexicalSearch.value} '
             f'feature is present'
+        )
+
+    if stemming is not None and FieldFeature.LexicalSearch not in features:
+        raise ValueError(
+            f'{name}: stemming can only be populated when {FieldFeature.LexicalSearch.value} '
+            f'feature is present'
+        )
+
+    if stemming is not None and stemming not in constants.VALID_STEMMING_VALUES:
+        raise ValueError(
+            f'{name}: stemming must be one of {constants.VALID_STEMMING_VALUES}, got "{stemming}"'
         )
 
     if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int,

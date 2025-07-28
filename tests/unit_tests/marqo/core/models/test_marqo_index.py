@@ -24,6 +24,7 @@ class TestField(unittest.TestCase):
         self.assertIsNone(field.filter_field_name)
         self.assertIsNone(field.dependent_fields)
         self.assertIsNone(field.language)
+        self.assertIsNone(field.stemming)
 
     def test_field_creation_with_all_parameters(self):
         """Test creating a Field with all parameters."""
@@ -34,7 +35,8 @@ class TestField(unittest.TestCase):
             lexical_field_name="description_lexical",
             filter_field_name="description_filter",
             dependent_fields=None,
-            language="en"
+            language="en",
+            stemming="best"
         )
         self.assertEqual(field.name, "description")
         self.assertEqual(field.type, FieldType.Text)
@@ -43,6 +45,7 @@ class TestField(unittest.TestCase):
         self.assertEqual(field.filter_field_name, "description_filter")
         self.assertIsNone(field.dependent_fields)
         self.assertEqual(field.language, "en")
+        self.assertEqual(field.stemming, "best")
 
     def test_field_creation_multimodal_combination(self):
         """Test creating a MultimodalCombination field with dependent fields."""
@@ -206,6 +209,59 @@ class TestField(unittest.TestCase):
                 language="en"
             )
         self.assertIn("language can only be populated when", str(cm.exception))
+
+    def test_stemming_field_validation(self):
+        """Test that stemming field is only valid when LexicalSearch feature is present."""
+        # Valid: LexicalSearch feature with stemming
+        field = Field(
+            name="text_field",
+            type=FieldType.Text,
+            features=[FieldFeature.LexicalSearch],
+            lexical_field_name="text_field_lexical",
+            filter_field_name=None,
+            stemming="best"
+        )
+        self.assertEqual(field.stemming, "best")
+
+        # Invalid: No LexicalSearch feature but stemming is set
+        with self.assertRaises(ValidationError) as cm:
+            Field(
+                name="text_field",
+                type=FieldType.Text,
+                features=[],
+                lexical_field_name=None,
+                filter_field_name=None,
+                stemming="best"
+            )
+        self.assertIn("stemming can only be populated when", str(cm.exception))
+
+    def test_stemming_value_validation(self):
+        """Test that stemming field validates against allowed values."""
+        # Test valid stemming values
+        valid_values = ["none", "best", "shortest", "multiple"]
+        for stemming_value in valid_values:
+            with self.subTest(stemming=stemming_value):
+                field = Field(
+                    name="text_field",
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch],
+                    lexical_field_name="text_field_lexical",
+                    filter_field_name=None,
+                    stemming=stemming_value
+                )
+                self.assertEqual(field.stemming, stemming_value)
+
+        # Test invalid stemming value
+        with self.assertRaises(ValidationError) as cm:
+            Field(
+                name="text_field",
+                type=FieldType.Text,
+                features=[FieldFeature.LexicalSearch],
+                lexical_field_name="text_field_lexical",
+                filter_field_name=None,
+                stemming="invalid_value"
+            )
+        self.assertIn("stemming must be one of", str(cm.exception))
 
     def test_dependent_fields_validation(self):
         """Test validation for dependent fields in MultimodalCombination type."""
