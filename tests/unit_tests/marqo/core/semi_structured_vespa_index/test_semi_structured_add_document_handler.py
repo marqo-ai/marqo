@@ -33,6 +33,9 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             return InferenceResult(result=result)
 
         self.mock_inference.vectorise.side_effect = vectorise_side_effect
+        
+        # Setup vespa client mock for translate_vespa_document_response
+        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
     def test_add_documents_success(self, mock_infer_modality):
@@ -246,3 +249,202 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                 inference=self.mock_inference,
                 field_count_config=self.field_count_config
             )
+
+    def test_add_documents_with_stemming_on_old_index_raises_error(self):
+        """Test that using stemming mapping on an old index raises AddDocumentsError"""
+        docs = [{"_id": "doc1", "title": "Running shoes for runners"}]
+        
+        marqo_index = self.semi_structured_marqo_index(
+            name="old_test_index",
+            marqo_version="2.15.0",  # Version before stemming support
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        add_docs_params = AddDocsParams(
+            index_name="old_test_index",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings={
+                "title": {"type": "text_field", "stemming": "best"}
+            },
+            use_existing_tensors=False
+        )
+
+        # Mock feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[], errors=False
+        )
+
+        handler = SemiStructuredAddDocumentsHandler(
+            marqo_index=marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+
+        self.assertIsInstance(response, MarqoAddDocumentsResponse)
+        self.assertEqual("old_test_index", response.index_name)
+
+        error_items = [item for item in response.items if item.status != 200]
+        self.assertEqual(1, len(error_items), "Expected exactly one error item")
+
+        # Check that at least one document failed with the stemming version error
+        error_item = error_items[0]
+        self.assertIn("Stemming is only supported for indexes created with Marqo version", str(error_item.error))
+        self.assertIn("2.16.0", error_item.error)
+        self.assertIn("2.15.0", error_item.error)
+
+    def test_stemming_field_consistency_validation(self):
+        """Test that stemming configuration cannot be changed for existing fields"""
+        # First add document with one stemming configuration
+        docs1 = [{"_id": "doc1", "title": "Test document"}]
+        
+        marqo_index = self.semi_structured_marqo_index(
+            name="consistency_test_index",
+            tensor_field_names=[],
+            lexical_field_names=["title"],  # Field already exists
+            string_array_field_names=[]
+        )
+        
+        # Manually create a field with stemming configuration using replace
+        from marqo.core.models.marqo_index import Field, FieldType, FieldFeature
+        existing_field = marqo_index.field_map["title"]
+        field_with_stemming = Field(
+            name=existing_field.name,
+            type=existing_field.type,
+            features=existing_field.features,
+            lexical_field_name=existing_field.lexical_field_name,
+            filter_field_name=existing_field.filter_field_name,
+            dependent_fields=existing_field.dependent_fields,
+            language=existing_field.language,
+            stemming="best"
+        )
+        marqo_index.field_map["title"] = field_with_stemming
+
+        add_docs_params = AddDocsParams(
+            index_name="consistency_test_index",  
+            docs=docs1,
+            device="cpu",
+            tensor_fields=[],
+            mappings={
+                "title": {"type": "text_field", "stemming": "shortest"}  # Different stemming
+            },
+            use_existing_tensors=False
+        )
+
+        # Mock feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[], errors=False
+        )
+
+        handler = SemiStructuredAddDocumentsHandler(
+            marqo_index=marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+
+        # Should have errors due to stemming configuration mismatch
+        error_items = [item for item in response.items if item.status != 200]
+        self.assertEqual(1, len(error_items), "Expected exactly one error item")
+        
+        error_item = error_items[0]
+        self.assertIn("different stemming configuration", str(error_item.error))
+        self.assertIn("Cannot change stemming", str(error_item.error))
+
+    def test_stemming_value_validation(self):
+        """Test that invalid stemming values raise appropriate errors"""
+        docs = [{"_id": "doc1", "title": "Test document"}]
+        
+        marqo_index = self.semi_structured_marqo_index(
+            name="stemming_validation_test",
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        add_docs_params = AddDocsParams(
+            index_name="stemming_validation_test",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings={
+                "title": {"type": "text_field", "stemming": "invalid_algorithm"}
+            },
+            use_existing_tensors=False
+        )
+
+        # Mock feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[], errors=False
+        )
+
+        # Should raise InvalidArgumentError during initialization due to invalid stemming value
+        with self.assertRaises(Exception) as cm:
+            handler = SemiStructuredAddDocumentsHandler(
+                marqo_index=marqo_index,
+                add_docs_params=add_docs_params,
+                vespa_client=self.mock_vespa_client,
+                index_management=self.mock_index_management,
+                inference=self.mock_inference,
+                field_count_config=self.field_count_config
+            )
+        
+        error_message = str(cm.exception)
+        self.assertIn("stemming", error_message.lower())
+        self.assertIn("invalid_algorithm", error_message)
+
+    def test_stemming_with_language_combination(self):
+        """Test that stemming can be used together with language configuration"""
+        docs = [{"_id": "doc1", "title": "Running shoes for runners"}]
+        
+        marqo_index = self.semi_structured_marqo_index(
+            name="combo_test_index",
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        add_docs_params = AddDocsParams(
+            index_name="combo_test_index",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings={
+                "title": {"type": "text_field", "language": "en", "stemming": "best"}
+            },
+            use_existing_tensors=False
+        )
+
+        # Mock successful feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            errors=False,
+            responses=[FeedBatchDocumentResponse(id="doc1", status=200)]
+        )
+
+        handler = SemiStructuredAddDocumentsHandler(         
+            marqo_index=marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+
+        # Should succeed with both language and stemming
+        self.assertIsInstance(response, MarqoAddDocumentsResponse)
+        successful_items = [item for item in response.items if item.status == 200]
+        self.assertEqual(1, len(successful_items), "Expected one successful item")

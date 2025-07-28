@@ -1,6 +1,6 @@
 import unittest
 import time
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase
 from marqo.client import Client
 
 

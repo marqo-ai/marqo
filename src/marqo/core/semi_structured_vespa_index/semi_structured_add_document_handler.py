@@ -105,13 +105,14 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             return None
 
         if field_mapping.get('type') == 'text_field':
-            if not self.marqo_index.index_supports_language:
+            language = field_mapping.get('language')
+            if language is not None and not self.marqo_index.index_supports_language:
                 raise AddDocumentsError(
                     f'Language is only supported for indexes created with Marqo version '
                     f'{constants.MARQO_LANGUAGE_MINIMUM_VERSION} or later. This index was created with  '
                     f'Marqo {self.marqo_index.marqo_version}.'
                 )
-            return field_mapping.get('language')
+            return language
 
         return None
 
@@ -125,13 +126,14 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             return None
 
         if field_mapping.get('type') == 'text_field':
-            if not self.marqo_index.index_supports_stemming:
+            stemming = field_mapping.get('stemming')
+            if stemming is not None and not self.marqo_index.index_supports_stemming:
                 raise AddDocumentsError(
                     f'Stemming is only supported for indexes created with Marqo version '
                     f'{constants.MARQO_STEMMING_MINIMUM_VERSION} or later. This index was created with  '
                     f'Marqo {self.marqo_index.marqo_version}.'
                 )
-            return field_mapping.get('stemming')
+            return stemming
 
         return None
 

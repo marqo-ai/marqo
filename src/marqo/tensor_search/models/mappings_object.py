@@ -76,6 +76,10 @@ text_field_mappings_schema = {
             "enum": ["none", "best", "shortest", "multiple"]
         }
     },
-    "required": ["type", "language"],
+    "required": ["type"],
+    "anyOf": [
+        {"required": ["language"]},
+        {"required": ["stemming"]}
+    ],
     "additionalProperties": False
 }
