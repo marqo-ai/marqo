@@ -141,7 +141,6 @@ class ServicesXml:
             # Ignore 'documents' which is always the first element, only compare 'document' objects
             elements_self[0] = elements_self[0][elements_self[0].find('>'):]
             elements_other[0] = elements_other[0][elements_other[0].find('>'):]
-        print(elements_self, elements_other)
 
         return len(elements_self) == len(elements_other) and all(x == y for x, y in zip(elements_self, elements_other))
 

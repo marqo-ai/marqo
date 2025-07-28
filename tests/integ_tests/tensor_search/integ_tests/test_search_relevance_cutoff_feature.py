@@ -841,7 +841,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         )
 
         page_2_sort_candidates = page_2_results["_sortCandidates"]
-        self.assertEqual(7, page_2_sort_candidates)
+        self.assertEqual(11, page_2_sort_candidates)
 
 
         page_3_results = self._search_helper(
@@ -856,7 +856,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             offset=8
         )
 
-        self.assertEqual(3, page_3_results["_sortCandidates"])
+        self.assertEqual(11, page_3_results["_sortCandidates"])
         self.assertEqual(10, page_3_results["_relevantCandidates"])
         self.assertEqual(3, len(page_3_results["hits"]))
 

@@ -416,7 +416,7 @@ public class HybridSearcher extends Searcher {
                             offset,
                             idsToExclude,
                             verbose);
-            sortCandidates = hitsForPostProcessing.size();
+            sortCandidates = hitsForPostProcessing.size() + idsToExclude.size();
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -626,7 +626,7 @@ public class HybridSearcher extends Searcher {
                             "Failed to create or update pagination state: "
                                     + res.error().getMessage());
                 }
-        } catch (Exception e) {
+        } catch (InternalException | InterruptedException e) {
             logger.error("Failed to create or update pagination state: " + e.getMessage());
         }
     }
