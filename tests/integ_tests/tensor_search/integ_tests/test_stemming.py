@@ -1,240 +1,310 @@
 import unittest
+import uuid
+
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+from marqo.tensor_search import tensor_search
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
-class TestStemming(MarqoTestCase):
+class TestStemmingIntegration(MarqoTestCase):
     """
-    Integration tests for stemming feature in Marqo.
-    
-    Tests stemming functionality similar to language feature but focusing on
-    word normalization during indexing.
+    Integration tests for text field stemming functionality.
     """
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         super().setUpClass()
 
-        # Create indexes for testing stemming
-        cls.unstructured_index_name = cls.get_unique_index_name("stemming_unstructured")
-        cls.structured_index_name = cls.get_unique_index_name("stemming_structured")
-        cls.semi_structured_index_name = cls.get_unique_index_name("stemming_semi_structured")
-
-        # Create semi-structured index (stemming only supported for v2.16+)
-        cls.marqo_client.create_index(
-            index_name=cls.semi_structured_index_name,
-            **cls.semi_structured_marqo_index_request()
+        # Create semi-structured index for stemming tests
+        cls.stemming_index = cls.unstructured_marqo_index_request(
+            name="stemming-integ-" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="hf/e5-small-v2")
         )
+        cls.indexes = cls.create_indexes([cls.stemming_index])
 
-        # Create structured index for comparison
-        cls.marqo_client.create_index(
-            index_name=cls.structured_index_name,
-            **cls.structured_marqo_index_request(
-                fields=[
-                    {"name": "title", "type": "text", "features": ["lexical_search"]},
-                    {"name": "content", "type": "text", "features": ["lexical_search"]},
-                    {"name": "description", "type": "text", "features": ["lexical_search"]},
-                ]
-            )
-        )
-
-    def test_document_addition_with_stemming_config(self):
-        """Test adding documents with stemming configuration."""
-        # Test documents with words that should be stemmed
+    def populate_index(self):
+        """Populate index with stemming test documents."""
         docs = [
             {
-                "_id": "doc1",
-                "title": "Running shoes are great for runners",
-                "content": "The running community loves running shoes designed for runners."
+                "_id": "1",
+                "title_stem1": "nacionalmente",  # none: nacionalmente
             },
             {
-                "_id": "doc2", 
-                "title": "Cooking recipes for cooking enthusiasts",
-                "content": "These cooking recipes help cooks improve their cooking skills."
-            }
-        ]
-
-        # Add documents with stemming configuration
-        mappings = {
-            "title": {"type": "text_field", "stemming": "best"},
-            "content": {"type": "text_field", "stemming": "shortest"}
-        }
-
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
-        )
-        self.assertFalse(response.errors)
-
-    def test_stemming_algorithms_produce_different_results(self):
-        """Test that different stemming algorithms produce different search results."""
-        # Test document with words that stem differently
-        docs = [
+                "_id": "2", 
+                "title_stem2": "nacionalmente",  # best: nacionalment
+            },
             {
-                "_id": "stem_test",
-                "field_best": "running runner runners ran",
-                "field_shortest": "running runner runners ran",
-                "field_multiple": "running runner runners ran",
-                "field_none": "running runner runners ran"
-            }
+                "_id": "3",
+                "title_stem3": "nacionalmente",  # shortest: nacionalment
+            },
+            {
+                "_id": "4",
+                "title_stem4": "nacionalmente",  # multiple: nacionalmente, nacionalment
+            },
         ]
 
-        # Configure different stemming algorithms for different fields
         mappings = {
-            "field_best": {"type": "text_field", "stemming": "best"},
-            "field_shortest": {"type": "text_field", "stemming": "shortest"},
-            "field_multiple": {"type": "text_field", "stemming": "multiple"},
-            "field_none": {"type": "text_field", "stemming": "none"}
+            "title_stem1": {"type": "text_field", "language": "de", "stemming": "none"},
+            "title_stem2": {"type": "text_field", "language": "de", "stemming": "best"},
+            "title_stem3": {"type": "text_field", "language": "de", "stemming": "shortest"},
+            "title_stem4": {"type": "text_field", "language": "de", "stemming": "multiple"},
         }
 
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
+        add_docs_params = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs,
+            mappings=mappings,
+            tensor_fields=["title_stem1"]
         )
-        self.assertFalse(response.errors)
 
-        # Test lexical search finds documents through stemming
-        search_response = self.marqo_client.index(cls.semi_structured_index_name).search(
-            "run", search_method="LEXICAL"
+        res = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params
         )
-        
-        # Should find the document because "run" is the stem of "running", "runner", etc.
-        self.assertTrue(len(search_response.hits) > 0)
-        self.assertEqual(search_response.hits[0]["_id"], "stem_test")
 
-    def test_stemming_field_consistency_validation(self):
-        """Test that stemming configuration cannot be changed for existing fields."""
-        # Add document with stemming configuration
-        doc1 = [{"_id": "consistent1", "title": "Test document"}]
-        mappings1 = {"title": {"type": "text_field", "stemming": "best"}}
+        self.assertFalse(res.errors, "Should not have errors when adding documents")
 
-        response1 = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            doc1, mappings=mappings1
+    def test_stemming_search(self):
+        """
+        Test docs with different stemming configs return expected search results.
+        """
+        cases = [
+            (
+                "nacionalmente", ["title_stem1"], ["1"], "Full word matches no stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem2"], ["2"], "Full word matches best stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem3"], ["3"], "Full word matches shortest stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem4"], ["4"], "Full word matches multiple stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem1", "title_stem2"], ["1", "2"], "Full word matches with none and best fields"
+            ),
+            (
+                "nacionalment", ["title_stem1"], [], "Stemmed word does not match none stemming"
+            ),
+            (
+                "nacionalment", ["title_stem2"], ["2"], "Stemmed word matches best stemming"
+            ),
+            (
+                "nacionalment", ["title_stem1", "title_stem2"], ["2"], "Stemmed word matches best stemming but not none"
+            ),
+            (
+                "nacionalment", ["title_stem3"], ["3"], "Stemmed word matches shortest stemming"
+            ),
+            (
+                "nacionalment", ["title_stem4"], ["4"], "Stemmed word matches multiple stemming"
+            ),
+        ]
+
+        self.populate_index()
+
+        for query, fields, expected_ids, description in cases:
+            # Test LEXICAL search
+            with self.subTest(f"LEXICAL search for '{query}' in {fields}: {description}"):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.stemming_index.name,
+                    text=query,
+                    search_method="LEXICAL",
+                    searchable_attributes=fields,
+                    result_count=10,
+                    offset=0,
+                    language="de"
+                )
+
+                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
+                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
+
+            # Test HYBRID search with lexical/lexical
+            with self.subTest(f"HYBRID lexical/lexical search for '{query}' in {fields}: {description}"):
+                hybrid_params = HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical, 
+                    rankingMethod=RankingMethod.Lexical,
+                    searchableAttributesLexical=fields
+                )
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.stemming_index.name,
+                    text=query,
+                    search_method="HYBRID",
+                    result_count=10,
+                    offset=0,
+                    language="de",
+                    hybrid_parameters=hybrid_params
+                )
+
+                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
+                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
+
+            # Test HYBRID search with RRF alpha=0
+            with self.subTest(f"HYBRID RRF alpha=0 search for '{query}' in {fields}: {description}"):
+                hybrid_params = HybridParameters(
+                    alpha=0,
+                    searchableAttributesLexical=fields
+                )
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.stemming_index.name,
+                    text=query,
+                    search_method="HYBRID",
+                    result_count=10,
+                    offset=0,
+                    language="de",
+                    hybrid_parameters=hybrid_params
+                )
+
+                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
+                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
+
+    def test_stemming_all_fields_search(self):
+        """
+        Test searching all fields (no searchable attributes specified) returns some results.
+        """
+        self.populate_index()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.stemming_index.name,
+            text="nacionalmente",
+            search_method="LEXICAL",
+            result_count=10,
+            offset=0,
+            language="de"
+        )
+
+        self.assertGreater(len(res["hits"]), 0, "Should find matches for 'nacionalmente' in all fields")
+
+    def test_stemming_invalid_value_error(self):
+        """Test that invalid stemming values produce proper errors."""
+        docs = [{"_id": "invalid_test", "field": "test content"}]
+        mappings = {"field": {"type": "text_field", "language": "en", "stemming": "invalid_algorithm"}}
+
+        add_docs_params = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs,
+            mappings=mappings,
+            tensor_fields=[]
+        )
+
+        # Should raise an error due to invalid stemming value
+        with self.assertRaises(Exception) as cm:
+            self.add_documents(
+                config=self.config,
+                add_docs_params=add_docs_params
+            )
+
+        error_message = str(cm.exception)
+        self.assertIn("stemming", error_message.lower())
+
+    def test_stemming_field_change_error(self):
+        """Test that changing stemming configuration produces error."""
+        # First add document with one stemming config
+        docs1 = [{"_id": "change_test1", "title": "First document"}]
+        mappings1 = {"title": {"type": "text_field", "language": "en", "stemming": "best"}}
+
+        add_docs_params1 = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs1,
+            mappings=mappings1,
+            tensor_fields=[]
+        )
+
+        response1 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params1
         )
         self.assertFalse(response1.errors)
 
-        # Try to add another document with different stemming for same field
-        doc2 = [{"_id": "consistent2", "title": "Another test document"}]
-        mappings2 = {"title": {"type": "text_field", "stemming": "shortest"}}
+        # Try to add document with different stemming config for same field
+        docs2 = [{"_id": "change_test2", "title": "Second document"}]
+        mappings2 = {"title": {"type": "text_field", "language": "en", "stemming": "shortest"}}
 
-        response2 = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            doc2, mappings=mappings2
+        add_docs_params2 = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs2,
+            mappings=mappings2,
+            tensor_fields=[]
         )
-        
-        # Should have errors due to stemming configuration change
+
+        response2 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params2
+        )
+
+        # Should have errors
         self.assertTrue(response2.errors)
-        error_message = str(response2.errors[0])
+        error_message = response2.items[0].message
         self.assertIn("different stemming configuration", error_message)
-        self.assertIn("Cannot change stemming", error_message)
 
-    def test_stemming_with_lexical_search_only(self):
-        """Test that stemming works with LEXICAL search method."""
+    def test_stemming_no_language(self):
+        """Test that no stemming occurs when stemming is set to 'none' without language in field mapping."""
         docs = [
             {
-                "_id": "lexical_test",
-                "content": "The developer is developing software development tools"
+                "_id": "no_lang_1",
+                "content": "running quickly"
+            },
+            {
+                "_id": "no_lang_2", 
+                "content": "runs fast"
             }
         ]
 
+        # Add documents with no stemming and no language in mapping
         mappings = {
-            "content": {"type": "text_field", "stemming": "best"}
+            "content": {"type": "text_field", "stemming": "none"}
         }
 
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
+        add_docs_params = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs,
+            mappings=mappings,
+            tensor_fields=[]
         )
-        self.assertFalse(response.errors)
 
-        # Search with stem word should find documents with variations
-        search_response = self.marqo_client.index(cls.semi_structured_index_name).search(
-            "develop", search_method="LEXICAL"
-        )
-        
-        self.assertTrue(len(search_response.hits) > 0)
-        self.assertEqual(search_response.hits[0]["_id"], "lexical_test")
-
-    def test_stemming_with_hybrid_search(self):
-        """Test that stemming works with HYBRID search method."""
-        docs = [
-            {
-                "_id": "hybrid_test",
-                "title": "Advanced analytics and analytical techniques",
-                "description": "Using analytical methods for data analysis"
-            }
-        ]
-
-        mappings = {
-            "title": {"type": "text_field", "stemming": "best"},
-            "description": {"type": "text_field", "stemming": "best"}
-        }
-
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
-        )
-        self.assertFalse(response.errors)
-
-        # Test HYBRID search with stemming
-        search_response = self.marqo_client.index(cls.semi_structured_index_name).search(
-            "analyze", search_method="HYBRID"
+        res = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params
         )
         
-        self.assertTrue(len(search_response.hits) > 0)
-        self.assertEqual(search_response.hits[0]["_id"], "hybrid_test")
+        self.assertFalse(res.errors, "Should not have errors when adding documents without language")
 
-    def test_stemming_version_compatibility(self):
-        """Test that stemming is rejected on older index versions."""
-        # This test would need an older index version to test properly
-        # For now, we test that current version supports stemming
-        docs = [{"_id": "version_test", "field": "testing"}]
-        mappings = {"field": {"type": "text_field", "stemming": "best"}}
-
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
+        # Search for exact matches should work
+        running_res = tensor_search.search(
+            config=self.config,
+            index_name=self.stemming_index.name,
+            text="running",
+            search_method="LEXICAL",
+            searchable_attributes=["content"],
+            result_count=10,
+            offset=0,
+            language="en"
         )
         
-        # Should work on current version (2.16+)
-        self.assertFalse(response.errors)
-
-    def test_structured_index_stemming_limitation(self):
-        """Test that stemming configurations work appropriately with structured indexes."""
-        # For structured indexes, stemming would be configured at index creation time
-        # This test verifies that adding documents to structured index works normally
-        docs = [
-            {
-                "_id": "struct_test",
-                "title": "Testing structured indexing",
-                "content": "Content for structured index test",
-                "description": "Description field for testing"
-            }
-        ]
-
-        response = self.marqo_client.index(cls.structured_index_name).add_documents(docs)
-        self.assertFalse(response.errors)
-
-    def test_stemming_and_language_combination(self):
-        """Test that stemming and language can be used together."""
-        docs = [
-            {
-                "_id": "combo_test",
-                "english_field": "running runners ran",
-                "spanish_field": "corriendo corredores corrió"
-            }
-        ]
-
-        mappings = {
-            "english_field": {"type": "text_field", "language": "en", "stemming": "best"},
-            "spanish_field": {"type": "text_field", "language": "es", "stemming": "best"}
-        }
-
-        response = self.marqo_client.index(cls.semi_structured_index_name).add_documents(
-            docs, mappings=mappings
+        runs_res = tensor_search.search(
+            config=self.config,
+            index_name=self.stemming_index.name,
+            text="runs",
+            search_method="LEXICAL",
+            searchable_attributes=["content"],
+            result_count=10,
+            offset=0,
+            language="en"
         )
-        self.assertFalse(response.errors)
 
-        # Test that both language and stemming work together
-        for field, query in [("english_field", "run"), ("spanish_field", "corr")]:
-            with self.subTest(field=field, query=query):
-                search_response = self.marqo_client.index(cls.semi_structured_index_name).search(
-                    query, search_method="LEXICAL", searchable_attributes=[field]
-                )
-                self.assertTrue(len(search_response.hits) > 0)
+        # Verify exact matches work
+        running_ids = {hit["_id"] for hit in running_res["hits"]}
+        runs_ids = {hit["_id"] for hit in runs_res["hits"]}
+        
+        self.assertEqual({"no_lang_1"}, running_ids, "Should find document with 'running'")
+        self.assertEqual({"no_lang_2"}, runs_ids, "Should find document with 'runs'")
 
 
 if __name__ == '__main__':

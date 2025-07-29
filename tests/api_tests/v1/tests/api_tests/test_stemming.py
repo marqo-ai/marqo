@@ -14,7 +14,7 @@ class TestStemming(MarqoTestCase):
         super().setUpClass()
         cls.client = Client()
 
-        # Create unstructured index for stemming tests
+        # Create semi-structured index for stemming tests
         cls.semi_structured_index_name = cls.random_index_name("stemming_semi")
         cls.client.create_index(
             index_name=cls.semi_structured_index_name,
