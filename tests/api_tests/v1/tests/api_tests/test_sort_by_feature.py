@@ -62,6 +62,32 @@ class TestSortByFeature(MarqoTestCase):
             str(cm.exception)
         )
 
+    def test_sort_by_feature_is_blocked_for_lexical_or_tensor_search(self):
+        """
+        Tests that sort by feature is blocked for lexical or tensor search.
+        """
+        for search_method in ["LEXICAL", "TENSOR"]:
+            with self.subTest(f"Test sort by with search method {search_method}"):
+                with self.assertRaises(MarqoWebError) as cm:
+                    self.client.index(self.unstructured_index_name).search(
+                        q="test",
+                        search_method=search_method,
+                        sort_by={
+                            "fields": [
+                                {
+                                    "fieldName": "title",
+                                    "order": "asc",
+                                    "missing": "last"
+                                }
+                            ]
+                        }
+                    )
+
+            self.assertIn(
+                f"sortBy can only be provided for",
+                str(cm.exception)
+            )
+
     def test_sort_by_and_global_modifiers_can_not_be_used_together(self):
         """
         Tests that sort by feature cannot be used with global modifiers.

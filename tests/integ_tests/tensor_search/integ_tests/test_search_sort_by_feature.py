@@ -1,15 +1,17 @@
 import json
+import pytest
+import semver
+from unittest.mock import patch, MagicMock
 
+from fastapi.exceptions import RequestValidationError
+
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import UnsupportedFeatureError
-from unittest.mock import patch, MagicMock
-from marqo.core.models.marqo_index import MarqoIndex
-import semver
-import pytest
 
 
 class TestSearchSortByFeature(MarqoTestCase):
@@ -242,6 +244,38 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 "offset": offset
             }
         ).body.decode('utf-8'))
+
+    def test_sort_by_is_blocked_by_tensor_search(self):
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.TENSOR,
+                    "sortBy": {
+                        "fields": [{"fieldName": "sort_field_1"}],
+                    }
+                }
+            )
+        self.assertIn("sortBy can only be provided for", str(context.exception.errors()))
+
+    def test_sort_by_is_blocked_by_lexical_search(self):
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.LEXICAL,
+                    "sortBy": {
+                        "fields": [{"fieldName": "sort_field_1"}],
+                    }
+                }
+            )
+        self.assertIn("sortBy can only be provided for", str(context.exception.errors()))
 
     def test_simple_sort_with_default_settings(self):
         """
