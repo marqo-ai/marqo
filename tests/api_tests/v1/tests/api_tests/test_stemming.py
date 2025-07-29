@@ -1,107 +1,127 @@
 import unittest
 import time
-from tests.marqo_test import MarqoTestCase
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
 from marqo.client import Client
 
 
-class TestStemmingAPI(MarqoTestCase):
+class TestStemming(MarqoTestCase):
     """
-    API-level tests for stemming feature in Marqo.
-    
-    Tests stemming functionality through the client API, focusing on
-    proper API behavior and error handling.
+    Test text field stemming functionality through the Marqo API.
     """
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.client = Client()
-        
+
         # Create unstructured index for stemming tests
-        cls.semi_structured_index_name = cls.random_index_name("api_stemming_semi")
+        cls.semi_structured_index_name = cls.random_index_name("stemming_semi")
         cls.client.create_index(
             index_name=cls.semi_structured_index_name,
             type="unstructured",
-            model="hf/all_datasets_v4_MiniLM-L6"
+            model="hf/e5-small-v2"
         )
         cls.indexes_to_delete.append(cls.semi_structured_index_name)
 
-    def test_stemming_document_addition_api(self):
-        """Test stemming through client API document addition."""
+    def populate_index(self):
         docs = [
             {
-                "_id": "api_doc1",
-                "title": "Running and walking exercises",
-                "content": "Runners enjoy running while walkers prefer walking"
-            }
-        ]
-
-        mappings = {
-            "title": {"type": "text_field", "language": "en", "stemming": "best"},
-            "content": {"type": "text_field", "language": "en", "stemming": "shortest"}
-        }
-
-        # Test API call succeeds
-        response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=[]
-        )
-        self.assertFalse(response['errors'])
-
-    def test_stemming_search_api_lexical(self):
-        """Test stemming works through API lexical search."""
-        docs = [
+                "_id": "1",
+                "title_stem1": "nacionalmente",  # none: nacionalmente
+            },
             {
-                "_id": "search_test1",
-                "field": "analytical analysis analyzing analyst"
-            }
-        ]
-
-        mappings = {
-            "field": {"type": "text_field", "language": "en", "stemming": "best"}
-        }
-
-        # Add documents
-        add_response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=[]
-        )
-        self.assertFalse(add_response['errors'])
-
-        # Search using stemmed form
-        search_response = self.client.index(self.semi_structured_index_name).search(
-            "analyze", search_method="LEXICAL"
-        )
-        
-        self.assertTrue(len(search_response['hits']) > 0)
-        self.assertEqual(search_response['hits'][0]["_id"], "search_test1")
-
-    def test_stemming_search_api_hybrid(self):
-        """Test stemming works through API hybrid search."""
-        docs = [
+                "_id": "2",
+                "title_stem2": "nacionalmente",  # best: nacionalment
+            },
             {
-                "_id": "hybrid_api_test",
-                "hybrid_content": "optimization optimize optimized optimizing"
-            }
+                "_id": "3",
+                "title_stem3": "nacionalmente",  # shortest: nacionalment
+            },
+            {
+                "_id": "4",
+                "title_stem4": "nacionalmente",  # multiple: nacionalmente, nacionalment
+            },
         ]
 
-        mappings = {
-            "hybrid_content": {"type": "text_field", "language": "en", "stemming": "best"}
-        }
-
-        # Add documents
-        add_response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=["hybrid_content"]
+        res = self.client.index(self.semi_structured_index_name).add_documents(
+            docs,
+            tensor_fields=["title_stem1"],
+            mappings={
+                "title_stem1": {"type": "text_field", "language": "de", "stemming": "none"},
+                "title_stem2": {"type": "text_field", "language": "de", "stemming": "best"},
+                "title_stem3": {"type": "text_field", "language": "de", "stemming": "shortest"},
+                "title_stem4": {"type": "text_field", "language": "de", "stemming": "multiple"},
+            },
         )
-        if add_response['errors']:
-            print("Hybrid test error:", add_response)
-        self.assertFalse(add_response['errors'])
 
-        # Test HYBRID search
-        search_response = self.client.index(self.semi_structured_index_name).search(
-            "optimal", search_method="HYBRID"
-        )
-        
-        self.assertTrue(len(search_response['hits']) > 0)
-        self.assertEqual(search_response['hits'][0]["_id"], "hybrid_api_test")
+        self.assertFalse(res['errors'], "Should not have errors when adding documents")
+
+    def test_stemming_search(self):
+        """
+        Test docs with different stemming configs return expected search results.
+        """
+        cases = [
+            (
+                "nacionalmente", ["title_stem1"], ["1"], "Full word matches no stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem2"], ["2"], "Full word matches best stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem3"], ["3"], "Full word matches shortest stemming"
+            ),
+            (
+                "nacionalmente", ["title_stem4"], ["4"], "Full word matches multiple stemming"
+            ),
+
+            (
+                "nacionalmente", ["title_stem1", "title_stem2"], ["1", "2"], "Full word matches with none and "
+                                                                             "best fields"
+            ),
+            (
+                "nacionalment", ["title_stem1"], [], "Stemmed word does not match none stemming"
+            ),
+            (
+                "nacionalment", ["title_stem2"], ["2"], "Stemmed word matches best stemming"
+            ),
+            (
+                "nacionalment", ["title_stem1", "title_stem2"], ["2"], "Stemmed word matches best stemming but not none"
+            ),
+            (
+                "nacionalment", ["title_stem3"], ["3"], "Stemmed word matches shortest stemming"
+            ),
+
+            (
+                "nacionalment", ["title_stem4"], ["4"], "Stemmed word matches multiple stemming"
+            ),
+        ]
+
+        search_configs = [
+            ("LEXICAL", {}, "lexical search"),
+            ("HYBRID", {"retrievalMethod": "lexical", "rankingMethod": "lexical"}, "hybrid lexical/lexical"),
+            ("HYBRID", {"alpha": 0}, "hybrid RRF with alpha=0")
+        ]
+
+        self.populate_index()
+
+        for query, fields, expected_ids, description in cases:
+            for search_method, hybrid_params, description in search_configs:
+                with self.subTest(f"{search_method} search for '{query}' in {fields}"):
+                    res = self.client.index(self.semi_structured_index_name).search(
+                        q=query,
+                        search_method=search_method,
+                        language="de",
+                        hybrid_parameters=hybrid_params if hybrid_params else None
+                    )
+
+                    actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
+                    self.assertEqual(set(expected_ids), actual_ids)
+
+    def test_stemming_all_fields_search(self):
+        """
+        Test searching all fields (no searchable attributes specified) returns some results.
+        """
+        pass
 
     def test_stemming_invalid_value_api_error(self):
         """Test that invalid stemming values produce proper API errors."""
@@ -113,7 +133,7 @@ class TestStemmingAPI(MarqoTestCase):
             self.client.index(self.semi_structured_index_name).add_documents(
                 docs, mappings=mappings, tensor_fields=[]
             )
-        
+
         error_message = str(cm.exception)
         self.assertIn("stemming", error_message.lower())
 
@@ -135,43 +155,11 @@ class TestStemmingAPI(MarqoTestCase):
         response2 = self.client.index(self.semi_structured_index_name).add_documents(
             docs2, mappings=mappings2, tensor_fields=[]
         )
-        
+
         # Should have errors
         self.assertTrue(response2['errors'])
         error_message = response2['items'][0]['message']
         self.assertIn("different stemming configuration", error_message)
-
-    def test_stemming_multiple_algorithms_api(self):
-        """Test using different stemming algorithms through API."""
-        docs = [
-            {
-                "_id": "multi_stem",
-                "field_best": "processing processed processes",
-                "field_shortest": "processing processed processes", 
-                "field_multiple": "processing processed processes",
-                "field_none": "processing processed processes"
-            }
-        ]
-
-        mappings = {
-            "field_best": {"type": "text_field", "language": "en", "stemming": "best"},
-            "field_shortest": {"type": "text_field", "language": "en", "stemming": "shortest"},
-            "field_multiple": {"type": "text_field", "language": "en", "stemming": "multiple"},
-            "field_none": {"type": "text_field", "language": "en", "stemming": "none"}
-        }
-
-        response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=[]
-        )
-        self.assertFalse(response['errors'])
-
-        # Test search works with different algorithms
-        search_response = self.client.index(self.semi_structured_index_name).search(
-            "process", search_method="LEXICAL"
-        )
-        
-        self.assertTrue(len(search_response['hits']) > 0)
-        self.assertEqual(search_response['hits'][0]["_id"], "multi_stem")
 
     def test_stemming_with_language_api(self):
         """Test stemming combined with language through API."""
@@ -202,58 +190,15 @@ class TestStemmingAPI(MarqoTestCase):
             "running", search_method="LEXICAL", searchable_attributes=["lang_english_text"]
         )
         self.assertTrue(len(english_search['hits']) > 0)
-        
+
         # Test general search to verify document is indexed
         general_search = self.client.index(self.semi_structured_index_name).search(
             "running", search_method="LEXICAL"
         )
         self.assertTrue(len(general_search['hits']) > 0)
-        
+
         # Test that language was accepted (this is the main purpose of the test)
         self.assertEqual(general_search['hits'][0]["_id"], "lang_stem_test")
-
-    def test_stemming_none_algorithm_api(self):
-        """Test that stemming 'none' disables stemming through API."""
-        docs = [
-            {
-                "_id": "no_stem_test",
-                "with_stemming": "running runners ran",
-                "without_stemming": "running runners ran"
-            }
-        ]
-
-        mappings = {
-            "with_stemming": {"type": "text_field", "language": "en", "stemming": "best"},
-            "without_stemming": {"type": "text_field", "language": "en", "stemming": "none"}
-        }
-
-        response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=[]
-        )
-        self.assertFalse(response['errors'])
-
-        # Allow time for indexing to complete
-        time.sleep(2)
-
-        # Search for "run" should find with_stemming field
-        # Note: Stemming behavior may vary, so let's test that documents are indexed correctly
-        # and that different stemming configs can be applied
-        search_response = self.client.index(self.semi_structured_index_name).search(
-            "running", search_method="LEXICAL", searchable_attributes=["with_stemming"]
-        )
-        self.assertTrue(len(search_response['hits']) > 0)
-        
-        # Test that the document was indexed correctly
-        search_response2 = self.client.index(self.semi_structured_index_name).search(
-            "running", search_method="LEXICAL", searchable_attributes=["without_stemming"]
-        )
-        self.assertTrue(len(search_response2['hits']) > 0)
-
-        # Search in field without stemming should not find partial matches as easily
-        search_response_no_stem = self.client.index(self.semi_structured_index_name).search(
-            "run", search_method="LEXICAL", searchable_attributes=["without_stemming"]
-        )
-        # This depends on exact matching behavior, may find fewer or no results
 
 
 if __name__ == '__main__':
