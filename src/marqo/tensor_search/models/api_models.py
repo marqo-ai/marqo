@@ -29,6 +29,18 @@ class BaseMarqoModel(BaseModel):
     pass
 
 
+class VariantGroupingParameters(BaseMarqoModel):
+    """Parameters for variant grouping functionality"""
+    max_variants_per_group: int = Field(..., alias="maxVariantsPerGroup", description="Maximum number of variants to return per group")
+    variant_group_field: str = Field(..., alias="variantGroupField", description="Field name to group variants by (e.g., 'product_id')")
+    
+    @validator("max_variants_per_group")
+    def validate_max_variants_per_group(cls, v):
+        if v < 1:
+            raise ValueError("max_variants_per_group must be at least 1")
+        return v
+
+
 class CustomVectorQuery(ImmutableStrictBaseModel):
     class CustomVector(ImmutableStrictBaseModel):
         content: Optional[str] = None
@@ -68,6 +80,7 @@ class SearchQuery(BaseMarqoModel):
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
+    variant_grouping: Optional[VariantGroupingParameters] = Field(default=None, alias="variantGrouping")
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3

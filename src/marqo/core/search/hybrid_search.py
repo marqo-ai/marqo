@@ -13,6 +13,7 @@ from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarq
     IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+from marqo.core.semi_structured_vespa_index.grouping_query_builder import GroupingQueryBuilder
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.core.models.interpolation_method import InterpolationMethod
@@ -22,7 +23,7 @@ from marqo.tensor_search.enums import (
     SearchMethod
 )
 from marqo.core.models import MarqoIndex
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery, VariantGroupingParameters
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -50,7 +51,8 @@ class HybridSearch:
             language: Optional[str] = None,
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
-            interpolation_method: Optional[InterpolationMethod] = None
+            interpolation_method: Optional[InterpolationMethod] = None,
+            variant_grouping: Optional[VariantGroupingParameters] = None
     ) -> Dict:
         """
 
@@ -292,11 +294,27 @@ class HybridSearch:
             track_total_hits=track_total_hits,
             language=language,
             relevance_cutoff=relevance_cutoff,
-            sort_by=sort_by
+            sort_by=sort_by,
+            variant_grouping=variant_grouping
         )
 
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)
+        
+        # Apply Vespa grouping if variant grouping is specified
+        if variant_grouping is not None:
+            base_yql = vespa_query.get('yql', '')
+            if base_yql:
+                try:
+                    grouped_yql = GroupingQueryBuilder.build_grouping_query(
+                        base_yql, 
+                        variant_grouping.variant_group_field,
+                        variant_grouping.max_variants_per_group
+                    )
+                    vespa_query['yql'] = grouped_yql
+                except Exception as e:
+                    logger.warning(f"Failed to apply Vespa grouping, falling back to post-search: {e}")
+                    # Will fall back to post-search processing
 
         total_preprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.processing_before_vespa")
         logger.debug(
@@ -340,6 +358,10 @@ class HybridSearch:
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
 
+        # Apply variant grouping if specified (post-search deduplication as fallback)
+        if variant_grouping is not None and not GroupingQueryBuilder.is_grouped_query(vespa_query.get('yql', '')):
+            gathered_results = self._apply_variant_grouping(gathered_results, variant_grouping)
+        
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
@@ -367,3 +389,47 @@ class HybridSearch:
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
         return gathered_results
+
+    def _apply_variant_grouping(self, search_results: Dict, variant_grouping: VariantGroupingParameters) -> Dict:
+        """
+        Apply variant grouping (deduplication) to search results.
+        
+        Args:
+            search_results: The search results dict containing 'hits' list
+            variant_grouping: Parameters for variant grouping
+            
+        Returns:
+            Modified search results with grouped/deduplicated hits
+        """
+        if "hits" not in search_results or not search_results["hits"]:
+            return search_results
+            
+        hits = search_results["hits"]
+        group_field = variant_grouping.variant_group_field
+        max_per_group = variant_grouping.max_variants_per_group
+        
+        # Group hits by the specified field
+        groups = {}
+        for hit in hits:
+            # Get the grouping field value from the hit
+            group_value = hit.get(group_field)
+            if group_value is None:
+                # If the document doesn't have the group field, treat it as a separate group
+                group_value = f"__missing_field_{id(hit)}"
+                
+            if group_value not in groups:
+                groups[group_value] = []
+            groups[group_value].append(hit)
+        
+        # Take the top max_per_group hits from each group (they're already sorted by relevance)
+        grouped_hits = []
+        for group_value, group_hits in groups.items():
+            grouped_hits.extend(group_hits[:max_per_group])
+        
+        # Sort the final results by their original relevance scores to maintain ranking
+        grouped_hits.sort(key=lambda hit: hit.get("_score", 0), reverse=True)
+        
+        # Return the updated results
+        result = search_results.copy()
+        result["hits"] = grouped_hits
+        return result

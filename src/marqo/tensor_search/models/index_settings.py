@@ -16,6 +16,11 @@ class AnnParameters(StrictBaseModel):
     parameters: core.HnswConfig
 
 
+class VariantGrouping(StrictBaseModel):
+    variantGroupField: str
+    minGroup: Optional[int] = None
+
+
 class IndexSettings(StrictBaseModel):
     type: core.IndexType = core.IndexType.SemiStructured
     allFields: Optional[List[FieldRequest]]
@@ -52,6 +57,7 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
+    variantGrouping: Optional[VariantGrouping] = None
     
     @root_validator
     def validate_url_pointer_treatment(cls, values):
@@ -142,6 +148,7 @@ class IndexSettings(StrictBaseModel):
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time(),
+                variant_group_field=self.variantGrouping.variantGroupField if self.variantGrouping else None,
             )
         elif self.type in [core.IndexType.Unstructured, core.IndexType.SemiStructured]:
             if self.allFields is not None:
@@ -193,7 +200,8 @@ class IndexSettings(StrictBaseModel):
                 filter_string_max_length=self.filterStringMaxLength,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
-                updated_at=time.time()
+                updated_at=time.time(),
+                variant_group_field=self.variantGrouping.variantGroupField if self.variantGrouping else None,
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
@@ -220,7 +228,11 @@ class IndexSettings(StrictBaseModel):
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
-                )
+                ),
+                variantGrouping=VariantGrouping(
+                    variantGroupField=marqo_index.variant_group_field,
+                    minGroup=10  # Default value as specified
+                ) if marqo_index.variant_group_field else None
             )
         elif isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
@@ -245,7 +257,11 @@ class IndexSettings(StrictBaseModel):
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
-                )
+                ),
+                variantGrouping=VariantGrouping(
+                    variantGroupField=marqo_index.variant_group_field,
+                    minGroup=10  # Default value as specified
+                ) if marqo_index.variant_group_field else None
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")

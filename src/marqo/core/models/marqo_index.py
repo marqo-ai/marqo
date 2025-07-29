@@ -11,7 +11,6 @@ from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic.v1.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
-from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 
@@ -20,8 +19,13 @@ from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 import marqo.core.constants as constants
 
+
 logger = get_logger(__name__)
 
+
+class VariantGrouping(StrictBaseModel):
+    variantGroupField: str
+    minGroup: Optional[int] = None
 
 class IndexType(Enum):
     Structured = 'structured'
@@ -282,6 +286,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     marqo_version: str
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
+    variant_grouping: Optional[VariantGrouping] = None
     # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
     _cache: Dict[str, Any] = PrivateAttr()
     version: Optional[int] = pydantic.Field(default=None)

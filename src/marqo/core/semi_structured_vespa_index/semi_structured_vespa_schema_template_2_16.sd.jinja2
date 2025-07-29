@@ -93,6 +93,13 @@ schema {{ index.schema_name }} {
         }
         {% endfor -%}
 
+        {% if index.variant_grouping -%}
+        field {{ index.variant_grouping.variantGroupField }} type string {
+            indexing: attribute | summary
+            attribute: fast-search
+        }
+        {% endif -%}
+
         {% for field in index.tensor_fields -%}
         field {{ field.chunk_field_name }} type array<string> {
             indexing: summary
@@ -277,6 +284,12 @@ schema {{ index.schema_name }} {
         first-phase {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
+        {% if index.variant_grouping and index.variant_grouping.minGroup -%}
+        diversity {
+            attribute: {{ index.variant_grouping.variantGroupField }}
+            min-groups: {{ index.variant_grouping.minGroup }}
+        }
+        {% endif -%}
         second-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
@@ -306,6 +319,9 @@ schema {{ index.schema_name }} {
         {% for string_array_field in index.string_array_fields -%}
         summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
         {% endfor -%}
+        {%- if index.variant_grouping %}
+        summary {{ index.variant_grouping.variantGroupField }} type string {}
+        {%- endif %}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}
@@ -323,6 +339,9 @@ schema {{ index.schema_name }} {
         {% for string_array_field in index.string_array_fields -%}
         summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
         {% endfor -%}
+        {%- if index.variant_grouping %}
+        summary {{ index.variant_grouping.variantGroupField }} type string {}
+        {%- endif %}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}

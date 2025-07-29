@@ -85,6 +85,8 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         string_array_prefix_length = len(common.STRING_ARRAY + '_')
 
         for field_name, field_value in fields.items():
+            if marqo_index.variant_grouping and field_name == marqo_index.variant_grouping.variantGroupField:
+                text_fields[field_name] = field_value
             if field_name in tensor_subfield_map:
                 tensor_fields[field_name] = field_value
             elif field_name in lexical_field_map:
@@ -199,6 +201,10 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
 
     @classmethod
     def _handle_string_field(cls, field_name: str, field_content: str, instance, marqo_index: SemiStructuredMarqoIndex):
+        if marqo_index.variant_grouping and field_name == marqo_index.variant_grouping.variantGroupField:
+            instance.text_fields[field_name] = field_content
+            return
+
         if field_name not in marqo_index.field_map:
             raise MarqoDocumentParsingError(f'Field {field_name} is not in index {marqo_index.name}')
         

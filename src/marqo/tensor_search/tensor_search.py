@@ -59,6 +59,7 @@ from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.semi_structured_vespa_index.grouping_query_builder import GroupingQueryBuilder
 from marqo.exceptions import InternalError
 from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
@@ -73,7 +74,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
-from marqo.tensor_search.models.api_models import CustomVectorQuery
+from marqo.tensor_search.models.api_models import CustomVectorQuery, VariantGroupingParameters
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
@@ -359,7 +360,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            language: Optional[str] = None,
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
-           interpolation_method: Optional[InterpolationMethod] = None
+           interpolation_method: Optional[InterpolationMethod] = None,
+           variant_grouping: Optional['VariantGroupingParameters'] = None
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -494,7 +496,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, 
-                rerank_depth=rerank_depth, interpolation_method=interpolation_method
+                rerank_depth=rerank_depth, interpolation_method=interpolation_method, variant_grouping=variant_grouping
             )
         else:  # SearchMethod.HYBRID
             # TODO: Deal with circular import when all modules are refactored out.
@@ -511,7 +513,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
                 language=language,
                 relevance_cutoff=relevance_cutoff, sort_by=sort_by,
-                interpolation_method=interpolation_method
+                interpolation_method=interpolation_method,
+                variant_grouping=variant_grouping
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -526,7 +529,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers, language=language
+            score_modifiers=score_modifiers, language=language, variant_grouping=variant_grouping
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -553,7 +556,8 @@ def _lexical_search(
         config: Config, marqo_index: MarqoIndex, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
-        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None):
+        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None,
+        variant_grouping: Optional['VariantGroupingParameters'] = None):
     """
 
     Args:
@@ -602,6 +606,21 @@ def _lexical_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
+    
+    # Apply Vespa grouping if variant grouping is specified
+    if variant_grouping is not None:
+        base_yql = vespa_query.get('yql', '')
+        if base_yql:
+            try:
+                grouped_yql = GroupingQueryBuilder.build_grouping_query(
+                    base_yql, 
+                    variant_grouping.variant_group_field,
+                    variant_grouping.max_variants_per_group
+                )
+                vespa_query['yql'] = grouped_yql
+            except Exception as e:
+                logger.warning(f"Failed to apply Vespa grouping, falling back to post-search: {e}")
+                # Will fall back to post-search processing
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_vespa")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
@@ -628,6 +647,10 @@ def _lexical_search(
     if highlights:
         for docs in gathered_docs['hits']:
             docs['_highlights'] = []
+
+    # Apply variant grouping if specified (post-search deduplication as fallback)
+    if variant_grouping is not None and not GroupingQueryBuilder.is_grouped_query(vespa_query.get('yql', '')):
+        gathered_docs = _apply_variant_grouping_to_results(gathered_docs, variant_grouping)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.lexical.postprocess")
     logger.debug(
@@ -1113,7 +1136,8 @@ def _vector_text_search(
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None,
-        interpolation_method: Optional[InterpolationMethod] = None
+        interpolation_method: Optional[InterpolationMethod] = None, 
+        variant_grouping: Optional['VariantGroupingParameters'] = None
 ) -> Dict:
     """
 
@@ -1203,6 +1227,21 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
+    
+    # Apply Vespa grouping if variant grouping is specified
+    if variant_grouping is not None:
+        base_yql = vespa_query.get('yql', '')
+        if base_yql:
+            try:
+                grouped_yql = GroupingQueryBuilder.build_grouping_query(
+                    base_yql, 
+                    variant_grouping.variant_group_field,
+                    variant_grouping.max_variants_per_group
+                )
+                vespa_query['yql'] = grouped_yql
+            except Exception as e:
+                logger.warning(f"Failed to apply Vespa grouping, falling back to post-search: {e}")
+                # Will fall back to post-search processing
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
@@ -1237,6 +1276,10 @@ def _vector_text_search(
     if boost is not None:
         raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
 
+    # Apply variant grouping if specified (post-search deduplication as fallback)
+    if variant_grouping is not None and not GroupingQueryBuilder.is_grouped_query(vespa_query.get('yql', '')):
+        gathered_docs = _apply_variant_grouping_to_results(gathered_docs, variant_grouping)
+
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
@@ -1244,6 +1287,51 @@ def _vector_text_search(
     )
 
     return gathered_docs
+
+
+def _apply_variant_grouping_to_results(search_results: Dict, variant_grouping: 'VariantGroupingParameters') -> Dict:
+    """
+    Apply variant grouping (deduplication) to search results.
+    
+    Args:
+        search_results: The search results dict containing 'hits' list
+        variant_grouping: Parameters for variant grouping
+        
+    Returns:
+        Modified search results with grouped/deduplicated hits
+    """
+    if "hits" not in search_results or not search_results["hits"]:
+        return search_results
+        
+    hits = search_results["hits"]
+    group_field = variant_grouping.variant_group_field
+    max_per_group = variant_grouping.max_variants_per_group
+    
+    # Group hits by the specified field
+    groups = {}
+    for hit in hits:
+        # Get the grouping field value from the hit
+        group_value = hit.get(group_field)
+        if group_value is None:
+            # If the document doesn't have the group field, treat it as a separate group
+            group_value = f"__missing_field_{id(hit)}"
+            
+        if group_value not in groups:
+            groups[group_value] = []
+        groups[group_value].append(hit)
+    
+    # Take the top max_per_group hits from each group (they're already sorted by relevance)
+    grouped_hits = []
+    for group_value, group_hits in groups.items():
+        grouped_hits.extend(group_hits[:max_per_group])
+    
+    # Sort the final results by their original relevance scores to maintain ranking
+    grouped_hits.sort(key=lambda hit: hit.get("_score", 0), reverse=True)
+    
+    # Return the updated results
+    result = search_results.copy()
+    result["hits"] = grouped_hits
+    return result
 
 
 def delete_index(config: Config, index_name):

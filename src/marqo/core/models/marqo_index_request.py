@@ -30,6 +30,7 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     marqo_version: str
     created_at: int
     updated_at: int
+    variant_grouping: Optional[marqo_index.VariantGrouping] = None
 
     @validator('name')
     def validate_name(cls, name):

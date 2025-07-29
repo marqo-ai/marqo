@@ -366,6 +366,7 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
+            variant_grouping=None,
     ) -> UnstructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
@@ -391,6 +392,7 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,
+            variant_grouping=variant_grouping,
         )
 
     class _AssertRaisesContext:

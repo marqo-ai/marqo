@@ -257,7 +257,8 @@ class VespaClient:
 
         self._query_raise_for_status(resp)
 
-        return QueryResult(**orjson.loads(resp.text))
+        resp_dict = orjson.loads(resp.text)
+        return QueryResult(**resp_dict)
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

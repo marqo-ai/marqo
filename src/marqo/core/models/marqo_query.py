@@ -11,6 +11,7 @@ from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParse
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.api_models import VariantGroupingParameters
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -73,6 +74,7 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     track_total_hits: Optional[bool] = None
     relevance_cutoff: Optional[RelevanceCutoffModel] = None
     sort_by: Optional[SortByModel] = None
+    variant_grouping: Optional[VariantGroupingParameters] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

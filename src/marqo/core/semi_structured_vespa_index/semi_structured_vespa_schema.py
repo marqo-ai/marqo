@@ -49,6 +49,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             marqo_version=self._index_request.marqo_version,
             created_at=self._index_request.created_at,
             updated_at=self._index_request.updated_at,
+            variant_grouping=self._index_request.variant_grouping,
             lexical_fields=[],
             tensor_fields=[],
             string_array_fields=[],

@@ -116,6 +116,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
 
     def _add_lexical_field_to_index(self, field_name, language=None):
+        if self.marqo_index.variant_grouping and field_name == self.marqo_index.variant_grouping.variantGroupField:
+            return
+
         if field_name in self.marqo_index.field_map:
             if language is not None:
                 existing_field = self.marqo_index.field_map[field_name]

@@ -571,6 +571,9 @@ class StructuredVespaIndex(VespaIndex):
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+        
+        # Note: Variant grouping will be handled in post-processing rather than in YQL
+        # to avoid complex Vespa grouping syntax issues
         facet_queries = None
 
         if marqo_query.facets or marqo_query.track_total_hits:
