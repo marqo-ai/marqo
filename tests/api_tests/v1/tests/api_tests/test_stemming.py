@@ -1,7 +1,7 @@
 import unittest
-import time
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
+
 from marqo.client import Client
+from tests.marqo_test import MarqoTestCase
 
 
 class TestStemming(MarqoTestCase):
@@ -121,9 +121,17 @@ class TestStemming(MarqoTestCase):
         """
         Test searching all fields (no searchable attributes specified) returns some results.
         """
-        pass
+        self.populate_index()
 
-    def test_stemming_invalid_value_api_error(self):
+        res = self.client.index(self.semi_structured_index_name).search(
+            q="nacionalmente",
+            search_method="LEXICAL",
+            language="de"
+        )
+
+        self.assertGreater(len(res["hits"]), 0, "Should find matches for 'nacionalmente' in all fields")
+
+    def test_stemming_invalid_value_error(self):
         """Test that invalid stemming values produce proper API errors."""
         docs = [{"_id": "invalid_test", "field": "test content"}]
         mappings = {"field": {"type": "text_field", "language": "en", "stemming": "invalid_algorithm"}}
@@ -137,7 +145,7 @@ class TestStemming(MarqoTestCase):
         error_message = str(cm.exception)
         self.assertIn("stemming", error_message.lower())
 
-    def test_stemming_field_change_api_error(self):
+    def test_stemming_field_change_error(self):
         """Test that changing stemming configuration produces API error."""
         # First add document with one stemming config
         docs1 = [{"_id": "change_test1", "title": "First document"}]
@@ -161,45 +169,51 @@ class TestStemming(MarqoTestCase):
         error_message = response2['items'][0]['message']
         self.assertIn("different stemming configuration", error_message)
 
-    def test_stemming_with_language_api(self):
-        """Test stemming combined with language through API."""
+    def test_stemming_no_language(self):
+        """Test that no stemming occurs when stemming is set to 'none' without language in field mapping."""
         docs = [
             {
-                "_id": "lang_stem_test",
-                "lang_english_text": "running runners ran",
-                "lang_french_text": "courant coureurs couru"
+                "_id": "no_lang_1",
+                "content": "running quickly"
+            },
+            {
+                "_id": "no_lang_2", 
+                "content": "runs fast"
             }
         ]
 
-        mappings = {
-            "lang_english_text": {"type": "text_field", "language": "en", "stemming": "best"},
-            "lang_french_text": {"type": "text_field", "language": "fr", "stemming": "best"}
-        }
-
-        response = self.client.index(self.semi_structured_index_name).add_documents(
-            docs, mappings=mappings, tensor_fields=[]
+        # Add documents with no stemming and no language in mapping
+        res = self.client.index(self.semi_structured_index_name).add_documents(
+            docs,
+            tensor_fields=[],
+            mappings={
+                "content": {"type": "text_field", "stemming": "none"}
+            }
         )
-        self.assertFalse(response['errors'])
+        
+        self.assertFalse(res['errors'], "Should not have errors when adding documents without language")
 
-        # Allow time for indexing to complete
-        time.sleep(2)
-
-        # Test that documents with language+stemming configuration are searchable
-        # First test English
-        english_search = self.client.index(self.semi_structured_index_name).search(
-            "running", search_method="LEXICAL", searchable_attributes=["lang_english_text"]
+        # Search for exact matches should work
+        running_res = self.client.index(self.semi_structured_index_name).search(
+            q="running",
+            search_method="LEXICAL",
+            language="en",
+            searchable_attributes=["content"]
         )
-        self.assertTrue(len(english_search['hits']) > 0)
-
-        # Test general search to verify document is indexed
-        general_search = self.client.index(self.semi_structured_index_name).search(
-            "running", search_method="LEXICAL"
+        
+        runs_res = self.client.index(self.semi_structured_index_name).search(
+            q="runs",
+            search_method="LEXICAL",
+            language="en",
+            searchable_attributes=["content"]
         )
-        self.assertTrue(len(general_search['hits']) > 0)
 
-        # Test that language was accepted (this is the main purpose of the test)
-        self.assertEqual(general_search['hits'][0]["_id"], "lang_stem_test")
-
+        # Verify exact matches work
+        running_ids = {hit["_id"] for hit in running_res["hits"]}
+        runs_ids = {hit["_id"] for hit in runs_res["hits"]}
+        
+        self.assertEqual({"no_lang_1"}, running_ids, "Should find document with 'running'")
+        self.assertEqual({"no_lang_2"}, runs_ids, "Should find document with 'runs'")
 
 if __name__ == '__main__':
     unittest.main()
