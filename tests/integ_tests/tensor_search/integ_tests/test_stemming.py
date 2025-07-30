@@ -23,7 +23,23 @@ class TestStemmingIntegration(MarqoTestCase):
             name="stemming-integ-" + str(uuid.uuid4()).replace('-', ''),
             model=Model(name="hf/e5-small-v2")
         )
-        cls.indexes = cls.create_indexes([cls.stemming_index])
+
+        # 2.16 unstructured index -- must support stemming
+        cls.v216_unstructured_index = cls.unstructured_marqo_index_request(
+            name='test_v216_stemming_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2'),
+            marqo_version='2.16.0',
+        )
+
+        # 2.15 unstructured index -- must not support stemming
+        cls.v215_unstructured_index = cls.unstructured_marqo_index_request(
+            name='test_v215_stemming_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2'),
+            marqo_version='2.15.0',
+        )
+
+        index_requests = [cls.stemming_index, cls.v216_unstructured_index, cls.v215_unstructured_index]
+        cls.indexes = cls.create_indexes(index_requests)
 
     def populate_index(self):
         """Populate index with stemming test documents."""
@@ -421,6 +437,90 @@ class TestStemmingIntegration(MarqoTestCase):
         # Stemming is set as a field property in Vespa schema
         self.assertIn('stemming: best', field_definition,
                       "Field should have stemming set to 'best' in the Vespa schema")
+
+    def test_v216_unstructured_index_supports_stemming_mapping(self):
+        """Test that v2.16 unstructured index supports stemming mapping."""
+        docs = [
+            {"_id": "v216_doc1", "title": "nacionalmente", "content": "German word example"},
+            {"_id": "v216_doc2", "title": "andere Wörter", "content": "Other German words"},
+            {"_id": "v216_doc3", "title": "mehr Text", "content": "More German text"}
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "language": "de", "stemming": "best"},
+            "content": {"type": "text_field", "language": "de", "stemming": "shortest"}
+        }
+
+        # Add documents with stemming mapping
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.v216_unstructured_index.name,
+                docs=docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+
+        # Verify documents were added successfully
+        self.assertFalse(response.errors, "Failed to add documents with stemming mapping to v2.16 index")
+
+        # Test search with stemmed word - should find matches due to stemming  
+        # "nacionalment" should match "nacionalmente" with German stemming
+        result = tensor_search.search(
+            config=self.config,
+            index_name=self.v216_unstructured_index.name,
+            text="nacionalment",
+            search_method="LEXICAL",
+            searchable_attributes=["title"],
+            language="de"
+        )
+
+        # Verify we get hits (stemmed "nacionalment" should match "nacionalmente")
+        self.assertGreater(len(result["hits"]), 0, "Expected hits for stemmed search on v2.16 index")
+        hit_ids = [hit["_id"] for hit in result["hits"]]
+        self.assertIn("v216_doc1", hit_ids, "Expected v216_doc1 in search results for stemmed query")
+
+    def test_v215_unstructured_index_rejects_stemming_mapping(self):
+        """Test that v2.15 unstructured index rejects stemming mapping."""
+        docs = [
+            {"_id": "v215_doc1", "title": "nacionalmente", "content": "example word"},
+            {"_id": "v215_doc2", "title": "andere", "content": "other words"}
+        ]
+
+        mappings = {
+            "title": {"type": "text_field", "stemming": "best"},
+            "content": {"type": "text_field", "stemming": "shortest"}
+        }
+
+        # Try to add documents with stemming mapping - this should fail
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.v215_unstructured_index.name,
+                docs=docs,
+                tensor_fields=["title"],
+                mappings=mappings
+            )
+        )
+
+        # Verify that adding documents with stemming mapping fails
+        self.assertTrue(
+            response.errors,
+            "Expected error when adding documents with stemming mapping to v2.15 index"
+        )
+
+        # Check the specific error message content in the response items
+        error_items = [item for item in response.items if item.error]
+        self.assertEqual(2, len(error_items), "Expected two error items in response")
+
+        # Verify all items have the stemming version error
+        for error_item in error_items:
+            self.assertIn(
+                "Stemming is only supported for indexes created with Marqo version 2.16.0 or later",
+                error_item.error
+            )
+            self.assertIn("2.15.0", error_item.error)
 
 
 if __name__ == '__main__':
