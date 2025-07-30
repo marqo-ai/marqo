@@ -243,6 +243,17 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
+    {% if index.variant_grouping -%}
+    rank-profile bm25_diversity inherits bm25 {
+        diversity {
+            attribute: {{ index.variant_grouping.variantGroupField }}
+            min-groups: {{ index.variant_grouping.minGroup }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
     {% endif -%}
 
     {# We provide this rank profile even without the tensor field to support embed requests -#}
@@ -261,6 +272,18 @@ schema {{ index.schema_name }} {
         }
         {%- endif %}
     }
+
+    {% if index.variant_grouping -%}
+    rank-profile embedding_similarity_diversity inherits embedding_similarity {
+        diversity {
+            attribute: {{ index.variant_grouping.variantGroupField }}
+            min-groups: {{ index.variant_grouping.minGroup }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
 
     {% if index.lexical_fields and index.tensor_fields -%}
     rank-profile hybrid_custom_searcher inherits default {
@@ -284,12 +307,6 @@ schema {{ index.schema_name }} {
         first-phase {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
-        {% if index.variant_grouping and index.variant_grouping.minGroup -%}
-        diversity {
-            attribute: {{ index.variant_grouping.variantGroupField }}
-            min-groups: {{ index.variant_grouping.minGroup }}
-        }
-        {% endif -%}
         second-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
@@ -308,6 +325,26 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
+
+    {% if index.variant_grouping -%}
+    rank-profile hybrid_bm25_then_embedding_similarity_diversity inherits hybrid_bm25_then_embedding_similarity {
+        diversity {
+            attribute: {{ index.variant_grouping.variantGroupField }}
+            min-groups: {{ index.variant_grouping.minGroup }}
+        }
+    }
+
+    rank-profile hybrid_embedding_similarity_then_bm25_diversity inherits hybrid_embedding_similarity_then_bm25 {
+        diversity {
+            attribute: {{ index.variant_grouping.variantGroupField }}
+            min-groups: {{ index.variant_grouping.minGroup }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
+
     {%- endif %}
 
     document-summary all-non-vector-summary {

@@ -52,7 +52,8 @@ class HybridSearch:
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
-            variant_grouping: Optional[VariantGroupingParameters] = None
+            variant_grouping: Optional[VariantGroupingParameters] = None,
+            ensure_diversity: bool = False
     ) -> Dict:
         """
 
@@ -295,27 +296,13 @@ class HybridSearch:
             language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
-            variant_grouping=variant_grouping
+            variant_grouping=variant_grouping,
+            ensure_diversity=ensure_diversity
         )
 
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)
         
-        # Apply Vespa grouping if variant grouping is specified
-        if variant_grouping is not None:
-            base_yql = vespa_query.get('yql', '')
-            if base_yql:
-                try:
-                    grouped_yql = GroupingQueryBuilder.build_grouping_query(
-                        base_yql, 
-                        variant_grouping.variant_group_field,
-                        variant_grouping.max_variants_per_group
-                    )
-                    vespa_query['yql'] = grouped_yql
-                except Exception as e:
-                    logger.warning(f"Failed to apply Vespa grouping, falling back to post-search: {e}")
-                    # Will fall back to post-search processing
-
         total_preprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.processing_before_vespa")
         logger.debug(
             f"search (hybrid) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")

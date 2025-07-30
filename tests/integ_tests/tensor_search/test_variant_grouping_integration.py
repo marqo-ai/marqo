@@ -1,4 +1,5 @@
 import os
+import random
 import time
 from typing import Dict, List, Any
 from unittest import mock
@@ -24,7 +25,7 @@ class TestVariantGroupingIntegration(MarqoTestCase):
         # UNSTRUCTURED indexes - for now, use this and handle grouping field issue differently
         unstructured_index = cls.unstructured_marqo_index_request(
             model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
-            variant_grouping=VariantGrouping(variantGroupField="product_id", minGroup=5),
+            variant_grouping=VariantGrouping(variantGroupField="product_id", minGroup=20),
         )
 
         cls.indexes = cls.create_indexes([
@@ -43,17 +44,7 @@ class TestVariantGroupingIntegration(MarqoTestCase):
                 index_name=self.unstructured_index.name,
                 docs=self._create_variant_test_data(),
                 use_existing_tensors=False,
-                tensor_fields=['combo'],
-                mappings={
-                    'combo': {
-                        'type': 'multimodal_combination',
-                        'weights': {
-                            'title': 1.0,
-                            'color': 0.5,
-                            'size': 0.5,
-                        }
-                    }
-                }
+                tensor_fields=['variant_title'],
             )
         )
         self.assertFalse(res.errors)
@@ -71,107 +62,51 @@ class TestVariantGroupingIntegration(MarqoTestCase):
 
     def _create_variant_test_data(self) -> List[Dict[str, Any]]:
         """Create test data with multiple variants per product for testing grouping"""
-        return [
-            # Nike Air Force variants
+        products = [
             {
-                "_id": "11",
-                "product_id": "nike_air_force", 
-                "title": "Nike Air Force 1",
-                "brand": "Nike",
-                "category": "Sneakers",
-                "description": "Classic basketball shoe",
-                "color": "white",
-                "size": "10",
-                "price": 100.0,
-                "stock": 5
-            },
-            {
-                "_id": "12",
                 "product_id": "nike_air_force",
                 "title": "Nike Air Force 1",
-                "brand": "Nike", 
-                "category": "Sneakers",
-                "description": "Classic basketball shoe",
-                "color": "white",
-                "size": "11", 
-                "price": 100.0,
-                "stock": 3
-            },
-            {
-                "_id": "13",
-                "product_id": "nike_air_force",
-                "title": "Nike Air Force 1", 
                 "brand": "Nike",
-                "category": "Sneakers", 
+                "collection": ["Sneakers", "On Sale"],
                 "description": "Classic basketball shoe",
-                "color": "black",
-                "size": "10",
-                "price": 105.0,
-                "stock": 2
-            },
-            # Adidas Stan Smith variants
-            {
-                "_id": "21",
-                "product_id": "adidas_stan_smith",
-                "title": "Adidas Stan Smith",
-                "brand": "Adidas", 
-                "category": "Sneakers",
-                "description": "Iconic tennis shoe",
-                "color": "white",
-                "size": "9",
-                "price": 80.0,
-                "stock": 8
+                "price": 100.0,
             },
             {
-                "_id": "22",
-                "product_id": "adidas_stan_smith", 
-                "title": "Adidas Stan Smith",
-                "brand": "Adidas",
-                "category": "Sneakers",
-                "description": "Iconic tennis shoe", 
-                "color": "white",
-                "size": "10",
-                "price": 80.0,
-                "stock": 4
-            },
-            {
-                "_id": "23",
                 "product_id": "adidas_stan_smith",
                 "title": "Adidas Stan Smith",
                 "brand": "Adidas",
-                "category": "Sneakers", 
+                "collection": ["Sneakers", "On Sale"],
                 "description": "Iconic tennis shoe",
-                "color": "green",
-                "size": "10",
-                "price": 85.0,
-                "stock": 6
+                "price": 80.0,
             },
-            # Converse Chuck Taylor variants
             {
-                "_id": "32",
-                "product_id": "converse_chuck", 
+                "product_id": "converse_chuck",
                 "title": "Converse Chuck Taylor All Star",
                 "brand": "Converse",
-                "category": "Sneakers",
+                "collection": ["Sneakers", "New Arrival"],
                 "description": "Classic canvas shoe",
-                "color": "red",
-                "size": "8", 
                 "price": 60.0,
-                "stock": 10
             },
-            {
-                "_id": "33",
-                "product_id": "converse_chuck",
-                "title": "Converse Chuck Taylor All Star", 
-                "brand": "Converse",
-                "category": "Sneakers",
-                "description": "Classic canvas shoe",
-                "color": "black",
-                "size": "9",
-                "price": 60.0,
-                "stock": 7
-            }
         ]
+
+        color_variants = ['white', 'black', 'navy', 'red', 'blue', 'pink']
+        size_variants = ['9', '10', '11', '12', '13']
+
+        all_variants = []
+
+        for product in products:
+            for color in color_variants:
+                for size in size_variants:
+                    all_variants.append({
+                        **product,
+                        'color': color,
+                        'size': size,
+                        'variant_title': f'{product["title"]} - {color} - Size: {size}',
+                        'stock': 0 if color == 'white' and size == '10' else 5,
+                        '_id': f'{product["product_id"]}_{color}_{size}'
+                    })
+
+        return all_variants
 
     def test_search_without_grouping_should_return_all_variants(self):
         for search_method in [SearchMethod.HYBRID]:
@@ -183,10 +118,11 @@ class TestVariantGroupingIntegration(MarqoTestCase):
                     search_method=search_method,
                     text="sneakers",
                     result_count=3,
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="lexical",
-                        rankingMethod="tensor"
-                    )
+                    ensure_diversity=True
+                    # hybrid_parameters=HybridParameters(
+                    #     retrievalMethod="lexical",
+                    #     rankingMethod="tensor"
+                    # )
                 )
 
                 # Verify we get multiple variants per product
@@ -203,18 +139,15 @@ class TestVariantGroupingIntegration(MarqoTestCase):
                 grouped_results = tensor_search.search(
                     config=self.config,
                     index_name=self.unstructured_index.name,
-                    text="white sneakers",
-                    result_count=3,
+                    text="sneakers",
+                    result_count=5,
                     offset=0,
                     search_method=search_method,
-                    variant_grouping=VariantGroupingParameters(
-                        maxVariantsPerGroup=2,
-                        variantGroupField="product_id"
-                    ),
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="lexical",
-                        rankingMethod="tensor"
-                    )
+                    ensure_diversity=True,
+                    # variant_grouping=VariantGroupingParameters(
+                    #     maxVariantsPerGroup=2,
+                    #     variantGroupField="product_id"
+                    # )
                 )
 
                 print([f'{hit["_id"]}: {hit["_score"]}' for hit in grouped_results["hits"]])

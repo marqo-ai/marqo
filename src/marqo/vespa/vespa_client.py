@@ -248,7 +248,7 @@ class VespaClient:
 
         query = {key: value for key, value in query.items() if value is not None}
 
-        logger.debug(f'Query: {query}')
+        logger.info(f'Query: {query}')
 
         try:
             resp = self.http_client.post(f'{self.query_url}/search/', json=query)
@@ -258,7 +258,24 @@ class VespaClient:
         self._query_raise_for_status(resp)
 
         resp_dict = orjson.loads(resp.text)
+
+        #flattern grouped children
+        if 'root' in resp_dict and 'children' in resp_dict['root'] and resp_dict['root']['children'] and 'fields' not in resp_dict['root']['children'][0]:
+            def flatten_child(child: dict) -> List[dict]:
+                if 'fields' in child:
+                    return [child]
+                if 'children' in child:
+                    leaves = []
+                    for grandchild in child['children']:
+                        leaves += flatten_child(grandchild)
+                    return leaves
+                return []
+
+            children = flatten_child(resp_dict['root']['children'][0])
+            resp_dict['root']['children'] = children
+
         return QueryResult(**resp_dict)
+
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

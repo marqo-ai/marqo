@@ -44,10 +44,9 @@ class GroupingQueryBuilder:
 
         grouping_clause = f"all(group({group_field}) each(max({max_per_group}) each(output(summary()))))"
 
-        # return f"{base_yql} limit 0 | {grouping_clause}"
+        return f"{base_yql} limit 0 | {grouping_clause}"
 
-        return base_yql
-    
+
     @staticmethod
     def extract_base_query(grouped_yql: str) -> Optional[str]:
         """

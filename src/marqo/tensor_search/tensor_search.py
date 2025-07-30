@@ -361,7 +361,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
            interpolation_method: Optional[InterpolationMethod] = None,
-           variant_grouping: Optional['VariantGroupingParameters'] = None
+           variant_grouping: Optional['VariantGroupingParameters'] = None,
+           ensure_diversity: bool = False,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -496,7 +497,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, 
-                rerank_depth=rerank_depth, interpolation_method=interpolation_method, variant_grouping=variant_grouping
+                rerank_depth=rerank_depth, interpolation_method=interpolation_method, variant_grouping=variant_grouping,
             )
         else:  # SearchMethod.HYBRID
             # TODO: Deal with circular import when all modules are refactored out.
@@ -514,7 +515,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 language=language,
                 relevance_cutoff=relevance_cutoff, sort_by=sort_by,
                 interpolation_method=interpolation_method,
-                variant_grouping=variant_grouping
+                variant_grouping=variant_grouping,
+                ensure_diversity=ensure_diversity
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -529,7 +531,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers, language=language, variant_grouping=variant_grouping
+            score_modifiers=score_modifiers, language=language, variant_grouping=variant_grouping,
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")

@@ -81,6 +81,7 @@ class SearchQuery(BaseMarqoModel):
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
     variant_grouping: Optional[VariantGroupingParameters] = Field(default=None, alias="variantGrouping")
+    ensure_diversity: bool = Field(default=False, alias="ensureDiversity")
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3

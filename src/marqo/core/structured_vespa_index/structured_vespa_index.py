@@ -572,51 +572,12 @@ class StructuredVespaIndex(VespaIndex):
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
         
-        # Note: Variant grouping will be handled in post-processing rather than in YQL
-        # to avoid complex Vespa grouping syntax issues
-        facet_queries = None
+        if marqo_query.variant_grouping:
+            grouping_clause = f"all(group({marqo_query.variant_grouping.variant_group_field}) each(max({marqo_query.variant_grouping.max_variants_per_group}) each(output(summary()))))"
+            tensor_yql += f" limit 0 | {grouping_clause}"
+            lexical_yql += f" limit 0 | {grouping_clause}"
 
-        if marqo_query.facets or marqo_query.track_total_hits:
-            facets_query_skeleton = '%s limit 0 | %s'
-            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
-            unique_exclusions = []
-            facet_queries = []
-            facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
-            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
-            if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
-                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
-            elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
-                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
-
-            if marqo_query.track_total_hits is not None:
-                # 0 is byte representation of letter "t"
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
-
-            if marqo_query.facets is not None:
-                facets_term = self._get_facets_term(marqo_query.facets)
-
-                if facets_term is not None:
-                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
-
-                # Using a unique delimiter that's unlikely to appear in YQL
-
-                for facet_field in marqo_query.facets.fields.items():
-                    facet_name, facet_parameters = facet_field
-                    if facet_parameters.exclude_terms is not None:
-                        if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
-                            continue
-                        unique_exclusions.append(set(facet_parameters.exclude_terms))
-                        new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
-                        if new_filter_term:
-                            new_filter_term = f' AND {new_filter_term}'
-                        else:
-                            new_filter_term = ''
-                        new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
-
-                        query_yql = f'{base_yql}{new_filter_term}'
-
-                        facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
-            facet_queries = QUERY_DELIMITER.join(facet_queries)
+        facet_queries = self.generate_facet_queries(filter_term, marqo_query, select_attributes, tensor_term)
 
         query = {
             'searchChain': 'marqo',
@@ -642,10 +603,10 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__yql.lexical': lexical_yql,
             'marqo__yql.facets': facet_queries,
 
-            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
-            'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
-            'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
-            'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
+            'marqo__ranking.lexical.lexical': self._ensure_diversity(common.RANK_PROFILE_BM25, marqo_query.ensure_diversity),
+            'marqo__ranking.tensor.tensor': self._ensure_diversity(common.RANK_PROFILE_EMBEDDING_SIMILARITY, marqo_query.ensure_diversity),
+            'marqo__ranking.lexical.tensor': self._ensure_diversity(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY, marqo_query.ensure_diversity),
+            'marqo__ranking.tensor.lexical': self._ensure_diversity(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25, marqo_query.ensure_diversity),
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
@@ -689,6 +650,56 @@ class StructuredVespaIndex(VespaIndex):
                 query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
 
         return query
+
+    def _ensure_diversity(self, base_rank_profile: str, diversity: bool):
+        return f"{base_rank_profile}_diversity" if diversity else base_rank_profile
+
+    def generate_facet_queries(self, filter_term, marqo_query, select_attributes, tensor_term):
+        facet_queries = None
+        if marqo_query.facets or marqo_query.track_total_hits:
+            facets_query_skeleton = '%s limit 0 | %s'
+            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
+            unique_exclusions = []
+            facet_queries = []
+            facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
+            if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
+            elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
+                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
+
+            if marqo_query.track_total_hits is not None:
+                # 0 is byte representation of letter "t"
+                facet_queries.append(facets_query_skeleton % (
+                f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
+
+            if marqo_query.facets is not None:
+                facets_term = self._get_facets_term(marqo_query.facets)
+
+                if facets_term is not None:
+                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
+
+                # Using a unique delimiter that's unlikely to appear in YQL
+
+                for facet_field in marqo_query.facets.fields.items():
+                    facet_name, facet_parameters = facet_field
+                    if facet_parameters.exclude_terms is not None:
+                        if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in
+                               unique_exclusions):
+                            continue
+                        unique_exclusions.append(set(facet_parameters.exclude_terms))
+                        new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
+                        if new_filter_term:
+                            new_filter_term = f' AND {new_filter_term}'
+                        else:
+                            new_filter_term = ''
+                        new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
+
+                        query_yql = f'{base_yql}{new_filter_term}'
+
+                        facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+            facet_queries = QUERY_DELIMITER.join(facet_queries)
+        return facet_queries
 
     def _get_tensor_fields_to_search(
             self,

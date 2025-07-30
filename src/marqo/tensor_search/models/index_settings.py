@@ -1,7 +1,7 @@
 import time
 from typing import Dict, Any, Optional, List, Union
 
-from pydantic.v1 import root_validator
+from pydantic.v1 import root_validator, Field
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
@@ -148,7 +148,7 @@ class IndexSettings(StrictBaseModel):
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time(),
-                variant_group_field=self.variantGrouping.variantGroupField if self.variantGrouping else None,
+                variant_grouping=self.variant_grouping,
             )
         elif self.type in [core.IndexType.Unstructured, core.IndexType.SemiStructured]:
             if self.allFields is not None:
@@ -201,7 +201,7 @@ class IndexSettings(StrictBaseModel):
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time(),
-                variant_group_field=self.variantGrouping.variantGroupField if self.variantGrouping else None,
+                variant_grouping=self.variantGrouping,
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
@@ -229,10 +229,7 @@ class IndexSettings(StrictBaseModel):
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
                 ),
-                variantGrouping=VariantGrouping(
-                    variantGroupField=marqo_index.variant_group_field,
-                    minGroup=10  # Default value as specified
-                ) if marqo_index.variant_group_field else None
+                variantGrouping=marqo_index.variant_grouping
             )
         elif isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
@@ -258,10 +255,7 @@ class IndexSettings(StrictBaseModel):
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
                 ),
-                variantGrouping=VariantGrouping(
-                    variantGroupField=marqo_index.variant_group_field,
-                    minGroup=10  # Default value as specified
-                ) if marqo_index.variant_group_field else None
+                variantGrouping=marqo_index.variant_grouping
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
