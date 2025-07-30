@@ -33,7 +33,7 @@ class TestStemmingIntegration(MarqoTestCase):
                 "title_stem1": "nacionalmente",  # none: nacionalmente
             },
             {
-                "_id": "2", 
+                "_id": "2",
                 "title_stem2": "nacionalmente",  # best: nacionalment
             },
             {
@@ -85,7 +85,8 @@ class TestStemmingIntegration(MarqoTestCase):
                 "nacionalmente", ["title_stem4"], ["4"], "Full word matches multiple stemming"
             ),
             (
-                "nacionalmente", ["title_stem1", "title_stem2"], ["1", "2"], "Full word matches with none and best fields"
+                "nacionalmente", ["title_stem1", "title_stem2"], ["1", "2"],
+                "Full word matches with none and best fields"
             ),
             (
                 "nacionalment", ["title_stem1"], [], "Stemmed word does not match none stemming"
@@ -104,65 +105,50 @@ class TestStemmingIntegration(MarqoTestCase):
             ),
         ]
 
+        search_configs = [
+            ("LEXICAL", None, "lexical search"),
+            ("HYBRID", HybridParameters(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Lexical),
+             "hybrid lexical/lexical"),
+            ("HYBRID", HybridParameters(alpha=0), "hybrid RRF with alpha=0")
+        ]
+
         self.populate_index()
 
         for query, fields, expected_ids, description in cases:
-            # Test LEXICAL search
-            with self.subTest(f"LEXICAL search for '{query}' in {fields}: {description}"):
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.stemming_index.name,
-                    text=query,
-                    search_method="LEXICAL",
-                    searchable_attributes=fields,
-                    result_count=10,
-                    offset=0,
-                    language="de"
-                )
+            for search_method, hybrid_params, search_description in search_configs:
+                with self.subTest(f"{search_method} search for '{query}' in {fields}: {description}"):
+                    if search_method == "LEXICAL":
+                        res = tensor_search.search(
+                            config=self.config,
+                            index_name=self.stemming_index.name,
+                            text=query,
+                            search_method=search_method,
+                            searchable_attributes=fields,
+                            result_count=10,
+                            offset=0,
+                            language="de"
+                        )
+                    else:  # HYBRID
+                        # For hybrid search, need to specify fields in hybrid parameters
+                        hybrid_params_with_fields = HybridParameters(
+                            retrievalMethod=hybrid_params.retrievalMethod,
+                            rankingMethod=hybrid_params.rankingMethod,
+                            alpha=hybrid_params.alpha,
+                            searchableAttributesLexical=fields
+                        )
+                        res = tensor_search.search(
+                            config=self.config,
+                            index_name=self.stemming_index.name,
+                            text=query,
+                            search_method=search_method,
+                            result_count=10,
+                            offset=0,
+                            language="de",
+                            hybrid_parameters=hybrid_params_with_fields
+                        )
 
-                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
-                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
-
-            # Test HYBRID search with lexical/lexical
-            with self.subTest(f"HYBRID lexical/lexical search for '{query}' in {fields}: {description}"):
-                hybrid_params = HybridParameters(
-                    retrievalMethod=RetrievalMethod.Lexical, 
-                    rankingMethod=RankingMethod.Lexical,
-                    searchableAttributesLexical=fields
-                )
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.stemming_index.name,
-                    text=query,
-                    search_method="HYBRID",
-                    result_count=10,
-                    offset=0,
-                    language="de",
-                    hybrid_parameters=hybrid_params
-                )
-
-                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
-                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
-
-            # Test HYBRID search with RRF alpha=0
-            with self.subTest(f"HYBRID RRF alpha=0 search for '{query}' in {fields}: {description}"):
-                hybrid_params = HybridParameters(
-                    alpha=0,
-                    searchableAttributesLexical=fields
-                )
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.stemming_index.name,
-                    text=query,
-                    search_method="HYBRID",
-                    result_count=10,
-                    offset=0,
-                    language="de",
-                    hybrid_parameters=hybrid_params
-                )
-
-                actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
-                self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
+                    actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
+                    self.assertEqual(set(expected_ids), actual_ids, f"Failed for query '{query}' in fields {fields}")
 
     def test_stemming_all_fields_search(self):
         """
@@ -249,11 +235,11 @@ class TestStemmingIntegration(MarqoTestCase):
         docs = [
             {
                 "_id": "no_lang_1",
-                "content": "running quickly"
+                "content": "apples"
             },
             {
-                "_id": "no_lang_2", 
-                "content": "runs fast"
+                "_id": "no_lang_2",
+                "content": "apple"
             }
         ]
 
@@ -273,25 +259,25 @@ class TestStemmingIntegration(MarqoTestCase):
             config=self.config,
             add_docs_params=add_docs_params
         )
-        
+
         self.assertFalse(res.errors, "Should not have errors when adding documents without language")
 
         # Search for exact matches should work
-        running_res = tensor_search.search(
+        apples_res = tensor_search.search(
             config=self.config,
             index_name=self.stemming_index.name,
-            text="running",
+            text="apples",
             search_method="LEXICAL",
             searchable_attributes=["content"],
             result_count=10,
             offset=0,
             language="en"
         )
-        
-        runs_res = tensor_search.search(
+
+        apple_res = tensor_search.search(
             config=self.config,
             index_name=self.stemming_index.name,
-            text="runs",
+            text="apple",
             search_method="LEXICAL",
             searchable_attributes=["content"],
             result_count=10,
@@ -300,11 +286,141 @@ class TestStemmingIntegration(MarqoTestCase):
         )
 
         # Verify exact matches work
-        running_ids = {hit["_id"] for hit in running_res["hits"]}
-        runs_ids = {hit["_id"] for hit in runs_res["hits"]}
-        
-        self.assertEqual({"no_lang_1"}, running_ids, "Should find document with 'running'")
-        self.assertEqual({"no_lang_2"}, runs_ids, "Should find document with 'runs'")
+        apples_ids = {hit["_id"] for hit in apples_res["hits"]}
+        apple_ids = {hit["_id"] for hit in apple_res["hits"]}
+
+        self.assertEqual({"no_lang_1"}, apples_ids, "Should find document with 'running'")
+        self.assertEqual({"no_lang_2"}, apple_ids, "Should find document with 'runs'")
+
+    def test_stemming_not_specified(self):
+        """Test that stemming configuration persists when not specified in subsequent document additions."""
+        # First add document with explicit stemming=none
+        docs1 = [{"_id": "doc1", "text_field": "green apples"}]
+        mappings1 = {"text_field": {"type": "text_field", "language": "en", "stemming": "none"}}
+
+        add_docs_params1 = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs1,
+            mappings=mappings1,
+            tensor_fields=[]
+        )
+
+        response1 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params1
+        )
+        self.assertFalse(response1.errors, "Should not have errors when adding first document")
+
+        # Add second document to same field without specifying stemming
+        docs2 = [{"_id": "doc2", "text_field": "green apple"}]
+        mappings2 = {"text_field": {"type": "text_field", "language": "en"}}  # No stemming specified
+
+        add_docs_params2 = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs2,
+            mappings=mappings2,
+            tensor_fields=[]
+        )
+
+        response2 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params2
+        )
+        self.assertFalse(response2.errors, "Should not have errors when adding second document")
+
+        # Verify exact matches still work as expected
+        apples_res = tensor_search.search(
+            config=self.config,
+            index_name=self.stemming_index.name,
+            text="apples",
+            search_method="LEXICAL",
+            searchable_attributes=["text_field"],
+            result_count=10,
+            offset=0,
+            language="en"
+        )
+
+        apple_res = tensor_search.search(
+            config=self.config,
+            index_name=self.stemming_index.name,
+            text="apple",
+            search_method="LEXICAL",
+            searchable_attributes=["text_field"],
+            result_count=10,
+            offset=0,
+            language="en"
+        )
+
+        apples_ids = {hit["_id"] for hit in apples_res["hits"]}
+        apple_ids = {hit["_id"] for hit in apple_res["hits"]}
+
+        self.assertEqual({"doc1"}, apples_ids, "Should find first document with exact match 'running'")
+        self.assertEqual({"doc2"}, apple_ids, "Should find second document with exact match 'runs'")
+
+    def test_vespa_schema_contains_language_and_stemming(self):
+        """
+        Test that the generated Vespa schema contains both language and stemming configuration when both are specified.
+        """
+        # Add document with both language and stemming specified
+        docs = [{"_id": "schema_test", "schema_field": "testing words"}]
+        mappings = {"schema_field": {"type": "text_field", "language": "en", "stemming": "best"}}
+
+        add_docs_params = AddDocsParams(
+            index_name=self.stemming_index.name,
+            docs=docs,
+            mappings=mappings,
+            tensor_fields=[]
+        )
+
+        response = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params
+        )
+        self.assertFalse(response.errors, "Should not have errors when adding document")
+
+        # Get the actual deployed Vespa schema content
+        # First get the MarqoIndex to find the schema name
+        marqo_index = self.config.vespa_client.get_index_setting_by_name(self.stemming_index.name)
+        self.assertIsNotNone(marqo_index, "Should be able to retrieve the index settings")
+
+        content_base_url = f"{self.config.vespa_client.config_url}/application/v2/tenant/default/application/default/environment/prod/region/default/instance/default/content"
+        schema_file_name = f"{marqo_index.schema_name}.sd"
+
+        try:
+            schema_content = self.config.vespa_client.get_text_content(content_base_url, "/schemas/", schema_file_name)
+        except Exception as e:
+            self.fail(f"Could not retrieve schema content: {e}")
+
+        # Parse the schema content to find the field definition
+        schema_field_found = False
+        field_lines = []
+        in_field_block = False
+        brace_count = 0
+
+        for line in schema_content.split('\n'):
+            if f'field marqo__lexical_schema_field' in line and 'type string' in line:
+                schema_field_found = True
+                in_field_block = True
+                field_lines.append(line.strip())
+                brace_count += line.count('{') - line.count('}')
+            elif in_field_block:
+                field_lines.append(line.strip())
+                brace_count += line.count('{') - line.count('}')
+                if brace_count == 0:  # End of field block
+                    break
+
+        self.assertTrue(schema_field_found, "Should find the schema_field in the generated Vespa schema")
+
+        # Check that the field definition contains both language and stemming
+        field_definition = '\n'.join(field_lines)
+
+        # Language is set using set_language in Vespa indexing pipeline
+        self.assertIn('"en" | set_language', field_definition,
+                      "Field should have language set to 'en' via set_language in the Vespa schema")
+
+        # Stemming is set as a field property in Vespa schema
+        self.assertIn('stemming: best', field_definition,
+                      "Field should have stemming set to 'best' in the Vespa schema")
 
 
 if __name__ == '__main__':
