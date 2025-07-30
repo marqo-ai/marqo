@@ -88,6 +88,13 @@ class TestLanguage(MarqoTestCase):
         )
         index_requests.append(cls.pt_br_index)
 
+        # Create a separate index for the language persistence test
+        cls.language_persistence_index = cls.unstructured_marqo_index_request(
+            name='test_lang_persistence_' + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name='hf/e5-small-v2')
+        )
+        index_requests.append(cls.language_persistence_index)
+
         # Create a structured index for testing language search failure
         cls.structured_index = cls.structured_marqo_index_request(
             name='test_structured_lang_' + str(uuid.uuid4()).replace('-', ''),
@@ -755,3 +762,70 @@ class TestLanguage(MarqoTestCase):
                 error_item.error
             )
             self.assertIn("2.15.0", error_item.error)
+
+    def test_language_persists_when_not_specified_in_subsequent_adds(self):
+        """Test that language configuration persists when not specified in subsequent document additions."""
+        # First add document with explicit language=pt
+        docs1 = [{"_id": "pt_doc1", "content": "mole"}]
+        mappings1 = {"content": {"type": "text_field", "language": "pt"}}
+
+        add_docs_params1 = AddDocsParams(
+            index_name=self.language_persistence_index.name,
+            docs=docs1,
+            mappings=mappings1,
+            tensor_fields=[]
+        )
+
+        response1 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params1
+        )
+        self.assertFalse(response1.errors, "Should not have errors when adding first document")
+
+        # Add second document to same field without specifying mappings
+        # This should use the existing field configuration (language=pt)
+        docs2 = [{"_id": "pt_doc2", "content": "mole"}]
+
+        add_docs_params2 = AddDocsParams(
+            index_name=self.language_persistence_index.name,
+            docs=docs2,
+            tensor_fields=[]
+        )
+
+        response2 = self.add_documents(
+            config=self.config,
+            add_docs_params=add_docs_params2
+        )
+        self.assertFalse(response2.errors, "Should not have errors when adding second document")
+
+        # Test that language=pt is still in effect for both documents
+        # Search for "mole" with language=en should not find any hits (because both docs are pt)
+        en_res = tensor_search.search(
+            config=self.config,
+            index_name=self.language_persistence_index.name,
+            text="mole",
+            search_method="LEXICAL",
+            searchable_attributes=["content"],
+            result_count=10,
+            offset=0,
+            language="en"
+        )
+
+        # With language=en, "mole" should not match Portuguese "mole" documents
+        en_ids = {hit["_id"] for hit in en_res["hits"]}
+        self.assertEqual(set(), en_ids, "Should not find any documents when searching with wrong language (en instead of pt)")
+
+        # Verify that searching with correct language (pt) finds both documents
+        pt_res = tensor_search.search(
+            config=self.config,
+            index_name=self.language_persistence_index.name,
+            text="mole",
+            search_method="LEXICAL",
+            searchable_attributes=["content"],
+            result_count=10,
+            offset=0,
+            language="pt"
+        )
+
+        pt_ids = {hit["_id"] for hit in pt_res["hits"]}
+        self.assertEqual({"pt_doc1", "pt_doc2"}, pt_ids, "Should find both documents when searching with correct language (pt)")
