@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 from marqo.core.exceptions import AddDocumentsError, InvalidArgumentError
+from marqo.core.models.marqo_index import Stemming
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import (
@@ -272,19 +273,19 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         test_cases = [
             (
                 "stemming_change",
-                {"stemming": "best", "language": "en"},  # Existing field config
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
                 {"type": "text_field", "stemming": "shortest", "language": "en"},  # New mapping
                 ["different stemming configuration", "Cannot change stemming"]
             ),
             (
                 "language_change", 
-                {"stemming": "best", "language": "en"},  # Existing field config
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
                 {"type": "text_field", "stemming": "best", "language": "es"},  # New mapping
                 ["different language configuration", "Cannot change language"]
             ),
             (
                 "both_change",
-                {"stemming": "best", "language": "en"},  # Existing field config  
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config  
                 {"type": "text_field", "stemming": "shortest", "language": "es"},  # New mapping
                 ["different language configuration", "Cannot change language"]  # Language error comes first
             )
@@ -364,7 +365,7 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         )
 
         # Should raise InvalidArgumentError during initialization due to invalid stemming value
-        with self.assertRaises(Exception) as cm:
+        with self.assertRaises(InvalidArgumentError) as cm:
             handler = SemiStructuredAddDocumentsHandler(
                 marqo_index=marqo_index,
                 add_docs_params=add_docs_params,
@@ -375,5 +376,5 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             )
         
         error_message = str(cm.exception)
-        self.assertIn("stemming", error_message.lower())
+        self.assertIn("is not one of", error_message)
         self.assertIn("invalid_algorithm", error_message)

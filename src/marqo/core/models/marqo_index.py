@@ -63,6 +63,13 @@ class FieldFeature(Enum):
     Filter = 'filter'
 
 
+class Stemming(str, Enum):
+    None_ = 'none'
+    Best = 'best'
+    Shortest = 'shortest'
+    Multiple = 'multiple'
+
+
 class DistanceMetric(Enum):
     Euclidean = 'euclidean'
     Angular = 'angular'
@@ -95,7 +102,7 @@ class Field(ImmutableStrictBaseModel):
     filter_field_name: Optional[str]
     dependent_fields: Optional[Dict[str, float]]
     language: Optional[str] = None
-    stemming: Optional[str] = None
+    stemming: Optional[Stemming] = None
 
     @root_validator
     def check_all_fields(cls, values):
@@ -754,11 +761,6 @@ def validate_structured_field(values, marqo_index: bool) -> None:
         raise ValueError(
             f'{name}: stemming can only be populated when {FieldFeature.LexicalSearch.value} '
             f'feature is present'
-        )
-
-    if stemming is not None and stemming not in constants.VALID_STEMMING_VALUES:
-        raise ValueError(
-            f'{name}: stemming must be one of {constants.VALID_STEMMING_VALUES}, got "{stemming}"'
         )
 
     if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int,

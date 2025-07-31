@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.marqo_index import Field, FieldType, FieldFeature
+from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, Stemming
 
 
 class TestField(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestField(unittest.TestCase):
             filter_field_name="description_filter",
             dependent_fields=None,
             language="en",
-            stemming="best"
+            stemming=Stemming.Best
         )
         self.assertEqual(field.name, "description")
         self.assertEqual(field.type, FieldType.Text)
@@ -45,7 +45,7 @@ class TestField(unittest.TestCase):
         self.assertEqual(field.filter_field_name, "description_filter")
         self.assertIsNone(field.dependent_fields)
         self.assertEqual(field.language, "en")
-        self.assertEqual(field.stemming, "best")
+        self.assertEqual(field.stemming, Stemming.Best)
 
     def test_field_creation_multimodal_combination(self):
         """Test creating a MultimodalCombination field with dependent fields."""
@@ -196,12 +196,12 @@ class TestField(unittest.TestCase):
             ),
             (
                 "stemming_without_lexical_search",
-                {"stemming": "best"},
+                {"stemming": Stemming.Best},
                 "stemming can only be populated when"
             ),
             (
                 "both_without_lexical_search",
-                {"language": "en", "stemming": "best"},
+                {"language": "en", "stemming": Stemming.Best},
                 "language can only be populated when"  # Language error comes first
             )
         ]
@@ -220,33 +220,6 @@ class TestField(unittest.TestCase):
                     )
                 self.assertIn(expected_error, str(cm.exception))
 
-    def test_stemming_value_validation(self):
-        """Test that stemming field validates against allowed values."""
-        # Test valid stemming values
-        valid_values = ["none", "best", "shortest", "multiple"]
-        for stemming_value in valid_values:
-            with self.subTest(stemming=stemming_value):
-                field = Field(
-                    name="text_field",
-                    type=FieldType.Text,
-                    features=[FieldFeature.LexicalSearch],
-                    lexical_field_name="text_field_lexical",
-                    filter_field_name=None,
-                    stemming=stemming_value
-                )
-                self.assertEqual(field.stemming, stemming_value)
-
-        # Test invalid stemming value
-        with self.assertRaises(ValidationError) as cm:
-            Field(
-                name="text_field",
-                type=FieldType.Text,
-                features=[FieldFeature.LexicalSearch],
-                lexical_field_name="text_field_lexical",
-                filter_field_name=None,
-                stemming="invalid_value"
-            )
-        self.assertIn("stemming must be one of", str(cm.exception))
 
     def test_dependent_fields_validation(self):
         """Test validation for dependent fields in MultimodalCombination type."""
@@ -365,7 +338,7 @@ class TestField(unittest.TestCase):
                 "lexical_field_name": "text_field_lexical",
                 "filter_field_name": "text_field_filter",
                 "language": "en",
-                "stemming": "best",
+                "stemming": Stemming.Best,
                 "description": "Text with LexicalSearch and Filter"
             },
             {
@@ -385,7 +358,7 @@ class TestField(unittest.TestCase):
                 "lexical_field_name": "custom_vector_lexical",
                 "filter_field_name": "custom_vector_filter",
                 "language": None,
-                "stemming": "multiple",
+                "stemming": Stemming.Multiple,
                 "description": "CustomVector with LexicalSearch and Filter"
             }
         ]
@@ -396,7 +369,7 @@ class TestField(unittest.TestCase):
                     name=test_case["name"],
                     type=test_case["type"],
                     features=test_case["features"],
-                    # stemming=test_case["stemming"],
+                    stemming=test_case["stemming"],
                     lexical_field_name=test_case["lexical_field_name"],
                     filter_field_name=test_case["filter_field_name"],
                     language=test_case["language"]
@@ -414,7 +387,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="en",
-            stemming="best"
+            stemming=Stemming.Best
         )
 
         field2 = Field(
@@ -424,7 +397,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="en",
-            stemming="best"
+            stemming=Stemming.Best
         )
 
         field3 = Field(
@@ -434,7 +407,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="es",  # Different language
-            stemming = "best"
+            stemming=Stemming.Best
         )
 
         self.assertEqual(field1, field2)
