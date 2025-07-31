@@ -495,6 +495,9 @@ class StructuredVespaIndex(VespaIndex):
             'ranking': ranking,
             'language': marqo_query.language
         }
+
+        if marqo_query.debugging_parameters:
+            query = {**query, **marqo_query.debugging_parameters}
         
         query = {k: v for k, v in query.items() if v is not None}
 
@@ -612,6 +615,9 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
+
+        if marqo_query.debugging_parameters:
+            query = {**query, **marqo_query.debugging_parameters}
             
         query = {k: v for k, v in query.items() if v is not None}
 

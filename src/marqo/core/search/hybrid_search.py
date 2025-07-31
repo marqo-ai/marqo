@@ -53,7 +53,8 @@ class HybridSearch:
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
             variant_grouping: Optional[VariantGroupingParameters] = None,
-            ensure_diversity: bool = False
+            ensure_diversity: bool = False,
+            debugging_parameters: Optional[Dict] = None,
     ) -> Dict:
         """
 
@@ -297,7 +298,8 @@ class HybridSearch:
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
             variant_grouping=variant_grouping,
-            ensure_diversity=ensure_diversity
+            ensure_diversity=ensure_diversity,
+            debugging_parameters=debugging_parameters
         )
 
         vespa_index = vespa_index_factory(marqo_index)

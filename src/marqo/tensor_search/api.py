@@ -441,7 +441,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 sort_by = search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,
                 variant_grouping=search_query.variant_grouping,
-                ensure_diversity=search_query.ensure_diversity
+                ensure_diversity=search_query.ensure_diversity,
+                debugging_parameters=search_query.debugging_parameters,
             )
             return ORJSONResponse(result)
         except Exception as e:

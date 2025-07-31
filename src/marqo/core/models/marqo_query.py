@@ -26,6 +26,7 @@ class MarqoQuery(StrictBaseModel, ABC):
     filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
+    debugging_parameters: Optional[dict] = None
 
     @validator('filter', pre=True, always=True)
     def parse_filter(cls, filter):
