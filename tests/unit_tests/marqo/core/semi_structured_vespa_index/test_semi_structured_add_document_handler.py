@@ -99,63 +99,66 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             }
         }
 
-        add_docs_params = AddDocsParams(
-            index_name="test_index",
-            docs=docs,
-            device="cpu",
-            tensor_fields=["content", "multimodal_content", "audio_description", "image_url", "combined_content",
-                           "my_custom_vector", "embedding_vector"],
-            mappings=mappings,
-            use_existing_tensors=False,
-            text_chunk_prefix="chunk:"
-        )
+        mappings_cases = [mappings, None]
+        for mappings in mappings_cases:
+            with self.subTest(mappings=mappings):
+                add_docs_params = AddDocsParams(
+                    index_name="test_index",
+                    docs=docs,
+                    device="cpu",
+                    tensor_fields=["content", "multimodal_content", "audio_description", "image_url", "combined_content",
+                                   "my_custom_vector", "embedding_vector"],
+                    mappings=mappings,
+                    use_existing_tensors=False,
+                    text_chunk_prefix="chunk:"
+                )
 
-        marqo_index = self.semi_structured_marqo_index(
-            name="test_index",
-            tensor_field_names=[],
-            lexical_field_names=[],
-            string_array_field_names=[]
-        )
+                marqo_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    tensor_field_names=[],
+                    lexical_field_names=[],
+                    string_array_field_names=[]
+                )
 
-        # Mock external dependencies  
-        mock_infer_modality.return_value = Modality.TEXT
+                # Mock external dependencies
+                mock_infer_modality.return_value = Modality.TEXT
 
-        # Mock vespa client feed_batch response with proper structure
-        mock_feed_responses = [
-            FeedBatchDocumentResponse(status=200, id="doc1", message="OK"),
-            FeedBatchDocumentResponse(status=200, id="doc2", message="OK"),
-            FeedBatchDocumentResponse(status=200, id="doc3", message="OK")
-        ]
-        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
-            responses=mock_feed_responses,
-            errors=False
-        )
+                # Mock vespa client feed_batch response with proper structure
+                mock_feed_responses = [
+                    FeedBatchDocumentResponse(status=200, id="doc1", message="OK"),
+                    FeedBatchDocumentResponse(status=200, id="doc2", message="OK"),
+                    FeedBatchDocumentResponse(status=200, id="doc3", message="OK")
+                ]
+                self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+                    responses=mock_feed_responses,
+                    errors=False
+                )
 
-        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
+                self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
-        handler = SemiStructuredAddDocumentsHandler(
-            marqo_index=marqo_index,
-            add_docs_params=add_docs_params,
-            vespa_client=self.mock_vespa_client,
-            index_management=self.mock_index_management,
-            inference=self.mock_inference,
-            field_count_config=self.field_count_config
-        )
+                handler = SemiStructuredAddDocumentsHandler(
+                    marqo_index=marqo_index,
+                    add_docs_params=add_docs_params,
+                    vespa_client=self.mock_vespa_client,
+                    index_management=self.mock_index_management,
+                    inference=self.mock_inference,
+                    field_count_config=self.field_count_config
+                )
 
-        response = handler.add_documents()
+                response = handler.add_documents()
 
-        self.assertIsInstance(response, MarqoAddDocumentsResponse)
-        self.assertEqual("test_index", response.index_name)
-        self.assertIsInstance(response.processingTimeMs, (int, float))
-        self.assertGreater(response.processingTimeMs, 0)
-        self.assertGreater(len(response.items), 0)
+                self.assertIsInstance(response, MarqoAddDocumentsResponse)
+                self.assertEqual("test_index", response.index_name)
+                self.assertIsInstance(response.processingTimeMs, (int, float))
+                self.assertGreater(response.processingTimeMs, 0)
+                self.assertGreater(len(response.items), 0)
 
-        # Verify successful documents were processed correctly
-        successful_items = [item for item in response.items if item.status == 200]
-        self.assertEqual(3, len(successful_items))
+                # Verify successful documents were processed correctly
+                successful_items = [item for item in response.items if item.status == 200]
+                self.assertEqual(3, len(successful_items))
 
-        # Verify that vespa client was called for feeding documents
-        self.mock_vespa_client.feed_batch.assert_called()
+                # Verify that vespa client was called for feeding documents
+                self.mock_vespa_client.feed_batch.assert_called()
 
     def test_add_documents_with_language_or_stemming_on_old_index_raises_error(self):
         """Test that using language and/or stemming mapping on an old index raises AddDocumentsError"""
