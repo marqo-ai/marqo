@@ -69,7 +69,7 @@ class TestField(unittest.TestCase):
             ("field with spaces", "contains spaces"),
             ("field@symbol", "contains @ symbol")
         ]
-        
+
         for invalid_name, description in invalid_names:
             with self.subTest(invalid_name=invalid_name, description=description):
                 with self.assertRaises(ValidationError) as cm:
@@ -120,7 +120,7 @@ class TestField(unittest.TestCase):
             (FieldType.Float, "float_field", FieldFeature.LexicalSearch, False, {}),
             (FieldType.ImagePointer, "image_field", FieldFeature.LexicalSearch, False, {}),
             (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.LexicalSearch, False, {}),
-            
+
             # ScoreModifier feature compatibility
             (FieldType.Int, "int_field", FieldFeature.ScoreModifier, True, {}),
             (FieldType.Long, "long_field", FieldFeature.ScoreModifier, True, {}),
@@ -136,7 +136,7 @@ class TestField(unittest.TestCase):
             (FieldType.CustomVector, "custom_vector_field", FieldFeature.ScoreModifier, False, {}),
             (FieldType.ImagePointer, "image_field", FieldFeature.ScoreModifier, False, {}),
             (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.ScoreModifier, False, {}),
-            
+
             # Filter feature compatibility
             (FieldType.Text, "text_field", FieldFeature.Filter, True, {"filter_field_name": "text_field_filter"}),
             (FieldType.Bool, "bool_field", FieldFeature.Filter, True, {"filter_field_name": "bool_field_filter"}),
@@ -159,7 +159,7 @@ class TestField(unittest.TestCase):
             (FieldType.ImagePointer, "image_field", FieldFeature.Filter, False, {}),
             (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.Filter, False, {}),
         ]
-        
+
         for field_type, field_name, feature, should_be_valid, required_fields in compatibility_matrix:
             with self.subTest(field_type=field_type, feature=feature, expected_valid=should_be_valid):
                 # Prepare field arguments
@@ -170,11 +170,11 @@ class TestField(unittest.TestCase):
                     "lexical_field_name": required_fields.get("lexical_field_name"),
                     "filter_field_name": required_fields.get("filter_field_name")
                 }
-                
+
                 # Add dependent_fields for MultimodalCombination
                 if field_type == FieldType.MultimodalCombination:
                     field_args["dependent_fields"] = {"text": 1.0}
-                
+
                 if should_be_valid:
                     # Should create successfully
                     field = Field(**field_args)
@@ -185,55 +185,40 @@ class TestField(unittest.TestCase):
                     with self.assertRaises(ValidationError):
                         Field(**field_args)
 
-    def test_language_field_validation(self):
-        """Test that language field is only valid when LexicalSearch feature is present."""
-        # Valid: LexicalSearch feature with language
-        field = Field(
-            name="text_field",
-            type=FieldType.Text,
-            features=[FieldFeature.LexicalSearch],
-            lexical_field_name="text_field_lexical",
-            filter_field_name=None,
-            language="en"
-        )
-        self.assertEqual(field.language, "en")
+    def test_language_stemming_field_validation(self):
+        """Test that language and stemming fields raise ValidationError when LexicalSearch feature is not present."""
 
-        # Invalid: No LexicalSearch feature but language is set
-        with self.assertRaises(ValidationError) as cm:
-            Field(
-                name="text_field",
-                type=FieldType.Text,
-                features=[],
-                lexical_field_name=None,
-                filter_field_name=None,
-                language="en"
+        test_cases = [
+            (
+                "language_without_lexical_search",
+                {"language": "en"},
+                "language can only be populated when"
+            ),
+            (
+                "stemming_without_lexical_search",
+                {"stemming": "best"},
+                "stemming can only be populated when"
+            ),
+            (
+                "both_without_lexical_search",
+                {"language": "en", "stemming": "best"},
+                "language can only be populated when"  # Language error comes first
             )
-        self.assertIn("language can only be populated when", str(cm.exception))
+        ]
 
-    def test_stemming_field_validation(self):
-        """Test that stemming field is only valid when LexicalSearch feature is present."""
-        # Valid: LexicalSearch feature with stemming
-        field = Field(
-            name="text_field",
-            type=FieldType.Text,
-            features=[FieldFeature.LexicalSearch],
-            lexical_field_name="text_field_lexical",
-            filter_field_name=None,
-            stemming="best"
-        )
-        self.assertEqual(field.stemming, "best")
-
-        # Invalid: No LexicalSearch feature but stemming is set
-        with self.assertRaises(ValidationError) as cm:
-            Field(
-                name="text_field",
-                type=FieldType.Text,
-                features=[],
-                lexical_field_name=None,
-                filter_field_name=None,
-                stemming="best"
-            )
-        self.assertIn("stemming can only be populated when", str(cm.exception))
+        for case_name, field_config, expected_error in test_cases:
+            with self.subTest(case=case_name):
+                with self.assertRaises(ValidationError) as cm:
+                    Field(
+                        name="text_field",
+                        type=FieldType.Text,
+                        features=[],
+                        lexical_field_name=None,
+                        filter_field_name=None,
+                        language=field_config.get("language"),
+                        stemming=field_config.get("stemming")
+                    )
+                self.assertIn(expected_error, str(cm.exception))
 
     def test_stemming_value_validation(self):
         """Test that stemming field validates against allowed values."""
@@ -301,7 +286,7 @@ class TestField(unittest.TestCase):
                 "description": "multimodal_with_empty_dependent_fields"
             }
         ]
-        
+
         for case in invalid_cases:
             with self.subTest(test_case=case["description"]):
                 with self.assertRaises(ValidationError) as cm:
@@ -334,7 +319,7 @@ class TestField(unittest.TestCase):
                 "description": "Filter feature without filter_field_name"
             }
         ]
-        
+
         for test_case in test_cases:
             with self.subTest(description=test_case["description"]):
                 with self.assertRaises(ValidationError) as cm:
@@ -347,8 +332,6 @@ class TestField(unittest.TestCase):
                     )
                 self.assertIn(test_case["expected_error"], str(cm.exception))
 
-
-
     def test_field_immutability(self):
         """Test that Field objects are immutable."""
         field = Field(
@@ -358,19 +341,18 @@ class TestField(unittest.TestCase):
             lexical_field_name=None,
             filter_field_name=None
         )
-        
+
         # Test that all field attributes are immutable
         immutable_attributes = [
             ("name", "new_name"),
             ("type", FieldType.Int),
             ("features", [FieldFeature.LexicalSearch])
         ]
-        
+
         for attribute, new_value in immutable_attributes:
             with self.subTest(attribute=attribute):
                 with self.assertRaises(TypeError):
                     setattr(field, attribute, new_value)
-
 
     def test_multiple_features_combination(self):
         """Test fields with multiple features simultaneously."""
@@ -383,15 +365,17 @@ class TestField(unittest.TestCase):
                 "lexical_field_name": "text_field_lexical",
                 "filter_field_name": "text_field_filter",
                 "language": "en",
+                "stemming": "best",
                 "description": "Text with LexicalSearch and Filter"
             },
             {
-                "name": "int_field", 
+                "name": "int_field",
                 "type": FieldType.Int,
                 "features": [FieldFeature.ScoreModifier, FieldFeature.Filter],
                 "lexical_field_name": None,
                 "filter_field_name": "int_field_filter",
                 "language": None,
+                "stemming": None,
                 "description": "Int with ScoreModifier and Filter"
             },
             {
@@ -401,16 +385,18 @@ class TestField(unittest.TestCase):
                 "lexical_field_name": "custom_vector_lexical",
                 "filter_field_name": "custom_vector_filter",
                 "language": None,
+                "stemming": "multiple",
                 "description": "CustomVector with LexicalSearch and Filter"
             }
         ]
-        
+
         for test_case in test_cases:
             with self.subTest(description=test_case["description"]):
                 field = Field(
                     name=test_case["name"],
                     type=test_case["type"],
                     features=test_case["features"],
+                    # stemming=test_case["stemming"],
                     lexical_field_name=test_case["lexical_field_name"],
                     filter_field_name=test_case["filter_field_name"],
                     language=test_case["language"]
@@ -427,26 +413,29 @@ class TestField(unittest.TestCase):
             features=[FieldFeature.LexicalSearch],
             lexical_field_name="test_lexical",
             filter_field_name=None,
-            language="en"
+            language="en",
+            stemming="best"
         )
-        
+
         field2 = Field(
             name="test_field",
             type=FieldType.Text,
             features=[FieldFeature.LexicalSearch],
             lexical_field_name="test_lexical",
             filter_field_name=None,
-            language="en"
+            language="en",
+            stemming="best"
         )
-        
+
         field3 = Field(
             name="test_field",
             type=FieldType.Text,
             features=[FieldFeature.LexicalSearch],
             lexical_field_name="test_lexical",
             filter_field_name=None,
-            language="es"  # Different language
+            language="es",  # Different language
+            stemming = "best"
         )
-        
+
         self.assertEqual(field1, field2)
         self.assertNotEqual(field1, field3)
