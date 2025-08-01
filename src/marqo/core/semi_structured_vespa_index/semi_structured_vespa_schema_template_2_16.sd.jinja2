@@ -83,7 +83,7 @@ schema {{ index.schema_name }} {
             {%- endif %}
             index: enable-bm25
             {%- if lexical_field.stemming %}
-            stemming: {{ lexical_field.stemming }}
+            stemming: {{ lexical_field.stemming.value }}
             {%- endif %}
         }
         {% endfor -%}
