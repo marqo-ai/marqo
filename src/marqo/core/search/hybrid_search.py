@@ -377,6 +377,9 @@ class HybridSearch:
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
+        if debugging_parameters and responses.trace:
+            gathered_results['_trace'] = responses.trace
+
         return gathered_results
 
     def _apply_variant_grouping(self, search_results: Dict, variant_grouping: VariantGroupingParameters) -> Dict:

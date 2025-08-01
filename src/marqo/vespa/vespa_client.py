@@ -281,6 +281,8 @@ class VespaClient:
             resp_dict['root']['children'] = children
 
     def _sanitise_rank_features(self, resp_dict):
+        if 'children' not in resp_dict['root']:
+            return
         for doc in resp_dict['root']['children']:
             if 'rankfeatures' in doc['fields']:
                 doc['fields']['rankfeatures'] = {name: value for name, value
