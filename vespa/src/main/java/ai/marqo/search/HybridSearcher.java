@@ -214,6 +214,7 @@ public class HybridSearcher extends Searcher {
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 verbose,
                                 facetsYql);
+                queryFacets.properties().set("collapsefield", null); // make sure we do not collapse
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
             }

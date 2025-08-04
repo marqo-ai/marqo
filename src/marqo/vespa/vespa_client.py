@@ -258,8 +258,8 @@ class VespaClient:
         self._query_raise_for_status(resp)
 
         resp_dict = orjson.loads(resp.text)
-        self._flatten_grouped_docs(resp_dict)
-        self._sanitise_rank_features(resp_dict)
+        # self._flatten_grouped_docs(resp_dict)
+        # self._sanitise_rank_features(resp_dict)
         # logger.info(f'Vespa Resp: {orjson.dumps(resp_dict)}')
         return QueryResult(**resp_dict)
 

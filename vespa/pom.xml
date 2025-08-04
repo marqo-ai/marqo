@@ -156,7 +156,7 @@
         of Vespa.
         TODO upgrade this to 8.513.17 after Marqo Cloud has upgraded to this version
         -->
-        <version>8.332.5</version>
+        <version>8.513.17</version>
         <relativePath/>
     </parent>
     

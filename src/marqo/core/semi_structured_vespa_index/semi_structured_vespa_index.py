@@ -161,9 +161,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 field_type = FIELD_TYPES[field_type_overwrite]
                 funcs = [f'{func}({field_type}{{"{field_name}"}})' for func in aggregations]
                 funcs.append("count()")
-                output = f"each(output({', '.join(funcs)}))"
+                if facets_parameters.collapse_field:
+                    group_on_collapse_field = f"group(marqo__short_string_fields{{\"{facets_parameters.collapse_field}\"}})"
+                    output = f"each({group_on_collapse_field} output(count()))"
+                else:
+                    output = f"each(output({', '.join(funcs)}))"
             else:
-                output = "each(output(count()))"
+                if facets_parameters.collapse_field:
+                    group_on_collapse_field = f"group(marqo__short_string_fields{{\"{facets_parameters.collapse_field}\"}})"
+                    output = f"each({group_on_collapse_field} output(count()))"
+                else:
+                    output = f"each(output(count()))"
 
             return f"all(group({group_expr}) {params} {output}) "
 
@@ -930,11 +938,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if current_stats == {}:
             return stats
         aggregated_stats = {}
-        aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
-        aggregated_stats["count"] = current_stats["count"] + stats["count"]
-        aggregated_stats["avg"] = (current_stats["avg"] * current_stats["count"] + stats["avg"] * stats["count"]) / (current_stats["count"] + stats["count"])
-        aggregated_stats["min"] = min(current_stats["min"], stats["min"])
-        aggregated_stats["max"] = max(current_stats["max"], stats["max"])
+        if "count" in current_stats and "count" in stats:
+            aggregated_stats["count"] = current_stats["count"] + stats["count"]
+        if "sum" in current_stats and "sum" in stats:
+            aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
+        if "avg" in current_stats and "avg" in stats:
+            aggregated_stats["avg"] = (current_stats["avg"] * current_stats["count"] + stats["avg"] * stats["count"]) / (current_stats["count"] + stats["count"])
+        if "min" in current_stats and "min" in stats:
+            aggregated_stats["min"] = min(current_stats["min"], stats["min"])
+        if "max" in current_stats and "max" in stats:
+            aggregated_stats["max"] = max(current_stats["max"], stats["max"])
         return aggregated_stats
 
 

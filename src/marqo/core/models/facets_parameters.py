@@ -73,6 +73,7 @@ class FacetsParameters(StrictBaseModel):
     max_depth: Optional[int] = Field(None, alias="maxDepth")
     max_results: Optional[int] = Field(None, alias="maxResults")
     order: Optional[Literal["asc", "desc"]] = None
+    collapse_field: Optional[str] = Field(None, alias="collapseField")
 
     @validator('max_depth')
     def validate_max_depth(cls, v):
