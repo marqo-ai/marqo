@@ -233,8 +233,19 @@ schema {{ index.schema_name }} {
         function sort_field_value_2() {
             expression: sort_field_value(query(marqo__sort_field_weights_2))
         }
-
-        match-features: global_mult_modifier global_add_modifier sort_field_value_0  sort_field_value_1 sort_field_value_2
+        {% if index.variant_grouping -%}
+        function collapse_field_hash() {
+            expression: attribute({{ index.variant_grouping.variantGroupField }})
+        }
+        {% endif -%}
+        match-features {
+            global_mult_modifier
+            global_add_modifier
+            sort_field_value_0
+            sort_field_value_1
+            sort_field_value_2
+            {% if index.variant_grouping -%}collapse_field_hash{%- endif %}
+        }
     }
 
     {% if index.lexical_fields -%}

@@ -178,6 +178,10 @@ public class HybridSearcher extends Searcher {
         Integer sortByMinSortCandidates =
                 query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", null);
 
+        // Collapse Parameters
+        // TODO support multiple collapse fields
+        boolean collapse = query.properties().getString("collapsefield") != null;
+
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
@@ -297,7 +301,13 @@ public class HybridSearcher extends Searcher {
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
                 hitsForPostProcessing =
-                        rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
+                        rrf(
+                                resultTensor.hits(),
+                                resultLexical.hits(),
+                                rrf_k,
+                                alpha,
+                                verbose,
+                                collapse);
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
@@ -653,8 +663,14 @@ public class HybridSearcher extends Searcher {
      * @param verbose
      */
     HitGroup rrf(
-            HitGroup hitsTensor, HitGroup hitsLexical, Integer k, Double alpha, boolean verbose) {
+            HitGroup hitsTensor,
+            HitGroup hitsLexical,
+            Integer k,
+            Double alpha,
+            boolean verbose,
+            boolean collapse) {
 
+        HashMap<Double, String> collapseFieldHashToDocId = new HashMap<>();
         HashMap<String, Double> rrfScores = new HashMap<>();
         HashMap<String, String> docIdsToHitIds = new HashMap<>();
         HitGroup result = new HitGroup();
@@ -683,17 +699,23 @@ public class HybridSearcher extends Searcher {
                 logIfVerbose(hit.toString(), verbose);
 
                 extractedDocId = extractDocIdFromHitId(hit.getId().toString());
+                if (collapse) {
+                    Double collapseFieldHash = extractCollapseFieldHash(hit);
+                    if (collapseFieldHash != null) {
+                        collapseFieldHashToDocId.put(collapseFieldHash, extractedDocId);
+                    }
+                }
                 reciprocalRank = alpha * (1.0 / (rank + k));
-                // Map hit's score to its shortened doc ID
-                rrfScores.put(extractedDocId, reciprocalRank);
-                // Map hit's full URI to its shortened doc ID
-                docIdsToHitIds.put(extractedDocId, hit.getId().toString());
-                hit.setField(
-                        "marqo__raw_tensor_score",
-                        hit.getRelevance()
-                                .getScore()); // Encode raw score for Marqo debugging purposes
-                hit.setRelevance(reciprocalRank); // Update score to be weighted RR (tensor)
-                result.add(hit);
+
+                addHitToResult(
+                        hit,
+                        reciprocalRank,
+                        rrfScores,
+                        extractedDocId,
+                        docIdsToHitIds,
+                        result,
+                        "marqo__raw_tensor_score");
+
                 logIfVerbose(String.format("Set relevance to: %.7f", reciprocalRank), verbose);
                 rank++;
             }
@@ -721,23 +743,9 @@ public class HybridSearcher extends Searcher {
                 // Check if score already exists. If so, add to it.
                 extractedDocId = extractDocIdFromHitId(hit.getId().toString());
                 existingScore = rrfScores.get(extractedDocId);
-                if (existingScore == null) {
-                    // If the score doesn't exist, add new hit to result list (with rrf score).
-                    logIfVerbose("No existing score found! Starting at 0.0.", verbose);
-                    hit.setField(
-                            "marqo__raw_lexical_score",
-                            hit.getRelevance()
-                                    .getScore()); // Encode raw score for Marqo debugging purposes
-                    hit.setRelevance(reciprocalRank); // Update score to be weighted RR (lexical)
-                    // Map hit's score to its shortened doc ID
-                    rrfScores.put(extractedDocId, reciprocalRank);
-                    // Map hit's full URI to its shortened doc ID
-                    docIdsToHitIds.put(extractedDocId, hit.getId().toString());
-                    result.add(hit);
 
-                } else {
-                    // If it does, find that hit in the result list and update it, adding new rrf to
-                    // its score.
+                if (existingScore != null) {
+                    // the document already exists in tensor result, so we fuse
                     newScore = existingScore + reciprocalRank;
                     rrfScores.put(extractedDocId, newScore);
 
@@ -758,6 +766,75 @@ public class HybridSearcher extends Searcher {
                             verbose);
                     logIfVerbose(String.format("Existing score is: %.7f", existingScore), verbose);
                     logIfVerbose(String.format("New score is: %.7f", newScore), verbose);
+
+                } else if (!collapse) {
+                    // If the score doesn't exist, add new hit to result list (with rrf score).
+                    logIfVerbose("No existing score found! Starting at 0.0.", verbose);
+                    addHitToResult(
+                            hit,
+                            reciprocalRank,
+                            rrfScores,
+                            extractedDocId,
+                            docIdsToHitIds,
+                            result,
+                            "marqo__raw_lexical_score");
+
+                } else {
+                    // when collapsing on any field, we need to find if any doc with the same value
+                    // of that field exists
+                    String extractedDocIdInTensor =
+                            collapseFieldHashToDocId.get(extractCollapseFieldHash(hit));
+
+                    if (extractedDocIdInTensor == null) {
+                        // No hit with the same collapse_field_hash exists in tensor result. Add it.
+                        logIfVerbose("No existing score found! Add it.", verbose);
+                        addHitToResult(
+                                hit,
+                                reciprocalRank,
+                                rrfScores,
+                                extractedDocId,
+                                docIdsToHitIds,
+                                result,
+                                "marqo__raw_lexical_score");
+
+                        continue;
+                    }
+
+                    if (extractedDocId.equals(extractedDocIdInTensor)) {
+                        // This should not happen, it should be handled by the first branch
+                        continue;
+                    }
+
+                    Double existingScoreInTensor = rrfScores.get(extractedDocIdInTensor);
+                    logIfVerbose(
+                            "Found hit with same collapse field hash in tensor. Existing score: "
+                                    + existingScoreInTensor,
+                            verbose);
+                    if (reciprocalRank > existingScoreInTensor) {
+                        // discard the tensor one, and use this hit
+                        logIfVerbose(
+                                "Score is higher than the existing doc in tensor result, replacing"
+                                        + " tensor hit.",
+                                verbose);
+
+                        rrfScores.remove(extractedDocIdInTensor);
+                        result.remove(docIdsToHitIds.get(extractedDocIdInTensor));
+
+                        addHitToResult(
+                                hit,
+                                reciprocalRank,
+                                rrfScores,
+                                extractedDocId,
+                                docIdsToHitIds,
+                                result,
+                                "marqo__raw_lexical_score");
+                    } else {
+                        // same or lower rank in lexical result, discard the lexical hit
+                        logIfVerbose(
+                                "Score is lower than or equal to the existing doc in tensor result,"
+                                        + " discarding lexical hit",
+                                verbose);
+                    }
                 }
 
                 logIfVerbose(String.format("Modified lexical hit at rank: %d", rank), verbose);
@@ -768,6 +845,30 @@ public class HybridSearcher extends Searcher {
         }
 
         return result;
+    }
+
+    private static void addHitToResult(
+            Hit hit,
+            Double reciprocalRank,
+            HashMap<String, Double> rrfScores,
+            String extractedDocId,
+            HashMap<String, String> docIdsToHitIds,
+            HitGroup result,
+            String rawScoreFieldName) {
+        hit.setField(
+                rawScoreFieldName,
+                hit.getRelevance().getScore()); // Encode raw score for Marqo debugging purposes
+        hit.setRelevance(reciprocalRank); // Update score to be weighted RR (lexical)
+        // Map hit's score to its shortened doc ID
+        rrfScores.put(extractedDocId, reciprocalRank);
+        // Map hit's full URI to its shortened doc ID
+        docIdsToHitIds.put(extractedDocId, hit.getId().toString());
+        result.add(hit);
+    }
+
+    private Double extractCollapseFieldHash(Hit hit) {
+        // TODO check null
+        return ((FeatureData) hit.getField("matchfeatures")).getDouble("collapse_field_hash");
     }
 
     HitGroup collectErrorsFromResults(Result resultLexical, Result resultTensor) {
