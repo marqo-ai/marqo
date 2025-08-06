@@ -31,7 +31,15 @@ class SemiStructuredVespaSchema(VespaSchema):
             vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template_2_16.sd.jinja2")
         else:
             vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
-        return vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
+
+        # simplify the logic in the template to just pass in the first collapse field if exists
+        collapse_field = marqo_index.collapse_fields[0] if marqo_index.collapse_fields else None
+
+        return vespa_schema_template.render(
+            index=marqo_index,
+            collapse_field=collapse_field,
+            dimension=str(marqo_index.model.get_dimension())
+        )
 
     def _generate_marqo_index(self, schema_name: str) -> SemiStructuredMarqoIndex:
         marqo_index = SemiStructuredMarqoIndex(
