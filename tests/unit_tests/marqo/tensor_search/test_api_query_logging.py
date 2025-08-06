@@ -648,8 +648,7 @@ class TestAPIQueryLogging(MarqoTestCase):
                         },
                         "parameters": {
                             "tensorFields": ["description"],
-                            "excludeInputDocuments": False,
-                            "concurrency": 5,
+                            "excludeInputDocuments": False
                         }
                     }
                 },
@@ -732,8 +731,7 @@ class TestAPIQueryLogging(MarqoTestCase):
                         },
                         "parameters": {
                             "tensorFields": ["description"],
-                            "excludeInputDocuments": False,
-                            "concurrency": 5,
+                            "excludeInputDocuments": False
                         }
                     }
                 },

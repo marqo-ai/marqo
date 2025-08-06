@@ -219,6 +219,52 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(self._test_dir, 'existing_vespa_app', *file)
             )
 
+    def test_bootstrap_vespa_should_preserve_document_operation_executor_config(self):
+        """
+        Integration test to verify that document-operation-executor config is preserved
+        during the bootstrap process and not overridden by Marqo OS bootstrapping logic.
+        """
+        # Deploy initial app package
+        self._deploy_initial_app_package()
+        
+        # First bootstrap to get Marqo configured
+        self.index_management.bootstrap_vespa()
+        
+        # Now manually add document-operation-executor config to simulate Cloud team configuration
+        app = self.index_management._get_vespa_application()
+        services_xml_content = app._store.read_text_file('services.xml')
+        
+        # Insert document-operation-executor config into the container section
+        # Find a position after search config but before nodes
+        services_xml_with_config = services_xml_content.replace(
+            '</search>',
+            '''</search>
+            <config name="com.yahoo.document.restapi.document-operation-executor">
+                <maxThrottled>0</maxThrottled>
+            </config>'''
+        )
+        
+        app._store.save_file(services_xml_with_config, 'services.xml')
+        app._deploy()
+        
+        # Bootstrap Marqo again - this should preserve the document-operation-executor config
+        self.index_management.bootstrap_vespa()
+        
+        # Verify the config is still present after bootstrap
+        bootstrapped_app = str(self.vespa_client.download_application())
+        services_xml_path = os.path.join(bootstrapped_app, 'services.xml')
+        
+        with open(services_xml_path, 'r') as f:
+            final_services_xml = f.read()
+        
+        # Assert that the document-operation-executor config is preserved
+        self.assertIn('config name="com.yahoo.document.restapi.document-operation-executor"', final_services_xml)
+        self.assertIn('<maxThrottled>0</maxThrottled>', final_services_xml)
+        
+        # Also verify that Marqo components were properly added
+        self.assertIn('ai.marqo.search.HybridSearcher', final_services_xml)
+        self.assertIn('ai.marqo.index.IndexSettingRequestHandler', final_services_xml)
+
     def test_rollback_should_succeed(self):
         self._deploy_existing_app_package()
         self.index_management.bootstrap_vespa()
