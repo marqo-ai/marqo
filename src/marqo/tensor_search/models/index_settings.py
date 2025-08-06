@@ -23,6 +23,7 @@ class IndexSettings(StrictBaseModel):
     treatUrlsAndPointersAsImages: Optional[bool]
     treatUrlsAndPointersAsMedia: Optional[bool]
     filterStringMaxLength: Optional[int]
+    collapseFields: Optional[List[core.CollapseField]] = None
     model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
     textQueryPrefix: Optional[str] = None
@@ -72,6 +73,19 @@ class IndexSettings(StrictBaseModel):
         if treat_as_media:
             values['treatUrlsAndPointersAsImages'] = True
 
+        return values
+
+    @root_validator
+    def validate_collapse_fields(cls, values):
+        collapse_fields = values.get('collapseFields')
+        index_type = values.get('type')
+        
+        # collapseFields is only supported for SemiStructuredIndex
+        if collapse_fields is not None and index_type == core.IndexType.Structured:
+            raise api_exceptions.InvalidArgError(
+                "collapseFields is only supported for unstructured indexes"
+            )
+        
         return values
 
     @root_validator(pre=True)
@@ -191,6 +205,7 @@ class IndexSettings(StrictBaseModel):
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
                 treat_urls_and_pointers_as_media=self.treatUrlsAndPointersAsMedia,
                 filter_string_max_length=self.filterStringMaxLength,
+                collapse_fields=self.collapseFields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
@@ -204,11 +219,18 @@ class IndexSettings(StrictBaseModel):
             # This covers both UnstructuredMarqoIndex and SemiStructuredMarqoIndex
             # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
             # this information and the SemiStructured concept are internal implementation details only.
+            
+            # Only include collapseFields for SemiStructuredMarqoIndex
+            collapse_fields = None
+            if isinstance(marqo_index, core.SemiStructuredMarqoIndex):
+                collapse_fields = marqo_index.collapse_fields
+            
             return cls(
                 type=core.IndexType.Unstructured,
                 treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
                 treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
                 filterStringMaxLength=marqo_index.filter_string_max_length,
+                collapseFields=collapse_fields,
                 model=marqo_index.model.name,
                 modelProperties=IndexSettings.get_model_properties(marqo_index),
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
