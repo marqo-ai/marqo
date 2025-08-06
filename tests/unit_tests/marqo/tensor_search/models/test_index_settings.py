@@ -34,7 +34,7 @@ class TestIndexSettingsCollapseFields(unittest.TestCase):
         
         self.assertEqual(len(settings.collapseFields), 1)
         self.assertEqual(settings.collapseFields[0].name, "product_id")
-        self.assertEqual(settings.collapseFields[0].minGroups, 100)
+        self.assertEqual(settings.collapseFields[0].min_groups, 100)
 
     def test_index_settings_collapse_fields_structured_index_fails(self):
         """Test that collapseFields with Structured index type fails."""
@@ -58,7 +58,7 @@ class TestIndexSettingsCollapseFields(unittest.TestCase):
         self.assertIsInstance(request, UnstructuredMarqoIndexRequest)
         self.assertEqual(len(request.collapse_fields), 1)
         self.assertEqual(request.collapse_fields[0].name, "variant_group")
-        self.assertEqual(request.collapse_fields[0].minGroups, 500)
+        self.assertEqual(request.collapse_fields[0].min_groups, 500)
 
     def test_to_marqo_index_request_none_collapse_fields(self):
         """Test conversion when collapseFields is None."""
@@ -106,7 +106,7 @@ class TestIndexSettingsCollapseFields(unittest.TestCase):
         
         self.assertEqual(len(settings.collapseFields), 1)
         self.assertEqual(settings.collapseFields[0].name, "product_id")
-        self.assertEqual(settings.collapseFields[0].minGroups, 200)
+        self.assertEqual(settings.collapseFields[0].min_groups, 200)
 
 
 if __name__ == '__main__':

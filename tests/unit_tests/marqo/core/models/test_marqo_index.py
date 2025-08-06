@@ -403,13 +403,13 @@ class TestCollapseField(unittest.TestCase):
         """Test creating a CollapseField with valid parameters."""
         collapse_field = CollapseField(name="product_id", minGroups=100)
         self.assertEqual(collapse_field.name, "product_id")
-        self.assertEqual(collapse_field.minGroups, 100)
+        self.assertEqual(collapse_field.min_groups, 100)
 
     def test_collapse_field_creation_default_min_groups(self):
         """Test creating a CollapseField with default minGroups."""
         collapse_field = CollapseField(name="category_id")
         self.assertEqual(collapse_field.name, "category_id")
-        self.assertEqual(collapse_field.minGroups, 500)
+        self.assertEqual(collapse_field.min_groups, 500)
 
     def test_collapse_field_invalid_name_marqo_prefix(self):
         """Test that collapse field names starting with 'marqo__' are rejected."""
@@ -453,13 +453,13 @@ class TestCollapseField(unittest.TestCase):
         """Test that minGroups of 0 is rejected."""
         with self.assertRaises(ValidationError) as cm:
             CollapseField(name="valid_name", minGroups=0)
-        self.assertIn("must be at least 1", str(cm.exception))
+        self.assertIn("ensure this value is greater than 0", str(cm.exception))
 
     def test_collapse_field_invalid_min_groups_negative(self):
         """Test that negative minGroups is rejected."""
         with self.assertRaises(ValidationError) as cm:
             CollapseField(name="valid_name", minGroups=-10)
-        self.assertIn("must be at least 1", str(cm.exception))
+        self.assertIn("ensure this value is greater than 0", str(cm.exception))
 
     def test_collapse_field_valid_edge_cases(self):
         """Test valid edge cases for collapse field names."""
@@ -484,7 +484,7 @@ class TestCollapseField(unittest.TestCase):
             with self.subTest(field_name=name):
                 collapse_field = CollapseField(name=name, minGroups=1)
                 self.assertEqual(collapse_field.name, name)
-                self.assertEqual(collapse_field.minGroups, 1)
+                self.assertEqual(collapse_field.min_groups, 1)
 
 
 class TestSemiStructuredMarqoIndexCollapseFields(unittest.TestCase):

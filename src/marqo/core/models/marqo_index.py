@@ -24,18 +24,12 @@ logger = get_logger(__name__)
 
 class CollapseField(StrictBaseModel):
     name: str
-    minGroups: int = 500
+    min_groups: int = pydantic.Field(default=500, gt=0, alias='minGroups')
 
     @validator('name')
     def validate_field_name_collapse(cls, v):
         # Use common field name validation
         validate_field_name(v)
-        return v
-
-    @validator('minGroups')
-    def validate_min_groups(cls, v):
-        if v < 1:
-            raise ValueError("minGroups must be at least 1")
         return v
 
 

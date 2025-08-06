@@ -54,7 +54,7 @@ class TestUnstructuredMarqoIndexRequestCollapseFields(unittest.TestCase):
         
         self.assertEqual(len(request.collapse_fields), 1)
         self.assertEqual(request.collapse_fields[0].name, "product_id")
-        self.assertEqual(request.collapse_fields[0].minGroups, 100)
+        self.assertEqual(request.collapse_fields[0].min_groups, 100)
 
     def test_unstructured_request_with_valid_collapse_field_name_and_min_groups(self):
         """Test with valid collapse field name and minGroups."""
@@ -62,7 +62,7 @@ class TestUnstructuredMarqoIndexRequestCollapseFields(unittest.TestCase):
         request = self._create_base_unstructured_request(collapse_fields=collapse_fields)
         
         self.assertEqual(request.collapse_fields[0].name, "variant_group")
-        self.assertEqual(request.collapse_fields[0].minGroups, 500)
+        self.assertEqual(request.collapse_fields[0].min_groups, 500)
 
     def test_unstructured_request_with_invalid_collapse_field_name(self):
         """Test with invalid collapse field name."""

@@ -37,4 +37,4 @@ class TestCollapseFields(MarqoTestCase):
         self.assertIsInstance(index, SemiStructuredMarqoIndex)
         self.assertIsNotNone(index.collapse_fields)
         self.assertEqual(index.collapse_fields[0].name, "parent_id")
-        self.assertEqual(index.collapse_fields[0].minGroups, 100)
+        self.assertEqual(index.collapse_fields[0].min_groups, 100)
