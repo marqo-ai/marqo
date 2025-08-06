@@ -81,15 +81,51 @@ class ServicesXml:
         """
         Components config needs to be in sync with the components in the jar files. This method cleans up the
         custom components config, so we can always start fresh. This assumes that the container section of the
-        services.xml file only has `node` config and empty `document-api` and `search` elements initially. Please
-        note that any manual config change in container section will be overwritten.
+        services.xml file only has empty `document-api`, `document-processing`, `search` elements, and the preserved
+        elements initially.
+
+        Please note that:
+        - Any manual config change to non-preserved elements in the container section will be overwritten during Vespa
+        bootstrapping (when a new version of Marqo is deployed).
+        - Manual rollback will replace the entire services.xml file with the previous version. This means the changes
+        to the preserved elements will also be reverted.
+        
+        Preserved elements:
+        - <nodes>...</nodes>: container nodes configuration
+        - <config name="com.yahoo.document.restapi.document-operation-executor">...</config>: doc operation executors
         """
         container_element = self._ensure_only_one('container')
         for child in container_element.findall('*'):
+            if self._should_preserve_container_element(child):
+                continue
+
             if child.tag in ['document-api', 'document-processing', 'search']:
+                # clear the children of these elements to add config
                 child.clear()
-            elif child.tag != 'nodes':
+            else:
+                # clean up other components
                 container_element.remove(child)
+
+    def _should_preserve_container_element(self, element):
+        """
+        Determines if a container element should be preserved during cleanup.
+        
+        Args:
+            element: XML element to check
+            
+        Returns:
+            bool: True if element should be preserved, False if it should be removed
+        """
+        # Always preserve nodes element
+        if element.tag == 'nodes':
+            return True
+            
+        # Preserve document-operation-executor config
+        if (element.tag == 'config' and 
+            element.get('name') == 'com.yahoo.document.restapi.document-operation-executor'):
+            return True
+            
+        return False
 
     def _config_search(self):
         search_elements = self._ensure_only_one('container/search')

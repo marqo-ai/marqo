@@ -8,22 +8,18 @@ from starlette.responses import Response
 
 from marqo.core.monitoring.statsd_client import StatsDClient
 
-_SEARCH_RE = re.compile(r"/indexes/[^/]+/search$")
 _DOCS_RE = re.compile(r"/indexes/[^/]+/documents$")
 _DOCUMENT_ID_RE = re.compile(r"(/documents/)[^/]+")
 
 
 class StatsDMiddleware(BaseHTTPMiddleware):
     """
-    Emits the former Reverse-Proxy (RP) CloudWatch metrics via StatsD.
+    Emits high-cardinality generic metrics.
 
-    Metrics implemented (parity with RP):
-      • requests.completed                counter   • status_code
-                                              also  • path, method, status_code
-      • marqo_processing_time             timing    (no tags)
-      • search_processing_time            timing    (no tags)
-      • index_processing_time             timing    (no tags)
-      • x-count-success / -failure / -error  counter • method
+    • request.duration_ms   |ms  path,method,status_code
+    • batch.success         |c   path,method,status_code
+    • batch.failure         |c   path,method,status_code
+    • batch.error           |c   path,method,status_code
     """
 
     def __init__(self, app, statsd_client: StatsDClient):
@@ -38,44 +34,30 @@ class StatsDMiddleware(BaseHTTPMiddleware):
         response: Response = await call_next(request)
         duration_ms = int((time.perf_counter() - t_start) * 1000)
 
-        status = response.status_code
-        status_tag = f"{status // 100}XX"      # 2XX / 3XX / 4XX / 5XX
+        path_tag = self._sanitize_path(request.url.path)
+        tags = {
+            "path": path_tag,
+            "method": request.method,
+            "status_code": str(response.status_code),
+        }
 
-        # --- requests.completed (status-only) ------------------------
-        self.statsd.increment("requests.completed", tags={"status_code": status_tag})
+        # latency
+        self.statsd.timing("request.duration_ms", duration_ms, tags=tags)
 
-        # --- requests.completed (path/method/status variant) ---------
-        sanitized_path = self._sanitize_path(request.url.path)
-        self.statsd.increment(
-            "requests.completed",
-            tags={
-                "path": sanitized_path,
-                "method": request.method,
-                "status_code": status_tag,
-            },
-        )
-
-        # --- marqo_processing_time -----------------------------
-        self.statsd.timing("marqo_processing_time", duration_ms)
-
-        # --- search_processing_time ----------------------------
-        if _SEARCH_RE.fullmatch(request.url.path):
-            self.statsd.timing("search_processing_time", duration_ms)
-
-        # --- index_processing_time and x-count-* counters -------
-        if _DOCS_RE.fullmatch(request.url.path):
-            if request.method in {"POST", "PATCH"}:
-                self.statsd.timing("index_processing_time", duration_ms)
-
-            if request.method in {"POST", "PATCH", "GET"}:
-                lowered: Dict[str, str] = {k.lower(): v for k, v in response.headers.items()}
-                for hdr in ("x-count-success", "x-count-failure", "x-count-error"):
-                    if hdr in lowered:
-                        try:
-                            self.statsd.increment(hdr, int(lowered[hdr]), tags={"method": request.method})
-                        except ValueError:
-                            # Header value wasn’t an int – ignore
-                            pass
+        # batch outcome counters
+        if _DOCS_RE.fullmatch(request.url.path) and request.method in {"POST", "PATCH", "GET"}:
+            lowered: Dict[str, str] = {k.lower(): v for k, v in response.headers.items()}
+            for hdr, metric in (
+                    ("x-count-success", "batch.success"),
+                    ("x-count-failure", "batch.failure"),
+                    ("x-count-error", "batch.error"),
+            ):
+                if hdr in lowered:
+                    try:
+                        self.statsd.increment(metric, int(lowered[hdr]), tags=tags)
+                    except ValueError:
+                        # Header value wasn’t an int – ignore
+                        pass
 
         return response
 
