@@ -542,9 +542,14 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     @root_validator
     def validate_collapse_fields(cls, values):
         collapse_fields = values.get('collapse_fields')
-        if collapse_fields and len(collapse_fields) > 1:
-            raise ValueError("Only one collapse field is supported")
+        if collapse_fields is not None and len(collapse_fields) != 1:
+            raise ValueError("There must be exactly one collapse field")
         return values
+
+    def is_collapse_field(self, field_name: str) -> bool:
+        if not self.collapse_fields:
+            return False
+        return field_name in [field.name for field in self.collapse_fields]
 
     @property
     def field_map(self) -> Dict[str, Field]:

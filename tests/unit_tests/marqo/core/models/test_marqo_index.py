@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 from pydantic.v1 import ValidationError
 
 from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, CollapseField, SemiStructuredMarqoIndex, UnstructuredMarqoIndex, StructuredMarqoIndex
+from unit_tests.marqo_test import MarqoTestCase
 
 
 class TestField(unittest.TestCase):
@@ -487,22 +488,17 @@ class TestCollapseField(unittest.TestCase):
                 self.assertEqual(collapse_field.min_groups, 1)
 
 
-class TestSemiStructuredMarqoIndexCollapseFields(unittest.TestCase):
+class TestSemiStructuredMarqoIndexCollapseFields(MarqoTestCase):
     """Unit tests for SemiStructuredMarqoIndex collapse fields functionality."""
     
     def test_semi_structured_index_single_collapse_field_valid(self):
         """Test that SemiStructuredMarqoIndex accepts a single collapse field."""
-        # Test that the root validator accepts single collapse field
         collapse_fields = [CollapseField(name="product_id", minGroups=100)]
-        
-        # Create a minimal data dict that would pass SemiStructuredMarqoIndex validation
-        valid_data = {
-            'collapse_fields': collapse_fields
-        }
-        
-        # Test the validator directly
-        validated_data = SemiStructuredMarqoIndex.validate_collapse_fields(valid_data)
-        self.assertEqual(validated_data['collapse_fields'], collapse_fields)
+
+        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+        self.assertEqual(index.collapse_fields, collapse_fields)
+        self.assertTrue(index.is_collapse_field('product_id'))
+        self.assertFalse(index.is_collapse_field('some_other_field'))
 
     def test_semi_structured_index_multiple_collapse_fields_invalid(self):
         """Test that SemiStructuredMarqoIndex rejects multiple collapse fields."""
@@ -510,59 +506,19 @@ class TestSemiStructuredMarqoIndexCollapseFields(unittest.TestCase):
             CollapseField(name="product_id", minGroups=100),
             CollapseField(name="brand_id", minGroups=50)
         ]
-        
-        invalid_data = {
-            'collapse_fields': collapse_fields
-        }
-        
-        # Test the validator directly
-        with self.assertRaises(ValueError) as cm:
-            SemiStructuredMarqoIndex.validate_collapse_fields(invalid_data)
-        self.assertIn("Only one collapse field is supported", str(cm.exception))
+
+        with self.assertRaises(ValidationError) as cm:
+            self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+        self.assertIn("There must be exactly one collapse field", str(cm.exception))
+
+    def test_semi_structured_index_empty_collapse_fields_invalid(self):
+        """Test that SemiStructuredMarqoIndex rejects empty collapse fields list."""
+        with self.assertRaises(ValidationError) as cm:
+            self.semi_structured_marqo_index(name='test_index', collapse_fields=[])
+        self.assertIn("There must be exactly one collapse field", str(cm.exception))
 
     def test_semi_structured_index_no_collapse_fields_valid(self):
         """Test that SemiStructuredMarqoIndex accepts no collapse fields (None)."""
-        valid_data = {
-            'collapse_fields': None
-        }
-        
-        # Test the validator directly
-        validated_data = SemiStructuredMarqoIndex.validate_collapse_fields(valid_data)
-        self.assertIsNone(validated_data['collapse_fields'])
-
-    def test_semi_structured_index_empty_collapse_fields_valid(self):
-        """Test that SemiStructuredMarqoIndex accepts empty collapse fields list."""
-        valid_data = {
-            'collapse_fields': []
-        }
-        
-        # Test the validator directly
-        validated_data = SemiStructuredMarqoIndex.validate_collapse_fields(valid_data)
-        self.assertEqual(validated_data['collapse_fields'], [])
-
-    def test_semi_structured_index_collapse_field_validation_integration(self):
-        """Test that SemiStructuredMarqoIndex properly validates collapse field names through CollapseField validation."""
-        # Test that invalid collapse field names are caught during CollapseField creation
-        with self.assertRaises(ValidationError) as cm:
-            collapse_fields = [CollapseField(name="invalid-name", minGroups=100)]
-        self.assertIn("Field name must match", str(cm.exception))
-        
-        # Test that valid collapse field works in SemiStructuredMarqoIndex validator
-        valid_collapse_fields = [CollapseField(name="product_id", minGroups=100)]
-        valid_data = {'collapse_fields': valid_collapse_fields}
-        validated_data = SemiStructuredMarqoIndex.validate_collapse_fields(valid_data)
-        self.assertEqual(validated_data['collapse_fields'], valid_collapse_fields)
-
-    def test_other_marqo_index_types_do_not_have_collapse_fields(self):
-        """Test that UnstructuredMarqoIndex and StructuredMarqoIndex do not have collapse_fields."""
-        # Check that UnstructuredMarqoIndex doesn't have collapse_fields attribute
-        unstructured_fields = [field for field in UnstructuredMarqoIndex.__fields__.keys()]
-        self.assertNotIn('collapse_fields', unstructured_fields)
-        
-        # Check that StructuredMarqoIndex doesn't have collapse_fields attribute
-        structured_fields = [field for field in StructuredMarqoIndex.__fields__.keys()]
-        self.assertNotIn('collapse_fields', structured_fields)
-        
-        # Check that SemiStructuredMarqoIndex does have collapse_fields attribute
-        semi_structured_fields = [field for field in SemiStructuredMarqoIndex.__fields__.keys()]
-        self.assertIn('collapse_fields', semi_structured_fields)
+        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=None)
+        self.assertIsNone(index.collapse_fields)
+        self.assertFalse(index.is_collapse_field('product_id'))

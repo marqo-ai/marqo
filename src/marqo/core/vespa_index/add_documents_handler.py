@@ -175,14 +175,15 @@ class AddDocumentsHandler(ABC):
         with RequestMetricsStore.for_request().time("add_documents.vespa.to_vespa_docs"):
             vespa_docs = self._convert_to_vespa_docs()
 
-        self._pre_persist_to_vespa()
+        if vespa_docs:  # only continue if there's still vespa docs to persist
+            self._pre_persist_to_vespa()
 
-        # persist to vespa if there are still valid docs
-        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
+            # persist to vespa if there are still valid docs
+            with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+                response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
-        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            self._handle_vespa_response(response)
+            with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+                self._handle_vespa_response(response)
 
         return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
