@@ -55,6 +55,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             filter_string_max_length=self._index_request.filter_string_max_length,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=self._index_request.treat_urls_and_pointers_as_media,
+            collapse_fields=self._index_request.collapse_fields,
         )
 
         return marqo_index
