@@ -108,6 +108,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # add sort by and relevance cutoff
         self._add_relevance_cutoff_and_sort_by_params(marqo_query, query)
 
+        return query
+
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
         if marqo_query.relevance_cutoff:
             query["marqo__hybrid.relevanceCutoff.method"] = marqo_query.relevance_cutoff.method
