@@ -184,6 +184,8 @@ class AddDocumentsHandler(ABC):
 
             with RequestMetricsStore.for_request().time("add_documents.postprocess"):
                 self._handle_vespa_response(response)
+        else:
+            logger.debug('Skipping the Vespa roundtrip since there is no valid doc to feed')
 
         return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
