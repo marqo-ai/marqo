@@ -43,6 +43,43 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.should_update_index = False
         self.field_count_config = field_count_config
 
+    def _validate_doc(self, doc) -> None:
+        """Override parent validation to add collapse field validation."""
+        # Call parent validation first
+        super()._validate_doc(doc)
+        
+        # Add collapse field validation
+        self._validate_collapse_field_presence(doc)
+
+    def _validate_collapse_field_presence(self, doc: Dict[str, Any]) -> None:
+        """Validate that documents contain required collapse fields with correct type."""
+        if not self.marqo_index.collapse_fields:
+            return  # No collapse fields configured
+        
+        collapse_field = self.marqo_index.collapse_fields[0]  # Only one allowed per spec
+        collapse_field_name = collapse_field.name
+
+        # TODO confirm if all these validations are required
+        if collapse_field_name not in doc:
+            raise AddDocumentsError(
+                f"Document missing required field '{collapse_field_name}'. "
+                f"All documents must contain this field for grouping."
+            )
+        
+        collapse_value = doc[collapse_field_name]
+        
+        if not isinstance(collapse_value, str):
+            raise AddDocumentsError(
+                f"Field '{collapse_field_name}' must be of type string. "
+                f"Got {type(collapse_value).__name__}: {collapse_value}"
+            )
+        
+        if not collapse_value.strip():
+            raise AddDocumentsError(
+                f"Field '{collapse_field_name}' cannot be empty. "
+                f"Provide a non-empty string value for grouping."
+            )
+
     def _handle_field(self, marqo_doc, field_name, field_content):
         """Handle a field in a Marqo document by processing it and updating the index schema if needed.
         
@@ -53,6 +90,10 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         """
         # Process field using parent class handler
         super()._handle_field(marqo_doc, field_name, field_content)
+
+        # Skip automatic lexical field creation for collapse fields - they are predefined in schema
+        if self.marqo_index.is_collapse_field(field_name):
+            return
 
         # Add lexical field if content is a string
         if isinstance(marqo_doc[field_name], str):

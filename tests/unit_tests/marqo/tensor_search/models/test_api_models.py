@@ -564,16 +564,6 @@ class TestSearchContextDocuments(unittest.TestCase):
         docs = SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
         self.assertEqual(docs.ids, {"doc1": 1.0, "doc2": 0.5})
 
-    def test_concurrency_validation(self):
-        """Test concurrency parameter validation"""
-        # Valid positive integer
-        params = SearchContextDocumentsParameters(concurrency=5)
-        self.assertEqual(params.concurrency, 5)
-
-        # None should be valid
-        params = SearchContextDocumentsParameters(concurrency=None)
-        self.assertIsNone(params.concurrency)
-
     def test_exclude_input_documents_boolean_validation(self):
         """Test excludeInputDocuments boolean validation"""
         # Valid boolean values
@@ -594,13 +584,11 @@ class TestSearchContextDocuments(unittest.TestCase):
         params = SearchContextDocumentsParameters(
             tensorFields=["field1"],
             excludeInputDocuments=False,
-            concurrency=10
         )
         docs = SearchContextDocuments(ids={"doc1": 1.0}, parameters=params)
 
         self.assertEqual(docs.parameters.tensor_fields, ["field1"])
         self.assertFalse(docs.parameters.exclude_input_documents)
-        self.assertEqual(docs.parameters.concurrency, 10)
 
     def test_search_context_documents_with_invalid_weight_types(self):
         """Test that invalid weight types are handled by pydantic"""

@@ -1,15 +1,17 @@
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
 import numpy as np
-from marqo.core.exceptions import AddDocumentsError, InvalidArgumentError
+
+from marqo.core.exceptions import InvalidArgumentError
 from marqo.core.models.marqo_index import Stemming
+from marqo.core.inference.api import InferenceRequest, InferenceResult, Modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
+from marqo.core.models.marqo_index import CollapseField
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import (
     SemiStructuredAddDocumentsHandler,
     SemiStructuredFieldCountConfig
 )
-from marqo.core.inference.api import InferenceRequest, InferenceResult, InferenceErrorModel, Modality
-from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.feed_response import FeedBatchResponse, FeedBatchDocumentResponse
 from tests.unit_tests.marqo_test import MarqoTestCase
 
@@ -34,7 +36,7 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             return InferenceResult(result=result)
 
         self.mock_inference.vectorise.side_effect = vectorise_side_effect
-        
+
         # Setup vespa client mock for translate_vespa_document_response
         self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
@@ -106,7 +108,8 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                     index_name="test_index",
                     docs=docs,
                     device="cpu",
-                    tensor_fields=["content", "multimodal_content", "audio_description", "image_url", "combined_content",
+                    tensor_fields=["content", "multimodal_content", "audio_description", "image_url",
+                                   "combined_content",
                                    "my_custom_vector", "embedding_vector"],
                     mappings=mappings,
                     use_existing_tensors=False,
@@ -254,18 +257,17 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         self.assertIn("language", error_message.lower())
         self.assertIn("stemming", error_message.lower())
 
-
     def test_language_and_stemming_field_consistency_validation(self):
         """Test that stemming and language configuration cannot be changed for existing fields"""
         docs = [{"_id": "doc1", "title": "Test document"}]
-        
+
         marqo_index = self.semi_structured_marqo_index(
             name="consistency_test_index",
             tensor_field_names=[],
             lexical_field_names=["title"],  # Field already exists
             string_array_field_names=[]
         )
-        
+
         # Mock feed response
         self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
             responses=[], errors=False
@@ -281,14 +283,14 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                 ["different stemming configuration", "Cannot change stemming"]
             ),
             (
-                "language_change", 
+                "language_change",
                 {"stemming": Stemming.Best, "language": "en"},  # Existing field config
                 {"type": "text_field", "stemming": "best", "language": "es"},  # New mapping
                 ["different language configuration", "Cannot change language"]
             ),
             (
                 "both_change",
-                {"stemming": Stemming.Best, "language": "en"},  # Existing field config  
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
                 {"type": "text_field", "stemming": "shortest", "language": "es"},  # New mapping
                 ["different language configuration", "Cannot change language"]  # Language error comes first
             )
@@ -337,13 +339,13 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                 error_item = error_items[0]
                 error_message = str(error_item.error)
                 for expected_error in expected_errors:
-                    self.assertIn(expected_error, error_message, 
-                                f"Expected '{expected_error}' in error message for {case_name}")
+                    self.assertIn(expected_error, error_message,
+                                  f"Expected '{expected_error}' in error message for {case_name}")
 
     def test_stemming_value_validation(self):
         """Test that invalid stemming values raise appropriate errors"""
         docs = [{"_id": "doc1", "title": "Test document"}]
-        
+
         marqo_index = self.semi_structured_marqo_index(
             name="stemming_validation_test",
             tensor_field_names=[],
@@ -377,7 +379,135 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                 inference=self.mock_inference,
                 field_count_config=self.field_count_config
             )
-        
+
         error_message = str(cm.exception)
         self.assertIn("is not one of", error_message)
         self.assertIn("invalid_algorithm", error_message)
+
+    def test_collapse_field_validation_should_succeed(self):
+        """Test collapse field validation with various success scenarios"""
+        collapse_fields = [CollapseField(name="parent_id", minGroups=100)]
+
+        add_docs_params = AddDocsParams(
+            index_name="test_index",
+            docs=[{"_id": "doc1", "title": "Test document", "parent_id": "product_123"}],
+            tensor_fields=[],
+        )
+
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            collapse_fields=collapse_fields
+        )
+
+        # Mock the vespa client response for successful documents
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[FeedBatchDocumentResponse(status=200, id="doc1", message="OK")],
+            errors=False
+        )
+        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
+
+        handler = SemiStructuredAddDocumentsHandler(
+            marqo_index=marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+        error_items = [item for item in response.items if item.status != 200]
+        self.assertEqual(0, len(error_items))
+
+    def test_collapse_field_validation_should_fail(self):
+        """Test collapse field validation with various failure scenarios"""
+        collapse_fields = [CollapseField(name="parent_id", minGroups=100)]
+        
+        test_cases = [
+            {
+                "name": "missing_field",
+                "doc": {"_id": "doc1", "title": "Test document"},
+                "expected_error": "Document missing required field 'parent_id'",
+            },
+            {
+                "name": "invalid_type_int",
+                "doc": {"_id": "doc2", "title": "Test document", "parent_id": 123},
+                "expected_error": "Field 'parent_id' must be of type string",
+            },
+            {
+                "name": "invalid_type_none",
+                "doc": {"_id": "doc3", "title": "Test document", "parent_id": None},
+                "expected_error": "Field 'parent_id' must be of type string",
+            },
+            {
+                "name": "empty_string",
+                "doc": {"_id": "doc4", "title": "Test document", "parent_id": ""},
+                "expected_error": "Field 'parent_id' cannot be empty",
+            },
+            {
+                "name": "whitespace_only",
+                "doc": {"_id": "doc5", "title": "Test document", "parent_id": "   "},
+                "expected_error": "Field 'parent_id' cannot be empty",
+            },
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case["name"]):
+                add_docs_params = AddDocsParams(
+                    index_name="test_index",
+                    docs=[case["doc"]],
+                    tensor_fields=[],
+                )
+
+                marqo_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    collapse_fields=collapse_fields
+                )
+
+                handler = SemiStructuredAddDocumentsHandler(
+                    marqo_index=marqo_index,
+                    add_docs_params=add_docs_params,
+                    vespa_client=self.mock_vespa_client,
+                    index_management=self.mock_index_management,
+                    inference=self.mock_inference,
+                    field_count_config=self.field_count_config
+                )
+
+                response = handler.add_documents()
+                error_items = [item for item in response.items if item.status != 200]
+                self.assertEqual(1, len(error_items), f"Expected error for case: {case['name']}")
+                self.assertIn(case["expected_error"], str(error_items[0].error))
+
+    def test_collapse_field_validation_no_collapse_fields_configured(self):
+        """Test that validation is skipped when no collapse fields are configured"""
+        docs = [{"_id": "doc1", "title": "Test document"}]
+        
+        add_docs_params = AddDocsParams(
+            index_name="test_index",
+            docs=docs,
+            tensor_fields=[],
+        )
+
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            collapse_fields=None
+        )
+
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[FeedBatchDocumentResponse(status=200, id="doc1", message="OK")],
+            errors=False
+        )
+        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
+
+        handler = SemiStructuredAddDocumentsHandler(
+            marqo_index=marqo_index,
+            add_docs_params=add_docs_params,
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management,
+            inference=self.mock_inference,
+            field_count_config=self.field_count_config
+        )
+
+        response = handler.add_documents()
+        error_items = [item for item in response.items if item.status != 200]
+        self.assertEqual(0, len(error_items))

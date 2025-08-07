@@ -125,6 +125,7 @@ class MarqoTestCase(TestCase):
             lexical_field_names=(),
             tensor_field_names=(),
             string_array_field_names=(),
+            collapse_fields=None,
     ) -> SemiStructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndex.
@@ -167,4 +168,5 @@ class MarqoTestCase(TestCase):
                     string_array_field_name=f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}'
                 ) for field_name in string_array_field_names
             ],
+            collapse_fields=collapse_fields,
         )

@@ -1,9 +1,9 @@
 import unittest
-from typing import Dict, List, Optional
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, Stemming
+from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, CollapseField, Stemming
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestField(unittest.TestCase):
@@ -412,3 +412,130 @@ class TestField(unittest.TestCase):
 
         self.assertEqual(field1, field2)
         self.assertNotEqual(field1, field3)
+
+
+class TestCollapseField(unittest.TestCase):
+    """Unit tests for the CollapseField model class."""
+
+    def test_collapse_field_creation_valid(self):
+        """Test creating a CollapseField with valid parameters."""
+        collapse_field = CollapseField(name="product_id", minGroups=100)
+        self.assertEqual(collapse_field.name, "product_id")
+        self.assertEqual(collapse_field.min_groups, 100)
+
+    def test_collapse_field_creation_default_min_groups(self):
+        """Test creating a CollapseField with default minGroups."""
+        collapse_field = CollapseField(name="category_id")
+        self.assertEqual(collapse_field.name, "category_id")
+        self.assertEqual(collapse_field.min_groups, 500)
+
+    def test_collapse_field_invalid_name_marqo_prefix(self):
+        """Test that collapse field names starting with 'marqo__' are rejected."""
+        with self.assertRaises(ValidationError) as cm:
+            CollapseField(name="marqo__internal_field")
+        self.assertIn('Field name must not start with "marqo__"', str(cm.exception))
+
+    def test_collapse_field_invalid_name_protected_names(self):
+        """Test that protected field names are rejected."""
+        protected_names = ["_id", "_tensor_facets", "_highlights", "_score", "_found"]
+        
+        for protected_name in protected_names:
+            with self.subTest(protected_name=protected_name):
+                with self.assertRaises(ValidationError) as cm:
+                    CollapseField(name=protected_name)
+                self.assertIn("must not be one of", str(cm.exception))
+
+    def test_collapse_field_invalid_name_invalid_pattern_start_digit(self):
+        """Test that field names starting with digits are rejected."""
+        with self.assertRaises(ValidationError) as cm:
+            CollapseField(name="123invalid")
+        self.assertIn("Field name must match", str(cm.exception))
+
+    def test_collapse_field_invalid_name_invalid_pattern_special_chars(self):
+        """Test that field names with invalid special characters are rejected."""
+        invalid_names = ["field-name", "field.name", "field space", "field@name", "field#name"]
+        
+        for invalid_name in invalid_names:
+            with self.subTest(invalid_name=invalid_name):
+                with self.assertRaises(ValidationError) as cm:
+                    CollapseField(name=invalid_name)
+                self.assertIn("Field name must match", str(cm.exception))
+
+    def test_collapse_field_invalid_name_empty_string(self):
+        """Test that empty string field names are rejected."""
+        with self.assertRaises(ValidationError) as cm:
+            CollapseField(name="")
+        self.assertIn("Field name must match", str(cm.exception))
+
+    def test_collapse_field_invalid_min_groups_zero(self):
+        """Test that minGroups of 0 is rejected."""
+        with self.assertRaises(ValidationError) as cm:
+            CollapseField(name="valid_name", minGroups=0)
+        self.assertIn("ensure this value is greater than 0", str(cm.exception))
+
+    def test_collapse_field_invalid_min_groups_negative(self):
+        """Test that negative minGroups is rejected."""
+        with self.assertRaises(ValidationError) as cm:
+            CollapseField(name="valid_name", minGroups=-10)
+        self.assertIn("ensure this value is greater than 0", str(cm.exception))
+
+    def test_collapse_field_valid_edge_cases(self):
+        """Test valid edge cases for collapse field names."""
+        # These should all be valid per Vespa name pattern [a-zA-Z_][a-zA-Z0-9_]*
+        valid_names = [
+            "product_id",
+            "category",
+            "brand_name", 
+            "parent_product_id",
+            "variant_group",
+            "CamelCase",
+            "camelCase",
+            "UPPER_CASE",
+            "field123",
+            "field_with_underscores",
+            "_valid_underscore_start",
+            "a",  # single letter
+            "field123ABC"
+        ]
+        
+        for name in valid_names:
+            with self.subTest(field_name=name):
+                collapse_field = CollapseField(name=name, minGroups=1)
+                self.assertEqual(collapse_field.name, name)
+                self.assertEqual(collapse_field.min_groups, 1)
+
+
+class TestSemiStructuredMarqoIndexCollapseFields(MarqoTestCase):
+    """Unit tests for SemiStructuredMarqoIndex collapse fields functionality."""
+    
+    def test_semi_structured_index_single_collapse_field_valid(self):
+        """Test that SemiStructuredMarqoIndex accepts a single collapse field."""
+        collapse_fields = [CollapseField(name="product_id", minGroups=100)]
+
+        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+        self.assertEqual(index.collapse_fields, collapse_fields)
+        self.assertTrue(index.is_collapse_field('product_id'))
+        self.assertFalse(index.is_collapse_field('some_other_field'))
+
+    def test_semi_structured_index_multiple_collapse_fields_invalid(self):
+        """Test that SemiStructuredMarqoIndex rejects multiple collapse fields."""
+        collapse_fields = [
+            CollapseField(name="product_id", minGroups=100),
+            CollapseField(name="brand_id", minGroups=50)
+        ]
+
+        with self.assertRaises(ValidationError) as cm:
+            self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+        self.assertIn("There must be exactly one collapse field", str(cm.exception))
+
+    def test_semi_structured_index_empty_collapse_fields_invalid(self):
+        """Test that SemiStructuredMarqoIndex rejects empty collapse fields list."""
+        with self.assertRaises(ValidationError) as cm:
+            self.semi_structured_marqo_index(name='test_index', collapse_fields=[])
+        self.assertIn("There must be exactly one collapse field", str(cm.exception))
+
+    def test_semi_structured_index_no_collapse_fields_valid(self):
+        """Test that SemiStructuredMarqoIndex accepts no collapse fields (None)."""
+        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=None)
+        self.assertIsNone(index.collapse_fields)
+        self.assertFalse(index.is_collapse_field('product_id'))

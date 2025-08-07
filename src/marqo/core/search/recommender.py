@@ -26,8 +26,7 @@ class Recommender:
     def get_doc_vectors_from_ids(self,
                   index_name: str,
                   documents: Union[List[str], Dict[str, float]],
-                  tensor_fields: Optional[List[str]] = None,
-                  concurrency: Optional[int] = None) -> Dict[str, List[List[float]]]:
+                  tensor_fields: Optional[List[str]] = None) -> Dict[str, List[List[float]]]:
         """
         This method gets documents from Vespa using their IDs, removes any unnecessary data, checks for
         lack of vectors, then returns a list of document vectors. Can be used internally (in recommend)
@@ -37,7 +36,6 @@ class Recommender:
             index_name: Name of the index to search
             documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
             tensor_fields: List of tensor fields to use for recommendation (can include text, image, audio, and video fields)
-            concurrency: Max number of concurrent requests to use when fetching documents by batch
 
         Returns:
             A dictionary mapping document IDs to lists of vector embeddings. This is flattened to 1 list per document
@@ -90,8 +88,7 @@ class Recommender:
             config.Config(self.vespa_client, inference=self.inference),
             index_name, 
             document_ids, 
-            tensor_fields=tensor_fields,
-            concurrency=concurrency
+            tensor_fields=tensor_fields
         )
 
         # Check that all documents were found

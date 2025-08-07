@@ -85,7 +85,9 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         string_array_prefix_length = len(common.STRING_ARRAY + '_')
 
         for field_name, field_value in fields.items():
-            if field_name in tensor_subfield_map:
+            if marqo_index.is_collapse_field(field_name):
+                text_fields[field_name] = field_value
+            elif field_name in tensor_subfield_map:
                 tensor_fields[field_name] = field_value
             elif field_name in lexical_field_map:
                 # Lexical fields are returned with prefixed name from get_by_ids
@@ -199,6 +201,10 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
 
     @classmethod
     def _handle_string_field(cls, field_name: str, field_content: str, instance, marqo_index: SemiStructuredMarqoIndex):
+        if marqo_index.is_collapse_field(field_name):
+            instance.text_fields[field_name] = field_content
+            return
+
         if field_name not in marqo_index.field_map:
             raise MarqoDocumentParsingError(f'Field {field_name} is not in index {marqo_index.name}')
         
@@ -209,6 +215,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             instance.fixed_fields.short_string_fields[field_name] = field_content
             
         if instance.index_supports_partial_updates:
+            # TODO do we need to store field type of collapse field? maybe since we need to support partial updates
             instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING.value
 
     @classmethod

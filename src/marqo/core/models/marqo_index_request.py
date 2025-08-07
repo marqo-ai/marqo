@@ -41,6 +41,17 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
     treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
+    collapse_fields: Optional[List[marqo_index.CollapseField]] = None
+
+    @root_validator
+    def validate_collapse_fields(cls, values):
+        collapse_fields = values.get('collapse_fields')
+        if collapse_fields is not None:
+            if len(collapse_fields) == 0:
+                raise ValueError("collapse_fields cannot be an empty list")
+            if len(collapse_fields) > 1:
+                raise ValueError("Only one collapse field is supported")
+        return values
 
 
 class FieldRequest(StrictBaseModel):
