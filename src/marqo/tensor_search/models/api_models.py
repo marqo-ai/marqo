@@ -29,6 +29,10 @@ class BaseMarqoModel(BaseModel):
     pass
 
 
+class SearchCollapseField(BaseMarqoModel):
+    name: str
+
+
 class CustomVectorQuery(ImmutableStrictBaseModel):
     class CustomVector(ImmutableStrictBaseModel):
         content: Optional[str] = None
@@ -68,6 +72,7 @@ class SearchQuery(BaseMarqoModel):
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
+    collapse_fields: Optional[List[SearchCollapseField]] = Field(default=None, alias="collapseFields")
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -422,6 +427,25 @@ class SearchQuery(BaseMarqoModel):
                     f" minSortCandidates={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
                     f" offset={values.get('offset')} "
                 )
+        return values
+
+    @root_validator(pre=False)
+    def validate_collapse_fields_only_for_hybrid_search(cls, values):
+        """Validate collapse fields only provided for hybrid search"""
+        collapse_fields = values.get('collapse_fields')
+        search_method = values.get('searchMethod')
+        if collapse_fields is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"collapseFields can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
+        return values
+        
+    @root_validator(pre=False) 
+    def validate_single_collapse_field(cls, values):
+        """Validate exactly one collapse field is provided"""
+        collapse_fields = values.get('collapse_fields')
+        if collapse_fields is not None:
+            if len(collapse_fields) != 1:
+                raise ValueError("Exactly one collapse field must be provided")
         return values
 
 
