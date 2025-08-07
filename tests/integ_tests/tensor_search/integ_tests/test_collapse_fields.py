@@ -1,6 +1,7 @@
 import os
 from unittest import mock
 
+from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import CollapseField, SemiStructuredMarqoIndex
 from marqo.tensor_search import tensor_search
@@ -115,3 +116,48 @@ class TestCollapseFields(MarqoTestCase):
                                                document_id="valid1")
 
         self.assertEqual(doc["parent_id"], "group_1")
+
+    def test_search_with_invalid_collapse_field_raises_error(self):
+        """Test that search with invalid collapse field name raises error"""
+        with self.assertRaises(InvalidArgError) as cm:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="test query",
+                search_method="HYBRID",
+                collapse_field_name="non_existent_field"
+            )
+        
+        self.assertIn("Field 'non_existent_field' is not configured as collapseFields for this index", 
+                      str(cm.exception))
+
+    def test_search_with_valid_collapse_field_succeeds(self):
+        """Test that search with valid collapse field name succeeds"""
+        # Add some test documents
+        docs = [
+            {"_id": "doc1", "title": "Test document 1", "parent_id": "group_1"},
+            {"_id": "doc2", "title": "Test document 2", "parent_id": "group_2"}
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+        
+        # This should not raise an exception
+        result = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="test",
+            search_method="HYBRID",
+            collapse_field_name="parent_id"
+        )
+        
+        # Verify the search executed successfully
+        self.assertIn("hits", result)
+        self.assertIsInstance(result["hits"], list)
+        # TODO test search collapse on parent_id

@@ -439,7 +439,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 language=search_query.language,
                 relevance_cutoff= search_query.relevance_cutoff,
                 sort_by = search_query.sort_by,
-                interpolation_method=search_query.interpolationMethod
+                interpolation_method=search_query.interpolationMethod,
+                collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None
             )
             return ORJSONResponse(result)
         except Exception as e:
