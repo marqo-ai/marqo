@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pydantic.v1 as pydantic
 
@@ -157,7 +157,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         return None
 
-    def _get_field_stemming(self, field_name):
+    def _get_field_stemming(self, field_name) -> Optional[str]:
         """Extract stemming specification for a field from mappings and validate."""
         if not self.add_docs_params.mappings:
             return None
