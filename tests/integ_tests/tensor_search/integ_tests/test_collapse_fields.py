@@ -59,22 +59,20 @@ class TestCollapseFields(MarqoTestCase):
             )
         )
 
-        # Check results
-        successful_items = [item for item in res.items if item.status == 200]
-        failed_items = [item for item in res.items if item.status != 200]
-
-        self.assertEqual(2, len(successful_items), "Expected 2 successful documents")
-        self.assertEqual(2, len(failed_items), "Expected 2 failed documents")
-
-        # Verify successful document IDs
-        successful_ids = {item.id for item in successful_items}
-        self.assertEqual({"valid1", "valid2"}, successful_ids)
-
         # Verify failed documents
+        failed_items = [item for item in res.items if item.status != 200]
+        self.assertEqual(2, len(failed_items), "Expected 2 failed documents")
         self.assertIn("Document missing required field 'parent_id'", failed_items[0].message)
         self.assertIn("Field 'parent_id' must be of type string", failed_items[1].message)
 
-        # TODO see if we can get the two valid docs back from Vespa with correct parent_id
+        # Verify successful documents
+        successful_items = [item for item in res.items if item.status == 200]
+        self.assertEqual(2, len(successful_items), "Expected 2 successful documents")
+
+        successful_ids = {item.id for item in successful_items}
+        self.assertEqual({"valid1", "valid2"}, successful_ids)
+
+        # Verify we can retrieve the parent_id back
         valid_docs = tensor_search.get_documents_by_ids(config=self.config, index_name=self.default_text_index.name,
                                                         document_ids=successful_ids)
 
@@ -83,3 +81,37 @@ class TestCollapseFields(MarqoTestCase):
         for doc in valid_docs.results:
             expected_parent_id = "group_1" if doc["_id"] == "valid1" else "group_2"
             self.assertEqual(expected_parent_id, doc["parent_id"])
+
+    def test_partial_update_of_collapse_field_does_not_work(self):
+        docs = [
+            {"_id": "valid1", "title": "Valid document 1", "parent_id": "group_1"},
+        ]
+
+        res = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=[]
+            )
+        )
+
+        self.assertFalse(res.errors)
+        self.assertEqual(1, len(res.items))
+
+        update_res = self.config.document.partial_update_documents_by_index_name(
+            index_name=self.default_text_index.name,
+            partial_documents=[{"_id": "valid1", "parent_id": "group_2"}])
+
+        self.assertTrue(update_res.errors)
+        self.assertEqual(400, update_res.items[0].status)
+
+        # TODO please note that this is not working due to a side effect that partial update treats all string fields
+        #  as lexical fields. Ideally, partial updates should treat collapse differently to avoid confusing error msg.
+        self.assertIn("parent_id of type str does not exist in the original document. "
+                      "Marqo does not support adding new lexical fields in partial updates", update_res.items[0].error)
+
+        doc = tensor_search.get_document_by_id(config=self.config, index_name=self.default_text_index.name,
+                                               document_id="valid1")
+
+        self.assertEqual(doc["parent_id"], "group_1")
