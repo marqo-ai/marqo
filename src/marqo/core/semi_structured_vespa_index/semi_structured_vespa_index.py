@@ -110,7 +110,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # add sort by and relevance cutoff
         self._add_relevance_cutoff_and_sort_by_params(marqo_query, query)
 
+        # add the collapse_field to query
+        if marqo_query.collapse_field_name:
+            self._add_collapse_field(marqo_query.collapse_field_name, query)
+
         return query
+
+    def _add_collapse_field(self, collapse_field_name: str, query: Dict[str, Any]):
+        query['collapsefield'] = collapse_field_name
+        query['collapsesize'] = 1  # each group has at most 1 doc
+
+        # use a different rank profile to ensure diversity in the result returned to Vespa container
+        query.update({
+            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25 + '_diversity',
+            'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
+            'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
+            'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
+        })
 
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
         if marqo_query.relevance_cutoff:
@@ -173,7 +189,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
 
         if marqo_query.facets is not None:
-            facets_term = self._get_facets_term(marqo_query.facets)
+            facets_term = self._get_facets_term(marqo_query.facets,
+                                                collapse_field_name=marqo_query.collapse_field_name)
 
             if facets_term is not None:
                 facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
@@ -192,7 +209,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                         new_filter_term = f' AND {new_filter_term}'
                     else:
                         new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
+                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms,
+                                                            collapse_field_name=marqo_query.collapse_field_name)
 
                     query_yql = f'{base_yql}{new_filter_term}'
 
@@ -200,7 +218,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         return QUERY_DELIMITER.join(facet_queries)
 
-    def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None) -> str:
+    def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None,
+                         collapse_field_name: Optional[str] = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -262,7 +281,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             params = build_group_parameters(field_config)
 
             # Build output expression
-            if field_config.type == "number":
+            if collapse_field_name:
+                # we can only get the count collapsed to this field regardless of data type
+                output = f"each(group({collapse_field_name}) output(count()))"
+            elif field_config.type == "number":
+                # if we do not collapse, we can get the following stats with count for number type
                 aggregations = ["sum", "avg", "min", "max"]
                 field_type = FIELD_TYPES[field_type_overwrite]
                 funcs = [f'{func}({field_type}{{"{field_name}"}})' for func in aggregations]
@@ -1036,11 +1059,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if current_stats == {}:
             return stats
         aggregated_stats = {}
-        aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
         aggregated_stats["count"] = current_stats["count"] + stats["count"]
-        aggregated_stats["avg"] = (current_stats["avg"] * current_stats["count"] + stats["avg"] * stats["count"]) / (current_stats["count"] + stats["count"])
-        aggregated_stats["min"] = min(current_stats["min"], stats["min"])
-        aggregated_stats["max"] = max(current_stats["max"], stats["max"])
+        if "sum" in current_stats and "sum" in stats:
+            aggregated_stats["sum"] = current_stats["sum"] + stats["sum"]
+        if "avg" in current_stats and "avg" in stats:
+            aggregated_stats["avg"] = (current_stats["avg"] * current_stats["count"] + stats["avg"] * stats["count"]) / (current_stats["count"] + stats["count"])
+        if "min" in current_stats and "min" in stats:
+            aggregated_stats["min"] = min(current_stats["min"], stats["min"])
+        if "max" in current_stats and "max" in stats:
+            aggregated_stats["max"] = max(current_stats["max"], stats["max"])
         return aggregated_stats
 
 
