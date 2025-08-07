@@ -1,10 +1,9 @@
 import unittest
-from typing import Dict, List, Optional
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, CollapseField, SemiStructuredMarqoIndex, UnstructuredMarqoIndex, StructuredMarqoIndex
-from unit_tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, CollapseField
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestField(unittest.TestCase):
