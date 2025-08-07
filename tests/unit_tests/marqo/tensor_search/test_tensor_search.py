@@ -1,22 +1,21 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.config import Config
-from marqo.core.models.marqo_index import MarqoIndex, IndexType, Model, StructuredMarqoIndex, SemiStructuredMarqoIndex
+from marqo.core import exceptions as core_exceptions
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, CollapseField
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.search import VectorisedJobPointer, JHash
-from marqo.tensor_search.models.api_models import CustomVectorQuery
-from marqo.vespa.models import QueryResult
-from marqo.vespa.models.query_result import Child, Root, Coverage
-from marqo.core import exceptions as core_exceptions
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.search import VectorisedJobPointer, JHash
+from marqo.vespa.models import QueryResult
+from marqo.vespa.models.query_result import Child, Root, Coverage
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
-class TestTensorSearch(unittest.TestCase):
+class TestTensorSearch(MarqoTestCase):
     """Test core search functionality and utility functions."""
 
     def setUp(self):
@@ -26,18 +25,7 @@ class TestTensorSearch(unittest.TestCase):
         self.config.index_management = Mock()
         self.config.inference = Mock()
 
-        # Mock index - use proper SemiStructuredMarqoIndex
-        self.mock_index = Mock(spec=SemiStructuredMarqoIndex)
-        self.mock_index.name = "test-index"
-        self.mock_index.type = IndexType.SemiStructured
-        self.mock_index.schema_name = "test_schema"
-        self.mock_index.normalize_embeddings = True
-        self.mock_index.model = Mock(spec=Model)
-        self.mock_index.model.name = "test-model"
-        self.mock_index.model.get_text_query_prefix.return_value = ""
-        self.mock_index.model.get_dimension.return_value = 512
-        self.mock_index.model.get_properties.return_value = {}
-        self.mock_index.parsed_marqo_version.return_value = version.__version__
+        self.index = self.semi_structured_marqo_index(name="test-index")
 
         # Setup mock Vespa response
         self.mock_hit = Child(
@@ -56,7 +44,7 @@ class TestTensorSearch(unittest.TestCase):
     def _setup_common_mocks(self, mock_metrics, mock_vespa_factory, mock_get_index):
         """Helper method to set up common mocks used across multiple tests."""
         # Setup index mock
-        mock_get_index.return_value = self.mock_index
+        mock_get_index.return_value = self.index
         
         # Setup vespa index mock
         mock_vespa_index = Mock()
@@ -157,7 +145,7 @@ class TestTensorSearch(unittest.TestCase):
     def test_search_hybrid_method(self, mock_hybrid_search_class, mock_get_index):
         """Test search with hybrid method returns expected results."""
         # Setup
-        mock_get_index.return_value = self.mock_index
+        mock_get_index.return_value = self.index
 
         # Mock hybrid search instance
         mock_hybrid_instance = Mock()
@@ -353,22 +341,21 @@ class TestTensorSearch(unittest.TestCase):
                 # Verify search results including sanitized query
                 self._assert_basic_search_response(result, case["expected"])
 
-class TestTensorSearchValidation(unittest.TestCase):
+
+class TestTensorSearchValidation(MarqoTestCase):
     """Test validation and error handling for tensor search operations."""
 
     def setUp(self):
         """Set up test fixtures."""
         self.config = Mock(spec=Config)
         self.config.index_management = Mock()
-        self.mock_index = Mock(spec=SemiStructuredMarqoIndex)
-        self.mock_index.type = IndexType.SemiStructured
-        self.mock_index.parsed_marqo_version.return_value = version.__version__
+        self.mock_index = self.semi_structured_marqo_index("index")
 
     def test_search_result_count_validation_negative_fails(self):
         """Test that negative result_count raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=-1
@@ -379,7 +366,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that zero result_count raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=0
@@ -390,7 +377,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that non-integer result_count raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=5.5
@@ -401,7 +388,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that negative offset raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=5,
@@ -414,7 +401,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that exceeding max retrievable docs raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=8,
@@ -427,7 +414,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that exceeding max search limit raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=10  # > 5
@@ -439,7 +426,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that exceeding max search offset raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=5,
@@ -459,7 +446,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             # Use a dict query to avoid the validation error for string + context
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text={"query": 1.0},  # Use dict query to pass validation
                 result_count=5,
@@ -473,7 +460,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that invalid search method raises InvalidArgError"""
         with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=5,
@@ -488,7 +475,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         
         with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             tensor_search.search(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 text="query",
                 result_count=5,
@@ -517,7 +504,7 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that empty document_ids collection raises InvalidArgError"""
         with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             tensor_search.get_documents_by_ids(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 document_ids=[]
             )
@@ -528,11 +515,45 @@ class TestTensorSearchValidation(unittest.TestCase):
         """Test that exceeding max docs limit raises IllegalRequestedDocCount"""
         with self.assertRaises(api_exceptions.IllegalRequestedDocCount) as cm:
             tensor_search.get_documents_by_ids(
-                config=Mock(),
+                config=self.config,
                 index_name="test",
                 document_ids=["doc1", "doc2", "doc3"]
             )
         self.assertIn("documents were requested, which is more than the allowed limit", str(cm.exception))
+
+    @patch('marqo.tensor_search.tensor_search.index_meta_cache.get_index')
+    def test_search_collapse_fields_fail_on_validation(self, mock_get_index):
+        """Test that collapse_field_name parameter fails for various validation"""
+
+        test_cases = [
+            ('version check', self.semi_structured_marqo_index(name="old_index", marqo_version='2.22.0'),
+             core_exceptions.UnsupportedFeatureError, "'collapseFields' search parameter is only supported for indexes created with Marqo version 2.23.0 or later"),
+
+            ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index'),
+             api_exceptions.InvalidArgError, "'collapseFields' search parameter is not supported for this index"),
+
+            ('index without collapseFields', self.semi_structured_marqo_index(name='new_index'),
+             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as collapseFields for this index"),
+
+            ('index with different collapseFields', self.semi_structured_marqo_index(
+                name='new_index', collapse_fields=[CollapseField(name='parent_id')]),
+             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as collapseFields for this index")
+        ]
+
+        for name, index, exception_class, expected_error in test_cases:
+            with self.subTest(msg=name):
+                mock_get_index.return_value = index
+                with self.assertRaises(exception_class) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="test query",
+                        search_method=SearchMethod.HYBRID,
+                        collapse_field_name="variant_id"
+                    )
+
+                self.assertIn(expected_error, str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

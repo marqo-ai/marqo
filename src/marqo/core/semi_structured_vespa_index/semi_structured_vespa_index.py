@@ -26,6 +26,8 @@ from marqo.vespa.models import QueryResult
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     """
     An implementation of VespaIndex for SemiStructured indexes.
+    FIXME the multi-inheritance makes the implementation difficult to reason about. Consider refactor to composition
+      instead. e.g. extract different logics to different query component builders, and combined the result.
     """
     index_supports_partial_updates: bool = False
 

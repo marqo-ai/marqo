@@ -458,13 +458,22 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     
     # Validate collapse field configuration
     if collapse_field_name is not None:
+        # Validate if the index version support this feature
+        if marqo_index_version < constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION:
+            raise core_exceptions.UnsupportedFeatureError(
+                f"The 'collapseFields' search parameter is only supported for indexes created with Marqo version "
+                f"{str(constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION)} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
+            )
+
         # Validate index supports collapse fields
-        if marqo_index.type != IndexType.SemiStructured:
-            raise api_exceptions.InvalidArgError("collapseFields search parameter is not supported for this index")
+        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise api_exceptions.InvalidArgError("'collapseFields' search parameter is not supported for this index")
         
         # Validate collapse field exists in index configuration  
         if not marqo_index.is_collapse_field(collapse_field_name):
-            raise api_exceptions.InvalidArgError(f"Field '{collapse_field_name}' is not configured as collapseFields for this index")
+            raise api_exceptions.InvalidArgError(f"Field '{collapse_field_name}' is not configured as collapseFields "
+                                                 f"for this index")
     
     if rerank_depth is not None \
             and marqo_index_version < constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION:
@@ -473,6 +482,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             f"{str(constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION)} or later. "
             f"This index was created with Marqo {marqo_index_version}."
         )
+
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search

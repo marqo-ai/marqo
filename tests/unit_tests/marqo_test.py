@@ -33,8 +33,8 @@ class MarqoTestCase(TestCase):
             cls,
             name: str,
             schema_name: str,
-            fields: List[Field] = None,
-            tensor_fields: List[TensorField] = None,
+            fields: List[Field] = (),
+            tensor_fields: List[TensorField] = (),
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
