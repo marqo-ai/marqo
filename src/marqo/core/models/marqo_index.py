@@ -18,9 +18,19 @@ from marqo.logging import get_logger
 # TODO refactor to remove dep to s2_inference
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
-import marqo.core.constants as constants
 
 logger = get_logger(__name__)
+
+
+class CollapseField(StrictBaseModel):
+    name: str
+    min_groups: int = pydantic.Field(default=500, gt=0, alias='minGroups')
+
+    @validator('name')
+    def validate_field_name_collapse(cls, v):
+        # Use common field name validation
+        validate_field_name(v)
+        return v
 
 
 class IndexType(Enum):
@@ -520,6 +530,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     tensor_fields: List[TensorField]
     string_array_fields: Optional[List[
         StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    collapse_fields: Optional[List[CollapseField]] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -527,6 +538,18 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     @classmethod
     def _valid_type(cls) -> IndexType:
         return IndexType.SemiStructured
+
+    @root_validator
+    def validate_collapse_fields(cls, values):
+        collapse_fields = values.get('collapse_fields')
+        if collapse_fields is not None and len(collapse_fields) != 1:
+            raise ValueError("There must be exactly one collapse field")
+        return values
+
+    def is_collapse_field(self, field_name: str) -> bool:
+        if not self.collapse_fields:
+            return False
+        return field_name in [field.name for field in self.collapse_fields]
 
     @property
     def field_map(self) -> Dict[str, Field]:

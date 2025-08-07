@@ -141,7 +141,13 @@ schema marqo__test_00semi_00structured_00schema {
             expression: sort_field_value(query(marqo__sort_field_weights_2))
         }
 
-        match-features: global_mult_modifier global_add_modifier sort_field_value_0  sort_field_value_1 sort_field_value_2
+        match-features {
+            global_mult_modifier
+            global_add_modifier
+            sort_field_value_0
+            sort_field_value_1
+            sort_field_value_2
+        }
 
     }
 

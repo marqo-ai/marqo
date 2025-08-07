@@ -172,8 +172,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual([('1', 'field4')], handler.handled_fields)
         self.assertEqual(0, handler.to_vespa_doc_call_count)
 
-        self.assertEqual(1, self.vespa_client.feed_batch.call_count)
-        self.assertEqual(([], 'index1'), self.vespa_client.feed_batch.call_args_list[0][0])  # no vespa docs to persist
+        self.assertEqual(0, self.vespa_client.feed_batch.call_count)  # feed_batch should not be called when no valid docs remain
 
     def test_add_documents_should_handle_various_errors(self):
         self.vespa_client.feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
