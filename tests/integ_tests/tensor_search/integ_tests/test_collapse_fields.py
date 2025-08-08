@@ -1,6 +1,8 @@
 import os
 from unittest import mock
 
+import pytest
+
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
@@ -292,6 +294,7 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertDictEqual({'count': 2}, res["facets"]["price"]["2.0:4.0"])
                 self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
 
+    @pytest.mark.skip_for_multinode("Pagination result is not consistent across different Vespa infrastructures")
     def test_pagination(self):
         # Add some test documents
         docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
