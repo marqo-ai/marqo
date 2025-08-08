@@ -571,49 +571,6 @@ class StructuredVespaIndex(VespaIndex):
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
-        facet_queries = None
-
-        if marqo_query.facets or marqo_query.track_total_hits:
-            facets_query_skeleton = '%s limit 0 | %s'
-            QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
-            unique_exclusions = []
-            facet_queries = []
-            facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
-            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
-            if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
-                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
-            elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
-                base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
-
-            if marqo_query.track_total_hits is not None:
-                # 0 is byte representation of letter "t"
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
-
-            if marqo_query.facets is not None:
-                facets_term = self._get_facets_term(marqo_query.facets)
-
-                if facets_term is not None:
-                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
-
-                # Using a unique delimiter that's unlikely to appear in YQL
-
-                for facet_field in marqo_query.facets.fields.items():
-                    facet_name, facet_parameters = facet_field
-                    if facet_parameters.exclude_terms is not None:
-                        if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in unique_exclusions):
-                            continue
-                        unique_exclusions.append(set(facet_parameters.exclude_terms))
-                        new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
-                        if new_filter_term:
-                            new_filter_term = f' AND {new_filter_term}'
-                        else:
-                            new_filter_term = ''
-                        new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
-
-                        query_yql = f'{base_yql}{new_filter_term}'
-
-                        facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
-            facet_queries = QUERY_DELIMITER.join(facet_queries)
 
         query = {
             'searchChain': 'marqo',
@@ -637,7 +594,6 @@ class StructuredVespaIndex(VespaIndex):
                     marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
             ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
-            'marqo__yql.facets': facet_queries,
 
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
@@ -648,7 +604,7 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
-            
+
         query = {k: v for k, v in query.items() if v is not None}
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
@@ -657,33 +613,6 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
-
-        # Relevance cut-off part
-        if marqo_query.relevance_cutoff:
-            query["marqo__hybrid.relevanceCutoff.method"] = marqo_query.relevance_cutoff.method
-            if marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.RelativeMaxScore:
-                query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
-                    marqo_query.relevance_cutoff.parameters.relative_score_factor
-            elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
-                query["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"] = \
-                    marqo_query.relevance_cutoff.parameters.std_dev_factor
-            else:
-                # No parameters for other methods
-                pass
-            query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
-
-        # Sort by part
-        if marqo_query.sort_by:
-            query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
-            query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sort_depth
-            query["marqo__hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.min_sort_candidates
-
-            query["query_features"]["marqo__sort_field_weights_0"] = {}
-            query["query_features"]["marqo__sort_field_weights_1"] = {}
-            query["query_features"]["marqo__sort_field_weights_2"] = {}
-
-            for index, field in enumerate(marqo_query.sort_by.fields):
-                query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
 
         return query
 

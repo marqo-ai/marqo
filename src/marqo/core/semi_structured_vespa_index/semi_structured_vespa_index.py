@@ -1,24 +1,25 @@
-import uuid
 from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
+from marqo.core.models.facets_parameters import FacetsParameters
+from marqo.core.models.hybrid_parameters import RetrievalMethod
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, BOOL_FIELDS, SHORT_STRINGS_FIELDS, \
     STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS
+from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument, \
     generate_uuid_str
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 
 
@@ -85,6 +86,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
         # Hybrid must be checked first since it is a subclass of Tensor and Lexical
         if isinstance(marqo_query, MarqoHybridQuery):
+            # this overrides the StructuredVespaIndex's implementation
             return self._to_vespa_hybrid_query(marqo_query)
         elif isinstance(marqo_query, MarqoTensorQuery):
             return StructuredVespaIndex._to_vespa_tensor_query(self, marqo_query)
@@ -93,6 +95,108 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
+
+    def _to_vespa_hybrid_query(self, marqo_query):
+        # get base query from parents
+        # TODO we will need a refactoring to duplicate this
+        query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
+
+        # add facets query
+        if marqo_query.facets or marqo_query.track_total_hits:
+            query['marqo__yql.facets'] = self._generate_facet_queries(marqo_query)
+
+        # add sort by and relevance cutoff
+        self._add_relevance_cutoff_and_sort_by_params(marqo_query, query)
+
+        return query
+
+    def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
+        if marqo_query.relevance_cutoff:
+            query["marqo__hybrid.relevanceCutoff.method"] = marqo_query.relevance_cutoff.method
+            if marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.RelativeMaxScore:
+                query["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"] = \
+                    marqo_query.relevance_cutoff.parameters.relative_score_factor
+            elif marqo_query.relevance_cutoff.method == RelevanceCutoffMethod.MeanStdDev:
+                query["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"] = \
+                    marqo_query.relevance_cutoff.parameters.std_dev_factor
+            else:
+                # No parameters for other methods
+                pass
+            query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
+        # Sort by part
+        if marqo_query.sort_by:
+            query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
+            query["marqo__hybrid.sortBy.sortDepth"] = marqo_query.sort_by.sort_depth
+            query["marqo__hybrid.sortBy.minSortCandidates"] = marqo_query.sort_by.min_sort_candidates
+
+            query["query_features"]["marqo__sort_field_weights_0"] = {}
+            query["query_features"]["marqo__sort_field_weights_1"] = {}
+            query["query_features"]["marqo__sort_field_weights_2"] = {}
+
+            for index, field in enumerate(marqo_query.sort_by.fields):
+                query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
+
+    def _generate_facet_queries(self, marqo_query):
+        facets_query_skeleton = '%s limit 0 | %s'
+        QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n"
+        unique_exclusions = []
+        facet_queries = []
+
+        select_attributes = self._get_select_attributes(marqo_query)
+
+        filter_term = self._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND ({filter_term})'
+        else:
+            filter_term = ''
+
+        fields_to_search_tensor = self._get_tensor_fields_to_search(
+            searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesTensor
+        )
+        tensor_term = "False"
+        if fields_to_search_tensor:
+            marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
+            tensor_term = self._get_tensor_search_term(marqo_query)
+
+        facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+        base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
+        if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
+        elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
+            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
+
+        if marqo_query.track_total_hits is not None:
+            # 0 is byte representation of letter "t"
+            facet_queries.append(facets_query_skeleton % (
+            f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
+
+        if marqo_query.facets is not None:
+            facets_term = self._get_facets_term(marqo_query.facets)
+
+            if facets_term is not None:
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
+
+            # Using a unique delimiter that's unlikely to appear in YQL
+
+            for facet_field in marqo_query.facets.fields.items():
+                facet_name, facet_parameters = facet_field
+                if facet_parameters.exclude_terms is not None:
+                    if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in
+                           unique_exclusions):
+                        continue
+                    unique_exclusions.append(set(facet_parameters.exclude_terms))
+                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
+                    if new_filter_term:
+                        new_filter_term = f' AND {new_filter_term}'
+                    else:
+                        new_filter_term = ''
+                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms)
+
+                    query_yql = f'{base_yql}{new_filter_term}'
+
+                    facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+
+        return QUERY_DELIMITER.join(facet_queries)
 
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None) -> str:
         """
