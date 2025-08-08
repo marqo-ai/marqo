@@ -1006,6 +1006,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
             ids
         )
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes so the results may not consistently match")
     def test_sort_by_when_fields_do_not_exist_three_fields(self):
         """
         Sorting by three non-existent fields should preserve relevance-only order
