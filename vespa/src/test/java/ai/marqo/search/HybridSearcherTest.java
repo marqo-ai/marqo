@@ -150,7 +150,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose, false);
 
             // Check that the result size is correct
             // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done
@@ -232,7 +232,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose, false);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(9);
