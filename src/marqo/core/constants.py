@@ -26,6 +26,7 @@ MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0'
 MARQO_RERANK_DEPTH_MINIMUM_VERSION = semver.VersionInfo.parse('2.15.0')
 MARQO_SORT_BY_MINIMUM_VERSION = semver.VersionInfo.parse('2.22.0')
 MARQO_LANGUAGE_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
+MARQO_STEMMING_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 MARQO_PARTIAL_UPDATE_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
 
