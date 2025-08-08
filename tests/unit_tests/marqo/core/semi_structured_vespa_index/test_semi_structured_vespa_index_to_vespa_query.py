@@ -824,8 +824,6 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                          'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
                          'each(group(parent_id) output(count()))) )', vespa_query['marqo__yql.facets'])
 
-        # TODO add filter test (including the collapse field)
-
     def test_hybrid_query_without_collapse_fields(self):
         marqo_query = MarqoHybridQuery(
             index_name="test_index",

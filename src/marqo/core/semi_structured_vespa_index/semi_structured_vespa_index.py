@@ -26,7 +26,7 @@ from marqo.vespa.models import QueryResult
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     """
     An implementation of VespaIndex for SemiStructured indexes.
-    FIXME the multi-inheritance makes the implementation difficult to reason about. Consider refactor to composition
+    TODO the multi-inheritance makes the implementation difficult to reason about. Consider refactor to composition
       instead. e.g. extract different logics to different query component builders, and combined the result.
     """
     index_supports_partial_updates: bool = False
@@ -112,21 +112,21 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # add the collapse_field to query
         if marqo_query.collapse_field_name:
-            self._add_collapse_field(marqo_query.collapse_field_name, query)
+            query.update(self._generate_collapse_query_params(marqo_query.collapse_field_name))
 
         return query
 
-    def _add_collapse_field(self, collapse_field_name: str, query: Dict[str, Any]):
-        query['collapsefield'] = collapse_field_name
-        query['collapsesize'] = 1  # each group has at most 1 doc
+    def _generate_collapse_query_params(self, collapse_field_name: str):
+        return {
+            'collapsefield': collapse_field_name,
+            'collapsesize': 1,  # currently fixed to 1, will support multiple if needed in the future
 
-        # use a different rank profile to ensure diversity in the result returned to Vespa container
-        query.update({
+            # use a different rank profile to ensure diversity in the result returned to Vespa container
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25 + '_diversity',
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
-        })
+        }
 
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
         if marqo_query.relevance_cutoff:
@@ -153,6 +153,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             for index, field in enumerate(marqo_query.sort_by.fields):
                 query["query_features"][f'marqo__sort_field_weights_{index}'] = {field.field_name: 1}
+
+        return query
 
     def _generate_facet_queries(self, marqo_query):
         facets_query_skeleton = '%s limit 0 | %s'

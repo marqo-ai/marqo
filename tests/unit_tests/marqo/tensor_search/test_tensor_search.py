@@ -527,17 +527,21 @@ class TestTensorSearchValidation(MarqoTestCase):
 
         test_cases = [
             ('version check', self.semi_structured_marqo_index(name="old_index", marqo_version='2.22.0'),
-             core_exceptions.UnsupportedFeatureError, "'collapseFields' search parameter is only supported for indexes created with Marqo version 2.23.0 or later"),
+             core_exceptions.UnsupportedFeatureError,
+             "'collapseFields' search parameter is only supported for unstructured indexes created with "
+             "Marqo version 2.23.0 or later. This index is unstructured and was created with Marqo 2.22.0."),
 
             ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index'),
-             api_exceptions.InvalidArgError, "'collapseFields' search parameter is not supported for this index"),
+             core_exceptions.UnsupportedFeatureError,
+             "'collapseFields' search parameter is only supported for unstructured indexes created with "
+             "Marqo version 2.23.0 or later. This index is structured and was created with Marqo 2.23.0."),
 
             ('index without collapseFields', self.semi_structured_marqo_index(name='new_index'),
-             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as collapseFields for this index"),
+             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as a collapse field for this index"),
 
             ('index with different collapseFields', self.semi_structured_marqo_index(
                 name='new_index', collapse_fields=[CollapseField(name='parent_id')]),
-             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as collapseFields for this index")
+             api_exceptions.InvalidArgError, "Field 'variant_id' is not configured as a collapse field for this index")
         ]
 
         for name, index, exception_class, expected_error in test_cases:

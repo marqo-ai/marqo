@@ -29,7 +29,7 @@ class BaseMarqoModel(BaseModel):
     pass
 
 
-class SearchCollapseField(BaseMarqoModel):
+class SearchCollapseField(ImmutableStrictBaseModel):
     name: str
 
 

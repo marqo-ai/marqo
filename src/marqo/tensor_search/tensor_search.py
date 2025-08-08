@@ -459,20 +459,18 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     # Validate collapse field configuration
     if collapse_field_name is not None:
         # Validate if the index version support this feature
-        if marqo_index_version < constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION:
+        if (marqo_index_version < constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION or
+                not isinstance(marqo_index, SemiStructuredMarqoIndex)):
+            index_type = 'structured' if marqo_index.type == IndexType.Structured else 'unstructured'
             raise core_exceptions.UnsupportedFeatureError(
-                f"The 'collapseFields' search parameter is only supported for indexes created with Marqo version "
-                f"{str(constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION)} or later. "
-                f"This index was created with Marqo {marqo_index_version}."
+                f"The 'collapseFields' search parameter is only supported for unstructured indexes created with "
+                f"Marqo version {str(constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION)} or later. "
+                f"This index is {index_type} and was created with Marqo {marqo_index_version}."
             )
 
-        # Validate index supports collapse fields
-        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
-            raise api_exceptions.InvalidArgError("'collapseFields' search parameter is not supported for this index")
-        
-        # Validate collapse field exists in index configuration  
+        # Validate collapse field exists in index configuration
         if not marqo_index.is_collapse_field(collapse_field_name):
-            raise api_exceptions.InvalidArgError(f"Field '{collapse_field_name}' is not configured as collapseFields "
+            raise api_exceptions.InvalidArgError(f"Field '{collapse_field_name}' is not configured as a collapse field "
                                                  f"for this index")
     
     if rerank_depth is not None \

@@ -82,6 +82,7 @@ class HybridSearch:
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
+                collapse_field_name:  field name to collapse the search result on.
             Returns:
 
             Output format:
