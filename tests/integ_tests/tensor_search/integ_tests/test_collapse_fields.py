@@ -134,7 +134,7 @@ class TestCollapseFields(MarqoTestCase):
                 collapse_field_name="non_existent_field"
             )
         
-        self.assertIn("Field 'non_existent_field' is not configured as collapseFields for this index", 
+        self.assertIn("Field 'non_existent_field' is not configured as a collapse field for this index",
                       str(cm.exception))
 
     def test_search_with_valid_collapse_field_succeeds(self):
@@ -239,7 +239,7 @@ class TestCollapseFields(MarqoTestCase):
         docs = [{"_id": f"doc{g}{i:02}",
                  "title": f"Test document {g}{i:02}",
                  "parent_id": f"group_{g}",
-                 "price": g + 1,
+                 "price": float(g + 1.1),
                  "color": colors[i % 5]
                  } for i in range(10) for g in range(5)]
 
@@ -274,12 +274,12 @@ class TestCollapseFields(MarqoTestCase):
                         rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
                     collapse_field_name="parent_id",
-                    filter="price:[0 TO 3] AND (color:red OR color:yellow)",
+                    filter="price:[0 TO 4] AND (color:red OR color:yellow)",
                     facets=FacetsParameters(
                         fields={
                             "price": FieldFacetsConfiguration(type="number", ranges=[
-                                {"from": 0, "to": 1},
-                                {"from": 1, "to": 3},
+                                {"from": 0, "to": 2},
+                                {"from": 2, "to": 4},
                             ]),
                             "color": FieldFacetsConfiguration(type="string")
                         }
@@ -288,9 +288,8 @@ class TestCollapseFields(MarqoTestCase):
                 )
 
                 self.assertEqual(3, len(res["hits"]))
-                # FIXME 0.0:1.0 is 3, which comes from float group
-                # self.assertDictEqual({'count': 1}, res["facets"]["price"]["0.0:1.0"])
-                self.assertDictEqual({'count': 2}, res["facets"]["price"]["1.0:3.0"])
+                self.assertDictEqual({'count': 1}, res["facets"]["price"]["0.0:2.0"])
+                self.assertDictEqual({'count': 2}, res["facets"]["price"]["2.0:4.0"])
                 self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
 
     def test_pagination(self):
