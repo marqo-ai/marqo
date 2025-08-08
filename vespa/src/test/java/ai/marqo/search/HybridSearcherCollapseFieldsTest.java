@@ -345,5 +345,4 @@ class HybridSearcherCollapseFieldsTest {
     private String extractDocIdFromResult(Hit hit) {
         return HybridSearcher.extractDocIdFromHitId(hit.getId().toString());
     }
-
 }

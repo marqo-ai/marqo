@@ -200,7 +200,8 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Query limit cannot be null.");
         }
 
-        List<Future<Result>> futureFacets = getFacetsFutureList(query, execution, verbose, collapse);
+        List<Future<Result>> futureFacets =
+                getFacetsFutureList(query, execution, verbose, collapse);
 
         // --- Begin relevance cut-off handling ---
         // Execute probe lexical search for relevance cut-off if parameters are provided
@@ -340,7 +341,11 @@ public class HybridSearcher extends Searcher {
         return new Result(query, processedHits);
     }
 
-    private void attachFacetsResult(List<Future<Result>> futureFacets, Integer timeout, HitGroup processedHits, boolean verbose) {
+    private void attachFacetsResult(
+            List<Future<Result>> futureFacets,
+            Integer timeout,
+            HitGroup processedHits,
+            boolean verbose) {
         try {
             long startTime = System.currentTimeMillis();
             int facetCounter = 0;
@@ -377,7 +382,8 @@ public class HybridSearcher extends Searcher {
     }
 
     @VisibleForTesting
-    List<Future<Result>> getFacetsFutureList(Query query, Execution execution, boolean verbose, boolean collapse) {
+    List<Future<Result>> getFacetsFutureList(
+            Query query, Execution execution, boolean verbose, boolean collapse) {
         // Check for custom facets YQL properties - expect array of strings
         String[] facetsYqlQueries =
                 query.properties()
@@ -396,7 +402,9 @@ public class HybridSearcher extends Searcher {
                                 verbose,
                                 facetsYql);
                 if (collapse) {
-                    queryFacets.properties().set("collapsefield", null); // make sure we do not collapse
+                    queryFacets
+                            .properties()
+                            .set("collapsefield", null); // make sure we do not collapse
                 }
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
