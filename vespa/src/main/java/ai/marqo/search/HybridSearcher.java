@@ -200,29 +200,7 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Query limit cannot be null.");
         }
 
-        // --- Begin facets subquery handling ---
-        // Check for custom facets YQL properties - expect array of strings
-        String[] facetsYqlQueries =
-                query.properties()
-                        .getString("marqo__yql.facets", "")
-                        .split("\n---MARQO-YQL-QUERY-DELIMITER---\n");
-        List<Future<Result>> futureFacets = new ArrayList<>();
-
-        for (String facetsYql : facetsYqlQueries) {
-            if (!facetsYql.isEmpty()) {
-                // Create a subquery for each facet query
-                Query queryFacets =
-                        createSubQuery(
-                                query,
-                                MARQO_SEARCH_METHOD_LEXICAL,
-                                MARQO_SEARCH_METHOD_LEXICAL,
-                                verbose,
-                                facetsYql);
-                AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
-                futureFacets.add(asyncExecutionFacets.search(queryFacets));
-            }
-        }
-        // --- End facets subquery handling ---
+        List<Future<Result>> futureFacets = getFacetsFutureList(query, execution, verbose, collapse);
 
         // --- Begin relevance cut-off handling ---
         // Execute probe lexical search for relevance cut-off if parameters are provided
@@ -351,48 +329,80 @@ public class HybridSearcher extends Searcher {
                             verbose);
         }
 
-        // --- Attach facets results if available ---
         if (!futureFacets.isEmpty()) {
-            try {
-                long startTime = System.currentTimeMillis();
-                int facetCounter = 0;
-                for (Future<Result> futureFacet : futureFacets) {
-                    Result facetsResult = futureFacet.get(timeout, TimeUnit.MILLISECONDS);
-                    if (facetsResult != null && facetsResult.hits() != null) {
-                        // Ensure unique IDs for each facet group by adding counter
-                        int hitCounter = 0;
-                        for (Hit hit : facetsResult.hits().asList()) {
-                            String originalId = hit.getId().toString();
-                            if (originalId.startsWith("group:")) {
-                                hit.setId("group:facet:" + facetCounter + ":" + hitCounter);
-                                hitCounter++;
-                            }
-                        }
-                        // Add facets as children to the processed hits
-                        processedHits.addAll(facetsResult.hits().asList());
-                        facetCounter++;
-                    }
-                }
-                long facetsTime = System.currentTimeMillis() - startTime;
-                logIfVerbose(
-                        String.format(
-                                "Took %.3fms to process and attach %d facet queries",
-                                facetsTime / 1000.0, futureFacets.size()),
-                        verbose);
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                throw new RuntimeException(
-                        "Hybrid search facets timeout error. Current timeout: "
-                                + timeout
-                                + ". "
-                                + e.toString());
-            }
+            attachFacetsResult(futureFacets, timeout, processedHits, verbose);
         }
-        // --- End facets attachment ---
+
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);
+    }
+
+    private void attachFacetsResult(List<Future<Result>> futureFacets, Integer timeout, HitGroup processedHits, boolean verbose) {
+        try {
+            long startTime = System.currentTimeMillis();
+            int facetCounter = 0;
+            for (Future<Result> futureFacet : futureFacets) {
+                Result facetsResult = futureFacet.get(timeout, TimeUnit.MILLISECONDS);
+                if (facetsResult != null && facetsResult.hits() != null) {
+                    // Ensure unique IDs for each facet group by adding counter
+                    int hitCounter = 0;
+                    for (Hit hit : facetsResult.hits().asList()) {
+                        String originalId = hit.getId().toString();
+                        if (originalId.startsWith("group:")) {
+                            hit.setId("group:facet:" + facetCounter + ":" + hitCounter);
+                            hitCounter++;
+                        }
+                    }
+                    // Add facets as children to the processed hits
+                    processedHits.addAll(facetsResult.hits().asList());
+                    facetCounter++;
+                }
+            }
+            long facetsTime = System.currentTimeMillis() - startTime;
+            logIfVerbose(
+                    String.format(
+                            "Took %.3fms to process and attach %d facet queries",
+                            facetsTime / 1000.0, futureFacets.size()),
+                    verbose);
+        } catch (TimeoutException | InterruptedException | ExecutionException e) {
+            throw new RuntimeException(
+                    "Hybrid search facets timeout error. Current timeout: "
+                            + timeout
+                            + ". "
+                            + e.toString());
+        }
+    }
+
+    @VisibleForTesting
+    List<Future<Result>> getFacetsFutureList(Query query, Execution execution, boolean verbose, boolean collapse) {
+        // Check for custom facets YQL properties - expect array of strings
+        String[] facetsYqlQueries =
+                query.properties()
+                        .getString("marqo__yql.facets", "")
+                        .split("\n---MARQO-YQL-QUERY-DELIMITER---\n");
+        List<Future<Result>> futureFacets = new ArrayList<>();
+
+        for (String facetsYql : facetsYqlQueries) {
+            if (!facetsYql.isEmpty()) {
+                // Create a subquery for each facet query
+                Query queryFacets =
+                        createSubQuery(
+                                query,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                verbose,
+                                facetsYql);
+                if (collapse) {
+                    queryFacets.properties().set("collapsefield", null); // make sure we do not collapse
+                }
+                AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
+                futureFacets.add(asyncExecutionFacets.search(queryFacets));
+            }
+        }
+        return futureFacets;
     }
 
     /**
