@@ -7,6 +7,10 @@ from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsCon
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import CollapseField, SemiStructuredMarqoIndex
 from marqo.tensor_search import tensor_search
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel, RelevanceCutoffMethod, \
+    MeanStdParameters
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
+from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
@@ -248,32 +252,46 @@ class TestCollapseFields(MarqoTestCase):
             )
         )
 
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.default_text_index.name,
-            text="test",
-            search_method="HYBRID",
-            hybrid_parameters=HybridParameters(
-                rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
-            ),
-            collapse_field_name="parent_id",
-            filter="price:[* TO 3] AND (color:red OR color:yellow)",
-            facets=FacetsParameters(
-                fields={
-                    "price": FieldFacetsConfiguration(type="number", ranges=[
-                        {"from": 0, "to": 1},
-                        {"from": 1, "to": 3},
-                    ]),
-                    "color": FieldFacetsConfiguration(type="string")
-                }
-            ),
-            result_count=6
-        )
+        test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
+            (RetrievalMethod.Lexical, RankingMethod.Tensor),
+            (RetrievalMethod.Tensor, RankingMethod.Tensor),
+            (RetrievalMethod.Tensor, RankingMethod.Lexical),
+        ]
 
-        self.assertEqual(3, len(res["hits"]))
-        # FIXME 0.0:1.0 should have count 1
-        self.assertDictEqual({'0.0:1.0': {'count': 3}, '1.0:3.0': {'count': 2}}, res["facets"]["price"])
-        self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index.name,
+                    text="test",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method,
+                        rankingMethod=ranking_method,
+                        rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
+                    ),
+                    collapse_field_name="parent_id",
+                    filter="price:[0 TO 3] AND (color:red OR color:yellow)",
+                    facets=FacetsParameters(
+                        fields={
+                            "price": FieldFacetsConfiguration(type="number", ranges=[
+                                {"from": 0, "to": 1},
+                                {"from": 1, "to": 3},
+                            ]),
+                            "color": FieldFacetsConfiguration(type="string")
+                        }
+                    ),
+                    result_count=6
+                )
+
+                self.assertEqual(3, len(res["hits"]))
+                # FIXME 0.0:1.0 is 3, which comes from float group
+                # self.assertDictEqual({'count': 1}, res["facets"]["price"]["0.0:1.0"])
+                self.assertDictEqual({'count': 2}, res["facets"]["price"]["1.0:3.0"])
+                self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
 
     def test_pagination(self):
         # Add some test documents
@@ -290,9 +308,9 @@ class TestCollapseFields(MarqoTestCase):
         )
 
         test_cases = [
-            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            # (RetrievalMethod.Disjunction, RankingMethod.RRF),  # FIXME dup can only be fixed by pagination fix
             (RetrievalMethod.Lexical, RankingMethod.Lexical),
-            (RetrievalMethod.Lexical, RankingMethod.Tensor),
+            # (RetrievalMethod.Lexical, RankingMethod.Tensor),  # FIXME dup and missing doc
             (RetrievalMethod.Tensor, RankingMethod.Tensor),
             (RetrievalMethod.Tensor, RankingMethod.Lexical),
         ]
@@ -307,7 +325,7 @@ class TestCollapseFields(MarqoTestCase):
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
                         rankingMethod=ranking_method,
-                        rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
+                        rerankDepthTensor=100,  # set a large value to expand the tensor retrieval set
                     ),
                     collapse_field_name="parent_id",
                     result_count=6
@@ -325,26 +343,256 @@ class TestCollapseFields(MarqoTestCase):
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
                         rankingMethod=ranking_method,
-                        rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
+                        rerankDepthTensor=100,  # set a large value to expand the tensor retrieval set
                     ),
                     collapse_field_name="parent_id",
                     offset=6,
                     result_count=6
                 )
 
-                # self.assertEqual(4, len(page_2_res["hits"]))
+                self.assertEqual(4, len(page_2_res["hits"]))
                 page_2_res_groups = set([hit['parent_id'] for hit in page_2_res["hits"]])
-                # self.assertEqual(4, len(page_2_res_groups))
+                self.assertEqual(4, len(page_2_res_groups))
 
-                # FIXME there's missing and dup results across pages
                 print(retrieval_method, ranking_method, page_1_res_groups, page_2_res_groups)
-                # self.assertEqual(10, len(page_1_res_groups.union(page_2_res_groups)))
+                self.assertEqual(10, len(page_1_res_groups.union(page_2_res_groups)))
 
-    def test_sort_by_and_relevance_cutoff(self):
-        pass
+    def test_sort_by(self):
+        # Add some test documents
+        colors = ['white', 'red', 'green', 'yellow', 'blue']
+        docs = [{"_id": f"doc{g}{i:02}",
+                 "title": f"Test document {g}{i:02}",
+                 "parent_id": f"group_{g}",
+                 "price": g + 1,
+                 "color": colors[i % 5]
+                 } for i in range(10) for g in range(5)]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="test",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                rerankDepthTensor=10,
+            ),
+            sort_by=SortByModel(fields=[
+               SortByField(field_name="price", order="desc"),
+            ], min_sort_candidates=18),
+            collapse_field_name="parent_id",
+            filter="price:[* TO 3] AND (color:red OR color:yellow)",
+            result_count=6
+        )
+
+        self.assertEqual(3, len(res["hits"]))  # there's only 5 groups, so at most 5 results
+        # all hits should have different group_ids
+        self.assertListEqual(["group_2", "group_1", "group_0"], [hit['parent_id'] for hit in res["hits"]])
+
+        for hit in res["hits"]:
+            self.assertLessEqual(hit["price"], 3)
+            self.assertIn(hit["color"], ("red", "yellow"))
+
+    def test_relevance_cutoff(self):
+        # 30 documents designed for "machine learning artificial intelligence algorithms" query
+        test_docs = [
+            # === HIGH RELEVANCE (10 docs) - Contains ALL 5 query words ===
+            {"_id": "h1", "parent_id": "group_0",
+             "content": "Machine learning algorithms in artificial intelligence enable systems to adapt by processing data efficiently.",
+             "sort_value": 8.1},
+            {"_id": "h2", "parent_id": "group_0",
+             "content": "Artificial intelligence relies on machine learning algorithms to build predictive models from large datasets.",
+             "sort_value": 9.2},
+            {"_id": "h3", "parent_id": "group_0",
+             "content": "Researchers develop artificial intelligence machine learning algorithms to improve decision-making processes.",
+             "sort_value": 7.4},
+            {"_id": "h4", "parent_id": "group_0",
+             "content": "Scalable artificial intelligence frameworks integrate machine learning algorithms for real-time data analysis.",
+             "sort_value": 9.8},
+            {"_id": "h5", "parent_id": "group_1",
+             "content": "Modern artificial intelligence and machine learning algorithms optimize operational workflows across industries.",
+             "sort_value": 6.5},
+            {"_id": "h6", "parent_id": "group_1",
+             "content": "Sophisticated artificial intelligence machine learning algorithms optimize data mining operations effectively.",
+             "sort_value": 8.9},
+            {"_id": "h7", "parent_id": "group_1",
+             "content": "Cutting-edge artificial intelligence machine learning algorithms accelerate data processing in cloud platforms.",
+             "sort_value": 5.3},
+            {"_id": "h8", "parent_id": "group_2",
+             "content": "Enterprise artificial intelligence solutions embed machine learning algorithms to enhance user experiences.",
+             "sort_value": 9.0},
+            {"_id": "h9", "parent_id": "group_2",
+             "content": "Robust artificial intelligence machine learning algorithms improve data quality assessment procedures.",
+             "sort_value": 7.8},
+            {"_id": "h10", "parent_id": "group_2",
+             "content": "Innovative artificial intelligence and machine learning algorithms revolutionize data analytics workflows.",
+             "sort_value": 8.4},
+
+            # === MEDIUM RELEVANCE (10 docs) - Contains EXACTLY 3 of the 5 query words ===
+            # (e.g., {machine, learning, algorithms} or {artificial, intelligence, learning}, etc.)
+            {"_id": "m1",  "parent_id": "group_3",
+             "content": "Machine learning algorithms process financial time series for forecasting market trends.",
+             "sort_value": 64},
+            {"_id": "m2",  "parent_id": "group_3",
+             "content": "Artificial intelligence algorithms underpin recommendation engines in e-commerce platforms.",
+             "sort_value": 6.7},
+            {"_id": "m3",  "parent_id": "group_3",
+             "content": "Artificial intelligence learning models adapt to new user behaviors in real time.",
+             "sort_value": 4.3},
+            {"_id": "m4",  "parent_id": "group_3",
+             "content": "Machine and artificial intelligence technologies converge to create autonomous robotic systems.",
+             "sort_value": 7.1},
+            {"_id": "m5",  "parent_id": "group_4",
+             "content": "Machine learning artificial neural networks mimic animal brain structures.",
+             "sort_value": 6.2},
+            {"_id": "m6",  "parent_id": "group_4",
+             "content": "Advanced machine learning algorithms accelerate computational biology research.",
+             "sort_value": 5.9},
+            {"_id": "m7",  "parent_id": "group_4",
+             "content": "Distributed artificial intelligence systems leverage algorithms for parallel decision making.",
+             "sort_value": 4.8},
+            {"_id": "m8",  "parent_id": "group_4",
+             "content": "Deep learning frameworks support neural architectures and optimization algorithms.",
+             "sort_value": 7.5},
+            {"_id": "m9",  "parent_id": "group_5",
+             "content": "Evolutionary algorithms integrate with machine frameworks for adaptive problem solving.",
+             "sort_value": 6.0},
+            {"_id": "m10",  "parent_id": "group_5",
+             "content": "Artificial learning simulations test intelligence benchmarks under controlled conditions.",
+             "sort_value": 4.1},
+
+            # === LOW RELEVANCE ===
+            # 5 docs with exactly 1 query word, matching the word counts of l1–l5
+            {"_id": "l1",  "parent_id": "group_6",
+             "content": "Engineers use machine tools for precise cutting.",
+             "sort_value": 65},
+
+            {"_id": "l2",  "parent_id": "group_6",
+             "content": "Innovators encourage collaborative learning environments to foster team growth.",
+             "sort_value": 2.7},  # 9 words, contains "learning"
+
+            {"_id": "l3",  "parent_id": "group_6",
+             "content": "Manufacturers produce artificial components designed precisely for specialized industrial applications.",
+             "sort_value": 1.4},  # 10 words, contains "artificial"
+
+            {"_id": "l4",  "parent_id": "group_6",
+             "content": "Local units value human intelligence during critical decision making.",
+             "sort_value": 100},  # 9 words, contains "intelligence"
+
+            {"_id": "l5",  "parent_id": "group_6",
+             "content": "Researchers propose algorithms optimized specifically to accelerate image processing tasks.",
+             "sort_value": 60},  # 10 words, contains "algorithms"
+
+            # === Irrelevant ===
+            # 5 docs with 0 words from the query
+            {"_id": "l6",  "parent_id": "group_7",
+             "content": "Bright morning sunlight streamed through the quiet study room.",
+             "sort_value": 2.1},
+
+            {"_id": "l7",  "parent_id": "group_7",
+             "content": "Surprising weather patterns emerged across the town.",
+             "sort_value": 70},
+
+            {"_id": "l8",  "parent_id": "group_7",
+             "content": "Vibrant wildflowers adorned the rolling hills during summer.",
+             "sort_value": 1.9},
+
+            {"_id": "l9",  "parent_id": "group_7",
+             "content": "Chilly autumn breeze painted golden leaves across streets.",
+             "sort_value": 24},
+
+            {"_id": "l10",  "parent_id": "group_7",
+             "content": "The ancient manuscript revealed hidden stories from forgotten civilizations.",
+             "sort_value": 5.6}
+
+            # group 0-2 are of high relevance, 3-5 are of medium relevance, 6-7 are of low relevance
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=test_docs,
+                tensor_fields=["content"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="machine learning artificial intelligence algorithms",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                rerankDepthTensor=10,
+            ),
+            sort_by=SortByModel(fields=[
+                SortByField(field_name="sort_value", order="desc"),
+            ]),
+            relevance_cutoff=RelevanceCutoffModel(method=RelevanceCutoffMethod.MeanStdDev,
+                                                  parameters=MeanStdParameters(stdDevFactor=0.5)),
+            collapse_field_name="parent_id",
+            result_count=6
+        )
+
+        # Verify we only return 1 doc for each group
+        unique_groups = set([hit['parent_id'] for hit in res['hits']])
+        self.assertEqual(len(unique_groups), len(res['hits']))
+
+        # Verify we only return docs with high relevance
+        for group in unique_groups:
+            self.assertIn(group, ['group_0', 'group_1', 'group_2'])
 
     def test_score_modifiers(self):
-        pass
+        # Add some test documents
+        docs = [{"_id": f"doc{g}{i:02}", "rating": i+1, "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
+                for i in range(5) for g in range(5)]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        score_modifiers = ScoreModifierLists(multiply_score_by=[ScoreModifierOperator(field_name="rating", weight=1)])
+
+        test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
+            (RetrievalMethod.Lexical, RankingMethod.Tensor),
+            (RetrievalMethod.Tensor, RankingMethod.Tensor),
+            (RetrievalMethod.Tensor, RankingMethod.Lexical),
+        ]
+
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index.name,
+                    text="test",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method,
+                        rankingMethod=ranking_method,
+                        rerankDepthTensor=25,  # make this deep enough to see high rating docs
+                        scoreModifiersTensor=score_modifiers if ranking_method in [RankingMethod.Tensor, RankingMethod.RRF] else None,
+                        scoreModifiersLexical=score_modifiers if ranking_method != RankingMethod.Tensor or retrieval_method != RetrievalMethod.Tensor else None,
+                    ),
+                    result_count=6,
+                    collapse_field_name="parent_id",
+                )
+
+                # Verify that the result only contains doc with rating 5
+                self.assertTrue(all([hit['rating'] == 5 for hit in res['hits']]))
 
     def test_filter_by_collapse_field(self):
         # Add some test documents

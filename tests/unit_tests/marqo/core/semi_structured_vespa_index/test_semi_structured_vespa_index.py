@@ -346,3 +346,68 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
                 'marqo__vector_count': 1
             },
         }, vespa_doc)
+
+    def test_combine_number_stats_empty_current_stats(self):
+        """Test _combine_number_stats when current_stats is empty"""
+        stats = {"count": 5, "sum": 100, "avg": 20.0, "min": 10, "max": 30}
+        result = self.vespa_index._combine_number_stats({}, stats)
+        self.assertEqual(stats, result)
+
+    def test_combine_number_stats_complete_stats(self):
+        """Test _combine_number_stats with complete statistics"""
+        current_stats = {"count": 3, "sum": 60, "avg": 20.0, "min": 15, "max": 25}
+        stats = {"count": 2, "sum": 40, "avg": 20.0, "min": 10, "max": 30}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 5,  # 3 + 2
+            "sum": 100,  # 60 + 40
+            "avg": 20.0,  # (20.0 * 3 + 20.0 * 2) / (3 + 2) = 100 / 5
+            "min": 10,   # min(15, 10)
+            "max": 30    # max(25, 30)
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_partial_stats(self):
+        """Test _combine_number_stats with partial statistics (missing some fields)"""
+        current_stats = {"count": 4, "sum": 80, "min": 5}
+        stats = {"count": 3, "max": 50}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 7,  # 4 + 3
+            # sum not in both, so not included in result
+            # avg not in both, so not included in result  
+            # min only in current_stats, so not included
+            # max only in stats, so not included
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_weighted_average_calculation(self):
+        """Test _combine_number_stats weighted average calculation with different counts"""
+        current_stats = {"count": 10, "avg": 15.0}
+        stats = {"count": 5, "avg": 30.0}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 15,  # 10 + 5
+            "avg": 20.0   # (15.0 * 10 + 30.0 * 5) / (10 + 5) = 300 / 15 = 20.0
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_min_max_edge_cases(self):
+        """Test _combine_number_stats min/max with edge case values"""
+        current_stats = {"count": 2, "min": -100, "max": 0}
+        stats = {"count": 3, "min": 50, "max": -10}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 5,    # 2 + 3
+            "min": -100,   # min(-100, 50)
+            "max": 0       # max(0, -10)
+        }
+        self.assertEqual(expected, result)
