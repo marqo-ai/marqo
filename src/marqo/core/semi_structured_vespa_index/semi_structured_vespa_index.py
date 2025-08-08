@@ -346,6 +346,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if node.field == MARQO_DOC_ID:
                 return f'({VESPA_FIELD_ID} contains "{node.value}")'
 
+            if self.get_marqo_index().is_collapse_field(node.field):
+                # collapse field is indexed as attribute, can be used directly in a filter term
+                return f'({node.field} contains "{node.value}")'
+
             # Bool Filter
             if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
                 filter_value = int(True if node.value.lower() == "true" else False)

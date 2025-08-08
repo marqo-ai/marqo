@@ -55,6 +55,38 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
                 result_filter_string = self.vespa_index._get_filter_term(marqo_query)
                 self.assertIn(expected_result, result_filter_string,)
 
+    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_index.SemiStructuredVespaIndex.get_marqo_index')
+    def test_get_filter_string_collapse_field(self, mock_get_marqo_index):
+        """
+        Test that collapse fields use direct attribute filtering instead of standard filtering logic
+        """
+        # Mock the is_collapse_field method
+        mock_index = mock_get_marqo_index.return_value
+        mock_index.is_collapse_field.side_effect = lambda field: field in ['parent_id', 'variant_id']
+        
+        test_cases = [
+            # Collapse field filtering - should use direct attribute filter
+            ('parent_id:group_1', '(parent_id contains "group_1")'),
+            # Test it works on different collapse field name
+            ('variant_id:product_123', '(variant_id contains "product_123")'),
+            # Escape special characters in collapse field values - quotes need escaping  
+            ('parent_id:group"test', '(parent_id contains "group\\"test")'),
+            # non-collapse field works differently
+            ('color:red', '((marqo__short_string_fields contains sameElement(key contains "color", value contains "red")))'),
+        ]
+        
+        for filter_string, expected_result in test_cases:
+            with self.subTest(filter_string=filter_string):
+                marqo_query = MarqoQuery(
+                    index_name=self.vespa_index._marqo_index.name,
+                    limit=10,
+                    filter=filter_string,
+                    score_modifiers=[],
+                    expose_facets=False
+                )
+                result_filter_string = self.vespa_index._get_filter_term(marqo_query)
+                self.assertEqual(expected_result, result_filter_string)
+
     def test_vespa_to_marqo_conversion_should_handle_all_fields_from_search_result(self):
         vespa_doc = {
             "id": "index:index1/1/123",

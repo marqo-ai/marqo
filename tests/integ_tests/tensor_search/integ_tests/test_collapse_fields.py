@@ -177,8 +177,6 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertEqual(5, len(res["hits"]))  # there's only 5 groups, so at most 5 results
                 self.assertEqual(set([f"group_{g}" for g in range(5)]), set([hit['parent_id'] for hit in res["hits"]]))
 
-                # TODO find a test case to fail the RRF due to RRF dup
-
     def test_filter(self):
         # Add some test documents
         colors = ['white', 'red', 'green', 'yellow', 'blue']
@@ -349,6 +347,47 @@ class TestCollapseFields(MarqoTestCase):
         pass
 
     def test_filter_by_collapse_field(self):
-        # TODO check if filter by collapse_field needs to be supported (better to support lexical)
-        pass
+        # Add some test documents
+        docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
+                for i in range(5) for g in range(5)]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        hybrid_res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="test",
+            search_method="HYBRID",
+            filter="parent_id:group_1",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Lexical,
+                rankingMethod=RankingMethod.Lexical,
+            ),
+            result_count=10
+        )
+
+        # Verify the search returns all docs in one group
+        self.assertEqual(5, len(hybrid_res["hits"]))
+        self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in hybrid_res["hits"]]))
+
+        # verify lexical search also works
+        lexical_res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="*",
+            search_method="LEXICAL",
+            filter="parent_id:group_1",
+            result_count=10
+        )
+
+        # Verify the search returns all docs in one group
+        self.assertEqual(5, len(lexical_res["hits"]))
+        self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in lexical_res["hits"]]))
 
