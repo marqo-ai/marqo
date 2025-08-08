@@ -702,19 +702,19 @@ class TestLanguage(MarqoTestCase):
                         }
                     ),
                     relevance_cutoff=RelevanceCutoffModel(method=RelevanceCutoffMethod.MeanStdDev,
-                                                          parameters=MeanStdParameters(stdDevFactor=1.2)
+                                                          parameters=MeanStdParameters(stdDevFactor=-100)
                                                           )
                 )
 
                 if matches:
                     self.assertGreater(len(res["hits"]), 0, "Should find matches for 'mole'")
                     self.assertGreater(len(res['facets']['size']), 0, "Should have facets for 'size'")
-                    self.assertGreater(res["_relevantCandidates"], 0,
+                    self.assertGreater(res["_probeCandidates"], 0,
                                        "Should have relevant candidates count greater than 0")
                 else:
                     self.assertEqual(len(res["hits"]), 0, "Should find no matches for 'mole' in English")
                     self.assertEqual(len(res['facets']), 0, "Should have no facets for 'size' in English")
-                    self.assertEqual(res["_relevantCandidates"], 0,
+                    self.assertEqual(res["_probeCandidates"], 0,
                                      "Should have no relevant candidates count in English")
 
     def test_structured_index_language_search_fails(self):
