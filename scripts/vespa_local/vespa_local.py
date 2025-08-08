@@ -157,6 +157,7 @@ class VespaLocalSingleNode(VespaLocal):
                     <search/>
                     <nodes>
                         <node hostalias="node1"/>
+                        <jvm options="-Xms32M -Xmx256M -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" />
                     </nodes>
                 </container>
                 <content id="content_default" version="1.0">

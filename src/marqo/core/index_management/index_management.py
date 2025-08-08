@@ -219,24 +219,25 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
+        existing_index = self.get_index(marqo_index.name)
+        if not isinstance(existing_index, SemiStructuredMarqoIndex):
+            # This is just a sanity check, it should not happen since we do not expose this method to end user.
+            raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
+                                f'can not be updated.')
+
+        def is_subset(dict_a, dict_b):
+            # check if dict_a is a subset of dict_b
+            return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
+
+        if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
+                is_subset(marqo_index.field_map, existing_index.field_map) and
+                    is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
+            logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
+            return
+
         with self._vespa_deployment_lock():
-            existing_index = self.get_index(marqo_index.name)
-            if not isinstance(existing_index, SemiStructuredMarqoIndex):
-                # This is just a sanity check, it should not happen since we do not expose this method to end user.
-                raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
-                                    f'can not be updated.')
-
-            def is_subset(dict_a, dict_b):
-                # check if dict_a is a subset of dict_b
-                return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
-
-            if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
-                    is_subset(marqo_index.field_map, existing_index.field_map) and
-                        is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
-                logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
-                return
-
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+            logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:

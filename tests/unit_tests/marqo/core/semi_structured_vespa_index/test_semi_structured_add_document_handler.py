@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 from marqo.core.exceptions import InvalidArgumentError
+from marqo.core.models.marqo_index import Stemming
 from marqo.core.inference.api import InferenceRequest, InferenceResult, Modality
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
@@ -35,6 +36,9 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             return InferenceResult(result=result)
 
         self.mock_inference.vectorise.side_effect = vectorise_side_effect
+
+        # Setup vespa client mock for translate_vespa_document_response
+        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
     def test_add_documents_success(self, mock_infer_modality):
@@ -80,10 +84,10 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         ]
 
         mappings = {
-            "title": {"type": "text_field", "language": "es"},
-            "description": {"type": "text_field", "language": "en"},
-            "categories": {"type": "text_field", "language": "en"},
-            "tags": {"type": "text_field", "language": "en"},
+            "title": {"type": "text_field", "language": "es", "stemming": "best"},
+            "description": {"type": "text_field", "language": "en", "stemming": "shortest"},
+            "categories": {"type": "text_field", "language": "en", "stemming": "multiple"},
+            "tags": {"type": "text_field", "language": "en", "stemming": "none"},
             "multimodal_content": {"type": "text_field", "language": "en"},
             "audio_description": {"type": "text_field", "language": "en"},
             "my_custom_vector": {"type": "custom_vector"},
@@ -97,132 +101,131 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             }
         }
 
-        add_docs_params = AddDocsParams(
-            index_name="test_index",
-            docs=docs,
-            device="cpu",
-            tensor_fields=["content", "multimodal_content", "audio_description", "image_url", "combined_content",
-                           "my_custom_vector", "embedding_vector"],
-            mappings=mappings,
-            use_existing_tensors=False,
-            text_chunk_prefix="chunk:"
-        )
+        mappings_cases = [mappings, None]
+        for mappings in mappings_cases:
+            with self.subTest(mappings=mappings):
+                add_docs_params = AddDocsParams(
+                    index_name="test_index",
+                    docs=docs,
+                    device="cpu",
+                    tensor_fields=["content", "multimodal_content", "audio_description", "image_url",
+                                   "combined_content",
+                                   "my_custom_vector", "embedding_vector"],
+                    mappings=mappings,
+                    use_existing_tensors=False,
+                    text_chunk_prefix="chunk:"
+                )
 
-        marqo_index = self.semi_structured_marqo_index(
-            name="test_index",
-            tensor_field_names=[],
-            lexical_field_names=[],
-            string_array_field_names=[]
-        )
+                marqo_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    tensor_field_names=[],
+                    lexical_field_names=[],
+                    string_array_field_names=[]
+                )
 
-        # Mock external dependencies  
-        mock_infer_modality.return_value = Modality.TEXT
+                # Mock external dependencies
+                mock_infer_modality.return_value = Modality.TEXT
 
-        # Mock vespa client feed_batch response with proper structure
-        mock_feed_responses = [
-            FeedBatchDocumentResponse(status=200, id="doc1", message="OK"),
-            FeedBatchDocumentResponse(status=200, id="doc2", message="OK"),
-            FeedBatchDocumentResponse(status=200, id="doc3", message="OK")
-        ]
-        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
-            responses=mock_feed_responses,
-            errors=False
-        )
+                # Mock vespa client feed_batch response with proper structure
+                mock_feed_responses = [
+                    FeedBatchDocumentResponse(status=200, id="doc1", message="OK"),
+                    FeedBatchDocumentResponse(status=200, id="doc2", message="OK"),
+                    FeedBatchDocumentResponse(status=200, id="doc3", message="OK")
+                ]
+                self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+                    responses=mock_feed_responses,
+                    errors=False
+                )
 
-        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
+                self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
-        handler = SemiStructuredAddDocumentsHandler(
-            marqo_index=marqo_index,
-            add_docs_params=add_docs_params,
-            vespa_client=self.mock_vespa_client,
-            index_management=self.mock_index_management,
-            inference=self.mock_inference,
-            field_count_config=self.field_count_config
-        )
+                handler = SemiStructuredAddDocumentsHandler(
+                    marqo_index=marqo_index,
+                    add_docs_params=add_docs_params,
+                    vespa_client=self.mock_vespa_client,
+                    index_management=self.mock_index_management,
+                    inference=self.mock_inference,
+                    field_count_config=self.field_count_config
+                )
 
-        response = handler.add_documents()
+                response = handler.add_documents()
 
-        self.assertIsInstance(response, MarqoAddDocumentsResponse)
-        self.assertEqual("test_index", response.index_name)
-        self.assertIsInstance(response.processingTimeMs, (int, float))
-        self.assertGreater(response.processingTimeMs, 0)
-        self.assertGreater(len(response.items), 0)
+                self.assertIsInstance(response, MarqoAddDocumentsResponse)
+                self.assertEqual("test_index", response.index_name)
+                self.assertIsInstance(response.processingTimeMs, (int, float))
+                self.assertGreater(response.processingTimeMs, 0)
+                self.assertGreater(len(response.items), 0)
 
-        # Verify successful documents were processed correctly
-        successful_items = [item for item in response.items if item.status == 200]
-        self.assertEqual(3, len(successful_items))
+                # Verify successful documents were processed correctly
+                successful_items = [item for item in response.items if item.status == 200]
+                self.assertEqual(3, len(successful_items))
 
-        # Verify that vespa client was called for feeding documents
-        self.mock_vespa_client.feed_batch.assert_called()
+                # Verify that vespa client was called for feeding documents
+                self.mock_vespa_client.feed_batch.assert_called()
 
-    def test_add_documents_with_language_on_old_index_raises_error(self):
-        """Test that using language mapping on an old index raises AddDocumentsError"""
+    def test_add_documents_with_language_or_stemming_on_old_index_raises_error(self):
+        """Test that using language and/or stemming mapping on an old index raises AddDocumentsError"""
         old_marqo_index = self.semi_structured_marqo_index(
             name="old_test_index",
-            marqo_version="2.15.0",  # Version before language support
+            marqo_version="2.15.0",  # Version before language/stemming support
             tensor_field_names=[],
             lexical_field_names=[],
             string_array_field_names=[]
         )
 
-        docs = [
-            {
-                "_id": "doc1",
-                "title": "Hola mundo",
-                "description": "Este es un documento en español"
-            }
-        ]
+        docs = [{"_id": "doc1", "title": "Test document"}]
 
-        mappings = {
-            "title": {"type": "text_field", "language": "es"}
-        }
-
-        add_docs_params = AddDocsParams(
-            index_name="old_test_index",
-            docs=docs,
-            device="cpu",
-            tensor_fields=[],
-            mappings=mappings,
-            use_existing_tensors=False
-        )
-
-        mock_feed_responses = [
-            FeedBatchDocumentResponse(status=200, id="doc1", message="OK")
-        ]
+        # Mock feed response
+        mock_feed_responses = [FeedBatchDocumentResponse(status=200, id="doc1", message="OK")]
         self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
-            responses=mock_feed_responses,
-            errors=False
+            responses=mock_feed_responses, errors=False
         )
         self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
 
-        handler = SemiStructuredAddDocumentsHandler(
-            marqo_index=old_marqo_index,
-            add_docs_params=add_docs_params,
-            vespa_client=self.mock_vespa_client,
-            index_management=self.mock_index_management,
-            inference=self.mock_inference,
-            field_count_config=self.field_count_config
-        )
+        test_cases = [
+            ("language_only", {"type": "text_field", "language": "es"}, "Language is only supported"),
+            ("stemming_only", {"type": "text_field", "stemming": "best"}, "Stemming is only supported"),
+            ("both", {"type": "text_field", "language": "es", "stemming": "best"}, "Language is only supported")
+        ]
 
-        response = handler.add_documents()
+        for case_name, mapping, expected_error_text in test_cases:
+            with self.subTest(case=case_name):
+                add_docs_params = AddDocsParams(
+                    index_name="old_test_index",
+                    docs=docs,
+                    device="cpu",
+                    tensor_fields=[],
+                    mappings={"title": mapping},
+                    use_existing_tensors=False
+                )
 
-        self.assertIsInstance(response, MarqoAddDocumentsResponse)
-        self.assertEqual("old_test_index", response.index_name)
+                handler = SemiStructuredAddDocumentsHandler(
+                    marqo_index=old_marqo_index,
+                    add_docs_params=add_docs_params,
+                    vespa_client=self.mock_vespa_client,
+                    index_management=self.mock_index_management,
+                    inference=self.mock_inference,
+                    field_count_config=self.field_count_config
+                )
 
-        error_items = [item for item in response.items if item.status != 200]
-        self.assertEqual(1, len(error_items), "Expected exactly one error item")
+                response = handler.add_documents()
 
-        # Check that at least one document failed with the language version error
-        error_item = error_items[0]
-        self.assertIn("Language is only supported for indexes created with Marqo version", str(error_item.error))
-        self.assertIn("2.16.0", error_item.error)
-        self.assertIn("2.15.0", error_item.error)
+                self.assertIsInstance(response, MarqoAddDocumentsResponse)
+                self.assertEqual("old_test_index", response.index_name)
 
-    def test_text_field_mapping_without_language_raises_invalid_argument_error(self):
-        """Test that text_field mapping without language specification raises InvalidArgumentError"""
+                error_items = [item for item in response.items if item.status != 200]
+                self.assertEqual(1, len(error_items), f"Expected exactly one error item for {case_name}")
+
+                error_item = error_items[0]
+                self.assertIn(expected_error_text, str(error_item.error))
+                self.assertIn("2.16.0", error_item.error)
+                self.assertIn("2.15.0", error_item.error)
+
+    def test_text_field_mapping_without_language_or_stemming_raises_invalid_argument_error(self):
+        """Test that text_field mapping without language or stemming specification raises InvalidArgumentError"""
         docs = [{"_id": "doc1", "title": "Test document"}]
         mappings = {"title": {"type": "text_field"}}  # Missing language specification
-        
+
         add_docs_params = AddDocsParams(
             index_name="test_index",
             docs=docs,
@@ -239,7 +242,7 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             string_array_field_names=[]
         )
 
-        with self.assertRaises(InvalidArgumentError):
+        with self.assertRaises(InvalidArgumentError) as cm:
             SemiStructuredAddDocumentsHandler(
                 marqo_index=marqo_index,
                 add_docs_params=add_docs_params,
@@ -248,6 +251,138 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
                 inference=self.mock_inference,
                 field_count_config=self.field_count_config
             )
+
+        error_message = str(cm.exception)
+        self.assertIn("text_field", error_message)
+        self.assertIn("language", error_message.lower())
+        self.assertIn("stemming", error_message.lower())
+
+    def test_language_and_stemming_field_consistency_validation(self):
+        """Test that stemming and language configuration cannot be changed for existing fields"""
+        docs = [{"_id": "doc1", "title": "Test document"}]
+
+        marqo_index = self.semi_structured_marqo_index(
+            name="consistency_test_index",
+            tensor_field_names=[],
+            lexical_field_names=["title"],  # Field already exists
+            string_array_field_names=[]
+        )
+
+        # Mock feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[], errors=False
+        )
+
+        from marqo.core.models.marqo_index import Field
+
+        test_cases = [
+            (
+                "stemming_change",
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
+                {"type": "text_field", "stemming": "shortest", "language": "en"},  # New mapping
+                ["different stemming configuration", "Cannot change stemming"]
+            ),
+            (
+                "language_change",
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
+                {"type": "text_field", "stemming": "best", "language": "es"},  # New mapping
+                ["different language configuration", "Cannot change language"]
+            ),
+            (
+                "both_change",
+                {"stemming": Stemming.Best, "language": "en"},  # Existing field config
+                {"type": "text_field", "stemming": "shortest", "language": "es"},  # New mapping
+                ["different language configuration", "Cannot change language"]  # Language error comes first
+            )
+        ]
+
+        for case_name, existing_config, new_mapping, expected_errors in test_cases:
+            with self.subTest(case=case_name):
+                # Set up existing field with specific configuration
+                existing_field = marqo_index.field_map["title"]
+                field_with_config = Field(
+                    name=existing_field.name,
+                    type=existing_field.type,
+                    features=existing_field.features,
+                    lexical_field_name=existing_field.lexical_field_name,
+                    filter_field_name=existing_field.filter_field_name,
+                    dependent_fields=existing_field.dependent_fields,
+                    language=existing_config.get("language"),
+                    stemming=existing_config.get("stemming")
+                )
+                marqo_index.field_map["title"] = field_with_config
+
+                add_docs_params = AddDocsParams(
+                    index_name="consistency_test_index",
+                    docs=docs,
+                    device="cpu",
+                    tensor_fields=[],
+                    mappings={"title": new_mapping},
+                    use_existing_tensors=False
+                )
+
+                handler = SemiStructuredAddDocumentsHandler(
+                    marqo_index=marqo_index,
+                    add_docs_params=add_docs_params,
+                    vespa_client=self.mock_vespa_client,
+                    index_management=self.mock_index_management,
+                    inference=self.mock_inference,
+                    field_count_config=self.field_count_config
+                )
+
+                response = handler.add_documents()
+
+                # Should have errors due to configuration mismatch
+                error_items = [item for item in response.items if item.status != 200]
+                self.assertEqual(1, len(error_items), f"Expected exactly one error item for {case_name}")
+
+                error_item = error_items[0]
+                error_message = str(error_item.error)
+                for expected_error in expected_errors:
+                    self.assertIn(expected_error, error_message,
+                                  f"Expected '{expected_error}' in error message for {case_name}")
+
+    def test_stemming_value_validation(self):
+        """Test that invalid stemming values raise appropriate errors"""
+        docs = [{"_id": "doc1", "title": "Test document"}]
+
+        marqo_index = self.semi_structured_marqo_index(
+            name="stemming_validation_test",
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+
+        add_docs_params = AddDocsParams(
+            index_name="stemming_validation_test",
+            docs=docs,
+            device="cpu",
+            tensor_fields=[],
+            mappings={
+                "title": {"type": "text_field", "stemming": "invalid_algorithm"}
+            },
+            use_existing_tensors=False
+        )
+
+        # Mock feed response
+        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
+            responses=[], errors=False
+        )
+
+        # Should raise InvalidArgumentError during initialization due to invalid stemming value
+        with self.assertRaises(InvalidArgumentError) as cm:
+            handler = SemiStructuredAddDocumentsHandler(
+                marqo_index=marqo_index,
+                add_docs_params=add_docs_params,
+                vespa_client=self.mock_vespa_client,
+                index_management=self.mock_index_management,
+                inference=self.mock_inference,
+                field_count_config=self.field_count_config
+            )
+
+        error_message = str(cm.exception)
+        self.assertIn("is not one of", error_message)
+        self.assertIn("invalid_algorithm", error_message)
 
     def test_collapse_field_validation_should_succeed(self):
         """Test collapse field validation with various success scenarios"""

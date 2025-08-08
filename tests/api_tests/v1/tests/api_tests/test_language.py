@@ -33,19 +33,22 @@ class TestLanguage(MarqoTestCase):
                 "_id": "1",
                 "title1": "Vestido Mole Perfeito",  # Portuguese
                 "title2": "Collections de livres",  # French
-                "title3": "White dog"  # English
+                "title3": "White dog",  # English,
+                "size": "M"
             },
             {
                 "_id": "2",
                 "title1": "Vestido Mole Confortável",
                 "title2": "collections art francais",
-                "title3": "black cat"
+                "title3": "black cat",
+                "size": "M"
             },
             {
                 "_id": "3",
                 "title1": "Vestido Leve e Elegante",
                 "title2": "mes collections Preferees",
-                "title3": "blue sky"
+                "title3": "blue sky",
+                "size": "S"
             }
         ]
 
@@ -174,6 +177,43 @@ class TestLanguage(MarqoTestCase):
 
         self.assertEqual(["1"], hits_pt, "Should find only the Portuguese doc")
         self.assertEqual(["2"], hits_en, "Should find only the English doc")
+
+    def test_facets_and_relevance_cutoff(self):
+        self.populate_index()
+
+        cases = [
+            ("pt", True),
+            ("en", False)
+        ]
+
+        for language, matches in cases:
+            with self.subTest(f"Testing facets and relevance cutoff for language: {language}"):
+                res = self.client.index(self.multilingual_index_name).search(
+                    q="mole",
+                    search_method="HYBRID",
+                    language=language,
+                    hybrid_parameters={
+                        'searchableAttributesLexical': ['title1'],
+                        'retrievalMethod': 'lexical',
+                        'rankingMethod': 'lexical',
+                    }, # Use lexical retrieval so that facets don't get tensor hits
+                    facets={
+                        "fields": {
+                            "size": {"type": "string"}
+                        }
+                    }, relevance_cutoff={"method": "mean_std_dev", "parameters": {"stdDevFactor": 1.2}},
+                )
+
+                if matches:
+                    self.assertGreater(len(res["hits"]), 0, "Should find matches for 'mole'")
+                    self.assertGreater(len(res['facets']['size']), 0, "Should have facets for 'size'")
+                    self.assertGreater(res["_relevantCandidates"], 0,
+                                       "Should have relevant candidates count greater than 0")
+                else:
+                    self.assertEqual(len(res["hits"]), 0, "Should find no matches for 'mole' in English")
+                    self.assertEqual(len(res['facets']), 0, "Should have no facets for 'size' in English")
+                    self.assertEqual(res["_relevantCandidates"], 0,
+                                     "Should have no relevant candidates count in English")
 
     def test_tensor_search_with_language_error(self):
         """Test that specifying language for tensor search raises an error."""

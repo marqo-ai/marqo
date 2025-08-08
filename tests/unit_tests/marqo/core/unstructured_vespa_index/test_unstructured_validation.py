@@ -76,9 +76,9 @@ class TestValidateMappingsObject(unittest.TestCase):
                 "exception_type": InvalidArgError
             },
             {
-                "description": "text field missing language",
+                "description": "text field missing language and stemming",
                 "mapping": {"field": {"type": "text_field"}},
-                "expected_error": "'language' is a required property",
+                "expected_error": "not valid under any of the given schemas",
                 "exception_type": InvalidArgumentError
             },
             {
