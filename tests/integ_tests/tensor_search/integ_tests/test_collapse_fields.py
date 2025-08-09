@@ -394,7 +394,7 @@ class TestCollapseFields(MarqoTestCase):
             result_count=6
         )
 
-        self.assertEqual(3, len(res["hits"]))  # there's only 5 groups, so at most 5 results
+        self.assertEqual(3, len(res["hits"]))
         # all hits should have different group_ids
         self.assertListEqual(["group_2", "group_1", "group_0"], [hit['parent_id'] for hit in res["hits"]])
 
