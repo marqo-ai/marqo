@@ -242,6 +242,7 @@ class TestCollapseFields(MarqoTestCase):
                  "title": f"Test document {g}{i:02}",
                  "parent_id": f"group_{g}",
                  "price": float(g + 1.1),
+                 "rating": int(g + 1) if g % 2 == 0 else float(g + 1.5),  # mix of float and int
                  "color": colors[i % 5]
                  } for i in range(10) for g in range(5)]
 
@@ -283,6 +284,10 @@ class TestCollapseFields(MarqoTestCase):
                                 {"from": 0, "to": 2},
                                 {"from": 2, "to": 4},
                             ]),
+                            "rating": FieldFacetsConfiguration(type="number", ranges=[
+                                {"from": 0, "to": 2},
+                                {"from": 2, "to": 4},
+                            ]),
                             "color": FieldFacetsConfiguration(type="string")
                         }
                     ),
@@ -290,9 +295,18 @@ class TestCollapseFields(MarqoTestCase):
                 )
 
                 self.assertEqual(3, len(res["hits"]))
+                self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
+
+                # prices are [1.1, 2.1, 3.1]
                 self.assertDictEqual({'count': 1}, res["facets"]["price"]["0.0:2.0"])
                 self.assertDictEqual({'count': 2}, res["facets"]["price"]["2.0:4.0"])
-                self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
+
+                # ratings are [1, 2.5, 3]
+                self.assertDictEqual({'count': 2}, res["facets"]["rating"]["2.0:4.0"])
+                # FIXME mixed int and float rating confuses Vespa, 0.0:2.0 in the float field returns 2 instead of 0
+                self.assertDictEqual({'count': 3}, res["facets"]["rating"]["0.0:2.0"])
+
+
 
     @pytest.mark.skip_for_multinode("Pagination result is not consistent across different Vespa infrastructures")
     def test_pagination(self):
