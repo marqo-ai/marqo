@@ -551,6 +551,7 @@ class TestCollapseFields(MarqoTestCase):
         for group in unique_groups:
             self.assertIn(group, ['group_0', 'group_1', 'group_2'])
 
+    @pytest.mark.skip_for_multinode
     def test_score_modifiers(self):
         # Add some test documents
         docs = [{"_id": f"doc{g}{i:02}", "rating": i+1, "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}

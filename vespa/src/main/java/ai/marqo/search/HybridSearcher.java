@@ -179,7 +179,6 @@ public class HybridSearcher extends Searcher {
                 query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", null);
 
         // Collapse Parameters
-        // TODO support multiple collapse fields
         boolean collapse = query.properties().getString("collapsefield") != null;
 
         // Log fetched variables
@@ -402,9 +401,9 @@ public class HybridSearcher extends Searcher {
                                 verbose,
                                 facetsYql);
                 if (collapse) {
-                    queryFacets
-                            .properties()
-                            .set("collapsefield", null); // make sure we do not collapse
+                    // Carrying collapsefield parameter to facets query will cause extra count since
+                    // CollapseFieldSearch does extra searches
+                    queryFacets.properties().set("collapsefield", null);
                 }
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
@@ -813,11 +812,6 @@ public class HybridSearcher extends Searcher {
                                 result,
                                 "marqo__raw_lexical_score");
 
-                        // Update collapse mapping
-                        if (collapseFieldHash != null) {
-                            collapseFieldHashToDocId.put(collapseFieldHash, extractedDocId);
-                        }
-
                     } else if (!extractedDocId.equals(extractedDocIdInTensor)) {
                         // Different document with same collapse field hash
                         Double existingScoreInTensor = rrfScores.get(extractedDocIdInTensor);
@@ -846,9 +840,6 @@ public class HybridSearcher extends Searcher {
                                     docIdsToHitIds,
                                     result,
                                     "marqo__raw_lexical_score");
-
-                            // Update collapse mapping
-                            collapseFieldHashToDocId.put(collapseFieldHash, extractedDocId);
 
                         } else {
                             // Same or lower rank in lexical result, discard the lexical hit
