@@ -6,7 +6,7 @@ from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsCon
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery, SearchCollapseField
 from marqo.tensor_search.models.search import (
     SearchContext, 
     SearchContextTensor, 
@@ -690,6 +690,85 @@ class TestQueryContent(unittest.TestCase):
         
         self.assertEqual(query_content.modality, Modality.IMAGE)
         self.assertEqual(query_content.content, "http://example.com/image.jpg")
+
+
+class TestSearchQueryCollapseFields(unittest.TestCase):
+    """Test SearchQuery collapse fields validation"""
+
+    def test_collapse_fields_valid_format(self):
+        """Test that collapse fields with valid format are accepted"""
+        collapse_fields = [SearchCollapseField(name="product_id")]
+        
+        search_query = SearchQuery(
+            q="test query",
+            searchMethod=SearchMethod.HYBRID,
+            collapseFields=collapse_fields
+        )
+        
+        self.assertEqual(len(search_query.collapse_fields), 1)
+        self.assertEqual(search_query.collapse_fields[0].name, "product_id")
+
+    def test_collapse_fields_only_for_hybrid_search(self):
+        """Test that collapse fields are only allowed for hybrid search"""
+        collapse_fields = [SearchCollapseField(name="product_id")]
+        
+        with self.subTest("TENSOR search method"):
+            with self.assertRaises(ValueError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.TENSOR,
+                    collapseFields=collapse_fields
+                )
+            self.assertIn("collapseFields can only be provided for 'HYBRID' search", str(cm.exception))
+        
+        with self.subTest("LEXICAL search method"):
+            with self.assertRaises(ValueError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.LEXICAL,
+                    collapseFields=collapse_fields
+                )
+            self.assertIn("collapseFields can only be provided for 'HYBRID' search", str(cm.exception))
+
+    def test_collapse_fields_single_field_only(self):
+        """Test that exactly one collapse field must be provided"""
+        with self.subTest("Multiple collapse fields"):
+            collapse_fields = [
+                SearchCollapseField(name="product_id"),
+                SearchCollapseField(name="category_id")
+            ]
+            
+            with self.assertRaises(ValueError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.HYBRID,
+                    collapseFields=collapse_fields
+                )
+            self.assertIn("Exactly one collapse field must be provided", str(cm.exception))
+        
+        with self.subTest("Empty collapse fields list"):
+            with self.assertRaises(ValueError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.HYBRID,
+                    collapseFields=[]
+                )
+            self.assertIn("Exactly one collapse field must be provided", str(cm.exception))
+
+    def test_collapse_fields_none_is_valid(self):
+        """Test that None collapse fields is valid"""
+        search_query = SearchQuery(
+            q="test query",
+            searchMethod=SearchMethod.HYBRID,
+            collapseFields=None
+        )
+        
+        self.assertIsNone(search_query.collapse_fields)
+
+    def test_search_collapse_field_requires_name(self):
+        """Test that SearchCollapseField requires name field"""
+        with self.assertRaises(ValidationError):
+            SearchCollapseField()  # Missing required name field
 
 
 if __name__ == '__main__':
