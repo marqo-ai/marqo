@@ -150,7 +150,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose, false);
 
             // Check that the result size is correct
             // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done
@@ -232,7 +232,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose, false);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(9);
@@ -621,6 +621,77 @@ class HybridSearcherTest {
                             "SELECT * FROM sources * WHERE brand = 'nike' | all()",
                             "SELECT * FROM sources * WHERE category = 'shoes' | all()",
                             "lexical yql");
+        }
+
+        /**
+         * Test that verifies collapsefield property is removed from facet queries when collapse is enabled.
+         */
+        @Test
+        void shouldRemoveCollapseFieldFromFacetQueries() {
+            // Setup a searcher that captures queries and their properties
+            ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+
+            // Configure downstream searcher to return empty results for each query
+            when(downstreamSearcher.process(queryCaptor.capture(), any(Execution.class)))
+                    .thenReturn(new Result(new Query(), new HitGroup()));
+
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // Create a query with collapsefield property set and facets
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            query.properties().set("collapsefield", "brand"); // Set collapsefield on main query
+
+            String facetsYql =
+                    "SELECT * FROM sources * WHERE brand = 'nike' | all()\n"
+                            + "---MARQO-YQL-QUERY-DELIMITER---\n"
+                            + "SELECT * FROM sources * WHERE category = 'shoes' | all()";
+            query.properties().set("marqo__yql.facets", facetsYql);
+
+            // Execute search - this should create facet queries with collapsefield removed
+            execution.search(query);
+
+            // Capture all queries that were executed
+            List<Query> capturedQueries = queryCaptor.getAllValues();
+
+            // Should have 3 queries: main lexical query + 2 facet queries
+            assertThat(capturedQueries).hasSize(3);
+
+            // Find the facet queries (they should have the specific YQL we set)
+            List<Query> facetQueries =
+                    capturedQueries.stream()
+                            .filter(
+                                    q -> {
+                                        String yql = q.properties().getString("yql");
+                                        return yql != null
+                                                && (yql.contains("brand = 'nike'")
+                                                        || yql.contains("category = 'shoes'"));
+                                    })
+                            .toList();
+
+            // Verify we have 2 facet queries
+            assertThat(facetQueries).hasSize(2);
+
+            // Verify that collapsefield is null/removed in all facet queries
+            for (Query facetQuery : facetQueries) {
+                assertThat(facetQuery.properties().getString("collapsefield"))
+                        .as("Facet query should not have collapsefield property")
+                        .isNull();
+            }
+
+            // Verify the main query still has the collapsefield (it should be the lexical query)
+            Query mainQuery =
+                    capturedQueries.stream()
+                            .filter(q -> "lexical yql".equals(q.properties().getString("yql")))
+                            .findFirst()
+                            .orElse(null);
+
+            assertThat(mainQuery).isNotNull();
+            assertThat(mainQuery.properties().getString("collapsefield"))
+                    .as("Main query should still have collapsefield property")
+                    .isEqualTo("brand");
         }
     }
 }

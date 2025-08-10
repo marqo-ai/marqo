@@ -55,6 +55,38 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
                 result_filter_string = self.vespa_index._get_filter_term(marqo_query)
                 self.assertIn(expected_result, result_filter_string,)
 
+    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_index.SemiStructuredVespaIndex.get_marqo_index')
+    def test_get_filter_string_collapse_field(self, mock_get_marqo_index):
+        """
+        Test that collapse fields use direct attribute filtering instead of standard filtering logic
+        """
+        # Mock the is_collapse_field method
+        mock_index = mock_get_marqo_index.return_value
+        mock_index.is_collapse_field.side_effect = lambda field: field in ['parent_id', 'variant_id']
+        
+        test_cases = [
+            # Collapse field filtering - should use direct attribute filter
+            ('parent_id:group_1', '(parent_id contains "group_1")'),
+            # Test it works on different collapse field name
+            ('variant_id:product_123', '(variant_id contains "product_123")'),
+            # Escape special characters in collapse field values - quotes need escaping  
+            ('parent_id:group"test', '(parent_id contains "group\\"test")'),
+            # non-collapse field works differently
+            ('color:red', '((marqo__short_string_fields contains sameElement(key contains "color", value contains "red")))'),
+        ]
+        
+        for filter_string, expected_result in test_cases:
+            with self.subTest(filter_string=filter_string):
+                marqo_query = MarqoQuery(
+                    index_name=self.vespa_index._marqo_index.name,
+                    limit=10,
+                    filter=filter_string,
+                    score_modifiers=[],
+                    expose_facets=False
+                )
+                result_filter_string = self.vespa_index._get_filter_term(marqo_query)
+                self.assertEqual(expected_result, result_filter_string)
+
     def test_vespa_to_marqo_conversion_should_handle_all_fields_from_search_result(self):
         vespa_doc = {
             "id": "index:index1/1/123",
@@ -314,3 +346,68 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
                 'marqo__vector_count': 1
             },
         }, vespa_doc)
+
+    def test_combine_number_stats_empty_current_stats(self):
+        """Test _combine_number_stats when current_stats is empty"""
+        stats = {"count": 5, "sum": 100, "avg": 20.0, "min": 10, "max": 30}
+        result = self.vespa_index._combine_number_stats({}, stats)
+        self.assertEqual(stats, result)
+
+    def test_combine_number_stats_complete_stats(self):
+        """Test _combine_number_stats with complete statistics"""
+        current_stats = {"count": 3, "sum": 60, "avg": 20.0, "min": 15, "max": 25}
+        stats = {"count": 2, "sum": 40, "avg": 20.0, "min": 10, "max": 30}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 5,  # 3 + 2
+            "sum": 100,  # 60 + 40
+            "avg": 20.0,  # (20.0 * 3 + 20.0 * 2) / (3 + 2) = 100 / 5
+            "min": 10,   # min(15, 10)
+            "max": 30    # max(25, 30)
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_partial_stats(self):
+        """Test _combine_number_stats with partial statistics (missing some fields)"""
+        current_stats = {"count": 4, "sum": 80, "min": 5}
+        stats = {"count": 3, "max": 50}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 7,  # 4 + 3
+            # sum not in both, so not included in result
+            # avg not in both, so not included in result  
+            # min only in current_stats, so not included
+            # max only in stats, so not included
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_weighted_average_calculation(self):
+        """Test _combine_number_stats weighted average calculation with different counts"""
+        current_stats = {"count": 10, "avg": 15.0}
+        stats = {"count": 5, "avg": 30.0}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 15,  # 10 + 5
+            "avg": 20.0   # (15.0 * 10 + 30.0 * 5) / (10 + 5) = 300 / 15 = 20.0
+        }
+        self.assertEqual(expected, result)
+
+    def test_combine_number_stats_min_max_edge_cases(self):
+        """Test _combine_number_stats min/max with edge case values"""
+        current_stats = {"count": 2, "min": -100, "max": 0}
+        stats = {"count": 3, "min": 50, "max": -10}
+        
+        result = self.vespa_index._combine_number_stats(current_stats, stats)
+        
+        expected = {
+            "count": 5,    # 2 + 3
+            "min": -100,   # min(-100, 50)
+            "max": 0       # max(0, -10)
+        }
+        self.assertEqual(expected, result)

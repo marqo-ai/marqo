@@ -50,7 +50,8 @@ class HybridSearch:
             language: Optional[str] = None,
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
-            interpolation_method: Optional[InterpolationMethod] = None
+            interpolation_method: Optional[InterpolationMethod] = None,
+            collapse_field_name: Optional[str] = None
     ) -> Dict:
         """
 
@@ -81,6 +82,7 @@ class HybridSearch:
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
+                collapse_field_name:  field name to collapse the search result on.
             Returns:
 
             Output format:
@@ -292,7 +294,8 @@ class HybridSearch:
             track_total_hits=track_total_hits,
             language=language,
             relevance_cutoff=relevance_cutoff,
-            sort_by=sort_by
+            sort_by=sort_by,
+            collapse_field_name=collapse_field_name
         )
 
         vespa_index = vespa_index_factory(marqo_index)

@@ -6,15 +6,17 @@ import unittest
 from typing import List
 from unittest.mock import MagicMock
 
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import (
     Model, TextPreProcessing, TextSplitMethod,
     ImagePreProcessing, HnswConfig, DistanceMetric, Field, FieldType,
-    FieldFeature, TensorField, StringArrayField
+    FieldFeature, TensorField, StringArrayField, CollapseField
 )
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery, MarqoLexicalQuery
 from marqo.core.models.marqo_query import MarqoTensorQuery
+from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.tensor_search.models.relevance_cutoff_model import (
@@ -25,6 +27,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
 )
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.version import get_version
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
@@ -766,6 +769,106 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
         self.assertAlmostEqual(10.0,
                                r["marqo__hybrid.relevanceCutoff.parameters.stdDevFactor"])
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])  # default
+
+
+class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
+
+    def setUp(self):
+        marqo_index = self.semi_structured_marqo_index("test_index",
+                                                       collapse_fields=[CollapseField(name='parent_id')])
+
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def test_hybrid_query_with_collapse_fields(self):
+        marqo_query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            offset=0,
+            or_phrases=[],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(),
+            collapse_field_name='parent_id',
+            facets=FacetsParameters(
+                fields={
+                    "price": FieldFacetsConfiguration(type="number", ranges=[
+                        {"from": 0, "to": 1},
+                        {"from": 1, "to": 3},
+                    ]),
+                    "color": FieldFacetsConfiguration(type="string")
+                }
+            )
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+
+        # assert collapsefield are populated
+        self.assertEqual('parent_id', vespa_query['collapsefield'])
+        self.assertEqual(1, vespa_query['collapsesize'])
+
+        # assert rank profiles with '_diversity' suffix is used
+        self.assertEqual(common.RANK_PROFILE_BM25 + '_diversity',
+                         vespa_query['marqo__ranking.lexical.lexical'])
+        self.assertEqual(common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.tensor.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.lexical.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
+                         vespa_query['marqo__ranking.tensor.lexical'])
+
+        # assert facets query has an extra grouping
+        self.assertEqual('select * from test_index where (false OR False) limit 0 | all( '
+                         'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
+                         'bucket(1.0, 3.0))) max(100) order(-count()) each(group(parent_id) '
+                         'output(count()))) all(group(predefined(marqo__float_fields{"price"}, '
+                         'bucket(0.0, 1.0), bucket(1.0, 3.0))) max(100) order(-count()) '
+                         'each(group(parent_id) output(count()))) '
+                         'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
+                         'each(group(parent_id) output(count()))) )', vespa_query['marqo__yql.facets'])
+
+    def test_hybrid_query_without_collapse_fields(self):
+        marqo_query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            offset=0,
+            or_phrases=[],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(),
+            facets=FacetsParameters(
+                fields={
+                    "price": FieldFacetsConfiguration(type="number", ranges=[
+                        {"from": 0, "to": 1},
+                        {"from": 1, "to": 3},
+                    ]),
+                    "color": FieldFacetsConfiguration(type="string")
+                }
+            )
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+
+        self.assertNotIn('collapsefield', vespa_query)
+        self.assertNotIn('collapsesize', vespa_query)
+
+        self.assertEqual(common.RANK_PROFILE_BM25,
+                         vespa_query['marqo__ranking.lexical.lexical'])
+        self.assertEqual(common.RANK_PROFILE_EMBEDDING_SIMILARITY,
+                         vespa_query['marqo__ranking.tensor.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
+                         vespa_query['marqo__ranking.lexical.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
+                         vespa_query['marqo__ranking.tensor.lexical'])
+
+        self.assertEqual('select * from test_index where (false OR False) limit 0 | all( '
+                         'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
+                         'bucket(1.0, 3.0))) max(100) order(-count()) '
+                         'each(output(sum(marqo__int_fields{"price"}), '
+                         'avg(marqo__int_fields{"price"}), min(marqo__int_fields{"price"}), '
+                         'max(marqo__int_fields{"price"}), count()))) '
+                         'all(group(predefined(marqo__float_fields{"price"}, bucket(0.0, 1.0), '
+                         'bucket(1.0, 3.0))) max(100) order(-count()) '
+                         'each(output(sum(marqo__float_fields{"price"}), '
+                         'avg(marqo__float_fields{"price"}), min(marqo__float_fields{"price"}), '
+                         'max(marqo__float_fields{"price"}), count()))) '
+                         'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
+                         'each(output(count()))) )', vespa_query['marqo__yql.facets'])
 
 
 if __name__ == '__main__':
