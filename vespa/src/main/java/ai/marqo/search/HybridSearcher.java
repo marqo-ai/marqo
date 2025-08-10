@@ -784,7 +784,8 @@ public class HybridSearcher extends Searcher {
                     logIfVerbose(String.format("New score is: %.7f", newScore), verbose);
 
                 } else if (!collapse) {
-                    // If the score doesn't exist and no collapsing, add new hit to result list
+                    // If the document doesn't exist and there is no collapsing, add new hit to
+                    // result list
                     logIfVerbose("No existing score found! Starting at 0.0.", verbose);
                     addHitToResult(
                             hit,
@@ -802,7 +803,12 @@ public class HybridSearcher extends Searcher {
 
                     if (extractedDocIdInTensor == null) {
                         // No hit with the same collapse_field_hash exists in tensor result. Add it.
-                        logIfVerbose("No existing collapse field hash found! Add it.", verbose);
+                        logIfVerbose(
+                                String.format(
+                                        "No existing doc with the same collapse field (with hash"
+                                                + " %.7f) found! Add this doc with id: %s.",
+                                        collapseFieldHash, extractedDocId),
+                                verbose);
                         addHitToResult(
                                 hit,
                                 reciprocalRank,
@@ -816,16 +822,22 @@ public class HybridSearcher extends Searcher {
                         // Different document with same collapse field hash
                         Double existingScoreInTensor = rrfScores.get(extractedDocIdInTensor);
                         logIfVerbose(
-                                "Found hit with same collapse field hash in tensor. Existing score:"
-                                        + " "
-                                        + existingScoreInTensor,
+                                String.format(
+                                        "Found hit with same collapse field (with hash %.7f) in"
+                                                + " tensor. Existing score: %.7f. Id is: %s.",
+                                        collapseFieldHash,
+                                        existingScoreInTensor,
+                                        extractedDocIdInTensor),
                                 verbose);
 
                         if (reciprocalRank > existingScoreInTensor) {
                             // Discard the tensor hit, use this lexical hit
                             logIfVerbose(
-                                    "Score is higher than the existing doc in tensor result,"
-                                            + " replacing tensor hit.",
+                                    String.format(
+                                            "Score is higher than the existing doc in tensor"
+                                                + " result, replacing tensor hit. New score: %.7f,"
+                                                + " New id is: %s.",
+                                            reciprocalRank, extractedDocId),
                                     verbose);
 
                             rrfScores.remove(extractedDocIdInTensor);
@@ -844,8 +856,11 @@ public class HybridSearcher extends Searcher {
                         } else {
                             // Same or lower rank in lexical result, discard the lexical hit
                             logIfVerbose(
-                                    "Score is lower than or equal to the existing doc in tensor"
-                                            + " result, discarding lexical hit",
+                                    String.format(
+                                            "Score is lower than or equal to the existing doc in"
+                                                    + " tensor result, discarding lexical hit."
+                                                    + " Discarded score is %.7f, id is: %s.",
+                                            reciprocalRank, extractedDocId),
                                     verbose);
                         }
                     }
