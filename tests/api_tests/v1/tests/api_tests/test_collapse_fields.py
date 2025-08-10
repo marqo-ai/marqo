@@ -26,6 +26,7 @@ class TestCollapseFields(MarqoTestCase):
         cls.indexes_to_delete = [cls.unstructured_text_index_name]
 
     def test_collapse_fields_is_in_index_settings(self):
+        """Test that collapse field in the index creation request is persisted"""
         index_name = self.unstructured_text_index_name
         index_settings = self.client.index(index_name).get_settings()
         self.assertTrue("collapseFields" in index_settings)
@@ -70,6 +71,7 @@ class TestCollapseFields(MarqoTestCase):
             self.assertEqual(expected_parent_id, doc["parent_id"])
 
     def test_partial_update_of_collapse_field_does_not_work(self):
+        """Test that partial update on the collapse field fails"""
         docs = [
             {"_id": "valid1", "title": "Valid document 1", "parent_id": "group_1"},
         ]
@@ -116,7 +118,6 @@ class TestCollapseFields(MarqoTestCase):
 
     def test_search_with_valid_collapse_field_succeeds(self):
         """Test that search with valid collapse field name succeeds"""
-        # Add some test documents
         docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
                 for i in range(10) for g in range(5)]
 
@@ -153,7 +154,7 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertEqual(set([f"group_{g}" for g in range(5)]), set([hit['parent_id'] for hit in res["hits"]]))
 
     def test_filter(self):
-        # Add some test documents
+        """Test that filtering works with search with collapse field"""
         colors = ['white', 'red', 'green', 'yellow', 'blue']
         docs = [{"_id": f"doc{g}{i:02}",
                  "title": f"Test document {g}{i:02}",
@@ -199,7 +200,7 @@ class TestCollapseFields(MarqoTestCase):
                     self.assertIn(hit["color"], ("red", "yellow"))
 
     def test_facets(self):
-        # Add some test documents
+        """Test that facets query works with search with collapse field"""
         colors = ['white', 'red', 'green', 'yellow', 'blue']
         docs = [{"_id": f"doc{g}{i:02}",
                  "title": f"Test document {g}{i:02}",
@@ -250,7 +251,7 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
 
     def test_pagination(self):
-        # Add some test documents
+        """Test that pagination works with search with collapse field"""
         docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
                 for i in range(10) for g in range(10)]
 
@@ -307,7 +308,7 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertEqual(10, len(page_1_res_groups.union(page_2_res_groups)))
 
     def test_sort_by(self):
-        # Add some test documents
+        """Test that sort by param works with search with collapse field"""
         colors = ['white', 'red', 'green', 'yellow', 'blue']
         docs = [{"_id": f"doc{g}{i:02}",
                  "title": f"Test document {g}{i:02}",
@@ -345,6 +346,7 @@ class TestCollapseFields(MarqoTestCase):
 
 
     def test_relevance_cutoff(self):
+        """Test that relevance cutoff param works with search with collapse field"""
         # 30 documents designed for "machine learning artificial intelligence algorithms" query
         test_docs = [
             # === HIGH RELEVANCE (10 docs) - Contains ALL 5 query words ===
@@ -491,7 +493,7 @@ class TestCollapseFields(MarqoTestCase):
             self.assertIn(group, ['group_0', 'group_1', 'group_2'])
 
     def test_score_modifiers(self):
-        # Add some test documents
+        """Test that score modifiers work with search with collapse field"""
         docs = [{"_id": f"doc{g}{i:02}", "rating": i+1, "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
                 for i in range(5) for g in range(5)]
 
@@ -533,7 +535,7 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertTrue(all([hit['rating'] == 5 for hit in res['hits']]))
 
     def test_filter_by_collapse_field(self):
-        # Add some test documents
+        """Test that filtering on collapse field works for both lexical search and hybrid lexical-lexical search"""
         docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
                 for i in range(5) for g in range(5)]
 
