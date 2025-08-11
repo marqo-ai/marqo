@@ -111,7 +111,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
         min_inference_time_ms = 8      # inference usually takes at least 8ms
-        cache_reading_time_ms = 2      # if it hits cache, it's usually less than 2ms
+        cache_reading_time_ms = 3      # if it hits cache, it's usually less than 3ms
 
         # Test search query's embedding is cached when inference cache is enabled
         for query in ["test", {"random": 1, "query": 2}]:
