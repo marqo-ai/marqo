@@ -112,6 +112,17 @@ class TestTypeahead(MarqoTestCase):
 
     def test_index_queries_with_empty_list(self):
         """Test indexing queries with an empty list."""
+        # Check initial stats
+        initial_stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if initial_stats_response.status_code == 200:
+            initial_count = initial_stats_response.json().get("indexedQueries", 0)
+        else:
+            initial_count = 0
+        
         queries_request = {
             "queries": []
         }
@@ -126,6 +137,16 @@ class TestTypeahead(MarqoTestCase):
         if response.status_code == 200:
             response_data = response.json()
             self.assertEqual(response_data["indexed"], 0)
+            
+            # Stats should remain unchanged
+            final_stats_response = requests.get(
+                f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if final_stats_response.status_code == 200:
+                final_count = final_stats_response.json().get("indexedQueries", 0)
+                self.assertEqual(final_count, initial_count)
 
     def test_index_queries_with_invalid_format(self):
         """Test indexing queries with invalid format."""
@@ -169,18 +190,25 @@ class TestTypeahead(MarqoTestCase):
         nonexistent_index = "nonexistent_index_" + str(uuid.uuid4()).replace('-', '')
         
         endpoints_and_data = [
-            ("/suggestions", {"input": "test"}),
-            ("/queries", {"queries": [{"query": "test", "rank": 1.0}]}),
-            ("/queries/delete", {})
+            ("/suggestions", {"input": "test"}, "POST"),
+            ("/queries", {"queries": [{"query": "test", "rank": 1.0}]}, "POST"),
+            ("/queries/delete", {}, "POST"),
+            ("/queries/stats", {}, "GET")
         ]
         
-        for endpoint, data in endpoints_and_data:
+        for endpoint, data, method in endpoints_and_data:
             with self.subTest(endpoint):
-                response = requests.post(
-                    f"{self._MARQO_URL}/indexes/{nonexistent_index}{endpoint}",
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(data)
-                )
+                if method == "POST":
+                    response = requests.post(
+                        f"{self._MARQO_URL}/indexes/{nonexistent_index}{endpoint}",
+                        headers={"Content-Type": "application/json"},
+                        data=json.dumps(data)
+                    )
+                else:  # GET
+                    response = requests.get(
+                        f"{self._MARQO_URL}/indexes/{nonexistent_index}{endpoint}",
+                        headers={"Content-Type": "application/json"}
+                    )
                 
                 self.assertIn(response.status_code, [400, 404, 500])
 
@@ -208,7 +236,18 @@ class TestTypeahead(MarqoTestCase):
 
     def test_typeahead_workflow(self):
         """Test a complete typeahead workflow: index queries, then get suggestions."""
-        # First, index some queries
+        # Check initial stats (should be 0)
+        initial_stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if initial_stats_response.status_code == 200:
+            initial_count = initial_stats_response.json().get("indexedQueries", 0)
+        else:
+            initial_count = 0  # Assume 0 if endpoint not implemented
+        
+        # Index some queries
         queries_request = {
             "queries": [
                 {"query": "machine learning algorithms", "rank": 10.0},
@@ -224,7 +263,19 @@ class TestTypeahead(MarqoTestCase):
             data=json.dumps(queries_request)
         )
         
-        # Then, try to get suggestions
+        # Check stats after indexing
+        if index_response.status_code == 200:
+            post_index_stats_response = requests.get(
+                f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if post_index_stats_response.status_code == 200:
+                post_index_count = post_index_stats_response.json().get("indexedQueries", 0)
+                # Should have 4 more queries than initial count
+                self.assertEqual(post_index_count, initial_count + 4)
+        
+        # Try to get suggestions
         suggestion_request = {
             "input": "machine",
             "maxSuggestions": 5
@@ -247,3 +298,41 @@ class TestTypeahead(MarqoTestCase):
         )
         
         self.assertIn(delete_response.status_code, [200, 500])
+        
+        # Check stats after deletion (should be back to 0)
+        if delete_response.status_code == 200:
+            final_stats_response = requests.get(
+                f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if final_stats_response.status_code == 200:
+                final_count = final_stats_response.json().get("indexedQueries", 0)
+                self.assertEqual(final_count, 0)
+
+    def test_get_typeahead_stats_endpoint_exists(self):
+        """Test that the typeahead stats endpoint is accessible."""
+        response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertIn(response.status_code, [200, 500])
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            self.assertIn("indexedQueries", response_data)
+            self.assertIsInstance(response_data["indexedQueries"], int)
+        else:
+            self.assertIn("message", response_data)
+
+    def test_stats_endpoint_with_nonexistent_index(self):
+        """Test stats endpoint with nonexistent index."""
+        nonexistent_index = "nonexistent_index_" + str(uuid.uuid4()).replace('-', '')
+        
+        response = requests.get(
+            f"{self._MARQO_URL}/indexes/{nonexistent_index}/queries/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertIn(response.status_code, [400, 404, 500])

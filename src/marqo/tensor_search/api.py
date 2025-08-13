@@ -817,6 +817,28 @@ def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(ge
         raise api_exceptions.InternalError(f"Error deleting queries: {str(e)}")
 
 
+@app.get("/indexes/{index_name}/queries/stats")
+@throttle(RequestType.SEARCH)
+def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Get statistics about the typeahead queries for an index.
+    
+    Args:
+        index_name: Name of the index to get stats for
+    """
+    try:
+        # TODO: Implement typeahead stats logic
+        # This will return the number of indexed queries
+        
+        return JSONResponse(
+            content={
+                "indexedQueries": 0  # Placeholder
+            }
+        )
+    except Exception as e:
+        raise api_exceptions.InternalError(f"Error getting typeahead stats: {str(e)}")
+
+
 @app.get('/memory', include_in_schema=False)
 @utils.enable_debug_apis()
 def memory():
