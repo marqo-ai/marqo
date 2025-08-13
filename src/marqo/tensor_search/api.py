@@ -735,6 +735,88 @@ def schema_validation(index_name: str, settings_object: dict):
     )
 
 
+@app.post("/indexes/{index_name}/suggestions")
+@throttle(RequestType.SEARCH)
+def get_suggestions(index_name: str, suggestion_request: dict, 
+                   marqo_config: config.Config = Depends(get_config)):
+    """
+    Get query suggestions for type-ahead functionality.
+    
+    Args:
+        index_name: Name of the index to get suggestions for
+        suggestion_request: Dict containing:
+            - input: Partial user search input
+            - maxSuggestions: Maximum number of suggestions to return (default: 10)
+            - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
+            - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
+    """
+    try:
+        # TODO: Implement type-ahead suggestion logic
+        # This will call the type-ahead handler to get suggestions
+        suggestions = []  # Placeholder
+        
+        return JSONResponse(
+            content={
+                "suggestions": suggestions,
+                "processingTimeMs": 0  # Placeholder
+            }
+        )
+    except Exception as e:
+        raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
+
+
+@app.post("/indexes/{index_name}/queries")
+@throttle(RequestType.INDEX)
+def index_queries(index_name: str, queries_request: dict,
+                 marqo_config: config.Config = Depends(get_config)):
+    """
+    Index queries for type-ahead suggestions.
+    
+    Args:
+        index_name: Name of the index to add queries to
+        queries_request: Dict containing:
+            - queries: List of dicts with 'query' and 'rank' fields
+    """
+    try:
+        # TODO: Implement query indexing logic
+        # This will validate and index the queries into the type-ahead schema
+        
+        queries = queries_request.get("queries", [])
+        indexed_count = len(queries)  # Placeholder
+        
+        return JSONResponse(
+            content={
+                "indexed": indexed_count,
+                "errors": []
+            }
+        )
+    except Exception as e:
+        raise api_exceptions.InternalError(f"Error indexing queries: {str(e)}")
+
+
+@app.post("/indexes/{index_name}/queries/delete")
+@throttle(RequestType.INDEX)
+def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Delete all queries from the type-ahead index.
+    
+    Args:
+        index_name: Name of the index to delete queries from
+    """
+    try:
+        # TODO: Implement query deletion logic
+        # This will clear all documents from the type-ahead schema
+        
+        return JSONResponse(
+            content={
+                "deleted": True,
+                "message": "All queries deleted successfully"
+            }
+        )
+    except Exception as e:
+        raise api_exceptions.InternalError(f"Error deleting queries: {str(e)}")
+
+
 @app.get('/memory', include_in_schema=False)
 @utils.enable_debug_apis()
 def memory():
