@@ -173,9 +173,36 @@ class IndexManagement:
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
             index_to_create.append((schema, marqo_index))
             logger.debug(f'Creating index {str(request.name)} with schema:\n{schema}')
+            
+            # Create typeahead schema for unstructured indexes
+            from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
+            from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
+            if isinstance(request, UnstructuredMarqoIndexRequest):
+                typeahead_schema_generator = TypeaheadVespaSchema(request.name)
+                typeahead_schema = typeahead_schema_generator.generate_schema()
+                # The typeahead schema is just a Vespa schema, not a Marqo index
+                # We'll skip adding it to index_to_create and handle it separately
+                logger.debug(f'Typeahead schema will be created for {str(request.name)}: {typeahead_schema_generator._get_typeahead_schema_name(request.name)}')
 
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_add_index_setting_and_schema(index_to_create)
+            
+            # Deploy typeahead schemas separately for unstructured indexes
+            from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
+            from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
+            for request in marqo_index_requests:
+                if isinstance(request, UnstructuredMarqoIndexRequest):
+                    typeahead_schema_generator = TypeaheadVespaSchema(request.name)
+                    typeahead_schema = typeahead_schema_generator.generate_schema()
+                    typeahead_schema_name = typeahead_schema_generator._get_typeahead_schema_name(request.name)
+                    
+                    # Add typeahead schema directly to Vespa
+                    self._get_vespa_application()._store.save_file(typeahead_schema, 'schemas', f'{typeahead_schema_name}.sd')
+                    self._get_vespa_application()._service_xml.add_schema(typeahead_schema_name)
+                    logger.debug(f'Added typeahead schema for {str(request.name)}: {typeahead_schema_name}')
+            
+            # Deploy the application with all schemas
+            self._get_vespa_application()._deploy()
 
         return [index for _, index in index_to_create]
 

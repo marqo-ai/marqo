@@ -740,7 +740,7 @@ def schema_validation(index_name: str, settings_object: dict):
 def get_suggestions(index_name: str, suggestion_request: dict, 
                    marqo_config: config.Config = Depends(get_config)):
     """
-    Get query suggestions for type-ahead functionality.
+    Get query suggestions for typeahead functionality.
     
     Args:
         index_name: Name of the index to get suggestions for
@@ -751,16 +751,53 @@ def get_suggestions(index_name: str, suggestion_request: dict,
             - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
     """
     try:
-        # TODO: Implement type-ahead suggestion logic
-        # This will call the type-ahead handler to get suggestions
-        suggestions = []  # Placeholder
+        from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
+        import time
+        
+        start_time = time.time()
+        
+        # Validate input
+        input_text = suggestion_request.get("input")
+        if not input_text:
+            raise api_exceptions.InvalidArgError("Input text is required")
+        
+        max_suggestions = suggestion_request.get("maxSuggestions", 10)
+        fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
+        min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
+        
+        # Validate parameters
+        if max_suggestions <= 0:
+            raise api_exceptions.InvalidArgError("maxSuggestions must be positive")
+        if fuzzy_edit_distance < 0:
+            raise api_exceptions.InvalidArgError("fuzzyEditDistance must be non-negative")
+        if min_fuzzy_match_length < 0:
+            raise api_exceptions.InvalidArgError("minFuzzyMatchLength must be non-negative")
+        
+        # Check if index exists
+        try:
+            marqo_config.index_management.get_index(index_name)
+        except Exception:
+            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        
+        # Get suggestions
+        handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
+        suggestions = handler.get_suggestions(
+            input_text=input_text,
+            max_suggestions=max_suggestions,
+            fuzzy_edit_distance=fuzzy_edit_distance,
+            min_fuzzy_match_length=min_fuzzy_match_length
+        )
+        
+        processing_time_ms = int((time.time() - start_time) * 1000)
         
         return JSONResponse(
             content={
                 "suggestions": suggestions,
-                "processingTimeMs": 0  # Placeholder
+                "processingTimeMs": processing_time_ms
             }
         )
+    except api_exceptions.MarqoWebError:
+        raise
     except Exception as e:
         raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
 
@@ -770,7 +807,7 @@ def get_suggestions(index_name: str, suggestion_request: dict,
 def index_queries(index_name: str, queries_request: dict,
                  marqo_config: config.Config = Depends(get_config)):
     """
-    Index queries for type-ahead suggestions.
+    Index queries for typeahead suggestions.
     
     Args:
         index_name: Name of the index to add queries to
@@ -778,18 +815,40 @@ def index_queries(index_name: str, queries_request: dict,
             - queries: List of dicts with 'query' and 'rank' fields
     """
     try:
-        # TODO: Implement query indexing logic
-        # This will validate and index the queries into the type-ahead schema
+        from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
         
-        queries = queries_request.get("queries", [])
-        indexed_count = len(queries)  # Placeholder
+        # Validate input
+        queries = queries_request.get("queries")
+        if queries is None:
+            raise api_exceptions.InvalidArgError("queries field is required")
         
-        return JSONResponse(
-            content={
-                "indexed": indexed_count,
-                "errors": []
-            }
-        )
+        if not isinstance(queries, list):
+            raise api_exceptions.InvalidArgError("queries must be a list")
+        
+        # Check if index exists
+        try:
+            marqo_config.index_management.get_index(index_name)
+        except Exception:
+            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        
+        # Validate queries format
+        for i, query_data in enumerate(queries):
+            if not isinstance(query_data, dict):
+                raise api_exceptions.InvalidArgError(f"Query at index {i} must be a dictionary")
+            if "query" not in query_data:
+                raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'query' field")
+            if "rank" not in query_data:
+                raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'rank' field")
+            if not query_data["query"].strip():
+                raise api_exceptions.InvalidArgError(f"Query at index {i} cannot be empty")
+        
+        # Index queries
+        handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
+        result = handler.index_queries(queries)
+        
+        return JSONResponse(content=result)
+    except api_exceptions.MarqoWebError:
+        raise
     except Exception as e:
         raise api_exceptions.InternalError(f"Error indexing queries: {str(e)}")
 
@@ -798,21 +857,32 @@ def index_queries(index_name: str, queries_request: dict,
 @throttle(RequestType.INDEX)
 def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
-    Delete all queries from the type-ahead index.
+    Delete all queries from the typeahead index.
     
     Args:
         index_name: Name of the index to delete queries from
     """
     try:
-        # TODO: Implement query deletion logic
-        # This will clear all documents from the type-ahead schema
+        from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
+        
+        # Check if index exists
+        try:
+            marqo_config.index_management.get_index(index_name)
+        except Exception:
+            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        
+        # Delete all queries
+        handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
+        success = handler.delete_all_queries()
         
         return JSONResponse(
             content={
-                "deleted": True,
-                "message": "All queries deleted successfully"
+                "deleted": success,
+                "message": "All queries deleted successfully" if success else "Failed to delete queries"
             }
         )
+    except api_exceptions.MarqoWebError:
+        raise
     except Exception as e:
         raise api_exceptions.InternalError(f"Error deleting queries: {str(e)}")
 
@@ -827,14 +897,21 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         index_name: Name of the index to get stats for
     """
     try:
-        # TODO: Implement typeahead stats logic
-        # This will return the number of indexed queries
+        from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
         
-        return JSONResponse(
-            content={
-                "indexedQueries": 0  # Placeholder
-            }
-        )
+        # Check if index exists
+        try:
+            marqo_config.index_management.get_index(index_name)
+        except Exception:
+            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        
+        # Get stats
+        handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
+        stats = handler.get_stats()
+        
+        return JSONResponse(content=stats)
+    except api_exceptions.MarqoWebError:
+        raise
     except Exception as e:
         raise api_exceptions.InternalError(f"Error getting typeahead stats: {str(e)}")
 
