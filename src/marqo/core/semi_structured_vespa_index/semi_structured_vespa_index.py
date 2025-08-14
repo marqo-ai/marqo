@@ -179,7 +179,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             tensor_term = self._get_tensor_search_term(marqo_query)
 
         facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
-        base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {facets_lexical_term}'
+        base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term})'
         if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
             base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
