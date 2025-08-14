@@ -8,7 +8,7 @@ from marqo.client import Client
 from marqo.enums import SearchMethods
 from marqo.errors import MarqoWebError
 
-from tests.marqo_test import MarqoTestCase
+from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
 
 
 class TestUnstructuredSearch(MarqoTestCase):
@@ -65,7 +65,7 @@ class TestUnstructuredSearch(MarqoTestCase):
             del copied[to_strip]
 
         return copied
-    
+
     def test_search_single_doc(self):
         """Searches an index of a single doc.
         Checks the basic functionality and response structure"""
@@ -87,7 +87,7 @@ class TestUnstructuredSearch(MarqoTestCase):
         search_res = self.client.index(self.text_index_name).search(
             "title about some doc")
         assert len(search_res["hits"]) == 0
-        
+
     def test_search_multi_docs(self):
         d1 = {
                 "doc_title": "Cool Document 1",
@@ -136,7 +136,7 @@ class TestUnstructuredSearch(MarqoTestCase):
         #    but can look for a word
         assert self.client.index(self.text_index_name).search(
             "captain", search_method=marqo.SearchMethods.LEXICAL)["hits"][0]["_id"] == "123456"
-        
+
     def test_search_with_no_device(self):
         """use default as defined in config unless overridden"""
         temp_client = copy.deepcopy(self.client)
@@ -270,7 +270,7 @@ class TestUnstructuredSearch(MarqoTestCase):
             # the poodle doc should be lower ranked than the irrelevant doc
             for hit_position, _ in enumerate(res['hits']):
                 assert res['hits'][hit_position]['_id'] == expected_ordering[hit_position]
-                
+
     def test_custom_search_results(self):
         self.client.index(index_name=self.image_index_name).add_documents(
             [
@@ -286,7 +286,7 @@ class TestUnstructuredSearch(MarqoTestCase):
                 }
             ], tensor_fields=["Title", "Description"]
         )
-        
+
         query = {
             "What are the best pets": 1
         }
@@ -454,3 +454,45 @@ class TestUnstructuredSearch(MarqoTestCase):
                                                                       searchable_attributes=["title"])
         self.assertEqual(len(search_res["hits"]), 1)
         self.assertEqual(search_res["hits"][0]["_id"], "1")
+
+    def test_filter_maps(self):
+        docs = [
+            {
+                "_id": "doc1",
+                "title": "Cool Document 1",
+                "metadata": {
+                    "score": 0.9,
+                    "rank": 10
+                }
+            },
+            {
+                "_id": "doc2",
+                "title": "Just Your Average Doc",
+                "metadata": {
+                    "score": 0.5,
+                    "rank": 20
+                }
+            },
+            {
+                "_id": "doc3",
+                "title": "Another Document",
+                "metadata": {
+                    "score": 0.7,
+                    "rank": 15.1
+                }
+            }
+        ]
+        res = self.client.index(self.text_index_name).add_documents(docs, tensor_fields=["title"])
+        test_case = [
+            ("metadata.score:[0 TO 1]", ["doc1", "doc2", "doc3"]),
+            ("metadata.rank:[15 TO 20]", ["doc2", "doc3"]),
+
+        ]
+        for search_method in ["LEXICAL", "TENSOR"]:
+            for filter_string, expected in test_case:
+                with self.subTest(f"{search_method}"):
+                    search_res = self.client.index(self.text_index_name).search(q="title", filter_string=filter_string)
+                    actual_ids = set([hit["_id"] for hit in search_res["hits"]])
+                    self.assertEqual(len(search_res["hits"]), len(expected),
+                                     f"Failed count check for filter '{filter_string}'.")
+                    self.assertEqual(actual_ids, set(expected), f"Failed ID match for filter '{filter_string}'")
