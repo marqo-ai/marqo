@@ -28,13 +28,13 @@ schema {{ schema_name }} {
 
     rank-profile default {
         first-phase {
-            expression: (attribute(rank) * 10) + bm25(query_suffixes)
+            expression: attribute(rank)
         }
     }
 
     rank-profile fuzzy {
         first-phase {
-            expression: attribute(rank) + bm25(query_suffixes) * 0.5
+            expression: attribute(rank) + bm25(query_suffixes)
         }
     }
 
