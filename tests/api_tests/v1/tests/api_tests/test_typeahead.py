@@ -77,12 +77,12 @@ class TestTypeahead(MarqoTestCase):
             data=json.dumps(suggestion_request)
         )
         
-        if response.status_code == 200:
-            response_data = response.json()
-            self.assertIn("suggestions", response_data)
-            self.assertIn("processingTimeMs", response_data)
-            self.assertIsInstance(response_data["suggestions"], list)
-            self.assertIsInstance(response_data["processingTimeMs"], (int, float))
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertIn("suggestions", response_data)
+        self.assertIn("processingTimeMs", response_data)
+        self.assertIsInstance(response_data["suggestions"], list)
+        self.assertIsInstance(response_data["processingTimeMs"], (int, float))
 
     def test_add_queries_and_get_suggestions_success(self):
         """Test that adding queries and getting suggestions returns successful response with results."""
