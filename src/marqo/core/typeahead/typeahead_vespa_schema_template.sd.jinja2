@@ -3,7 +3,7 @@ schema {{ schema_name }} {
     document {{ schema_name }} {
         
         field query_suffixes type array<string> {
-            indexing: summary | index
+            indexing: summary | index | attribute
             index: enable-bm25
             attribute: fast-search
         }

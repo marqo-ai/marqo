@@ -336,3 +336,69 @@ class TestTypeahead(MarqoTestCase):
         )
         
         self.assertIn(response.status_code, [400, 404, 500])
+
+    def test_add_queries_and_get_suggestions_success(self):
+        """Test that adding queries and getting suggestions returns successful response with results."""
+        # First, index some queries with a common prefix
+        queries_request = {
+            "queries": [
+                {"query": "machine learning algorithms", "rank": 10.0},
+                {"query": "machine learning basics", "rank": 8.0},
+                {"query": "machine learning tutorial", "rank": 6.0},
+                {"query": "artificial intelligence", "rank": 9.0},
+                {"query": "deep learning", "rank": 7.0}
+            ]
+        }
+        
+        # Index the queries
+        index_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(queries_request)
+        )
+        
+        # Should successfully index queries
+        self.assertEqual(index_response.status_code, 200)
+        index_data = index_response.json()
+        self.assertEqual(index_data["indexed"], 5)
+        self.assertEqual(index_data["errors"], [])
+        
+        # Wait a moment for indexing to complete
+        import time
+        time.sleep(2)
+        
+        # Now get suggestions for a prefix that should match
+        suggestion_request = {
+            "input": "machine",
+            "maxSuggestions": 5
+        }
+        
+        suggestion_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(suggestion_request)
+        )
+        
+        # Should get successful response
+        self.assertEqual(suggestion_response.status_code, 200)
+        suggestion_data = suggestion_response.json()
+        
+        # Should have required fields
+        self.assertIn("suggestions", suggestion_data)
+        self.assertIn("processingTimeMs", suggestion_data)
+        
+        # Should return at least one suggestion
+        suggestions = suggestion_data["suggestions"]
+        self.assertIsInstance(suggestions, list)
+        self.assertGreaterEqual(len(suggestions), 1)
+        
+        # Each suggestion should have the required structure
+        for suggestion in suggestions:
+            self.assertIn("query", suggestion)
+            self.assertIn("relevance", suggestion)
+            self.assertIsInstance(suggestion["query"], str)
+            self.assertIsInstance(suggestion["relevance"], (int, float))
+        
+        # At least one suggestion should contain "machine"
+        machine_suggestions = [s for s in suggestions if "machine" in s["query"].lower()]
+        self.assertGreaterEqual(len(machine_suggestions), 1)

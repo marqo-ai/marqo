@@ -84,26 +84,27 @@ class TypeaheadHandler:
                     errors.append(f"No suffixes generated for query: {query}")
                     continue
                 
-                vespa_doc = {
-                    "fields": {
+                from marqo.vespa.models.vespa_document import VespaDocument
+                vespa_doc = VespaDocument(
+                    id=doc_id,
+                    fields={
                         "query_suffixes": suffixes,
                         "original_query": query,
                         "rank": float(rank),
                         "query_id": doc_id
                     }
-                }
-                
-                # Index document in Vespa
-                response = self.vespa_client.feed_document(
-                    schema=self.typeahead_schema_name,
-                    doc_id=doc_id,
-                    document=vespa_doc
                 )
                 
-                if response and response.status_code == 200:
+                # Index document in Vespa
+                try:
+                    response = self.vespa_client.feed_document(
+                        document=vespa_doc,
+                        schema=self.typeahead_schema_name
+                    )
+                    # If no exception was raised, the document was successfully indexed
                     indexed_count += 1
-                else:
-                    errors.append(f"Failed to index query: {query}")
+                except Exception as e:
+                    errors.append(f"Failed to index query '{query}': {str(e)}")
             
             return {"indexed": indexed_count, "errors": errors}
         except Exception as e:
@@ -124,23 +125,24 @@ class TypeaheadHandler:
             }
             
             while True:
-                search_response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-                
-                if not search_response or search_response.status_code != 200:
-                    break
-                
-                hits = search_response.json().get("root", {}).get("children", [])
-                if not hits:
-                    break
-                
-                # Delete documents in this batch
-                for hit in hits:
-                    doc_id = hit.get("id", "").split("::")[-1]  # Extract doc ID from Vespa ID format
-                    if doc_id:
-                        self.vespa_client.delete_document(schema=self.typeahead_schema_name, doc_id=doc_id)
-                
-                # If we got fewer hits than requested, we're done
-                if len(hits) < search_params["hits"]:
+                try:
+                    search_response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+                    hits = search_response.hits
+                    
+                    if not hits:
+                        break
+                    
+                    # Delete documents in this batch
+                    for hit in hits:
+                        doc_id = hit.id.split("::")[-1] if hit.id else None  # Extract doc ID from Vespa ID format
+                        if doc_id:
+                            self.vespa_client.delete_document(schema=self.typeahead_schema_name, doc_id=doc_id)
+                    
+                    # If we got fewer hits than requested, we're done
+                    if len(hits) < search_params["hits"]:
+                        break
+                except Exception:
+                    # If query fails, stop deletion
                     break
             
             return True
@@ -163,13 +165,10 @@ class TypeaheadHandler:
             }
             
             response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-            
-            if response and response.status_code == 200:
-                total_count = response.json().get("root", {}).get("fields", {}).get("totalCount", 0)
-                return {"indexedQueries": total_count}
-            else:
-                return {"indexedQueries": 0}
-        except Exception as e:
+            # Access total_count property from QueryResult
+            total_count = response.total_count or 0
+            return {"indexedQueries": total_count}
+        except Exception:
             # If schema doesn't exist or other error, return 0
             return {"indexedQueries": 0}
     
@@ -181,26 +180,26 @@ class TypeaheadHandler:
             "ranking": "default"
         }
         
-        response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-        
-        if not response or response.status_code != 200:
-            return []
-        
-        hits = response.json().get("root", {}).get("children", [])
-        suggestions = []
-        
-        for hit in hits:
-            fields = hit.get("fields", {})
-            original_query = fields.get("original_query")
-            relevance = hit.get("relevance", 0.0)
+        try:
+            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+            hits = response.hits  # Use the hits property from QueryResult
+            suggestions = []
             
-            if original_query:
-                suggestions.append({
-                    "query": original_query,
-                    "relevance": relevance
-                })
-        
-        return suggestions
+            for hit in hits:
+                fields = hit.fields or {}
+                original_query = fields.get("original_query")
+                relevance = hit.relevance
+                
+                if original_query:
+                    suggestions.append({
+                        "query": original_query,
+                        "relevance": relevance
+                    })
+            
+            return suggestions
+        except Exception:
+            # If query fails, return empty list
+            return []
     
     def _get_fuzzy_suggestions(self, normalized_input: str, max_suggestions: int, max_edit_distance: int) -> List[Dict[str, Any]]:
         """Get suggestions using fuzzy matching."""
@@ -217,32 +216,32 @@ class TypeaheadHandler:
             "ranking": "fuzzy"
         }
         
-        response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-        
-        if not response or response.status_code != 200:
+        try:
+            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+            hits = response.hits
+            fuzzy_suggestions = []
+            exact_queries = {s["query"] for s in exact_suggestions}
+            
+            for hit in hits:
+                fields = hit.fields or {}
+                original_query = fields.get("original_query")
+                
+                if not original_query or original_query in exact_queries:
+                    continue
+                
+                # Check if query matches fuzzy criteria
+                normalized_query = normalize_text(original_query)
+                edit_distance = calculate_edit_distance(normalized_input, normalized_query[:len(normalized_input)])
+                
+                if edit_distance <= max_edit_distance:
+                    relevance = hit.relevance * (1.0 - edit_distance / (max_edit_distance + 1))
+                    fuzzy_suggestions.append({
+                        "query": original_query,
+                        "relevance": relevance
+                    })
+        except Exception:
+            # If query fails, return exact suggestions only
             return exact_suggestions
-        
-        hits = response.json().get("root", {}).get("children", [])
-        fuzzy_suggestions = []
-        exact_queries = {s["query"] for s in exact_suggestions}
-        
-        for hit in hits:
-            fields = hit.get("fields", {})
-            original_query = fields.get("original_query")
-            
-            if not original_query or original_query in exact_queries:
-                continue
-            
-            # Check if query matches fuzzy criteria
-            normalized_query = normalize_text(original_query)
-            edit_distance = calculate_edit_distance(normalized_input, normalized_query[:len(normalized_input)])
-            
-            if edit_distance <= max_edit_distance:
-                relevance = hit.get("relevance", 0.0) * (1.0 - edit_distance / (max_edit_distance + 1))
-                fuzzy_suggestions.append({
-                    "query": original_query,
-                    "relevance": relevance
-                })
         
         # Combine and sort suggestions
         all_suggestions = exact_suggestions + fuzzy_suggestions

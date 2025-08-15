@@ -750,56 +750,56 @@ def get_suggestions(index_name: str, suggestion_request: dict,
             - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
             - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
     """
+    # try:
+    from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
+    import time
+
+    start_time = time.time()
+
+    # Validate input
+    input_text = suggestion_request.get("input")
+    if not input_text:
+        raise api_exceptions.InvalidArgError("Input text is required")
+
+    max_suggestions = suggestion_request.get("maxSuggestions", 10)
+    fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
+    min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
+
+    # Validate parameters
+    if max_suggestions <= 0:
+        raise api_exceptions.InvalidArgError("maxSuggestions must be positive")
+    if fuzzy_edit_distance < 0:
+        raise api_exceptions.InvalidArgError("fuzzyEditDistance must be non-negative")
+    if min_fuzzy_match_length < 0:
+        raise api_exceptions.InvalidArgError("minFuzzyMatchLength must be non-negative")
+
+    # Check if index exists
     try:
-        from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
-        import time
-        
-        start_time = time.time()
-        
-        # Validate input
-        input_text = suggestion_request.get("input")
-        if not input_text:
-            raise api_exceptions.InvalidArgError("Input text is required")
-        
-        max_suggestions = suggestion_request.get("maxSuggestions", 10)
-        fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
-        min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
-        
-        # Validate parameters
-        if max_suggestions <= 0:
-            raise api_exceptions.InvalidArgError("maxSuggestions must be positive")
-        if fuzzy_edit_distance < 0:
-            raise api_exceptions.InvalidArgError("fuzzyEditDistance must be non-negative")
-        if min_fuzzy_match_length < 0:
-            raise api_exceptions.InvalidArgError("minFuzzyMatchLength must be non-negative")
-        
-        # Check if index exists
-        try:
-            marqo_config.index_management.get_index(index_name)
-        except Exception:
-            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
-        
-        # Get suggestions
-        handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
-        suggestions = handler.get_suggestions(
-            input_text=input_text,
-            max_suggestions=max_suggestions,
-            fuzzy_edit_distance=fuzzy_edit_distance,
-            min_fuzzy_match_length=min_fuzzy_match_length
-        )
-        
-        processing_time_ms = int((time.time() - start_time) * 1000)
-        
-        return JSONResponse(
-            content={
-                "suggestions": suggestions,
-                "processingTimeMs": processing_time_ms
-            }
-        )
-    except api_exceptions.MarqoWebError:
-        raise
-    except Exception as e:
-        raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
+        marqo_config.index_management.get_index(index_name)
+    except Exception:
+        raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+
+    # Get suggestions
+    handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
+    suggestions = handler.get_suggestions(
+        input_text=input_text,
+        max_suggestions=max_suggestions,
+        fuzzy_edit_distance=fuzzy_edit_distance,
+        min_fuzzy_match_length=min_fuzzy_match_length
+    )
+
+    processing_time_ms = int((time.time() - start_time) * 1000)
+
+    return JSONResponse(
+        content={
+            "suggestions": suggestions,
+            "processingTimeMs": processing_time_ms
+        }
+    )
+    # except api_exceptions.MarqoWebError:
+    #     raise
+    # except Exception as e:
+    #     raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
 
 
 @app.post("/indexes/{index_name}/queries")
