@@ -4,7 +4,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.typeahead.text_normalization import normalize_text, generate_suffixes, calculate_edit_distance
+from marqo.core.typeahead.text_normalization import normalize_text, generate_suffixes
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core import exceptions as core_exceptions
 
@@ -205,51 +205,33 @@ class TypeaheadHandler:
             raise core_exceptions.BackendCommunicationError(f"Failed to get exact suggestions: {str(e)}")
     
     def _get_fuzzy_suggestions(self, normalized_input: str, max_suggestions: int, max_edit_distance: int) -> List[Dict[str, Any]]:
-        """Get suggestions using fuzzy matching."""
-        # First try exact matching
-        exact_suggestions = self._get_exact_suggestions(normalized_input, max_suggestions)
-        
-        if len(exact_suggestions) >= max_suggestions:
-            return exact_suggestions[:max_suggestions]
-        
-        # Get more candidates for fuzzy matching
+        """Get suggestions using Vespa's native fuzzy prefix matching."""
+        # Use Vespa's fuzzy prefix matching which covers both exact and fuzzy matches
         search_params = {
-            "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE true",
-            "hits": max_suggestions * 3,  # Get more candidates for filtering
+            "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE query_suffixes contains ({{maxEditDistance: {max_edit_distance}, prefix: true}}fuzzy(\"{normalized_input}\"))",
+            "hits": max_suggestions,
             "ranking": "fuzzy"
         }
         
         try:
             response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
             hits = response.hits
-            fuzzy_suggestions = []
-            exact_queries = {s["query"] for s in exact_suggestions}
+            suggestions = []
             
             for hit in hits:
                 fields = hit.fields or {}
                 original_query = fields.get("original_query")
+                relevance = hit.relevance
                 
-                if not original_query or original_query in exact_queries:
-                    continue
-                
-                # Check if query matches fuzzy criteria
-                normalized_query = normalize_text(original_query)
-                edit_distance = calculate_edit_distance(normalized_input, normalized_query[:len(normalized_input)])
-                
-                if edit_distance <= max_edit_distance:
-                    relevance = hit.relevance * (1.0 - edit_distance / (max_edit_distance + 1))
-                    fuzzy_suggestions.append({
+                if original_query:
+                    suggestions.append({
                         "query": original_query,
                         "relevance": relevance
                     })
+            
+            return suggestions
         except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return exact suggestions only
-            return exact_suggestions
+            # If schema doesn't exist, return empty list
+            return []
         except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
             raise core_exceptions.BackendCommunicationError(f"Failed to get fuzzy suggestions: {str(e)}")
-        
-        # Combine and sort suggestions
-        all_suggestions = exact_suggestions + fuzzy_suggestions
-        all_suggestions.sort(key=lambda x: x["relevance"], reverse=True)
-        
-        return all_suggestions[:max_suggestions]
