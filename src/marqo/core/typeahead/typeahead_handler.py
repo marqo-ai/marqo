@@ -134,7 +134,7 @@ class TypeaheadHandler:
                     for hit in hits:
                         doc_id = hit.id.split("::")[-1] if hit.id else None  # Extract doc ID from Vespa ID format
                         if doc_id:
-                            self.vespa_client.delete_document(schema=self.typeahead_schema_name, doc_id=doc_id)
+                            self.vespa_client.delete_document(id=doc_id, schema=self.typeahead_schema_name)
                     
                     # If we got fewer hits than requested, we're done
                     if len(hits) < search_params["hits"]:

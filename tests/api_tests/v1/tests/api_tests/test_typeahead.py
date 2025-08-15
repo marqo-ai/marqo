@@ -85,7 +85,7 @@ class TestTypeahead(MarqoTestCase):
         self.assertIsInstance(response_data["processingTimeMs"], (int, float))
 
     def test_add_queries_and_get_suggestions_success(self):
-        """Test that adding queries and getting suggestions returns successful response with results."""
+        """Test complete typeahead workflow: index queries, verify stats, get suggestions, delete queries, verify stats again."""
         # First, index some queries with a common prefix
         queries_request = {
             "queries": [
@@ -113,6 +113,17 @@ class TestTypeahead(MarqoTestCase):
         # Wait a moment for indexing to complete
         import time
         time.sleep(2)
+        
+        # 1. Check stats after adding queries - should show 5 queries
+        stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(stats_response.status_code, 200)
+        stats_data = stats_response.json()
+        self.assertIn("indexedQueries", stats_data)
+        self.assertEqual(stats_data["indexedQueries"], 5)
         
         # Now get suggestions for a prefix that should match
         suggestion_request = {
@@ -149,3 +160,29 @@ class TestTypeahead(MarqoTestCase):
         # At least one suggestion should contain "machine"
         machine_suggestions = [s for s in suggestions if "machine" in s["query"].lower()]
         self.assertGreaterEqual(len(machine_suggestions), 1)
+        
+        # 2. Delete all queries
+        delete_response = requests.delete(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(delete_response.status_code, 200)
+        delete_data = delete_response.json()
+        self.assertIn("deleted", delete_data)
+        self.assertIn("message", delete_data)
+        self.assertTrue(delete_data["deleted"])
+        
+        # Wait a moment for deletion to complete
+        time.sleep(2)
+        
+        # 3. Check stats after deletion - should show 0 queries
+        final_stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(final_stats_response.status_code, 200)
+        final_stats_data = final_stats_response.json()
+        self.assertIn("indexedQueries", final_stats_data)
+        self.assertEqual(final_stats_data["indexedQueries"], 0)
