@@ -802,7 +802,7 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     #     raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
 
 
-@app.post("/indexes/{index_name}/queries")
+@app.post("/indexes/{index_name}/suggestions/queries")
 @throttle(RequestType.INDEX)
 def index_queries(index_name: str, queries_request: dict,
                  marqo_config: config.Config = Depends(get_config)):
@@ -853,7 +853,7 @@ def index_queries(index_name: str, queries_request: dict,
         raise api_exceptions.InternalError(f"Error indexing queries: {str(e)}")
 
 
-@app.post("/indexes/{index_name}/queries/delete")
+@app.delete("/indexes/{index_name}/suggestions/queries")
 @throttle(RequestType.INDEX)
 def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
@@ -887,7 +887,7 @@ def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(ge
         raise api_exceptions.InternalError(f"Error deleting queries: {str(e)}")
 
 
-@app.get("/indexes/{index_name}/queries/stats")
+@app.get("/indexes/{index_name}/suggestions/stats")
 @throttle(RequestType.SEARCH)
 def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
