@@ -1503,6 +1503,69 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.assertEqual(failed_characters, [],
                          f"Expected no characters to fail, but got: {failed_characters}")
 
+    def test_filter_maps(self):
+        """Test filtering on map fields using range syntax"""
+        docs = [
+            {
+                "_id": "doc1",
+                "title": "Cool Document 1",
+                "metadata": {
+                    "score": 0.9,
+                    "rank": 10
+                }
+            },
+            {
+                "_id": "doc2",
+                "title": "Just Your Average Doc",
+                "metadata": {
+                    "score": 0.5,
+                    "rank": 20
+                }
+            },
+            {
+                "_id": "doc3",
+                "title": "Another Document",
+                "metadata": {
+                    "score": 0.7,
+                    "rank": 15
+                }
+            }
+        ]
+        
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+        
+        test_cases = [
+            ("metadata.score:[0 TO 1]", ["doc1", "doc2", "doc3"]),
+            ("metadata.score:[0.0 TO 1.0]", ["doc1", "doc2", "doc3"]),
+            ("metadata.score:[1.1 TO 10]", []),
+            ("metadata.rank:[15 TO 20]", ["doc2", "doc3"]),
+            ("metadata.rank:[15.0 TO 20]", ["doc2", "doc3"]),
+            ("metadata.rank:[0 TO 9]", []),
+        ]
+        
+        for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
+            for filter_string, expected in test_cases:
+                with self.subTest(f"search_method={search_method}, filter={filter_string}"):
+                    search_res = tensor_search.search(
+                        config=self.config,
+                        index_name=self.default_text_index.name,
+                        text="*",
+                        filter=filter_string,
+                        search_method=search_method
+                    )
+                    actual_ids = set([hit["_id"] for hit in search_res["hits"]])
+                    self.assertEqual(len(search_res["hits"]), len(expected),
+                                     f"Failed count check for filter '{filter_string}'.")
+                    self.assertEqual(actual_ids, set(expected), 
+                                     f"Failed ID match for filter '{filter_string}'")
+
     def test_search_incomplete_response_processed_correctly(self):
         """ This test validates that incomplete response for float/int fields is processed correctly.
             This is an edge case that happens during race condition when adding and updating document at the same time.
