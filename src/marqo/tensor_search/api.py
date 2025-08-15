@@ -774,10 +774,7 @@ def get_suggestions(index_name: str, suggestion_request: dict,
         raise api_exceptions.InvalidArgError("minFuzzyMatchLength must be non-negative")
 
     # Check if index exists
-    try:
-        marqo_config.index_management.get_index(index_name)
-    except Exception:
-        raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+    marqo_config.index_management.get_index(index_name)
 
     # Get suggestions
     handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
@@ -826,10 +823,7 @@ def index_queries(index_name: str, queries_request: dict,
             raise api_exceptions.InvalidArgError("queries must be a list")
         
         # Check if index exists
-        try:
-            marqo_config.index_management.get_index(index_name)
-        except Exception:
-            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        marqo_config.index_management.get_index(index_name)
         
         # Validate queries format
         for i, query_data in enumerate(queries):
@@ -849,8 +843,6 @@ def index_queries(index_name: str, queries_request: dict,
         return JSONResponse(content=result)
     except api_exceptions.MarqoWebError:
         raise
-    except Exception as e:
-        raise api_exceptions.InternalError(f"Error indexing queries: {str(e)}")
 
 
 @app.delete("/indexes/{index_name}/suggestions/queries")
@@ -866,10 +858,7 @@ def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(ge
         from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
         
         # Check if index exists
-        try:
-            marqo_config.index_management.get_index(index_name)
-        except Exception:
-            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        marqo_config.index_management.get_index(index_name)
         
         # Delete all queries
         handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
@@ -883,8 +872,6 @@ def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(ge
         )
     except api_exceptions.MarqoWebError:
         raise
-    except Exception as e:
-        raise api_exceptions.InternalError(f"Error deleting queries: {str(e)}")
 
 
 @app.get("/indexes/{index_name}/suggestions/stats")
@@ -900,10 +887,7 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
         
         # Check if index exists
-        try:
-            marqo_config.index_management.get_index(index_name)
-        except Exception:
-            raise api_exceptions.IndexNotFoundError(f"Index '{index_name}' not found")
+        marqo_config.index_management.get_index(index_name)
         
         # Get stats
         handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
@@ -912,8 +896,6 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         return JSONResponse(content=stats)
     except api_exceptions.MarqoWebError:
         raise
-    except Exception as e:
-        raise api_exceptions.InternalError(f"Error getting typeahead stats: {str(e)}")
 
 
 @app.get('/memory', include_in_schema=False)

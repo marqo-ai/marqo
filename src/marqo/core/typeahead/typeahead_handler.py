@@ -39,17 +39,14 @@ class TypeaheadHandler:
         if not normalized_input:
             return []
         
-        try:
-            if len(normalized_input) < min_fuzzy_match_length:
-                # Use exact prefix matching
-                suggestions = self._get_exact_suggestions(normalized_input, max_suggestions)
-            else:
-                # Use fuzzy matching
-                suggestions = self._get_fuzzy_suggestions(normalized_input, max_suggestions, fuzzy_edit_distance)
-            
-            return suggestions
-        except Exception as e:
-            raise core_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
+        if len(normalized_input) < min_fuzzy_match_length:
+            # Use exact prefix matching
+            suggestions = self._get_exact_suggestions(normalized_input, max_suggestions)
+        else:
+            # Use fuzzy matching
+            suggestions = self._get_fuzzy_suggestions(normalized_input, max_suggestions, fuzzy_edit_distance)
+        
+        return suggestions
     
     def index_queries(self, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -103,12 +100,13 @@ class TypeaheadHandler:
                     )
                     # If no exception was raised, the document was successfully indexed
                     indexed_count += 1
-                except Exception as e:
+                except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
                     errors.append(f"Failed to index query '{query}': {str(e)}")
             
             return {"indexed": indexed_count, "errors": errors}
-        except Exception as e:
-            raise core_exceptions.InternalError(f"Error indexing queries: {str(e)}")
+        except core_exceptions.MarqoError:
+            # Re-raise known Marqo errors
+            raise
     
     def delete_all_queries(self) -> bool:
         """
@@ -141,13 +139,14 @@ class TypeaheadHandler:
                     # If we got fewer hits than requested, we're done
                     if len(hits) < search_params["hits"]:
                         break
-                except Exception:
-                    # If query fails, stop deletion
-                    break
+                except (core_exceptions.BackendCommunicationError, core_exceptions.IndexNotFoundError) as e:
+                    # If query fails due to communication or missing index, stop deletion
+                    raise core_exceptions.InternalError(f"Failed to query documents for deletion: {str(e)}")
             
             return True
-        except Exception as e:
-            raise core_exceptions.InternalError(f"Error deleting queries: {str(e)}")
+        except core_exceptions.MarqoError:
+            # Re-raise known Marqo errors
+            raise
     
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -168,9 +167,11 @@ class TypeaheadHandler:
             # Access total_count property from QueryResult
             total_count = response.total_count or 0
             return {"indexedQueries": total_count}
-        except Exception:
-            # If schema doesn't exist or other error, return 0
+        except core_exceptions.IndexNotFoundError:
+            # If schema doesn't exist, return 0
             return {"indexedQueries": 0}
+        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
+            raise core_exceptions.BackendCommunicationError(f"Failed to get typeahead stats: {str(e)}")
     
     def _get_exact_suggestions(self, normalized_input: str, max_suggestions: int) -> List[Dict[str, Any]]:
         """Get suggestions using exact prefix matching."""
@@ -197,9 +198,11 @@ class TypeaheadHandler:
                     })
             
             return suggestions
-        except Exception:
-            # If query fails, return empty list
+        except core_exceptions.IndexNotFoundError:
+            # If schema doesn't exist, return empty list
             return []
+        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
+            raise core_exceptions.BackendCommunicationError(f"Failed to get exact suggestions: {str(e)}")
     
     def _get_fuzzy_suggestions(self, normalized_input: str, max_suggestions: int, max_edit_distance: int) -> List[Dict[str, Any]]:
         """Get suggestions using fuzzy matching."""
@@ -239,9 +242,11 @@ class TypeaheadHandler:
                         "query": original_query,
                         "relevance": relevance
                     })
-        except Exception:
-            # If query fails, return exact suggestions only
+        except core_exceptions.IndexNotFoundError:
+            # If schema doesn't exist, return exact suggestions only
             return exact_suggestions
+        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
+            raise core_exceptions.BackendCommunicationError(f"Failed to get fuzzy suggestions: {str(e)}")
         
         # Combine and sort suggestions
         all_suggestions = exact_suggestions + fuzzy_suggestions
