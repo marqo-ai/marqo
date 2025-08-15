@@ -368,7 +368,61 @@ class TestUnstructuredSearch(MarqoTestCase):
         for search_method in ["TENSOR", "LEXICAL"]:
             for filter_string, expected, msg in test_case:
                 with self.subTest(f"{search_method} - {msg}"):
-                    search_res = self.client.index(self.text_index_name).search(q = "title", filter_string=filter_string)
+                    search_res = self.client.index(self.text_index_name).search(
+                        q = "*",
+                        search_method=search_method,
+                        filter_string=filter_string
+                    )
+                    actual_ids = set([hit["_id"] for hit in search_res["hits"]])
+                    self.assertEqual(len(search_res["hits"]), len(expected),
+                                     f"Failed count check for filter '{filter_string}'.")
+                    self.assertEqual(actual_ids, set(expected), f"Failed ID match for filter '{filter_string}'")
+
+    def test_filter_maps(self):
+        docs = [
+            {
+                "_id": "doc1",
+                "title": "Cool Document 1",
+                "metadata": {
+                    "score": 0.9,
+                    "rank": 10
+                }
+            },
+            {
+                "_id": "doc2",
+                "title": "Just Your Average Doc",
+                "metadata": {
+                    "score": 0.5,
+                    "rank": 20
+                }
+            },
+            {
+                "_id": "doc3",
+                "title": "Another Document",
+                "metadata": {
+                    "score": 0.7,
+                    "rank": 15.1
+                }
+            }
+        ]
+        res = self.client.index(self.text_index_name).add_documents(docs, tensor_fields=["title"])
+        test_cases = [
+            ("metadata.score:[0 TO 1]", ["doc1", "doc2", "doc3"]),
+            ("metadata.score:[0.0 TO 1.0]", ["doc1", "doc2", "doc3"]),
+            ("metadata.score:[1.1 TO 10]", []),
+            ("metadata.rank:[15 TO 20]", ["doc2", "doc3"]),
+            ("metadata.rank:[15.0 TO 20]", ["doc2", "doc3"]),
+            ("metadata.rank:[0 TO 9]", []),
+        ]
+
+        for search_method in ["LEXICAL", "TENSOR"]:
+            for filter_string, expected in test_cases:
+                with self.subTest(f"{search_method}"):
+                    search_res = self.client.index(self.text_index_name).search(
+                        q="*",
+                        search_method=search_method,
+                        filter_string=filter_string
+                    )
                     actual_ids = set([hit["_id"] for hit in search_res["hits"]])
                     self.assertEqual(len(search_res["hits"]), len(expected),
                                      f"Failed count check for filter '{filter_string}'.")
