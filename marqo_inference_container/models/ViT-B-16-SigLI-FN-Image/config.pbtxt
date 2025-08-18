@@ -1,0 +1,27 @@
+name: "ViT-B-16-SigLI-FN-Image"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+instance_group [
+    {
+        count: 1
+        kind: KIND_GPU
+        gpus: [0]
+    }
+]
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+output [
+    {
+        name: "output"
+        data_type: TYPE_FP32
+        dims: [ 768 ]
+    }
+]
+dynamic_batching {
+    max_queue_delay_microseconds: 0
+}
