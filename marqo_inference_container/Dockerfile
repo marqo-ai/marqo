@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tritonserver:24.03-py3
+FROM nvcr.io/nvidia/tritonserver:25.06-trtllm-python-py3
 
 # Copy model repository into the container
 COPY models /models
