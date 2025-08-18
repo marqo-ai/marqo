@@ -1,12 +1,12 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
+import blake3
 import numpy as np
 
 from marqo.core.inference.api import Inference, InferenceRequest, ModelConfig, TextPreprocessingConfig, TextChunkConfig, \
-    InferenceResult, InferenceErrorModel
+    InferenceResult, InferenceErrorModel, ImagePreprocessingConfig, Modality
 from marqo.inference.inference_cache.caching_inference import CachingInference
-from marqo.s2_inference.types import Modality
 
 
 class TestCachingInferenceModelCacheKey(TestCase):
@@ -62,9 +62,11 @@ class TestCachingInferenceShouldSkip(TestCase):
         req = self.base_request.copy(update={'device': 'cpu'})
         self.assertTrue(self.caching_inference.should_skip_cache(req))
 
-    def test_should_skip_when_non_text_modality(self):
-        req = self.base_request.copy(update={'modality': Modality.IMAGE})
-        self.assertTrue(self.caching_inference.should_skip_cache(req))
+    def test_should_skip_when_non_text_image_modality(self):
+        for modality in [Modality.VIDEO, Modality.AUDIO]:
+            with self.subTest(modality=modality):
+                req = self.base_request.copy(update={'modality': modality})
+                self.assertTrue(self.caching_inference.should_skip_cache(req))
 
     def test_should_skip_when_chunking_enabled(self):
         req = self.base_request.copy(update={'preprocessing_config': TextPreprocessingConfig(
@@ -72,8 +74,9 @@ class TestCachingInferenceShouldSkip(TestCase):
         self.assertTrue(self.caching_inference.should_skip_cache(req))
 
     def test_should_not_skip_when_all_condition_clear(self):
-        req = self.base_request
-        self.assertFalse(self.caching_inference.should_skip_cache(req))
+        for modality in [Modality.TEXT, Modality.IMAGE]:
+            req = self.base_request.copy(update={'modality': modality})
+            self.assertFalse(self.caching_inference.should_skip_cache(req))
 
 
 class TestCachingInferenceVectorise(TestCase):
@@ -186,3 +189,114 @@ class TestCachingInferenceVectorise(TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             self.ci.vectorise(req)
         self.assertIn('does not support chunking', str(ctx.exception))
+
+
+class TestCachingInferenceBase64Images(TestCase):
+    def setUp(self):
+        self.mock_delegate = Mock(spec=Inference)
+        self.caching_inference = CachingInference(delegate=self.mock_delegate, cache_size=10, cache_type='LRU')
+        # Replace cache with a mock for better control
+        self.caching_inference.inference_cache = Mock()
+        # Stub model_cache_key to a fixed key
+        self.caching_inference.model_cache_key = Mock(return_value='fixed-key')
+
+        self.base64_png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+        self.base64_jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/'
+        self.url_image = 'https://example.com/image.jpg'
+
+        # Base64 image request template
+        self.base_request = InferenceRequest(
+            contents=[self.base64_png],
+            model_config=Mock(spec=ModelConfig),
+            use_inference_cache=True,
+            device=None,
+            modality=Modality.IMAGE,
+            preprocessing_config=ImagePreprocessingConfig(should_chunk=False)
+        )
+
+    def test_vectorise_caches_base64_images_only(self):
+        """Test that only base64 images are cached, URLs are processed normally."""
+        # Cache miss for base64, no cache check for URL
+        self.caching_inference.inference_cache.get.return_value = None
+        
+        # Mock delegate response
+        embedding1 = np.array([1.0, 2.0])
+        embedding2 = np.array([3.0, 4.0])
+        delegate_result = InferenceResult(result=[[(self.base64_png, embedding1)], [(self.url_image, embedding2)]])
+        self.mock_delegate.vectorise.return_value = delegate_result
+        
+        mixed_req = self.base_request.copy(update={'contents': [self.base64_png, self.url_image]})
+        result = self.caching_inference.vectorise(mixed_req)
+        
+        # Verify cache operations
+        expected_hash = blake3.blake3(self.base64_png.encode()).hexdigest()
+        expected_cache_key = f"blake3:{expected_hash}"
+        model_key = 'fixed-key'  # Mocked in setUp
+        
+        # Should check cache only for base64 image
+        self.caching_inference.inference_cache.get.assert_called_once_with(model_key, expected_cache_key)
+        
+        # Should cache only base64 image
+        self.caching_inference.inference_cache.set.assert_called_once_with(model_key, expected_cache_key, embedding1)
+        
+        # Delegate should be called with both contents
+        called_request = self.mock_delegate.vectorise.call_args[0][0]
+        self.assertEqual(called_request.contents, [self.base64_png, self.url_image])
+        
+        # Result should contain original base64 content and URL
+        self.assertEqual(result.result[0][0], (self.base64_png, embedding1))  # Original base64 returned
+        self.assertEqual(result.result[1][0], (self.url_image, embedding2))  # URL unchanged
+
+    def test_vectorise_mixed_cache_hits_and_misses(self):
+        """Test mixed scenario: base64 cache hit, URL processed normally."""
+        # Cache hit for base64
+        cached_embedding = np.array([1.0, 2.0])
+        self.caching_inference.inference_cache.get.return_value = cached_embedding
+        
+        # Mock delegate response for URL only
+        url_embedding = np.array([3.0, 4.0])
+        delegate_result = InferenceResult(result=[[(self.url_image, url_embedding)]])
+        self.mock_delegate.vectorise.return_value = delegate_result
+        
+        mixed_req = self.base_request.copy(update={'contents': [self.base64_png, self.url_image]})
+        result = self.caching_inference.vectorise(mixed_req)
+        
+        # Should call delegate with only URL (base64 was cached)
+        called_request = self.mock_delegate.vectorise.call_args[0][0]
+        self.assertEqual(called_request.contents, [self.url_image])
+        
+        # Should not cache URL image
+        self.caching_inference.inference_cache.set.assert_not_called()
+        
+        # Final result should have original base64 for base64, original URL for URL image
+        self.assertEqual(result.result, [[(self.base64_png, cached_embedding)], [(self.url_image, url_embedding)]])
+
+    def test_vectorise_multiple_base64_images(self):
+        """Test that multiple base64 images are all cached."""
+        # Cache miss for both
+        self.caching_inference.inference_cache.get.return_value = None
+        
+        # Mock delegate response
+        embedding1 = np.array([1.0, 2.0])
+        embedding2 = np.array([3.0, 4.0])
+        delegate_result = InferenceResult(result=[[(self.base64_png, embedding1)], [(self.base64_jpeg, embedding2)]])
+        self.mock_delegate.vectorise.return_value = delegate_result
+        
+        multi_base64_req = self.base_request.copy(update={'contents': [self.base64_png, self.base64_jpeg]})
+        result = self.caching_inference.vectorise(multi_base64_req)
+        
+        # Should cache both images
+        expected_hash1 = blake3.blake3(self.base64_png.encode()).hexdigest()
+        expected_hash2 = blake3.blake3(self.base64_jpeg.encode()).hexdigest()
+        expected_key1 = f"blake3:{expected_hash1}"
+        expected_key2 = f"blake3:{expected_hash2}"
+        model_key = 'fixed-key'
+        
+        self.assertEqual(self.caching_inference.inference_cache.set.call_count, 2)
+        set_calls = self.caching_inference.inference_cache.set.call_args_list
+        self.assertIn(((model_key, expected_key1, embedding1),), set_calls)
+        self.assertIn(((model_key, expected_key2, embedding2),), set_calls)
+        
+        # Results should contain original base64 content
+        self.assertEqual(result.result[0][0], (self.base64_png, embedding1))  # Original PNG base64
+        self.assertEqual(result.result[1][0], (self.base64_jpeg, embedding2))  # Original JPEG base64

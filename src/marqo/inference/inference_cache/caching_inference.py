@@ -1,11 +1,13 @@
 import hashlib
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
+import blake3
 import numpy as np
 import orjson
 
 from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality, \
     InferenceErrorModel
+from marqo.core.inference.modality_utils import is_base64_image
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
@@ -24,7 +26,12 @@ class CachingInference(Inference):
         contents_to_vectorise: List[str] = []
 
         for index, content in enumerate(request.contents):
-            embedding = self.inference_cache.get(model_cache_key, content)
+            content_cache_key = self.content_cache_key(content, request.modality)
+            if not content_cache_key:
+                contents_to_vectorise.append(content)
+                continue
+
+            embedding = self.inference_cache.get(model_cache_key, content_cache_key)
             if embedding is not None:
                 cached_result.append((index, content, embedding))
             else:
@@ -43,7 +50,9 @@ class CachingInference(Inference):
                                        f"Preprocessing config: "
                                        f"{orjson.dumps(dict(new_request.preprocessing_config)).decode('utf-8')}")
                 content, embedding = r[0]
-                self.inference_cache.set(model_cache_key, content, embedding)
+                content_cache_key = self.content_cache_key(content, request.modality)
+                if content_cache_key:
+                    self.inference_cache.set(model_cache_key, content_cache_key, embedding)
 
         # Merge result
         if cached_result:
@@ -61,10 +70,37 @@ class CachingInference(Inference):
         data = orjson.dumps(model_properties, option=orjson.OPT_SORT_KEYS)
         return hashlib.md5(data).hexdigest()
 
+    def content_cache_key(self, content: str, modality: Modality) -> Optional[str]:
+        """
+        Generate appropriate cache key for content based on modality.
+        
+        For TEXT modality: use content directly
+        For IMAGE modality: 
+            - if base64 image: use blake3 hash with prefix
+            - otherwise: use content directly (will be skipped in caching logic)
+        
+        Args:
+            content: The content string
+            modality: The modality type
+            
+        Returns:
+            Cache key string, None if it should not be cached
+        """
+        if modality == Modality.TEXT:
+            # Use original content for text and non-base64 images
+            return content
+        elif modality == Modality.IMAGE and is_base64_image(content):
+            # Use blake3 hash for base64 images to save memory
+            hash_digest = blake3.blake3(content.encode()).hexdigest()
+            return f"blake3:{hash_digest}"
+        else:
+            # should not cache non-base64-encoded images
+            return None
+
     def should_skip_cache(self, request):
         return (
             not request.use_inference_cache
             or request.device  # device is only specified to debug embedding, skip caching
-            or request.modality != Modality.TEXT  # we only support text modality for now
+            or request.modality not in [Modality.TEXT, Modality.IMAGE]  # we support text and image modalities
             or request.preprocessing_config.should_chunk  # we do not support caching chunks
         )

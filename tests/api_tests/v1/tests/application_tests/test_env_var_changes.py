@@ -24,6 +24,7 @@ from typing import Callable, Optional, List
 
 import math
 
+from tests.api_tests.v1.tests.marqo_test import TestImageUrls
 from tests import marqo_test
 from tests import utilities
 
@@ -83,7 +84,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         """
 
         # Restart marqo with new max values
-        new_models = ["hf/e5-large-v2"]
+        new_models = ["open_clip/ViT-H-14/laion2b_s32b_b79k"]
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
             env_vars=[
@@ -111,10 +112,12 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
         min_inference_time_ms = 8      # inference usually takes at least 8ms
-        cache_reading_time_ms = 2      # if it hits cache, it's usually less than 2ms
+        cache_reading_time_ms = 3      # if it hits cache, the pipeline should take less than 3ms
 
         # Test search query's embedding is cached when inference cache is enabled
-        for query in ["test", {"random": 1, "query": 2}]:
+        base64_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        image_url = TestImageUrls.HIPPO_STATUE.value
+        for query in ["test", {"random": 1, "query": 2}, base64_image]:
             with self.subTest(f"Search query: {query}"):
                 # Single query
                 # First search that misses cache should take longer
@@ -129,7 +132,13 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 inference_latency = self._run_in_threads(
                     lambda client: client.index(index_name).search(q=query),
                     max_workers=1, count=10, telemetry_name="search.vector_inference_full_pipeline")
-                self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
+
+                if query == image_url:
+                    # image url is not cached, so avg latency will usually be > min_inference_time_ms
+                    self.assertTrue(sum(inference_latency) / 10 > min_inference_time_ms, inference_latency)
+                else:
+                    # other queries are all cached, so avg latency should be < cache_reading_time_ms
+                    self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
 
         # Test to ensure inference cache is not working for add_documents:
         with self.subTest("Add document"):
