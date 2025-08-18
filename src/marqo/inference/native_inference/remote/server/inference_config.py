@@ -6,6 +6,8 @@ from marqo.inference.native_inference.load_model import NativeModelManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
+from marqo.inference.triton_inference.triton_inference import TritonInference
+from marqo.inference.triton_inference.triton_inference_client import TritonInferenceClient
 
 logger = logging.get_logger(__name__)
 
@@ -15,18 +17,13 @@ class Config:
         # TODO load env vars to this class and expose them as properties
         self.model_manager: ModelManager = NativeModelManager()
         self.device_manager: DeviceManager = DeviceManager()
-        inference = NativeInferenceLocal(device_manager=self.device_manager)
 
-        # initialise inference cache
-        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE)
-        if inference_cache_size > 0:  # enable inference cache
-            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE)
-            self.local_inference = CachingInference(
-                delegate=inference,
-                cache_size=inference_cache_size,
-                cache_type=inference_cache_type
+        triton_inference_url = utils.read_env_vars_and_defaults(EnvVars.TRITON_INFERENCE_URL)
+        if not triton_inference_url:
+            raise ValueError(
+                f"Environment variable {EnvVars.TRITON_INFERENCE_URL} is not set. "
+                "Please set it to the URL of the Triton inference server."
             )
-        else:
-            self.local_inference = inference
 
-
+        triton_inference_client = TritonInferenceClient(triton_inference_url)
+        self.triton_inference = TritonInference(triton_inference_client)

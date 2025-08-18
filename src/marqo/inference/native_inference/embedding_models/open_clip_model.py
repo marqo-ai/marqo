@@ -86,6 +86,11 @@ class OpenCLIPModel(AbstractCLIPModel):
             raise InvalidModelPropertiesError(f"Invalid model properties: {model_properties}. Original error: {e}") \
                 from e
 
+    def encode(self, inputs: List, modality: Modality, normalize=True) -> List[ndarray]:
+        raise RuntimeError(
+            "This code path should not be reached when using Triton inference pipeline. "
+        )
+
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
         if self.model_properties.url is not None or self.model_properties.model_location is not None or \
