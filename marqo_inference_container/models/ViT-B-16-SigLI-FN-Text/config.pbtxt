@@ -11,7 +11,7 @@ instance_group [
 input [
   {
     name: "input"
-    data_type: TYPE_INT64
+    data_type: TYPE_INT32
     dims: [ 64 ]
   }
 ]
