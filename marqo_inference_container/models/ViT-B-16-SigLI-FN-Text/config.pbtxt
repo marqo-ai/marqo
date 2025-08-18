@@ -12,14 +12,14 @@ input [
   {
     name: "input"
     data_type: TYPE_INT32
-    dims: [ 64 ]
+    dims: [ -1, 64 ]
   }
 ]
 output [
     {
         name: "output"
         data_type: TYPE_FP32
-        dims: [ 768 ]
+        dims: [ -1, 768 ]
     }
 ]
 dynamic_batching {

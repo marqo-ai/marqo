@@ -19,7 +19,7 @@ output [
     {
         name: "output"
         data_type: TYPE_FP32
-        dims: [ 768 ]
+        dims: [ -1, 768 ]
     }
 ]
 dynamic_batching {
