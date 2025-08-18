@@ -1,40 +1,43 @@
 schema {{ schema_name }} {
 
     document {{ schema_name }} {
-        
-        field query_suffixes type array<string> {
-            indexing: summary | index | attribute
-            index: enable-bm25
+
+        field query type string {
+            indexing: summary | attribute
             attribute: fast-search
         }
-        
-        field original_query type string {
-            indexing: summary | index
+
+        field query_suffixes type array<string> {
+            indexing: summary | attribute
+            attribute: fast-search
         }
-        
+
+        field query_suffixes_index type array<string> {
+            indexing: index
+            index: enable-bm25
+            stemming: none
+            normalizing: none
+        }
+
         field rank type double {
             indexing: summary | attribute
         }
-        
-        field query_id type string {
-            indexing: summary | attribute
-        }
-        
+
     }
 
     fieldset default {
         fields: query_suffixes
     }
 
-    rank-profile default {
+    rank-profile exact inherits default {
         first-phase {
             expression: attribute(rank)
         }
     }
 
-    rank-profile fuzzy {
+    rank-profile fuzzy inherits default {
         first-phase {
-            expression: attribute(rank) + bm25(query_suffixes)
+            expression: attribute(rank) + bm25(query_suffixes_index)
         }
     }
 

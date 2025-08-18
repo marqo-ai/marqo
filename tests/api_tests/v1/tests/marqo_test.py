@@ -9,9 +9,16 @@ import json
 import time
 
 import unittest
-from marqo.utils import construct_authorized_url
-from marqo import Client
-from marqo.errors import MarqoWebError
+# from marqo.tensor_search.utils import construct_authorized_url
+# from marqo import Client
+# from marqo.errors import MarqoWebError
+
+# Mock classes for API tests that don't actually use pymarqo
+class MarqoWebError(Exception):
+    pass
+
+def construct_authorized_url(url):
+    return url
 import requests
 
 
@@ -29,7 +36,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.authorized_url = cls.client_settings["url"]
         # A list with index names to be cleared in each setUp call and to be deleted in tearDownClass call
         cls.indexes_to_delete: List[str] = []
-        cls.client = Client(**cls.client_settings)
+        # cls.client = Client(**cls.client_settings)  # Skip client for API tests
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -81,19 +88,21 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def removeAllModels(cls) -> None:
-        # A function that can be called to remove loaded models in Marqo.
-        # Use it whenever you think there is a risk of OOM problem.
-        # E.g., add it into the `tearDown` function to remove models between test cases.
+        # Skip for API tests - would need pymarqo client
+        pass
+        # # A function that can be called to remove loaded models in Marqo.
+        # # Use it whenever you think there is a risk of OOM problem.
+        # # E.g., add it into the `tearDown` function to remove models between test cases.
 
-        client = Client(**cls.client_settings)
-        index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
-        for index_name in index_names_list:
-            loaded_models = client.index(index_name).get_loaded_models().get("models", [])
-            for model in loaded_models:
-                try:
-                    client.index(index_name).eject_model(model_name=model["model_name"], model_device=model["model_device"])
-                except MarqoWebError:
-                    pass
+        # client = Client(**cls.client_settings)
+        # index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
+        # for index_name in index_names_list:
+        #     loaded_models = client.index(index_name).get_loaded_models().get("models", [])
+        #     for model in loaded_models:
+        #         try:
+        #             client.index(index_name).eject_model(model_name=model["model_name"], model_device=model["model_device"])
+        #         except MarqoWebError:
+        #             pass
 
 
 class TestImageUrls(str, Enum):

@@ -55,7 +55,7 @@ class TestTypeahead(MarqoTestCase):
         for invalid_request in invalid_requests:
             with self.subTest(invalid_request):
                 response = requests.post(
-                    f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/queries",
+                    f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
                     headers={"Content-Type": "application/json"},
                     data=json.dumps(invalid_request)
                 )
