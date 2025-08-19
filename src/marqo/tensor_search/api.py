@@ -750,7 +750,6 @@ def get_suggestions(index_name: str, suggestion_request: dict,
             - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
             - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
     """
-    # try:
     from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
     import time
 
@@ -793,10 +792,6 @@ def get_suggestions(index_name: str, suggestion_request: dict,
             "processingTimeMs": processing_time_ms
         }
     )
-    # except api_exceptions.MarqoWebError:
-    #     raise
-    # except Exception as e:
-    #     raise api_exceptions.InternalError(f"Error getting suggestions: {str(e)}")
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")

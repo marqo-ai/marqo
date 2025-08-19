@@ -28,13 +28,7 @@ schema {{ schema_name }} {
         fields: query_suffixes
     }
 
-    rank-profile exact inherits default {
-        first-phase {
-            expression: attribute(rank)
-        }
-    }
-
-    rank-profile fuzzy inherits default {
+    rank-profile suggestions-rank-profile inherits default {
         first-phase {
             expression: attribute(rank) + bm25(query_index)
         }

@@ -36,18 +36,65 @@ class TypeaheadHandler:
         if not input_text or not input_text.strip():
             return []
 
+        # Normalize the input
         normalized_input = normalize_text(input_text.strip())
         if not normalized_input:
             return []
 
-        if len(normalized_input) < min_fuzzy_match_length:
-            # Use exact prefix matching
-            suggestions = self._get_exact_suggestions(normalized_input, max_suggestions)
-        else:
-            # Use fuzzy matching
-            suggestions = self._get_fuzzy_suggestions(normalized_input, max_suggestions, fuzzy_edit_distance)
+        # Tokenize by whitespace
+        tokens = normalized_input.split()
+        if not tokens:
+            return []
 
-        return suggestions
+        # Build YQL query conditions for each token
+        retrieval_terms = []
+        ranking_terms = []
+        for token in tokens:
+            if len(token) < min_fuzzy_match_length:
+                # Use exact matching for short tokens
+                retrieval_terms.append(f"query_suffixes contains '{token}'")
+            else:
+                # Use fuzzy matching for longer tokens
+                retrieval_terms.append(
+                    f"query_suffixes contains "
+                    f"({{maxEditDistance:{fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
+                )
+
+            ranking_terms.append(f"query_index contains '{token}'")
+
+        # Create single YQL query that ORs all token conditions
+        yql_retrieval = " OR ".join(retrieval_terms)
+        yql_ranking = " OR ".join(ranking_terms)
+        yql = (f"SELECT * FROM {self.typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
+
+        search_params = {
+            "yql": yql,
+            "hits": max_suggestions,
+            "ranking": "suggestions-rank-profile"
+        }
+
+        try:
+            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+            hits = response.hits
+            suggestions = []
+
+            for hit in hits:
+                fields = hit.fields or {}
+                query = fields.get("query")
+                relevance = hit.relevance
+
+                if query:
+                    suggestions.append({
+                        "query": query,
+                        "relevance": relevance
+                    })
+
+            return suggestions
+        except core_exceptions.IndexNotFoundError:
+            # If schema doesn't exist, return empty list
+            return []
+        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
+            raise core_exceptions.BackendCommunicationError(f"Failed to get suggestions: {str(e)}")
 
     def index_queries(self, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -106,7 +153,6 @@ class TypeaheadHandler:
 
         return {"indexed": indexed_count, "errors": errors}
 
-
     def delete_all_queries(self) -> None:
         """
         Delete all queries from the typeahead index.
@@ -154,71 +200,3 @@ class TypeaheadHandler:
             return {"indexedQueries": 0}
         except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
             raise core_exceptions.BackendCommunicationError(f"Failed to get typeahead stats: {str(e)}")
-
-    def _get_exact_suggestions(self, normalized_input: str, max_suggestions: int) -> List[Dict[str, Any]]:
-        """Get suggestions using exact prefix matching."""
-        search_params = {
-            "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE query_suffixes contains '{normalized_input}'",
-            "hits": max_suggestions,
-            "ranking": "exact"
-        }
-
-        try:
-            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-            hits = response.hits  # Use the hits property from QueryResult
-            suggestions = []
-
-            for hit in hits:
-                fields = hit.fields or {}
-                query = fields.get("query")
-                relevance = hit.relevance
-
-                if query:
-                    suggestions.append({
-                        "query": query,
-                        "relevance": relevance
-                    })
-
-            return suggestions
-        except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return empty list
-            return []
-        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-            raise core_exceptions.BackendCommunicationError(f"Failed to get exact suggestions: {str(e)}")
-
-    def _get_fuzzy_suggestions(self, normalized_input: str, max_suggestions: int, max_edit_distance: int) -> List[
-        Dict[str, Any]]:
-        """Get suggestions using prefix matching on query_suffixes."""
-        search_params = {
-            "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE rank("
-                   f"query_suffixes contains ("
-                   f"{{maxEditDistance:{max_edit_distance}, prefix:true}}fuzzy(\"{normalized_input}\")"
-                   f")"
-                   f", query_suffixes_index contains '{normalized_input}'"
-                   f")",
-            "hits": max_suggestions,
-            "ranking": "fuzzy"
-        }
-
-        try:
-            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-            hits = response.hits
-            suggestions = []
-
-            for hit in hits:
-                fields = hit.fields or {}
-                query = fields.get("query")
-                relevance = hit.relevance
-
-                if query:
-                    suggestions.append({
-                        "query": query,
-                        "relevance": relevance
-                    })
-
-            return suggestions
-        except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return empty list
-            return []
-        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-            raise core_exceptions.BackendCommunicationError(f"Failed to get fuzzy suggestions: {str(e)}")
