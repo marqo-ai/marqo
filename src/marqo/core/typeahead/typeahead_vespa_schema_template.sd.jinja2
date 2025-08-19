@@ -4,7 +4,6 @@ schema {{ schema_name }} {
 
         field query type string {
             indexing: summary | attribute
-            attribute: fast-search
         }
 
         field query_suffixes type array<string> {

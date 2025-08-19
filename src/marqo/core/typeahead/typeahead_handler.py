@@ -65,49 +65,46 @@ class TypeaheadHandler:
         indexed_count = 0
         errors = []
 
-        try:
-            for query_data in queries:
-                query = query_data.get("query", "").strip()
-                rank = query_data.get("rank", 0.0)
+        for query_data in queries:
+            query = query_data.get("query", "").strip()
+            rank = query_data.get("rank", 0.0)
 
-                if not query:
-                    errors.append(f"Empty query in: {query_data}")
-                    continue
+            if not query:
+                errors.append(f"Empty query in: {query_data}")
+                continue
 
-                # Generate document ID using hash of query to avoid duplicates
-                doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
-                suffixes = generate_suffixes(query)
+            # Generate document ID using hash of query to avoid duplicates
+            doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
+            suffixes = generate_suffixes(query)
 
-                if not suffixes:
-                    errors.append(f"No suffixes generated for query: {query}")
-                    continue
+            if not suffixes:
+                errors.append(f"No suffixes generated for query: {query}")
+                continue
 
-                from marqo.vespa.models.vespa_document import VespaDocument
-                vespa_doc = VespaDocument(
-                    id=doc_id,
-                    fields={
-                        "query_suffixes": suffixes,
-                        "query_suffixes_index": suffixes,
-                        "query": query,
-                        "rank": float(rank),
-                    }
+            from marqo.vespa.models.vespa_document import VespaDocument
+            vespa_doc = VespaDocument(
+                id=doc_id,
+                fields={
+                    "query_suffixes": suffixes,
+                    "query_suffixes_index": suffixes,
+                    "query": query,
+                    "rank": float(rank),
+                }
+            )
+
+            # Index document in Vespa
+            try:
+                response = self.vespa_client.feed_document(
+                    document=vespa_doc,
+                    schema=self.typeahead_schema_name
                 )
+                # If no exception was raised, the document was successfully indexed
+                indexed_count += 1
+            except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
+                errors.append(f"Failed to index query '{query}': {str(e)}")
 
-                # Index document in Vespa
-                try:
-                    response = self.vespa_client.feed_document(
-                        document=vespa_doc,
-                        schema=self.typeahead_schema_name
-                    )
-                    # If no exception was raised, the document was successfully indexed
-                    indexed_count += 1
-                except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-                    errors.append(f"Failed to index query '{query}': {str(e)}")
+        return {"indexed": indexed_count, "errors": errors}
 
-            return {"indexed": indexed_count, "errors": errors}
-        except core_exceptions.MarqoError:
-            # Re-raise known Marqo errors
-            raise
 
     def delete_all_queries(self) -> None:
         """
@@ -191,8 +188,6 @@ class TypeaheadHandler:
     def _get_fuzzy_suggestions(self, normalized_input: str, max_suggestions: int, max_edit_distance: int) -> List[
         Dict[str, Any]]:
         """Get suggestions using prefix matching on query_suffixes."""
-        # Since Vespa fuzzy search doesn't work with array fields, use regular prefix matching
-        # which will match against the normalized suffixes in query_suffixes
         search_params = {
             "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE rank("
                    f"query_suffixes contains ("
