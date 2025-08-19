@@ -23,10 +23,14 @@ class Recommender:
         self.index_management = index_management
         self.inference = inference
 
-    def get_doc_vectors_from_ids(self,
-                  index_name: str,
-                  documents: Union[List[str], Dict[str, float]],
-                  tensor_fields: Optional[List[str]] = None) -> Dict[str, List[List[float]]]:
+    def get_doc_vectors_from_ids(
+            self,
+            index_name: str,
+            documents: Union[List[str], Dict[str, float]],
+            tensor_fields: Optional[List[str]] = None,
+            allow_missing_documents: bool = False,
+            allow_missing_embeddings: bool = False
+    ) -> Dict[str, List[List[float]]]:
         """
         This method gets documents from Vespa using their IDs, removes any unnecessary data, checks for
         lack of vectors, then returns a list of document vectors. Can be used internally (in recommend)
@@ -36,6 +40,8 @@ class Recommender:
             index_name: Name of the index to search
             documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
             tensor_fields: List of tensor fields to use for recommendation (can include text, image, audio, and video fields)
+            allow_missing_documents: If True, will not raise an error if some document IDs are not found
+            allow_missing_embeddings: If True, will not raise an error if some documents do not have embeddings
 
         Returns:
             A dictionary mapping document IDs to lists of vector embeddings. This is flattened to 1 list per document
@@ -88,50 +94,101 @@ class Recommender:
             config.Config(self.vespa_client, inference=self.inference),
             index_name, 
             document_ids, 
-            tensor_fields=tensor_fields
+            tensor_fields=tensor_fields,
+            allow_missing_documents=allow_missing_documents,
         )
 
-        # Check that all documents were found
-        not_found = []
-        for doc_id in document_ids:
-            if doc_id not in doc_embeddings_by_field:
-                not_found.append(doc_id)
+        return self._sanitize_doc_embeddins_by_field(
+            all_documents_ids = document_ids,
+            marqo_index=marqo_index,
+            doc_embeddings_by_field=doc_embeddings_by_field,
+            tensor_fields=tensor_fields,
+            allow_missing_documents=allow_missing_documents,
+            allow_missing_embeddings=allow_missing_embeddings,
+        )
 
-        if len(not_found) > 0:
-            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
+    def _sanitize_doc_embeddins_by_field(
+            self,
+            all_documents_ids: List[str],
+            marqo_index: MarqoIndex,
+            doc_embeddings_by_field: Dict[str, Dict[str, List[List[float]]]],
+            tensor_fields: Optional[List[str]],
+            allow_missing_documents: bool,
+            allow_missing_embeddings: bool
+    ) -> Dict[str, List[List[float]]]:
+        """
+        Sanitize the document embeddings by checking for missing documents and embeddings,
+        and flattening the structure to a simple mapping of document ID to list of embeddings.
+
+        If allow_missing_documents is False, raises an error if any document IDs are not found.
+        If allow_missing_embeddings is False, raises an error if any documents do not have embeddings.
+
+        Documents with no embeddings are removed from the result.
+        Args:
+            all_documents_ids: The list of all document IDs that were requested
+            marqo_index: The marqo index object containing metadata about the index
+            doc_embeddings_by_field: The document embeddings by field returned from
+                tensor_search.get_doc_vectors_per_tensor_field_by_ids
+            tensor_fields: tensor fields to include in the result. If None, all fields are included.
+            allow_missing_documents: If True, will not raise an error if some document IDs are not found.
+            allow_missing_embeddings: If True, will not raise an error if some documents do not have embeddings.
+
+        Returns:
+            A dictionary mapping document IDs to lists of vector embeddings.
+            E.g.,
+            {
+                "doc1": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+                "doc2": [[0.7, 0.8, 0.9]]
+            }
+            where each list contains embeddings from all tensor fields where order of embeddings is not preserved.
+
+        Raises:
+            InvalidArgumentError: If any document IDs are not found and allow_missing_documents is False,
+                                  or if any documents do not have embeddings and allow_missing_embeddings is False.
+        """
+
+        # Check that all documents were found
+        not_found_docs = []
+        for doc_id in all_documents_ids:
+            if doc_id not in doc_embeddings_by_field:
+                not_found_docs.append(doc_id)
+
+        if len(not_found_docs) > 0 and not allow_missing_documents:
+            raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found_docs)}')
 
         # Flatten the embeddings structure to match the expected return format
-        # Convert from Dict[doc_id, Dict[field_name, List[List[float]]]] 
+        # Convert from Dict[doc_id, Dict[field_name, List[List[float]]]]
         # to Dict[doc_id, List[List[float]]]
         doc_vectors: Dict[str, List[List[float]]] = {}
         docs_without_vectors = []
-        
+
         for doc_id, field_embeddings in doc_embeddings_by_field.items():
             vectors: List[List[float]] = []
-            
+
             # Flatten all embeddings from all fields for this document
             for field_name, embedding_list in field_embeddings.items():
                 # For legacy unstructured indices, field_name will be "marqo__embeddings"
                 # and we should include all embeddings regardless of tensor_fields filter
                 # since all embeddings are stored together in marqo__embeddings
-                if (tensor_fields is None or 
+                if (tensor_fields is None or
                     field_name in tensor_fields or
                     (marqo_index.type == IndexType.Unstructured and
                      field_name == unstructured_common.VESPA_DOC_EMBEDDINGS)):
                     vectors.extend(embedding_list)
-            
+
             doc_vectors[doc_id] = vectors
 
             if len(vectors) == 0:
                 docs_without_vectors.append(doc_id)
 
-        if len(docs_without_vectors) > 0:
+
+        if len(docs_without_vectors) > 0 and not allow_missing_embeddings:
             raise InvalidArgumentError(
                 f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
             )
-
+        for doc_id in docs_without_vectors:
+            del doc_vectors[doc_id]
         return doc_vectors
-
 
     def recommend(self,
                   index_name: str,

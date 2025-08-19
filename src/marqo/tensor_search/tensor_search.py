@@ -943,7 +943,9 @@ def get_query_vectors_from_jobs(
                                             context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
                             index_name=q.index.name,
                             documents=context_documents.ids,
-                            tensor_fields=context_documents.parameters.tensor_fields
+                            tensor_fields=context_documents.parameters.tensor_fields,
+                            allow_missing_documents=context_documents.parameters.allow_missing_documents,
+                            allow_missing_embeddings= context_documents.parameters.allow_missing_embeddings
                         )
 
                 # Update weights and vectors list
@@ -1353,6 +1355,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
     index_name: str, 
     document_ids: List[str],
     tensor_fields: Optional[List[str]] = None,
+    allow_missing_documents: bool = False,
 ) -> Dict[str, Dict[str, List[List[float]]]]:
     """
     Get only the embeddings for documents by their IDs.
@@ -1362,9 +1365,19 @@ def get_doc_vectors_per_tensor_field_by_ids(
         index_name: Name of the index
         document_ids: List of document IDs to fetch
         tensor_fields: Specific tensor fields to get. If None, get all tensor fields.
+        allow_missing_documents: If True, will not raise an error if a document is not found
+        allow_missing_embeddings: If True, will not raise an error if an embedding field is not found
     
     Returns:
         Dict mapping document_id to field_name to list of embedding vectors
+        E.g.,
+        {
+            "doc_id_1": {
+                "field_name_1": [[0.1, 0.2, ...], ...],
+                "field_name_2": [[0.3, 0.4, ...], ...],
+            },
+            "doc_id_2": {"field_name_1": [[0.5, 0.6, ...], ...]}
+         }
     """
 
     # We can just use the cache here since we refresh every 1s.
@@ -1418,6 +1431,9 @@ def get_doc_vectors_per_tensor_field_by_ids(
                     # Otherwise, field is empty list
                     result[doc_id][marqo_tensor_field_name] = []
         else:
+            if response.status == 404 and allow_missing_documents:
+                # If the document is not found and we are allowing missing documents, continue to next response
+                continue
             # If the response is not successful, error out
             raise core_exceptions.InvalidArgumentError(
                 f"Failed to retrieve document {document_ids[res_idx]} from index {index_name}. "
