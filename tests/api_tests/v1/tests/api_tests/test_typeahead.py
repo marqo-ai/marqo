@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 import requests
 from tests.marqo_test import MarqoTestCase
@@ -186,3 +187,101 @@ class TestTypeahead(MarqoTestCase):
         final_stats_data = final_stats_response.json()
         self.assertIn("indexedQueries", final_stats_data)
         self.assertEqual(final_stats_data["indexedQueries"], 0)
+
+    def test_duplicate_queries_not_added_twice(self):
+        """Test that indexing the same query twice doesn't create duplicates."""
+        # Clear any existing queries first
+        delete_response = requests.delete(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"}
+        )
+        time.sleep(2)  # Wait for deletion to complete
+        
+        # Index the same query twice with different ranks
+        query_batch = {
+            "queries": [
+                {"query": "test duplicate query abc123", "rank": 5.0}
+            ]
+        }
+        
+        # Index first time
+        first_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(query_batch)
+        )
+        
+        self.assertEqual(first_response.status_code, 200)
+        first_data = first_response.json()
+        self.assertEqual(first_data["indexed"], 1)
+        
+        # Wait for indexing to complete
+        time.sleep(2)
+        
+        # Check stats after first indexing
+        stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(stats_response.status_code, 200)
+        stats_data = stats_response.json()
+        self.assertEqual(stats_data["indexedQueries"], 1)
+        
+        # Index the same query again with different rank
+        query_batch_updated = {
+            "queries": [
+                {"query": "test duplicate query abc123", "rank": 10.0}  # Same query, different rank
+            ]
+        }
+        
+        second_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(query_batch_updated)
+        )
+        
+        self.assertEqual(second_response.status_code, 200)
+        second_data = second_response.json()
+        self.assertEqual(second_data["indexed"], 1)  # Should still report 1 indexed (updated)
+        
+        # Wait for indexing to complete
+        time.sleep(2)
+        
+        # Check final stats - should still be 1 unique query
+        final_stats_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(final_stats_response.status_code, 200)
+        final_stats_data = final_stats_response.json()
+        self.assertEqual(final_stats_data["indexedQueries"], 1)  # Should still be 1, not 2
+        
+        # Verify the rank was updated by checking suggestions
+        suggestion_request = {
+            "input": "test duplicate",
+            "maxSuggestions": 5
+        }
+        
+        suggestion_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(suggestion_request)
+        )
+        
+        self.assertEqual(suggestion_response.status_code, 200)
+        suggestion_data = suggestion_response.json()
+        suggestions = suggestion_data["suggestions"]
+        
+        # Should find exactly one suggestion for our test query
+        test_suggestions = [s for s in suggestions if s["query"] == "test duplicate query abc123"]
+        self.assertEqual(len(test_suggestions), 1)
+        
+        # Clean up
+        delete_response = requests.delete(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"}
+        )
+        
+        self.assertEqual(delete_response.status_code, 200)

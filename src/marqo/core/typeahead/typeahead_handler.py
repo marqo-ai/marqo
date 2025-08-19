@@ -1,6 +1,7 @@
 import json
 import time
 import uuid
+import hashlib
 from typing import List, Dict, Any, Optional
 
 from marqo.vespa.vespa_client import VespaClient
@@ -73,8 +74,8 @@ class TypeaheadHandler:
                     errors.append(f"Empty query in: {query_data}")
                     continue
 
-                # Generate document for Vespa
-                doc_id = str(uuid.uuid4())
+                # Generate document ID using hash of query to avoid duplicates
+                doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
                 suffixes = generate_suffixes(query)
 
                 if not suffixes:
