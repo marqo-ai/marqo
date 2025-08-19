@@ -112,7 +112,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Test search query's embedding is cached when inference cache is enabled
         base64_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
         image_url = marqo_test.TestImageUrls.HIPPO_STATUE.value
-        for query in ["test", {"random": 1, "query": 2}, base64_image]:
+        for query in ["test", {"random": 1, "query": 2}, base64_image, image_url]:
             with self.subTest(f"Search query: {query}"):
                 # Single query
                 # First search that misses cache should take longer
