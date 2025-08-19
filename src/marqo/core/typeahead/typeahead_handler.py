@@ -75,7 +75,8 @@ class TypeaheadHandler:
 
             # Generate document ID using hash of query to avoid duplicates
             doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
-            suffixes = generate_suffixes(query)
+            normalized_query = normalize_text(query)
+            suffixes = generate_suffixes(normalized_query)
 
             if not suffixes:
                 errors.append(f"No suffixes generated for query: {query}")
@@ -86,7 +87,7 @@ class TypeaheadHandler:
                 id=doc_id,
                 fields={
                     "query_suffixes": suffixes,
-                    "query_suffixes_index": suffixes,
+                    "query_index": normalized_query,
                     "query": query,
                     "rank": float(rank),
                 }

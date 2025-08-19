@@ -11,7 +11,7 @@ schema {{ schema_name }} {
             attribute: fast-search
         }
 
-        field query_suffixes_index type array<string> {
+        field query_index type string {
             indexing: index
             index: enable-bm25
             stemming: none
@@ -36,7 +36,7 @@ schema {{ schema_name }} {
 
     rank-profile fuzzy inherits default {
         first-phase {
-            expression: attribute(rank) + bm25(query_suffixes_index)
+            expression: attribute(rank) + bm25(query_index)
         }
     }
 
