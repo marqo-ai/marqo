@@ -109,45 +109,28 @@ class TypeaheadHandler:
             # Re-raise known Marqo errors
             raise
 
-    def delete_all_queries(self) -> bool:
+    def delete_all_queries(self) -> None:
         """
         Delete all queries from the typeahead index.
         
         Returns:
             True if successful
         """
-        try:
-            # Query all documents and delete them
-            search_params = {
-                "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE true",
-                "hits": 1000  # Batch size for deletion
-            }
+        self.vespa_client.delete_all_docs(self.typeahead_schema_name)
 
-            while True:
-                try:
-                    search_response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
-                    hits = search_response.hits
+    def delete_queries(self, queries: List[str]) -> Dict[str, Any]:
+        """
+        Delete specific queries from the typeahead index.
+        
+        Args:
+            queries: List of query strings to delete
+            
+        Returns:
+            Dictionary with deletion results
+        """
+        ids = [hashlib.sha256(q.strip().encode('utf-8')).hexdigest() for q in queries]
 
-                    if not hits:
-                        break
-
-                    # Delete documents in this batch
-                    for hit in hits:
-                        doc_id = hit.id.split("::")[-1] if hit.id else None  # Extract doc ID from Vespa ID format
-                        if doc_id:
-                            self.vespa_client.delete_document(id=doc_id, schema=self.typeahead_schema_name)
-
-                    # If we got fewer hits than requested, we're done
-                    if len(hits) < search_params["hits"]:
-                        break
-                except (core_exceptions.BackendCommunicationError, core_exceptions.IndexNotFoundError) as e:
-                    # If query fails due to communication or missing index, stop deletion
-                    raise core_exceptions.InternalError(f"Failed to query documents for deletion: {str(e)}")
-
-            return True
-        except core_exceptions.MarqoError:
-            # Re-raise known Marqo errors
-            raise
+        self.vespa_client.delete_batch(ids, schema=self.typeahead_schema_name)
 
     def get_stats(self) -> Dict[str, Any]:
         """
