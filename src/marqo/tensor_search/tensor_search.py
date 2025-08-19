@@ -970,13 +970,14 @@ def get_query_vectors_from_jobs(
             # Use interpolation to combine all vectors
             vector_interpolation = from_interpolation_method(interpolation_method)
             with RequestMetricsStore.for_request().time(f"search.vectorise.interpolate_vectors"):
-                merged_vector = vector_interpolation.interpolate(
-                    vectors=collected_vectors,
-                    weights=collected_weights
-                )
-
-            result[qidx] = list(merged_vector)
-
+                if collected_vectors:
+                    merged_vector = vector_interpolation.interpolate(
+                        vectors=collected_vectors,
+                        weights=collected_weights
+                    )
+                    result[qidx] = list(merged_vector)
+                else:
+                    result[qidx] = []
         elif isinstance(q.q, str):
             if q.context:
                 raise core_exceptions.InvalidArgumentError(
@@ -990,6 +991,13 @@ def get_query_vectors_from_jobs(
             )
         else:
             raise ValueError(f"Unexpected query type: {type(q.q).__name__}")
+
+        if not result[qidx]:
+            raise api_exceptions.InvalidArgError(
+                f"Marqo could not collect any vectors from the search query '{q.q}'. "
+                f"Please check the provided query and context (if any). "
+            )
+
     return result
 
 
@@ -1366,7 +1374,6 @@ def get_doc_vectors_per_tensor_field_by_ids(
         document_ids: List of document IDs to fetch
         tensor_fields: Specific tensor fields to get. If None, get all tensor fields.
         allow_missing_documents: If True, will not raise an error if a document is not found
-        allow_missing_embeddings: If True, will not raise an error if an embedding field is not found
     
     Returns:
         Dict mapping document_id to field_name to list of embedding vectors
@@ -1430,10 +1437,10 @@ def get_doc_vectors_per_tensor_field_by_ids(
                 else:
                     # Otherwise, field is empty list
                     result[doc_id][marqo_tensor_field_name] = []
-        else:
-            if response.status == 404 and allow_missing_documents:
+        elif response.status == 404 and allow_missing_documents:
                 # If the document is not found and we are allowing missing documents, continue to next response
                 continue
+        else:
             # If the response is not successful, error out
             raise core_exceptions.InvalidArgumentError(
                 f"Failed to retrieve document {document_ids[res_idx]} from index {index_name}. "
