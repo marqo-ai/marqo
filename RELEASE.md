@@ -1,3 +1,9 @@
+# Release 2.23.0
+
+## New Features
+- **Configurable stemming for text fields** ([#1273](https://github.com/marqo-ai/marqo/pull/1273)). You can now control stemming on a per-field basis in a unstructured index. Stemming influences full-text search behavior. Filters are unaffected. Please refer to [this document](https://docs.marqo.ai/latest/reference/api/documents/mappings/#text-field-language-and-stemming-mappings) for detailed guidance.
+- **Collapse fields (variant grouping)** ([#1276](https://github.com/marqo-ai/marqo/pull/1276), [#1277](https://github.com/marqo-ai/marqo/pull/1277)). Collapse field groups search results by a field (e.g., product_id) and returns only one "top" document per group. It’s perfect for product variants (sizes, colors, SKUs) because you can show the "top" variant per product. This feature is available for hybrid search in unstructured indexes. Please refer to [this cookbook](https://docs.marqo.ai/latest/other-resources/cookbook/recipes/search-result-grouping-with-collapse-fields/) for more details. 
+
 # Release 2.22.0
 
 ## New features
