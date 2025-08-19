@@ -10,7 +10,7 @@ from pydantic.v1 import ValidationError, validator
 from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic.v1.utils import ROOT_KEY
 
-from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
+from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel, MarqoBaseModel
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
@@ -164,7 +164,7 @@ class ImagePreProcessing(ImmutableBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
 
 
-class Model(ImmutableBaseModel):
+class Model(MarqoBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False
