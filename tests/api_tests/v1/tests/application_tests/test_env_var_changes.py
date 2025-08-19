@@ -18,17 +18,12 @@ We may test multiple different env vars in the same test case. This is because
  this test suite's runtime from growing too large.
 """
 import json
-import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional, List
 
-import math
-
-from tests.api_tests.v1.tests.marqo_test import TestImageUrls
+from marqo import Client
 from tests import marqo_test
 from tests import utilities
-
-from marqo import Client
 
 
 class TestEnvVarChanges(marqo_test.MarqoTestCase):
@@ -116,7 +111,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         # Test search query's embedding is cached when inference cache is enabled
         base64_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-        image_url = TestImageUrls.HIPPO_STATUE.value
+        image_url = marqo_test.TestImageUrls.HIPPO_STATUE.value
         for query in ["test", {"random": 1, "query": 2}, base64_image]:
             with self.subTest(f"Search query: {query}"):
                 # Single query
