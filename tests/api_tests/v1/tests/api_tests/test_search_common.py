@@ -324,7 +324,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
+                    assert "Either 'hybridParameters.queryLexical' or just 'q'" in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -333,7 +333,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
+                    assert "Marqo could not collect any vectors from the search query" in str(e.exception)
 
                 with self.subTest(
                         "Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
