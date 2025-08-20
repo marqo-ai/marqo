@@ -19,7 +19,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
 import marqo.api.exceptions as api_exception
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
 import pytest
@@ -2477,6 +2477,94 @@ class TestHybridSearch(MarqoTestCase):
 
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
+
+    def test_hybrid_search_query_tensor_none_with_context_vectors_passes(self):
+        """Test to ensure that context vectors work with queryTensor=None, and a different queryLexical.
+        """
+        custom_vector = [0.655 for _ in range(16)]
+
+        docs = [
+            {
+                "_id": "1",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_1",
+                        "vector": np.random.rand(16).tolist()
+                    }
+            },
+            {
+                "_id": "2",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_2",
+                        "vector": custom_vector
+                    }
+            }
+        ]
+
+        for index in [self.structured_index_with_no_model, self.semi_structured_index_with_no_model]:
+            with (self.subTest(index_name=index.name)):
+                add_docs_params = AddDocsParams(index_name=index.name,
+                                                docs=docs,
+                                                tensor_fields=["custom_field_1"] \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None,
+                                                mappings={"custom_field_1": {"type": "custom_vector"}} \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
+
+                r = tensor_search.search(
+                    config=self.config, index_name=index.name, text=None,
+                    search_method="hybrid",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        queryTensor=None,
+                        queryLexical="test",
+                        verbose=True
+                    ),
+                    context=SearchContext(**{"tensor": [{"vector": custom_vector,
+                                                         "weight": 1}], })
+                )
+                self.assertEqual(2, len(r["hits"]))
+
+    def test_hybrid_search_query_tensor_none_with_context_docs_passes(self):
+        """Test to ensure that context documents work with queryTensor=None, and a different queryLexical.
+        """
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "Some content 1"
+            },
+            {
+                "_id": "2",
+                "text_field_1": "Some content 2"
+            }
+        ]
+
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with (self.subTest(index_name=index.name)):
+                add_docs_params = AddDocsParams(index_name=index.name,
+                                                docs=docs,
+                                                tensor_fields=["text_field_1"] \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
+
+                r = tensor_search.search(
+                    config=self.config, index_name=index.name, text=None,
+                    search_method="hybrid",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        queryTensor=None,
+                        queryLexical="test",
+                        verbose=True
+                    ),
+                    context=SearchContext(documents=SearchContextDocuments(ids={"1": 1}))
+                )
+                ids = [hit["_id"] for hit in r["hits"]]
+                self.assertEqual(["2"], ids)
 
     def test_hybrid_search_unstructured_with_searchable_attributes_fails(self):
         """
