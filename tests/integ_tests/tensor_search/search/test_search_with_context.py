@@ -2,7 +2,6 @@ import os
 import unittest
 from unittest import mock
 
-from marqo.marqo_docs import hybrid_parameters
 from marqo.tensor_search.enums import EnvVars
 from pydantic.v1.error_wrappers import ValidationError
 from marqo.core.exceptions import InvalidFieldNameError, UnsupportedFeatureError
@@ -1509,7 +1508,9 @@ class TestSearchWithContext(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             hybrid_parameters_test_cases = (
                 {"queryLexical": "*", "queryTensor": None, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
-                {"queryTensor": None, "retrievalMethod": "tensor", "rankingMethod": "tensor"}
+                {"queryLexical": "*", "queryTensor": {}, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
+                {"queryTensor": None, "retrievalMethod": "tensor", "rankingMethod": "tensor"},
+                {"queryTensor": {}, "retrievalMethod": "tensor", "rankingMethod": "tensor"}
             )
             for hybrid_parameters in hybrid_parameters_test_cases:
                 with self.subTest(f"index={index.type}, hybrid_parameters={hybrid_parameters_test_cases}"):
@@ -1559,3 +1560,59 @@ class TestSearchWithContext(MarqoTestCase):
                     self.assertGreater(len(results["hits"]), 0)
                     result_ids = set([hit["_id"] for hit in results["hits"]])
                     self.assertEqual({"doc2"}, result_ids)
+
+    def test_search_with_context_documents_raise_vector_collect_errors_with_disjunction(self):
+        """Test that search works when both allowMissingDocuments=True and allowMissingEmbeddings=True with mixed scenarios,
+        with different hybrid parameters"""
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            hybrid_parameters_test_cases = (
+                {"queryLexical": "*", "queryTensor": None, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
+                {"queryLexical": "*", "queryTensor": {}, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
+                {"queryTensor": None, "retrievalMethod": "tensor", "rankingMethod": "tensor"},
+                {"queryTensor": {}, "retrievalMethod": "tensor", "rankingMethod": "tensor"}
+            )
+            for hybrid_parameters in hybrid_parameters_test_cases:
+                with self.subTest(f"index={index.type}, hybrid_parameters={hybrid_parameters_test_cases}"):
+                    # Add some documents
+                    docs = [
+                        {"_id": "doc1", "text_field_1": "Machine learning and artificial intelligence"},
+                        {"_id": "doc2", "text_field_1": "Deep learning neural networks"},
+                        {"_id": "doc3", "text_field_2": "Natural language processing"}
+                    ]
+
+                    self.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index.name,
+                            docs=docs,
+                            tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                        )
+                    )
+
+                    # Create search context with mix of existing and non-existent documents
+                    search_context = SearchContext(
+                        documents=SearchContextDocuments(
+                            # doc3 does not have "text_field_1"
+                            ids={"doc3": 0.1, "not_exists_doc": 1},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                exclueInputDocuments=True,
+                                allowMissingEmbeddings=True,
+                                allowMissingDocuments=True
+                            )
+                        )
+                    )
+
+                    with self.assertRaises(InvalidArgError) as e:
+                        _ = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text=None,
+                            context=search_context,
+                            result_count=5,
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(**hybrid_parameters)
+                        )
+                    self.assertIn("Marqo could not collect any vectors from the search query", str(e.exception))
+                    self.assertIn("Please check the provided query, context (if any), "
+                                  "or queryTensor(for Hybrid search)", str(e.exception))
