@@ -1198,6 +1198,9 @@ def _vector_text_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
+    if not vectorised_text: # pragma: no cover
+        raise InternalError(f"No vector is generated for the tensor query: {query}. ")
+
     marqo_query = MarqoTensorQuery(
         index_name=index_name,
         vector_query=vectorised_text,
