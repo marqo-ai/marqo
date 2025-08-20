@@ -419,11 +419,11 @@ class UnstructuredVespaIndex(VespaIndex):
     @staticmethod
     def _validate_list(field_content: list, is_tensor_field: bool) -> None:
         for element in field_content:
-            if not isinstance(element, str):
+            if not isinstance(element, (str, dict)):
                 # if the field content is a list, it should only contain strings.
                 raise errors.InvalidArgError(
                     f"Field content {field_content} includes an element of type {type(element).__name__} "
-                    f"which is not a string. Unstructured Marqo index only supports string lists."
+                    f"Unstructured Marqo index only supports string lists or object lists."
                 )
         if is_tensor_field:
             raise errors.InvalidArgError(

@@ -121,11 +121,11 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
             if isinstance(field_content, list):
                 for element in field_content:
-                    if not isinstance(element, str):
+                    if not isinstance(element, (str, dict)):
                         # if the field content is a list, it should only contain strings.
                         raise AddDocumentsError(
                             f"Field content {field_content} includes an element of type {type(element).__name__} "
-                            f"which is not a string. Unstructured Marqo index only supports string lists."
+                            f"Unstructured Marqo index only supports string lists or object lists."
                         )
 
             is_tensor_field = field_name in self.add_docs_params.tensor_fields

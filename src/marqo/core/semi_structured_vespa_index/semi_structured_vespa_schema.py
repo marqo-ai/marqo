@@ -64,6 +64,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=self._index_request.treat_urls_and_pointers_as_media,
             collapse_fields=self._index_request.collapse_fields,
+            object_array_fields=self._index_request.object_array_fields,
         )
 
         return marqo_index

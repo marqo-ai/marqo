@@ -1,5 +1,16 @@
 {# semi_structured_vespa_schema_template_2_16.sd.jinja2 -#}
 schema {{ index.schema_name }} {
+    {# Define structs for object array fields -#}
+    {% if index.object_array_fields -%}
+    {% for object_array_field in index.object_array_fields -%}
+    struct {{ object_array_field.struct_name }} {
+        {% for field_def in object_array_field.fields -%}
+        field {{ field_def.name }} type {{ object_array_field.get_vespa_field_type_for_struct_field(field_def) }} {}
+        {% endfor -%}
+    }
+    {% endfor -%}
+    {% endif -%}
+
     document {
         field marqo__id type string {
             indexing: attribute | summary
@@ -103,6 +114,22 @@ schema {{ index.schema_name }} {
             rank: filter
         }
         {% endfor -%}
+
+        {# Object array fields -#}
+        {% if index.object_array_fields -%}
+        {% for object_array_field in index.object_array_fields -%}
+        field {{ object_array_field.object_array_field_name or object_array_field.name }} type array<{{ object_array_field.struct_name }}> {
+            indexing: summary
+            {% for field_def in object_array_field.fields -%}
+            struct-field {{ field_def.name }} {
+                indexing: attribute | summary
+                attribute: fast-search
+                rank: filter
+            }
+            {% endfor -%}
+        }
+        {% endfor -%}
+        {% endif -%}
 
         {% for field in index.tensor_fields -%}
         field {{ field.chunk_field_name }} type array<string> {
@@ -381,6 +408,11 @@ schema {{ index.schema_name }} {
         {%- for field in index.tensor_fields %}
         summary {{ field.chunk_field_name }} type array<string> {}
         {%- endfor %}
+        {%- if index.object_array_fields %}
+        {%- for object_array_field in index.object_array_fields %}
+        summary {{ object_array_field.object_array_field_name or object_array_field.name }} type array<{{ object_array_field.struct_name }}> {}
+        {%- endfor %}
+        {%- endif %}
     }
 
     document-summary all-vector-summary {
@@ -402,5 +434,10 @@ schema {{ index.schema_name }} {
         summary {{ field.chunk_field_name }} type array<string> {}
         summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
         {%- endfor %}
+        {%- if index.object_array_fields %}
+        {%- for object_array_field in index.object_array_fields %}
+        summary {{ object_array_field.object_array_field_name or object_array_field.name }} type array<{{ object_array_field.struct_name }}> {}
+        {%- endfor %}
+        {%- endif %}
     }
 }

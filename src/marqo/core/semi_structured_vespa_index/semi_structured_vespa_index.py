@@ -10,7 +10,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, BOOL_FIELDS, SHORT_STRINGS_FIELDS, \
-    STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS
+    STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS, OBJECT_ARRAY_FIELDS
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument, \
     generate_uuid_str
@@ -230,6 +230,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             "float": FLOAT_FIELDS,
             "string": SHORT_STRINGS_FIELDS,
             "array": STRING_ARRAY,
+            "object_array": OBJECT_ARRAY_FIELDS,
         }
 
         global_max_results = facets_parameters.max_results or 100
@@ -273,6 +274,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             elif field_type == STRING_ARRAY:
                 return f"{STRING_ARRAY}_{field_name}"
+                
+            elif field_type == OBJECT_ARRAY_FIELDS:
+                # Handle object array faceting (field_name.subfield syntax)
+                return self._build_object_array_facet_expression(field_name)
 
             # Handle fields without ranges
             return str(field_id) if field_type in [INT_FIELDS, FLOAT_FIELDS] else f'{field_type}{{"{field_name}"}}'
@@ -322,6 +327,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 if field_parameters.type == "array":
                     if self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
                         # Skip array field if it is not in the string array field map
+                        continue
+                elif field_parameters.type == "object_array":
+                    # Check if this is a valid object array field reference (field.subfield)
+                    if not self._is_valid_object_array_facet_field(field_name):
                         continue
                 grouping_query += build_field_group(field_parameters, field_name, field_id)
 
@@ -394,6 +403,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if numeric_filter_string:
                 filter_parts.append(numeric_filter_string)
 
+            # Object Array Filter
+            object_array_filter_string = self._generate_object_array_filter_string(node)
+            if object_array_filter_string:
+                filter_parts.append(object_array_filter_string)
+
             # Final Filter String
             final_filter_string = f"({' OR '.join(filter_parts)})"
             return final_filter_string
@@ -413,6 +427,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             int_field_string = (f'({INT_FIELDS} contains '
                                 f'sameElement(key contains "{node.field}", {bound}))')
+
+            # Check for object array range filter
+            object_array_filter_string = self._generate_object_array_range_filter_string(node, bound)
+            if object_array_filter_string:
+                return f'({float_field_string} OR {int_field_string} OR {object_array_filter_string})'
 
             return f'({float_field_string} OR {int_field_string})'
 
@@ -467,6 +486,168 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
+
+    def _generate_object_array_filter_string(self, node: 'search_filter.EqualityTerm') -> Optional[str]:
+        """Generate filter string for object array fields (field_name.subfield syntax)"""
+        if '.' not in node.field:
+            return None
+            
+        # Parse field reference: variants._sku or variants.stock
+        field_parts = node.field.split('.')
+        if len(field_parts) != 2:
+            return None
+            
+        array_field_name, sub_field_name = field_parts
+        
+        # Check if this is an object array field
+        marqo_index = self.get_marqo_index()
+        if not marqo_index.object_array_fields:
+            return None
+            
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return None
+            
+        # Check if the sub-field exists in the object array definition
+        valid_sub_fields = {field_def.name for field_def in object_array_field.fields}
+        if sub_field_name not in valid_sub_fields:
+            return None
+            
+        # Get the vespa field name
+        vespa_field_name = object_array_field.object_array_field_name or array_field_name
+        
+        # Build sameElement query based on field type
+        field_def = next(field_def for field_def in object_array_field.fields if field_def.name == sub_field_name)
+        
+        # Convert value to appropriate type and format
+        if field_def.type.value in ['text']:
+            # String fields
+            filter_condition = f'{sub_field_name} contains "{node.value}"'
+        elif field_def.type.value in ['int', 'long']:
+            # Integer fields
+            try:
+                int_value = int(node.value)
+                filter_condition = f'{sub_field_name} = {int_value}'
+            except ValueError:
+                return None
+        elif field_def.type.value in ['float', 'double']:
+            # Float fields
+            try:
+                float_value = float(node.value)
+                filter_condition = f'{sub_field_name} = {float_value}'
+            except ValueError:
+                return None
+        elif field_def.type.value == 'bool':
+            # Boolean fields (stored as byte in Vespa)
+            if node.value.lower() in ('true', '1', 'yes'):
+                filter_condition = f'{sub_field_name} = 1'
+            elif node.value.lower() in ('false', '0', 'no'):
+                filter_condition = f'{sub_field_name} = 0'
+            else:
+                return None
+        else:
+            return None
+            
+        return f'({vespa_field_name} contains sameElement({filter_condition}))'
+
+    def _generate_object_array_range_filter_string(self, node: 'search_filter.RangeTerm', bound: str) -> Optional[str]:
+        """Generate range filter string for object array fields (field_name.subfield syntax)"""
+        if '.' not in node.field:
+            return None
+            
+        # Parse field reference: variants.price or variants.stock
+        field_parts = node.field.split('.')
+        if len(field_parts) != 2:
+            return None
+            
+        array_field_name, sub_field_name = field_parts
+        
+        # Check if this is an object array field
+        marqo_index = self.get_marqo_index()
+        if not marqo_index.object_array_fields:
+            return None
+            
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return None
+            
+        # Check if the sub-field exists in the object array definition
+        valid_sub_fields = {field_def.name for field_def in object_array_field.fields}
+        if sub_field_name not in valid_sub_fields:
+            return None
+            
+        # Get the field definition to check if it's numeric
+        field_def = next(field_def for field_def in object_array_field.fields if field_def.name == sub_field_name)
+        
+        # Only support range queries on numeric fields
+        if field_def.type.value not in ['int', 'long', 'float', 'double']:
+            return None
+            
+        # Get the vespa field name
+        vespa_field_name = object_array_field.object_array_field_name or array_field_name
+        
+        # Build sameElement range query
+        # Replace 'value' in bound with the actual sub-field name
+        sub_field_bound = bound.replace('value', sub_field_name)
+        
+        return f'({vespa_field_name} contains sameElement({sub_field_bound}))'
+    
+    def _build_object_array_facet_expression(self, field_name: str) -> str:
+        """Build facet group expression for object array fields (field_name.subfield syntax)"""
+        if '.' not in field_name:
+            # This shouldn't happen in normal flow, but provide fallback
+            return f'"{field_name}"'
+            
+        # Parse field reference: variants._sku or variants.stock
+        field_parts = field_name.split('.')
+        if len(field_parts) != 2:
+            return f'"{field_name}"'
+            
+        array_field_name, sub_field_name = field_parts
+        
+        # Check if this is an object array field
+        marqo_index = self.get_marqo_index()
+        if not marqo_index.object_array_fields:
+            return f'"{field_name}"'
+            
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return f'"{field_name}"'
+            
+        # Check if the sub-field exists in the object array definition
+        valid_sub_fields = {field_def.name for field_def in object_array_field.fields}
+        if sub_field_name not in valid_sub_fields:
+            return f'"{field_name}"'
+            
+        # Get the vespa field name and build grouping expression for struct field
+        vespa_field_name = object_array_field.object_array_field_name or array_field_name
+        
+        return f'{vespa_field_name}.{sub_field_name}'
+    
+    def _is_valid_object_array_facet_field(self, field_name: str) -> bool:
+        """Check if field_name is a valid object array field reference for faceting"""
+        if '.' not in field_name:
+            return False
+            
+        # Parse field reference: variants._sku or variants.stock
+        field_parts = field_name.split('.')
+        if len(field_parts) != 2:
+            return False
+            
+        array_field_name, sub_field_name = field_parts
+        
+        # Check if this is an object array field
+        marqo_index = self.get_marqo_index()
+        if not marqo_index.object_array_fields:
+            return False
+            
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return False
+            
+        # Check if the sub-field exists in the object array definition
+        valid_sub_fields = {field_def.name for field_def in object_array_field.fields}
+        return sub_field_name in valid_sub_fields
 
     def _extract_document_id(self, document: Dict[str, Any]) -> str:
         """Extract and validate document ID."""
@@ -990,7 +1171,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     if field_name == self._TOTAL_HITS_GROUP_CONST:
                         total_hits = processed_stats["count"]
 
-                    elif facets.fields[field_name].type in ["string", "array"]:
+                    elif facets.fields[field_name].type in ["string", "array", "object_array"]:
                         if value.id == "group:string:":
                             # Vespa's value for not found
                             continue

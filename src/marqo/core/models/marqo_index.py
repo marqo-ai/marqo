@@ -128,6 +128,76 @@ class StringArrayField(ImmutableStrictBaseModel):
     features: List[FieldFeature] = []
 
 
+class ObjectArrayFieldDefinition(ImmutableStrictBaseModel):
+    """
+    Defines a single field within an object array struct.
+    """
+    name: str
+    type: FieldType
+    
+    @validator('name')
+    def validate_field_name_object_array_def(cls, v):
+        validate_field_name(v)
+        return v
+    
+    @validator('type')
+    def validate_supported_types(cls, v):
+        # Only allow basic types for struct fields
+        supported_types = {
+            FieldType.Text, FieldType.Int, FieldType.Long, 
+            FieldType.Float, FieldType.Double, FieldType.Bool
+        }
+        if v not in supported_types:
+            raise ValueError(f'Object array field type {v.value} is not supported. '
+                           f'Supported types: {[t.value for t in supported_types]}')
+        return v
+
+
+class ObjectArrayField(ImmutableStrictBaseModel):
+    """
+    A field that contains an array of objects/structs with consistent schema.
+    Each object can contain multiple fields of different types as defined by the fields list.
+    """
+    name: str
+    object_array_field_name: Optional[str] = None
+    fields: List[ObjectArrayFieldDefinition]
+    
+    @validator('name')
+    def validate_field_name_object_array(cls, v):
+        validate_field_name(v)
+        return v
+    
+    @validator('fields')
+    def validate_fields_not_empty(cls, v):
+        if not v:
+            raise ValueError('Object array field must have at least one field definition')
+        return v
+    
+    @validator('fields')
+    def validate_unique_field_names(cls, v):
+        field_names = [field.name for field in v]
+        if len(field_names) != len(set(field_names)):
+            raise ValueError('Object array field names must be unique')
+        return v
+    
+    @property
+    def struct_name(self) -> str:
+        """Generate a unique struct name for this object array field"""
+        return f"struct_{self.name}"
+    
+    def get_vespa_field_type_for_struct_field(self, field_def: ObjectArrayFieldDefinition) -> str:
+        """Convert FieldType to Vespa type for struct fields"""
+        type_mapping = {
+            FieldType.Text: 'string',
+            FieldType.Int: 'int',
+            FieldType.Long: 'long', 
+            FieldType.Float: 'float',
+            FieldType.Double: 'double',
+            FieldType.Bool: 'byte'  # Vespa uses byte for boolean in structs
+        }
+        return type_mapping[field_def.type]
+
+
 class TensorField(ImmutableStrictBaseModel):
     """
     A tensor field that has a corresponding field.
@@ -538,6 +608,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     tensor_fields: List[TensorField]
     string_array_fields: Optional[List[
         StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    object_array_fields: Optional[List[ObjectArrayField]] = None
     collapse_fields: Optional[List[CollapseField]] = None
 
     def __init__(self, **data):
@@ -591,6 +662,28 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         return self._cache_or_get('string_array_field_map',
                                   lambda: {} if self.string_array_fields is None
                                   else {field.string_array_field_name: field for field in self.string_array_fields})
+
+    @property
+    def name_to_object_array_field_map(self):
+        """
+        A map from an ObjectArrayField object's "name" property to corresponding ObjectArrayField object.
+        "Name" is the name of the ObjectArrayField object, which is passed by the user.
+        Returns an empty dict if object_array_fields is None.
+        """
+        return self._cache_or_get('name_to_object_array_field_map',
+                                  lambda: {} if self.object_array_fields is None
+                                  else {field.name: field for field in self.object_array_fields})
+
+    @property
+    def object_array_field_name_to_object_array_field_map(self):
+        """
+        A map from an ObjectArrayField object's "object_array_field_name" property to corresponding ObjectArrayField object.
+        An "object_array_field_name" is the name used in the index schema with Marqo prefix.
+        Returns an empty dict if object_array_fields is None.
+        """
+        return self._cache_or_get('object_array_field_map',
+                                  lambda: {} if self.object_array_fields is None
+                                  else {field.object_array_field_name: field for field in self.object_array_fields if field.object_array_field_name})
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:

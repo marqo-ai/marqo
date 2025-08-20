@@ -42,6 +42,7 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
     collapse_fields: Optional[List[marqo_index.CollapseField]] = None
+    object_array_fields: Optional[List[marqo_index.ObjectArrayField]] = None
 
     @root_validator
     def validate_collapse_fields(cls, values):
@@ -51,6 +52,41 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
                 raise ValueError("collapse_fields cannot be an empty list")
             if len(collapse_fields) > 1:
                 raise ValueError("Only one collapse field is supported")
+        return values
+
+
+class ObjectArrayFieldDefinitionRequest(StrictBaseModel):
+    name: str
+    type: marqo_index.FieldType
+
+
+class ObjectArrayFieldRequest(StrictBaseModel):
+    name: str
+    object_array_field_name: Optional[str] = Field(alias='objectArrayFieldName')
+    fields: List[ObjectArrayFieldDefinitionRequest]
+
+    @root_validator(skip_on_failure=True)
+    def validate_object_array_field(cls, values):
+        """Validate object array field definition"""
+        fields = values.get('fields', [])
+        
+        if not fields:
+            raise ValueError("Object array field must have at least one field definition")
+        
+        # Check for duplicate field names
+        field_names = [field.name for field in fields]
+        if len(field_names) != len(set(field_names)):
+            raise ValueError("Object array field names must be unique")
+        
+        # Validate each field type
+        for field_def in fields:
+            if field_def.type not in [
+                marqo_index.FieldType.Text, marqo_index.FieldType.Int, 
+                marqo_index.FieldType.Long, marqo_index.FieldType.Float, 
+                marqo_index.FieldType.Double, marqo_index.FieldType.Bool
+            ]:
+                raise ValueError(f"Object array field type '{field_def.type}' is not supported")
+        
         return values
 
 

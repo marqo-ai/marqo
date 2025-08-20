@@ -13,3 +13,4 @@ class MarqoFieldTypes(Enum):
     STRING_ARRAY = 'string_array'
     STRING = 'string'
     TENSOR = 'tensor'
+    OBJECT_ARRAY = 'object_array'

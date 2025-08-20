@@ -8,7 +8,7 @@ import marqo.core.models.marqo_index as core
 from marqo import version, marqo_docs
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
-    UnstructuredMarqoIndexRequest
+    UnstructuredMarqoIndexRequest, ObjectArrayFieldRequest
 
 
 class AnnParameters(StrictBaseModel):
@@ -24,6 +24,7 @@ class IndexSettings(StrictBaseModel):
     treatUrlsAndPointersAsMedia: Optional[bool]
     filterStringMaxLength: Optional[int]
     collapseFields: Optional[List[core.CollapseField]] = None
+    objectArrayFields: Optional[List[ObjectArrayFieldRequest]] = None
     model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
     textQueryPrefix: Optional[str] = None
@@ -84,6 +85,19 @@ class IndexSettings(StrictBaseModel):
         if collapse_fields is not None and index_type == core.IndexType.Structured:
             raise api_exceptions.InvalidArgError(
                 "collapseFields is only supported for unstructured indexes"
+            )
+        
+        return values
+
+    @root_validator
+    def validate_object_array_fields(cls, values):
+        object_array_fields = values.get('objectArrayFields')
+        index_type = values.get('type')
+        
+        # objectArrayFields is only supported for SemiStructuredIndex
+        if object_array_fields is not None and index_type == core.IndexType.Structured:
+            raise api_exceptions.InvalidArgError(
+                "objectArrayFields is only supported for unstructured indexes"
             )
         
         return values
@@ -206,12 +220,69 @@ class IndexSettings(StrictBaseModel):
                 treat_urls_and_pointers_as_media=self.treatUrlsAndPointersAsMedia,
                 filter_string_max_length=self.filterStringMaxLength,
                 collapse_fields=self.collapseFields,
+                object_array_fields=self._convert_object_array_fields_to_core(),
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
+
+    def _convert_object_array_fields_to_core(self):
+        """Convert ObjectArrayFieldRequest objects to core ObjectArrayField objects"""
+        if self.objectArrayFields is None:
+            return None
+        
+        core_object_array_fields = []
+        for obj_array_req in self.objectArrayFields:
+            # Convert field definitions
+            core_field_defs = []
+            for field_def_req in obj_array_req.fields:
+                core_field_defs.append(
+                    core.ObjectArrayFieldDefinition(
+                        name=field_def_req.name,
+                        type=field_def_req.type
+                    )
+                )
+            
+            # Create core ObjectArrayField
+            core_obj_array = core.ObjectArrayField(
+                name=obj_array_req.name,
+                object_array_field_name=obj_array_req.object_array_field_name,
+                fields=core_field_defs
+            )
+            core_object_array_fields.append(core_obj_array)
+        
+        return core_object_array_fields
+
+    @classmethod
+    def _convert_core_object_array_fields_to_request(cls, core_object_array_fields):
+        """Convert core ObjectArrayField objects to ObjectArrayFieldRequest objects"""
+        if core_object_array_fields is None:
+            return None
+        
+        request_object_array_fields = []
+        for core_obj_array in core_object_array_fields:
+            # Convert field definitions
+            request_field_defs = []
+            for core_field_def in core_obj_array.fields:
+                from marqo.core.models.marqo_index_request import ObjectArrayFieldDefinitionRequest
+                request_field_defs.append(
+                    ObjectArrayFieldDefinitionRequest(
+                        name=core_field_def.name,
+                        type=core_field_def.type
+                    )
+                )
+            
+            # Create request ObjectArrayField
+            request_obj_array = ObjectArrayFieldRequest(
+                name=core_obj_array.name,
+                object_array_field_name=core_obj_array.object_array_field_name,
+                fields=request_field_defs
+            )
+            request_object_array_fields.append(request_obj_array)
+        
+        return request_object_array_fields
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
@@ -220,10 +291,12 @@ class IndexSettings(StrictBaseModel):
             # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
             # this information and the SemiStructured concept are internal implementation details only.
             
-            # Only include collapseFields for SemiStructuredMarqoIndex
+            # Only include collapseFields and objectArrayFields for SemiStructuredMarqoIndex
             collapse_fields = None
+            object_array_fields = None
             if isinstance(marqo_index, core.SemiStructuredMarqoIndex):
                 collapse_fields = marqo_index.collapse_fields
+                object_array_fields = cls._convert_core_object_array_fields_to_request(marqo_index.object_array_fields)
             
             return cls(
                 type=core.IndexType.Unstructured,
@@ -231,6 +304,7 @@ class IndexSettings(StrictBaseModel):
                 treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
                 filterStringMaxLength=marqo_index.filter_string_max_length,
                 collapseFields=collapse_fields,
+                objectArrayFields=object_array_fields,
                 model=marqo_index.model.name,
                 modelProperties=IndexSettings.get_model_properties(marqo_index),
                 normalizeEmbeddings=marqo_index.normalize_embeddings,

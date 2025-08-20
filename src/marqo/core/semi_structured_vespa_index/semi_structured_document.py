@@ -34,6 +34,9 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
 
+    # object array fields
+    object_array_fields: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict, alias=common.OBJECT_ARRAY_FIELDS)
+
     # metadata fields
     version_uuid: Optional[str] = Field(default=None, alias=common.VESPA_DOC_VERSION_UUID)
     field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPES)
@@ -77,11 +80,13 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         tensor_fields = {}
         text_fields = {}
         string_arrays_dict = {}
+        object_arrays_dict = {}
 
         tensor_subfield_map = marqo_index.tensor_subfield_map
         lexical_field_map = marqo_index.lexical_field_map
         field_map = marqo_index.field_map
         string_array_field_map = marqo_index.string_array_field_name_to_string_array_field_map
+        object_array_field_map = marqo_index.object_array_field_name_to_object_array_field_map
         string_array_prefix_length = len(common.STRING_ARRAY + '_')
 
         for field_name, field_value in fields.items():
@@ -104,6 +109,9 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
                 # Here we will collect all such string array fields and put them in string_arrays_dict, which will later be used  to construct the SemiStructuredVespaDocument object.
                 string_array_field_key = field_name[string_array_prefix_length:]
                 string_arrays_dict[string_array_field_key] = field_value
+            elif field_name in object_array_field_map:
+                # Handle object array fields
+                object_arrays_dict[field_name] = field_value
 
         # model_construct assumes all the fields are validated. We construct each field manually so the validation
         # (which in this case is just simple type check) is not necessary.
@@ -192,6 +200,8 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             cls._handle_bool_field(field_name, field_content, instance)
         elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
             cls._handle_string_array_field(field_name, field_content, instance)
+        elif isinstance(field_content, list) and all(isinstance(elem, dict) for elem in field_content):
+            cls._handle_object_array_field(field_name, field_content, instance, marqo_index)
         elif isinstance(field_content, (int, float)):
             cls._handle_numeric_field(field_name, field_content, instance)
         elif isinstance(field_content, dict):
@@ -243,6 +253,89 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             if instance.index_supports_partial_updates:
                 instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.FLOAT.value
         instance.fixed_fields.score_modifiers_fields[field_name] = field_content
+
+    @classmethod
+    def _handle_object_array_field(cls, field_name: str, field_content: List[Dict], instance, marqo_index: SemiStructuredMarqoIndex):
+        """Handle object array fields (list of dictionaries/structs)"""
+        # Check if this field is defined as an object array field in the index
+        object_array_field = marqo_index.name_to_object_array_field_map.get(field_name)
+        if not object_array_field:
+            raise MarqoDocumentParsingError(
+                f"Field '{field_name}' contains an array of objects but is not defined as an object array field in the index"
+            )
+        
+        # Validate and process each object in the array
+        processed_objects = []
+        for i, obj in enumerate(field_content):
+            if not isinstance(obj, dict):
+                raise MarqoDocumentParsingError(
+                    f"Object array field '{field_name}' element {i} must be a dictionary"
+                )
+            
+            processed_obj = cls._process_object_array_item(field_name, obj, object_array_field, i)
+            processed_objects.append(processed_obj)
+        
+        # Store the processed objects in the appropriate field
+        vespa_field_name = object_array_field.object_array_field_name or field_name
+        instance.fixed_fields.object_array_fields[vespa_field_name] = processed_objects
+        
+        if instance.index_supports_partial_updates:
+            instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.OBJECT_ARRAY.value
+
+    @classmethod
+    def _process_object_array_item(cls, field_name: str, obj: Dict, object_array_field, index: int) -> Dict:
+        """Process a single object within an object array"""
+        processed_obj = {}
+        
+        # Create a map of allowed fields for quick lookup
+        allowed_fields = {field_def.name: field_def for field_def in object_array_field.fields}
+        
+        # Process each field in the object
+        for key, value in obj.items():
+            if key not in allowed_fields:
+                raise MarqoDocumentParsingError(
+                    f"Object array field '{field_name}' element {index} contains unknown field '{key}'. "
+                    f"Allowed fields: {list(allowed_fields.keys())}"
+                )
+            
+            field_def = allowed_fields[key]
+            processed_value = cls._convert_value_for_struct_field(field_name, key, value, field_def, index)
+            processed_obj[key] = processed_value
+        
+        return processed_obj
+
+    @classmethod
+    def _convert_value_for_struct_field(cls, array_field_name: str, field_name: str, value: Any, 
+                                      field_def, index: int) -> Any:
+        """Convert a value to the appropriate type for a struct field"""
+        from marqo.core.models.marqo_index import FieldType
+        
+        try:
+            if field_def.type == FieldType.Text:
+                return str(value)
+            elif field_def.type == FieldType.Int:
+                return int(value)
+            elif field_def.type == FieldType.Long:
+                return int(value)  # Vespa long is Python int
+            elif field_def.type == FieldType.Float:
+                return float(value)
+            elif field_def.type == FieldType.Double:
+                return float(value)  # Vespa double is Python float
+            elif field_def.type == FieldType.Bool:
+                # Convert to int (byte) for Vespa
+                if isinstance(value, bool):
+                    return int(value)
+                elif isinstance(value, str):
+                    return int(value.lower() in ('true', '1', 'yes'))
+                else:
+                    return int(bool(value))
+            else:
+                raise MarqoDocumentParsingError(f"Unsupported struct field type: {field_def.type}")
+        except (ValueError, TypeError) as e:
+            raise MarqoDocumentParsingError(
+                f"Object array field '{array_field_name}' element {index} field '{field_name}': "
+                f"Cannot convert value '{value}' to type {field_def.type.value}: {str(e)}"
+            )
 
     @classmethod
     def _handle_dict_field(cls, field_name: str, field_content: Dict[str, Union[int, float]], instance):
@@ -361,6 +454,10 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         marqo_document.update(self.fixed_fields.float_fields)
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
+        
+        # Add object array fields back to document
+        marqo_document.update(self.fixed_fields.object_array_fields)
+        
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
         # Note: We are not adding field_types & version_uuid to the document because
         # it's a field for internal Marqo use only.
