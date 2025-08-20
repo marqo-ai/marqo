@@ -347,8 +347,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Reuse logic in UnstructuredVespaIndex to create filter term
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
-            filter_parts = []
-
             # Escape special characters in field name and value
             node.field = self.escape(node.field)
             node.value = self.escape(node.value)
@@ -360,6 +358,14 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if self.get_marqo_index().is_collapse_field(node.field):
                 # collapse field is indexed as attribute, can be used directly in a filter term
                 return f'({node.field} contains "{node.value}")'
+
+            # Check for Object Array Filter first - if it matches, return it exclusively
+            object_array_filter_string = self._generate_object_array_filter_string(node)
+            if object_array_filter_string:
+                return object_array_filter_string
+
+            # If not an object array field, proceed with other filter types
+            filter_parts = []
 
             # Bool Filter
             if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
@@ -403,11 +409,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if numeric_filter_string:
                 filter_parts.append(numeric_filter_string)
 
-            # Object Array Filter
-            object_array_filter_string = self._generate_object_array_filter_string(node)
-            if object_array_filter_string:
-                filter_parts.append(object_array_filter_string)
-
             # Final Filter String
             final_filter_string = f"({' OR '.join(filter_parts)})"
             return final_filter_string
@@ -422,16 +423,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if not bound:
                 raise InternalError('RangeTerm has no lower or upper bound')
 
+            # Check for object array range filter first - if it matches, return it exclusively
+            object_array_filter_string = self._generate_object_array_range_filter_string(node, bound)
+            if object_array_filter_string:
+                return object_array_filter_string
+
+            # If not an object array field, proceed with standard range filters
             float_field_string = (f'({FLOAT_FIELDS} contains '
                                   f'sameElement(key contains "{node.field}", {bound}))')
 
             int_field_string = (f'({INT_FIELDS} contains '
                                 f'sameElement(key contains "{node.field}", {bound}))')
-
-            # Check for object array range filter
-            object_array_filter_string = self._generate_object_array_range_filter_string(node, bound)
-            if object_array_filter_string:
-                return f'({float_field_string} OR {int_field_string} OR {object_array_filter_string})'
 
             return f'({float_field_string} OR {int_field_string})'
 
@@ -443,6 +445,21 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             if isinstance(node, search_filter.Operator):
                 if isinstance(node, search_filter.And):
+                    # Special handling for AND operations with object array fields
+                    # Check if both sides are object array terms for the same array field
+                    left_node = node.left
+                    right_node = node.right
+                    
+                    # Check if both are object array terms
+                    left_array_field = self._get_object_array_field_name(left_node) if isinstance(left_node, search_filter.Term) else None
+                    right_array_field = self._get_object_array_field_name(right_node) if isinstance(right_node, search_filter.Term) else None
+                    
+                    # If both sides reference the same object array field, combine them
+                    if left_array_field and right_array_field and left_array_field == right_array_field:
+                        combined_filter = self._combine_object_array_conditions(left_node, right_node, left_array_field)
+                        if combined_filter:
+                            return combined_filter
+                    
                     operator = 'AND'
                 elif isinstance(node, search_filter.Or):
                     operator = 'OR'
@@ -486,6 +503,123 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
+
+    def _get_object_array_field_name(self, node: search_filter.Term) -> Optional[str]:
+        """Extract the object array field name from a term node (e.g., 'variant' from 'variant.stock')"""
+        if not hasattr(node, 'field') or '.' not in node.field:
+            return None
+            
+        field_parts = node.field.split('.')
+        if len(field_parts) != 2:
+            return None
+            
+        array_field_name = field_parts[0]
+        
+        # Check if this is actually an object array field
+        marqo_index = self.get_marqo_index()
+        if not marqo_index.object_array_fields:
+            return None
+            
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return None
+            
+        return array_field_name
+
+    def _combine_object_array_conditions(self, left_node: search_filter.Term, right_node: search_filter.Term, 
+                                       array_field_name: str) -> Optional[str]:
+        """Combine multiple object array conditions into a single sameElement query"""
+        conditions = []
+        
+        # Process left condition
+        left_condition = self._build_object_array_condition(left_node, array_field_name)
+        if left_condition:
+            conditions.append(left_condition)
+        
+        # Process right condition  
+        right_condition = self._build_object_array_condition(right_node, array_field_name)
+        if right_condition:
+            conditions.append(right_condition)
+            
+        if not conditions:
+            return None
+            
+        # Get vespa field name
+        marqo_index = self.get_marqo_index()
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return None
+            
+        vespa_field_name = object_array_field.object_array_field_name or array_field_name
+        
+        # Combine conditions in a single sameElement
+        combined_conditions = ', '.join(conditions)
+        return f'({vespa_field_name} contains sameElement({combined_conditions}))'
+
+    def _build_object_array_condition(self, node: search_filter.Term, array_field_name: str) -> Optional[str]:
+        """Build a single condition string for an object array field"""
+        if not hasattr(node, 'field') or '.' not in node.field:
+            return None
+            
+        field_parts = node.field.split('.')
+        if len(field_parts) != 2 or field_parts[0] != array_field_name:
+            return None
+            
+        sub_field_name = field_parts[1]
+        
+        # Get object array field definition
+        marqo_index = self.get_marqo_index()
+        object_array_field = marqo_index.name_to_object_array_field_map.get(array_field_name)
+        if not object_array_field:
+            return None
+            
+        # Check if the sub-field exists in the object array definition
+        valid_sub_fields = {field_def.name for field_def in object_array_field.fields}
+        if sub_field_name not in valid_sub_fields:
+            return None
+            
+        # Get field definition
+        field_def = next(field_def for field_def in object_array_field.fields if field_def.name == sub_field_name)
+        
+        if isinstance(node, search_filter.EqualityTerm):
+            # Handle equality condition
+            if field_def.type.value in ['text']:
+                return f'{sub_field_name} contains "{node.value}"'
+            elif field_def.type.value in ['int', 'long']:
+                try:
+                    int_value = int(node.value)
+                    return f'{sub_field_name} = {int_value}'
+                except ValueError:
+                    return None
+            elif field_def.type.value in ['float', 'double']:
+                try:
+                    float_value = float(node.value)
+                    return f'{sub_field_name} = {float_value}'
+                except ValueError:
+                    return None
+            elif field_def.type.value == 'bool':
+                if node.value.lower() in ('true', '1', 'yes'):
+                    return f'{sub_field_name} = 1'
+                elif node.value.lower() in ('false', '0', 'no'):
+                    return f'{sub_field_name} = 0'
+                else:
+                    return None
+                    
+        elif isinstance(node, search_filter.RangeTerm):
+            # Handle range condition
+            if field_def.type.value not in ['int', 'long', 'float', 'double']:
+                return None
+                
+            range_conditions = []
+            if node.lower is not None:
+                range_conditions.append(f'{sub_field_name} >= {node.lower}')
+            if node.upper is not None:
+                range_conditions.append(f'{sub_field_name} <= {node.upper}')
+                
+            if range_conditions:
+                return ', '.join(range_conditions)
+                
+        return None
 
     def _generate_object_array_filter_string(self, node: 'search_filter.EqualityTerm') -> Optional[str]:
         """Generate filter string for object array fields (field_name.subfield syntax)"""

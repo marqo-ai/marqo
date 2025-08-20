@@ -675,17 +675,6 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
                                   else {field.name: field for field in self.object_array_fields})
 
     @property
-    def object_array_field_name_to_object_array_field_map(self):
-        """
-        A map from an ObjectArrayField object's "object_array_field_name" property to corresponding ObjectArrayField object.
-        An "object_array_field_name" is the name used in the index schema with Marqo prefix.
-        Returns an empty dict if object_array_fields is None.
-        """
-        return self._cache_or_get('object_array_field_map',
-                                  lambda: {} if self.object_array_fields is None
-                                  else {field.object_array_field_name: field for field in self.object_array_fields if field.object_array_field_name})
-
-    @property
     def lexical_field_map(self) -> Dict[str, Field]:
         """Return a map from lexical field name to the field object.
 

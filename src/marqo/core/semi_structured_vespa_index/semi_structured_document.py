@@ -34,9 +34,6 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
 
-    # object array fields
-    object_array_fields: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict, alias=common.OBJECT_ARRAY_FIELDS)
-
     # metadata fields
     version_uuid: Optional[str] = Field(default=None, alias=common.VESPA_DOC_VERSION_UUID)
     field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPES)
@@ -68,6 +65,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
     text_fields: dict = Field(default_factory=dict)
     tensor_fields: dict = Field(default_factory=dict)
     string_array_fields: Dict[str, List[str]] = Field(default_factory=dict)
+    object_array_fields: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
     index_supports_partial_updates: bool = False
 
     @classmethod
@@ -86,7 +84,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         lexical_field_map = marqo_index.lexical_field_map
         field_map = marqo_index.field_map
         string_array_field_map = marqo_index.string_array_field_name_to_string_array_field_map
-        object_array_field_map = marqo_index.object_array_field_name_to_object_array_field_map
+        object_array_field_map = marqo_index.name_to_object_array_field_map
         string_array_prefix_length = len(common.STRING_ARRAY + '_')
 
         for field_name, field_value in fields.items():
@@ -121,6 +119,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             tensor_fields=tensor_fields,
             text_fields=text_fields,
             string_array_fields=string_arrays_dict,
+            object_array_fields=object_arrays_dict,
             index_supports_partial_updates=marqo_index.index_supports_partial_updates)
 
     @classmethod
@@ -406,6 +405,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             **{k: v for k, v in self.fixed_fields.model_dump(exclude_none=True, by_alias=True).items() if v or v == 0},
             **self.text_fields,
             **self.tensor_fields,
+            **self.object_array_fields,
             common.FIELD_VECTOR_COUNT: self.fixed_fields.vector_counts,
         }
 
@@ -455,8 +455,30 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         
-        # Add object array fields back to document
-        marqo_document.update(self.fixed_fields.object_array_fields)
+        # Add object array fields back to document with byte->bool conversion
+        if self.object_array_fields:
+            for field_name, field_array in self.object_array_fields.items():
+                # Convert byte values back to bool in object arrays
+                converted_array = []
+                for obj in field_array:
+                    converted_obj = {}
+                    for key, value in obj.items():
+                        # Convert bytes to bool for boolean fields (bytes are stored as 0/1 in Vespa)
+                        if isinstance(value, int) and value in (0, 1):
+                            # Check if this should be a boolean field based on the index definition
+                            object_array_field = marqo_index.name_to_object_array_field_map.get(field_name)
+                            if object_array_field:
+                                field_def = next((f for f in object_array_field.fields if f.name == key), None)
+                                if field_def and field_def.type.value == 'bool':
+                                    converted_obj[key] = bool(value)
+                                else:
+                                    converted_obj[key] = value
+                            else:
+                                converted_obj[key] = value
+                        else:
+                            converted_obj[key] = value
+                    converted_array.append(converted_obj)
+                marqo_document[field_name] = converted_array
         
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
         # Note: We are not adding field_types & version_uuid to the document because
