@@ -1428,7 +1428,7 @@ class TestSearchWithContext(MarqoTestCase):
                             ids={"doc1": 2.0, "doc3": 0.1, "not_exists_doc": 1},
                             parameters=SearchContextDocumentsParameters(
                                 tensorFields=["text_field_1"],
-                                exclueInputDocuments=True,
+                                excludeInputDocuments=True,
                                 allowMissingEmbeddings=True,
                                 allowMissingDocuments=True
                             )
@@ -1481,7 +1481,7 @@ class TestSearchWithContext(MarqoTestCase):
                             ids={"doc3": 0.1, "not_exists_doc": 1},
                             parameters=SearchContextDocumentsParameters(
                                 tensorFields=["text_field_1"],
-                                exclueInputDocuments=True,
+                                excludeInputDocuments=True,
                                 allowMissingEmbeddings=True,
                                 allowMissingDocuments=True
                             )
@@ -1537,7 +1537,7 @@ class TestSearchWithContext(MarqoTestCase):
                             ids={"doc1": 2.0, "doc3": 0.1, "not_exists_doc": 1},
                             parameters=SearchContextDocumentsParameters(
                                 tensorFields=["text_field_1"],
-                                exclueInputDocuments=True,
+                                excludeInputDocuments=True,
                                 allowMissingEmbeddings=True,
                                 allowMissingDocuments=True
                             )
@@ -1596,7 +1596,7 @@ class TestSearchWithContext(MarqoTestCase):
                             ids={"doc3": 0.1, "not_exists_doc": 1},
                             parameters=SearchContextDocumentsParameters(
                                 tensorFields=["text_field_1"],
-                                exclueInputDocuments=True,
+                                excludeInputDocuments=True,
                                 allowMissingEmbeddings=True,
                                 allowMissingDocuments=True
                             )
