@@ -887,7 +887,7 @@ def get_query_vectors_from_jobs(
 ) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
-    Handles multi-modal queries, by weighting and combining queries into a single vector
+    Handles multi-modal queries, by weighting and combining queries into a single vector.
 
     Args:
         - queries: Original search queries.
@@ -895,6 +895,8 @@ def get_query_vectors_from_jobs(
         - job_to_vectors: inference output from each VectorisedJob
         - config: standard Marqo config.
 
+    Raises:
+        api_exceptions.InvalidArgError: If this method can not collect a valid vector from the query
     """
     result: Dict[Qidx, List[float]] = defaultdict(list)
     for qidx, ptrs in qidx_to_job.items():
@@ -994,7 +996,8 @@ def get_query_vectors_from_jobs(
 
         if not result[qidx]:
             raise api_exceptions.InvalidArgError(
-                f"Marqo could not collect any vectors from the search query '{q.q}'. "
+                f"Marqo could not collect any vectors from the search query but the retrieval or ranking method requires "
+                f"at least one valid vector. "
                 f"Please check the provided query and context (if any). "
             )
 
@@ -1079,7 +1082,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str],
                            interpolation_method: InterpolationMethod = None) -> Dict[
     Qidx, List[float]]:
-    """Run the query vectorisation process
+    """Run the query vectorisation process. This is a pipeline used for both Tensor search and Hybrid search.
 
     Raise:
         api_exceptions.InvalidArgError: If the vectorisation process fails or if the media cannot be downloaded.

@@ -46,6 +46,11 @@ class Recommender:
         Returns:
             A dictionary mapping document IDs to lists of vector embeddings. This is flattened to 1 list per document
                 ID (not separated by tensor field). Order of embeddings is not guaranteed.
+
+        Raises:
+            InvalidArgumentError:
+                - If any document IDs are not found and allow_missing_documents is False
+                - If any document IDs does not have embeddings and allow_missing_embeddings is False
         """
 
         # TODO - Extract search and get_docs from tensor_search and refactor this
@@ -207,7 +212,9 @@ class Recommender:
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
                   score_modifiers: Optional[ScoreModifierLists] = None,
-                  rerank_depth: Optional[int] = None
+                  rerank_depth: Optional[int] = None,
+                  allow_missing_documents: bool = False,
+                  allow_missing_embeddings: bool = False,
                   ):
         """
         Recommend documents similar to the provided documents.
@@ -248,7 +255,9 @@ class Recommender:
         doc_vectors = self.get_doc_vectors_from_ids(
             index_name=index_name,
             documents=documents,
-            tensor_fields=tensor_fields
+            tensor_fields=tensor_fields,
+            allow_missing_documents=allow_missing_documents,
+            allow_missing_embeddings=allow_missing_embeddings,
         )
 
         # Save original document IDs for filtering
@@ -265,8 +274,15 @@ class Recommender:
                 weight = documents[document_id]
             else:
                 weight = 1
+
             vectors.extend(vector_list)
             weights.extend([weight] * len(vector_list))
+
+        if len(vectors) == 0:
+            raise InvalidArgumentError(
+                "Marqo could not collect any valid vector from the documents. "
+                "Please check if the provided documents exist or if the documents have valid embeddings. "
+            )
 
         try:
             interpolated_vector = vector_interpolation.interpolate(
@@ -310,7 +326,7 @@ class Recommender:
             attributes_to_retrieve=attributes_to_retrieve,
             score_modifiers=score_modifiers,
             processing_start=t0,
-            rerank_depth=rerank_depth
+            rerank_depth=rerank_depth,
         )
 
         return results
