@@ -1395,10 +1395,8 @@ class TestSearchWithContext(MarqoTestCase):
                     self.assertGreater(len(results["hits"]), 0)
 
                     # Verify that existing documents are still included in results
-                    result_ids = [hit["_id"] for hit in results["hits"]]
-                    self.assertIn("doc1", result_ids)
-                    self.assertIn("doc2", result_ids)
-                    self.assertIn("doc3", result_ids)
+                    result_ids = set([hit["_id"] for hit in results["hits"]])
+                    self.assertEqual({"doc1", "doc2", "doc3"}, result_ids)
 
     def test_search_with_context_documents_allow_missing_both_parameters(self):
         """Test that search works when both allowMissingDocuments=True and allowMissingEmbeddings=True with mixed scenarios."""
@@ -1452,9 +1450,8 @@ class TestSearchWithContext(MarqoTestCase):
                     # Verify search was successful
                     self.assertIn("hits", results)
                     self.assertGreater(len(results["hits"]), 0)
-                    self.assertNotIn("doc1", results["hits"][0]["_id"])
-                    self.assertNotIn("doc3", results["hits"][0]["_id"])
-                    self.assertIn("doc2", results["hits"][0]["_id"])
+                    result_ids = set([hit["_id"] for hit in results["hits"]])
+                    self.assertEqual({"doc2"}, result_ids)
 
     def test_a_proper_error_is_raised_if_marqo_can_not_collect_any_vector(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
