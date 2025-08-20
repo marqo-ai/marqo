@@ -77,7 +77,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called correctly
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1", "doc2"], tensor_fields=None
+            mock_config, "test_index", ["doc1", "doc2"], tensor_fields=None, allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -117,7 +117,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called with non-zero weight docs only
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1", "doc3"], tensor_fields=None
+            mock_config, "test_index", ["doc1", "doc3"], tensor_fields=None, allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -155,7 +155,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called with specific fields
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1"], tensor_fields=["title", "content"]
+            mock_config, "test_index", ["doc1"], tensor_fields=["title", "content"], allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
