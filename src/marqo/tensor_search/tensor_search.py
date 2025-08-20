@@ -998,7 +998,7 @@ def get_query_vectors_from_jobs(
             raise api_exceptions.InvalidArgError(
                 f"Marqo could not collect any vectors from the search query but the retrieval or ranking method requires "
                 f"at least one valid vector. "
-                f"Please check the provided query and context (if any). "
+                f"Please check the provided query, context (if any), or queryTensor(for Hybrid search) "
             )
 
     return result

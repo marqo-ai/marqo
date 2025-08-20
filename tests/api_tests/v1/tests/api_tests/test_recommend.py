@@ -272,3 +272,152 @@ class TestRecommend(MarqoTestCase):
                         self.client.index(index_name).recommend(
                             documents=["doc_0", "doc_1"], limit=10, offset=0, rerank_depth=-1
                         )
+
+    def test_recommend_allow_missing_documents_true(self):
+        """Test recommend with allow_missing_documents=True allows missing documents"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+                "tags": ["flower", "orchid"],
+            },
+            {
+                "_id": "2", 
+                "title": "Red rose",
+                "tags": ["flower"],
+            },
+            {
+                "_id": "3",
+                "title": "Europe",
+                "tags": ["continent"],
+            },
+        ]
+
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
+                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                if add_docs_results["errors"]:
+                    raise Exception(f"Failed to add documents to index {index_name}")
+
+                # Should succeed even with missing document "missing_doc"
+                res = self.client.index(index_name).recommend(
+                    documents=['1', '2', 'missing_doc'],
+                    allow_missing_documents=True
+                )
+                
+                # Should return results based on available documents
+                ids = [doc["_id"] for doc in res["hits"]]
+                self.assertEqual(set(ids), {"3"})
+
+    def test_recommend_allow_missing_embeddings_true(self):
+        """Test recommend with allow_missing_embeddings=True allows documents without embeddings"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+                "tags": ["flower", "orchid"],
+            },
+            {
+                "_id": "2",
+                "title": "Red rose", 
+                "tags": ["flower"],
+                "content": "test"
+            },
+            {
+                "_id": "3",
+                "title": "Europe",
+                "tags": ["continent"],
+            },
+        ]
+
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                # For structured: use content field but only doc 2 has content (docs 1,3 lack embeddings)
+                # For unstructured: use content field but only doc 2 has content
+                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
+                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                if add_docs_results["errors"]:
+                    raise Exception(f"Failed to add documents to index {index_name}")
+
+                # Should succeed even when documents 1 and 3 lack embeddings for content field
+                res = self.client.index(index_name).recommend(
+                    documents=['1', '2', '3'],
+                    tensor_fields=["content"],
+                    allow_missing_embeddings=True
+                )
+
+    def test_recommend_allow_missing_both_true(self):
+        """Test recommend with both allow_missing_documents=True and allow_missing_embeddings=True"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+                "tags": ["flower", "orchid"],
+            },
+            {
+                "_id": "2",
+                "title": "Red rose",
+                "tags": ["flower"],
+                "content": "test"
+            },
+            {
+                "_id": "3", 
+                "title": "Europe",
+                "tags": ["continent"],
+            },
+        ]
+
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
+                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                if add_docs_results["errors"]:
+                    raise Exception(f"Failed to add documents to index {index_name}")
+
+                # Should succeed with both missing documents and missing embeddings
+                res = self.client.index(index_name).recommend(
+                    documents=['1', '2', '3', 'missing_doc'],
+                    tensor_fields=["content"],
+                    allow_missing_documents=True,
+                    allow_missing_embeddings=True
+                )
+
+    def test_recommend_failed_to_collect_vectors_error(self):
+        """Test recommend raises error when no valid vectors available and allow_missing_embeddings=False"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+                "tags": ["flower", "orchid"],
+            },
+            {
+                "_id": "2",
+                "title": "Red rose",
+                "tags": ["flower"],
+            },
+            {
+                "_id": "3",
+                "content": "test",
+            }
+        ]
+
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
+                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                if add_docs_results["errors"]:
+                    raise Exception(f"Failed to add documents to index {index_name}")
+
+                # Should fail when all documents lack embeddings and allow_missing_embeddings=False
+                with self.assertRaises(MarqoWebError) as e:
+                    self.client.index(index_name).recommend(
+                        documents=['1', '2'],
+                        tensor_fields=["content"],  # Documents don't have content embeddings
+                        allow_missing_embeddings=True
+                    )
+                self.assertIn("Marqo could not collect any valid vector from the documents.", str(e.exception))
