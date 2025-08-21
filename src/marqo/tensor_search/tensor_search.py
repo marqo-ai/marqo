@@ -887,7 +887,7 @@ def get_query_vectors_from_jobs(
 ) -> Dict[Qidx, List[float]]:
     """
     Retrieve the vectorised content associated to each query from the set of batch vectorise jobs.
-    Handles multi-modal queries, by weighting and combining queries into a single vector
+    Handles multi-modal queries, by weighting and combining queries into a single vector.
 
     Args:
         - queries: Original search queries.
@@ -895,6 +895,8 @@ def get_query_vectors_from_jobs(
         - job_to_vectors: inference output from each VectorisedJob
         - config: standard Marqo config.
 
+    Raises:
+        api_exceptions.InvalidArgError: If this method can not collect a valid vector from the query
     """
     result: Dict[Qidx, List[float]] = defaultdict(list)
     for qidx, ptrs in qidx_to_job.items():
@@ -943,7 +945,9 @@ def get_query_vectors_from_jobs(
                                             context_doc_vectors = config.recommender.get_doc_vectors_from_ids(
                             index_name=q.index.name,
                             documents=context_documents.ids,
-                            tensor_fields=context_documents.parameters.tensor_fields
+                            tensor_fields=context_documents.parameters.tensor_fields,
+                            allow_missing_documents=context_documents.parameters.allow_missing_documents,
+                            allow_missing_embeddings= context_documents.parameters.allow_missing_embeddings
                         )
 
                 # Update weights and vectors list
@@ -968,13 +972,14 @@ def get_query_vectors_from_jobs(
             # Use interpolation to combine all vectors
             vector_interpolation = from_interpolation_method(interpolation_method)
             with RequestMetricsStore.for_request().time(f"search.vectorise.interpolate_vectors"):
-                merged_vector = vector_interpolation.interpolate(
-                    vectors=collected_vectors,
-                    weights=collected_weights
-                )
-
-            result[qidx] = list(merged_vector)
-
+                if collected_vectors:
+                    merged_vector = vector_interpolation.interpolate(
+                        vectors=collected_vectors,
+                        weights=collected_weights
+                    )
+                    result[qidx] = list(merged_vector)
+                else:
+                    result[qidx] = []
         elif isinstance(q.q, str):
             if q.context:
                 raise core_exceptions.InvalidArgumentError(
@@ -988,6 +993,14 @@ def get_query_vectors_from_jobs(
             )
         else:
             raise ValueError(f"Unexpected query type: {type(q.q).__name__}")
+
+        if not result[qidx]:
+            raise api_exceptions.InvalidArgError(
+                f"Marqo could not collect any vectors from the search query but the retrieval or ranking method requires "
+                f"at least one valid vector. "
+                f"Please check the provided query, context (if any), or queryTensor(for Hybrid search) "
+            )
+
     return result
 
 
@@ -1069,7 +1082,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str],
                            interpolation_method: InterpolationMethod = None) -> Dict[
     Qidx, List[float]]:
-    """Run the query vectorisation process
+    """Run the query vectorisation process. This is a pipeline used for both Tensor search and Hybrid search.
 
     Raise:
         api_exceptions.InvalidArgError: If the vectorisation process fails or if the media cannot be downloaded.
@@ -1184,6 +1197,9 @@ def _vector_text_search(
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
     vectorised_text = list(qidx_to_vectors.values())[0]
+
+    if not vectorised_text: # pragma: no cover
+        raise InternalError(f"No vector is generated for the tensor query: {query}. ")
 
     marqo_query = MarqoTensorQuery(
         index_name=index_name,
@@ -1353,6 +1369,7 @@ def get_doc_vectors_per_tensor_field_by_ids(
     index_name: str, 
     document_ids: List[str],
     tensor_fields: Optional[List[str]] = None,
+    allow_missing_documents: bool = False,
 ) -> Dict[str, Dict[str, List[List[float]]]]:
     """
     Get only the embeddings for documents by their IDs.
@@ -1362,9 +1379,18 @@ def get_doc_vectors_per_tensor_field_by_ids(
         index_name: Name of the index
         document_ids: List of document IDs to fetch
         tensor_fields: Specific tensor fields to get. If None, get all tensor fields.
+        allow_missing_documents: If True, will not raise an error if a document is not found
     
     Returns:
         Dict mapping document_id to field_name to list of embedding vectors
+        E.g.,
+        {
+            "doc_id_1": {
+                "field_name_1": [[0.1, 0.2, ...], ...],
+                "field_name_2": [[0.3, 0.4, ...], ...],
+            },
+            "doc_id_2": {"field_name_1": [[0.5, 0.6, ...], ...]}
+         }
     """
 
     # We can just use the cache here since we refresh every 1s.
@@ -1417,6 +1443,9 @@ def get_doc_vectors_per_tensor_field_by_ids(
                 else:
                     # Otherwise, field is empty list
                     result[doc_id][marqo_tensor_field_name] = []
+        elif response.status == 404 and allow_missing_documents:
+                # If the document is not found and we are allowing missing documents, continue to next response
+                continue
         else:
             # If the response is not successful, error out
             raise core_exceptions.InvalidArgumentError(
