@@ -16,7 +16,6 @@ from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import S
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
     SearchMethod
@@ -28,7 +27,6 @@ from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContext
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
-import semver
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 
