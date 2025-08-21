@@ -277,7 +277,7 @@ class Model(StrictBaseModel):
         return default_prefix
 
 
-class MarqoIndex(MarqoBaseModel, ABC):
+class MarqoIndex(ImmutableBaseModel, ABC):
     """
     Base class for a Marqo index.
     We inherit from ImmutableBaseModel and add the extra = "allow" config to allow extra fields during deserialization.

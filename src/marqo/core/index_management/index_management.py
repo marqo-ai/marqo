@@ -164,7 +164,7 @@ class IndexManagement:
         """
         index_to_create: List[Tuple[str, MarqoIndex]] = []
         schemas_to_add: List[Tuple[str, str]] = []  # (schema_content, schema_name) for typeahead schemas
-        
+
         for request in marqo_index_requests:
             # set the default prefixes if not provided
             if request.model.text_query_prefix is None:
@@ -173,21 +173,26 @@ class IndexManagement:
                 request.model.text_chunk_prefix = request.model.get_default_text_chunk_prefix()
 
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
-            index_to_create.append((schema, marqo_index))
             logger.debug(f'Creating index {request.name} with schema:\n{schema}')
-            
+
             # Create typeahead schema for unstructured indexes
+            # TODO This doesn't appear be the right place to do this, since we end up accessing protexted members of
+            # VespaApp later on. We should everything to index_to_create instead
             from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 
-            typeahead_schema_generator = TypeaheadVespaSchema(request.name)
-            typeahead_schema_name, typeahead_schema = typeahead_schema_generator.generate_schema()
-            marqo_index.typeahead_schema = typeahead_schema
-            schemas_to_add.append((typeahead_schema, typeahead_schema_name))
-            logger.debug(f'Creating typeahead schema for index {request.name} with schema: {typeahead_schema_name}')
+            typeahead_schema_generator = TypeaheadVespaSchema(marqo_index)
+            updated_marqo_index, typeahead_schema = typeahead_schema_generator.generate_schema()
+
+            schemas_to_add.append((typeahead_schema, updated_marqo_index.typeahead_schema_name))
+
+            index_to_create.append((schema, updated_marqo_index))
+
+            logger.debug(
+                f'Creating typeahead schema for index {request.name} with schema: {updated_marqo_index.typeahead_schema_name}')
 
         with self._vespa_deployment_lock():
             vespa_app = self._get_vespa_application()
-            
+
             # Add typeahead schemas to services.xml and save schema files BEFORE main deployment
             for typeahead_schema, typeahead_schema_name in schemas_to_add:
                 # Save schema file
@@ -195,7 +200,7 @@ class IndexManagement:
                 # Add schema to services.xml
                 vespa_app._service_xml.add_schema(typeahead_schema_name)
                 logger.debug(f'Added typeahead schema file and service config: {typeahead_schema_name}')
-            
+
             # Deploy main schemas and index settings (this will deploy everything together)
             vespa_app.batch_add_index_setting_and_schema(index_to_create)
 
@@ -253,7 +258,7 @@ class IndexManagement:
 
         if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
                 is_subset(marqo_index.field_map, existing_index.field_map) and
-                    is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
+                is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
             logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
             return
 
