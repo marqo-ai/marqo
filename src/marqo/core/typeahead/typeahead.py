@@ -6,6 +6,8 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
+from marqo.tensor_search import index_meta_cache
+from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -30,7 +32,6 @@ class Typeahead:
         start_time = time.time()
 
         # Check if index exists and get typeahead schema name
-        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
@@ -147,7 +148,6 @@ class Typeahead:
                 errors.append(f"No tokens generated for query: {query}")
                 continue
 
-            from marqo.vespa.models.vespa_document import VespaDocument
             vespa_doc = VespaDocument(
                 id=doc_id,
                 fields={
@@ -179,7 +179,6 @@ class Typeahead:
             index_name: Name of the index to delete queries from
         """
         # Check if index exists and get typeahead schema name
-        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
@@ -197,7 +196,6 @@ class Typeahead:
             Dictionary with deletion results
         """
         # Check if index exists and get typeahead schema name
-        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
@@ -216,7 +214,6 @@ class Typeahead:
             Dictionary with stats including indexed query count
         """
         # Check if index exists and get typeahead schema name
-        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 

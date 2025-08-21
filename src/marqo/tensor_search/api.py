@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pydantic import ValidationError
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -28,7 +29,10 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.typeahead.models import TypeaheadRequest
 from marqo.core.monitoring import memory_profiler
+import marqo.inference.native_inference.remote.server.inference_config as inference_config
+from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -74,8 +78,6 @@ def generate_config() -> config.Config:
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
     if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
-        import marqo.inference.native_inference.remote.server.inference_config as inference_config
-        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
 
         native_inference_local_config = inference_config.Config()
         inference_on_start(native_inference_local_config)  # pre-warm the model
@@ -742,8 +744,6 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     """
     Get query suggestions for typeahead functionality.
     """
-    from marqo.core.typeahead.models import TypeaheadRequest
-    from pydantic import ValidationError
     
     try:
         request = TypeaheadRequest(**suggestion_request)
@@ -769,7 +769,6 @@ def index_queries(index_name: str, queries_request: dict,
         queries_request: Dict containing:
             - queries: List of dicts with 'query' and 'popularity' fields
     """
-    from marqo.core.typeahead.typeahead import Typeahead
 
     # Validate input
     queries = queries_request.get("queries")
