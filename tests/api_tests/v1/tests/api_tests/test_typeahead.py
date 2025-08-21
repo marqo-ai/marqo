@@ -47,9 +47,9 @@ class TestTypeahead(MarqoTestCase):
         invalid_requests = [
             {},  # Missing queries
             {"queries": "not a list"},  # queries is not a list
-            {"queries": [{"query": "test"}]},  # Missing rank
-            {"queries": [{"rank": 1.0}]},  # Missing query
-            {"queries": [{"query": "", "rank": 1.0}]},  # Empty query
+            {"queries": [{"query": "test"}]},  # Missing popularity
+            {"queries": [{"popularity": 1.0}]},  # Missing query
+            {"queries": [{"query": "", "popularity": 1.0}]},  # Empty query
         ]
 
         for invalid_request in invalid_requests:
@@ -89,11 +89,11 @@ class TestTypeahead(MarqoTestCase):
         # First, index some queries with a common prefix
         queries_request = {
             "queries": [
-                {"query": "machine learning algorithms", "rank": 10.0},
-                {"query": "machine learning basics", "rank": 8.0},
-                {"query": "machine learning tutorial", "rank": 6.0},
-                {"query": "artificial intelligence", "rank": 9.0},
-                {"query": "deep learning", "rank": 7.0}
+                {"query": "machine learning algorithms", "popularity": 10.0},
+                {"query": "machine learning basics", "popularity": 8.0},
+                {"query": "machine learning tutorial", "popularity": 6.0},
+                {"query": "artificial intelligence", "popularity": 9.0},
+                {"query": "deep learning", "popularity": 7.0}
             ]
         }
 
@@ -189,10 +189,10 @@ class TestTypeahead(MarqoTestCase):
         )
         # Wait for deletion to complete
 
-        # Index the same query twice with different ranks
+        # Index the same query twice with different popularities
         query_batch = {
             "queries": [
-                {"query": "test duplicate query abc123", "rank": 5.0}
+                {"query": "test duplicate query abc123", "popularity": 5.0}
             ]
         }
 
@@ -219,10 +219,10 @@ class TestTypeahead(MarqoTestCase):
         stats_data = stats_response.json()
         self.assertEqual(stats_data["indexedQueries"], 1)
 
-        # Index the same query again with different rank
+        # Index the same query again with different popularity
         query_batch_updated = {
             "queries": [
-                {"query": "test duplicate query abc123", "rank": 10.0}  # Same query, different rank
+                {"query": "test duplicate query abc123", "popularity": 10.0}  # Same query, different popularity
             ]
         }
 
@@ -248,7 +248,7 @@ class TestTypeahead(MarqoTestCase):
         final_stats_data = final_stats_response.json()
         self.assertEqual(final_stats_data["indexedQueries"], 1)  # Should still be 1, not 2
 
-        # Verify the rank was updated by checking suggestions
+        # Verify the popularity was updated by checking suggestions
         suggestion_request = {
             "q": "test duplicate",
             "limit": 5
@@ -273,10 +273,10 @@ class TestTypeahead(MarqoTestCase):
         # Index some queries
         queries_request = {
             "queries": [
-                {"query": "delete test query one", "rank": 10.0},
-                {"query": "delete test query two", "rank": 8.0},
-                {"query": "delete test query three", "rank": 6.0},
-                {"query": "keep this query", "rank": 9.0}
+                {"query": "delete test query one", "popularity": 10.0},
+                {"query": "delete test query two", "popularity": 8.0},
+                {"query": "delete test query three", "popularity": 6.0},
+                {"query": "keep this query", "popularity": 9.0}
             ]
         }
 

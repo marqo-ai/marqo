@@ -804,7 +804,7 @@ def index_queries(index_name: str, queries_request: dict,
     Args:
         index_name: Name of the index to add queries to
         queries_request: Dict containing:
-            - queries: List of dicts with 'query' and 'rank' fields
+            - queries: List of dicts with 'query' and 'popularity' fields
     """
     from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
 
@@ -825,8 +825,8 @@ def index_queries(index_name: str, queries_request: dict,
             raise api_exceptions.InvalidArgError(f"Query at index {i} must be a dictionary")
         if "query" not in query_data:
             raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'query' field")
-        if "rank" not in query_data:
-            raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'rank' field")
+        if "popularity" not in query_data:
+            raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'popularity' field")
         if not query_data["query"].strip():
             raise api_exceptions.InvalidArgError(f"Query at index {i} cannot be empty")
 

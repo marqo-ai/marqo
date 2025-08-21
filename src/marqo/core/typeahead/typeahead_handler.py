@@ -111,7 +111,7 @@ class TypeaheadHandler:
 
         for query_data in queries:
             query = query_data.get("query", "").strip()
-            rank = query_data.get("rank", 0.0)
+            popularity = query_data.get("popularity", 0.0)
 
             if not query:
                 errors.append(f"Empty query in: {query_data}")
@@ -133,7 +133,7 @@ class TypeaheadHandler:
                     "query_words": tokenized_query,
                     "query_index": normalized_query,
                     "query": query,
-                    "rank": float(rank),
+                    "popularity": float(popularity),
                 }
             )
 

@@ -19,7 +19,7 @@ schema {{ schema_name }} {
             normalizing: none
         }
 
-        field rank type double {
+        field popularity type double {
             indexing: summary | attribute
         }
 
@@ -31,7 +31,7 @@ schema {{ schema_name }} {
 
     rank-profile suggestions-rank-profile inherits default {
         first-phase {
-            expression: attribute(rank) + bm25(query_index)
+            expression: attribute(popularity) + bm25(query_index)
         }
     }
 
