@@ -174,17 +174,16 @@ class IndexManagement:
 
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
             index_to_create.append((schema, marqo_index))
-            logger.debug(f'Creating index {str(request.name)} with schema:\n{schema}')
+            logger.debug(f'Creating index {request.name} with schema:\n{schema}')
             
             # Create typeahead schema for unstructured indexes
             from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
-            from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
-            if isinstance(request, UnstructuredMarqoIndexRequest):
-                typeahead_schema_generator = TypeaheadVespaSchema(request.name)
-                typeahead_schema = typeahead_schema_generator.generate_schema()
-                typeahead_schema_name = typeahead_schema_generator._get_typeahead_schema_name(request.name)
-                schemas_to_add.append((typeahead_schema, typeahead_schema_name))
-                logger.debug(f'Typeahead schema will be created for {str(request.name)}: {typeahead_schema_name}')
+
+            typeahead_schema_generator = TypeaheadVespaSchema(request.name)
+            typeahead_schema_name, typeahead_schema = typeahead_schema_generator.generate_schema()
+            marqo_index.typeahead_schema = typeahead_schema
+            schemas_to_add.append((typeahead_schema, typeahead_schema_name))
+            logger.debug(f'Creating typeahead schema for index {request.name} with schema: {typeahead_schema_name}')
 
         with self._vespa_deployment_lock():
             vespa_app = self._get_vespa_application()

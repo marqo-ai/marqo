@@ -4,9 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from marqo.core import exceptions as core_exceptions
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
-from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
-from marqo.tensor_search import index_meta_cache
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -30,12 +28,10 @@ class Typeahead:
         """
         start_time = time.time()
 
-        # Check if index exists
+        # Check if index exists and get typeahead schema name
+        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        # Set up schema information for this index
-        schema_generator = TypeaheadVespaSchema(index_name)
-        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not request.q or not request.q.strip():
             return TypeaheadResponse(suggestions=[], processing_time_ms=0)
@@ -134,12 +130,10 @@ class Typeahead:
         Returns:
             Dictionary with indexing results
         """
-        # Check if index exists
+        # Check if index exists and get typeahead schema name
+        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        # Set up schema information for this index
-        schema_generator = TypeaheadVespaSchema(index_name)
-        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not queries:
             return {"indexed": 0, "errors": []}
@@ -197,12 +191,10 @@ class Typeahead:
         Args:
             index_name: Name of the index to delete queries from
         """
-        # Check if index exists
+        # Check if index exists and get typeahead schema name
+        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        # Set up schema information for this index
-        schema_generator = TypeaheadVespaSchema(index_name)
-        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
 
         self.vespa_client.delete_all_docs(typeahead_schema_name)
 
@@ -217,12 +209,10 @@ class Typeahead:
         Returns:
             Dictionary with deletion results
         """
-        # Check if index exists
+        # Check if index exists and get typeahead schema name
+        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        # Set up schema information for this index
-        schema_generator = TypeaheadVespaSchema(index_name)
-        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
 
         ids = [hashlib.sha256(normalize_text(q).encode('utf-8')).hexdigest() for q in queries]
 
@@ -238,12 +228,10 @@ class Typeahead:
         Returns:
             Dictionary with stats including indexed query count
         """
-        # Check if index exists
+        # Check if index exists and get typeahead schema name
+        from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-
-        # Set up schema information for this index
-        schema_generator = TypeaheadVespaSchema(index_name)
-        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
 
         try:
             # Count total documents in typeahead schema
