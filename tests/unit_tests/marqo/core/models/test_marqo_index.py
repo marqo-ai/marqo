@@ -2,7 +2,12 @@ import unittest
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.marqo_index import Field, FieldType, FieldFeature, CollapseField, Stemming
+from marqo.core.models.marqo_index import (
+    Field, FieldType, FieldFeature, CollapseField, Stemming,
+    Model, TensorField, StringArrayField, HnswConfig,
+    TextPreProcessing, VideoPreProcessing, AudioPreProcessing, ImagePreProcessing,
+    TextSplitMethod, PatchMethod, VectorNumericType, DistanceMetric
+)
 from tests.unit_tests.marqo_test import MarqoTestCase
 
 
@@ -539,3 +544,141 @@ class TestSemiStructuredMarqoIndexCollapseFields(MarqoTestCase):
         index = self.semi_structured_marqo_index(name='test_index', collapse_fields=None)
         self.assertIsNone(index.collapse_fields)
         self.assertFalse(index.is_collapse_field('product_id'))
+
+
+class TestForwardCompatibility(unittest.TestCase):
+    """Test forward compatibility by ensuring models accept extra fields."""
+
+    def test_field_forward_compatibility(self):
+        """Test that Field model accepts extra fields gracefully."""
+        field = Field(
+            name="test_field",
+            type=FieldType.Text,
+            features=[FieldFeature.LexicalSearch],
+            lexical_field_name="marqo__lexical_test_field",
+            filter_field_name=None,
+            dependent_fields=None,
+            language="en",
+            stemming=Stemming.Best,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(field.name, "test_field")
+        self.assertEqual(field.type, FieldType.Text)
+        self.assertEqual(field.features, [FieldFeature.LexicalSearch])
+        self.assertEqual(field.lexical_field_name, "marqo__lexical_test_field")
+        self.assertIsNone(field.filter_field_name)
+        self.assertIsNone(field.dependent_fields)
+        self.assertEqual(field.language, "en")
+        self.assertEqual(field.stemming, Stemming.Best)
+
+    def test_model_forward_compatibility(self):
+        """Test that Model accepts extra fields gracefully."""
+        model = Model(
+            name="test_model",
+            properties={"name": "test_model", "dimensions": 512, "tokens": 128, "type": "sbert"},  # Use valid model type
+            custom=True,
+            text_query_prefix="query:",
+            text_chunk_prefix="chunk:",
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(model.name, "test_model")
+        self.assertEqual(model.properties, {"name": "test_model", "dimensions": 512, "tokens": 128, "type": "sbert"})
+        self.assertTrue(model.custom)
+        self.assertEqual(model.text_query_prefix, "query:")
+        self.assertEqual(model.text_chunk_prefix, "chunk:")
+
+    def test_collapse_field_forward_compatibility(self):
+        """Test that CollapseField accepts extra fields gracefully."""
+        collapse_field = CollapseField(
+            name="collapse_test",
+            minGroups=100,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(collapse_field.name, "collapse_test")
+        self.assertEqual(collapse_field.min_groups, 100)
+
+    def test_tensor_field_forward_compatibility(self):
+        """Test that TensorField accepts extra fields gracefully."""
+        tensor_field = TensorField(
+            name="tensor_field",
+            chunk_field_name="marqo__chunk_tensor_field",
+            embeddings_field_name="marqo__embeddings_tensor_field",
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(tensor_field.name, "tensor_field")
+        self.assertEqual(tensor_field.chunk_field_name, "marqo__chunk_tensor_field")
+        self.assertEqual(tensor_field.embeddings_field_name, "marqo__embeddings_tensor_field")
+
+    def test_string_array_field_forward_compatibility(self):
+        """Test that StringArrayField accepts extra fields gracefully."""
+        string_array_field = StringArrayField(
+            name="string_array_field",
+            type=FieldType.ArrayText,
+            string_array_field_name="marqo__string_array_test",
+            features=[FieldFeature.Filter],
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(string_array_field.name, "string_array_field")
+        self.assertEqual(string_array_field.type, FieldType.ArrayText)
+        self.assertEqual(string_array_field.string_array_field_name, "marqo__string_array_test")
+        self.assertEqual(string_array_field.features, [FieldFeature.Filter])
+
+    def test_hnsw_config_forward_compatibility(self):
+        """Test that HnswConfig accepts extra fields gracefully."""
+        hnsw_config = HnswConfig(
+            efConstruction=200,
+            m=16,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(hnsw_config.ef_construction, 200)
+        self.assertEqual(hnsw_config.m, 16)
+
+    def test_text_preprocessing_forward_compatibility(self):
+        """Test that TextPreProcessing accepts extra fields gracefully."""
+        text_preprocessing = TextPreProcessing(
+            splitLength=100,
+            splitOverlap=10,
+            splitMethod=TextSplitMethod.Sentence,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(text_preprocessing.split_length, 100)
+        self.assertEqual(text_preprocessing.split_overlap, 10)
+        self.assertEqual(text_preprocessing.split_method, TextSplitMethod.Sentence)
+
+    def test_video_preprocessing_forward_compatibility(self):
+        """Test that VideoPreProcessing accepts extra fields gracefully."""
+        video_preprocessing = VideoPreProcessing(
+            splitLength=30,
+            splitOverlap=5,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(video_preprocessing.split_length, 30)
+        self.assertEqual(video_preprocessing.split_overlap, 5)
+
+    def test_audio_preprocessing_forward_compatibility(self):
+        """Test that AudioPreProcessing accepts extra fields gracefully."""
+        audio_preprocessing = AudioPreProcessing(
+            splitLength=60,
+            splitOverlap=10,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(audio_preprocessing.split_length, 60)
+        self.assertEqual(audio_preprocessing.split_overlap, 10)
+
+    def test_image_preprocessing_forward_compatibility(self):
+        """Test that ImagePreProcessing accepts extra fields gracefully."""
+        image_preprocessing = ImagePreProcessing(
+            patchMethod=PatchMethod.Simple,
+            future_field="extra_value"  # Extra field
+        )
+        # Assert all existing fields are populated correctly
+        self.assertEqual(image_preprocessing.patch_method, PatchMethod.Simple)
