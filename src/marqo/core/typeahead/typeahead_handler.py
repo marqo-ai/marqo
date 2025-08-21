@@ -95,7 +95,7 @@ class TypeaheadHandler:
 
                 if query:
                     suggestions.append({
-                        "query": query,
+                        "suggestion": query,
                         "_score": relevance
                     })
 

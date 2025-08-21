@@ -265,7 +265,7 @@ class TestTypeahead(MarqoTestCase):
         suggestions = suggestion_data["suggestions"]
 
         # Should find exactly one suggestion for our test query
-        test_suggestions = [s for s in suggestions if s["query"] == "test duplicate query abc123"]
+        test_suggestions = [s for s in suggestions if s["suggestion"] == "test duplicate query abc123"]
         self.assertEqual(len(test_suggestions), 1)
 
     def test_delete_specific_queries(self):
@@ -351,11 +351,11 @@ class TestTypeahead(MarqoTestCase):
         suggestions = suggestion_data["suggestions"]
 
         # Should find "delete test query three" (not deleted) but not the 2 deleted ones
-        remaining_three_suggestions = [s for s in suggestions if s["query"] == "delete test query three"]
+        remaining_three_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query three"]
         self.assertEqual(len(remaining_three_suggestions), 1)  # Should remain
 
-        deleted_one_suggestions = [s for s in suggestions if s["query"] == "delete test query one"]
-        deleted_two_suggestions = [s for s in suggestions if s["query"] == "delete test query two"]
+        deleted_one_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query one"]
+        deleted_two_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query two"]
 
         self.assertEqual(len(deleted_one_suggestions), 0)  # Should be gone
         self.assertEqual(len(deleted_two_suggestions), 0)  # Should be gone
@@ -403,7 +403,7 @@ class TestTypeahead(MarqoTestCase):
         
         # The high popularity query should be ranked highly when popularity weight is high
         high_popularity_suggestion = next(
-            (s for s in popularity_suggestions if "high popularity" in s["query"]), None
+            (s for s in popularity_suggestions if "high popularity" in s["suggestion"]), None
         )
         self.assertIsNotNone(high_popularity_suggestion)
 
