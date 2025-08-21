@@ -5,6 +5,7 @@ STRINGS = "marqo__strings"
 SHORT_STRINGS_FIELDS = "marqo__short_string_fields"
 LONGS_STRINGS_FIELDS = "marqo__long_string_fields"
 STRING_ARRAY = "marqo__string_array"
+# TODO this might not be needed
 OBJECT_ARRAY_FIELDS = "marqo__object_array_fields"
 
 FIELD_VECTOR_COUNT = 'marqo__vector_count'

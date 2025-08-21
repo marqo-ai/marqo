@@ -159,6 +159,7 @@ class ObjectArrayField(ImmutableStrictBaseModel):
     Each object can contain multiple fields of different types as defined by the fields list.
     """
     name: str
+    # TODO this might not be needed
     object_array_field_name: Optional[str] = None
     fields: List[ObjectArrayFieldDefinition]
     

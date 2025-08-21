@@ -676,3 +676,7 @@ retrieved_settings = IndexSettings.from_marqo_index(existing_index)
 - `src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema.py` - Schema generation
 
 The implementation provides complete API integration for object array fields, allowing users to define custom struct schemas when creating indexes and retrieve that configuration when querying index settings.
+
+# Action Items
+[ ] The facets of a variant field does not work yet
+[ ] Partial update does not work
