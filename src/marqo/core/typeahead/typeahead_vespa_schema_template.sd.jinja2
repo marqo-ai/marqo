@@ -30,8 +30,12 @@ schema {{ schema_name }} {
     }
 
     rank-profile suggestions-rank-profile inherits default {
+        inputs {
+            query(popularity_weight) float: 1.0
+            query(bm25_weight) float: 1.0
+        }
         first-phase {
-            expression: attribute(popularity) + bm25(query_index)
+            expression: query(popularity_weight) * attribute(popularity) + query(bm25_weight) * bm25(query_index)
         }
     }
 

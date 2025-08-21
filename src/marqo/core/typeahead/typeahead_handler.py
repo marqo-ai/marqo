@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from marqo.core import exceptions as core_exceptions
 from marqo.core.typeahead.text_normalization import normalize_text
@@ -17,7 +17,8 @@ class TypeaheadHandler:
         self.typeahead_schema_name = self.schema_generator._get_typeahead_schema_name(index_name)
 
     def get_suggestions(self, input_text: str, limit: int = 10,
-                        fuzzy_edit_distance: int = 2, min_fuzzy_match_length: int = 3) -> List[Dict[str, Any]]:
+                        fuzzy_edit_distance: int = 2, min_fuzzy_match_length: int = 3,
+                        popularity_weight: Optional[float] = None, bm25_weight: Optional[float] = None) -> List[Dict[str, Any]]:
         """
         Get query suggestions for the given input.
         
@@ -26,6 +27,8 @@ class TypeaheadHandler:
             limit: Maximum number of suggestions to return
             fuzzy_edit_distance: Maximum edit distance for fuzzy matching
             min_fuzzy_match_length: Minimum length to switch to fuzzy matching
+            popularity_weight: Weight for popularity score in ranking (optional)
+            bm25_weight: Weight for BM25 score in ranking (optional)
             
         Returns:
             List of suggestion dictionaries with query and relevance score
@@ -69,6 +72,16 @@ class TypeaheadHandler:
             "hits": limit,
             "ranking": "suggestions-rank-profile"
         }
+
+        # Add query features if weights are provided
+        query_features = {}
+        if popularity_weight is not None:
+            query_features["popularity_weight"] = popularity_weight
+        if bm25_weight is not None:
+            query_features["bm25_weight"] = bm25_weight
+        
+        if query_features:
+            search_params["query_features"] = query_features
 
         try:
             response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)

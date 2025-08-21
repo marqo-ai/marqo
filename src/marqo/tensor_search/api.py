@@ -749,6 +749,8 @@ def get_suggestions(index_name: str, suggestion_request: dict,
             - limit: Maximum number of suggestions to return (default: 10)
             - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
             - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
+            - popularityWeight: Weight for popularity score in ranking (optional)
+            - bm25Weight: Weight for BM25 score in ranking (optional)
     """
     from marqo.core.typeahead.typeahead_handler import TypeaheadHandler
     import time
@@ -763,6 +765,8 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     limit = suggestion_request.get("limit", 10)
     fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
     min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
+    popularity_weight = suggestion_request.get("popularityWeight")
+    bm25_weight = suggestion_request.get("bm25Weight")
 
     # Validate parameters
     if limit <= 0:
@@ -781,7 +785,9 @@ def get_suggestions(index_name: str, suggestion_request: dict,
         input_text=input_text,
         limit=limit,
         fuzzy_edit_distance=fuzzy_edit_distance,
-        min_fuzzy_match_length=min_fuzzy_match_length
+        min_fuzzy_match_length=min_fuzzy_match_length,
+        popularity_weight=popularity_weight,
+        bm25_weight=bm25_weight
     )
 
     processing_time_ms = int((time.time() - start_time) * 1000)

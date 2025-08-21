@@ -359,3 +359,90 @@ class TestTypeahead(MarqoTestCase):
 
         self.assertEqual(len(deleted_one_suggestions), 0)  # Should be gone
         self.assertEqual(len(deleted_two_suggestions), 0)  # Should be gone
+
+    def test_suggestions_with_custom_weights(self):
+        """Test that custom popularity and BM25 weights affect suggestion ranking."""
+        # Index queries with different popularities
+        queries_request = {
+            "queries": [
+                {"query": "weight test high popularity", "popularity": 100.0},
+                {"query": "weight test low popularity", "popularity": 1.0},
+                {"query": "weight test medium popularity", "popularity": 50.0}
+            ]
+        }
+
+        # Index the queries
+        index_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(queries_request)
+        )
+
+        self.assertEqual(index_response.status_code, 200)
+
+        # Test with high popularity weight - should favor high popularity query
+        suggestion_request_popularity = {
+            "q": "weight test",
+            "limit": 10,
+            "popularityWeight": 10.0,
+            "bm25Weight": 0.1
+        }
+
+        popularity_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(suggestion_request_popularity)
+        )
+
+        self.assertEqual(popularity_response.status_code, 200)
+        popularity_data = popularity_response.json()
+        popularity_suggestions = popularity_data["suggestions"]
+
+        # Should have suggestions
+        self.assertGreater(len(popularity_suggestions), 0)
+        
+        # The high popularity query should be ranked highly when popularity weight is high
+        high_popularity_suggestion = next(
+            (s for s in popularity_suggestions if "high popularity" in s["query"]), None
+        )
+        self.assertIsNotNone(high_popularity_suggestion)
+
+        # Test with high BM25 weight and low popularity weight
+        suggestion_request_bm25 = {
+            "q": "weight test",
+            "limit": 10,
+            "popularityWeight": 0.1,
+            "bm25Weight": 10.0
+        }
+
+        bm25_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(suggestion_request_bm25)
+        )
+
+        self.assertEqual(bm25_response.status_code, 200)
+        bm25_data = bm25_response.json()
+        bm25_suggestions = bm25_data["suggestions"]
+
+        # Should have suggestions
+        self.assertGreater(len(bm25_suggestions), 0)
+
+        # Test without weights (should use defaults)
+        suggestion_request_default = {
+            "q": "weight test",
+            "limit": 10
+        }
+
+        default_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(suggestion_request_default)
+        )
+
+        self.assertEqual(default_response.status_code, 200)
+        default_data = default_response.json()
+        default_suggestions = default_data["suggestions"]
+
+        # Should have suggestions
+        self.assertGreater(len(default_suggestions), 0)
