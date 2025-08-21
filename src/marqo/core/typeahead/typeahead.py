@@ -36,17 +36,17 @@ class Typeahead:
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not request.q or not request.q.strip():
-            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
+            return TypeaheadResponse(suggestions=[])
 
         # Normalize the input
         normalized_input = normalize_text(request.q.strip())
         if not normalized_input:
-            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
+            return TypeaheadResponse(suggestions=[])
 
         # Tokenize by whitespace
         tokens = normalized_input.split()
         if not tokens:
-            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
+            return TypeaheadResponse(suggestions=[])
 
         # Build YQL query conditions for each token
         retrieval_terms = []
