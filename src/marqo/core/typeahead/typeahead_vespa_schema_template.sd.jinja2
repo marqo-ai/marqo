@@ -6,7 +6,7 @@ schema {{ schema_name }} {
             indexing: summary | attribute
         }
 
-        field query_suffixes type array<string> {
+        field query_words type array<string> {
             indexing: summary | attribute
             attribute: fast-search
             rank: filter
@@ -26,7 +26,7 @@ schema {{ schema_name }} {
     }
 
     fieldset default {
-        fields: query_suffixes
+        fields: query_words
     }
 
     rank-profile suggestions-rank-profile inherits default {

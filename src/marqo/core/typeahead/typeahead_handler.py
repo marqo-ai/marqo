@@ -1,13 +1,10 @@
-import json
-import time
-import uuid
 import hashlib
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
-from marqo.vespa.vespa_client import VespaClient
-from marqo.core.typeahead.text_normalization import normalize_text, generate_suffixes
-from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core import exceptions as core_exceptions
+from marqo.core.typeahead.text_normalization import normalize_text
+from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
+from marqo.vespa.vespa_client import VespaClient
 
 
 class TypeaheadHandler:
@@ -52,11 +49,11 @@ class TypeaheadHandler:
         for token in tokens:
             if len(token) < min_fuzzy_match_length:
                 # Use exact matching for short tokens
-                retrieval_terms.append(f"query_suffixes contains '{token}'")
+                retrieval_terms.append(f"query_words contains '{token}'")
             else:
                 # Use fuzzy matching for longer tokens
                 retrieval_terms.append(
-                    f"query_suffixes contains "
+                    f"query_words contains "
                     f"({{maxEditDistance:{fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
                 )
 
@@ -123,17 +120,17 @@ class TypeaheadHandler:
             # Generate document ID using hash of query to avoid duplicates
             doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
             normalized_query = normalize_text(query)
-            suffixes = generate_suffixes(normalized_query)
+            tokenized_query = normalized_query.split()
 
-            if not suffixes:
-                errors.append(f"No suffixes generated for query: {query}")
+            if not tokenized_query:
+                errors.append(f"No tokens generated for query: {query}")
                 continue
 
             from marqo.vespa.models.vespa_document import VespaDocument
             vespa_doc = VespaDocument(
                 id=doc_id,
                 fields={
-                    "query_suffixes": suffixes,
+                    "query_words": tokenized_query,
                     "query_index": normalized_query,
                     "query": query,
                     "rank": float(rank),
