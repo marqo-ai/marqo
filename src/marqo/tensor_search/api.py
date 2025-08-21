@@ -29,7 +29,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
-from marqo.core.typeahead.models import TypeaheadRequest
+from marqo.core.models.typeahead import TypeaheadRequest
 from marqo.core.monitoring import memory_profiler
 import marqo.inference.native_inference.remote.server.inference_config as inference_config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start

@@ -1,6 +1,7 @@
 """Pydantic models for typeahead API requests and responses."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
+
 from pydantic import Field, field_validator
 
 from marqo.base_model import ImmutableStrictBaseModelV2
@@ -10,14 +11,16 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
     """Request model for typeahead suggestions."""
 
     q: str = Field(..., description="Partial user search input")
-    limit: int = Field(default=10, description="Maximum number of suggestions to return")
+    limit: int = Field(default=10, ge=0, description="Maximum number of suggestions to return")
     fuzzy_edit_distance: int = Field(
         default=2,
+        ge=0,
         alias="fuzzyEditDistance",
-        description="Maximum edit distance for fuzzy matching",
+        description="Maximum edit distance for fuzzy matching"
     )
     min_fuzzy_match_length: int = Field(
         default=3,
+        ge=0,
         alias="minFuzzyMatchLength",
         description="Minimum length to switch to fuzzy matching"
     )
@@ -33,31 +36,9 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
     )
 
     @field_validator('q')
-    @classmethod
     def validate_q(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError("q text is required")
-        return v
-
-    @field_validator('limit')
-    @classmethod
-    def validate_limit(cls, v: int) -> int:
-        if v <= 0:
-            raise ValueError("limit must be positive")
-        return v
-
-    @field_validator('fuzzy_edit_distance')
-    @classmethod
-    def validate_fuzzy_edit_distance(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("fuzzyEditDistance must be non-negative")
-        return v
-
-    @field_validator('min_fuzzy_match_length')
-    @classmethod
-    def validate_min_fuzzy_match_length(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("minFuzzyMatchLength must be non-negative")
+            raise ValueError("q is required")
         return v
 
 
@@ -72,4 +53,8 @@ class TypeaheadResponse(ImmutableStrictBaseModelV2):
     """Response model for typeahead suggestions."""
 
     suggestions: List[TypeaheadSuggestion] = Field(..., description="List of suggestions")
-    processing_time_ms: int = Field(..., alias="processingTimeMs", description="Processing time in milliseconds")
+    processing_time_ms: Optional[float] = Field(
+        default=None,
+        alias="processingTimeMs",
+        description="Processing time in milliseconds"
+    )

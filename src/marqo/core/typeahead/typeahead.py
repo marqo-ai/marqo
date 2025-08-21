@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
+from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
