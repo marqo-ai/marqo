@@ -19,14 +19,14 @@ class TypeaheadHandler:
         self.schema_generator = TypeaheadVespaSchema(index_name)
         self.typeahead_schema_name = self.schema_generator._get_typeahead_schema_name(index_name)
 
-    def get_suggestions(self, input_text: str, max_suggestions: int = 10,
+    def get_suggestions(self, input_text: str, limit: int = 10,
                         fuzzy_edit_distance: int = 2, min_fuzzy_match_length: int = 3) -> List[Dict[str, Any]]:
         """
         Get query suggestions for the given input.
         
         Args:
             input_text: Partial user search input
-            max_suggestions: Maximum number of suggestions to return
+            limit: Maximum number of suggestions to return
             fuzzy_edit_distance: Maximum edit distance for fuzzy matching
             min_fuzzy_match_length: Minimum length to switch to fuzzy matching
             
@@ -69,7 +69,7 @@ class TypeaheadHandler:
 
         search_params = {
             "yql": yql,
-            "hits": max_suggestions,
+            "hits": limit,
             "ranking": "suggestions-rank-profile"
         }
 

@@ -26,10 +26,10 @@ class TestTypeahead(MarqoTestCase):
     def test_get_suggestions_with_invalid_params(self):
         """Test suggestions endpoint with invalid parameters."""
         invalid_requests = [
-            {},  # Missing input
-            {"input": ""},  # Empty input
-            {"input": "test", "maxSuggestions": -1},  # Invalid maxSuggestions
-            {"input": "test", "fuzzyEditDistance": -1},  # Invalid fuzzyEditDistance
+            {},  # Missing q
+            {"q": ""},  # Empty q
+            {"q": "test", "limit": -1},  # Invalid limit
+            {"q": "test", "fuzzyEditDistance": -1},  # Invalid fuzzyEditDistance
         ]
 
         for invalid_request in invalid_requests:
@@ -65,8 +65,8 @@ class TestTypeahead(MarqoTestCase):
     def test_suggestions_response_format(self):
         """Test that suggestions response has the correct format when successful."""
         suggestion_request = {
-            "input": "test",
-            "maxSuggestions": 10,
+            "q": "test",
+            "limit": 10,
             "fuzzyEditDistance": 2,
             "minFuzzyMatchLength": 3
         }
@@ -123,8 +123,8 @@ class TestTypeahead(MarqoTestCase):
 
         # Now get suggestions for a prefix that should match
         suggestion_request = {
-            "input": "machine",
-            "maxSuggestions": 5
+            "q": "machine",
+            "limit": 5
         }
 
         suggestion_response = requests.post(
@@ -250,8 +250,8 @@ class TestTypeahead(MarqoTestCase):
 
         # Verify the rank was updated by checking suggestions
         suggestion_request = {
-            "input": "test duplicate",
-            "maxSuggestions": 5
+            "q": "test duplicate",
+            "limit": 5
         }
 
         suggestion_response = requests.post(
@@ -336,8 +336,8 @@ class TestTypeahead(MarqoTestCase):
 
         # Verify correct queries remain by checking suggestions
         suggestion_request = {
-            "input": "delete test query three",  # Search for specific remaining query
-            "maxSuggestions": 10
+            "q": "delete test query three",  # Search for specific remaining query
+            "limit": 10
         }
 
         suggestion_response = requests.post(

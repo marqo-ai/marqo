@@ -745,8 +745,8 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     Args:
         index_name: Name of the index to get suggestions for
         suggestion_request: Dict containing:
-            - input: Partial user search input
-            - maxSuggestions: Maximum number of suggestions to return (default: 10)
+            - q: Partial user search input
+            - limit: Maximum number of suggestions to return (default: 10)
             - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
             - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
     """
@@ -756,17 +756,17 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     start_time = time.time()
 
     # Validate input
-    input_text = suggestion_request.get("input")
+    input_text = suggestion_request.get("q")
     if not input_text:
-        raise api_exceptions.InvalidArgError("Input text is required")
+        raise api_exceptions.InvalidArgError("q text is required")
 
-    max_suggestions = suggestion_request.get("maxSuggestions", 10)
+    limit = suggestion_request.get("limit", 10)
     fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
     min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
 
     # Validate parameters
-    if max_suggestions <= 0:
-        raise api_exceptions.InvalidArgError("maxSuggestions must be positive")
+    if limit <= 0:
+        raise api_exceptions.InvalidArgError("limit must be positive")
     if fuzzy_edit_distance < 0:
         raise api_exceptions.InvalidArgError("fuzzyEditDistance must be non-negative")
     if min_fuzzy_match_length < 0:
@@ -779,7 +779,7 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     handler = TypeaheadHandler(marqo_config.vespa_client, index_name)
     suggestions = handler.get_suggestions(
         input_text=input_text,
-        max_suggestions=max_suggestions,
+        limit=limit,
         fuzzy_edit_distance=fuzzy_edit_distance,
         min_fuzzy_match_length=min_fuzzy_match_length
     )
