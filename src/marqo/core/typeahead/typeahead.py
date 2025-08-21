@@ -3,6 +3,7 @@ import time
 from typing import List, Dict, Any, Optional
 
 from marqo.core import exceptions as core_exceptions
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
 from marqo.vespa.vespa_client import VespaClient
@@ -11,7 +12,7 @@ from marqo.vespa.vespa_client import VespaClient
 class Typeahead:
     """Handler for typeahead functionality."""
 
-    def __init__(self, vespa_client: VespaClient, index_management):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
         self.vespa_client = vespa_client
         self.index_management = index_management
 
@@ -85,39 +86,32 @@ class Typeahead:
         if query_features:
             search_params["query_features"] = query_features
 
-        try:
-            response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
-            hits = response.hits
-            suggestions_data = []
+        response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
+        hits = response.hits
+        suggestions_data = []
 
-            for hit in hits:
-                fields = hit.fields or {}
-                query = fields.get("query")
-                relevance = hit.relevance
+        for hit in hits:
+            fields = hit.fields or {}
+            query = fields.get("query")
+            relevance = hit.relevance
 
-                if query:
-                    suggestions_data.append({
-                        "suggestion": query,
-                        "_score": relevance
-                    })
+            if query:
+                suggestions_data.append({
+                    "suggestion": query,
+                    "_score": relevance
+                })
 
-            processing_time_ms = int((time.time() - start_time) * 1000)
+        processing_time_ms = int((time.time() - start_time) * 1000)
 
-            suggestions = [
-                TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
-                for item in suggestions_data
-            ]
+        suggestions = [
+            TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
+            for item in suggestions_data
+        ]
 
-            return TypeaheadResponse(
-                suggestions=suggestions,
-                processing_time_ms=processing_time_ms
-            )
-        except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return empty response
-            processing_time_ms = int((time.time() - start_time) * 1000)
-            return TypeaheadResponse(suggestions=[], processing_time_ms=processing_time_ms)
-        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-            raise core_exceptions.BackendCommunicationError(f"Failed to get suggestions: {str(e)}")
+        return TypeaheadResponse(
+            suggestions=suggestions,
+            processing_time_ms=processing_time_ms
+        )
 
     def index_queries(self, index_name: str, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -131,8 +125,7 @@ class Typeahead:
             Dictionary with indexing results
         """
         # Check if index exists and get typeahead schema name
-        from marqo.tensor_search import index_meta_cache
-        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+        marqo_index = self.index_management.get_index(index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not queries:
