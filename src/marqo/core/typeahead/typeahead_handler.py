@@ -51,8 +51,10 @@ class TypeaheadHandler:
         ranking_terms = []
         for token in tokens:
             if len(token) < min_fuzzy_match_length:
-                # Use exact matching for short tokens
-                retrieval_terms.append(f"query_words contains '{token}'")
+                # Use exact prefix matching for short tokens
+                retrieval_terms.append(
+                    f"query_words contains ({{prefix:true}}\"{token}\")"
+                )
             else:
                 # Use fuzzy matching for longer tokens
                 retrieval_terms.append(
