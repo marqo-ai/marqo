@@ -1,4 +1,4 @@
-import hashlib
+import blake3
 from timeit import default_timer as timer
 from typing import List, Dict, Any
 
@@ -142,7 +142,7 @@ class Typeahead:
             tokenized_query = normalized_query.split()
             query_prefixes = generate_prefixes(normalized_query)
 
-            doc_id = hashlib.sha256(normalized_query.encode('utf-8')).hexdigest()
+            doc_id = self._generate_query_hash(normalized_query)
 
             if not tokenized_query:
                 errors.append(f"No tokens generated for query: {query}")
@@ -201,7 +201,7 @@ class Typeahead:
         marqo_index = self.index_management.get_index(index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
-        ids = [hashlib.sha256(normalize_text(q).encode('utf-8')).hexdigest() for q in queries]
+        ids = [self._generate_query_hash(normalize_text(q)) for q in queries]
 
         # TODO process DeleteBatchResponse and return an appropriate API response
         self.vespa_client.delete_batch(ids, schema=typeahead_schema_name)
@@ -232,3 +232,14 @@ class Typeahead:
         total_count = response.total_count or 0
         # TODO Use a pydantic model for the response
         return {"indexedQueries": total_count}
+
+    def _generate_query_hash(self, query: str) -> str:
+        """Generate a 128-bit blake3 hash for a query string.
+
+        Args:
+            query: The query string to hash
+
+        Returns:
+            32-character hexadecimal hash (128 bits)
+        """
+        return blake3.blake3(query.encode('utf-8')).digest(16).hex()
