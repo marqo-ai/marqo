@@ -7,7 +7,7 @@ from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.vespa.vespa_client import VespaClient
 
 
-class TypeaheadHandler:
+class Typeahead:
     """Handler for typeahead functionality."""
 
     def __init__(self, vespa_client: VespaClient, index_name: str):
