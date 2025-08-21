@@ -6,86 +6,55 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
+from marqo.tensor_search import index_meta_cache
 from marqo.vespa.vespa_client import VespaClient
 
 
 class Typeahead:
     """Handler for typeahead functionality."""
 
-    def __init__(self, vespa_client: VespaClient, index_name: str):
+    def __init__(self, vespa_client: VespaClient, index_management):
         self.vespa_client = vespa_client
-        self.index_name = index_name
-        self.schema_generator = TypeaheadVespaSchema(index_name)
-        self.typeahead_schema_name = self.schema_generator._get_typeahead_schema_name(index_name)
+        self.index_management = index_management
 
-    def get_suggestions_with_response(self, request: TypeaheadRequest) -> TypeaheadResponse:
+    def get_suggestions(self, index_name: str, request: TypeaheadRequest) -> TypeaheadResponse:
         """
         Get query suggestions with timing and response model.
         
         Args:
+            index_name: Name of the index to get suggestions for
             request: TypeaheadRequest containing all parameters
             
         Returns:
             TypeaheadResponse with suggestions and processing time
         """
         start_time = time.time()
-        
-        suggestions_data = self.get_suggestions(
-            input_text=request.q,
-            limit=request.limit,
-            fuzzy_edit_distance=request.fuzzy_edit_distance,
-            min_fuzzy_match_length=request.min_fuzzy_match_length,
-            popularity_weight=request.popularity_weight,
-            bm25_weight=request.bm25_weight
-        )
-        
-        processing_time_ms = int((time.time() - start_time) * 1000)
-        
-        suggestions = [
-            TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
-            for item in suggestions_data
-        ]
-        
-        return TypeaheadResponse(
-            suggestions=suggestions,
-            processing_time_ms=processing_time_ms
-        )
 
-    def get_suggestions(self, input_text: str, limit: int = 10,
-                        fuzzy_edit_distance: int = 2, min_fuzzy_match_length: int = 3,
-                        popularity_weight: Optional[float] = None, bm25_weight: Optional[float] = None) -> List[Dict[str, Any]]:
-        """
-        Get query suggestions for the given input.
-        
-        Args:
-            input_text: Partial user search input
-            limit: Maximum number of suggestions to return
-            fuzzy_edit_distance: Maximum edit distance for fuzzy matching
-            min_fuzzy_match_length: Minimum length to switch to fuzzy matching
-            popularity_weight: Weight for popularity score in ranking (optional)
-            bm25_weight: Weight for BM25 score in ranking (optional)
-            
-        Returns:
-            List of suggestion dictionaries with query and relevance score
-        """
-        if not input_text or not input_text.strip():
-            return []
+        # Check if index exists
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+
+        # Set up schema information for this index
+        schema_generator = TypeaheadVespaSchema(index_name)
+        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+
+        if not request.q or not request.q.strip():
+            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
 
         # Normalize the input
-        normalized_input = normalize_text(input_text.strip())
+        normalized_input = normalize_text(request.q.strip())
         if not normalized_input:
-            return []
+            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
 
         # Tokenize by whitespace
         tokens = normalized_input.split()
         if not tokens:
-            return []
+            return TypeaheadResponse(suggestions=[], processing_time_ms=0)
 
         # Build YQL query conditions for each token
         retrieval_terms = []
         ranking_terms = []
         for token in tokens:
-            if len(token) < min_fuzzy_match_length:
+            if len(token) < request.min_fuzzy_match_length:
                 # Use exact prefix matching for short tokens
                 retrieval_terms.append(
                     f"query_words contains ({{prefix:true}}\"{token}\")"
@@ -94,7 +63,7 @@ class Typeahead:
                 # Use fuzzy matching for longer tokens
                 retrieval_terms.append(
                     f"query_words contains "
-                    f"({{maxEditDistance:{fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
+                    f"({{maxEditDistance:{request.fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
                 )
 
             ranking_terms.append(f"query_index contains \"{token}\"")
@@ -102,28 +71,28 @@ class Typeahead:
         # Create single YQL query that ORs all token conditions
         yql_retrieval = " OR ".join(retrieval_terms)
         yql_ranking = " OR ".join(ranking_terms)
-        yql = (f"SELECT * FROM {self.typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
+        yql = (f"SELECT * FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
 
         search_params = {
             "yql": yql,
-            "hits": limit,
+            "hits": request.limit,
             "ranking": "suggestions-rank-profile"
         }
 
         # Add query features if weights are provided
         query_features = {}
-        if popularity_weight is not None:
-            query_features["popularity_weight"] = popularity_weight
-        if bm25_weight is not None:
-            query_features["bm25_weight"] = bm25_weight
-        
+        if request.popularity_weight is not None:
+            query_features["popularity_weight"] = request.popularity_weight
+        if request.bm25_weight is not None:
+            query_features["bm25_weight"] = request.bm25_weight
+
         if query_features:
             search_params["query_features"] = query_features
 
         try:
-            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+            response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
             hits = response.hits
-            suggestions = []
+            suggestions_data = []
 
             for hit in hits:
                 fields = hit.fields or {}
@@ -131,28 +100,47 @@ class Typeahead:
                 relevance = hit.relevance
 
                 if query:
-                    suggestions.append({
+                    suggestions_data.append({
                         "suggestion": query,
                         "_score": relevance
                     })
 
-            return suggestions
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            suggestions = [
+                TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
+                for item in suggestions_data
+            ]
+
+            return TypeaheadResponse(
+                suggestions=suggestions,
+                processing_time_ms=processing_time_ms
+            )
         except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return empty list
-            return []
+            # If schema doesn't exist, return empty response
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            return TypeaheadResponse(suggestions=[], processing_time_ms=processing_time_ms)
         except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
             raise core_exceptions.BackendCommunicationError(f"Failed to get suggestions: {str(e)}")
 
-    def index_queries(self, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def index_queries(self, index_name: str, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Index queries for typeahead suggestions.
         
         Args:
+            index_name: Name of the index to index queries for
             queries: List of dictionaries with 'query' and 'rank' fields
             
         Returns:
             Dictionary with indexing results
         """
+        # Check if index exists
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+
+        # Set up schema information for this index
+        schema_generator = TypeaheadVespaSchema(index_name)
+        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+
         if not queries:
             return {"indexed": 0, "errors": []}
 
@@ -193,7 +181,7 @@ class Typeahead:
             try:
                 response = self.vespa_client.feed_document(
                     document=vespa_doc,
-                    schema=self.typeahead_schema_name
+                    schema=typeahead_schema_name
                 )
                 # If no exception was raised, the document was successfully indexed
                 indexed_count += 1
@@ -202,45 +190,70 @@ class Typeahead:
 
         return {"indexed": indexed_count, "errors": errors}
 
-    def delete_all_queries(self) -> None:
+    def delete_all_queries(self, index_name: str) -> None:
         """
         Delete all queries from the typeahead index.
         
-        Returns:
-            True if successful
+        Args:
+            index_name: Name of the index to delete queries from
         """
-        self.vespa_client.delete_all_docs(self.typeahead_schema_name)
+        # Check if index exists
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
-    def delete_queries(self, queries: List[str]) -> Dict[str, Any]:
+        # Set up schema information for this index
+        schema_generator = TypeaheadVespaSchema(index_name)
+        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+
+        self.vespa_client.delete_all_docs(typeahead_schema_name)
+
+    def delete_queries(self, index_name: str, queries: List[str]) -> Dict[str, Any]:
         """
         Delete specific queries from the typeahead index.
         
         Args:
+            index_name: Name of the index to delete queries from
             queries: List of query strings to delete
             
         Returns:
             Dictionary with deletion results
         """
+        # Check if index exists
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+
+        # Set up schema information for this index
+        schema_generator = TypeaheadVespaSchema(index_name)
+        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+
         ids = [hashlib.sha256(normalize_text(q).encode('utf-8')).hexdigest() for q in queries]
 
-        self.vespa_client.delete_batch(ids, schema=self.typeahead_schema_name)
+        self.vespa_client.delete_batch(ids, schema=typeahead_schema_name)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self, index_name: str) -> Dict[str, Any]:
         """
         Get statistics about indexed queries.
+        
+        Args:
+            index_name: Name of the index to get stats for
         
         Returns:
             Dictionary with stats including indexed query count
         """
+        # Check if index exists
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
+
+        # Set up schema information for this index
+        schema_generator = TypeaheadVespaSchema(index_name)
+        typeahead_schema_name = schema_generator._get_typeahead_schema_name(index_name)
+
         try:
             # Count total documents in typeahead schema
             search_params = {
-                "yql": f"SELECT * FROM {self.typeahead_schema_name} WHERE true",
+                "yql": f"SELECT * FROM {typeahead_schema_name} WHERE true",
                 "hits": 0,  # We only want the count
                 "summary": "minimal"
             }
 
-            response = self.vespa_client.query(schema=self.typeahead_schema_name, **search_params)
+            response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
             # Access total_count property from QueryResult
             total_count = response.total_count or 0
             return {"indexedQueries": total_count}

@@ -742,7 +742,6 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     """
     Get query suggestions for typeahead functionality.
     """
-    from marqo.core.typeahead.typeahead import Typeahead
     from marqo.core.typeahead.models import TypeaheadRequest
     from pydantic import ValidationError
     
@@ -751,13 +750,9 @@ def get_suggestions(index_name: str, suggestion_request: dict,
     except ValidationError as e:
         error_details = "; ".join([f"{err['loc'][0]}: {err['msg']}" for err in e.errors()])
         raise api_exceptions.InvalidArgError(f"Invalid request: {error_details}")
-    
-    # Check if index exists
-    marqo_config.index_management.get_index(index_name)
 
     # Get suggestions
-    handler = Typeahead(marqo_config.vespa_client, index_name)
-    response = handler.get_suggestions_with_response(request)
+    response = marqo_config.typeahead.get_suggestions(index_name, request)
 
     return JSONResponse(content=response.model_dump(by_alias=True))
 
@@ -799,8 +794,7 @@ def index_queries(index_name: str, queries_request: dict,
             raise api_exceptions.InvalidArgError(f"Query at index {i} cannot be empty")
 
     # Index queries
-    handler = Typeahead(marqo_config.vespa_client, index_name)
-    result = handler.index_queries(queries)
+    result = marqo_config.typeahead.index_queries(index_name, queries)
 
     return JSONResponse(content=result)
 
@@ -814,14 +808,8 @@ def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(ge
     Args:
         index_name: Name of the index to delete queries from
     """
-    from marqo.core.typeahead.typeahead import Typeahead
-
-    # Check if index exists
-    marqo_config.index_management.get_index(index_name)
-
     # Delete all queries
-    handler = Typeahead(marqo_config.vespa_client, index_name)
-    handler.delete_all_queries()
+    marqo_config.typeahead.delete_all_queries(index_name)
 
     return JSONResponse("All queries deleted successfully")
 
@@ -835,11 +823,8 @@ def delete_queries(index_name: str, queries: List[str], marqo_config: config.Con
         index_name: Name of the index to delete queries from
         delete_request: Dict containing queries to delete:
     """
-    from marqo.core.typeahead.typeahead import Typeahead
     # Delete specific queries
-    handler = Typeahead(marqo_config.vespa_client, index_name)
-
-    handler.delete_queries(queries)
+    marqo_config.typeahead.delete_queries(index_name, queries)
 
     return JSONResponse("Queries deleted successfully")
 
@@ -854,14 +839,8 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         index_name: Name of the index to get stats for
     """
     try:
-        from marqo.core.typeahead.typeahead import Typeahead
-        
-        # Check if index exists
-        marqo_config.index_management.get_index(index_name)
-        
         # Get stats
-        handler = Typeahead(marqo_config.vespa_client, index_name)
-        stats = handler.get_stats()
+        stats = marqo_config.typeahead.get_stats(index_name)
         
         return JSONResponse(content=stats)
     except api_exceptions.MarqoWebError:
