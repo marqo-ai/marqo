@@ -21,3 +21,14 @@ def normalize_text(text: str) -> str:
     without_accents = ''.join(c for c in normalized if not unicodedata.combining(c))
     # Convert to lowercase
     return without_accents.lower()
+
+def generate_prefixes(text: str) -> List[str]:
+    result = []
+    prefix = ""
+    for ch in text:
+        if ch.isspace():
+            prefix = ""   # reset when hitting whitespace
+        else:
+            prefix += ch
+            result.append(prefix)
+    return result

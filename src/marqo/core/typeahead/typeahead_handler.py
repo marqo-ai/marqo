@@ -2,7 +2,7 @@ import hashlib
 from typing import List, Dict, Any, Optional
 
 from marqo.core import exceptions as core_exceptions
-from marqo.core.typeahead.text_normalization import normalize_text
+from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.vespa.vespa_client import VespaClient
 
@@ -62,7 +62,7 @@ class TypeaheadHandler:
                     f"({{maxEditDistance:{fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
                 )
 
-            ranking_terms.append(f"query_index contains '{token}'")
+            ranking_terms.append(f"query_index contains \"{token}\"")
 
         # Create single YQL query that ORs all token conditions
         yql_retrieval = " OR ".join(retrieval_terms)
@@ -133,9 +133,11 @@ class TypeaheadHandler:
                 continue
 
             # Generate document ID using hash of query to avoid duplicates
-            doc_id = hashlib.sha256(query.encode('utf-8')).hexdigest()
             normalized_query = normalize_text(query)
             tokenized_query = normalized_query.split()
+            query_prefixes = generate_prefixes(normalized_query)
+
+            doc_id = hashlib.sha256(normalized_query.encode('utf-8')).hexdigest()
 
             if not tokenized_query:
                 errors.append(f"No tokens generated for query: {query}")
@@ -146,7 +148,7 @@ class TypeaheadHandler:
                 id=doc_id,
                 fields={
                     "query_words": tokenized_query,
-                    "query_index": normalized_query,
+                    "query_index": " ".join(query_prefixes),
                     "query": query,
                     "popularity": float(popularity),
                 }
