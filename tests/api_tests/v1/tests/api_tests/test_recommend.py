@@ -413,7 +413,7 @@ class TestRecommend(MarqoTestCase):
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
-                # Should fail when all documents lack embeddings and allow_missing_embeddings=False
+                # Should fail when all documents lack embeddings and allow_missing_embeddings=True
                 with self.assertRaises(MarqoWebError) as e:
                     self.client.index(index_name).recommend(
                         documents=['1', '2'],

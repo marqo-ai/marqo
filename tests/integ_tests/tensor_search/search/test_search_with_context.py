@@ -1616,3 +1616,58 @@ class TestSearchWithContext(MarqoTestCase):
                     self.assertIn("Marqo could not collect any vectors from the search query", str(e.exception))
                     self.assertIn("Please check the provided query, context (if any), "
                                   "or queryTensor(for Hybrid search)", str(e.exception))
+
+    def test_search_with_context_if_context_vectors_exist_documents_can_have_no_embeddings(self):
+        """Test that if context vector is provided, even if marqo can not collect any vectors from the documents,
+        the search can still proceed when allow_missing_documents=True, allowing_missing_embeddings=True"""
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            hybrid_parameters_test_cases = (
+                {"queryLexical": "*", "queryTensor": None, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
+                {"queryLexical": "*", "queryTensor": {}, "retrievalMethod": "disjunction", "rankingMethod": "rrf"},
+                {"queryTensor": None, "retrievalMethod": "tensor", "rankingMethod": "tensor"},
+                {"queryTensor": {}, "retrievalMethod": "tensor", "rankingMethod": "tensor"}
+            )
+            for hybrid_parameters in hybrid_parameters_test_cases:
+                with self.subTest(f"index={index.type}, hybrid_parameters={hybrid_parameters_test_cases}"):
+                    # Add some documents
+                    docs = [
+                        {"_id": "doc1", "text_field_1": "Machine learning and artificial intelligence"},
+                        {"_id": "doc2", "text_field_1": "Deep learning neural networks"},
+                        {"_id": "doc3", "text_field_2": "Natural language processing"}
+                    ]
+
+                    self.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index.name,
+                            docs=docs,
+                            tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                        )
+                    )
+
+                    # Create search context with mix of existing and non-existent documents
+                    search_context = SearchContext(
+                        documents=SearchContextDocuments(
+                            # doc3 does not have "text_field_1"
+                            ids={"doc3": 0.1, "not_exists_doc": 1},
+                            parameters=SearchContextDocumentsParameters(
+                                tensorFields=["text_field_1"],
+                                excludeInputDocuments=True,
+                                allowMissingEmbeddings=True,
+                                allowMissingDocuments=True
+                            )
+                        ),
+                        tensor=[SearchContextTensor(vector=[0.01] * 384, weight=1)]
+                    )
+
+                    r = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        context=search_context,
+                        result_count=5,
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(**hybrid_parameters)
+                    )
+
+                    self.assertEqual(2, len(r["hits"]))

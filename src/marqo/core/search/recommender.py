@@ -95,6 +95,7 @@ class Recommender:
                                                     f'Available tensor fields: {", ".join(valid_tensor_fields)}')
 
         # Use the new optimized method to get only embeddings
+        # TODO - Consolidate these two method into one place
         doc_embeddings_by_field = tensor_search.get_doc_vectors_per_tensor_field_by_ids(
             config.Config(self.vespa_client, inference=self.inference),
             index_name, 
