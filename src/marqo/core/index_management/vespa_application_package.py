@@ -693,14 +693,19 @@ class VespaApplicationPackage:
         self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
         self._deploy()
 
-    def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, MarqoIndex]]) -> None:
-        for schema, index in indexes:
+    def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, str, MarqoIndex]]) -> None:
+        for schema, typeahead_schema, index in indexes:
             if self.has_index(index.name):
                 raise IndexExistsError(f"Index {index.name} already exists")
 
+            # Add index settings and schema
             self._index_setting_store.save_index_setting(index)
             self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
             self._service_xml.add_schema(index.schema_name)
+
+            # Add typeahead schema if provided
+            self._store.save_file(typeahead_schema, 'schemas', f'{index.typeahead_schema_name}.sd')
+            self._service_xml.add_schema(index.typeahead_schema_name)
 
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
