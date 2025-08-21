@@ -741,63 +741,25 @@ def get_suggestions(index_name: str, suggestion_request: dict,
                    marqo_config: config.Config = Depends(get_config)):
     """
     Get query suggestions for typeahead functionality.
-    
-    Args:
-        index_name: Name of the index to get suggestions for
-        suggestion_request: Dict containing:
-            - q: Partial user search input
-            - limit: Maximum number of suggestions to return (default: 10)
-            - fuzzyEditDistance: Maximum edit distance for fuzzy matching (default: 2)
-            - minFuzzyMatchLength: Minimum length to switch to fuzzy matching (default: 3)
-            - popularityWeight: Weight for popularity score in ranking (optional)
-            - bm25Weight: Weight for BM25 score in ranking (optional)
     """
     from marqo.core.typeahead.typeahead import Typeahead
-    import time
-
-    start_time = time.time()
-
-    # Validate input
-    input_text = suggestion_request.get("q")
-    if not input_text:
-        raise api_exceptions.InvalidArgError("q text is required")
-
-    limit = suggestion_request.get("limit", 10)
-    fuzzy_edit_distance = suggestion_request.get("fuzzyEditDistance", 2)
-    min_fuzzy_match_length = suggestion_request.get("minFuzzyMatchLength", 3)
-    popularity_weight = suggestion_request.get("popularityWeight")
-    bm25_weight = suggestion_request.get("bm25Weight")
-
-    # Validate parameters
-    if limit <= 0:
-        raise api_exceptions.InvalidArgError("limit must be positive")
-    if fuzzy_edit_distance < 0:
-        raise api_exceptions.InvalidArgError("fuzzyEditDistance must be non-negative")
-    if min_fuzzy_match_length < 0:
-        raise api_exceptions.InvalidArgError("minFuzzyMatchLength must be non-negative")
-
+    from marqo.core.typeahead.models import TypeaheadRequest
+    from pydantic import ValidationError
+    
+    try:
+        request = TypeaheadRequest(**suggestion_request)
+    except ValidationError as e:
+        error_details = "; ".join([f"{err['loc'][0]}: {err['msg']}" for err in e.errors()])
+        raise api_exceptions.InvalidArgError(f"Invalid request: {error_details}")
+    
     # Check if index exists
     marqo_config.index_management.get_index(index_name)
 
     # Get suggestions
     handler = Typeahead(marqo_config.vespa_client, index_name)
-    suggestions = handler.get_suggestions(
-        input_text=input_text,
-        limit=limit,
-        fuzzy_edit_distance=fuzzy_edit_distance,
-        min_fuzzy_match_length=min_fuzzy_match_length,
-        popularity_weight=popularity_weight,
-        bm25_weight=bm25_weight
-    )
+    response = handler.get_suggestions_with_response(request)
 
-    processing_time_ms = int((time.time() - start_time) * 1000)
-
-    return JSONResponse(
-        content={
-            "suggestions": suggestions,
-            "processingTimeMs": processing_time_ms
-        }
-    )
+    return JSONResponse(content=response.model_dump(by_alias=True))
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")

@@ -1,9 +1,11 @@
 import hashlib
+import time
 from typing import List, Dict, Any, Optional
 
 from marqo.core import exceptions as core_exceptions
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
+from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -15,6 +17,39 @@ class Typeahead:
         self.index_name = index_name
         self.schema_generator = TypeaheadVespaSchema(index_name)
         self.typeahead_schema_name = self.schema_generator._get_typeahead_schema_name(index_name)
+
+    def get_suggestions_with_response(self, request: TypeaheadRequest) -> TypeaheadResponse:
+        """
+        Get query suggestions with timing and response model.
+        
+        Args:
+            request: TypeaheadRequest containing all parameters
+            
+        Returns:
+            TypeaheadResponse with suggestions and processing time
+        """
+        start_time = time.time()
+        
+        suggestions_data = self.get_suggestions(
+            input_text=request.q,
+            limit=request.limit,
+            fuzzy_edit_distance=request.fuzzy_edit_distance,
+            min_fuzzy_match_length=request.min_fuzzy_match_length,
+            popularity_weight=request.popularity_weight,
+            bm25_weight=request.bm25_weight
+        )
+        
+        processing_time_ms = int((time.time() - start_time) * 1000)
+        
+        suggestions = [
+            TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
+            for item in suggestions_data
+        ]
+        
+        return TypeaheadResponse(
+            suggestions=suggestions,
+            processing_time_ms=processing_time_ms
+        )
 
     def get_suggestions(self, input_text: str, limit: int = 10,
                         fuzzy_edit_distance: int = 2, min_fuzzy_match_length: int = 3,

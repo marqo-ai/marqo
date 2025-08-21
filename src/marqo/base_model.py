@@ -36,5 +36,5 @@ class ImmutableBaseModelV2(MarqoBaseModelV2):
     model_config = ConfigDict(frozen=True)
 
 
-class ImmutableStrictBaseModelV2(StrictBaseModel, ImmutableBaseModel):
+class ImmutableStrictBaseModelV2(StrictBaseModelV2, ImmutableBaseModelV2):
     pass

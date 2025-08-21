@@ -148,13 +148,13 @@ class TestTypeahead(MarqoTestCase):
 
         # Each suggestion should have the required structure
         for suggestion in suggestions:
-            self.assertIn("query", suggestion)
+            self.assertIn("suggestion", suggestion)
             self.assertIn("_score", suggestion)
-            self.assertIsInstance(suggestion["query"], str)
+            self.assertIsInstance(suggestion["suggestion"], str)
             self.assertIsInstance(suggestion["_score"], (int, float))
 
         # At least one suggestion should contain "machine"
-        machine_suggestions = [s for s in suggestions if "machine" in s["query"].lower()]
+        machine_suggestions = [s for s in suggestions if "machine" in s["suggestion"].lower()]
         self.assertGreaterEqual(len(machine_suggestions), 1)
 
         # 2. Delete all queries
