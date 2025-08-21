@@ -88,7 +88,7 @@ class Typeahead:
 
         response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
         hits = response.hits
-        suggestions_data = []
+        suggestions = []
 
         for hit in hits:
             fields = hit.fields or {}
@@ -96,17 +96,11 @@ class Typeahead:
             relevance = hit.relevance
 
             if query:
-                suggestions_data.append({
-                    "suggestion": query,
-                    "_score": relevance
-                })
+                suggestions.append(
+                    TypeaheadSuggestion(suggestion=query, score=relevance)
+                )
 
         processing_time_ms = int((time.time() - start_time) * 1000)
-
-        suggestions = [
-            TypeaheadSuggestion(suggestion=item["suggestion"], score=item["_score"])
-            for item in suggestions_data
-        ]
 
         return TypeaheadResponse(
             suggestions=suggestions,
