@@ -737,9 +737,9 @@ def schema_validation(index_name: str, settings_object: dict):
     )
 
 
+# TODO verify: not throttling. Would require a separate category, but we're not using Marqo throttling anymore?
 @app.post("/indexes/{index_name}/suggestions")
-@throttle(RequestType.SEARCH)
-def get_suggestions(index_name: str, suggestion_request: dict, 
+def get_suggestions(index_name: str, suggestion_request: dict,
                    marqo_config: config.Config = Depends(get_config)):
     """
     Get query suggestions for typeahead functionality.
@@ -758,7 +758,6 @@ def get_suggestions(index_name: str, suggestion_request: dict,
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")
-@throttle(RequestType.INDEX)
 def index_queries(index_name: str, queries_request: dict,
                  marqo_config: config.Config = Depends(get_config)):
     """
@@ -829,7 +828,6 @@ def delete_queries(index_name: str, queries: List[str], marqo_config: config.Con
 
 
 @app.get("/indexes/{index_name}/suggestions/stats")
-@throttle(RequestType.SEARCH)
 def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
     Get statistics about the typeahead queries for an index.
