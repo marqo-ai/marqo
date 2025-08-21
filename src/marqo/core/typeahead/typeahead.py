@@ -1,11 +1,11 @@
 import hashlib
-import time
-from typing import List, Dict, Any, Optional
+from timeit import default_timer as timer
+from typing import List, Dict, Any
 
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.core.typeahead.models import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
+from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.tensor_search import index_meta_cache
 from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
@@ -29,7 +29,7 @@ class Typeahead:
         Returns:
             TypeaheadResponse with suggestions and processing time
         """
-        start_time = time.time()
+        start_time = timer()
 
         # Check if index exists and get typeahead schema name
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
@@ -92,16 +92,15 @@ class Typeahead:
         suggestions = []
 
         for hit in hits:
-            fields = hit.fields or {}
-            query = fields.get("query")
+            fields = hit.fields
+            query = fields["query"]
             relevance = hit.relevance
 
-            if query:
-                suggestions.append(
-                    TypeaheadSuggestion(suggestion=query, score=relevance)
-                )
+            suggestions.append(
+                TypeaheadSuggestion(suggestion=query, score=relevance)
+            )
 
-        processing_time_ms = int((time.time() - start_time) * 1000)
+        processing_time_ms = round((timer() - start_time) * 1000)
 
         return TypeaheadResponse(
             suggestions=suggestions,
@@ -133,6 +132,7 @@ class Typeahead:
             query = query_data.get("query", "").strip()
             popularity = query_data.get("popularity", 0.0)
 
+            # TODO Response format including errors to be updated according to the design review session
             if not query:
                 errors.append(f"Empty query in: {query_data}")
                 continue
@@ -159,6 +159,7 @@ class Typeahead:
             )
 
             # Index document in Vespa
+            # TODO Index with the batch API and improve error handling
             try:
                 response = self.vespa_client.feed_document(
                     document=vespa_doc,
@@ -169,6 +170,7 @@ class Typeahead:
             except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
                 errors.append(f"Failed to index query '{query}': {str(e)}")
 
+        # Response must be consistent with add docs
         return {"indexed": indexed_count, "errors": errors}
 
     def delete_all_queries(self, index_name: str) -> None:
@@ -201,6 +203,7 @@ class Typeahead:
 
         ids = [hashlib.sha256(normalize_text(q).encode('utf-8')).hexdigest() for q in queries]
 
+        # TODO process DeleteBatchResponse and return an appropriate API response
         self.vespa_client.delete_batch(ids, schema=typeahead_schema_name)
 
     def get_stats(self, index_name: str) -> Dict[str, Any]:
@@ -217,20 +220,15 @@ class Typeahead:
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
-        try:
-            # Count total documents in typeahead schema
-            search_params = {
-                "yql": f"SELECT * FROM {typeahead_schema_name} WHERE true",
-                "hits": 0,  # We only want the count
-                "summary": "minimal"
-            }
+        # Count total documents in typeahead schema
+        search_params = {
+            "yql": f"SELECT * FROM {typeahead_schema_name} WHERE true",
+            "hits": 0,  # We only want the count
+            "summary": "minimal"
+        }
 
-            response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
-            # Access total_count property from QueryResult
-            total_count = response.total_count or 0
-            return {"indexedQueries": total_count}
-        except core_exceptions.IndexNotFoundError:
-            # If schema doesn't exist, return 0
-            return {"indexedQueries": 0}
-        except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-            raise core_exceptions.BackendCommunicationError(f"Failed to get typeahead stats: {str(e)}")
+        response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
+        # Access total_count property from QueryResult
+        total_count = response.total_count or 0
+        # TODO Use a pydantic model for the response
+        return {"indexedQueries": total_count}
