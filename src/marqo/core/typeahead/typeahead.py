@@ -186,7 +186,7 @@ class Typeahead:
         Returns:
             Dictionary with deletion results
         """
-        ids = [hashlib.sha256(q.strip().encode('utf-8')).hexdigest() for q in queries]
+        ids = [hashlib.sha256(normalize_text(q).encode('utf-8')).hexdigest() for q in queries]
 
         self.vespa_client.delete_batch(ids, schema=self.typeahead_schema_name)
 
