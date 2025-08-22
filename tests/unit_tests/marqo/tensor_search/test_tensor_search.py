@@ -531,7 +531,8 @@ class TestTensorSearchValidation(MarqoTestCase):
              "'collapseFields' search parameter is only supported for unstructured indexes created with "
              "Marqo version 2.23.0 or later. This index is unstructured and was created with Marqo 2.22.0."),
 
-            ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index'),
+            ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index',
+                                                             marqo_version="2.23.0"),
              core_exceptions.UnsupportedFeatureError,
              "'collapseFields' search parameter is only supported for unstructured indexes created with "
              "Marqo version 2.23.0 or later. This index is structured and was created with Marqo 2.23.0."),
