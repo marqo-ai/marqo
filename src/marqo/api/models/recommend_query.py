@@ -2,7 +2,7 @@ from typing import Dict, List, Union, Optional
 
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.models.api_models import BaseMarqoModel
-from pydantic.v1 import root_validator
+from pydantic.v1 import root_validator, Field
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
@@ -22,6 +22,8 @@ class RecommendQuery(BaseMarqoModel):
     attributesToRetrieve: Union[None, List[str]] = None
     scoreModifiers: Optional[ScoreModifierLists] = None
     rerankDepth: Optional[int] = None
+    allow_missing_documents: bool = Field(default=False, alias="allowMissingDocuments")
+    allow_missing_embeddings: bool = Field(default=False, alias="allowMissingEmbeddings")
 
     @root_validator(pre=False)
     def validate_rerank_depth(cls, values):

@@ -77,7 +77,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called correctly
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1", "doc2"], tensor_fields=None
+            mock_config, "test_index", ["doc1", "doc2"], tensor_fields=None, allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -117,7 +117,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called with non-zero weight docs only
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1", "doc3"], tensor_fields=None
+            mock_config, "test_index", ["doc1", "doc3"], tensor_fields=None, allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -155,7 +155,7 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         # Verify tensor_search function was called with specific fields
         mock_get_vectors.assert_called_once_with(
-            mock_config, "test_index", ["doc1"], tensor_fields=["title", "content"]
+            mock_config, "test_index", ["doc1"], tensor_fields=["title", "content"], allow_missing_documents=False
         )
     
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -677,4 +677,112 @@ class TestRecommenderGetDocVectorsFromIds(unittest.TestCase):
         
         error_message = str(cm.exception)
         self.assertIn("Duplicate document IDs found", error_message)
-        self.assertIn("doc1", error_message) 
+        self.assertIn("doc1", error_message)
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
+    @patch('marqo.config.Config')
+    def test_get_doc_vectors_allow_missing_documents_true(self, mock_config_class, mock_get_vectors, mock_get_index):
+        """Test that allowMissingDocuments=True allows missing documents and only returns existing ones"""
+        
+        # Mock dependencies
+        mock_get_index.return_value = self.mock_structured_index
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock response with only some documents (simulating missing documents ignored)
+        mock_get_vectors.return_value = {
+            "doc1": {"title": [[0.1, 0.2, 0.3]]},
+            "doc3": {"title": [[0.7, 0.8, 0.9]]}
+            # doc2 and doc4 are missing but should be ignored due to allowMissingDocuments=True
+        }
+        
+        # Should succeed with allowMissingDocuments=True
+        result = self.recommender.get_doc_vectors_from_ids(
+            index_name="test_index",
+            documents=["doc1", "doc2", "doc3", "doc4"],
+            allow_missing_documents=True
+        )
+        
+        # Should only return vectors for existing documents
+        expected = {
+            "doc1": [[0.1, 0.2, 0.3]],
+            "doc3": [[0.7, 0.8, 0.9]]
+        }
+        self.assertEqual(result, expected)
+        
+        # Verify tensor_search function was called with allowMissingDocuments=True
+        mock_get_vectors.assert_called_once_with(
+            mock_config, "test_index", ["doc1", "doc2", "doc3", "doc4"], tensor_fields=None, allow_missing_documents=True
+        )
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
+    @patch('marqo.config.Config')
+    def test_get_doc_vectors_allow_missing_embeddings_true(self, mock_config_class, mock_get_vectors, mock_get_index):
+        """Test that allowMissingEmbeddings=True allows documents with missing embeddings"""
+
+        # Mock dependencies
+        mock_get_index.return_value = self.mock_structured_index
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+
+        # Mock response where one document has no embeddings for requested field
+        mock_get_vectors.return_value = {
+            "doc1": {"title": [[0.1, 0.2, 0.3]]},
+            "doc2": {}  # No embeddings for the requested field
+        }
+
+        r = self.recommender.get_doc_vectors_from_ids(
+            index_name="test_index",
+            documents=["doc1", "doc2"],
+            tensor_fields=["title"],
+            allow_missing_embeddings=True
+        )
+
+        self.assertEqual(
+            {"doc1": [[0.1, 0.2, 0.3]]}, r
+        )
+
+        mock_get_vectors.assert_called_once_with(
+            mock_config, "test_index", ["doc1", "doc2"], tensor_fields=["title"],
+            allow_missing_documents=False
+        )
+
+    @patch('marqo.tensor_search.index_meta_cache.get_index')
+    @patch('marqo.tensor_search.tensor_search.get_doc_vectors_per_tensor_field_by_ids')
+    @patch('marqo.config.Config')
+    def test_get_doc_vectors_allow_both_missing_parameters_true(self, mock_config_class, mock_get_vectors, mock_get_index):
+        """Test that both allowMissingDocuments=True and allowMissingEmbeddings=True work together"""
+        
+        # Mock dependencies
+        mock_get_index.return_value = self.mock_structured_index
+        mock_config = Mock()
+        mock_config_class.return_value = mock_config
+        
+        # Mock response where some documents are missing and others lack embeddings
+        mock_get_vectors.return_value = {
+            "doc1": {"title": [[0.1, 0.2, 0.3]]},
+            "doc4": {},
+            # doc2 missing entirely, doc3 exists but has no title embeddings
+        }
+        
+        # Should succeed with both parameters set to True
+        result = self.recommender.get_doc_vectors_from_ids(
+            index_name="test_index",
+            documents=["doc1", "doc2", "doc3", "doc4"],
+            tensor_fields=["title"],
+            allow_missing_documents=True,
+            allow_missing_embeddings=True
+        )
+        
+        # Should only return vectors for documents that exist and have embeddings
+        expected = {
+            "doc1": [[0.1, 0.2, 0.3]],
+        }
+        self.assertEqual(result, expected)
+        
+        # Verify tensor_search function was called with both parameters=True
+        mock_get_vectors.assert_called_once_with(
+            mock_config, "test_index", ["doc1", "doc2", "doc3", "doc4"], tensor_fields=["title"], allow_missing_documents=True
+        )

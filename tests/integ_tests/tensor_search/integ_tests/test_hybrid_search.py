@@ -19,7 +19,8 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext
+from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
+import marqo.api.exceptions as api_exception
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
 import pytest
 
@@ -2357,9 +2358,7 @@ class TestHybridSearch(MarqoTestCase):
         """
         Test that hybrid search with a None query and wrong retrieval or ranking method fails.
         """
-        custom_vector = [0.655 for _ in range(16)]
         test_cases = [
-            (RetrievalMethod.Disjunction, RankingMethod.RRF),
             (RetrievalMethod.Tensor, RankingMethod.Lexical),
             (RetrievalMethod.Lexical, RankingMethod.Tensor),
             (RetrievalMethod.Lexical, RankingMethod.Lexical)
@@ -2382,6 +2381,51 @@ class TestHybridSearch(MarqoTestCase):
                                 )
                             )
                         self.assertIn("retrievalMethod and rankingMethod are both 'tensor'", str(e.exception))
+
+    def test_hybrid_search_none_query_wrong_retrieval_or_ranking_fails_for_disjunction(self):
+        """
+        Test that hybrid search with a None query will raise error for disjunction and rrf.
+        """
+        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with self.subTest(index=index.name):
+                with self.assertRaises(InvalidArgumentError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=None,
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        )
+                    )
+                self.assertIn("Either 'hybridParameters.queryLexical' or just 'q'", str(e.exception))
+
+    def test_hybrid_search_none_query_tensor_without_text_raises_error(self):
+        """
+        Test that hybrid search with none query tensor and no context will raise an error.
+        """
+        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with self.subTest(index=index.name):
+                with self.assertRaises(api_exception.InvalidArgError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        text=None,
+                        index_name=index.name,
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            queryLexical="test",
+                            queryTensor=None,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        )
+                    )
+                self.assertIn(
+                    "Marqo could not collect any vectors from the search query but the retrieval or ranking method",
+                              str(e.exception)
+                )
 
     def test_hybrid_search_none_query_with_context_vectors_passes(self):
         """Test to ensure that context vectors work with no_model by setting query as None and providing context
@@ -2433,6 +2477,94 @@ class TestHybridSearch(MarqoTestCase):
 
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
+
+    def test_hybrid_search_query_tensor_none_with_context_vectors_passes(self):
+        """Test to ensure that context vectors work with queryTensor=None, and a different queryLexical.
+        """
+        custom_vector = [0.655 for _ in range(16)]
+
+        docs = [
+            {
+                "_id": "1",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_1",
+                        "vector": np.random.rand(16).tolist()
+                    }
+            },
+            {
+                "_id": "2",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_2",
+                        "vector": custom_vector
+                    }
+            }
+        ]
+
+        for index in [self.structured_index_with_no_model, self.semi_structured_index_with_no_model]:
+            with (self.subTest(index_name=index.name)):
+                add_docs_params = AddDocsParams(index_name=index.name,
+                                                docs=docs,
+                                                tensor_fields=["custom_field_1"] \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None,
+                                                mappings={"custom_field_1": {"type": "custom_vector"}} \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
+
+                r = tensor_search.search(
+                    config=self.config, index_name=index.name, text=None,
+                    search_method="hybrid",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        queryTensor=None,
+                        queryLexical="test",
+                        verbose=True
+                    ),
+                    context=SearchContext(**{"tensor": [{"vector": custom_vector,
+                                                         "weight": 1}], })
+                )
+                self.assertEqual(2, len(r["hits"]))
+
+    def test_hybrid_search_query_tensor_none_with_context_docs_passes(self):
+        """Test to ensure that context documents work with queryTensor=None, and a different queryLexical.
+        """
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "Some content 1"
+            },
+            {
+                "_id": "2",
+                "text_field_1": "Some content 2"
+            }
+        ]
+
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with (self.subTest(index_name=index.name)):
+                add_docs_params = AddDocsParams(index_name=index.name,
+                                                docs=docs,
+                                                tensor_fields=["text_field_1"] \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
+
+                r = tensor_search.search(
+                    config=self.config, index_name=index.name, text=None,
+                    search_method="hybrid",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        queryTensor=None,
+                        queryLexical="test",
+                        verbose=True
+                    ),
+                    context=SearchContext(documents=SearchContextDocuments(ids={"1": 1}))
+                )
+                ids = [hit["_id"] for hit in r["hits"]]
+                self.assertEqual(["2"], ids)
 
     def test_hybrid_search_unstructured_with_searchable_attributes_fails(self):
         """
@@ -3006,7 +3138,7 @@ class TestHybridSearch(MarqoTestCase):
                 assert res["hits"][0]["_id"] == res_reverse["hits"][-1]["_id"]
 
     def test_empty_tensor_query_dict(self):
-        """Ensure empty tensor query dict does not raise errors and behaves correctly."""
+        """Ensure empty tensor query dict can be provided in the API but downstream errors will be raised."""
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.type):
                 self.add_documents(
@@ -3016,7 +3148,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.assertRaises(ValueError):
+                with self.assertRaises(api_exception.InvalidArgError) as e:
                     tensor_search.search(
                         config=self.config, index_name=index.name, text=None, search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
@@ -3025,6 +3157,10 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod=RankingMethod.RRF
                         ), result_count=5
                     )
+                self.assertIn(
+                    "Marqo could not collect any vectors from the search query but the retrieval or ranking method",
+                    str(e.exception)
+                )
 
     def test_query_tensor_as_string_equivalent_to_single_query(self):
         """String tensor query should work like dict with one key."""
@@ -3189,28 +3325,6 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             queryTensor="dogs",
                             queryLexical=None,
-                            retrievalMethod=RetrievalMethod.Disjunction,
-                            rankingMethod=RankingMethod.RRF
-                        ), result_count=5
-                    )
-
-    def test_none_query_tensor_disjunction_retrieval(self):
-        """Ensure that a None query tensor and lexical with disjunction retrieval raises an error."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
-            with self.subTest(index=index.type):
-                self.add_documents(
-                    config=self.config, add_docs_params=AddDocsParams(
-                        index_name=index.name, docs=self.docs_list,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                with self.assertRaises(InvalidArgumentError):
-                    tensor_search.search(
-                        config=self.config, index_name=index.name, search_method="HYBRID", text=None,
-                        hybrid_parameters=HybridParameters(
-                            queryTensor=None,
-                            queryLexical="dogs",
                             retrievalMethod=RetrievalMethod.Disjunction,
                             rankingMethod=RankingMethod.RRF
                         ), result_count=5

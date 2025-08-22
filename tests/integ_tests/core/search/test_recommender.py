@@ -766,6 +766,203 @@ class TestRecommender(MarqoTestCase):
                     expected = {"doc1": [[0.1, 0.2, 0.3]]}
                     self.assertEqual(result, expected)
 
+    def test_recommend_allow_missing_documents_true_success(self):
+        """Test that allowMissingDocuments=True allows missing documents and only uses existing ones"""
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                # Should succeed with allowMissingDocuments=True and only use existing documents
+                res = self.recommender.recommend(
+                    index_name=index.name,
+                    documents=["1", "non_existent_doc", "2", "another_missing_doc"],
+                    allow_missing_documents=True,
+                    exclude_input_documents=False
+                )
+
+                # Verify search was successful
+                self.assertIn("hits", res)
+                self.assertGreater(len(res["hits"]), 0)
+
+                # Verify that existing documents are included in results
+                result_ids = [hit["_id"] for hit in res["hits"]]
+                self.assertIn("1", result_ids)
+                self.assertIn("2", result_ids)
+
+    def test_recommend_allow_missing_embeddings_true_success(self):
+        """Test that allowMissingEmbeddings=True allows documents with missing embeddings"""
+        # Create documents where some have embeddings for specific fields and others don't
+        docs = [
+            {
+                "_id": "doc_with_title",
+                "title": "Document with title embedding",
+                "description": "Also has description"
+            },
+            {
+                "_id": "doc_with_content", 
+                "content": "Document with only content embedding",
+                "tags": ["test"]
+            },
+            {
+                "_id": "doc_mixed",
+                "title": "Mixed document",
+                "content": "Has both title and content"
+            }
+        ]
+
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                # For unstructured, specify which fields to vectorize
+                if isinstance(index, UnstructuredMarqoIndex):
+                    tensor_fields = ["title", "description"]  # Don't vectorize content
+                else:
+                    tensor_fields = None
+
+                self.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                # Should succeed with allowMissingEmbeddings=True, using only docs with required embeddings
+                res = self.recommender.recommend(
+                    index_name=index.name,
+                    documents=["doc_with_title", "doc_with_content", "doc_mixed"],
+                    tensor_fields=["title"],
+                    allow_missing_embeddings=True,
+                    exclude_input_documents=False
+                )
+
+                # Verify search was successful
+                self.assertIn("hits", res)
+                self.assertGreater(len(res["hits"]), 0)
+
+                # Verify that documents with required embeddings are included
+                result_ids = [hit["_id"] for hit in res["hits"]]
+                self.assertIn("doc_with_title", result_ids)
+                self.assertIn("doc_mixed", result_ids)
+
+    def test_recommend_allow_both_missing_parameters_true_success(self):
+        """Test that both allowMissingDocuments=True and allowMissingEmbeddings=True work together"""
+        # Create documents with various scenarios
+        docs = [
+            {
+                "_id": "complete_doc",
+                "title": "Complete document",
+                "description": "Has both title and description"
+            },
+            {
+                "_id": "partial_doc",
+                "content": "Document with only content",
+                "tags": ["partial"]
+            }
+        ]
+
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                # For unstructured, specify which fields to vectorize
+                if isinstance(index, UnstructuredMarqoIndex):
+                    tensor_fields = ["title", "description"]  # Don't vectorize content
+                else:
+                    tensor_fields = None
+
+                self.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                # Should succeed with both parameters=True, handling missing docs and missing embeddings
+                res = self.recommender.recommend(
+                    index_name=index.name,
+                    documents=[
+                        "complete_doc",           # Exists, has required embeddings
+                        "non_existent_doc",       # Doesn't exist (should be ignored)
+                        "partial_doc",            # Exists, but missing required embeddings (should be ignored)
+                        "another_missing_doc"     # Doesn't exist (should be ignored)
+                    ],
+                    tensor_fields=["title"],
+                    allow_missing_documents=True,
+                    allow_missing_embeddings=True,
+                    exclude_input_documents=False
+                )
+
+                # Verify search was successful
+                self.assertIn("hits", res)
+                self.assertGreater(len(res["hits"]), 0)
+
+                # Verify that only the document with required embeddings is used for context
+                result_ids = [hit["_id"] for hit in res["hits"]]
+                self.assertIn("complete_doc", result_ids)
+
+    def test_recommend_all_documents_missing_with_allow_missing_documents_true_fails(self):
+        """Test that when allowMissingDocuments=True but ALL documents are missing, it should fail"""
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                # Should still fail when no documents are available at all
+                with self.assertRaisesStrict(InvalidArgumentError) as cm:
+                    self.recommender.recommend(
+                        index_name=index.name,
+                        documents=["non_existent_1", "non_existent_2", "non_existent_3"],
+                        allow_missing_documents=True
+                    )
+
+                self.assertIn("Marqo could not collect any valid vector from the documents", str(cm.exception))
+
+    def test_recommend_all_documents_missing_embeddings_with_allow_missing_embeddings_true_fails(self):
+        """Test that when allowMissingEmbeddings=True but ALL documents lack embeddings, it should fail"""
+        # Create documents that all lack a specific embedding field
+        docs = [
+            {
+                "_id": "doc1",
+                "content": "Document 1 with only content"
+            },
+            {
+                "_id": "doc2", 
+                "content": "Document 2 with only content"
+            },
+            {
+                "_id": "doc3",
+                "title": "Document 3",
+            }
+        ]
+
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                # For unstructured, only vectorize content (not title)
+                if isinstance(index, UnstructuredMarqoIndex):
+                    tensor_fields = ["content", "title"]
+                else:
+                    tensor_fields = None
+
+                self.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                # Should still fail when no documents have the required embeddings
+                with self.assertRaisesStrict(InvalidArgumentError) as cm:
+                    self.recommender.recommend(
+                        index_name=index.name,
+                        documents=["doc1", "doc2"],
+                        tensor_fields=["title"],  # Request field that no documents have
+                        allow_missing_embeddings=True
+                    )
+
+                self.assertIn("Marqo could not collect any valid vector from the documents", str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()
