@@ -7,7 +7,8 @@ import blake3
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
-    TypeaheadIndexResponse, TypeaheadIndexError, TypeaheadIndexRequest
+    TypeaheadIndexResponse, TypeaheadIndexError, TypeaheadIndexRequest,
+    TypeaheadStatsResponse
 )
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.logging import get_logger
@@ -242,7 +243,7 @@ class Typeahead:
         # TODO process DeleteBatchResponse and return an appropriate API response
         self.vespa_client.delete_batch(ids, schema=typeahead_schema_name)
 
-    def get_stats(self, index_name: str) -> Dict[str, Any]:
+    def get_stats(self, index_name: str) -> TypeaheadStatsResponse:
         """
         Get statistics about indexed queries.
         
@@ -250,7 +251,7 @@ class Typeahead:
             index_name: Name of the index to get stats for
         
         Returns:
-            Dictionary with stats including indexed query count
+            TypeaheadStatsResponse with stats including indexed query count
         """
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
@@ -266,8 +267,7 @@ class Typeahead:
         response = self.vespa_client.query(schema=typeahead_schema_name, **search_params)
         # Access total_count property from QueryResult
         total_count = response.total_count or 0
-        # TODO Use a pydantic model for the response
-        return {"indexedQueries": total_count}
+        return TypeaheadStatsResponse(indexed_queries=total_count)
 
     def _generate_query_hash(self, query: str) -> str:
         """Generate a 128-bit blake3 hash for a query string.

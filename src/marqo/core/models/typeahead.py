@@ -84,3 +84,10 @@ class TypeaheadIndexResponse(ImmutableStrictBaseModelV2):
         alias="processingTimeMs",
         description="Processing time in milliseconds"
     )
+
+
+class TypeaheadStatsResponse(ImmutableStrictBaseModelV2):
+    indexed_queries: int = Field(
+        alias="indexedQueries",
+        description="Number of indexed queries"
+    )

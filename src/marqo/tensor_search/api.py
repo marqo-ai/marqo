@@ -806,7 +806,7 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         # Get stats
         stats = marqo_config.typeahead.get_stats(index_name)
         
-        return JSONResponse(content=stats)
+        return ORJSONResponse(content=stats.model_dump(by_alias=True))
     except api_exceptions.MarqoWebError:
         raise
 
