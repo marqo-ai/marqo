@@ -1,13 +1,20 @@
-import blake3
+import time
 from timeit import default_timer as timer
 from typing import List, Dict, Any
 
-from marqo.core import exceptions as core_exceptions
+import blake3
+
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion
+from marqo.core.models.typeahead import (
+    TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
+    TypeaheadIndexResponse, TypeaheadIndexError, TypeaheadIndexRequest
+)
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
+from marqo.logging import get_logger
 from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+
+logger = get_logger(__name__)
 
 
 class Typeahead:
@@ -94,10 +101,11 @@ class Typeahead:
         for hit in hits:
             fields = hit.fields
             query = fields["query"]
+            metadata = fields.get("metadata", {})
             relevance = hit.relevance
 
             suggestions.append(
-                TypeaheadSuggestion(suggestion=query, score=relevance)
+                TypeaheadSuggestion(suggestion=query, score=relevance, metadata=metadata)
             )
 
         processing_time_ms = round((timer() - start_time) * 1000)
@@ -107,45 +115,64 @@ class Typeahead:
             processing_time_ms=processing_time_ms
         )
 
-    def index_queries(self, index_name: str, queries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def index_queries(self, index_name: str, request: TypeaheadIndexRequest) -> TypeaheadIndexResponse:
         """
         Index queries for typeahead suggestions.
         
         Args:
             index_name: Name of the index to index queries for
-            queries: List of dictionaries with 'query' and 'rank' fields
+            request: TypeaheadIndexRequest containing the queries
             
         Returns:
-            Dictionary with indexing results
+            TypeaheadIndexResponse with indexing results
         """
+        start_time = timer()
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
-        if not queries:
-            return {"indexed": 0, "errors": []}
+        if not request.queries:
+            processing_time_ms = round((timer() - start_time) * 1000)
+            return TypeaheadIndexResponse(
+                indexed=0,
+                errors=[],
+                processing_time_ms=processing_time_ms
+            )
 
         indexed_count = 0
         errors = []
+        vespa_docs = []
+        normalised_query_map = {}  # map of normalised query and the original query, used for deduping
+        doc_id_query_map = {}  # map of hash doc_id and the query, used for vespa response handling
 
-        for query_data in queries:
-            query = query_data.get("query", "").strip()
-            popularity = query_data.get("popularity", 0.0)
-
-            # TODO Response format including errors to be updated according to the design review session
+        for idx, add_query_request in enumerate(request.queries):
+            query = add_query_request.query.strip()
             if not query:
-                errors.append(f"Empty query in: {query_data}")
+                errors.append(TypeaheadIndexError(query=query, message=f"Empty query at index {idx}", code=400))
                 continue
 
-            # Generate document ID using hash of query to avoid duplicates
             normalized_query = normalize_text(query)
+
+            if normalized_query in normalised_query_map:
+                errors.append(TypeaheadIndexError(
+                    query=query,
+                    message=f"Query is duplicate of {normalised_query_map[normalized_query]} "
+                            f"after normalisation, will ignore",
+                    code=400
+                ))
+                continue
+            else:
+                normalised_query_map[normalized_query] = query
+
             tokenized_query = normalized_query.split()
             query_prefixes = generate_prefixes(normalized_query)
 
+            # Generate document ID using hash of query to avoid duplicates and special characters
             doc_id = self._generate_query_hash(normalized_query)
+            doc_id_query_map[doc_id] = query
 
             if not tokenized_query:
-                errors.append(f"No tokens generated for query: {query}")
+                errors.append(TypeaheadIndexError(query=query, message="No tokens generated for query", code=400))
                 continue
 
             vespa_doc = VespaDocument(
@@ -154,24 +181,33 @@ class Typeahead:
                     "query_words": tokenized_query,
                     "query_index": " ".join(query_prefixes),
                     "query": query,
-                    "popularity": float(popularity),
+                    "popularity": add_query_request.popularity,
+                    "metadata": add_query_request.metadata,
+                    "last_updated_at": int(time.time())
                 }
             )
 
-            # Index document in Vespa
-            # TODO Index with the batch API and improve error handling
-            try:
-                response = self.vespa_client.feed_document(
-                    document=vespa_doc,
-                    schema=typeahead_schema_name
-                )
-                # If no exception was raised, the document was successfully indexed
-                indexed_count += 1
-            except (core_exceptions.BackendCommunicationError, core_exceptions.VespaDocumentParsingError) as e:
-                errors.append(f"Failed to index query '{query}': {str(e)}")
+            logger.debug("Adding typeahead vespa doc", vespa_doc)
 
-        # Response must be consistent with add docs
-        return {"indexed": indexed_count, "errors": errors}
+            vespa_docs.append(vespa_doc)
+
+        if vespa_docs:
+            response = self.vespa_client.feed_batch(vespa_docs, schema=typeahead_schema_name)
+            for resp in response.responses:
+                doc_id = resp.id.split('::')[-1] if resp.id else None
+                query = doc_id_query_map.get(doc_id, None)
+                status, message = self.vespa_client.translate_vespa_document_response(resp.status, message=resp.message)
+                if status != 200:
+                    errors.append(TypeaheadIndexError(query=query, message=message, code=status))
+                else:
+                    indexed_count += 1
+
+        processing_time_ms = round((timer() - start_time) * 1000)
+        return TypeaheadIndexResponse(
+            indexed=indexed_count, 
+            errors=errors, 
+            processing_time_ms=processing_time_ms
+        )
 
     def delete_all_queries(self, index_name: str) -> None:
         """

@@ -29,7 +29,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
-from marqo.core.models.typeahead import TypeaheadRequest
+from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexRequest
 from marqo.core.monitoring import memory_profiler
 import marqo.inference.native_inference.remote.server.inference_config as inference_config
 from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
@@ -739,62 +739,29 @@ def schema_validation(index_name: str, settings_object: dict):
 
 # TODO verify: not throttling. Would require a separate category, but we're not using Marqo throttling anymore?
 @app.post("/indexes/{index_name}/suggestions")
-def get_suggestions(index_name: str, suggestion_request: dict,
-                   marqo_config: config.Config = Depends(get_config)):
+def get_suggestions(index_name: str, suggestion_request: TypeaheadRequest,
+                    marqo_config: config.Config = Depends(get_config)):
     """
     Get query suggestions for typeahead functionality.
     """
-    
-    try:
-        request = TypeaheadRequest(**suggestion_request)
-    except ValidationError as e:
-        error_details = "; ".join([f"{err['loc'][0]}: {err['msg']}" for err in e.errors()])
-        raise api_exceptions.InvalidArgError(f"Invalid request: {error_details}")
+    response = marqo_config.typeahead.get_suggestions(index_name, suggestion_request)
 
-    # Get suggestions
-    response = marqo_config.typeahead.get_suggestions(index_name, request)
-
-    return JSONResponse(content=response.model_dump(by_alias=True))
+    return ORJSONResponse(content=response.model_dump(by_alias=True))
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")
-def index_queries(index_name: str, queries_request: dict,
+def index_queries(index_name: str, typeahead_index_request: TypeaheadIndexRequest,
                  marqo_config: config.Config = Depends(get_config)):
     """
     Index queries for typeahead suggestions.
     
     Args:
         index_name: Name of the index to add queries to
-        queries_request: Dict containing:
-            - queries: List of dicts with 'query' and 'popularity' fields
+        typeahead_index_request: Request object to index the query suggestions
     """
+    result = marqo_config.typeahead.index_queries(index_name, typeahead_index_request)
 
-    # Validate input
-    queries = queries_request.get("queries")
-    if queries is None:
-        raise api_exceptions.InvalidArgError("queries field is required")
-
-    if not isinstance(queries, list):
-        raise api_exceptions.InvalidArgError("queries must be a list")
-
-    # Check if index exists
-    marqo_config.index_management.get_index(index_name)
-
-    # Validate queries format
-    for i, query_data in enumerate(queries):
-        if not isinstance(query_data, dict):
-            raise api_exceptions.InvalidArgError(f"Query at index {i} must be a dictionary")
-        if "query" not in query_data:
-            raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'query' field")
-        if "popularity" not in query_data:
-            raise api_exceptions.InvalidArgError(f"Query at index {i} is missing 'popularity' field")
-        if not query_data["query"].strip():
-            raise api_exceptions.InvalidArgError(f"Query at index {i} cannot be empty")
-
-    # Index queries
-    result = marqo_config.typeahead.index_queries(index_name, queries)
-
-    return JSONResponse(content=result)
+    return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 
 @app.delete("/indexes/{index_name}/suggestions/queries/delete-all", include_in_schema=False)
@@ -819,7 +786,7 @@ def delete_queries(index_name: str, queries: List[str], marqo_config: config.Con
     
     Args:
         index_name: Name of the index to delete queries from
-        delete_request: Dict containing queries to delete:
+        queries: list containing queries to delete:
     """
     # Delete specific queries
     marqo_config.typeahead.delete_queries(index_name, queries)

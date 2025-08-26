@@ -1,6 +1,6 @@
 """Pydantic models for typeahead API requests and responses."""
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import Field, field_validator
 
@@ -47,6 +47,7 @@ class TypeaheadSuggestion(ImmutableStrictBaseModelV2):
 
     suggestion: str = Field(..., description="The suggested query text")
     score: float = Field(..., alias="_score", description="Relevance score for the suggestion")
+    metadata: Optional[dict] = Field(default=None, description="Additional metadata")
 
 
 class TypeaheadResponse(ImmutableStrictBaseModelV2):
@@ -55,6 +56,31 @@ class TypeaheadResponse(ImmutableStrictBaseModelV2):
     suggestions: List[TypeaheadSuggestion] = Field(..., description="List of suggestions")
     processing_time_ms: Optional[float] = Field(
         default=None,
+        alias="processingTimeMs",
+        description="Processing time in milliseconds"
+    )
+
+
+class TypeaheadAddQueryRequest(ImmutableStrictBaseModelV2):
+    query: str = Field(..., description="User search query")
+    popularity: float = Field(default=0.0, description="Popularity score")
+    metadata: Dict[str, float] = Field(default_factory=dict, description="Additional metadata")
+
+
+class TypeaheadIndexRequest(ImmutableStrictBaseModelV2):
+    queries: List[TypeaheadAddQueryRequest]
+
+
+class TypeaheadIndexError(ImmutableStrictBaseModelV2):
+    query: Optional[str] = None
+    message: str
+    code: int = 400
+
+
+class TypeaheadIndexResponse(ImmutableStrictBaseModelV2):
+    indexed: int = Field(..., description="Indexed queries")
+    errors: List[TypeaheadIndexError] = Field(default_factory=list, description="Index Errors")
+    processing_time_ms: float = Field(
         alias="processingTimeMs",
         description="Processing time in milliseconds"
     )
