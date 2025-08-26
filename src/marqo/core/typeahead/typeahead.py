@@ -146,12 +146,8 @@ class Typeahead:
         normalised_query_map = {}  # map of normalised query and the original query, used for deduping
         doc_id_query_map = {}  # map of hash doc_id and the query, used for vespa response handling
 
-        for idx, add_query_request in enumerate(request.queries):
-            query = add_query_request.query.strip()
-            if not query:
-                errors.append(TypeaheadIndexError(query=query, message=f"Empty query at index {idx}", code=400))
-                continue
-
+        for add_query_request in request.queries:
+            query = add_query_request.query
             normalized_query = normalize_text(query)
 
             if normalized_query in normalised_query_map:

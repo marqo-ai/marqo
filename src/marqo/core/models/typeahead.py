@@ -39,7 +39,7 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
     def validate_q(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("q is required")
-        return v
+        return v.strip()
 
 
 class TypeaheadSuggestion(ImmutableStrictBaseModelV2):
@@ -63,8 +63,15 @@ class TypeaheadResponse(ImmutableStrictBaseModelV2):
 
 class TypeaheadAddQueryRequest(ImmutableStrictBaseModelV2):
     query: str = Field(..., description="User search query")
+    # Please note that popularity is not mandatory. This is to support multiple popularity values in metadata for future
     popularity: float = Field(default=0.0, description="Popularity score")
     metadata: Dict[str, float] = Field(default_factory=dict, description="Additional metadata")
+
+    @field_validator('query')
+    def validate_q(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("query is required")
+        return v.strip()
 
 
 class TypeaheadIndexRequest(ImmutableStrictBaseModelV2):
