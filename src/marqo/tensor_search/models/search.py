@@ -69,6 +69,8 @@ class SearchContextTensor(BaseModel):
 class SearchContextDocumentsParameters(BaseModel):
     tensor_fields: Optional[List[str]] = Field(None, alias='tensorFields')
     exclude_input_documents: bool = Field(True, alias='excludeInputDocuments')
+    allow_missing_documents: bool = Field(False, alias='allowMissingDocuments')
+    allow_missing_embeddings: bool = Field(False, alias='allowMissingEmbeddings')
 
     @validator('tensor_fields', pre=True, always=True)
     def check_tensor_fields_not_empty(cls, v):

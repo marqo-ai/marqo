@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 from marqo.api import exceptions as api_exceptions
 from marqo.config import Config
@@ -531,7 +531,8 @@ class TestTensorSearchValidation(MarqoTestCase):
              "'collapseFields' search parameter is only supported for unstructured indexes created with "
              "Marqo version 2.23.0 or later. This index is unstructured and was created with Marqo 2.22.0."),
 
-            ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index'),
+            ('index type check', self.structured_marqo_index(name='structured_index', schema_name='structured_index',
+                                                             marqo_version="2.23.0"),
              core_exceptions.UnsupportedFeatureError,
              "'collapseFields' search parameter is only supported for unstructured indexes created with "
              "Marqo version 2.23.0 or later. This index is structured and was created with Marqo 2.23.0."),
@@ -557,6 +558,51 @@ class TestTensorSearchValidation(MarqoTestCase):
                     )
 
                 self.assertIn(expected_error, str(cm.exception))
+
+
+
+class TestGetQueryVectorFromJobs(unittest.TestCase):
+
+    def test_get_query_vector_from_jobs_fails_if_no_vector_is_collected(self):
+        """Test that get_query_vectors_from_jobs raises InvalidArgError when no vector is collected"""
+        # Create a mock index
+        mock_index = Mock(spec=SemiStructuredMarqoIndex)
+        mock_index.model = Mock()
+        mock_index.model.get_dimension.return_value = 3
+        mock_index.name = "test-index"
+        mock_index.type = IndexType.SemiStructured
+
+        # Create a multimodal query (dict) that will result in no vector being collected
+        # This will go through the multimodal path and can result in empty vectors
+        query = BulkSearchQueryEntity(
+            q=None,
+            index=mock_index,
+            searchMethod=SearchMethod.TENSOR,
+            limit=10,
+            offset=0,
+            showHighlights=False,
+            context=MagicMock(spec=SearchContext)
+        )
+
+        mock_recommender = MagicMock()
+        mock_config = MagicMock(spec=Config)
+        mock_config.recommender = mock_recommender
+
+        mock_recommender.get_doc_vectors_from_ids.return_value = {}
+        mock_recommender.get_default_interpolation_method.return_value="slerp"
+
+        with self.assertRaises(api_exceptions.InvalidArgError) as cm:
+            with patch("marqo.tensor_search.telemetry.RequestMetricsStore.for_request") as mock_telemetry:
+                r = tensor_search.get_query_vectors_from_jobs(
+                    queries=[query],
+                    qidx_to_job={0: []},
+                    job_to_vectors=dict(),
+                    config= mock_config,
+                    jobs = dict(),
+                    interpolation_method=None
+                )
+        self.assertIn("Marqo could not collect any vectors from the search query but the retrieval "
+                      "or ranking method requires at least one valid vector", str(cm.exception))
 
 
 if __name__ == '__main__':
