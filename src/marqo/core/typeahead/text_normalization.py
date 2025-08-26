@@ -22,6 +22,7 @@ def normalize_text(text: str) -> str:
     # Convert to lowercase
     return without_accents.lower()
 
+
 def generate_prefixes(text: str) -> List[str]:
     result = []
     prefix = ""
