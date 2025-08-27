@@ -324,7 +324,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
+                    assert "Either 'hybridParameters.queryLexical' or just 'q'" in str(e.exception)
                     with self.assertRaises(MarqoWebError) as e:
                         self.client.index(index_name).search(
                             search_method="HYBRID",
@@ -333,7 +333,7 @@ class TestSearchCommon(MarqoTestCase):
                             }
                         )
                     assert e.exception.status_code == 400
-                    assert "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor'" in str(e.exception)
+                    assert "Marqo could not collect any vectors from the search query" in str(e.exception)
 
                 with self.subTest(
                         "Hybrid search without query and with queryTensor/queryLexical should not raise an error"):
@@ -809,3 +809,213 @@ class TestSearchCommon(MarqoTestCase):
                     self.assertIsNotNone(result)
                     self.assertIn("hits", result)
 
+    def test_search_context_allow_missing_documents_true(self):
+        """Test search with context and allow_missing_documents=True allows missing context documents"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+                "content": "flower content",
+            },
+            {
+                "_id": "2", 
+                "title": "Red rose",
+                "content": "flower content",
+            },
+            {
+                "_id": "3",
+                "title": "Europe",
+                "content": "continent content",
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            for search_method in ["TENSOR", "HYBRID"]:
+                hybrid_parameters = {"retrievalMethod": "tensor", "rankingMethod": "tensor"} \
+                    if search_method == "HYBRID" else None
+                with self.subTest(f"index_name={index_name}, search_method={search_method}"):
+                    tensor_fields = ["title", "content"] if index_name == self.unstructured_text_index_name else None
+                    add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                    if add_docs_results["errors"]:
+                        raise Exception(f"Failed to add documents to index {index_name}")
+
+                    # Should succeed even with missing context document "missing_doc"
+                    context = {
+                        "documents": {
+                            "ids": {"1": 1.0, "2": 1.0, "missing_doc": 1.0},
+                            "parameters": {
+                                "tensorFields": ["title"],
+                                "excludeInputDocuments": True,
+                                "allowMissingDocuments": True
+                            }
+                        }
+                    }
+
+                    res = self.client.index(index_name).search(
+                        q=None,
+                        context=context,
+                        search_method=search_method,
+                        hybrid_parameters=hybrid_parameters
+                    )
+
+                    # Should return results based on available context documents
+                    ids = [doc["_id"] for doc in res["hits"]]
+                    self.assertIn("3", ids)
+
+    def test_search_context_allow_missing_embeddings_true(self):
+        """Test search with context and allow_missing_embeddings=True allows context documents without embeddings"""
+        docs = [
+            {
+                "_id": "1",
+                "title": "Red orchid",
+            },
+            {
+                "_id": "2",
+                "title": "Red rose", 
+                "content": "flower content",
+            },
+            {
+                "_id": "3",
+                "title": "Europe",
+                "content": "continent content",
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            for search_method in ["TENSOR", "HYBRID"]:
+                hybrid_parameters = {"retrievalMethod": "tensor", "rankingMethod": "tensor"} \
+                    if search_method == "HYBRID" else None
+                with self.subTest(f"index_name={index_name}, search_method={search_method}"):
+                    tensor_fields = ["content", "title"] if index_name == self.unstructured_text_index_name else None
+                    add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                    if add_docs_results["errors"]:
+                        raise Exception(f"Failed to add documents to index {index_name}")
+
+                    # Should succeed even when context documents 1 and 2 lack embeddings for title field
+                    context = {
+                        "documents": {
+                            "ids": {"1": 1.0, "2": 1.0},
+                            "parameters": {
+                                # doc '1' does not have content
+                                "tensorFields": ["content"],
+                                "excludeInputDocuments": True,
+                                "allowMissingEmbeddings": True
+                            }
+                        }
+                    }
+
+                    res = self.client.index(index_name).search(
+                        q=None,
+                        context=context,
+                        search_method=search_method,
+                        hybrid_parameters=hybrid_parameters
+                    )
+
+                    self.assertEqual("3", res["hits"][0]["_id"])
+
+    def test_search_context_allow_missing_both_true(self):
+        """Test search with context and both allow_missing_documents=True and allow_missing_embeddings=True"""
+        docs = [
+            {
+                "_id": "1",
+                "content": "flower content",
+            },
+            {
+                "_id": "2",
+                "title": "Red rose",
+                "content": "flower content",
+            },
+            {
+                "_id": "3", 
+                "title": "Europe",
+                "content": "continent content",
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            for search_method in ["TENSOR", "HYBRID"]:
+                hybrid_parameters = {"retrievalMethod": "tensor", "rankingMethod": "tensor"} \
+                    if search_method == "HYBRID" else None
+                with self.subTest(f"index_name={index_name}, search_method={search_method}"):
+                    tensor_fields = ["content", "title"] if index_name == self.unstructured_text_index_name else None
+                    add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                    if add_docs_results["errors"]:
+                        raise Exception(f"Failed to add documents to index {index_name}")
+
+                    # Should succeed with both missing context documents and missing embeddings
+                    context = {
+                        "documents": {
+                            # doc '1' has no title embeddings
+                            "ids": {"1": 1.0, "2": 1.0, "missing_doc": 1.0},
+                            "parameters": {
+                                "tensorFields": ["title"],
+                                "excludeInputDocuments": True,
+                                "allowMissingDocuments": True,
+                                "allowMissingEmbeddings": True
+                            }
+                        }
+                    }
+
+                    res = self.client.index(index_name).search(
+                        q=None,
+                        context=context,
+                        search_method=search_method,
+                        hybrid_parameters=hybrid_parameters
+                    )
+
+                    self.assertEqual("3", res["hits"][0]["_id"])
+
+    def test_search_context_failed_to_collect_vectors_error(self):
+        """Test search with context and both allow_missing_documents=True and allow_missing_embeddings=True"""
+        docs = [
+            {
+                "_id": "1",
+                "content": "flower content",
+            },
+            {
+                "_id": "2",
+                "title": "Red rose",
+                "content": "flower content",
+            },
+            {
+                "_id": "3",
+                "title": "Europe",
+                "content": "continent content",
+            },
+        ]
+
+        for index_name in [self.structured_text_index_name, self.unstructured_text_index_name]:
+            for search_method in ["TENSOR", "HYBRID"]:
+                hybrid_parameters = {"retrievalMethod": "tensor", "rankingMethod": "tensor"} \
+                    if search_method == "HYBRID" else None
+                with self.subTest(f"index_name={index_name}, search_method={search_method}"):
+                    tensor_fields = ["content", "title"] if index_name == self.unstructured_text_index_name else None
+                    add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+
+                    if add_docs_results["errors"]:
+                        raise Exception(f"Failed to add documents to index {index_name}")
+
+                    # Should succeed with both missing context documents and missing embeddings
+                    context = {
+                        "documents": {
+                            # doc '1' has no title embeddings
+                            "ids": {"1": 1.0, "missing_doc": 1.0},
+                            "parameters": {
+                                "tensorFields": ["title"],
+                                "excludeInputDocuments": True,
+                                "allowMissingDocuments": True,
+                                "allowMissingEmbeddings": True
+                            }
+                        }
+                    }
+                    with self.assertRaises(MarqoWebError) as e:
+                        _ = self.client.index(index_name).search(
+                            q=None,
+                            context=context,
+                            search_method=search_method,
+                            hybrid_parameters=hybrid_parameters
+                        )
+                    self.assertIn("Marqo could not collect any vectors from the search query", str(e.exception))
