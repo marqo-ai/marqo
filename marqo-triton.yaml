@@ -1,0 +1,91 @@
+services:
+  # CUDA profile services
+  marqo-api:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton:latest
+    container_name: marqo-api
+    restart: always
+    depends_on:
+      - marqo-inference-cuda
+    environment:
+      - MARQO_MODE=API
+      - MARQO_API_WORKERS=4
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - MARQO_REMOTE_INFERENCE_URL=http://marqo-image-preprocessing:8881
+      - VESPA_CONFIG_URL=http://vespa:19071
+      - VESPA_DOCUMENT_URL=http://vespa:8080
+      - VESPA_QUERY_URL=http://vespa:8080
+      - ZOOKEEPER_HOSTS=vespa:2181
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_ENABLE_BATCH_APIS=true
+      - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
+      - MARQO_MODELS_TO_PRELOAD=[]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8882:8882"
+    network:
+      - marqo-net
+
+  marqo-image-preprocessing:
+    image:
+    container_name: marqo-image-preprocessing
+    network_mode: "host"
+    environment:
+      - MARQO_MODE=INFERENCE
+      - MARQO_MODELS_TO_PRELOAD=[]
+      - MARQO_INFERENCE_WORKER_COUNT=1
+      - MARQO_ENABLE_THROTTLING=FALSE
+      - TRITON_INFERENCE_URL="http://marqo-image-preprocessing:8001"
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MARQO_MAX_CUDA_MODEL_MEMORY=15
+      - MARQO_MAX_CPU_MODEL_MEMORY=15
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8881:8881"
+    networks:
+      - marqo-net
+
+  marqo-inference-triton:
+    image:
+    container_name: marqo-inference-triton
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+    networks:
+      - marqo-net
+
+  vespa:
+    image: vespaengine/vespa:8.513.17
+    container_name: vespa
+    ports:
+      - "8080:8080"
+      - "19071:19071"
+      - "2181:2181"
+      - "5005:5005"
+
+  networks:
+    marqo-net:
+      driver: bridge
+      attachable: true
