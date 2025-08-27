@@ -1,3 +1,5 @@
+name: marqo-triton-inference
+
 services:
   # CUDA profile services
   marqo-api:
