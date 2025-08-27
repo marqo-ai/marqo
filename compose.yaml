@@ -6,6 +6,8 @@ services:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-api
     restart: always
+    depends_on:
+      - marqo-image-preprocessing
     environment:
       - MARQO_MODE=API
       - MARQO_API_WORKERS=4
@@ -37,6 +39,8 @@ services:
   marqo-image-preprocessing:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-image-preprocessing
+    depends_on:
+      - marqo-inference-triton
     environment:
       - MARQO_MODE=INFERENCE
       - MARQO_MODELS_TO_PRELOAD=[]
