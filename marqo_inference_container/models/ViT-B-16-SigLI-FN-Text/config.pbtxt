@@ -1,6 +1,6 @@
 name: "ViT-B-16-SigLI-FN-Text"
 platform: "onnxruntime_onnx"
-max_batch_size: 32
+max_batch_size: 128
 instance_group [
     {
         count: 1

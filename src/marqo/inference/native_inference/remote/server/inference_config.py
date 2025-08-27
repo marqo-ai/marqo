@@ -18,8 +18,10 @@ class Config:
         self.model_manager: ModelManager = NativeModelManager()
         self.device_manager: DeviceManager = DeviceManager()
 
+        marqo_mode = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE)
+        marqo_mode = marqo_mode.upper() if marqo_mode else None
         triton_inference_url = utils.read_env_vars_and_defaults(EnvVars.TRITON_INFERENCE_URL)
-        if not triton_inference_url:
+        if not triton_inference_url and marqo_mode == "INFERENCE":
             raise ValueError(
                 f"Environment variable {EnvVars.TRITON_INFERENCE_URL} is not set. "
                 "Please set it to the URL of the Triton inference server."
