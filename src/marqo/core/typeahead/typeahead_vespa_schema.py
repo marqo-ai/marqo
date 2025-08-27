@@ -1,8 +1,8 @@
 import os
+
 from jinja2 import Environment, FileSystemLoader
 
 from marqo.core.models import MarqoIndex
-from marqo.core.vespa_index.vespa_schema import VespaSchema
 
 
 class TypeaheadVespaSchema:
