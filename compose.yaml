@@ -27,8 +27,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-            - count: all
-            - capabilities: [gpu]
+              count: all
+              capabilities: [gpu]
     ports:
       - "8882:8882"
     networks:
