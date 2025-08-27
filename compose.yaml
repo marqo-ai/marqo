@@ -13,10 +13,10 @@ services:
       - MARQO_API_WORKERS=4
       - MARQO_ENABLE_THROTTLING=FALSE
       - MARQO_REMOTE_INFERENCE_URL=http://marqo-image-preprocessing:8881
-      - VESPA_CONFIG_URL=http://vespa:19071
-      - VESPA_DOCUMENT_URL=http://vespa:8080
-      - VESPA_QUERY_URL=http://vespa:8080
-      - ZOOKEEPER_HOSTS=vespa:2181
+      - VESPA_CONFIG_URL=http://host.docker.internal:19071
+      - VESPA_DOCUMENT_URL=http://host.docker.internal:8080
+      - VESPA_QUERY_URL=http://host.docker.internal:8080
+      - ZOOKEEPER_HOSTS=host.docker.internal:2181
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MARQO_ENABLE_BATCH_APIS=true
@@ -33,6 +33,8 @@ services:
       - "8882:8882"
     networks:
       - marqo-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   marqo-image-preprocessing:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
@@ -42,7 +44,7 @@ services:
       - MARQO_MODELS_TO_PRELOAD=[]
       - MARQO_INFERENCE_WORKER_COUNT=1
       - MARQO_ENABLE_THROTTLING=FALSE
-      - TRITON_INFERENCE_URL="http://marqo-image-preprocessing:8001"
+      - TRITON_INFERENCE_URL=http://marqo-inference-triton:8001
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MARQO_MAX_CUDA_MODEL_MEMORY=15
