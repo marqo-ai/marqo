@@ -35,9 +35,9 @@ services:
       - marqo-net
 
   marqo-image-preprocessing:
-    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
+    image: 424082663841.dkr.ecr.us-e
+    ast-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-image-preprocessing
-    network_mode: "host"
     environment:
       - MARQO_MODE=INFERENCE
       - MARQO_MODELS_TO_PRELOAD=[]
