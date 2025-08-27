@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from unittest import TestCase
 from unittest.mock import patch, Mock
 import time
@@ -91,6 +91,8 @@ class MarqoTestCase(TestCase):
     def semi_structured_marqo_index(
             cls,
             name: str,
+            schema_name: Optional[str] = None,
+            typeahead_schema_name: Optional[str] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
@@ -132,7 +134,8 @@ class MarqoTestCase(TestCase):
         """
         return SemiStructuredMarqoIndex(
             name=name,
-            schema_name=name,
+            schema_name=schema_name or name,
+            typeahead_schema_name=typeahead_schema_name or name,
             model=model,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
