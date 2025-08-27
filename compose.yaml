@@ -22,16 +22,13 @@ services:
       - MARQO_ENABLE_BATCH_APIS=true
       - MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0
       - MARQO_MODELS_TO_PRELOAD=[]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    device_requests:
+      - driver: nvidia
+        count: all
+        capabilities: [gpu]
     ports:
       - "8882:8882"
-    network:
+    networks:
       - marqo-net
 
   marqo-image-preprocessing:
@@ -49,13 +46,10 @@ services:
       - MARQO_MAX_CUDA_MODEL_MEMORY=15
       - MARQO_MAX_CPU_MODEL_MEMORY=15
       - HF_HUB_ENABLE_HF_TRANSFER=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    device_requests:
+      - driver: nvidia
+        count: all
+        capabilities: [gpu]
     ports:
       - "8881:8881"
     networks:
@@ -64,13 +58,10 @@ services:
   marqo-inference-triton:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton:latest
     container_name: marqo-inference-triton
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    device_requests:
+      - driver: nvidia
+        count: all
+        capabilities: [gpu]
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -90,4 +81,3 @@ services:
   networks:
     marqo-net:
       driver: bridge
-      attachable: true
