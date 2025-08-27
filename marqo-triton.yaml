@@ -5,7 +5,7 @@ services:
     container_name: marqo-api
     restart: always
     depends_on:
-      - marqo-inference-cuda
+      - vespa
     environment:
       - MARQO_MODE=API
       - MARQO_API_WORKERS=4
