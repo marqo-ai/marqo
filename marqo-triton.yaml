@@ -1,7 +1,7 @@
 services:
   # CUDA profile services
   marqo-api:
-    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-api
     restart: always
     depends_on:
@@ -33,7 +33,7 @@ services:
       - marqo-net
 
   marqo-image-preprocessing:
-    image:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-image-preprocessing
     network_mode: "host"
     environment:
@@ -60,7 +60,7 @@ services:
       - marqo-net
 
   marqo-inference-triton:
-    image:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton:latest
     container_name: marqo-inference-triton
     deploy:
       resources:
