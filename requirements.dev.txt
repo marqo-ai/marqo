@@ -12,5 +12,3 @@ opentelemetry-test-utils==0.54b1
 # For vespa_local setup
 docker==7.1.0
 PyYAML==6.0.2
-
-tritonclient[all]==2.36.0
