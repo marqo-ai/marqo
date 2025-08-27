@@ -6,8 +6,6 @@ services:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-triton-api:latest
     container_name: marqo-api
     restart: always
-    depends_on:
-      - vespa
     environment:
       - MARQO_MODE=API
       - MARQO_API_WORKERS=4
