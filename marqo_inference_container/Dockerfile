@@ -8,4 +8,4 @@ EXPOSE 8000
 EXPOSE 8001
 EXPOSE 8002
 
-ENTRYPOINT ["/opt/tritonserver/bin/tritonserver", "--model-repository=/models", "--log-verbose=1"]
+ENTRYPOINT ["/opt/tritonserver/bin/tritonserver", "--model-repository=/models"]
