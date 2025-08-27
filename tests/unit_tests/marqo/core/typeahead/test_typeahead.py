@@ -5,7 +5,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadSuggestion,
     TypeaheadAddQueryRequest, TypeaheadIndexRequest, TypeaheadIndexResponse,
-    TypeaheadIndexError
+    TypeaheadIndexError, TypeaheadStatsResponse
 )
 from marqo.core.typeahead.typeahead import Typeahead
 from marqo.vespa.models.feed_response import FeedBatchResponse, FeedBatchDocumentResponse
@@ -566,6 +566,127 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         
         # Should convert to milliseconds and round: 123.4ms -> 123ms
         self.assertEqual(result.processing_time_ms, 123)
+
+
+class TestTypeaheadDeleteQueries(unittest.TestCase):
+    """Test cases for delete query methods."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_vespa_client = Mock(spec=VespaClient)
+        self.mock_index_management = Mock(spec=IndexManagement)
+        self.typeahead = Typeahead(
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management
+        )
+        
+        self.mock_marqo_index = Mock()
+        self.mock_marqo_index.typeahead_schema_name = "test_schema"
+
+    def hash(self, query):
+        return self.typeahead._generate_query_hash(query)
+
+    def test_delete_all_queries_success(self):
+        """Test delete_all_queries removes all documents."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+        
+        # Mock successful delete response
+        self.mock_vespa_client.delete_all_docs.return_value = True
+        
+        # Execute
+        self.typeahead.delete_all_queries("test_index")
+        
+        # Verify
+        self.mock_index_management.get_index.assert_called_once_with(
+            index_name="test_index"
+        )
+        self.mock_vespa_client.delete_all_docs.assert_called_once_with(
+            "test_schema"
+        )
+
+    def test_delete_queries_success(self):
+        """Test delete_queries removes specified queries."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+
+        hash1 = f"{self.hash('query1')}"
+        hash2 = f"{self.hash('query2')}"
+
+        # Mock successful delete responses
+        successful_response = FeedBatchDocumentResponse(
+            id=hash1,
+            status=200,
+            message="OK",
+            path_id="/document/v1/test_schema/test_schema/docid/hash1"
+        )
+        failed_response = FeedBatchDocumentResponse(
+            id=hash2,
+            status=404,
+            message="Not found",
+            path_id="/document/v1/test_schema/test_schema/docid/hash2"
+        )
+        
+        feed_response = FeedBatchResponse(responses=[successful_response, failed_response], errors=True)
+        self.mock_vespa_client.delete_batch.return_value = feed_response
+        
+        # Execute
+        result = self.typeahead.delete_queries("test_index", ["query1", "query2"])
+        
+        # Verify
+        self.mock_index_management.get_index.assert_called_once()
+        self.mock_vespa_client.delete_batch.assert_called_once()
+        
+        # Check call arguments for delete_batch
+        call_args, kwargs = self.mock_vespa_client.delete_batch.call_args
+        self.assertListEqual([hash1, hash2], call_args[0])
+        self.assertEqual("test_schema", kwargs["schema"])
+
+        # Check result is returned as-is (TODO to process it properly)
+        # self.assertEqual(result, feed_response.__dict__)
+
+
+class TestTypeaheadStats(unittest.TestCase):
+    """Test cases for get_stats method."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_vespa_client = Mock(spec=VespaClient)
+        self.mock_index_management = Mock(spec=IndexManagement)
+        self.typeahead = Typeahead(
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management
+        )
+        
+        self.mock_marqo_index = Mock()
+        self.mock_marqo_index.typeahead_schema_name = "test_schema"
+
+    def test_get_stats_returns_document_count(self):
+        """Test get_stats returns the correct document count."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+        
+        # Mock query response with total_count
+        mock_query_response = Mock()
+        mock_query_response.total_count = 42
+        self.mock_vespa_client.query.return_value = mock_query_response
+        
+        # Execute
+        result = self.typeahead.get_stats("test_index")
+        
+        # Verify
+        self.mock_index_management.get_index.assert_called_once_with(
+            index_name="test_index"
+        )
+        
+        # Verify query was called with correct parameters
+        self.mock_vespa_client.query.assert_called_once_with(
+            schema="test_schema",
+            yql="SELECT * FROM test_schema WHERE true",
+            hits=0,
+            summary="minimal"
+        )
+        
+        # Check result
+        self.assertIsInstance(result, TypeaheadStatsResponse)
+        self.assertEqual(result.indexed_queries, 42)
 
 
 if __name__ == "__main__":
