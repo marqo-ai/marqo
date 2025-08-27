@@ -811,6 +811,20 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
         raise
 
 
+@app.get("/indexes/{index_name}/suggestions/queries")
+def get_queries(index_name: str, queries: List[str], marqo_config: config.Config = Depends(get_config)):
+    """
+    Get specific queries from the typeahead index by query strings.
+    
+    Args:
+        index_name: Name of the index to get queries from
+        queries: List of query strings to retrieve
+    """
+    result = marqo_config.typeahead.get_queries(index_name, queries)
+    
+    return ORJSONResponse(content=result.model_dump(by_alias=True))
+
+
 @app.get('/memory', include_in_schema=False)
 @utils.enable_debug_apis()
 def memory():

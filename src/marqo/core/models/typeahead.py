@@ -98,3 +98,16 @@ class TypeaheadStatsResponse(ImmutableStrictBaseModelV2):
         alias="indexedQueries",
         description="Number of indexed queries"
     )
+
+
+class TypeaheadQuery(ImmutableStrictBaseModelV2):
+    """Represents a query from the typeahead schema."""
+    query: str = Field(..., description="The query string")
+    popularity: float = Field(..., description="Popularity score")
+    metadata: Dict[str, float] = Field(..., description="Additional metadata")
+    last_updated_at: Optional[int] = Field(None, alias="lastUpdatedAt", description="Last updated timestamp")
+
+
+class TypeaheadGetQueriesResponse(ImmutableStrictBaseModelV2):
+    """Response model for getting typeahead queries."""
+    queries: List[TypeaheadQuery] = Field(..., description="List of retrieved queries")

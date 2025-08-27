@@ -7,7 +7,8 @@ from fastapi.testclient import TestClient
 from marqo import config
 from marqo.core.models.typeahead import (
     TypeaheadResponse, TypeaheadSuggestion,
-    TypeaheadIndexResponse, TypeaheadStatsResponse, TypeaheadIndexError
+    TypeaheadIndexResponse, TypeaheadStatsResponse, TypeaheadIndexError,
+    TypeaheadQuery, TypeaheadGetQueriesResponse
 )
 from marqo.tensor_search import api
 
@@ -277,6 +278,64 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         self.assertEqual(request_obj.fuzzy_edit_distance, 2)
         self.assertEqual(request_obj.popularity_weight, 0.8)
         self.assertEqual(request_obj.bm25_weight, 1.2)
+
+    def test_get_queries_success(self):
+        """Test get_queries endpoint returns correct queries."""
+        # Create mock queries
+        mock_queries = [
+            TypeaheadQuery(
+                query="test query 1",
+                popularity=1.5,
+                metadata={"category": 0.8},
+                last_updated_at=1234567890
+            ),
+            TypeaheadQuery(
+                query="test query 2", 
+                popularity=0.7,
+                metadata={"category": 0.5},
+                last_updated_at=1234567891
+            )
+        ]
+        mock_response = TypeaheadGetQueriesResponse(queries=mock_queries)
+        self.mock_typeahead.get_queries.return_value = mock_response
+        
+        # Send request with list of queries as JSON body
+        queries_list = ["test query 1", "test query 2"]
+        response = self.client.request("GET", "/indexes/test_index/suggestions/queries", json=queries_list)
+        
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertIn("queries", response_data)
+        self.assertEqual(len(response_data["queries"]), 2)
+        
+        # Check first query with camelCase aliases
+        query1 = response_data["queries"][0]
+        self.assertEqual(query1["query"], "test query 1")
+        self.assertEqual(query1["popularity"], 1.5)
+        self.assertEqual(query1["metadata"], {"category": 0.8})
+        self.assertEqual(query1["lastUpdatedAt"], 1234567890)  # camelCase alias
+        
+        # Verify typeahead service was called correctly
+        self.mock_typeahead.get_queries.assert_called_once_with("test_index", queries_list)
+
+    def test_get_queries_empty_list(self):
+        """Test get_queries endpoint with empty list."""
+        mock_response = TypeaheadGetQueriesResponse(queries=[])
+        self.mock_typeahead.get_queries.return_value = mock_response
+        
+        response = self.client.request("GET", "/indexes/test_index/suggestions/queries", json=[])
+        
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertEqual(response_data["queries"], [])
+
+    def test_get_queries_invalid_request(self):
+        """Test get_queries endpoint with invalid request parameters."""
+        # Send invalid query parameter type - FastAPI should handle this gracefully
+        response = self.client.request("GET", "/indexes/test_index/suggestions/queries", json="123")
+        
+        # Should still work since strings can be passed
+        self.assertTrue(response.status_code in [200, 422])  # Either works or validation error
 
 
 if __name__ == "__main__":

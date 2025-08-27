@@ -8,7 +8,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
     TypeaheadIndexResponse, TypeaheadIndexError, TypeaheadIndexRequest,
-    TypeaheadStatsResponse
+    TypeaheadStatsResponse, TypeaheadQuery, TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.logging import get_logger
@@ -264,6 +264,44 @@ class Typeahead:
         # Access total_count property from QueryResult
         total_count = response.total_count or 0
         return TypeaheadStatsResponse(indexed_queries=total_count)
+
+    def get_queries(self, index_name: str, queries: List[str]) -> TypeaheadGetQueriesResponse:
+        """
+        Get queries from the typeahead index by query strings.
+        
+        Args:
+            index_name: Name of the index to get queries from
+            queries: List of query strings to retrieve
+            
+        Returns:
+            TypeaheadGetQueriesResponse with matching queries
+        """
+        # Check if index exists and get typeahead schema name
+        marqo_index = self.index_management.get_index(index_name=index_name)
+        typeahead_schema_name = marqo_index.typeahead_schema_name
+        
+        if not queries:
+            return TypeaheadGetQueriesResponse(queries=[])
+        
+        # Generate document IDs from normalized queries
+        ids = [self._generate_query_hash(normalize_text(q)) for q in queries]
+        
+        # Get documents from Vespa
+        response = self.vespa_client.get_batch(ids, schema=typeahead_schema_name)
+        
+        query_results = []
+        for doc_response in response.responses:
+            if doc_response.document and doc_response.document.fields:  # Document found
+                fields = doc_response.document.fields
+                query_obj = TypeaheadQuery(
+                    query=fields["query"],
+                    popularity=fields["popularity"],
+                    metadata=fields.get("metadata", {}),
+                    last_updated_at=fields.get("last_updated_at")
+                )
+                query_results.append(query_obj)
+        
+        return TypeaheadGetQueriesResponse(queries=query_results)
 
     def _generate_query_hash(self, query: str) -> str:
         """Generate a 128-bit blake3 hash for a query string.

@@ -5,10 +5,11 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadSuggestion,
     TypeaheadAddQueryRequest, TypeaheadIndexRequest, TypeaheadIndexResponse,
-    TypeaheadIndexError, TypeaheadStatsResponse
+    TypeaheadIndexError, TypeaheadStatsResponse, TypeaheadQuery, TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.typeahead import Typeahead
 from marqo.vespa.models.feed_response import FeedBatchResponse, FeedBatchDocumentResponse
+from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
 from marqo.vespa.models.query_result import QueryResult, Root, Child, RootFields
 from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
@@ -687,6 +688,146 @@ class TestTypeaheadStats(unittest.TestCase):
         # Check result
         self.assertIsInstance(result, TypeaheadStatsResponse)
         self.assertEqual(result.indexed_queries, 42)
+
+
+class TestTypeaheadGetQueries(unittest.TestCase):
+    """Test cases for get_queries method."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_vespa_client = Mock(spec=VespaClient)
+        self.mock_index_management = Mock(spec=IndexManagement)
+        self.typeahead = Typeahead(
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management
+        )
+        
+        self.mock_marqo_index = Mock()
+        self.mock_marqo_index.typeahead_schema_name = "test_schema"
+
+    def test_get_queries_success(self):
+        """Test get_queries returns correct queries."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+        
+        # Mock batch get response with found documents
+        doc1_fields = {
+            "query": "test query 1",
+            "popularity": 1.5,
+            "metadata": {"category": 0.8},
+            "last_updated_at": 1234567890
+        }
+        doc2_fields = {
+            "query": "test query 2", 
+            "popularity": 0.7,
+            "metadata": {"category": 0.5},
+            "last_updated_at": 1234567891
+        }
+        
+        found_doc1 = GetBatchDocumentResponse(
+            status=200,
+            pathId="/document/v1/test_schema/test_schema/docid/hash1",
+            id="hash1",
+            document=Document(id="hash1", fields=doc1_fields)
+        )
+        found_doc2 = GetBatchDocumentResponse(
+            status=200,
+            pathId="/document/v1/test_schema/test_schema/docid/hash2",
+            id="hash2",
+            document=Document(id="hash2", fields=doc2_fields)
+        )
+        
+        get_batch_response = GetBatchResponse(responses=[found_doc1, found_doc2], errors=False)
+        self.mock_vespa_client.get_batch.return_value = get_batch_response
+        
+        # Execute
+        result = self.typeahead.get_queries("test_index", ["test query 1", "test query 2"])
+        
+        # Verify
+        self.mock_index_management.get_index.assert_called_once_with(index_name="test_index")
+        self.mock_vespa_client.get_batch.assert_called_once()
+        
+        # Check result
+        self.assertIsInstance(result, TypeaheadGetQueriesResponse)
+        self.assertEqual(len(result.queries), 2)
+        
+        # Check first query
+        query1 = result.queries[0]
+        self.assertEqual(query1.query, "test query 1")
+        self.assertEqual(query1.popularity, 1.5)
+        self.assertEqual(query1.metadata, {"category": 0.8})
+        self.assertEqual(query1.last_updated_at, 1234567890)
+        
+        # Check second query  
+        query2 = result.queries[1]
+        self.assertEqual(query2.query, "test query 2")
+        self.assertEqual(query2.popularity, 0.7)
+
+    def test_get_queries_empty_list(self):
+        """Test get_queries with empty query list."""
+        result = self.typeahead.get_queries("test_index", [])
+        
+        # Should return empty response without calling Vespa
+        self.assertIsInstance(result, TypeaheadGetQueriesResponse)
+        self.assertEqual(len(result.queries), 0)
+        self.mock_vespa_client.get_batch.assert_not_called()
+
+    def test_get_queries_not_found(self):
+        """Test get_queries with queries that don't exist."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+        
+        # Mock batch get response with no documents found
+        not_found_doc = GetBatchDocumentResponse(
+            status=404,
+            pathId="/document/v1/test_schema/test_schema/docid/hash1",
+            id="hash1",
+            document=None,
+            message="Document not found"
+        )
+        
+        get_batch_response = GetBatchResponse(responses=[not_found_doc], errors=True)
+        self.mock_vespa_client.get_batch.return_value = get_batch_response
+        
+        # Execute
+        result = self.typeahead.get_queries("test_index", ["nonexistent query"])
+        
+        # Verify
+        self.assertIsInstance(result, TypeaheadGetQueriesResponse)
+        self.assertEqual(len(result.queries), 0)  # No queries found
+
+    def test_get_queries_mixed_found_not_found(self):
+        """Test get_queries with mix of found and not found queries."""
+        self.mock_index_management.get_index.return_value = self.mock_marqo_index
+        
+        # Mock response with one found, one not found
+        found_doc = GetBatchDocumentResponse(
+            status=200,
+            pathId="/document/v1/test_schema/test_schema/docid/hash1",
+            id="hash1", 
+            document=Document(id="hash1", fields={
+                "query": "found query",
+                "popularity": 1.0,
+                "metadata": {},
+                "last_updated_at": 1234567890
+            })
+        )
+        not_found_doc = GetBatchDocumentResponse(
+            status=404,
+            pathId="/document/v1/test_schema/test_schema/docid/hash2",
+            id="hash2",
+            document=None,
+            message="Document not found"
+        )
+        
+        get_batch_response = GetBatchResponse(responses=[found_doc, not_found_doc], errors=True)
+        self.mock_vespa_client.get_batch.return_value = get_batch_response
+        
+        # Execute
+        result = self.typeahead.get_queries("test_index", ["found query", "nonexistent query"])
+        
+        # Verify - should return only the found query
+        self.assertIsInstance(result, TypeaheadGetQueriesResponse)
+        self.assertEqual(len(result.queries), 1)
+        self.assertEqual(result.queries[0].query, "found query")
 
 
 if __name__ == "__main__":
