@@ -79,15 +79,6 @@ services:
     networks:
       - marqo-net
 
-  vespa:
-    image: vespaengine/vespa:8.513.17
-    container_name: vespa
-    ports:
-      - "8080:8080"
-      - "19071:19071"
-      - "2181:2181"
-      - "5005:5005"
-
 networks:
   marqo-net:
     driver: bridge
