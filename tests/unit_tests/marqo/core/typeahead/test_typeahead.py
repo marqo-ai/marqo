@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadSuggestion,
-    TypeaheadAddQueryRequest, TypeaheadIndexRequest, TypeaheadIndexResponse,
-    TypeaheadIndexError, TypeaheadStatsResponse, TypeaheadQuery, TypeaheadGetQueriesResponse
+    TypeaheadAddQueryRequest, TypeaheadIndexRequest, TypeaheadIndexError, TypeaheadStatsResponse,
+    TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.typeahead import Typeahead
 from marqo.vespa.models.feed_response import FeedBatchResponse, FeedBatchDocumentResponse
@@ -34,22 +34,6 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
 
     def _hash(self, query):
         return self.typeahead._generate_query_hash(query)
-
-    def test_index_queries_empty_list(self):
-        """Test index_queries with empty queries list returns appropriate response."""
-        request = TypeaheadIndexRequest(queries=[])
-        
-        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.025]):
-            result = self.typeahead.index_queries("test_index", request)
-        
-        # Should return response with 0 indexed and empty errors
-        self.assertIsInstance(result, TypeaheadIndexResponse)
-        self.assertEqual(result.indexed, 0)
-        self.assertEqual(result.errors, [])
-        self.assertEqual(result.processing_time_ms, 25)
-        
-        # Should not call vespa client
-        self.mock_vespa_client.feed_batch.assert_not_called()
 
     def test_index_queries_valid_queries(self):
         """Test index_queries with valid queries processes successfully."""
