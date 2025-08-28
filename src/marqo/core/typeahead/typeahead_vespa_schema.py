@@ -26,8 +26,7 @@ class TypeaheadVespaSchema:
 
         new_marqo_index = self.marqo_index.copy(deep=True, update={"typeahead_schema_name": typeahead_schema_name})
 
-        return new_marqo_index, vespa_schema_template.render(
-            schema_name=typeahead_schema_name)
+        return vespa_schema_template.render(schema_name=typeahead_schema_name), new_marqo_index
 
     def _get_typeahead_schema_name(self, schema_name: str) -> str:
         """

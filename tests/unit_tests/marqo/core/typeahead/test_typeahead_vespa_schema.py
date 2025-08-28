@@ -29,7 +29,7 @@ class TestTypeaheadVespaSchema(MarqoTestCase):
 
         # Generate the typeahead schema
         typeahead_schema = TypeaheadVespaSchema(test_marqo_index)
-        updated_index, generated_schema = typeahead_schema.generate_schema()
+        generated_schema, updated_index = typeahead_schema.generate_schema()
 
         # Read expected schema
         expected_schema = self._read_schema_from_file('test_schemas/typeahead_vespa_schema.sd')

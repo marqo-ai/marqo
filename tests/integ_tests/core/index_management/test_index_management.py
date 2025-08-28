@@ -26,6 +26,7 @@ from marqo.core.index_management.vespa_application_package import (MarqoConfig, 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
@@ -415,16 +416,17 @@ class TestIndexManagement(MarqoTestCase):
         # merge batch create and delete happy path to save some testing time
         request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
         schema, index = vespa_schema_factory(request).generate_schema()
+        typeahead_schema, index = TypeaheadVespaSchema(index).generate_schema()
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_present(app, index, schema)
+        self._assert_index_is_present(app, index, schema, typeahead_schema)
 
         self.index_management.delete_index_by_name(index.name)
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_not_present(app, index.name, index.schema_name)
+        self._assert_index_is_not_present(app, index.name, index.schema_name, index.typeahead_schema_name)
 
     def test_update_index_should_succeed(self):
         request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
@@ -494,6 +496,7 @@ class TestIndexManagement(MarqoTestCase):
                 self.assertIn('can not be update', str(err.exception))
 
     def test_update_index_should_skip_if_nothing_to_update(self):
+        # TODO this test case is failing
         request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
@@ -562,14 +565,16 @@ class TestIndexManagement(MarqoTestCase):
             tensor_fields=['title']
         )
         schema1, index1 = vespa_schema_factory(request1).generate_schema()
+        typeahead_schema1, index1 = TypeaheadVespaSchema(index1).generate_schema()
         schema2, index2 = vespa_schema_factory(request2).generate_schema()
+        typeahead_schema2, index2 = TypeaheadVespaSchema(index2).generate_schema()
 
         self.index_management.bootstrap_vespa()
         self.index_management.batch_create_indexes([request1, request2])
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_present(app, index1, schema1)
-        self._assert_index_is_present(app, index2, schema2)
+        self._assert_index_is_present(app, index1, schema1, typeahead_schema1)
+        self._assert_index_is_present(app, index2, schema2, typeahead_schema2)
 
         all_indexes = {index.name: index for index in self.index_management.get_all_indexes()}
         self.assertEqual(2, len(all_indexes))
@@ -580,8 +585,8 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management.batch_delete_indexes_by_name([request1.name, request2.name])
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_not_present(app, index1.name, index1.schema_name)
-        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+        self._assert_index_is_not_present(app, index1.name, index1.schema_name, index1.typeahead_schema_name)
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name, index2.typeahead_schema_name)
 
         self.assertEqual(0, len(self.index_management.get_all_indexes()))
 
@@ -597,24 +602,26 @@ class TestIndexManagement(MarqoTestCase):
             self.index_management.batch_create_indexes([request2, request])
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name, index2.typeahead_schema_name)
 
     def test_batch_delete_index_should_fail_atomically(self):
         request = self.unstructured_marqo_index_request(name="index1")
         schema, index1 = vespa_schema_factory(request).generate_schema()
+        typeahead_schema1, index1 = TypeaheadVespaSchema(index1).generate_schema()
 
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
         request2 = self.unstructured_marqo_index_request(name="index2")
         _, index2 = vespa_schema_factory(request2).generate_schema()
+        _, index2 = TypeaheadVespaSchema(index2).generate_schema()
 
         with self.assertRaisesStrict(IndexNotFoundError):
             self.index_management.batch_delete_indexes_by_name([request.name, request2.name])
 
         app = self.vespa_client.download_application()
-        self._assert_index_is_present(app, index1, schema)
-        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+        self._assert_index_is_present(app, index1, schema, typeahead_schema1)
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name, index2.typeahead_schema_name)
 
     def test_concurrent_updates_is_prevented_by_distributed_locking(self):
         exception_list = []
@@ -692,7 +699,8 @@ class TestIndexManagement(MarqoTestCase):
         self.assertFalse(filecmp.cmp(path1, path2),
                          f'Expect file {path1} and {path2} to have different content, but they are the same')
 
-    def _assert_index_is_present(self, app, expected_index, expected_schema, expected_version=1):
+    def _assert_index_is_present(self, app, expected_index, expected_schema,
+                                 expected_typeahead_schema=None, expected_version=1):
         # assert index setting exists and equals to expected value
         saved_index = self.index_management.get_index(expected_index.name)
         exclude_fields = {'model', 'version'}
@@ -706,7 +714,7 @@ class TestIndexManagement(MarqoTestCase):
         if 'text_query_prefix' in model_properties:
             self.assertEqual(saved_index.model.text_query_prefix, model_properties['text_query_prefix'])
 
-        # assert schema file exists and has expected value
+        # assert schema files exist and have expected value
         schema_name = expected_index.schema_name
         self._assert_file_exists(app, 'schemas', f'{schema_name}.sd')
         with open(os.path.join(app, 'schemas', f'{schema_name}.sd')) as f:
@@ -714,14 +722,29 @@ class TestIndexManagement(MarqoTestCase):
         doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(f'content/documents/document[@type="{schema_name}"]')
         self.assertIsNotNone(doc)
 
-    def _assert_index_is_not_present(self, app, index_name, schema_name):
+        # assert that the typeschema file exists and has expected value
+        if expected_typeahead_schema:
+            schema_name = expected_index.typeahead_schema_name
+            self._assert_file_exists(app, 'schemas', f'{schema_name}.sd')
+            with open(os.path.join(app, 'schemas', f'{schema_name}.sd')) as f:
+                self.assertEqual(f.read(), expected_typeahead_schema)
+            doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(
+                f'content/documents/document[@type="{schema_name}"]')
+            self.assertIsNotNone(doc)
+
+    def _assert_index_is_not_present(self, app, index_name, schema_name, typeahead_schema_name):
         with self.assertRaisesStrict(IndexNotFoundError):
             self.index_management.get_index(index_name)
 
         self._assert_file_does_not_exist(app, 'schemas', f'{schema_name}.sd')
-        doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(
+        schema_doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(
             f'content/documents/document[@type="{schema_name}"]')
-        self.assertIsNone(doc)
+        self.assertIsNone(schema_doc)
+
+        self._assert_file_does_not_exist(app, 'schemas', f'{typeahead_schema_name}.sd')
+        typeahead_schema_doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(
+            f'content/documents/document[@type="{typeahead_schema_name}"]')
+        self.assertIsNone(typeahead_schema_doc)
 
     def _deploy_initial_app_package(self):
         app_root_path = os.path.join(self._test_dir, 'initial_vespa_app')

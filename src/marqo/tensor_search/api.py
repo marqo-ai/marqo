@@ -31,8 +31,6 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexRequest
 from marqo.core.monitoring import memory_profiler
-import marqo.inference.native_inference.remote.server.inference_config as inference_config
-from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -78,7 +76,9 @@ def generate_config() -> config.Config:
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
     if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
-
+        # !!!Please note that these imports are deliberately put here since we only need them in COMBINED mode
+        import marqo.inference.native_inference.remote.server.inference_config as inference_config
+        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
         native_inference_local_config = inference_config.Config()
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference

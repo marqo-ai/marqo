@@ -138,7 +138,7 @@ class MarqoTestCase(TestCase):
         return SemiStructuredMarqoIndex(
             name=name,
             schema_name=schema_name or name,
-            typeahead_schema_name=typeahead_schema_name or name,
+            typeahead_schema_name=typeahead_schema_name,
             model=model,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,

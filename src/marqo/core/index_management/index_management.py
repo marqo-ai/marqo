@@ -175,7 +175,7 @@ class IndexManagement:
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
             logger.debug(f'Creating index {request.name} with schema:\n{schema}')
 
-            updated_marqo_index, typeahead_schema = TypeaheadVespaSchema(marqo_index).generate_schema()
+            typeahead_schema, updated_marqo_index = TypeaheadVespaSchema(marqo_index).generate_schema()
             logger.debug(
                 f'Creating typeahead schema for index {request.name} with schema: '
                 f'{updated_marqo_index.typeahead_schema_name}'

@@ -162,5 +162,127 @@ class TestVespaApplicationPackage(MarqoTestCase):
         # Verify no deployment happened
         self.mock_store.deploy_application.assert_not_called()
 
+    def test_batch_delete_index_setting_and_schema_removes_typeahead_schema(self):
+        """Test that batch_delete_index_setting_and_schema removes both main and typeahead schemas."""
+        # Setup
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_name="marqo__test_index",
+            typeahead_schema_name="marqo__test_index_typeahead"
+        )
+        
+        # Mock the index store to return the index
+        self.vespa_app._index_setting_store.get_index = Mock(return_value=marqo_index)
+        
+        # Execute
+        self.vespa_app.batch_delete_index_setting_and_schema(["test_index"])
+        
+        # Verify that both main and typeahead schema files are removed
+        expected_remove_calls = [
+            unittest.mock.call('schemas', 'marqo__test_index.sd'),
+            unittest.mock.call('schemas', 'marqo__test_index_typeahead.sd')
+        ]
+        
+        actual_remove_calls = [
+            call for call in self.mock_store.remove_file.call_args_list
+            if len(call[0]) == 2 and call[0][0] == 'schemas'
+        ]
+        
+        self.assertEqual(len(actual_remove_calls), 2)
+        self.assertIn(expected_remove_calls[0], actual_remove_calls)
+        self.assertIn(expected_remove_calls[1], actual_remove_calls)
+        
+        # Verify deployment was called
+        self.mock_store.deploy_application.assert_called_once()
+
+    def test_batch_delete_index_setting_and_schema_handles_no_typeahead_schema(self):
+        """Test that batch_delete_index_setting_and_schema works when index has no typeahead schema."""
+        # Setup - index without typeahead schema
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_name="marqo__test_index",
+            typeahead_schema_name=None  # No typeahead schema
+        )
+        
+        # Mock the index store to return the index
+        self.vespa_app._index_setting_store.get_index = Mock(return_value=marqo_index)
+        
+        # Execute
+        self.vespa_app.batch_delete_index_setting_and_schema(["test_index"])
+        
+        # Verify that only the main schema file is removed
+        schema_remove_calls = [
+            call for call in self.mock_store.remove_file.call_args_list
+            if len(call[0]) == 2 and call[0][0] == 'schemas'
+        ]
+        
+        self.assertEqual(len(schema_remove_calls), 1)
+        self.assertEqual(schema_remove_calls[0], unittest.mock.call('schemas', 'marqo__test_index.sd'))
+        
+        # Verify deployment was called
+        self.mock_store.deploy_application.assert_called_once()
+
+    def test_batch_delete_multiple_indexes_removes_all_typeahead_schemas(self):
+        """Test that batch_delete_index_setting_and_schema removes typeahead schemas for multiple indexes."""
+        # Setup
+        index1 = self.semi_structured_marqo_index(
+            name="products",
+            schema_name="marqo__products",
+            typeahead_schema_name="marqo__products_typeahead"
+        )
+        
+        index2 = self.semi_structured_marqo_index(
+            name="users",
+            schema_name="marqo__users",
+            typeahead_schema_name="marqo__users_typeahead"
+        )
+        
+        index3 = self.semi_structured_marqo_index(
+            name="categories",
+            schema_name="marqo__categories",
+            typeahead_schema_name=None  # No typeahead schema
+        )
+        
+        # Mock the index store to return appropriate indexes
+        def mock_get_index(name):
+            if name == "products":
+                return index1
+            elif name == "users":
+                return index2
+            elif name == "categories":
+                return index3
+            return None
+        
+        self.vespa_app._index_setting_store.get_index = Mock(side_effect=mock_get_index)
+        
+        # Execute
+        self.vespa_app.batch_delete_index_setting_and_schema(["products", "users", "categories"])
+        
+        # Verify that all main schemas and typeahead schemas (where they exist) are removed
+        schema_remove_calls = [
+            call for call in self.mock_store.remove_file.call_args_list
+            if len(call[0]) == 2 and call[0][0] == 'schemas'
+        ]
+        
+        expected_removes = [
+            unittest.mock.call('schemas', 'marqo__products.sd'),
+            unittest.mock.call('schemas', 'marqo__products_typeahead.sd'),
+            unittest.mock.call('schemas', 'marqo__users.sd'),
+            unittest.mock.call('schemas', 'marqo__users_typeahead.sd'),
+            unittest.mock.call('schemas', 'marqo__categories.sd')
+            # Note: marqo__categories_typeahead.sd should NOT be removed since it's None
+        ]
+        
+        self.assertEqual(len(schema_remove_calls), 5)
+        for expected_call in expected_removes:
+            self.assertIn(expected_call, schema_remove_calls)
+        
+        # Ensure typeahead schema for categories was NOT removed
+        categories_typeahead_call = unittest.mock.call('schemas', 'marqo__categories_typeahead.sd')
+        self.assertNotIn(categories_typeahead_call, schema_remove_calls)
+        
+        # Verify deployment was called once for the batch
+        self.mock_store.deploy_application.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()

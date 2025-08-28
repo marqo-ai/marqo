@@ -178,7 +178,7 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
         mock_updated_index = mock_marqo_index.copy(deep=True, update={"typeahead_schema_name": "marqo__test_index_typeahead"})
         mock_typeahead_schema = "typeahead_schema_content"
         mock_typeahead_instance = Mock()
-        mock_typeahead_instance.generate_schema.return_value = (mock_updated_index, mock_typeahead_schema)
+        mock_typeahead_instance.generate_schema.return_value = (mock_typeahead_schema, mock_updated_index)
         mock_typeahead_schema_class.return_value = mock_typeahead_instance
 
         # Setup other mocks

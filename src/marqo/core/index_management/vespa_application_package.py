@@ -719,6 +719,9 @@ class VespaApplicationPackage:
             self._index_setting_store.delete_index_setting(index.name)
             self._store.remove_file('schemas', f'{index.schema_name}.sd')
             self._service_xml.remove_schema(index.schema_name)
+            if index.typeahead_schema_name is not None:
+                self._store.remove_file('schemas', f'{index.typeahead_schema_name}.sd')
+                self._service_xml.remove_schema(index.typeahead_schema_name)
 
         self._add_schema_removal_override()
         self._persist_index_settings()
