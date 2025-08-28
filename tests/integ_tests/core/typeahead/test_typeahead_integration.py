@@ -2,7 +2,6 @@ import os
 from unittest import mock
 
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadIndexRequest, TypeaheadAddQueryRequest
 )
@@ -56,20 +55,6 @@ class TestTypeaheadIntegration(MarqoTestCase):
         request = TypeaheadIndexRequest(queries=queries)
         return self.config.typeahead.index_queries(self.test_index_name, request)
     
-    def _verify_suggestions(self, query, expected_count=None, should_contain=None):
-        """Helper to verify suggestion responses."""
-        request = TypeaheadRequest(q=query)
-        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
-        
-        if expected_count is not None:
-            self.assertEqual(expected_count, len(response.suggestions))
-        
-        if should_contain:
-            suggestion_texts = [s.suggestion for s in response.suggestions]
-            for expected in should_contain:
-                self.assertIn(expected, suggestion_texts)
-        
-        return response
     
     # A. Index Creation Tests
     def test_create_index_with_typeahead_enabled(self):
@@ -185,46 +170,50 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self._index_test_queries()
         
         # Test getting suggestions
-        response = self._verify_suggestions("app",
-                                            expected_count=4,
-                                            should_contain=[
-                                                "apple iphone 14",
-                                                "apple macbook pro",
-                                                "apple watch series",
-                                                "laptop computer",  # fuzzy match
-                                            ])
+        request = TypeaheadRequest(q="app")
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         
-        # Verify response structure
-        self.assertGreater(len(response.suggestions), 0)
-        for suggestion in response.suggestions:
-            self.assertIsInstance(suggestion.suggestion, str)
-            self.assertIsInstance(suggestion.score, float)
-            self.assertIsInstance(suggestion.metadata, dict)
-    
-    def test_get_suggestions_prefix_matching(self):
+        # Verify expected suggestions are present
+        self.assertEqual(4, len(response.suggestions))
+        suggestion_texts = [s.suggestion for s in response.suggestions]
+        expected_suggestions = [
+            "apple iphone 14",
+            "apple macbook pro", 
+            "apple watch series",
+            "laptop computer",  # fuzzy match
+        ]
+        self.assertListEqual(expected_suggestions, suggestion_texts)
+
+    def test_get_suggestions_strict_prefix_matching(self):
         """Test prefix matching behavior."""
         self._index_test_queries()
         
-        # Test short prefix (should use exact prefix matching)
-        response = self._verify_suggestions("ap")
+        # Test short prefix (should use exact prefix matching, fuzziness if not triggered since the input length < 3)
+        request = TypeaheadRequest(q="ap")
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         apple_suggestions = [s for s in response.suggestions if "apple" in s.suggestion.lower()]
-        self.assertGreater(len(apple_suggestions), 0)
+        self.assertEqual(3, len(response.suggestions))
+        self.assertEqual(3, len(apple_suggestions))
     
     def test_get_suggestions_fuzzy_matching(self):
         """Test fuzzy matching for longer queries."""
         self._index_test_queries()
         
         # Test longer query with typo (should use fuzzy matching)
-        response = self._verify_suggestions("aplle iphone")  # typo in "apple"
+        request = TypeaheadRequest(q="aplle iphone")  # typo in "apple"
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         
         # Should still find apple iphone suggestions due to fuzzy matching
-        apple_suggestions = [s for s in response.suggestions if "apple" in s.suggestion.lower()]
-        self.assertGreater(len(apple_suggestions), 0)
+        self.assertEqual(3, len(response.suggestions))
+        self.assertEqual("apple iphone 14", response.suggestions[0].suggestion)
+
+        # TODO add a test case to stop fuzziness by setting the edit distance to 0
     
     def test_get_suggestions_with_weights(self):
         """Test popularity and BM25 weight parameters."""
         self._index_test_queries()
-        
+
+        # TODO design better test case
         # Test with different weight combinations
         test_cases = [
             {"popularity_weight": 2.0, "bm25_weight": 1.0},
@@ -283,15 +272,22 @@ class TestTypeaheadIntegration(MarqoTestCase):
         response = self.config.typeahead.get_queries(self.test_index_name, query_strings)
         
         self.assertEqual(len(response.queries), 2)
-        retrieved_queries = {q.query for q in response.queries}
+        retrieved_queries = {q.query: q for q in response.queries}
         for query_string in query_strings:
             self.assertIn(query_string, retrieved_queries)
         
-        # Verify metadata and popularity are preserved
-        for query in response.queries:
-            self.assertIsInstance(query.popularity, float)
-            self.assertIsInstance(query.metadata, dict)
-            self.assertIsInstance(query.last_updated_at, int)
+        # Create a map of expected values from test queries
+        expected_queries = {q.query: q for q in test_queries if q.query in query_strings}
+        
+        # Verify metadata and popularity match exactly what was indexed
+        for retrieved_query in response.queries:
+            expected_query = expected_queries[retrieved_query.query]
+            
+            # Verify exact values match
+            self.assertEqual(retrieved_query.popularity, expected_query.popularity)
+            self.assertEqual(retrieved_query.metadata, expected_query.metadata)
+            self.assertIsInstance(retrieved_query.last_updated_at, int)
+            self.assertGreater(retrieved_query.last_updated_at, 0)
     
     def test_get_queries_not_found(self):
         """Test behavior when queries don't exist."""
