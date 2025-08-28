@@ -207,26 +207,34 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self.assertEqual(3, len(response.suggestions))
         self.assertEqual("apple iphone 14", response.suggestions[0].suggestion)
 
-        # TODO add a test case to stop fuzziness by setting the edit distance to 0
+    def test_get_suggestions_fuzzy_matching_disabled(self):
+        """Test fuzzy matching can be disabled for longer queries."""
+        self._index_test_queries()
+
+        # Test with fuzziness disabled (edit distance = 0)
+        request_no_fuzzy = TypeaheadRequest(q="aplle ihone", fuzzy_edit_distance=0)
+        response_no_fuzzy = self.config.typeahead.get_suggestions(self.test_index_name, request_no_fuzzy)
+        
+        # Should find no suggestions since fuzzy matching is disabled
+        self.assertEqual(0, len(response_no_fuzzy.suggestions))
     
     def test_get_suggestions_with_weights(self):
         """Test popularity and BM25 weight parameters."""
         self._index_test_queries()
 
-        # TODO design better test case
-        # Test with different weight combinations
-        test_cases = [
-            {"popularity_weight": 2.0, "bm25_weight": 1.0},
-            {"popularity_weight": 1.0, "bm25_weight": 2.0},
-            {"popularity_weight": 0.0, "bm25_weight": 1.0},
-        ]
+        # Test that weights actually change the ranking of results
+        # From test data: "apple iphone 14" (popularity=2.0), "apple macbook pro" (popularity=1.5), "apple watch series" (popularity=1.0)
         
-        for weights in test_cases:
-            with self.subTest(weights=weights):
-                request = TypeaheadRequest(q="apple", **weights)
-                response = self.config.typeahead.get_suggestions(self.test_index_name, request)
-                self.assertGreater(len(response.suggestions), 0)
-    
+        # Test with high popularity weight - should favor "apple iphone 14" (highest popularity)
+        request_high_popularity = TypeaheadRequest(q="apple macbook", popularity_weight=10.0, bm25_weight=0.1)
+        response_high_popularity = self.config.typeahead.get_suggestions(self.test_index_name, request_high_popularity)
+        self.assertEqual("apple iphone 14", response_high_popularity.suggestions[0].suggestion)
+        
+        # Test with high BM25 weight - should favor BM25 scoring over popularity
+        request_high_bm25 = TypeaheadRequest(q="apple macbook", popularity_weight=0.1, bm25_weight=10.0)
+        response_high_bm25 = self.config.typeahead.get_suggestions(self.test_index_name, request_high_bm25)
+        self.assertEqual("apple macbook pro", response_high_bm25.suggestions[0].suggestion)
+
     def test_get_suggestions_limit(self):
         """Test limiting number of suggestions."""
         self._index_test_queries()
