@@ -7,6 +7,8 @@ from tests.marqo_test import MarqoTestCase
 
 class TestTypeahead(MarqoTestCase):
     """Test cases for typeahead functionality using direct HTTP requests."""
+    # TODO Please note that all requests are sent directly to the HTTP endpoint instead of using marqo client.
+    #   will address this when typeahead feature is added to pymarqo client
 
     @classmethod
     def setUpClass(cls):
@@ -47,7 +49,7 @@ class TestTypeahead(MarqoTestCase):
         invalid_requests = [
             {},  # Missing queries
             {"queries": "not a list"},  # queries is not a list
-            {"queries": [{"query": "test"}]},  # Missing popularity
+            # {"queries": [{"query": "test"}]},  # Missing popularity is allowed, default is 1.0
             {"queries": [{"popularity": 1.0}]},  # Missing query
             {"queries": [{"query": "", "popularity": 1.0}]},  # Empty query
         ]
@@ -89,10 +91,10 @@ class TestTypeahead(MarqoTestCase):
         # First, index some queries with a common prefix
         queries_request = {
             "queries": [
-                {"query": "machine learning algorithms", "popularity": 10.0},
+                {"query": "machine learning algorithms", "popularity": 10.0, "metadata": {"hit_count": 3}},
                 {"query": "machine learning basics", "popularity": 8.0},
                 {"query": "machine learning tutorial", "popularity": 6.0},
-                {"query": "artificial intelligence", "popularity": 9.0},
+                {"query": "artificial intelligence", "popularity": 9.0, "metadata": {"hit_count": 500}},
                 {"query": "deep learning", "popularity": 7.0}
             ]
         }
@@ -120,6 +122,22 @@ class TestTypeahead(MarqoTestCase):
         stats_data = stats_response.json()
         self.assertIn("indexedQueries", stats_data)
         self.assertEqual(stats_data["indexedQueries"], 5)
+
+        # Test that we can retrieve individual quries
+        get_response = requests.get(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(["artificial intelligence", "deep learning"])
+        )
+        self.assertEqual(get_response.status_code, 200)
+        get_data = get_response.json()
+        self.assertEqual(len(get_data["queries"]), 2)
+        self.assertEqual(get_data["queries"][0]["query"], "artificial intelligence")
+        self.assertEqual(get_data["queries"][0]["popularity"], 9.0)
+        self.assertEqual(get_data["queries"][0]["metadata"], {"hit_count": 500})
+        self.assertEqual(get_data["queries"][1]["query"], "deep learning")
+        self.assertEqual(get_data["queries"][1]["popularity"], 7.0)
+        self.assertEqual(get_data["queries"][1]["metadata"], {})
 
         # Now get suggestions for a prefix that should match
         suggestion_request = {
