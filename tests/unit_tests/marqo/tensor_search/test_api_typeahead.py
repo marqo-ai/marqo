@@ -336,6 +336,53 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         
         # Should still work since strings can be passed
         self.assertTrue(response.status_code in [200, 422])  # Either works or validation error
+    
+    def test_index_queries_batch_size_limit(self):
+        """Test index_queries with batch size exceeding limit."""
+        import os
+        
+        # Set a small batch size limit for testing
+        original_value = os.environ.get("MARQO_MAX_DOCUMENTS_BATCH_SIZE")
+        os.environ["MARQO_MAX_DOCUMENTS_BATCH_SIZE"] = "2"
+        
+        try:
+            # Create request with more queries than the limit
+            request_data = {
+                "queries": [
+                    {"query": "query1"},
+                    {"query": "query2"},
+                    {"query": "query3"}  # This exceeds the limit of 2
+                ]
+            }
+            
+            response = self.client.post("/indexes/test_index/suggestions/queries", json=request_data)
+            
+            # Should return validation error (InvalidArgumentError maps to 400)
+            self.assertEqual(response.status_code, 400)
+            response_data = response.json()
+            self.assertIn("message", response_data)
+            # Should contain batch size limit error message
+            error_message = response_data["message"]
+            self.assertIn("exceeds limit", error_message)
+            
+        finally:
+            # Restore original value
+            if original_value is None:
+                os.environ.pop("MARQO_MAX_DOCUMENTS_BATCH_SIZE", None)
+            else:
+                os.environ["MARQO_MAX_DOCUMENTS_BATCH_SIZE"] = original_value
+    
+    def test_index_queries_empty_batch(self):
+        """Test index_queries with empty queries list."""
+        request_data = {"queries": []}
+        
+        response = self.client.post("/indexes/test_index/suggestions/queries", json=request_data)
+        
+        # Should return validation error for empty batch
+        self.assertEqual(response.status_code, 400)
+        response_data = response.json()
+        error_message = response_data["message"]
+        self.assertIn("empty index queries request", error_message)
 
 
 if __name__ == "__main__":

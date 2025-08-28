@@ -5,6 +5,9 @@ from typing import List, Optional, Dict
 from pydantic import Field, field_validator
 
 from marqo.base_model import ImmutableStrictBaseModelV2
+from marqo.core.exceptions import InvalidArgumentError
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class TypeaheadRequest(ImmutableStrictBaseModelV2):
@@ -76,6 +79,19 @@ class TypeaheadAddQueryRequest(ImmutableStrictBaseModelV2):
 
 class TypeaheadIndexRequest(ImmutableStrictBaseModelV2):
     queries: List[TypeaheadAddQueryRequest]
+
+    @field_validator('queries')
+    def validate_queries_batch_size(cls, queries):
+        query_count = len(queries)
+        max_queries = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE)
+        if query_count == 0:
+            raise InvalidArgumentError("Received empty index queries request")
+        elif query_count > max_queries:
+            raise InvalidArgumentError(
+                f"Number of queries in index request ({query_count}) exceeds limit of {max_queries}. "
+                f"Please break up your request into smaller batches."
+            )
+        return queries
 
 
 class TypeaheadIndexError(ImmutableStrictBaseModelV2):
