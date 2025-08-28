@@ -1,0 +1,373 @@
+import os
+from unittest import mock
+
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.models.typeahead import (
+    TypeaheadRequest, TypeaheadIndexRequest, TypeaheadAddQueryRequest
+)
+from tests.integ_tests.marqo_test import MarqoTestCase
+
+
+class TestTypeaheadIntegration(MarqoTestCase):
+    """Integration tests for typeahead functionality with real Vespa instance."""
+    
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        
+        # Create a semi-structured index with typeahead
+        cls.test_index = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+        )
+        
+        cls.indexes = cls.create_indexes([cls.test_index])
+        cls.test_index_name = cls.test_index.name
+    
+    def setUp(self) -> None:
+        self.clear_indexes(self.indexes)
+        
+        # Also clear typeahead data specifically
+        self.config.typeahead.delete_all_queries(self.test_index_name)
+        
+        # Set device for any inference operations
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+    
+    def tearDown(self) -> None:
+        self.device_patcher.stop()
+    
+    def _create_test_queries(self):
+        """Create test query data with various patterns."""
+        return [
+            TypeaheadAddQueryRequest(query="apple iphone 14", popularity=2.0, metadata={"category": 0.8}),
+            TypeaheadAddQueryRequest(query="apple macbook pro", popularity=1.5, metadata={"category": 0.9}),
+            TypeaheadAddQueryRequest(query="apple watch series", popularity=1.0, metadata={"category": 0.7}),
+            TypeaheadAddQueryRequest(query="samsung galaxy s23", popularity=1.8, metadata={"category": 0.8}),
+            TypeaheadAddQueryRequest(query="samsung tablet", popularity=0.5, metadata={"category": 0.6}),
+            TypeaheadAddQueryRequest(query="laptop computer", popularity=1.2, metadata={"category": 0.7}),
+        ]
+    
+    def _index_test_queries(self, queries=None):
+        """Helper to index queries and return response."""
+        if queries is None:
+            queries = self._create_test_queries()
+        
+        request = TypeaheadIndexRequest(queries=queries)
+        return self.config.typeahead.index_queries(self.test_index_name, request)
+    
+    def _verify_suggestions(self, query, expected_count=None, should_contain=None):
+        """Helper to verify suggestion responses."""
+        request = TypeaheadRequest(q=query)
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+        
+        if expected_count is not None:
+            self.assertEqual(expected_count, len(response.suggestions))
+        
+        if should_contain:
+            suggestion_texts = [s.suggestion for s in response.suggestions]
+            for expected in should_contain:
+                self.assertIn(expected, suggestion_texts)
+        
+        return response
+    
+    # A. Index Creation Tests
+    def test_create_index_with_typeahead_enabled(self):
+        """Verify that creating an index automatically creates the typeahead schema."""
+        # Get the created index
+        marqo_index = self.index_management.get_index(self.test_index_name)
+        
+        # Verify typeahead schema name is set
+        expected_name = f"{marqo_index.schema_name}_typeahead"
+        self.assertEqual(marqo_index.typeahead_schema_name, expected_name)
+        
+        # Verify the typeahead schema exists in Vespa
+        stats_response = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats_response.indexed_queries, 0)  # Should be empty initially
+    
+    # B. Query Indexing Tests
+    def test_index_single_query(self):
+        """Index a single query and verify it's stored."""
+        query = TypeaheadAddQueryRequest(query="test query", popularity=1.0, metadata={"test": 0.5})
+        request = TypeaheadIndexRequest(queries=[query])
+        
+        response = self.config.typeahead.index_queries(self.test_index_name, request)
+        
+        self.assertEqual(response.indexed, 1)
+        self.assertEqual(len(response.errors), 0)
+        self.assertGreater(response.processing_time_ms, 0)
+        
+        # Verify it can be retrieved
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, 1)
+
+        get_result = self.config.typeahead.get_queries(self.test_index_name, ["test query"])
+        self.assertEqual(1, len(get_result.queries))
+        self.assertEqual(query.query, get_result.queries[0].query)
+        self.assertEqual(query.popularity, get_result.queries[0].popularity)
+        self.assertEqual(query.metadata, get_result.queries[0].metadata)
+        self.assertIsNotNone(get_result.queries[0].last_updated_at)
+
+    def test_index_multiple_queries(self):
+        """Index multiple queries in batch."""
+        queries = self._create_test_queries()
+        response = self._index_test_queries(queries)
+        
+        self.assertEqual(response.indexed, len(queries))
+        self.assertEqual(len(response.errors), 0)
+        
+        # Verify they can be retrieved
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, len(queries))
+
+    def test_index_duplicate_queries(self):
+        """Verify duplicate handling (normalized duplicates should be rejected)."""
+        queries = [
+            TypeaheadAddQueryRequest(query="Apple iPhone", popularity=1.0),
+            TypeaheadAddQueryRequest(query="apple iphone", popularity=2.0),  # Should be detected as duplicate
+            TypeaheadAddQueryRequest(query="  apple   iphone  ", popularity=3.0),  # this is not a duplicate. should it?
+        ]
+        request = TypeaheadIndexRequest(queries=queries)
+        
+        response = self.config.typeahead.index_queries(self.test_index_name, request)
+        
+        # Should have some duplicates detected (2 indexed, 1 error)
+        self.assertEqual(response.indexed, 2)
+        self.assertEqual(len(response.errors), 1)
+        
+        # Verify error messages contain duplicate information
+        for error in response.errors:
+            self.assertIn("duplicate", error.message.lower())
+
+        # Verify it can be retrieved
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, 2)
+    
+    def test_index_queries_batch_size_limit(self):
+        """Test batch size validation."""
+        # Set a small batch size limit for testing
+        original_value = os.environ.get("MARQO_MAX_DOCUMENTS_BATCH_SIZE")
+        os.environ["MARQO_MAX_DOCUMENTS_BATCH_SIZE"] = "2"
+        
+        try:
+            # Create request with more queries than the limit
+            queries = [
+                TypeaheadAddQueryRequest(query="query1"),
+                TypeaheadAddQueryRequest(query="query2"),
+                TypeaheadAddQueryRequest(query="query3")  # This exceeds the limit of 2
+            ]
+            
+            # Should raise InvalidArgumentError during model construction
+            with self.assertRaises(Exception) as context:
+                request = TypeaheadIndexRequest(queries=queries)
+            
+            self.assertIn("exceeds limit", str(context.exception))
+            
+        finally:
+            # Restore original value
+            if original_value is None:
+                os.environ.pop("MARQO_MAX_DOCUMENTS_BATCH_SIZE", None)
+            else:
+                os.environ["MARQO_MAX_DOCUMENTS_BATCH_SIZE"] = original_value
+    
+    def test_index_empty_batch(self):
+        """Test empty batch validation."""
+        # Should raise InvalidArgumentError during model construction
+        with self.assertRaises(InvalidArgumentError) as context:
+            request = TypeaheadIndexRequest(queries=[])
+        
+        self.assertIn("empty index queries request", str(context.exception))
+    
+    # C. Suggestion Retrieval Tests
+    def test_get_basic_suggestions(self):
+        """Test basic typeahead suggestions."""
+        # First index some queries
+        self._index_test_queries()
+        
+        # Test getting suggestions
+        response = self._verify_suggestions("app",
+                                            expected_count=4,
+                                            should_contain=[
+                                                "apple iphone 14",
+                                                "apple macbook pro",
+                                                "apple watch series",
+                                                "laptop computer",  # fuzzy match
+                                            ])
+        
+        # Verify response structure
+        self.assertGreater(len(response.suggestions), 0)
+        for suggestion in response.suggestions:
+            self.assertIsInstance(suggestion.suggestion, str)
+            self.assertIsInstance(suggestion.score, float)
+            self.assertIsInstance(suggestion.metadata, dict)
+    
+    def test_get_suggestions_prefix_matching(self):
+        """Test prefix matching behavior."""
+        self._index_test_queries()
+        
+        # Test short prefix (should use exact prefix matching)
+        response = self._verify_suggestions("ap")
+        apple_suggestions = [s for s in response.suggestions if "apple" in s.suggestion.lower()]
+        self.assertGreater(len(apple_suggestions), 0)
+    
+    def test_get_suggestions_fuzzy_matching(self):
+        """Test fuzzy matching for longer queries."""
+        self._index_test_queries()
+        
+        # Test longer query with typo (should use fuzzy matching)
+        response = self._verify_suggestions("aplle iphone")  # typo in "apple"
+        
+        # Should still find apple iphone suggestions due to fuzzy matching
+        apple_suggestions = [s for s in response.suggestions if "apple" in s.suggestion.lower()]
+        self.assertGreater(len(apple_suggestions), 0)
+    
+    def test_get_suggestions_with_weights(self):
+        """Test popularity and BM25 weight parameters."""
+        self._index_test_queries()
+        
+        # Test with different weight combinations
+        test_cases = [
+            {"popularity_weight": 2.0, "bm25_weight": 1.0},
+            {"popularity_weight": 1.0, "bm25_weight": 2.0},
+            {"popularity_weight": 0.0, "bm25_weight": 1.0},
+        ]
+        
+        for weights in test_cases:
+            with self.subTest(weights=weights):
+                request = TypeaheadRequest(q="apple", **weights)
+                response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+                self.assertGreater(len(response.suggestions), 0)
+    
+    def test_get_suggestions_limit(self):
+        """Test limiting number of suggestions."""
+        self._index_test_queries()
+        
+        # Test different limits
+        for limit in [1, 3]:
+            with self.subTest(limit=limit):
+                request = TypeaheadRequest(q="app", limit=limit)
+                response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+                self.assertEqual(len(response.suggestions), limit)
+    
+    def test_get_suggestions_normalization(self):
+        """Test that queries are normalized properly."""
+        # Index a query with specific formatting
+        query = TypeaheadAddQueryRequest(query="  Apple   iPhone  14  ", popularity=1.0)
+        self._index_test_queries([query])
+        
+        # Test that various input formats return the same result
+        test_queries = ["apple iphone", "Apple iPhone", "  apple   iphone  "]
+        
+        for test_query in test_queries:
+            request = TypeaheadRequest(q=test_query)
+            response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+            self.assertEqual(query.query, response.suggestions[0].suggestion)
+
+    def test_get_suggestions_empty_query(self):
+        """Test behavior with short query that doesn't match anything."""
+        self._index_test_queries()
+        
+        # Test with a query that won't match anything  
+        request = TypeaheadRequest(q="xyz")
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+        self.assertEqual(len(response.suggestions), 0)
+    
+    # D. Query Management Tests
+    def test_get_queries_by_strings(self):
+        """Retrieve specific queries by their query strings."""
+        test_queries = self._create_test_queries()
+        self._index_test_queries(test_queries)
+        
+        # Test retrieving specific queries
+        query_strings = ["apple iphone 14", "samsung galaxy s23"]
+        response = self.config.typeahead.get_queries(self.test_index_name, query_strings)
+        
+        self.assertEqual(len(response.queries), 2)
+        retrieved_queries = {q.query for q in response.queries}
+        for query_string in query_strings:
+            self.assertIn(query_string, retrieved_queries)
+        
+        # Verify metadata and popularity are preserved
+        for query in response.queries:
+            self.assertIsInstance(query.popularity, float)
+            self.assertIsInstance(query.metadata, dict)
+            self.assertIsInstance(query.last_updated_at, int)
+    
+    def test_get_queries_not_found(self):
+        """Test behavior when queries don't exist."""
+        self._index_test_queries()
+        
+        # Try to retrieve non-existent queries
+        response = self.config.typeahead.get_queries(self.test_index_name, ["nonexistent query"])
+        self.assertEqual(len(response.queries), 0)
+        
+        # Mix of existing and non-existing
+        response = self.config.typeahead.get_queries(
+            self.test_index_name, 
+            ["apple iphone 14", "nonexistent query"]
+        )
+        self.assertEqual(len(response.queries), 1)
+        self.assertEqual(response.queries[0].query, "apple iphone 14")
+    
+    def test_delete_specific_queries(self):
+        """Delete specific queries from typeahead."""
+        self._index_test_queries()
+        
+        # Verify queries exist
+        initial_stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertGreater(initial_stats.indexed_queries, 0)
+        
+        # Delete specific queries
+        queries_to_delete = ["apple iphone 14", "samsung galaxy s23"]
+        self.config.typeahead.delete_queries(self.test_index_name, queries_to_delete)
+        
+        # Verify they're gone
+        response = self.config.typeahead.get_queries(self.test_index_name, queries_to_delete)
+        self.assertEqual(len(response.queries), 0)
+        
+        # Verify stats are updated
+        final_stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(final_stats.indexed_queries, initial_stats.indexed_queries - len(queries_to_delete))
+    
+    def test_delete_all_queries(self):
+        """Delete all queries from typeahead index."""
+        self._index_test_queries()
+        
+        # Verify queries exist
+        initial_stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertGreater(initial_stats.indexed_queries, 0)
+        
+        # Delete all queries
+        self.config.typeahead.delete_all_queries(self.test_index_name)
+        
+        # Verify all are gone
+        final_stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(final_stats.indexed_queries, 0)
+        
+        # Verify suggestions are empty
+        request = TypeaheadRequest(q="apple")
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+        self.assertEqual(len(response.suggestions), 0)
+    
+    # E. Stats Tests
+    def test_get_typeahead_stats(self):
+        """Verify stats endpoint returns correct query counts."""
+        # Explicitly clear any existing queries
+        self.config.typeahead.delete_all_queries(self.test_index_name)
+        
+        # Initially should be empty
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, 0)
+        
+        # Index some queries
+        test_queries = self._create_test_queries()
+        self._index_test_queries(test_queries)
+        
+        # Stats should reflect indexed queries
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, len(test_queries))
+        
+        # Delete some queries and verify stats update
+        self.config.typeahead.delete_queries(self.test_index_name, ["apple iphone 14"])
+        stats = self.config.typeahead.get_stats(self.test_index_name)
+        self.assertEqual(stats.indexed_queries, len(test_queries) - 1)
