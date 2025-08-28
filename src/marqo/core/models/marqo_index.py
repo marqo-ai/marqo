@@ -22,7 +22,7 @@ from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesE
 logger = get_logger(__name__)
 
 
-class CollapseField(StrictBaseModel):
+class CollapseField(ImmutableBaseModel):
     name: str
     min_groups: int = pydantic.Field(default=500, gt=0, alias='minGroups')
 
@@ -104,7 +104,7 @@ class PatchMethod(Enum):
     MarqoYolo = 'marqo-yolo'
 
 
-class Field(ImmutableStrictBaseModel):
+class Field(ImmutableBaseModel):
     name: str
     type: FieldType
     features: List[FieldFeature] = []
@@ -121,14 +121,14 @@ class Field(ImmutableStrictBaseModel):
         return values
 
 
-class StringArrayField(ImmutableStrictBaseModel):
+class StringArrayField(ImmutableBaseModel):
     name: str
     type: FieldType
     string_array_field_name: Optional[str]
     features: List[FieldFeature] = []
 
 
-class TensorField(ImmutableStrictBaseModel):
+class TensorField(ImmutableBaseModel):
     """
     A tensor field that has a corresponding field.
 
@@ -139,32 +139,32 @@ class TensorField(ImmutableStrictBaseModel):
     embeddings_field_name: str
 
 
-class HnswConfig(ImmutableStrictBaseModel):
+class HnswConfig(ImmutableBaseModel):
     ef_construction: int = pydantic.Field(gt=0, alias='efConstruction')
     m: int = pydantic.Field(gt=0)
 
 
-class TextPreProcessing(ImmutableStrictBaseModel):
+class TextPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
 
-class VideoPreProcessing(ImmutableStrictBaseModel):
+class VideoPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
 
-class AudioPreProcessing(ImmutableStrictBaseModel):
+class AudioPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
 
-class ImagePreProcessing(ImmutableStrictBaseModel):
+class ImagePreProcessing(ImmutableBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
 
 
-class Model(StrictBaseModel):
+class Model(MarqoBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False

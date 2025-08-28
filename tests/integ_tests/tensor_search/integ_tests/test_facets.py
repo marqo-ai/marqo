@@ -1,29 +1,16 @@
 import copy
-import json
 import os
-import unittest
 from unittest import mock
 
-import httpx
-import numpy as np
-from fastapi.responses import ORJSONResponse
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
-
-import marqo.core.exceptions as core_exceptions
-import marqo.vespa.exceptions as vespa_exceptions
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
-from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import CustomVectorQuery
-from marqo.tensor_search.models.api_models import ScoreModifierLists
-from marqo.tensor_search.models.search import SearchContext
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
 import pytest
 
-import unittest
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
+from marqo.core.models.marqo_index import *
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import SearchMethod
+from tests.integ_tests.marqo_test import MarqoTestCase, EXAMPLE_FASHION_DOCUMENTS
 
 
 class TestFacets(MarqoTestCase):
@@ -551,6 +538,30 @@ class TestFacets(MarqoTestCase):
             facets=facets
         )
         self.assertEqual(res["facets"]["non_existent_field"], {})
+
+    @pytest.mark.skip_for_multinode
+    def test_facet_count_for_lexical_retriever_with_filter_and_multiple_or_phrases(self):
+        """
+        Tests numeric facets with custom range buckets using from/to configurations.
+        """
+        self.add_fashion_docs()
+        for retrieval_method, ranking_method in (
+                (RetrievalMethod.Lexical, RankingMethod.Tensor),
+                (RetrievalMethod.Lexical, RankingMethod.Lexical),
+        ):
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                facets = FacetsParameters(fields={
+                    "brand": FieldFacetsConfiguration(type="string"),
+                })
+                res = tensor_search.search(
+                    config=self.config, index_name=self.semi_structured_default_text_index.name, text="SnugNest shirt",
+                    facets=facets, filter="price:[* to 30.0]",  # there's only one product with price less than 30.0
+                    search_method=SearchMethod.HYBRID, hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                    )
+                )
+                # we should count the brand that only matches the filter
+                self.assertDictEqual({'SnugNest': {'count': 1}}, res["facets"]["brand"])
 
     @pytest.mark.skip_for_multinode
     def test_number_facets_stats_combination(self):

@@ -16,6 +16,7 @@ from marqo.core.models.marqo_index import (
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery, MarqoLexicalQuery
 from marqo.core.models.marqo_query import MarqoTensorQuery
+from marqo.core.search.search_filter import SearchFilter, EqualityTerm
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
@@ -869,6 +870,45 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                          'max(marqo__float_fields{"price"}), count()))) '
                          'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
                          'each(output(count()))) )', vespa_query['marqo__yql.facets'])
+
+
+class TestSemiStructuredVespaIndexToVespaQueryFacets(MarqoTestCase):
+
+    def setUp(self):
+        marqo_index = self.semi_structured_marqo_index("test_index")
+
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def test_facets_query_with_multiple_or_phrases_and_filter_for_lexical_retriever(self):
+        test_cases = [
+            ("lexical", "lexical"),
+            ("lexical", "tensor"),
+        ]
+
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                marqo_query = MarqoHybridQuery(
+                    index_name="test_index",
+                    limit=10,
+                    offset=0,
+                    or_phrases=["hello", "world"],
+                    and_phrases=[],
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method,
+                        rankingMethod=ranking_method,
+                    ),
+                    filter=SearchFilter(root=EqualityTerm('a', 'n', 'a:n')),
+                    facets=FacetsParameters(
+                        fields={"color": FieldFacetsConfiguration(type="string")}
+                    )
+                )
+
+            vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+            self.assertEqual('select * from test_index where (default contains "hello" OR default contains '
+                             '"world") AND (((marqo__short_string_fields contains sameElement(key contains '
+                             '"a", value contains "n")))) limit 0 | all( '
+                             'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
+                             'each(output(count()))) )', vespa_query['marqo__yql.facets'])
 
 
 if __name__ == '__main__':

@@ -198,10 +198,11 @@ class HybridSearch:
             tensor_query = query
             lexical_query = query
 
-        if (tensor_query is None) != (lexical_query is None):
+        if lexical_query is None:
+            # We could allow queryTensor to be None as tensors might be provided with context
             if hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
                 raise core_exceptions.InvalidArgumentError(
-                    "Either both of 'hybridParameters.queryLexical' and 'hybridParameters.queryTensor' or just 'q'"
+                    "Either 'hybridParameters.queryLexical' or just 'q'"
                     "must be present when 'disjunction' retrieval method is used."
                 )
 

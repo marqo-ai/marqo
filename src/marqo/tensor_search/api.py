@@ -482,7 +482,9 @@ def recommend(query_dict: dict, index_name: str,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
             score_modifiers=query.scoreModifiers,
-            rerank_depth=query.rerankDepth
+            rerank_depth=query.rerankDepth,
+            allow_missing_documents=query.allow_missing_documents,
+            allow_missing_embeddings=query.allow_missing_embeddings,
         )
 
 

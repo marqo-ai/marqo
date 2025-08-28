@@ -161,7 +161,7 @@ class SearchTest(unittest.TestCase):
     def get_expected_lexical_yql_with_or(self, query, include_select=True):
         query_strings = query.split(" ")
         query_string = " OR ".join([f"default contains \"{q}\"" for q in query_strings])
-        return f'select * from {self.current_index.schema_name} where {query_string}' if include_select else query_string
+        return f'select * from {self.current_index.schema_name} where ({query_string})' if include_select else query_string
 
     def set_index_to_return(self, index):
         self.get_index_patcher.stop()
