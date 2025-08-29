@@ -79,7 +79,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         """
 
         # Restart marqo with new max values
-        new_models = ["open_clip/ViT-B-32/laion2B-s34B-b79K"]
+        new_models = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
             env_vars=[
