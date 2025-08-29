@@ -496,7 +496,6 @@ class TestIndexManagement(MarqoTestCase):
                 self.assertIn('can not be update', str(err.exception))
 
     def test_update_index_should_skip_if_nothing_to_update(self):
-        # TODO this test case is failing
         request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
