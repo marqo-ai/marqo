@@ -911,5 +911,173 @@ class TestSemiStructuredVespaIndexToVespaQueryFacets(MarqoTestCase):
                              'each(output(count()))) )', vespa_query['marqo__yql.facets'])
 
 
+class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCase):
+
+    def setUp(self):
+        """Set up test fixtures with a semi-structured index that supports both tensor and lexical search."""
+        # Create a semi-structured index with both lexical and tensor fields
+        marqo_index = self.semi_structured_marqo_index(
+            name='test_index',
+            lexical_field_names=['title', 'description'], 
+            tensor_field_names=['title', 'description'],
+            string_array_field_names=['tags']
+        )
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def test_to_vespa_query_adds_collapse_field_to_attributes_to_retrieve(self):
+        """Test that collapse field is added to attributes_to_retrieve for hybrid queries"""
+        hybrid_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                searchableAttributesTensor=["title"],
+                searchableAttributesLexical=["title"]
+            ),
+            or_phrases=["test query"],
+            and_phrases=[],
+            attributes_to_retrieve=["title", "description"],
+            collapse_field_name="parent_id",
+            limit=10,
+            offset=0
+        )
+        
+        # Call to_vespa_query to process the query
+        vespa_query = self.vespa_index.to_vespa_query(hybrid_query)
+        
+        # Verify that collapse field was added to attributes_to_retrieve
+        self.assertIn("parent_id", hybrid_query.attributes_to_retrieve)
+        self.assertIn("parent_id", vespa_query["marqo__yql.tensor"])
+        self.assertIn("parent_id", vespa_query["marqo__yql.lexical"])
+
+        # Verify other expected attributes are still present
+        self.assertIn("title", hybrid_query.attributes_to_retrieve)
+        self.assertIn("description", hybrid_query.attributes_to_retrieve)
+
+    def test_to_vespa_query_adds_collapse_field_to_empty_attributes_to_retrieve(self):
+        """Test that collapse field is added to attributes_to_retrieve for hybrid queries"""
+        hybrid_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                searchableAttributesTensor=["title"],
+                searchableAttributesLexical=["title"]
+            ),
+            or_phrases=["test query"],
+            and_phrases=[],
+            attributes_to_retrieve=[],
+            collapse_field_name="parent_id",
+            limit=10,
+            offset=0
+        )
+
+        # Call to_vespa_query to process the query
+        vespa_query = self.vespa_index.to_vespa_query(hybrid_query)
+
+        # Verify that collapse field was added to attributes_to_retrieve
+        self.assertIn("parent_id", hybrid_query.attributes_to_retrieve)
+        self.assertIn("parent_id", vespa_query["marqo__yql.tensor"])
+        self.assertIn("parent_id", vespa_query["marqo__yql.lexical"])
+
+    def test_to_vespa_query_does_not_duplicate_collapse_field_in_attributes_to_retrieve(self):
+        """Test that collapse field is not duplicated if already in attributes_to_retrieve"""
+        hybrid_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            vector_query=[0.1, 0.2, 0.3, 0.4], 
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                searchableAttributesTensor=["title"],
+                searchableAttributesLexical=["title"]
+            ),
+            or_phrases=["test query"],
+            and_phrases=[],
+            attributes_to_retrieve=["title", "parent_id"],  # collapse field already present
+            collapse_field_name="parent_id",
+            limit=10,
+            offset=0
+        )
+        
+        # Call to_vespa_query to process the query
+        vespa_query = self.vespa_index.to_vespa_query(hybrid_query)
+        
+        self.assertEqual(1, hybrid_query.attributes_to_retrieve.count("parent_id"))
+        self.assertIn("parent_id", vespa_query["marqo__yql.tensor"])
+        self.assertIn("parent_id", vespa_query["marqo__yql.lexical"])
+
+    def test_to_vespa_query_does_not_add_collapse_field_to_attributes_if_not_provided(self):
+        """Test that collapse field is not added to attributes_to_retrieve if not provided"""
+        hybrid_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                searchableAttributesTensor=["title"],
+                searchableAttributesLexical=["title"]
+            ),
+            or_phrases=["test query"],
+            and_phrases=[],
+            attributes_to_retrieve=["title"],
+            limit=10,
+            offset=0
+        )
+
+        # Call to_vespa_query to process the query
+        vespa_query = self.vespa_index.to_vespa_query(hybrid_query)
+
+        self.assertNotIn("parent_id", hybrid_query.attributes_to_retrieve)
+        self.assertNotIn("parent_id", vespa_query["marqo__yql.tensor"])
+        self.assertNotIn("parent_id", vespa_query["marqo__yql.lexical"])
+
+    def test_to_vespa_query_does_not_add_collapse_field_to_attributes_if_attributes_to_retrieve_is_none(self):
+        """Test that collapse field is not added to attributes_to_retrieve if not provided"""
+        hybrid_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                searchableAttributesTensor=["title"],
+                searchableAttributesLexical=["title"]
+            ),
+            or_phrases=["test query"],
+            and_phrases=[],
+            collapse_field_name="parent_id",
+            limit=10,
+            offset=0
+        )
+
+        # Call to_vespa_query to process the query
+        vespa_query = self.vespa_index.to_vespa_query(hybrid_query)
+
+        self.assertIsNone(hybrid_query.attributes_to_retrieve)
+        self.assertNotIn("parent_id", vespa_query["marqo__yql.tensor"])
+        self.assertNotIn("parent_id", vespa_query["marqo__yql.lexical"])
+
+    def test_to_vespa_query_does_not_add_collapse_field_for_non_hybrid_queries(self):
+        """Test that collapse field is not added for non-hybrid queries"""
+        test_queries = [
+            MarqoTensorQuery(
+                index_name=self.vespa_index._marqo_index.name,
+                limit=10, offset=0,
+                attributes_to_retrieve=["title", "description"],
+                vector_query=[0.1, 0.2, 0.3, 0.4]
+            ),
+            MarqoLexicalQuery(
+                index_name=self.vespa_index._marqo_index.name,
+                limit=10, offset=0,
+                or_phrases=["test query"], and_phrases=[],
+                attributes_to_retrieve=["title", "description"]
+            )
+        ]
+
+        for marqo_query in test_queries:
+            with self.subTest(type=type(marqo_query)):
+                # MarqoQuery doesn't have collapse_field_name, so this should not affect attributes_to_retrieve
+                vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+
+                self.assertNotIn("parent_id", vespa_query["yql"])
+                self.assertNotIn("parent_id", marqo_query.attributes_to_retrieve)
+
+
 if __name__ == '__main__':
     unittest.main() 
