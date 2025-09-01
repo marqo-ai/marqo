@@ -284,5 +284,111 @@ class TestVespaApplicationPackage(MarqoTestCase):
         # Verify deployment was called once for the batch
         self.mock_store.deploy_application.assert_called_once()
 
+    def test_bootstrap_adds_missing_typeahead_schemas_for_2_23_0_indexes(self):
+        """Test that bootstrap adds typeahead schemas for Marqo 2.23.0+ indexes that don't have them."""
+        # Setup - create an index created by Marqo 2.23.0 without typeahead schema
+        index_without_typeahead = self.semi_structured_marqo_index(
+            name="test_index_230",
+            schema_name="marqo__test_index_230",
+            typeahead_schema_name=None,  # Missing typeahead schema
+            marqo_version="2.23.0",
+            version=1,
+        )
+        
+        # Mock the index setting store to return this index
+        self.vespa_app._index_setting_store._index_settings = {'test_index_230': index_without_typeahead}
+        self.vespa_app.has_schema = Mock(return_value=False)  # Schema doesn't exist yet
+        
+        # Execute bootstrap
+        self.vespa_app.bootstrap("2.24.0", None)
+        
+        # Verify typeahead schema was created
+        typeahead_save_calls = [
+            call for call in self.mock_store.save_file.call_args_list
+            if len(call[0]) >= 3 and call[0][1] == 'schemas' and 'typeahead' in call[0][2]
+        ]
+        
+        self.assertEqual(len(typeahead_save_calls), 1)
+        self.assertTrue(typeahead_save_calls[0][0][2].endswith('_typeahead.sd'))
+
+    def test_bootstrap_skips_typeahead_for_pre_2_23_0_indexes(self):
+        """Test that bootstrap does not add typeahead schemas for indexes created before Marqo 2.23.0."""
+        # Setup - create an index created by Marqo 2.22.0
+        old_index = self.semi_structured_marqo_index(
+            name="test_index_old",
+            schema_name="marqo__test_index_old",
+            typeahead_schema_name=None,
+            marqo_version="2.22.0"
+        )
+        
+        # Mock the index setting store to return this index
+        self.vespa_app._index_setting_store.get_all_index_settings = Mock(return_value=[old_index])
+        
+        # Execute bootstrap
+        self.vespa_app.bootstrap("2.24.0", None)
+        
+        # Verify NO typeahead schema was created
+        typeahead_save_calls = [
+            call for call in self.mock_store.save_file.call_args_list
+            if len(call[0]) >= 3 and call[0][1] == 'schemas' and 'typeahead' in call[0][2]
+        ]
+        
+        self.assertEqual(len(typeahead_save_calls), 0)
+
+    def test_bootstrap_skips_existing_typeahead_schemas(self):
+        """Test that bootstrap does not create duplicate typeahead schemas for indexes that already have them."""
+        # Setup - create an index that already has typeahead schema
+        index_with_typeahead = self.semi_structured_marqo_index(
+            name="test_index_with_typeahead",
+            schema_name="marqo__test_index_with_typeahead", 
+            typeahead_schema_name="marqo__test_index_with_typeahead_typeahead",
+            marqo_version="2.23.0"
+        )
+        
+        # Mock the index setting store to return this index
+        self.vespa_app._index_setting_store.get_all_index_settings = Mock(return_value=[index_with_typeahead])
+        
+        # Execute bootstrap
+        self.vespa_app.bootstrap("2.24.0", None)
+        
+        # Verify NO additional typeahead schema was created
+        typeahead_save_calls = [
+            call for call in self.mock_store.save_file.call_args_list
+            if len(call[0]) >= 3 and call[0][1] == 'schemas' and 'typeahead' in call[0][2]
+        ]
+        
+        self.assertEqual(len(typeahead_save_calls), 0)
+
+    def test_bootstrap_handles_mixed_indexes(self):
+        """Test that bootstrap correctly handles a mix of indexes with different versions and typeahead states."""
+        # Setup - create mixed indexes
+        self.vespa_app._index_setting_store._index_settings = {
+            name: self.semi_structured_marqo_index(
+                name=name,
+                schema_name=f"marqo__{name}",
+                typeahead_schema_name=f"marqo__{name}_typeahead" if has_typeahead_schema else None,
+                marqo_version=version,  # Already has typeahead
+                version=1
+            ) for name, version, has_typeahead_schema in [
+                ("old_index", "2.22.0", False),
+                ("index_223", "2.23.0", False),
+                ("index_224", "2.24.0", True)
+            ]
+        }
+        self.vespa_app.has_schema = Mock(return_value=False)  # Schema doesn't exist yet
+        
+        # Execute bootstrap
+        self.vespa_app.bootstrap("2.24.0", None)
+        
+        # Verify only one typeahead schema was created (for new_index_without_typeahead)
+        typeahead_save_calls = [
+            call for call in self.mock_store.save_file.call_args_list
+            if len(call[0]) >= 3 and call[0][1] == 'schemas' and 'typeahead' in call[0][2]
+        ]
+        
+        self.assertEqual(1, len(typeahead_save_calls))
+        self.assertTrue('index_223_typeahead.sd' in typeahead_save_calls[0][0][2])
+
+
 if __name__ == '__main__':
     unittest.main()

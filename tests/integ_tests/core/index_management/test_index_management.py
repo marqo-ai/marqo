@@ -157,6 +157,47 @@ class TestIndexManagement(MarqoTestCase):
             # The second bootstrapping only need to check version, so it will skip convergence check
             mock_check_convergence.assert_not_called()
 
+    def test_bootstrap_vespa_should_add_typeahead_schemas_for_existing_2_23_0_indexes(self):
+        """Test that bootstrap adds typeahead schemas for existing indexes created by Marqo 2.23.0+ that don't have them."""
+        # Create and deploy an index without typeahead schema (simulating an index created before typeahead was added to bootstrap)
+        request = self.unstructured_marqo_index_request(name="test_index_230", marqo_version="2.23.0")
+        schema, index_with_230_version = vespa_schema_factory(request).generate_schema()
+        
+        # Bootstrap first to get the basic setup
+        self.index_management.bootstrap_vespa()
+        
+        # Manually save the index without typeahead schema (simulating the old state)
+        app = self.index_management._get_vespa_application()
+        app._index_setting_store.save_index_setting(index_with_230_version)
+        app._store.save_file(schema, 'schemas', f'{index_with_230_version.schema_name}.sd')
+        app._service_xml.add_schema(index_with_230_version.schema_name)
+        app._store.save_file(app._service_xml.to_xml(), app._SERVICES_XML_FILE)
+        app._persist_index_settings()
+        app._deploy()
+
+        index = self.index_management.get_index(index_with_230_version.name)
+        self.assertIsNone(index.typeahead_schema_name)
+
+        # Now bootstrap again - this should add the missing typeahead schema
+        with patch('marqo.version.get_version', return_value='2.24.1'):
+            bootstrapped = self.index_management.bootstrap_vespa()
+            self.assertTrue(bootstrapped)
+        
+        # Verify that the typeahead schema was added
+        downloaded_app = self.vespa_client.download_application()
+        
+        # Check that the updated index now has typeahead_schema_name
+        saved_index = self.index_management.get_index(index_with_230_version.name)
+        self.assertEqual('marqo__test_00index_00230_typeahead', saved_index.typeahead_schema_name)
+        
+        # Check that the typeahead schema file exists
+        self._assert_file_exists(downloaded_app, 'schemas', f'{saved_index.typeahead_schema_name}.sd')
+        
+        # Check that the typeahead schema is referenced in services.xml
+        services_xml = ET.parse(os.path.join(downloaded_app, 'services.xml'))
+        typeahead_doc = services_xml.getroot().find(f'content/documents/document[@type="{saved_index.typeahead_schema_name}"]')
+        self.assertIsNotNone(typeahead_doc)
+
     def test_boostrap_vespa_should_migrate_index_settings_from_existing_vespa_app(self):
         """
         When we upgrade Marqo from prior to 2.13.0 to the latest version, we will migrate the index settings in the
