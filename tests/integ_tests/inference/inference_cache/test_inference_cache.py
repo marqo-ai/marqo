@@ -13,7 +13,7 @@ from opentelemetry.test.globals_test import reset_metrics_globals
 from orjson import orjson
 
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
-    InferenceResult, InferenceErrorModel
+    InferenceResult, InferenceErrorModel, ImagePreprocessingConfig
 from marqo.inference.inference_cache.caching_inference import CachingInference
 
 
@@ -198,6 +198,82 @@ class TestInferenceCache(unittest.TestCase):
                 self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 4)  # error result not cached
 
                 provider.shutdown()
+
+    def test_base64_image_selective_caching(self):
+        """Test selective caching: base64 images cached, URL images processed normally."""
+        caching_inference = CachingInference(self.inference_local, 10, "LRU")
+
+        base64_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        base64_jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/"
+        url_image = "https://example.com/image.jpg"
+
+        # Mixed request: 2 base64 images + 1 URL
+        mixed_request = InferenceRequest(
+            modality=Modality.IMAGE,
+            contents=[base64_png, url_image, base64_jpeg],
+            model_config=ModelConfig(
+                model_name="test/clip-model",
+                model_properties={
+                    "name": "test-clip-model",
+                    "dimensions": 512,
+                    "type": "clip"
+                }
+            ),
+            preprocessing_config=ImagePreprocessingConfig(should_chunk=False),
+            use_inference_cache=True
+        )
+
+        # First call - base64 images should be cached, URL processed normally
+        result1 = caching_inference.vectorise(mixed_request)
+
+        # Verify cache contains blake3 keys for both base64 images
+        import blake3
+        model_key = caching_inference.model_cache_key(mixed_request.model_config.model_properties)
+
+        hash1 = blake3.blake3(base64_png.encode()).hexdigest()
+        hash2 = blake3.blake3(base64_jpeg.encode()).hexdigest()
+        cache_key1 = f"blake3:{hash1}"
+        cache_key2 = f"blake3:{hash2}"
+
+        cached_embedding1 = caching_inference.inference_cache.get(model_key, cache_key1)
+        cached_embedding2 = caching_inference.inference_cache.get(model_key, cache_key2)
+
+        self.assertIsNotNone(cached_embedding1, "First base64 image should be cached")
+        self.assertIsNotNone(cached_embedding2, "Second base64 image should be cached")
+
+        # Verify URL image is NOT cached
+        url_cached_embedding = caching_inference.inference_cache.get(model_key, url_image)
+        self.assertIsNone(url_cached_embedding, "URL image should not be cached")
+
+        # Verify cache size (only 2 base64 images cached)
+        self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
+
+        # Second call with same mixed content
+        result2 = caching_inference.vectorise(mixed_request)
+
+        # Base64 results should return original base64 content (not blake3 keys)
+        png_content1, png_embedding1 = result1.result[0][0]
+        png_content2, png_embedding2 = result2.result[0][0]
+
+        # Content should be original base64, embeddings should be identical (from cache)
+        self.assertEqual(png_content1, base64_png)
+        self.assertEqual(png_content2, base64_png)
+        self.assertTrue(np.array_equal(png_embedding1, png_embedding2))
+
+        jpeg_content1, jpeg_embedding1 = result1.result[2][0]
+        jpeg_content2, jpeg_embedding2 = result2.result[2][0]
+
+        # Content should be original base64, embeddings should be identical (from cache)
+        self.assertEqual(jpeg_content1, base64_jpeg)
+        self.assertEqual(jpeg_content2, base64_jpeg)
+        self.assertTrue(np.array_equal(jpeg_embedding1, jpeg_embedding2))
+
+        # URL results should be unchanged (original URL returned)
+        url_content1, url_embedding1 = result1.result[1][0]
+        url_content2, url_embedding2 = result2.result[1][0]
+        self.assertEqual(url_content1, url_image)  # Original URL unchanged
+        self.assertEqual(url_content2, url_image)  # Original URL unchanged
+        self.assertTrue(np.array_equal(url_embedding1, url_embedding2))
 
     def _assert_metric_value(self, metric_data: MetricsData, name: str, expected_value: Any):
         cache_metrics = metric_data.resource_metrics[0].scope_metrics[0].metrics

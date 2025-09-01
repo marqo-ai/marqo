@@ -1,17 +1,10 @@
-import random
-import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
 
-import numpy as np
-
-from marqo.api.exceptions import EnvVarError
 from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
 from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
 
 
-class TestLFUCache(unittest.TestCase):
+class TestCache(unittest.TestCase):
     """This class tests the LRU and LFU cache implementations."""
 
     def setUp(self):

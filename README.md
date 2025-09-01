@@ -270,7 +270,7 @@ To power image and text search, Marqo allows users to plug and play with CLIP mo
 ```python
 settings = {
     "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-    "model":"ViT-L/14"
+    "model": "Marqo/ViT-L-14.laion2b_s32b_b82k"
 }
 response = mq.create_index("my-multimodal-index", **settings)
 ```
@@ -373,7 +373,7 @@ import pprint
 
 mq = marqo.Client(url="http://localhost:8882")
 
-settings = {"treat_urls_and_pointers_as_images": True, "model": "ViT-L/14"}
+settings = {"treat_urls_and_pointers_as_images": True, "model": "Marqo/ViT-L-14.laion2b_s32b_b82k"}
 
 mq.create_index("my-first-multimodal-index", **settings)
 
