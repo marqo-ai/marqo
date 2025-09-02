@@ -1,6 +1,7 @@
 import os
 from unittest import mock
 
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadIndexRequest, TypeaheadAddQueryRequest
@@ -19,9 +20,15 @@ class TestTypeaheadIntegration(MarqoTestCase):
         cls.test_index = cls.unstructured_marqo_index_request(
             model=Model(name='hf/all_datasets_v4_MiniLM-L6')
         )
+        # simulate an index created prior to 2.23.0
+        cls.old_version_index_request = cls.unstructured_marqo_index_request(
+            name="old_version_index",
+            marqo_version="2.22.0"
+        )
         
-        cls.indexes = cls.create_indexes([cls.test_index])
+        cls.indexes = cls.create_indexes([cls.test_index, cls.old_version_index_request])
         cls.test_index_name = cls.test_index.name
+        cls.index_220_name = cls.old_version_index_request.name
     
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -375,3 +382,56 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self.config.typeahead.delete_queries(self.test_index_name, ["apple iphone 14"])
         stats = self.config.typeahead.get_stats(self.test_index_name)
         self.assertEqual(stats.indexed_queries, len(test_queries) - 1)
+
+    # F. Version Checking Tests
+    def test_typeahead_version_check_with_old_version_index(self):
+        """Test that typeahead operations raise UnsupportedFeatureError for indexes created with old versions."""
+
+        # Test get_suggestions raises UnsupportedFeatureError
+        request = TypeaheadRequest(q="test query")
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.get_suggestions(self.index_220_name, request)
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+
+        # Test index_queries raises UnsupportedFeatureError
+        queries = [TypeaheadAddQueryRequest(query="test query", popularity=1.0)]
+        index_request = TypeaheadIndexRequest(queries=queries)
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.index_queries(self.index_220_name, index_request)
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+
+        # Test delete_all_queries raises UnsupportedFeatureError
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.delete_all_queries(self.index_220_name)
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+
+        # Test delete_queries raises UnsupportedFeatureError
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.delete_queries(self.index_220_name, ["test query"])
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+
+        # Test get_stats raises UnsupportedFeatureError
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.get_stats(self.index_220_name)
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+
+        # Test get_queries raises UnsupportedFeatureError
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.config.typeahead.get_queries(self.index_220_name, ["test query"])
+
+        self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
+            
+
+    def _assert_version_error_message(self, exception: UnsupportedFeatureError, index_name: str, version: str):
+        """Helper method to verify the error message contains expected information."""
+        error_message = str(exception)
+        self.assertIn("Typeahead functionality is not supported", error_message)
+        self.assertIn(index_name, error_message)
+        self.assertIn(version, error_message)
+        self.assertIn("2.23.0", error_message)
+        self.assertIn("recreate the index", error_message)
