@@ -29,7 +29,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
-from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexRequest
+from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
@@ -752,8 +752,8 @@ def get_suggestions(index_name: str, suggestion_request: TypeaheadRequest,
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")
-def index_queries(index_name: str, typeahead_index_request: TypeaheadIndexRequest,
-                 marqo_config: config.Config = Depends(get_config)):
+def index_queries(index_name: str, typeahead_index_request: TypeaheadIndexingRequest,
+                  marqo_config: config.Config = Depends(get_config)):
     """
     Index queries for typeahead suggestions.
     

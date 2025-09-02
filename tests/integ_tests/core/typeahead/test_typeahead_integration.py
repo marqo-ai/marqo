@@ -1,10 +1,11 @@
 import os
+import time
 from unittest import mock
 
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.typeahead import (
-    TypeaheadRequest, TypeaheadIndexRequest, TypeaheadAddQueryRequest
+    TypeaheadRequest, TypeaheadIndexingRequest, TypeaheadAddQueryRequest
 )
 from tests.integ_tests.marqo_test import MarqoTestCase
 
@@ -59,7 +60,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         if queries is None:
             queries = self._create_test_queries()
         
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         return self.config.typeahead.index_queries(self.test_index_name, request)
     
     
@@ -81,7 +82,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
     def test_index_single_query(self):
         """Index a single query and verify it's stored."""
         query = TypeaheadAddQueryRequest(query="test query", popularity=1.0, metadata={"test": 0.5})
-        request = TypeaheadIndexRequest(queries=[query])
+        request = TypeaheadIndexingRequest(queries=[query])
         
         response = self.config.typeahead.index_queries(self.test_index_name, request)
         
@@ -96,6 +97,8 @@ class TestTypeaheadIntegration(MarqoTestCase):
         get_result = self.config.typeahead.get_queries(self.test_index_name, ["test query"])
         self.assertEqual(1, len(get_result.queries))
         self.assertEqual(query.query, get_result.queries[0].query)
+        self.assertEqual(["test", "query"], get_result.queries[0].query_words)
+        self.assertEqual("t te tes test q qu que quer query", get_result.queries[0].query_index)
         self.assertEqual(query.popularity, get_result.queries[0].popularity)
         self.assertEqual(query.metadata, get_result.queries[0].metadata)
         self.assertIsNotNone(get_result.queries[0].last_updated_at)
@@ -119,7 +122,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
             TypeaheadAddQueryRequest(query="apple iphone", popularity=2.0),  # Should be detected as duplicate
             TypeaheadAddQueryRequest(query="  apple   iphone  ", popularity=3.0),  # this is not a duplicate. should it?
         ]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         response = self.config.typeahead.index_queries(self.test_index_name, request)
         
@@ -151,7 +154,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
             
             # Should raise InvalidArgumentError during model construction
             with self.assertRaises(Exception) as context:
-                request = TypeaheadIndexRequest(queries=queries)
+                request = TypeaheadIndexingRequest(queries=queries)
             
             self.assertIn("exceeds limit", str(context.exception))
             
@@ -166,7 +169,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         """Test empty batch validation."""
         # Should raise InvalidArgumentError during model construction
         with self.assertRaises(InvalidArgumentError) as context:
-            request = TypeaheadIndexRequest(queries=[])
+            request = TypeaheadIndexingRequest(queries=[])
         
         self.assertIn("empty index queries request", str(context.exception))
     
@@ -346,19 +349,20 @@ class TestTypeaheadIntegration(MarqoTestCase):
         
         # Verify queries exist
         initial_stats = self.config.typeahead.get_stats(self.test_index_name)
-        self.assertGreater(initial_stats.indexed_queries, 0)
+        self.assertEqual(6, initial_stats.indexed_queries)
         
         # Delete all queries
         self.config.typeahead.delete_all_queries(self.test_index_name)
         
         # Verify all are gone
+        time.sleep(1)  # give vespa some time to reach eventual consistency
         final_stats = self.config.typeahead.get_stats(self.test_index_name)
-        self.assertEqual(final_stats.indexed_queries, 0)
-        
+        self.assertEqual(0, final_stats.indexed_queries)
+
         # Verify suggestions are empty
         request = TypeaheadRequest(q="apple")
         response = self.config.typeahead.get_suggestions(self.test_index_name, request)
-        self.assertEqual(len(response.suggestions), 0)
+        self.assertEqual(0, len(response.suggestions))
     
     # E. Stats Tests
     def test_get_typeahead_stats(self):
@@ -396,7 +400,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
 
         # Test index_queries raises UnsupportedFeatureError
         queries = [TypeaheadAddQueryRequest(query="test query", popularity=1.0)]
-        index_request = TypeaheadIndexRequest(queries=queries)
+        index_request = TypeaheadIndexingRequest(queries=queries)
         with self.assertRaises(UnsupportedFeatureError) as context:
             self.config.typeahead.index_queries(self.index_220_name, index_request)
 

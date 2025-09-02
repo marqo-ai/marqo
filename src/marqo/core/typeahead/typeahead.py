@@ -9,7 +9,7 @@ from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
-    TypeaheadIndexResponse, TypeaheadIndexError, TypeaheadIndexRequest,
+    TypeaheadIndexingResponse, TypeaheadIndexingError, TypeaheadIndexingRequest,
     TypeaheadStatsResponse, TypeaheadQuery, TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
@@ -97,7 +97,7 @@ class Typeahead:
         # Create single YQL query that ORs all token conditions
         yql_retrieval = " OR ".join(retrieval_terms)
         yql_ranking = " OR ".join(ranking_terms)
-        yql = (f"SELECT * FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
+        yql = (f"SELECT query, metadata FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
 
         search_params = {
             "yql": yql,
@@ -137,7 +137,7 @@ class Typeahead:
             processing_time_ms=processing_time_ms
         )
 
-    def index_queries(self, index_name: str, request: TypeaheadIndexRequest) -> TypeaheadIndexResponse:
+    def index_queries(self, index_name: str, request: TypeaheadIndexingRequest) -> TypeaheadIndexingResponse:
         """
         Index queries for typeahead suggestions.
         
@@ -156,7 +156,7 @@ class Typeahead:
 
         if not request.queries:
             processing_time_ms = round((timer() - start_time) * 1000)
-            return TypeaheadIndexResponse(
+            return TypeaheadIndexingResponse(
                 indexed=0,
                 errors=[],
                 processing_time_ms=processing_time_ms
@@ -173,7 +173,7 @@ class Typeahead:
             normalized_query = normalize_text(query)
 
             if normalized_query in normalised_query_map:
-                errors.append(TypeaheadIndexError(
+                errors.append(TypeaheadIndexingError(
                     query=query,
                     message=f"Query is duplicate of {normalised_query_map[normalized_query]} "
                             f"after normalisation, will ignore",
@@ -191,7 +191,7 @@ class Typeahead:
             doc_id_query_map[doc_id] = query
 
             if not tokenized_query:
-                errors.append(TypeaheadIndexError(query=query, message="No tokens generated for query", code=400))
+                errors.append(TypeaheadIndexingError(query=query, message="No tokens generated for query", code=400))
                 continue
 
             vespa_doc = VespaDocument(
@@ -217,12 +217,12 @@ class Typeahead:
                 query = doc_id_query_map.get(doc_id, None)
                 status, message = self.vespa_client.translate_vespa_document_response(resp.status, message=resp.message)
                 if status != 200:
-                    errors.append(TypeaheadIndexError(query=query, message=message, code=status))
+                    errors.append(TypeaheadIndexingError(query=query, message=message, code=status))
                 else:
                     indexed_count += 1
 
         processing_time_ms = round((timer() - start_time) * 1000)
-        return TypeaheadIndexResponse(
+        return TypeaheadIndexingResponse(
             indexed=indexed_count, 
             errors=errors, 
             processing_time_ms=processing_time_ms
@@ -319,13 +319,7 @@ class Typeahead:
         for doc_response in response.responses:
             if doc_response.document and doc_response.document.fields:  # Document found
                 fields = doc_response.document.fields
-                query_obj = TypeaheadQuery(
-                    query=fields["query"],
-                    popularity=fields["popularity"],
-                    metadata=fields.get("metadata", {}),
-                    last_updated_at=fields.get("last_updated_at")
-                )
-                query_results.append(query_obj)
+                query_results.append(TypeaheadQuery(**fields))
         
         return TypeaheadGetQueriesResponse(queries=query_results)
 

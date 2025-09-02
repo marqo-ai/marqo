@@ -7,7 +7,7 @@ from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadSuggestion,
-    TypeaheadAddQueryRequest, TypeaheadIndexRequest, TypeaheadIndexError, TypeaheadStatsResponse,
+    TypeaheadAddQueryRequest, TypeaheadIndexingRequest, TypeaheadIndexingError, TypeaheadStatsResponse,
     TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.typeahead import Typeahead
@@ -45,7 +45,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
             TypeaheadAddQueryRequest(query="machine learning", popularity=10.0, metadata={"hit_count": 5}),
             TypeaheadAddQueryRequest(query="artificial intelligence", popularity=8.0, metadata={"hit_count": 6})
         ]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Create real Vespa response objects
         feed_responses = [
@@ -91,7 +91,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
             TypeaheadAddQueryRequest(query="Machine Learning", popularity=10.0),
             TypeaheadAddQueryRequest(query="machine learning", popularity=8.0)  # Duplicate after normalization
         ]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Mock normalization to return same result for both
         mock_normalize.return_value = "machine learning"
@@ -113,7 +113,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
         self.assertEqual(len(result.errors), 1)
         
         error = result.errors[0]
-        self.assertIsInstance(error, TypeaheadIndexError)
+        self.assertIsInstance(error, TypeaheadIndexingError)
         self.assertEqual(error.query, "machine learning")
         self.assertIn("duplicate", error.message.lower())
         self.assertEqual(error.code, 400)
@@ -125,7 +125,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
             TypeaheadAddQueryRequest(query="valid query", popularity=5.0),
             TypeaheadAddQueryRequest(query="!!!", popularity=3.0)  # Will produce no tokens
         ]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         def normalize_side_effect(text):
             if text == "valid query":
@@ -153,7 +153,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
         self.assertEqual(len(result.errors), 1)
         
         error = result.errors[0]
-        self.assertIsInstance(error, TypeaheadIndexError)
+        self.assertIsInstance(error, TypeaheadIndexingError)
         self.assertEqual(error.query, "!!!")
         self.assertIn("No tokens generated", error.message)
         self.assertEqual(error.code, 400)
@@ -164,7 +164,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
             TypeaheadAddQueryRequest(query="successful query", popularity=5.0),
             TypeaheadAddQueryRequest(query="failed query", popularity=3.0)
         ]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Create real Vespa response with mixed success/failure
         feed_responses = [
@@ -191,7 +191,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
         self.assertEqual(len(result.errors), 1)
         
         error = result.errors[0]
-        self.assertIsInstance(error, TypeaheadIndexError)
+        self.assertIsInstance(error, TypeaheadIndexingError)
         self.assertEqual(error.query, "failed query")
         self.assertEqual(error.message, "Internal error")
         self.assertEqual(error.code, 500)
@@ -200,7 +200,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
     def test_index_queries_hash_generation(self, mock_blake3):
         """Test index_queries generates consistent document IDs."""
         queries = [TypeaheadAddQueryRequest(query="test query", popularity=1.0)]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Mock hash generation
         mock_hasher = Mock()
@@ -231,7 +231,7 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
     def test_index_queries_processing_time_calculation(self):
         """Test index_queries calculates processing time correctly."""
         queries = [TypeaheadAddQueryRequest(query="test", popularity=1.0)]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Create minimal Vespa response
         feed_responses = [
@@ -463,14 +463,14 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
             relevance=0.95,
             fields={
                 "query": "test query 1",
-                "metadata": {"category": "tech"}
+                "metadata": {"hit_count": 50}
             }
         )
         hit2 = Child(
             relevance=0.88,
             fields={
                 "query": "test query 2", 
-                "metadata": {"category": "science"}
+                "metadata": {"hit_count": 200}
             }
         )
         
@@ -494,13 +494,13 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIsInstance(suggestion1, TypeaheadSuggestion)
         self.assertEqual(suggestion1.suggestion, "test query 1")
         self.assertEqual(suggestion1.score, 0.95)
-        self.assertEqual(suggestion1.metadata, {"category": "tech"})
+        self.assertEqual(suggestion1.metadata, {"hit_count": 50})
         
         # Check second suggestion
         suggestion2 = result.suggestions[1]
         self.assertEqual(suggestion2.suggestion, "test query 2")
         self.assertEqual(suggestion2.score, 0.88)
-        self.assertEqual(suggestion2.metadata, {"category": "science"})
+        self.assertEqual(suggestion2.metadata, {"hit_count": 200})
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
@@ -912,7 +912,7 @@ class TestTypeaheadVersionChecking(unittest.TestCase):
         self.mock_index_management.get_index.return_value = self.mock_old_index
         
         queries = [TypeaheadAddQueryRequest(query="test", popularity=1.0)]
-        request = TypeaheadIndexRequest(queries=queries)
+        request = TypeaheadIndexingRequest(queries=queries)
         
         # Should raise UnsupportedFeatureError
         with self.assertRaises(UnsupportedFeatureError):

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from marqo import config
 from marqo.core.models.typeahead import (
     TypeaheadResponse, TypeaheadSuggestion,
-    TypeaheadIndexResponse, TypeaheadStatsResponse, TypeaheadIndexError,
+    TypeaheadIndexingResponse, TypeaheadStatsResponse, TypeaheadIndexingError,
     TypeaheadQuery, TypeaheadGetQueriesResponse
 )
 from marqo.tensor_search import api
@@ -121,7 +121,7 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         """Test index_queries with valid JSON request."""
         
         # Create mock response from typeahead service
-        mock_response = TypeaheadIndexResponse(indexed=2, errors=[], processing_time_ms=100)
+        mock_response = TypeaheadIndexingResponse(indexed=2, errors=[], processing_time_ms=100)
         self.mock_typeahead.index_queries.return_value = mock_response
         
         # Test with valid JSON request
@@ -154,8 +154,8 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         """Test index_queries returns errors in response."""
         
         # Create mock response with errors
-        errors = [TypeaheadIndexError(query="bad query", message="Invalid query", code=400)]
-        mock_response = TypeaheadIndexResponse(indexed=1, errors=errors, processing_time_ms=80)
+        errors = [TypeaheadIndexingError(query="bad query", message="Invalid query", code=400)]
+        mock_response = TypeaheadIndexingResponse(indexed=1, errors=errors, processing_time_ms=80)
         self.mock_typeahead.index_queries.return_value = mock_response
         
         request_data = {

@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 
 from pydantic import Field, field_validator
 
-from marqo.base_model import ImmutableStrictBaseModelV2
+from marqo.base_model import ImmutableStrictBaseModelV2, ImmutableBaseModelV2
 from marqo.core.exceptions import InvalidArgumentError
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
@@ -73,11 +73,11 @@ class TypeaheadAddQueryRequest(ImmutableStrictBaseModelV2):
     @field_validator('query')
     def validate_q(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError("query is required")
+            raise ValueError("query is required and must not be an empty string")
         return v.strip()
 
 
-class TypeaheadIndexRequest(ImmutableStrictBaseModelV2):
+class TypeaheadIndexingRequest(ImmutableStrictBaseModelV2):
     queries: List[TypeaheadAddQueryRequest]
 
     @field_validator('queries')
@@ -94,15 +94,15 @@ class TypeaheadIndexRequest(ImmutableStrictBaseModelV2):
         return queries
 
 
-class TypeaheadIndexError(ImmutableStrictBaseModelV2):
+class TypeaheadIndexingError(ImmutableStrictBaseModelV2):
     query: Optional[str] = None
     message: str
     code: int = 400
 
 
-class TypeaheadIndexResponse(ImmutableStrictBaseModelV2):
+class TypeaheadIndexingResponse(ImmutableStrictBaseModelV2):
     indexed: int = Field(..., description="Indexed queries")
-    errors: List[TypeaheadIndexError] = Field(default_factory=list, description="Index Errors")
+    errors: List[TypeaheadIndexingError] = Field(default_factory=list, description="Index Errors")
     processing_time_ms: float = Field(
         alias="processingTimeMs",
         description="Processing time in milliseconds"
@@ -116,11 +116,14 @@ class TypeaheadStatsResponse(ImmutableStrictBaseModelV2):
     )
 
 
-class TypeaheadQuery(ImmutableStrictBaseModelV2):
+class TypeaheadQuery(ImmutableBaseModelV2):
+    # Please note we don't use StrictBaseModel here to gain forward compatibility when we add fields to the schema
     """Represents a query from the typeahead schema."""
     query: str = Field(..., description="The query string")
+    query_words: List[str] = Field(..., description="The normalised query splits into words")
+    query_index: str = Field(..., description="Substrings of the query used for lexical matching")
     popularity: float = Field(..., description="Popularity score")
-    metadata: Dict[str, float] = Field(..., description="Additional metadata")
+    metadata: Dict[str, float] = Field(default_factory=dict, description="Additional metadata")
     last_updated_at: Optional[int] = Field(None, alias="lastUpdatedAt", description="Last updated timestamp")
 
 
