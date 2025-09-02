@@ -130,9 +130,9 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
 
         # Verify that deployment lock was not acquired and update was not called
         self.index_management.get_index.assert_called_once_with(updated_index.name)
-        self.index_management._vespa_deployment_lock.assert_not_called()
-        mock_deployment_lock.__enter__.assert_not_called()
-        mock_deployment_lock.__exit__.assert_not_called()
+        self.index_management._vespa_deployment_lock.assert_called_once()
+        mock_deployment_lock.__enter__.assert_called_once()
+        mock_deployment_lock.__exit__.assert_called_once()
         mock_vespa_app.update_index_setting_and_schema.assert_not_called()
 
     def test_update_index_raises_internal_error_for_non_semi_structured_index(self):
@@ -154,10 +154,10 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
                     self.index_management.update_index(index)
 
                 self.assertIn("can not be updated", str(context.exception))
-                # Verify deployment lock was never acquired
-                self.index_management._vespa_deployment_lock.assert_not_called()
-                mock_deployment_lock.__enter__.assert_not_called()
-                mock_deployment_lock.__exit__.assert_not_called()
+                # Verify deployment lock was acquired
+                self.index_management._vespa_deployment_lock.assert_called_once()
+                mock_deployment_lock.__enter__.assert_called_once()
+                mock_deployment_lock.__exit__.assert_called_once()
 
     @patch('marqo.core.index_management.index_management.vespa_schema_factory')
     @patch('marqo.core.index_management.index_management.TypeaheadVespaSchema')
