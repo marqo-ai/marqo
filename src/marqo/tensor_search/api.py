@@ -804,13 +804,9 @@ def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(g
     Args:
         index_name: Name of the index to get stats for
     """
-    try:
-        # Get stats
-        stats = marqo_config.typeahead.get_stats(index_name)
-        
-        return ORJSONResponse(content=stats.model_dump(by_alias=True))
-    except api_exceptions.MarqoWebError:
-        raise
+    stats = marqo_config.typeahead.get_stats(index_name)
+
+    return ORJSONResponse(content=stats.model_dump(by_alias=True))
 
 
 @app.get("/indexes/{index_name}/suggestions/queries")

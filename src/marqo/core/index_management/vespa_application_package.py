@@ -14,7 +14,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_BACKPORT_MINIMUM_VERSION
+from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError, \
     ApplicationRollbackError
 from marqo.core.models import MarqoIndex
@@ -768,7 +768,7 @@ class VespaApplicationPackage:
 
         for _, index in self._index_setting_store._index_settings.items():
             if (index.typeahead_schema_name is not None or
-                    index.parsed_marqo_version() < MARQO_TYPEAHEAD_SCHEMA_BACKPORT_MINIMUM_VERSION):
+                    index.parsed_marqo_version() < MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION):
                 # already has typeahead schema or the version is too old
                 continue
 
