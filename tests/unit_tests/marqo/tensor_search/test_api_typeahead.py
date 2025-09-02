@@ -114,7 +114,7 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         self.assertIn("detail", response_data)
         # Verify it's a validation error for empty 'q' field
         error_detail = response_data["detail"][0]
-        self.assertEqual(error_detail["msg"], "Value error, q is required")
+        self.assertEqual(error_detail["msg"], "Value error, q is required and must not be an empty string")
         self.assertEqual(error_detail["loc"], ["body", "q"])
 
     def test_index_queries_valid_request(self):

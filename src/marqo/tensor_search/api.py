@@ -739,7 +739,7 @@ def schema_validation(index_name: str, settings_object: dict):
     )
 
 
-# TODO verify: not throttling. Would require a separate category, but we're not using Marqo throttling anymore?
+# No throttling config here. Throttling will be deprecated and removed from Marqo soon.
 @app.post("/indexes/{index_name}/suggestions")
 def get_suggestions(index_name: str, suggestion_request: TypeaheadRequest,
                     marqo_config: config.Config = Depends(get_config)):

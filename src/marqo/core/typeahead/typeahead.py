@@ -110,6 +110,7 @@ class Typeahead:
         if request.popularity_weight is not None:
             query_features["popularity_weight"] = request.popularity_weight
         if request.bm25_weight is not None:
+            # bm25 wights is used to boost exact match result
             query_features["bm25_weight"] = request.bm25_weight
 
         if query_features:

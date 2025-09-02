@@ -709,8 +709,9 @@ class VespaApplicationPackage:
             self._service_xml.add_schema(index.schema_name)
 
             # Add typeahead schema if provided
-            self._store.save_file(typeahead_schema, 'schemas', f'{index.typeahead_schema_name}.sd')
-            self._service_xml.add_schema(index.typeahead_schema_name)
+            if index.typeahead_schema_name:
+                self._store.save_file(typeahead_schema, 'schemas', f'{index.typeahead_schema_name}.sd')
+                self._service_xml.add_schema(index.typeahead_schema_name)
 
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)

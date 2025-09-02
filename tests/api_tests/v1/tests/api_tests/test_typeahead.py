@@ -52,6 +52,9 @@ class TestTypeahead(MarqoTestCase):
             # {"queries": [{"query": "test"}]},  # Missing popularity is allowed, default is 1.0
             {"queries": [{"popularity": 1.0}]},  # Missing query
             {"queries": [{"query": "", "popularity": 1.0}]},  # Empty query
+            {"queries": [{"query": "abc", "popularity": "very popular"}]},  # Wrong type of popularity
+            {"queries": [{"query": "abc", "popularity": 1.0, "some_random_field": "hello"}]},  # Unsupported fields
+
         ]
 
         for invalid_request in invalid_requests:

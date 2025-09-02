@@ -14,7 +14,7 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
     """Request model for typeahead suggestions."""
 
     q: str = Field(..., description="Partial user search input")
-    limit: int = Field(default=10, ge=0, description="Maximum number of suggestions to return")
+    limit: int = Field(default=10, gt=0, description="Maximum number of suggestions to return")
     fuzzy_edit_distance: int = Field(
         default=2,
         ge=0,
@@ -41,7 +41,7 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
     @field_validator('q')
     def validate_q(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError("q is required")
+            raise ValueError("q is required and must not be an empty string")
         return v.strip()
 
 
@@ -50,7 +50,7 @@ class TypeaheadSuggestion(ImmutableStrictBaseModelV2):
 
     suggestion: str = Field(..., description="The suggested query text")
     score: float = Field(..., alias="_score", description="Relevance score for the suggestion")
-    metadata: Optional[dict] = Field(default=None, description="Additional metadata")
+    metadata: Optional[Dict[str, float]] = Field(default=None, description="Additional metadata")
 
 
 class TypeaheadResponse(ImmutableStrictBaseModelV2):
