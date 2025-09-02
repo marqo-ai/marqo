@@ -775,6 +775,10 @@ class VespaApplicationPackage:
 
             # Generate typeahead schema
             typeahead_schema, updated_index = TypeaheadVespaSchema(index).generate_schema()
+            logger.debug(
+                f'Creating typeahead schema for index {index.name} with schema: '
+                f'{updated_index.typeahead_schema_name}'
+            )
 
             # Save the typeahead schema file
             self._store.save_file(typeahead_schema, 'schemas', f'{updated_index.typeahead_schema_name}.sd')
