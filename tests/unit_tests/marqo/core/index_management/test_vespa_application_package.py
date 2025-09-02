@@ -298,6 +298,7 @@ class TestVespaApplicationPackage(MarqoTestCase):
         # Mock the index setting store to return this index
         self.vespa_app._index_setting_store._index_settings = {'test_index_230': index_without_typeahead}
         self.vespa_app.has_schema = Mock(return_value=False)  # Schema doesn't exist yet
+        self.vespa_app._copy_components_jar = Mock()
         
         # Execute bootstrap
         self.vespa_app.bootstrap("2.24.0", None)
@@ -323,6 +324,7 @@ class TestVespaApplicationPackage(MarqoTestCase):
         
         # Mock the index setting store to return this index
         self.vespa_app._index_setting_store.get_all_index_settings = Mock(return_value=[old_index])
+        self.vespa_app._copy_components_jar = Mock()
         
         # Execute bootstrap
         self.vespa_app.bootstrap("2.24.0", None)
@@ -347,6 +349,7 @@ class TestVespaApplicationPackage(MarqoTestCase):
         
         # Mock the index setting store to return this index
         self.vespa_app._index_setting_store.get_all_index_settings = Mock(return_value=[index_with_typeahead])
+        self.vespa_app._copy_components_jar = Mock()
         
         # Execute bootstrap
         self.vespa_app.bootstrap("2.24.0", None)
@@ -376,6 +379,7 @@ class TestVespaApplicationPackage(MarqoTestCase):
             ]
         }
         self.vespa_app.has_schema = Mock(return_value=False)  # Schema doesn't exist yet
+        self.vespa_app._copy_components_jar = Mock()
         
         # Execute bootstrap
         self.vespa_app.bootstrap("2.24.0", None)
