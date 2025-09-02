@@ -1,9 +1,8 @@
 import unittest
 from unittest.mock import Mock, patch
+
 import semver
 
-from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
-from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadSuggestion,
@@ -11,6 +10,7 @@ from marqo.core.models.typeahead import (
     TypeaheadGetQueriesResponse
 )
 from marqo.core.typeahead.typeahead import Typeahead
+from marqo.tensor_search import api
 from marqo.vespa.models.feed_response import FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
 from marqo.vespa.models.query_result import QueryResult, Root, Child, RootFields
@@ -25,6 +25,8 @@ class TestTypeaheadIndexQueries(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_vespa_client = Mock(spec=VespaClient)
         self.mock_index_management = Mock(spec=IndexManagement)
+        # override index_management in api._config so the version check can also use the mock index_management
+        api._config.index_management = self.mock_index_management
         self.typeahead = Typeahead(
             vespa_client=self.mock_vespa_client,
             index_management=self.mock_index_management
@@ -536,7 +538,7 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         # Check YQL structure
         call_kwargs = self.mock_vespa_client.query.call_args[1]
         yql = call_kwargs['yql']
-        self.assertIn("SELECT * FROM custom_schema WHERE rank(", yql)
+        self.assertIn("SELECT query, metadata FROM custom_schema WHERE rank(", yql)
         self.assertIn("query_index contains", yql)
 
     @patch('marqo.tensor_search.index_meta_cache.get_index')
@@ -697,6 +699,8 @@ class TestTypeaheadGetQueries(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_vespa_client = Mock(spec=VespaClient)
         self.mock_index_management = Mock(spec=IndexManagement)
+        # override index_management in api._config so the version check can also use the mock index_management
+        api._config.index_management = self.mock_index_management
         self.typeahead = Typeahead(
             vespa_client=self.mock_vespa_client,
             index_management=self.mock_index_management
@@ -713,12 +717,16 @@ class TestTypeaheadGetQueries(unittest.TestCase):
         # Mock batch get response with found documents
         doc1_fields = {
             "query": "test query 1",
+            "query_words": ["test", "query", "1"],
+            "query_index": "t te tes test q qu que quer query 1",
             "popularity": 1.5,
             "metadata": {"category": 0.8},
             "last_updated_at": 1234567890
         }
         doc2_fields = {
-            "query": "test query 2", 
+            "query": "test query 2",
+            "query_words": ["test", "query", "2"],
+            "query_index": "t te tes test q qu que quer query 2",
             "popularity": 0.7,
             "metadata": {"category": 0.5},
             "last_updated_at": 1234567891
@@ -744,7 +752,6 @@ class TestTypeaheadGetQueries(unittest.TestCase):
         result = self.typeahead.get_queries("test_index", ["test query 1", "test query 2"])
         
         # Verify
-        self.mock_index_management.get_index.assert_called_once_with(index_name="test_index")
         self.mock_vespa_client.get_batch.assert_called_once()
         
         # Check result
@@ -808,6 +815,8 @@ class TestTypeaheadGetQueries(unittest.TestCase):
             id="hash1", 
             document=Document(id="hash1", fields={
                 "query": "found query",
+                "query_words": ["found", "query"],
+                "query_index": "f fo fou foun found q qu que quer query",
                 "popularity": 1.0,
                 "metadata": {},
                 "last_updated_at": 1234567890
@@ -831,139 +840,6 @@ class TestTypeaheadGetQueries(unittest.TestCase):
         self.assertIsInstance(result, TypeaheadGetQueriesResponse)
         self.assertEqual(len(result.queries), 1)
         self.assertEqual(result.queries[0].query, "found query")
-
-
-class TestTypeaheadVersionChecking(unittest.TestCase):
-    """Test cases for version checking functionality."""
-
-    def setUp(self):
-        """Set up test fixtures."""
-        self.mock_vespa_client = Mock(spec=VespaClient)
-        self.mock_index_management = Mock(spec=IndexManagement)
-        self.typeahead = Typeahead(
-            vespa_client=self.mock_vespa_client,
-            index_management=self.mock_index_management
-        )
-        
-        # Common mock index with old version (< 2.23.0)
-        self.mock_old_index = Mock()
-        self.mock_old_index.name = "old_index"
-        self.mock_old_index.marqo_version = "2.22.0"
-        self.mock_old_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.22.0")
-
-    def test_check_typeahead_support_raises_error_for_old_version(self):
-        """Test _check_typeahead_support raises UnsupportedFeatureError for versions < 2.23.0."""
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError) as context:
-            self.typeahead._check_typeahead_support(self.mock_old_index)
-        
-        # Verify error message contains helpful information
-        error_message = str(context.exception)
-        self.assertIn("Typeahead functionality is not supported", error_message)
-        self.assertIn("old_index", error_message)
-        self.assertIn("2.22.0", error_message)
-        self.assertIn("2.23.0", error_message)
-        self.assertIn("recreate the index", error_message)
-
-    def test_check_typeahead_support_passes_for_minimum_version(self):
-        """Test _check_typeahead_support passes for version 2.23.0."""
-        # Create mock index with version = 2.23.0
-        mock_index = Mock()
-        mock_index.name = "test_index"
-        mock_index.marqo_version = "2.23.0"
-        mock_index.parsed_marqo_version.return_value = MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
-        
-        # Should not raise any exception
-        try:
-            self.typeahead._check_typeahead_support(mock_index)
-        except UnsupportedFeatureError:
-            self.fail("_check_typeahead_support raised UnsupportedFeatureError for supported version")
-
-    def test_check_typeahead_support_passes_for_newer_version(self):
-        """Test _check_typeahead_support passes for version > 2.23.0."""
-        # Create mock index with version > 2.23.0
-        mock_index = Mock()
-        mock_index.name = "test_index"
-        mock_index.marqo_version = "2.24.0"
-        mock_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        
-        # Should not raise any exception
-        try:
-            self.typeahead._check_typeahead_support(mock_index)
-        except UnsupportedFeatureError:
-            self.fail("_check_typeahead_support raised UnsupportedFeatureError for supported version")
-
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
-    def test_get_suggestions_version_check(self, mock_get_index):
-        """Test get_suggestions performs version check."""
-        mock_get_index.return_value = self.mock_old_index
-        
-        request = TypeaheadRequest(q="test")
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.get_suggestions("old_index", request)
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.query.assert_not_called()
-
-    def test_index_queries_version_check(self):
-        """Test index_queries performs version check."""
-        self.mock_index_management.get_index.return_value = self.mock_old_index
-        
-        queries = [TypeaheadAddQueryRequest(query="test", popularity=1.0)]
-        request = TypeaheadIndexingRequest(queries=queries)
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.index_queries("old_index", request)
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.feed_batch.assert_not_called()
-
-    def test_delete_all_queries_version_check(self):
-        """Test delete_all_queries performs version check."""
-        self.mock_index_management.get_index.return_value = self.mock_old_index
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.delete_all_queries("old_index")
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.delete_all_docs.assert_not_called()
-
-    def test_delete_queries_version_check(self):
-        """Test delete_queries performs version check."""
-        self.mock_index_management.get_index.return_value = self.mock_old_index
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.delete_queries("old_index", ["test query"])
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.delete_batch.assert_not_called()
-
-    def test_get_stats_version_check(self):
-        """Test get_stats performs version check."""
-        self.mock_index_management.get_index.return_value = self.mock_old_index
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.get_stats("old_index")
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.query.assert_not_called()
-
-    def test_get_queries_version_check(self):
-        """Test get_queries performs version check."""
-        self.mock_index_management.get_index.return_value = self.mock_old_index
-        
-        # Should raise UnsupportedFeatureError
-        with self.assertRaises(UnsupportedFeatureError):
-            self.typeahead.get_queries("old_index", ["test query"])
-        
-        # Vespa client should not be called
-        self.mock_vespa_client.get_batch.assert_not_called()
 
 
 if __name__ == "__main__":

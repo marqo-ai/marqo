@@ -429,7 +429,6 @@ class TestTypeaheadIntegration(MarqoTestCase):
             self.config.typeahead.get_queries(self.index_220_name, ["test query"])
 
         self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
-            
 
     def _assert_version_error_message(self, exception: UnsupportedFeatureError, index_name: str, version: str):
         """Helper method to verify the error message contains expected information."""

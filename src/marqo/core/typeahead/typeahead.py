@@ -5,7 +5,6 @@ from typing import List, Dict, Any
 import blake3
 
 from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
-from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
@@ -14,6 +13,7 @@ from marqo.core.models.typeahead import (
 )
 from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
 from marqo.logging import get_logger
+from marqo.tensor_search.utils import check_feature_support
 from marqo.vespa.models.vespa_document import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 
@@ -22,28 +22,13 @@ logger = get_logger(__name__)
 
 class Typeahead:
     """Handler for typeahead functionality."""
+    check_typeahead_support = check_feature_support(MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION, 'Typeahead')
 
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
         self.vespa_client = vespa_client
         self.index_management = index_management
 
-    def _check_typeahead_support(self, marqo_index) -> None:
-        """Check if the index supports typeahead functionality based on its Marqo version.
-        
-        Args:
-            marqo_index: The index to check
-            
-        Raises:
-            UnsupportedFeatureError: If the index doesn't support typeahead
-        """
-        if marqo_index.parsed_marqo_version() < MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION:
-            raise UnsupportedFeatureError(
-                f"Typeahead functionality is not supported for index '{marqo_index.name}'. "
-                f"This index was created with Marqo {marqo_index.marqo_version}, but typeahead "
-                f"requires indexes created with Marqo {MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION} or later. "
-                f"Please recreate the index with a newer version of Marqo to use typeahead features."
-            )
-
+    @check_typeahead_support
     def get_suggestions(self, index_name: str, request: TypeaheadRequest) -> TypeaheadResponse:
         """
         Get query suggestions with timing and response model.
@@ -60,7 +45,6 @@ class Typeahead:
         # Check if index exists and get typeahead schema name
         from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not request.q or not request.q.strip():
@@ -137,6 +121,7 @@ class Typeahead:
             processing_time_ms=processing_time_ms
         )
 
+    @check_typeahead_support
     def index_queries(self, index_name: str, request: TypeaheadIndexingRequest) -> TypeaheadIndexingResponse:
         """
         Index queries for typeahead suggestions.
@@ -151,7 +136,6 @@ class Typeahead:
         start_time = timer()
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         if not request.queries:
@@ -228,6 +212,7 @@ class Typeahead:
             processing_time_ms=processing_time_ms
         )
 
+    @check_typeahead_support
     def delete_all_queries(self, index_name: str) -> None:
         """
         Delete all queries from the typeahead index.
@@ -237,11 +222,11 @@ class Typeahead:
         """
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         self.vespa_client.delete_all_docs(typeahead_schema_name)
 
+    @check_typeahead_support
     def delete_queries(self, index_name: str, queries: List[str]) -> Dict[str, Any]:
         """
         Delete specific queries from the typeahead index.
@@ -255,7 +240,6 @@ class Typeahead:
         """
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         ids = [self._generate_query_hash(normalize_text(q)) for q in queries]
@@ -263,6 +247,7 @@ class Typeahead:
         # TODO process DeleteBatchResponse and return an appropriate API response
         self.vespa_client.delete_batch(ids, schema=typeahead_schema_name)
 
+    @check_typeahead_support
     def get_stats(self, index_name: str) -> TypeaheadStatsResponse:
         """
         Get statistics about indexed queries.
@@ -275,7 +260,6 @@ class Typeahead:
         """
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
         # Count total documents in typeahead schema
@@ -290,6 +274,7 @@ class Typeahead:
         total_count = response.total_count or 0
         return TypeaheadStatsResponse(indexed_queries=total_count)
 
+    @check_typeahead_support
     def get_queries(self, index_name: str, queries: List[str]) -> TypeaheadGetQueriesResponse:
         """
         Get queries from the typeahead index by query strings.
@@ -303,7 +288,6 @@ class Typeahead:
         """
         # Check if index exists and get typeahead schema name
         marqo_index = self.index_management.get_index(index_name=index_name)
-        self._check_typeahead_support(marqo_index)
         typeahead_schema_name = marqo_index.typeahead_schema_name
         
         if not queries:
