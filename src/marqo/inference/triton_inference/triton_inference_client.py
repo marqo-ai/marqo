@@ -1,8 +1,7 @@
 import numpy as np
 from numpy import ndarray
 
-import grpc
-from tritonclient.grpc import service_pb2, service_pb2_grpc
+from tritonclient import grpc
 from marqo.core.inference.api import Modality
 from marqo.logging import get_logger
 from timeit import default_timer as timer
@@ -21,8 +20,7 @@ class TritonInferenceClient:
         :param url: The URL of the Triton inference server.
         """
         self.url = url
-        channel = grpc.insecure_channel(url.split("://")[1], compression=grpc.Compression.Gzip)
-        self.grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
+        self.client = grpc.InferenceServerClient(url=self.url, verbose=False)
 
     def encode(self, inputs: ndarray, modality: Modality) -> ndarray:
         """
@@ -31,23 +29,16 @@ class TritonInferenceClient:
         :param inputs: The input data to be encoded, as a numpy array.
         :return: The encoded output from the Triton server, as a numpy array.
         """
-        inference_start_time = timer()
-        request = service_pb2.ModelInferRequest(
-            model_name=self._get_model_name(modality),  # Replace with your actual model name
-            inputs=[self._get_input(inputs, modality)],
-            outputs=[
-                service_pb2.ModelInferRequest.InferRequestedOutputTensor(name="output")
-            ]
+        input_tensor = grpc.InferInput("input", list(inputs.shape), "FP32")
+        input_tensor.set_data_from_numpy(inputs.astype(np.float32))
+        output_tensor = grpc.InferRequestedOutput("output")
+        result = self.client.infer(
+            model_name="ViT-B-16-SigLI-FN-Image",
+            inputs=[input_tensor],
+            outputs=[output_tensor]
         )
-        duration = timer() - inference_start_time
-
-        logger.info(f"Prepared inference request in {round(duration * 1000)} ms")
-        start_time = timer()
-        response = self.grpc_stub.ModelInfer(request)
-        embeddings = np.frombuffer(response.raw_output_contents[0], dtype=np.float32).reshape(inputs.shape[0], -1)
-        duration = timer() - start_time
-        logger.info(f"Inference took {round(duration * 1000)} ms")
-        return embeddings
+        output_data = result.as_numpy("output")
+        return output_data
 
     def _get_model_name(self, modality: Modality) -> str:
         """
