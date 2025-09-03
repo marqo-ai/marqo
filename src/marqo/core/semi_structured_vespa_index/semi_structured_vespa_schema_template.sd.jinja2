@@ -110,6 +110,7 @@ schema {{ index.schema_name }} {
             {% endfor -%}
             query(marqo__bm25_aggregator): 0
             query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__ranking_query_embedding) tensor<float>(x[{{ dimension }}])
             query(marqo__mult_weights_lexical) tensor<double>(p{})
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
@@ -153,6 +154,10 @@ schema {{ index.schema_name }} {
             if (query({{ field.embeddings_field_name }}) > 0, closeness(field, {{ field.embeddings_field_name }}), 0)
         {%- endmacro -%}
 
+        {% macro ranking_embedding_score(field) -%}
+            if (query(marqo__ranking_query_embedding) > 0, 1.0/(1.0+sum(pow(attribute({{ field.embeddings_field_name }})-query(marqo__ranking_query_embedding),2))), 0)
+        {%- endmacro -%}
+
         {% macro sum_score(score_macro, fields) -%}
             {%- set add = joiner(" + ") -%}
             {%- for field in fields -%}{{ add() }}{{ score_macro(field) }}{%- endfor -%}
@@ -183,6 +188,10 @@ schema {{ index.schema_name }} {
         {# We provide this function even without the tensor field to support embed requests -#}
         function embedding_score() {
             expression: {{ max_score(embedding_score, index.tensor_fields) }}
+        }
+
+        function ranking_embedding_score() {
+            expression: {{ max_score(ranking_embedding_score, index.tensor_fields) }}
         }
 
         match-features: global_mult_modifier global_add_modifier
@@ -219,6 +228,7 @@ schema {{ index.schema_name }} {
             query(marqo__fields_to_rank_lexical) tensor<int8>(p{})
             query(marqo__fields_to_rank_tensor) tensor<int8>(p{})
             query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__ranking_query_embedding) tensor<float>(x[{{ dimension }}])
             query(marqo__mult_weights_lexical) tensor<double>(p{})
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
@@ -233,7 +243,7 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
         second-phase {
-            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+            expression: modify(ranking_embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
         match-features inherits base_rank_profile {
             {%- for field in index.tensor_fields %}

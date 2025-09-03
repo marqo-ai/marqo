@@ -39,6 +39,7 @@ class HybridParameters(StrictBaseModel):
     rerankDepthTensor: Optional[int] = None
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
+    rankingQueryTensor: Optional[Union[str, dict]] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
@@ -98,6 +99,11 @@ class HybridParameters(StrictBaseModel):
         if values.get('retrievalMethod') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:
             if values.get('rankingMethod') not in [RankingMethod.Lexical, RankingMethod.Tensor]:
                 raise ValueError("For retrievalMethod: tensor or lexical, rankingMethod must be: tensor or lexical")
+
+        # rankingQueryTensor can only be defined for Tensor ranking
+        if values.get('rankingQueryTensor') is not None:
+            if values.get('rankingMethod') != RankingMethod.Tensor:
+                raise ValueError("'rankingQueryTensor' can only be defined when 'rankingMethod' is 'tensor'")
 
         return values
 

@@ -182,6 +182,7 @@ class HybridSearch:
         if query is None:
             tensor_query = hybrid_parameters.queryTensor
             lexical_query = hybrid_parameters.queryLexical
+            ranking_tensor_query = hybrid_parameters.rankingQueryTensor
 
             if tensor_query is not None:
                 if hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and hybrid_parameters.rankingMethod == RankingMethod.Lexical:
@@ -196,9 +197,11 @@ class HybridSearch:
         elif isinstance(query, CustomVectorQuery):
             tensor_query = query.customVector.vector
             lexical_query = query.customVector.content
+            ranking_tensor_query = None  # Not supported for custom vector queries
         else:
             tensor_query = query
             lexical_query = query
+            ranking_tensor_query = None  # Not supported for regular queries
 
         if lexical_query is None:
             # We could allow queryTensor to be None as tensors might be provided with context
@@ -263,6 +266,23 @@ class HybridSearch:
         else:
             vectorised_text = None
 
+        # Vectorize separate ranking query if provided
+        ranking_vectorised_text = None
+        if ranking_tensor_query is not None and hybrid_parameters.rankingMethod == RankingMethod.Tensor:
+            # Create a separate query for ranking vectorization
+            ranking_queries = [BulkSearchQueryEntity(
+                q=ranking_tensor_query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
+                limit=result_count,
+                offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
+                boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
+                index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
+                hybridParameters=hybrid_parameters
+            )]
+            
+            with RequestMetricsStore.for_request().time(f"search.hybrid.ranking_vector_inference_full_pipeline"):
+                ranking_qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, ranking_queries, device, interpolation_method)
+            ranking_vectorised_text = list(ranking_qidx_to_vectors.values())[0]
+
         # Parse text into required and optional terms.
         if query_text_search:
             (required_terms, optional_terms) = utils.parse_lexical_query(query_text_search)
@@ -273,6 +293,7 @@ class HybridSearch:
         marqo_query = MarqoHybridQuery(
             index_name=index_name,
             vector_query=vectorised_text,
+            ranking_vector_query=ranking_vectorised_text,
             filter=filter_string,
             limit=result_count,
             ef_search=ef_search,

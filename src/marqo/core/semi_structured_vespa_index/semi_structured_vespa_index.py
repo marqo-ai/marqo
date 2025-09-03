@@ -103,6 +103,13 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # TODO we will need a refactoring to duplicate this
         query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
 
+        # add ranking query embedding if provided
+        if marqo_query.ranking_vector_query is not None:
+            query[common.QUERY_INPUT_RANKING_EMBEDDING] = marqo_query.ranking_vector_query
+        else:
+            # Fallback to using retrieval embedding for ranking if no separate ranking embedding
+            query[common.QUERY_INPUT_RANKING_EMBEDDING] = marqo_query.vector_query
+
         # add facets query
         if marqo_query.facets or marqo_query.track_total_hits:
             query['marqo__yql.facets'] = self._generate_facet_queries(marqo_query)
