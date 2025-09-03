@@ -120,11 +120,11 @@ class TypeaheadQuery(ImmutableBaseModelV2):
     # Please note we don't use StrictBaseModel here to gain forward compatibility when we add fields to the schema
     """Represents a query from the typeahead schema."""
     query: str = Field(..., description="The query string")
-    query_words: List[str] = Field(..., description="The normalised query splits into words")
-    query_index: str = Field(..., description="Substrings of the query used for lexical matching")
-    popularity: float = Field(..., description="Popularity score")
+    query_words: List[str] = Field(default_factory=list, alias="queryWords", description="The normalised query splits into words")
+    query_index: str = Field(default="", alias="queryIndex", description="Substrings of the query used for lexical matching")
+    popularity: float = Field(default=0.0, description="Popularity score")
     metadata: Dict[str, float] = Field(default_factory=dict, description="Additional metadata")
-    last_updated_at: Optional[int] = Field(None, alias="lastUpdatedAt", description="Last updated timestamp")
+    last_updated_at: Optional[int] = Field(default=None, alias="lastUpdatedAt", description="Last updated timestamp")
 
 
 class TypeaheadGetQueriesResponse(ImmutableStrictBaseModelV2):

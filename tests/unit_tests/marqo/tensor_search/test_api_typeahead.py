@@ -33,7 +33,7 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
 
         # Create mock response from typeahead service
         mock_suggestions = [
-            TypeaheadSuggestion(suggestion="test query", score=0.95, metadata={"key": "value"})
+            TypeaheadSuggestion(suggestion="test query", score=0.95, metadata={"key": 2.0})
         ]
         mock_response = TypeaheadResponse(suggestions=mock_suggestions, processing_time_ms=50)
         self.mock_typeahead.get_suggestions.return_value = mock_response
@@ -169,7 +169,8 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         
         self.assertEqual(response.status_code, 422)
         response_data = response.json()
-        self.assertEqual('Value error, query is required', response_data['detail'][0]['msg'])
+        self.assertEqual('Value error, query is required and must not be an empty string',
+                         response_data['detail'][0]['msg'])
 
     def test_index_queries_invalid_request(self):
         """Test index_queries with invalid JSON request."""
@@ -285,12 +286,16 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         mock_queries = [
             TypeaheadQuery(
                 query="test query 1",
+                query_words=["test", "query", "1"],
+                query_index="t te tes test q qu que quer query 1",
                 popularity=1.5,
                 metadata={"category": 0.8},
                 last_updated_at=1234567890
             ),
             TypeaheadQuery(
-                query="test query 2", 
+                query="test query 2",
+                query_words=["test", "query", "2"],
+                query_index="t te tes test q qu que quer query 2",
                 popularity=0.7,
                 metadata={"category": 0.5},
                 last_updated_at=1234567891
