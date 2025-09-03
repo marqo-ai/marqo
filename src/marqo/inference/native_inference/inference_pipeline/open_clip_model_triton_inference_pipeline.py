@@ -92,7 +92,7 @@ class OpenCLIPModelTritonInferencePipeline(AbstractInferencePipeline):
         logger.info(f"Encoding processed - Collecting valid content to encode took {round(duration * 1000)} ms")
 
         getting_content_to_encode_shape_start_time = timer()
-        content_to_encode: ndarray = torch.cat(content_to_encode, dim=0).cpu().to(torch.int32).numpy()
+        content_to_encode: ndarray = torch.cat(content_to_encode, dim=0).cpu().numpy()
         duration = timer() - getting_content_to_encode_shape_start_time
         logger.info(f"Encoding processed - Getting content to encode shape took {round(duration * 1000)} ms")
 

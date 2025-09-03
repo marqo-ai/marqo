@@ -29,9 +29,17 @@ class TritonInferenceClient:
         :param inputs: The input data to be encoded, as a numpy array.
         :return: The encoded output from the Triton server, as a numpy array.
         """
-        input_tensor = grpc.InferInput("input", list(inputs.shape),
-                                       "FP32" if modality == Modality.IMAGE else "INT32")
-        input_tensor.set_data_from_numpy(inputs.astype(np.float32))
+        if modality == Modality.TEXT:
+            inputs = inputs.astype(np.int32)
+            data_type = "INT32"
+        elif modality == Modality.IMAGE:
+            inputs = inputs.astype(np.float32)
+            data_type = "FP32"
+        else:
+            raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
+
+        input_tensor = grpc.InferInput("input", list(inputs.shape), data_type)
+        input_tensor.set_data_from_numpy(inputs)
         output_tensor = grpc.InferRequestedOutput("output")
         result = self.client.infer(
             model_name=self._get_model_name(modality),
