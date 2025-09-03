@@ -126,7 +126,7 @@ class TestTypeahead(MarqoTestCase):
         self.assertIn("indexedQueries", stats_data)
         self.assertEqual(stats_data["indexedQueries"], 5)
 
-        # Test that we can retrieve individual quries
+        # Test that we can retrieve individual queries
         get_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
@@ -177,6 +177,19 @@ class TestTypeahead(MarqoTestCase):
         # At least one suggestion should contain "machine"
         machine_suggestions = [s for s in suggestions if "machine" in s["suggestion"].lower()]
         self.assertGreaterEqual(len(machine_suggestions), 1)
+
+        # Now we do a wildcard query
+        wildcard_suggestion_response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"q": "*", "limit": 3})
+        )
+
+        # Check if we return the top 3 queries ordered by popularity
+        self.assertEqual(wildcard_suggestion_response.status_code, 200)
+        wildcard_suggestion_data = wildcard_suggestion_response.json()
+        expected_results = ["machine learning algorithms", "artificial intelligence", "machine learning basics"]
+        self.assertListEqual(expected_results, [s["suggestion"] for s in wildcard_suggestion_data["suggestions"]])
 
         # 2. Delete all queries
         delete_response = requests.delete(

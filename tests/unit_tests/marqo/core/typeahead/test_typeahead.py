@@ -262,16 +262,42 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
             vespa_client=self.mock_vespa_client,
             index_management=self.mock_index_management
         )
-
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
-    @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_empty_after_normalization(self, mock_normalize, mock_get_index):
-        """Test get_suggestions returns empty when normalized text is empty."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
         
+        # Common mock index setup
+        self.mock_marqo_index = Mock()
+        self.mock_marqo_index.typeahead_schema_name = "test_schema"
+        self.mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
+        
+        # Set up the mock_get_index patcher that will be used in most tests
+        self.mock_get_index_patcher = patch('marqo.tensor_search.index_meta_cache.get_index')
+        self.mock_get_index = self.mock_get_index_patcher.start()
+        self.mock_get_index.return_value = self.mock_marqo_index
+        
+        # Common empty Vespa response
+        self.empty_root_fields = RootFields(total_count=0)
+        self.empty_root = Root(relevance=0.0, fields=self.empty_root_fields, children=[])
+        self.empty_vespa_response = QueryResult(root=self.empty_root)
+        
+    def tearDown(self):
+        """Clean up patches."""
+        self.mock_get_index_patcher.stop()
+
+    def test_get_suggestions_for_wildcard_query(self):
+        """Test get_suggestions returns top n queries for wildcard query."""
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="*")
+        self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        yql = call_kwargs['yql']
+
+        # Check YQL uses "WHERE true" for wildcard
+        self.assertEqual('SELECT query, metadata FROM test_schema WHERE true', yql)
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_empty_after_normalization(self, mock_normalize):
+        """Test get_suggestions returns empty when normalized text is empty."""
         mock_normalize.return_value = ""  # Empty after normalization
         
         request = TypeaheadRequest(q="!!!")
@@ -280,15 +306,9 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertEqual(len(result.suggestions), 0)
         self.mock_vespa_client.query.assert_not_called()
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_no_tokens(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_no_tokens(self, mock_normalize):
         """Test get_suggestions returns empty when tokenization produces no tokens."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "   "  # Only whitespace, will produce no tokens
         
         request = TypeaheadRequest(q="test")
@@ -297,23 +317,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertEqual(len(result.suggestions), 0)
         self.mock_vespa_client.query.assert_not_called()
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_short_tokens_exact_matching(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_short_tokens_exact_matching(self, mock_normalize):
         """Test get_suggestions uses exact prefix matching for short tokens."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "ai ml"  # Both tokens are short (< 3 chars)
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="ai ml", min_fuzzy_match_length=3)
         
@@ -330,23 +339,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn('query_words contains ({prefix:true}"ml")', yql)
         self.assertNotIn('fuzzy', yql)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_long_tokens_fuzzy_matching(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_long_tokens_fuzzy_matching(self, mock_normalize):
         """Test get_suggestions uses fuzzy matching for long tokens."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "machine learning"  # Both tokens are long (>= 3 chars)
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="machine learning", fuzzy_edit_distance=2, min_fuzzy_match_length=3)
         
@@ -361,23 +359,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn('query_words contains ({maxEditDistance:2, prefix:true}fuzzy("machine"))', yql)
         self.assertIn('query_words contains ({maxEditDistance:2, prefix:true}fuzzy("learning"))', yql)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_mixed_token_lengths(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_mixed_token_lengths(self, mock_normalize):
         """Test get_suggestions handles mix of short and long tokens."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "ai machine"  # One short, one long token
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="ai machine", fuzzy_edit_distance=1, min_fuzzy_match_length=3)
         
@@ -392,23 +379,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         # Long token should use fuzzy matching
         self.assertIn('query_words contains ({maxEditDistance:1, prefix:true}fuzzy("machine"))', yql)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_with_popularity_weight(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_with_popularity_weight(self, mock_normalize):
         """Test get_suggestions includes popularity weight in query features."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "test"
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="test", popularity_weight=0.8)
         
@@ -420,23 +396,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn('query_features', call_kwargs)
         self.assertEqual(call_kwargs['query_features']['popularity_weight'], 0.8)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_with_both_weights(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_with_both_weights(self, mock_normalize):
         """Test get_suggestions includes both weights in query features."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "test"
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="test", popularity_weight=0.6, bm25_weight=0.4)
         
@@ -449,15 +414,9 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertEqual(query_features['popularity_weight'], 0.6)
         self.assertEqual(query_features['bm25_weight'], 0.4)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_response_mapping(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_response_mapping(self, mock_normalize):
         """Test get_suggestions properly maps Vespa response to TypeaheadSuggestions."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "test"
         
         # Create real Vespa response with hits
@@ -504,23 +463,15 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertEqual(suggestion2.score, 0.88)
         self.assertEqual(suggestion2.metadata, {"hit_count": 200})
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_vespa_query_construction(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_vespa_query_construction(self, mock_normalize):
         """Test get_suggestions constructs correct Vespa query parameters."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "custom_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
+        # Override the schema name for this specific test
+        self.mock_marqo_index.typeahead_schema_name = "custom_schema"
         
         mock_normalize.return_value = "machine learning"
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="machine learning", limit=15)
         
@@ -541,23 +492,12 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn("SELECT query, metadata FROM custom_schema WHERE rank(", yql)
         self.assertIn("query_index contains", yql)
 
-    @patch('marqo.tensor_search.index_meta_cache.get_index')
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_processing_time_calculation(self, mock_normalize, mock_get_index):
+    def test_get_suggestions_processing_time_calculation(self, mock_normalize):
         """Test get_suggestions calculates processing time correctly."""
-        mock_marqo_index = Mock()
-        mock_marqo_index.typeahead_schema_name = "test_schema"
-        mock_marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
-        mock_get_index.return_value = mock_marqo_index
-        
         mock_normalize.return_value = "test"
         
-        # Create real empty Vespa query response
-        root_fields = RootFields(total_count=0)
-        root = Root(relevance=0.0, fields=root_fields, children=[])
-        vespa_response = QueryResult(root=root)
-        
-        self.mock_vespa_client.query.return_value = vespa_response
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
         
         request = TypeaheadRequest(q="test")
         

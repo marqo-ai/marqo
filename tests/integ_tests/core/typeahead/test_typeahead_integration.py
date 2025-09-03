@@ -278,6 +278,32 @@ class TestTypeaheadIntegration(MarqoTestCase):
         request = TypeaheadRequest(q="xyz")
         response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         self.assertEqual(len(response.suggestions), 0)
+
+    def test_get_suggestions_wildcard_query(self):
+        """Test behavior with wildcard query that returns top queries by popularity"""
+        test_queries = self._create_test_queries()
+        self._index_test_queries(test_queries)
+
+        test_cases = [
+            # limit, bm25_weight, popularity_weight
+            (5, 1.0, 1.0),  # base test case
+            (5, 100.0, 1.0),  # test high bm_25 weight does not impact result
+            (5, 0.0, 1.0),  # test zero bm_25 weight does not impact result
+            (5, 1.0, 100.0),  # test high popularity weight does not impact result
+            (2, 1.0, 1.0),  # test different limit
+        ]
+
+        for limit, bm25_weight, popularity_weight in test_cases:
+            with self.subTest(limit=limit, bm25_weight=bm25_weight, popularity_weight=popularity_weight):
+                request = TypeaheadRequest(q="*", limit=limit, bm25_weight=bm25_weight,
+                                           popularity_weight=popularity_weight)
+                response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+                self.assertEqual(limit, len(response.suggestions))
+
+                sorted_queries = test_queries.copy()
+                sorted_queries.sort(key=lambda s: s.popularity, reverse=True)
+                self.assertListEqual([q.query for q in sorted_queries[0:limit]],
+                                     [s.suggestion for s in response.suggestions])
     
     # D. Query Management Tests
     def test_get_queries_by_strings(self):

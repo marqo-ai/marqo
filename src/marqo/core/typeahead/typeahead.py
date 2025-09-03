@@ -47,41 +47,42 @@ class Typeahead:
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
 
-        if not request.q or not request.q.strip():
-            return TypeaheadResponse(suggestions=[])
+        if request.q == "*":
+            yql = f"SELECT query, metadata FROM {typeahead_schema_name} WHERE true"
 
-        # Normalize the input
-        normalized_input = normalize_text(request.q.strip())
-        if not normalized_input:
-            return TypeaheadResponse(suggestions=[])
+        else:
+            # Normalize the input
+            normalized_input = normalize_text(request.q)
+            if not normalized_input:
+                return TypeaheadResponse(suggestions=[])
 
-        # Tokenize by whitespace
-        tokens = normalized_input.split()
-        if not tokens:
-            return TypeaheadResponse(suggestions=[])
+            # Tokenize by whitespace
+            tokens = normalized_input.split()
+            if not tokens:
+                return TypeaheadResponse(suggestions=[])
 
-        # Build YQL query conditions for each token
-        retrieval_terms = []
-        ranking_terms = []
-        for token in tokens:
-            if len(token) < request.min_fuzzy_match_length:
-                # Use exact prefix matching for short tokens
-                retrieval_terms.append(
-                    f"query_words contains ({{prefix:true}}\"{token}\")"
-                )
-            else:
-                # Use fuzzy matching for longer tokens
-                retrieval_terms.append(
-                    f"query_words contains "
-                    f"({{maxEditDistance:{request.fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
-                )
+            # Build YQL query conditions for each token
+            retrieval_terms = []
+            ranking_terms = []
+            for token in tokens:
+                if len(token) < request.min_fuzzy_match_length:
+                    # Use exact prefix matching for short tokens
+                    retrieval_terms.append(
+                        f"query_words contains ({{prefix:true}}\"{token}\")"
+                    )
+                else:
+                    # Use fuzzy matching for longer tokens
+                    retrieval_terms.append(
+                        f"query_words contains "
+                        f"({{maxEditDistance:{request.fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
+                    )
 
-            ranking_terms.append(f"query_index contains \"{token}\"")
+                ranking_terms.append(f"query_index contains \"{token}\"")
 
-        # Create single YQL query that ORs all token conditions
-        yql_retrieval = " OR ".join(retrieval_terms)
-        yql_ranking = " OR ".join(ranking_terms)
-        yql = (f"SELECT query, metadata FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})")
+            # Create single YQL query that ORs all token conditions
+            yql_retrieval = " OR ".join(retrieval_terms)
+            yql_ranking = " OR ".join(ranking_terms)
+            yql = f"SELECT query, metadata FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})"
 
         search_params = {
             "yql": yql,
