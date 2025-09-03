@@ -12,6 +12,11 @@ from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipe
 from marqo.inference.type import *
 import torch
 from marqo.inference.triton_inference.triton_inference_client import TritonInferenceClient
+from marqo.logging import get_logger
+from timeit import default_timer as timer
+
+
+logger = get_logger(__name__)
 
 OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
 
@@ -27,7 +32,10 @@ class OpenCLIPModelTritonInferencePipeline(AbstractInferencePipeline):
         self.model.model = None
 
     def run_pipeline(self) -> InferenceResult:
+        start_time = timer()
         preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
+        duration = timer() - start_time
+        logger.info(f"Content preprocessing took {round(duration * 1000)} ms")
 
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 

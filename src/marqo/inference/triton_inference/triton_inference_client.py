@@ -4,6 +4,10 @@ from numpy import ndarray
 import grpc
 from tritonclient.grpc import service_pb2, service_pb2_grpc
 from marqo.core.inference.api import Modality
+from marqo.logging import get_logger
+from timeit import default_timer as timer
+
+logger = get_logger(__name__)
 
 
 class TritonInferenceClient:
@@ -34,8 +38,12 @@ class TritonInferenceClient:
                 service_pb2.ModelInferRequest.InferRequestedOutputTensor(name="output")
             ]
         )
+
+        start_time = timer()
         response = self.grpc_stub.ModelInfer(request)
         embeddings = np.frombuffer(response.raw_output_contents[0], dtype=np.float32).reshape(inputs.shape[0], -1)
+        duration = timer() - start_time
+        logger.info(f"Inference took {round(duration) * 1000} ms")
         return embeddings
 
     def _get_model_name(self, modality: Modality) -> str:
