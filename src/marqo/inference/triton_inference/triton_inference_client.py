@@ -30,10 +30,10 @@ class TritonInferenceClient:
         :return: The encoded output from the Triton server, as a numpy array.
         """
         if modality == Modality.TEXT:
-            inputs = inputs.astype(np.int32)
+            inputs = np.ascontiguousarray(inputs, dtype=np.int32)
             data_type = "INT32"
         elif modality == Modality.IMAGE:
-            inputs = inputs.astype(np.float32)
+            inputs = np.ascontiguousarray(inputs, dtype=np.float32)
             data_type = "FP32"
         else:
             raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
