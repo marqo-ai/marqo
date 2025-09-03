@@ -144,7 +144,7 @@ class TestCollapseFields(MarqoTestCase):
     def test_search_with_valid_collapse_field_succeeds(self):
         """Test that search with valid collapse field name succeeds"""
         
-        docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
+        docs = [{"_id": f"doc{g}{i:02}", "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}", "group": g}
                 for i in range(10) for g in range(5)]
 
         self.add_documents(
@@ -177,13 +177,18 @@ class TestCollapseFields(MarqoTestCase):
                         rankingMethod=ranking_method,
                         rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
+                    # parent id is not added here, it will be added in the query for collapsing, but not in the result
+                    attributes_to_retrieve=["title", "group"],
                     collapse_field_name="parent_id",
                     result_count=6
                 )
 
-                # Verify the search executed successfully and only contain 1 doc from each group
-                self.assertEqual(5, len(res["hits"]))  # there's only 5 groups, so at most 5 results
-                self.assertEqual(set([f"group_{g}" for g in range(5)]), set([hit['parent_id'] for hit in res["hits"]]))
+                # there's only 5 groups, so only 5 results
+                self.assertEqual(5, len(res["hits"]))
+                # only contain 1 doc from each group
+                self.assertEqual(set(range(5)), set([hit['group'] for hit in res["hits"]]))
+                # parent_id is not returned
+                self.assertTrue(all("parent_id" not in hit for hit in res["hits"]))
 
     def test_filter(self):
         """Test that filtering works with search with collapse field"""

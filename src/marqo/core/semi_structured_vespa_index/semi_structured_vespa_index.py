@@ -80,6 +80,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             marqo_query.attributes_to_retrieve.append(common.VESPA_FIELD_ID)
 
+            # Add collapse field if provided, this is critical for collapsing search result
+            if (isinstance(marqo_query, MarqoHybridQuery) and marqo_query.collapse_field_name
+                    and marqo_query.collapse_field_name not in marqo_query.attributes_to_retrieve):
+                marqo_query.attributes_to_retrieve.append(marqo_query.collapse_field_name)
+
             # add chunk field names for tensor fields
             marqo_query.attributes_to_retrieve.extend(
                 [self.get_marqo_index().tensor_field_map[att].chunk_field_name
