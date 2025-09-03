@@ -2,7 +2,6 @@ import numpy as np
 from numpy import ndarray
 
 import grpc
-from pandas.conftest import compression
 from tritonclient.grpc import service_pb2, service_pb2_grpc
 from marqo.core.inference.api import Modality
 
@@ -18,7 +17,7 @@ class TritonInferenceClient:
         :param url: The URL of the Triton inference server.
         """
         self.url = url
-        channel = grpc.insecure_channel(url.split("://")[1])
+        channel = grpc.insecure_channel(url.split("://")[1], compression=grpc.Compression.Gzip)
         self.grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     def encode(self, inputs: ndarray, modality: Modality) -> ndarray:
@@ -35,7 +34,7 @@ class TritonInferenceClient:
                 service_pb2.ModelInferRequest.InferRequestedOutputTensor(name="output")
             ]
         )
-        response = self.grpc_stub.ModelInfer(request, compression=grpc.Compression.Gzip)
+        response = self.grpc_stub.ModelInfer(request)
         embeddings = np.frombuffer(response.raw_output_contents[0], dtype=np.float32).reshape(inputs.shape[0], -1)
         return embeddings
 
