@@ -31,6 +31,7 @@ class TritonInferenceClient:
         :param inputs: The input data to be encoded, as a numpy array.
         :return: The encoded output from the Triton server, as a numpy array.
         """
+        inference_start_time = timer()
         request = service_pb2.ModelInferRequest(
             model_name=self._get_model_name(modality),  # Replace with your actual model name
             inputs=[self._get_input(inputs, modality)],
@@ -38,6 +39,9 @@ class TritonInferenceClient:
                 service_pb2.ModelInferRequest.InferRequestedOutputTensor(name="output")
             ]
         )
+        duration = timer() - inference_start_time
+
+        logger.info(f"Prepared inference request in {round(duration * 1000)} ms")
         start_time = timer()
         response = self.grpc_stub.ModelInfer(request)
         embeddings = np.frombuffer(response.raw_output_contents[0], dtype=np.float32).reshape(inputs.shape[0], -1)
