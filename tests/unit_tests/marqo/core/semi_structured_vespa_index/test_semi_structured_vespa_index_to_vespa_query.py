@@ -797,7 +797,8 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                     ]),
                     "color": FieldFacetsConfiguration(type="string")
                 }
-            )
+            ),
+            track_total_hits=True,
         )
         vespa_query = self.vespa_index.to_vespa_query(marqo_query)
 
@@ -816,7 +817,10 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                          vespa_query['marqo__ranking.tensor.lexical'])
 
         # assert facets query has an extra grouping
-        self.assertEqual('select * from test_index where (false OR False) limit 0 | all( '
+        self.assertEqual('select * from test_index where (false OR False) limit 0 | all(group(1.1) '
+                         'each(group(parent_id) output(count())))\n'
+                         '---MARQO-YQL-QUERY-DELIMITER---\n'
+                         'select * from test_index where (false OR False) limit 0 | all( '
                          'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
                          'bucket(1.0, 3.0))) max(100) order(-count()) each(group(parent_id) '
                          'output(count()))) all(group(predefined(marqo__float_fields{"price"}, '
@@ -841,7 +845,8 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                     ]),
                     "color": FieldFacetsConfiguration(type="string")
                 }
-            )
+            ),
+            track_total_hits = True,
         )
         vespa_query = self.vespa_index.to_vespa_query(marqo_query)
 
@@ -857,7 +862,10 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
         self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
                          vespa_query['marqo__ranking.tensor.lexical'])
 
-        self.assertEqual('select * from test_index where (false OR False) limit 0 | all( '
+        self.assertEqual('select * from test_index where (false OR False) limit 0 | all(group(1.1) '
+                         'each(output(count())))\n'
+                         '---MARQO-YQL-QUERY-DELIMITER---\n'
+                         'select * from test_index where (false OR False) limit 0 | all( '
                          'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
                          'bucket(1.0, 3.0))) max(100) order(-count()) '
                          'each(output(sum(marqo__int_fields{"price"}), '

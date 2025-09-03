@@ -192,8 +192,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if marqo_query.track_total_hits is not None:
             # 0 is byte representation of letter "t"
-            facet_queries.append(facets_query_skeleton % (
-            f'{base_yql}{filter_term}', f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"))
+            if marqo_query.collapse_field_name:
+                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
+            else:
+                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
+            facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query))
 
         if marqo_query.facets is not None:
             facets_term = self._get_facets_term(marqo_query.facets,
