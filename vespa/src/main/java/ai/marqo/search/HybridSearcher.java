@@ -263,7 +263,7 @@ public class HybridSearcher extends Searcher {
             }
 
             // Collect errors from lexical and tensor results.
-            HitGroup combinedErrors = collectErrorsFromResults(resultLexical, resultTensor);
+            HitGroup combinedErrors = collectErrorsFromResults(resultLexical, resultTensor, verbose);
             if (combinedErrors.getError() != null) {
                 return new Result(query, combinedErrors);
             }
@@ -919,13 +919,13 @@ public class HybridSearcher extends Searcher {
         return null;
     }
 
-    HitGroup collectErrorsFromResults(Result resultLexical, Result resultTensor) {
+    HitGroup collectErrorsFromResults(Result resultLexical, Result resultTensor, Boolean verbose) {
         // Return errors if either result list has an error. Make sure all errors are returned.
         HitGroup combinedErrors = new HitGroup();
         logIfVerbose(
-                String.format("Tensor Errors found: %s", resultTensor.hits().getError()), true);
+                String.format("Tensor Errors found: %s", resultTensor.hits().getError()), verbose);
         logIfVerbose(
-                String.format("Lexical Errors found: %s", resultLexical.hits().getError()), true);
+                String.format("Lexical Errors found: %s", resultLexical.hits().getError()), verbose);
         combinedErrors.addErrorsFrom(resultTensor.hits());
         combinedErrors.addErrorsFrom(resultLexical.hits());
         return combinedErrors;
