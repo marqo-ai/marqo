@@ -82,32 +82,17 @@ class OpenCLIPModelTritonInferencePipeline(AbstractInferencePipeline):
         Returns:
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
-
-
-        collect_valid_content_to_encode_start_time = timer()
         content_to_encode: List[Tensor] = self._collect_valid_content_to_encode(preprocessed_content_list)
         if not content_to_encode:
             return []
-        duration = timer() - collect_valid_content_to_encode_start_time
-        logger.info(f"Encoding processed - Collecting valid content to encode took {round(duration * 1000)} ms")
 
-        getting_content_to_encode_shape_start_time = timer()
         content_to_encode: ndarray = torch.cat(content_to_encode, dim=0).cpu().numpy()
-        duration = timer() - getting_content_to_encode_shape_start_time
-        logger.info(f"Encoding processed - Getting content to encode shape took {round(duration * 1000)} ms")
 
-        triton_encoding_start_time = timer()
         raw_embeddings: ndarray = self.triton_client.encode(
             inputs=content_to_encode,
             modality=self.inference_request.modality
         )
-        duration = timer() - triton_encoding_start_time
-        logger.info(f"Encoding processed - Triton encoding took {round(duration * 1000)} ms")
-
-        format_result_start_time = timer()
         result = [r for r in raw_embeddings]
-        duration = timer() - format_result_start_time
-        logger.info(f"Encoding processed - Formatting result took {round(duration * 1000)}")
 
         return result
 
