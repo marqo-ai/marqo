@@ -54,17 +54,3 @@ class TritonInferenceClient:
             return "ViT-B-16-SigLI-FN-Image"
         else:
             raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
-
-    def _get_input_type(self, modality: Modality) -> str:
-        """
-        Returns the input type based on the modality.
-
-        :param modality: The modality of the input data.
-        :return: The input type as a string.
-        """
-        if modality == Modality.TEXT:
-            return "INT32"
-        elif modality == Modality.IMAGE:
-            return "FP32"
-        else:
-            raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
