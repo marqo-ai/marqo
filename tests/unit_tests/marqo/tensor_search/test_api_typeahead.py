@@ -85,6 +85,27 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         self.assertEqual(request_obj.min_fuzzy_match_length, 3)  # default value
         self.assertEqual(request_obj.fuzzy_edit_distance, 2)  # default value
 
+    def test_get_suggestions_request_with_empty_query(self):
+        """Test get_suggestions with minimal JSON request using defaults."""
+
+        mock_response = TypeaheadResponse(suggestions=[], processing_time_ms=25)
+        self.mock_typeahead.get_suggestions.return_value = mock_response
+
+        # Test with minimal JSON request
+        request_data = {"q": ""}
+
+        response = self.client.post("/indexes/test_index/suggestions", json=request_data)
+
+        self.assertEqual(response.status_code, 200)
+
+        # Verify defaults were applied
+        call_args = self.mock_typeahead.get_suggestions.call_args[0]
+        request_obj = call_args[1]
+        self.assertEqual(request_obj.q, "")  # empty string is allowed
+        self.assertEqual(request_obj.limit, 10)  # default value
+        self.assertEqual(request_obj.min_fuzzy_match_length, 3)  # default value
+        self.assertEqual(request_obj.fuzzy_edit_distance, 2)  # default value
+
     def test_get_suggestions_invalid_request(self):
         """Test get_suggestions with invalid JSON request triggers validation error."""
         
@@ -99,23 +120,6 @@ class TestTypeaheadAPIWithTestClient(unittest.TestCase):
         self.assertIn("detail", response_data)
         # Verify it's a validation error for missing 'q' field
         self.assertTrue(any("q" in str(error) for error in response_data["detail"]))
-
-    def test_get_suggestions_empty_query_validation(self):
-        """Test get_suggestions with empty q string triggers validation error."""
-        
-        # Test with empty string for 'q' field
-        request_data = {"q": ""}  # empty q field should trigger validation
-        
-        response = self.client.post("/indexes/test_index/suggestions", json=request_data)
-        
-        # Should return validation error
-        self.assertEqual(response.status_code, 422)
-        response_data = response.json()
-        self.assertIn("detail", response_data)
-        # Verify it's a validation error for empty 'q' field
-        error_detail = response_data["detail"][0]
-        self.assertEqual(error_detail["msg"], "Value error, q is required and must not be an empty string")
-        self.assertEqual(error_detail["loc"], ["body", "q"])
 
     def test_index_queries_valid_request(self):
         """Test index_queries with valid JSON request."""

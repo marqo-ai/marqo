@@ -46,13 +46,14 @@ class Typeahead:
         from marqo.tensor_search import index_meta_cache
         marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
         typeahead_schema_name = marqo_index.typeahead_schema_name
+        query = request.q.strip()
 
-        if request.q == "*":
+        if query == "":
             yql = f"SELECT query, metadata FROM {typeahead_schema_name} WHERE true"
 
         else:
             # Normalize the input
-            normalized_input = normalize_text(request.q)
+            normalized_input = normalize_text(query)
             if not normalized_input:
                 return TypeaheadResponse(suggestions=[])
 

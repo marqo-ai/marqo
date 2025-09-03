@@ -286,7 +286,7 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         """Test get_suggestions returns top n queries for wildcard query."""
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
 
-        request = TypeaheadRequest(q="*")
+        request = TypeaheadRequest(q="")
         self.typeahead.get_suggestions("test_index", request)
 
         call_kwargs = self.mock_vespa_client.query.call_args[1]

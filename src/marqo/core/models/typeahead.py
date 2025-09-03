@@ -38,13 +38,6 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
         description="Weight for BM25 score in ranking"
     )
 
-    @field_validator('q')
-    def validate_q(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("q is required and must not be an empty string")
-        return v.strip()
-
-
 class TypeaheadSuggestion(ImmutableStrictBaseModelV2):
     """Individual suggestion in typeahead response."""
 

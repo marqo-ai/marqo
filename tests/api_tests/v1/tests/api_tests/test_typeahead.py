@@ -29,7 +29,7 @@ class TestTypeahead(MarqoTestCase):
         """Test suggestions endpoint with invalid parameters."""
         invalid_requests = [
             {},  # Missing q
-            {"q": ""},  # Empty q
+            # {"q": ""},  # Empty q is allowed, it will return the top n queries
             {"q": "test", "limit": -1},  # Invalid limit
             {"q": "test", "fuzzyEditDistance": -1},  # Invalid fuzzyEditDistance
         ]
@@ -178,11 +178,11 @@ class TestTypeahead(MarqoTestCase):
         machine_suggestions = [s for s in suggestions if "machine" in s["suggestion"].lower()]
         self.assertGreaterEqual(len(machine_suggestions), 1)
 
-        # Now we do a wildcard query
+        # Now we do a empty query, which should return top queries
         wildcard_suggestion_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps({"q": "*", "limit": 3})
+            data=json.dumps({"q": "", "limit": 3})
         )
 
         # Check if we return the top 3 queries ordered by popularity

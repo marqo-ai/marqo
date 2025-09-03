@@ -295,7 +295,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
 
         for limit, bm25_weight, popularity_weight in test_cases:
             with self.subTest(limit=limit, bm25_weight=bm25_weight, popularity_weight=popularity_weight):
-                request = TypeaheadRequest(q="*", limit=limit, bm25_weight=bm25_weight,
+                request = TypeaheadRequest(q="", limit=limit, bm25_weight=bm25_weight,
                                            popularity_weight=popularity_weight)
                 response = self.config.typeahead.get_suggestions(self.test_index_name, request)
                 self.assertEqual(limit, len(response.suggestions))
