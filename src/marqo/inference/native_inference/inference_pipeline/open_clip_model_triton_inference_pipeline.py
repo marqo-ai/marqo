@@ -32,21 +32,12 @@ class OpenCLIPModelTritonInferencePipeline(AbstractInferencePipeline):
         self.model.model = None
 
     def run_pipeline(self) -> InferenceResult:
-        start_time = timer()
         preprocessed_content_list: List[OpenCLIPPreprocessedContent] = self._content_preprocessing()
-        duration_1 = timer() - start_time
-        logger.info(f"Content preprocessing took {round(duration_1 * 1000)} ms")
 
 
-        embeddings_start_time = timer()
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
-        embeddings_duration = timer() - embeddings_start_time
-        logger.info(f"Encoding processed content took {round(embeddings_duration * 1000)} ms")
 
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
-
-        duration_2 = timer() - start_time
-        logger.info(f"Total inference pipeline took {round(duration_2 * 1000)} ms")
         return formated_result
 
     def _content_preprocessing(self) -> List[OpenCLIPPreprocessedContent]:
