@@ -242,6 +242,7 @@ class TestCollapseFields(MarqoTestCase):
                         ]},
                         "color": {"type": "string"}
                     }},
+                    track_total_hits=True,
                     limit=6
                 )
 
@@ -249,6 +250,9 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertDictEqual({'count': 1}, res["facets"]["price"]["0.0:2.0"])
                 self.assertDictEqual({'count': 2}, res["facets"]["price"]["2.0:4.0"])
                 self.assertDictEqual({'red': {'count': 3}, 'yellow': {'count': 3}}, res["facets"]["color"])
+
+                # Test that the hit count returns the count of unique collapse field value
+                self.assertEqual(3, res['totalHits'])
 
     def test_pagination(self):
         """Test that pagination works with search with collapse field"""
