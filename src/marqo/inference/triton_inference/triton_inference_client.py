@@ -2,6 +2,7 @@ import numpy as np
 from numpy import ndarray
 
 import grpc
+from pandas.conftest import compression
 from tritonclient.grpc import service_pb2, service_pb2_grpc
 from marqo.core.inference.api import Modality
 
@@ -34,7 +35,7 @@ class TritonInferenceClient:
                 service_pb2.ModelInferRequest.InferRequestedOutputTensor(name="output")
             ]
         )
-        response = self.grpc_stub.ModelInfer(request)
+        response = self.grpc_stub.ModelInfer(request, compression=grpc.Compression.Gzip)
         embeddings = np.frombuffer(response.raw_output_contents[0], dtype=np.float32).reshape(inputs.shape[0], -1)
         return embeddings
 
@@ -90,7 +91,7 @@ class TritonInferenceClient:
                 shape=list(inputs.shape),
                 contents=service_pb2.InferTensorContents(
                     fp32_contents=inputs.flatten().astype(np.float32).tolist()
-                )
+                ),
             )
         else:
             raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
