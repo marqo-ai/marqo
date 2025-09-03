@@ -67,32 +67,3 @@ class TritonInferenceClient:
             return "FP32"
         else:
             raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
-
-    def _get_input(self, inputs: ndarray, modality: Modality) -> service_pb2.ModelInferRequest.InferInputTensor:
-        """
-        Creates an InferInputTensor for the given inputs and modality.
-
-        :param inputs: The input data to be sent to the Triton server.
-        :param modality: The modality of the input data.
-        :return: An InferInputTensor object containing the input data.
-        """
-        if modality == Modality.TEXT:
-            return service_pb2.ModelInferRequest.InferInputTensor(
-                name="input",
-                datatype="INT32",
-                shape=list(inputs.shape),
-                contents=service_pb2.InferTensorContents(
-                    int_contents=inputs.flatten().astype(np.int32).tolist()
-                )
-            )
-        elif modality == Modality.IMAGE:
-            return service_pb2.ModelInferRequest.InferInputTensor(
-                name="input",
-                datatype="FP32",
-                shape=list(inputs.shape),
-                contents=service_pb2.InferTensorContents(
-                    fp32_contents=inputs.flatten().astype(np.float32).tolist()
-                ),
-            )
-        else:
-            raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
