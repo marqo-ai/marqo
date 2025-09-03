@@ -293,6 +293,7 @@ class TestCollapseFields(MarqoTestCase):
                             "color": FieldFacetsConfiguration(type="string")
                         }
                     ),
+                    track_total_hits=True,
                     result_count=6
                 )
 
@@ -307,6 +308,9 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertDictEqual({'count': 2}, res["facets"]["rating"]["2.0:4.0"])
                 # FIXME mixed int and float rating confuses Vespa, 0.0:2.0 in the float field returns 2 instead of 0
                 self.assertDictEqual({'count': 3}, res["facets"]["rating"]["0.0:2.0"])
+
+                # Test that the hit count returns the count of unique collapse field value
+                self.assertEqual(3, res['totalHits'])
 
 
 
@@ -658,4 +662,3 @@ class TestCollapseFields(MarqoTestCase):
         # Verify the search returns all docs in one group
         self.assertEqual(5, len(lexical_res["hits"]))
         self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in lexical_res["hits"]]))
-

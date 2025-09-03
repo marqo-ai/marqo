@@ -445,7 +445,7 @@ class HybridSearcherTest {
                             ErrorMessage.createInternalServerError("Example lexical error"));
             Result resultTensor = new Result(new Query());
             HitGroup combinedErrors =
-                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor, true);
 
             assertThat(combinedErrors.getError().getDetailedMessage())
                     .contains("Example lexical error");
@@ -459,7 +459,7 @@ class HybridSearcherTest {
                             new Query(),
                             ErrorMessage.createInternalServerError("Example tensor error"));
             HitGroup combinedErrors =
-                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor, true);
 
             assertThat(combinedErrors.getError().getDetailedMessage())
                     .contains("Example tensor error");
@@ -476,7 +476,7 @@ class HybridSearcherTest {
                             new Query(),
                             ErrorMessage.createInternalServerError("Example tensor error"));
             HitGroup combinedErrors =
-                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor, true);
 
             Iterator<ErrorMessage> iterator = combinedErrors.getErrorHit().errors().iterator();
             assertThat(iterator.next().getDetailedMessage()).contains("Example tensor error");
@@ -488,7 +488,7 @@ class HybridSearcherTest {
             Result resultLexical = new Result(new Query());
             Result resultTensor = new Result(new Query());
             HitGroup combinedErrors =
-                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor, true);
             assertThat(combinedErrors.getError()).isNull();
         }
     }
