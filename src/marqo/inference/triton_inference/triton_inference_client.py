@@ -29,11 +29,12 @@ class TritonInferenceClient:
         :param inputs: The input data to be encoded, as a numpy array.
         :return: The encoded output from the Triton server, as a numpy array.
         """
-        input_tensor = grpc.InferInput("input", list(inputs.shape), "FP32")
+        input_tensor = grpc.InferInput("input", list(inputs.shape),
+                                       "FP32" if modality == Modality.IMAGE else "INT32")
         input_tensor.set_data_from_numpy(inputs.astype(np.float32))
         output_tensor = grpc.InferRequestedOutput("output")
         result = self.client.infer(
-            model_name="ViT-B-16-SigLI-FN-Image",
+            model_name=self._get_model_name(modality),
             inputs=[input_tensor],
             outputs=[output_tensor]
         )
