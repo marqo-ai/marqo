@@ -37,12 +37,15 @@ class TritonInferenceClient:
             data_type = "FP32"
         else:
             raise ValueError(f"Unsupported modality: {modality}. Supported modalities are TEXT and IMAGE.")
+        model_name=self._get_model_name(modality)
+
+        logger.info(f"Encoding processed - {model_name}")
 
         input_tensor = grpc.InferInput("input", list(inputs.shape), data_type)
         input_tensor.set_data_from_numpy(inputs)
         output_tensor = grpc.InferRequestedOutput("output")
         result = self.client.infer(
-            model_name=self._get_model_name(modality),
+            model_name=model_name,
             inputs=[input_tensor],
             outputs=[output_tensor]
         )
