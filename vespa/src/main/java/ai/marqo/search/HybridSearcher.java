@@ -919,7 +919,7 @@ public class HybridSearcher extends Searcher {
         return null;
     }
 
-    HitGroup collectErrorsFromResults(Result resultLexical, Result resultTensor, Boolean verbose) {
+    HitGroup collectErrorsFromResults(Result resultLexical, Result resultTensor, boolean verbose) {
         // Return errors if either result list has an error. Make sure all errors are returned.
         HitGroup combinedErrors = new HitGroup();
         logIfVerbose(
