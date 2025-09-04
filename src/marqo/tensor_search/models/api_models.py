@@ -363,7 +363,7 @@ class SearchQuery(BaseMarqoModel):
         sort_by = values.get('sort_by')
         score_modifiers = values.get('scoreModifiers')
         if sort_by is not None and score_modifiers is not None:
-            raise ValueError("'sortBy' cannot be used with 'scoreModifiers' (global score modifiers) in hybrid search "
+            raise ValueError("'sortBy' cannot be used with 'scoreModifiers'(global score modifiers) in hybrid search "
                              "as they are working in the same rerank phase. "
                              "Please use sortBy only for sorting by fields, and scoreModifiers only for modifying scores")
         return values

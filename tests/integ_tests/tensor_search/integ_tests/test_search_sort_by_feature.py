@@ -294,7 +294,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
                 }
             )
         self.assertIn(
-            "'sortBy' cannot be used with 'scoreModifiers' (global score modifiers)",
+            "'sortBy' cannot be used with 'scoreModifiers'(global score modifiers)",
                       str(context.exception.errors())
         )
 
