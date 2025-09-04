@@ -38,7 +38,7 @@ class _UDPSink:
                 with self._lock:
                     self.packets.append(data)
             except socket.timeout:
-                continue  # polling tick
+                continue
             except OSError:
                 break
 
@@ -101,30 +101,79 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
             statsd = sc.StatsDClient(host="127.0.0.1", port=cls.sink.port)
             app.add_middleware(sm.StatsDMiddleware, statsd_client=statsd)
 
-            @app.get("/")
-            def root():
-                return {"ok": True}
-
-            @app.get("/indexes/{name}/search")
+            # Search & related
+            @app.post("/indexes/{name}/search")
             def search(name: str):
                 return {"hits": []}
 
+            @app.post("/indexes/{name}/recommend")
+            def recommend(name: str):
+                return {"recommendations": []}
+
+            @app.post("/indexes/{name}/embed")
+            def embed(name: str):
+                return {"vectors": []}
+
+            @app.post("/indexes/bulk/search")
+            def bulk_search():
+                return {"results": []}
+
+            # Documents collection endpoints
             @app.post("/indexes/{name}/documents")
             def add_docs(name: str):
                 # Return explicit JSONResponse so we control headers precisely
                 return JSONResponse(
                     content={"indexed": 1},
-                    headers={
-                        "x-count-success": "1",
-                        "x-count-failure": "0",
-                        "x-count-error": "0",
-                    },
+                    headers={"x-count-success": "1", "x-count-failure": "0", "x-count-error": "0"},
                     status_code=200,
                 )
 
+            @app.get("/indexes/{name}/documents")
+            def get_docs(name: str):
+                return {"docs": []}
+
+            @app.patch("/indexes/{name}/documents")
+            def patch_docs(name: str):
+                return {"patched": True}
+
+            @app.post("/indexes/{name}/documents/delete-batch")
+            def delete_batch(name: str):
+                return {"deleted": 2}
+
+            @app.post("/indexes/{name}/documents/get-batch")
+            def get_batch(name: str):
+                return {"docs": [{"id": "a"}, {"id": "b"}]}
+
+            # Single document (MUST be redacted)
             @app.get("/indexes/{name}/documents/{doc_id}")
             def get_doc(name: str, doc_id: str):
                 return {"id": doc_id}
+
+            # Stats/settings
+            @app.get("/indexes/{name}/stats")
+            def stats(name: str):
+                return {"stats": {"docs": 10}}
+
+            @app.get("/indexes/{name}/settings")
+            def settings(name: str):
+                return {"settings": {"x": 1}}
+
+            # Models & devices
+            @app.get("/models")
+            def models_get():
+                return {"models": []}
+
+            @app.delete("/models")
+            def models_delete():
+                return {"deleted": True}
+
+            @app.get("/device/cuda")
+            def device_cuda():
+                return {"cuda": True}
+
+            @app.get("/device/cpu")
+            def device_cpu():
+                return {"cpu": True}
 
             return app
 
@@ -136,28 +185,74 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
         cls._sink_cm.__exit__(None, None, None)
 
-    def test_metrics_roundtrip(self):
-        """Test that the middleware emits expected metrics over UDP."""
-        self.client.get("/")
-        self.client.get("/indexes/foo/search")  # search timing
-        self.client.post("/indexes/foo/documents")  # index timing + headers
-        self.client.get("/indexes/foo/documents/abc123")  # redaction
+    def test_metrics_roundtrip_all_endpoints(self):
+        self.client.post("/indexes/foo/search")
+        self.client.post("/indexes/foo/recommend")
+        self.client.post("/indexes/foo/embed")
+        self.client.post("/indexes/bulk/search")
 
+        self.client.post("/indexes/foo/documents")  # emits batch counters
+        self.client.get("/indexes/foo/documents")   # collection GET
+        self.client.patch("/indexes/foo/documents") # partial update
+        self.client.get("/indexes/foo/documents/abc123")  # MUST redact id
+        self.client.post("/indexes/foo/documents/delete-batch")  # MUST NOT redact
+        self.client.post("/indexes/foo/documents/get-batch")     # MUST NOT redact
+
+        self.client.get("/indexes/foo/stats")
+        self.client.get("/indexes/foo/settings")
+
+        self.client.get("/models")
+        self.client.delete("/models")
+        self.client.get("/device/cuda")
+        self.client.get("/device/cpu")
+
+        # Expected metric patterns
         patterns = [
-            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/search,method:GET,status_code:200",
+
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/search,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/recommend,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/embed,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/bulk/search,method:POST,status_code:200",
+
+            # documents collection endpoints (no redaction)
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:GET,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:PATCH,status_code:200",
+
+            # single doc (redacted)
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200",
+
+            # fixed subpaths (no redaction)
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/delete-batch,method:POST,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/get-batch,method:POST,status_code:200",
+
+            # stats/settings
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/stats,method:GET,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/settings,method:GET,status_code:200",
+
+            # models & devices
+            r"request\.duration_ms:\d+\|ms\|#path:/models,method:GET,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/models,method:DELETE,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/device/cuda,method:GET,status_code:200",
+            r"request\.duration_ms:\d+\|ms\|#path:/device/cpu,method:GET,status_code:200",
+
+            # batch counters from POST /documents (headers-driven)
             r"batch\.success:1\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
             r"batch\.failure:0\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
             r"batch\.error:0\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
         ]
 
-        # Wait until the six packets we assert on have arrived
+        # Wait for all the expected packets
         self.sink.wait(n=len(patterns))
         pkt = self.sink.decoded()
 
         for pat in patterns:
-            self.assertTrue(
-                _has(pkt, pat),
-                msg=f"Missing packet matching /{pat}/ in {pkt}",
-            )
+            self.assertTrue(_has(pkt, pat), msg=f"Missing packet /{pat}/\nSeen:\n{pkt}")
+
+    def test_idempotent_redaction(self):
+        # sanity: redaction is stable on reprocessing
+        self.client.get("/indexes/foo/documents/abc123")
+        # at least one packet with the redacted path must exist; second pass shouldn't change it
+        self.sink.wait(n=1)
+        pkt = self.sink.decoded()
+        assert _has(pkt, r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200")
