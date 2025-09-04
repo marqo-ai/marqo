@@ -277,6 +277,27 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             )
         self.assertIn("sortBy can only be provided for", str(context.exception.errors()))
 
+    def test_sort_by_can_not_used_with_score_modifiers(self):
+        """Ensure that sort_by cannot be used with score modifiers."""
+        with self.assertRaises(RequestValidationError) as context:
+            _ = search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict={
+                    "q": "machine learning artificial intelligence algorithms",
+                    "searchMethod": SearchMethod.HYBRID,
+                    "sortBy": {
+                        "fields": [{"fieldName": "sort_field_1"}],
+                    },
+                    "scoreModifiers": {"multiply_score_by": [{"field_name": "sort_field_1", "weight": 2}]}
+                }
+            )
+        self.assertIn(
+            "'sortBy' cannot be used with 'scoreModifiers' (global score modifiers)",
+                      str(context.exception.errors())
+        )
+
     def test_simple_sort_with_default_settings(self):
         """
         The simple sort test check based on default values:
