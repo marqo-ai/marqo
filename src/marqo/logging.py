@@ -90,7 +90,7 @@ LOGGING_CONFIG = {
         },
         "uvicorn.access": {
             "handlers": ["access"],
-            "level": "INFO",  # access log should be printed out even when root log level is higher than info
+            "level": LOG_LEVEL,  # access log level also changes with root log level now
             "propagate": False,
         },
         "httpx": {
