@@ -196,7 +196,9 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         self.client.patch("/indexes/foo/documents") # partial update
         self.client.get("/indexes/foo/documents/abc123")  # MUST redact id
         self.client.post("/indexes/foo/documents/delete-batch")  # MUST NOT redact
+        self.client.post("/indexes/foo/documents/delete-batch?telemetry=true")  # MUST NOT redact (even with query)
         self.client.post("/indexes/foo/documents/get-batch")     # MUST NOT redact
+        self.client.post("/indexes/foo/documents/get-batch?telemetry=true")     # MUST NOT redact (even with query)
 
         self.client.get("/indexes/foo/stats")
         self.client.get("/indexes/foo/settings")
@@ -255,4 +257,5 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         # at least one packet with the redacted path must exist; second pass shouldn't change it
         self.sink.wait(n=1)
         pkt = self.sink.decoded()
-        assert _has(pkt, r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200")
+        self.assertTrue(_has(pkt, r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200"),
+                        msg=f"Missing redacted packet\nSeen:\n{pkt}")
