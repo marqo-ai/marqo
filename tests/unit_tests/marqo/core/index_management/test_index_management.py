@@ -130,9 +130,9 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
 
         # Verify that deployment lock was not acquired and update was not called
         self.index_management.get_index.assert_called_once_with(updated_index.name)
-        self.index_management._vespa_deployment_lock.assert_not_called()
-        mock_deployment_lock.__enter__.assert_not_called()
-        mock_deployment_lock.__exit__.assert_not_called()
+        self.index_management._vespa_deployment_lock.assert_called_once()
+        mock_deployment_lock.__enter__.assert_called_once()
+        mock_deployment_lock.__exit__.assert_called_once()
         mock_vespa_app.update_index_setting_and_schema.assert_not_called()
 
     def test_update_index_raises_internal_error_for_non_semi_structured_index(self):
@@ -154,10 +154,57 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
                     self.index_management.update_index(index)
 
                 self.assertIn("can not be updated", str(context.exception))
-                # Verify deployment lock was never acquired
-                self.index_management._vespa_deployment_lock.assert_not_called()
-                mock_deployment_lock.__enter__.assert_not_called()
-                mock_deployment_lock.__exit__.assert_not_called()
+                # Verify deployment lock was acquired
+                self.index_management._vespa_deployment_lock.assert_called_once()
+                mock_deployment_lock.__enter__.assert_called_once()
+                mock_deployment_lock.__exit__.assert_called_once()
+
+    @patch('marqo.core.index_management.index_management.vespa_schema_factory')
+    @patch('marqo.core.index_management.index_management.TypeaheadVespaSchema')
+    def test_batch_create_indexes_generates_typeahead_schema(self, mock_typeahead_schema_class, mock_vespa_schema_factory):
+        """Test that batch_create_indexes properly generates typeahead schemas."""
+        # Setup request
+        request = self.unstructured_marqo_index_request(
+            name="test_index",
+            model=Model(name='hf/e5-small')
+        )
+
+        # Setup mock returns
+        mock_main_schema = "main_schema_content"
+        mock_marqo_index = self._create_semi_structured_index("test_index")
+        mock_vespa_schema_factory.return_value.generate_schema.return_value = (mock_main_schema, mock_marqo_index)
+
+        # Setup typeahead schema mocks
+        mock_updated_index = mock_marqo_index.copy(deep=True, update={"typeahead_schema_name": "marqo__test_index_typeahead"})
+        mock_typeahead_schema = "typeahead_schema_content"
+        mock_typeahead_instance = Mock()
+        mock_typeahead_instance.generate_schema.return_value = (mock_typeahead_schema, mock_updated_index)
+        mock_typeahead_schema_class.return_value = mock_typeahead_instance
+
+        # Setup other mocks
+        mock_vespa_app = Mock()
+        mock_deployment_lock = MagicMock()
+        self.index_management._get_vespa_application = Mock(return_value=mock_vespa_app)
+        self.index_management._vespa_deployment_lock = Mock(return_value=mock_deployment_lock)
+
+        # Execute
+        result = self.index_management.batch_create_indexes([request])
+
+        # Verify TypeaheadVespaSchema was called with the main marqo_index
+        mock_typeahead_schema_class.assert_called_once_with(mock_marqo_index)
+        mock_typeahead_instance.generate_schema.assert_called_once()
+
+        # Verify batch_add_index_setting_and_schema was called with the correct tuple
+        expected_call = [(mock_main_schema, mock_typeahead_schema, mock_updated_index)]
+        mock_vespa_app.batch_add_index_setting_and_schema.assert_called_once_with(expected_call)
+
+        # Verify the result contains the updated index with typeahead schema name
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].typeahead_schema_name, "marqo__test_index_typeahead")
+
+        # Verify deployment lock was used
+        mock_deployment_lock.__enter__.assert_called_once()
+        mock_deployment_lock.__exit__.assert_called_once()
 
 
 if __name__ == '__main__':

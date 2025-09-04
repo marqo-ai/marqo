@@ -98,14 +98,14 @@ class TestLoggingConfig(unittest.TestCase):
 
                 self.assertEqual(LOGGING_CONFIG['loggers']['httpx']['level'], expected_level)
 
-    def test_access_log_level_fixed(self):
+    def test_access_log_level_changes_with_root_log_level(self):
         """Test that access log level is always INFO"""
         for level in ['debug', 'info', 'warning', 'error']:
             with patch.dict(os.environ, {'MARQO_LOG_LEVEL': level, 'MARQO_LOG_FORMAT': 'plain'}):
                 importlib.reload(marqo_logging)
                 from marqo.logging import LOGGING_CONFIG
 
-                self.assertEqual(LOGGING_CONFIG['loggers']['uvicorn.access']['level'], 'INFO')
+                self.assertEqual(level.upper(), LOGGING_CONFIG['loggers']['uvicorn.access']['level'])
 
     def test_plain_format_output(self):
         """Test the exact plain text format output"""
