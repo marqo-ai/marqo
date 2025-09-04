@@ -189,6 +189,15 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         """Count how many packets match the given regex pattern."""
         return sum(1 for p in pkt if re.search(pattern, p))
 
+    def _wait_for_all_patterns(self, sink, patterns: List[str], timeout: float = 8.0) -> List[str]:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            pkt = sink.decoded()
+            if all(any(re.search(p, x) for x in pkt) for p in patterns):
+                return pkt
+            time.sleep(0.05)
+        return sink.decoded()
+
     def test_metrics_roundtrip_all_endpoints(self):
         self.client.post("/indexes/foo/search")
         self.client.post("/indexes/foo/recommend")
@@ -249,8 +258,7 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         ]
 
         # Wait for all the expected packets
-        self.sink.wait(n=len(patterns))
-        pkt = self.sink.decoded()
+        pkt = self._wait_for_all_patterns(self.sink, patterns, timeout=8.0)
 
         for pat in patterns:
             self.assertTrue(_has(pkt, pat), msg=f"Missing packet /{pat}/\nSeen:\n{pkt}")
