@@ -78,6 +78,14 @@ class MarqoTestCase(unittest.TestCase):
             except requests.exceptions.HTTPError as e:
                 raise MarqoWebError(e)
 
+            r_queries = requests.delete(
+                f"{cls._MARQO_URL}/indexes/{index_name}/suggestions/queries/delete-all",
+                headers={"Content-Type": "application/json"}
+            )
+            try:
+                r_queries.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                raise MarqoWebError(e)
 
     @classmethod
     def removeAllModels(cls) -> None:

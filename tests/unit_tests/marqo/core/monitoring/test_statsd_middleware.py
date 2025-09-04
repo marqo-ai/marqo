@@ -176,3 +176,21 @@ class TestStatsDMiddleware(unittest.TestCase):
 
         timings = _extract(self.stub, "timing", "request.duration_ms")
         self.assertTrue(any("status_code:404" in m for m in timings))
+
+    def test_sanitize_path(self):
+        """Test the _sanitize_path method for various scenarios."""
+        sanitize = sm.StatsDMiddleware._sanitize_path
+
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/abc123"),
+            "/indexes/foo/documents/<document_id>",
+        )
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/delete-batch"),
+            "/indexes/foo/documents/delete-batch",
+        )
+
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/get-batch"),
+            "/indexes/foo/documents/get-batch",
+        )
