@@ -185,6 +185,10 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
         cls._sink_cm.__exit__(None, None, None)
 
+    def _count(self, pkt: List[str], pattern: str) -> int:
+        """ Count how many packets match the given regex pattern."""
+        return sum(1 for p in pkt if re.search(pattern, p))
+
     def test_metrics_roundtrip_all_endpoints(self):
         self.client.post("/indexes/foo/search")
         self.client.post("/indexes/foo/recommend")
@@ -192,13 +196,13 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         self.client.post("/indexes/bulk/search")
 
         self.client.post("/indexes/foo/documents")  # emits batch counters
-        self.client.get("/indexes/foo/documents")   # collection GET
-        self.client.patch("/indexes/foo/documents") # partial update
+        self.client.get("/indexes/foo/documents")  # collection GET
+        self.client.patch("/indexes/foo/documents")  # partial update
         self.client.get("/indexes/foo/documents/abc123")  # MUST redact id
         self.client.post("/indexes/foo/documents/delete-batch")  # MUST NOT redact
         self.client.post("/indexes/foo/documents/delete-batch?telemetry=true")  # MUST NOT redact (even with query)
-        self.client.post("/indexes/foo/documents/get-batch")     # MUST NOT redact
-        self.client.post("/indexes/foo/documents/get-batch?telemetry=true")     # MUST NOT redact (even with query)
+        self.client.post("/indexes/foo/documents/get-batch")  # MUST NOT redact
+        self.client.post("/indexes/foo/documents/get-batch?telemetry=true")  # MUST NOT redact (even with query)
 
         self.client.get("/indexes/foo/stats")
         self.client.get("/indexes/foo/settings")
@@ -250,6 +254,27 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
 
         for pat in patterns:
             self.assertTrue(_has(pkt, pat), msg=f"Missing packet /{pat}/\nSeen:\n{pkt}")
+
+            # 1) Query string must NEVER appear inside the #path tag.
+            # Detect any '#path:...?...,'
+            self.assertFalse(
+                any(re.search(r"#path:[^,]*\?", p) for p in pkt),
+                msg=f"Query string leaked into path tag\nSeen:\n{pkt}",
+            )
+            # 2) We sent delete-batch twice (with and without ?telemetry=true),
+            # so the normalized metric line should appear at least twice.
+            delete_batch_pat = r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/delete-batch,method:POST,status_code:200"
+            self.assertEqual(
+                self._count(pkt, delete_batch_pat), 2,
+                msg=f"Expected >=2 delete-batch packets (query stripped)\nSeen:\n{pkt}",
+            )
+
+            # 3) Same for get-batch (also called twice).
+            get_batch_pat = r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/get-batch,method:POST,status_code:200"
+            self.assertEqual(
+                self._count(pkt, get_batch_pat), 2,
+                msg=f"Expected >=2 get-batch packets (query stripped)\nSeen:\n{pkt}",
+            )
 
     def test_idempotent_redaction(self):
         # sanity: redaction is stable on reprocessing
