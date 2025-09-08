@@ -9,7 +9,7 @@ from marqo import marqo_docs
 from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.core.inference.api import ModelManager, ModelError
-from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.triton_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.logging import get_logger
 from marqo.s2_inference import constants
 from marqo.s2_inference.configs import get_default_normalization
@@ -23,6 +23,7 @@ from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults
+from marqo.inference.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 
 logger = get_logger(__name__)
 _available_models = dict()
@@ -30,20 +31,19 @@ MODEL_PROPERTIES = load_model_properties()
 lock = threading.Lock()
 
 
-def load_model(model_name: str, model_properties: dict, model_auth: Optional[ModelAuth], device: str, triton_grpc_client) -> AbstractEmbeddingModel:
+def load_model(
+        model_name: str, model_properties: dict, model_auth: Optional[ModelAuth], device: str,
+               triton_client: TritonGRPCClient
+               ) -> AbstractEmbeddingModel:
     """
     Load the model and preprocessor if not already loaded
     """
     validated_model_properties = model_properties
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
-
-
     _update_available_models(
         model_cache_key, model_name, validated_model_properties, device, normalize_embeddings=True, model_auth=model_auth
     )
-
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-
     return model
 
 
