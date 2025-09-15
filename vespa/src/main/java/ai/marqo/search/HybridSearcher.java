@@ -431,6 +431,17 @@ public class HybridSearcher extends Searcher {
 
         // Validate input parameters
         if (!isRelevanceCutoffEnabled && !isSortByEnabled) {
+            // For disjunction hybrid search, we need to set offset to 0 to handle the pagination
+            // correctly
+            // TODO the logic to extract retrievalMethod is duplicated here to reduce the effort of
+            //   changing method signature. We will do a refactoring in the near future
+            String retrievalMethod =
+                    query.properties().getString("marqo__hybrid.retrievalMethod", "");
+            if ("disjunction".equalsIgnoreCase(retrievalMethod)) {
+                query.setHits(query.getOffset() + query.getHits());
+                query.setOffset(0);
+            }
+
             return query;
         }
 
@@ -943,7 +954,28 @@ public class HybridSearcher extends Searcher {
             int limit,
             int offset,
             boolean verbose) {
-        // Split original hits into 2 lists: result to rerank and excess hits
+        // Check if we need special pagination handling
+        // TODO the logic to extract retrievalMethod and relevanceCutoffMethod is duplicated here to
+        //  reduce the effort of changing method signature. We will do a refactoring in the near
+        //  future to improve this
+        String retrievalMethod = query.properties().getString("marqo__hybrid.retrievalMethod", "");
+        String relevanceCutoffMethod =
+                query.properties().getString("marqo__hybrid.relevanceCutoff.method", null);
+        boolean needsPaginationBeforeRerank =
+                "disjunction".equalsIgnoreCase(retrievalMethod) || relevanceCutoffMethod != null;
+
+        // Step 1: Apply pagination BEFORE reranking if needed
+        if (needsPaginationBeforeRerank) {
+            // We fetched (offset + limit) results from position 0
+            // Now trim to remove the first 'offset' results
+            hitsForPostProcessing.trim(offset, hitsForPostProcessing.size());
+            logIfVerbose(
+                    String.format(
+                            "Applied pre-rerank pagination: removed first %d results", offset),
+                    verbose);
+        }
+
+        // Step 2: Split original hits into 2 lists: result to rerank and excess hits
         // Excess hits will not be reranked, and will be added back after reranking the other
         // results
         HitGroup resultToRerank = new HitGroup();
@@ -974,7 +1006,7 @@ public class HybridSearcher extends Searcher {
             logHitGroup(excessHits, verbose);
         }
 
-        // Apply global score modifiers and rerank
+        // Step 3: Apply global score modifiers and rerank
         // Skip whole process if global modifier weight tensors don't exist in query
         Tensor queryMultWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
@@ -992,11 +1024,13 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Rescored result list (UNSORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
+        // Step 4: Sort
         resultToRerank.sort();
 
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
+        // Step 5: Add excess hits if needed
         if (limit > rerankDepthGlobal) {
             // Add excess hits to the end of reranked results then sort
             logIfVerbose(
@@ -1007,11 +1041,8 @@ public class HybridSearcher extends Searcher {
             resultToRerank.addAll(excessHits.asList());
         }
 
-        // Paginate and/or trim
-        // Result list should always have limit length (if possible)
-        logIfVerbose(
-                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
-                verbose);
+        // Step 6: Final trim to limit (pagination was already applied if needed)
+        logIfVerbose(String.format("Final trimming result list to limit: %d", limit), verbose);
         resultToRerank.trim(0, limit);
 
         logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
