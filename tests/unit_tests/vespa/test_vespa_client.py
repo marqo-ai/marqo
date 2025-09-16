@@ -27,8 +27,6 @@ class TestVespaClient(unittest.TestCase):
             # Verify that close was called
             mock_close.assert_called_once()
 
-
-
     def test_get_content_url_single_path(self):
         """Test get_content_url with single path component"""
         
@@ -137,21 +135,24 @@ class TestVespaClient(unittest.TestCase):
             return mock_response
 
         test_cases = [
-            (1000, 5.0, "Vespa timeout 1000ms -> httpx timeout 5.0s"),
-            (1, 5.0, "Vespa timeout 1ms -> httpx timeout 5.0s"),
-            (6000, 7.0, "Vespa timeout 6000ms -> httpx timeout 7.0s"),
-            (None, 5.0, "Vespa timeout None -> Default to 1000 -> httpx timeout 5.0s"),
+            (1000, 5.0, "1000ms", "Vespa timeout 1000ms -> httpx timeout 5.0s"),
+            (1, 5.0, "1ms", "Vespa timeout 1ms -> httpx timeout 5.0s"),
+            (6000, 7.0, "6000ms", "Vespa timeout 6000ms -> httpx timeout 7.0s"),
+            (None, 5.0, "1000ms", "Vespa timeout None -> Default to 1000 -> httpx timeout 5.0s"),
+            (0, 5.0, "1000ms", "Vespa timeout 0ms -> Default to 1000 -> httpx timeout 5.0s"),
         ]
 
-        for vespa_timeout_ms, httpx_read_timeout_second, msg in test_cases:
+        for provided_vespa_timeout_ms, httpx_read_timeout_second, sent_vespa_timeout_ms, msg in test_cases:
             with self.subTest(msg=msg):
                 with patch.object(httpx.Client, 'post', side_effect=mock_post) as mock_query:
                     self.vespa_client.query(
                         yql="select * from sources * where test;",
-                        timeout=vespa_timeout_ms
+                        timeout=provided_vespa_timeout_ms
                     )
 
                     timeout_obj = mock_query.call_args.kwargs["timeout"]
+                    vespa_time_out = mock_query.call_args.kwargs["json"]["timeout"]
+                    self.assertEqual(sent_vespa_timeout_ms, vespa_time_out)
                     self.assertEqual(timeout_obj.read, httpx_read_timeout_second)
                     self.assertEqual(5.0, timeout_obj.connect)
                     self.assertEqual(5.0, timeout_obj.write)
