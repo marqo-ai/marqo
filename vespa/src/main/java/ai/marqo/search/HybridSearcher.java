@@ -961,19 +961,20 @@ public class HybridSearcher extends Searcher {
         String retrievalMethod = query.properties().getString("marqo__hybrid.retrievalMethod", "");
         String relevanceCutoffMethod =
                 query.properties().getString("marqo__hybrid.relevanceCutoff.method", null);
-        boolean needsPaginationBeforeRerank =
+        boolean needsToTrim =
                 "disjunction".equalsIgnoreCase(retrievalMethod) || relevanceCutoffMethod != null;
 
         // Step 1: Apply pagination BEFORE reranking if needed
-        if (needsPaginationBeforeRerank) {
-            // We fetched (offset + limit) results from position 0
-            // Now trim to remove the first 'offset' results
-            hitsForPostProcessing.trim(offset, hitsForPostProcessing.size());
-            logIfVerbose(
-                    String.format(
-                            "Applied pre-rerank pagination: removed first %d results", offset),
-                    verbose);
-        }
+        //        if (needsToTrim) {
+        //            // We fetched (offset + limit) results from position 0
+        //            // Now trim to remove the first 'offset' results
+        //            hitsForPostProcessing.trim(offset, hitsForPostProcessing.size() - offset);
+        //            logIfVerbose(
+        //                    String.format(
+        //                            "Applied pre-rerank pagination: removed first %d results",
+        // offset),
+        //                    verbose);
+        //        }
 
         // Step 2: Split original hits into 2 lists: result to rerank and excess hits
         // Excess hits will not be reranked, and will be added back after reranking the other
@@ -1042,8 +1043,17 @@ public class HybridSearcher extends Searcher {
         }
 
         // Step 6: Final trim to limit (pagination was already applied if needed)
-        logIfVerbose(String.format("Final trimming result list to limit: %d", limit), verbose);
-        resultToRerank.trim(0, limit);
+        if (needsToTrim) {
+            logIfVerbose(
+                    String.format(
+                            "Final trimming result list from offset %s and limit: %d",
+                            offset, limit),
+                    verbose);
+            resultToRerank.trim(offset, limit);
+        } else {
+            logIfVerbose(String.format("Final trimming result list to limit: %d", limit), verbose);
+            resultToRerank.trim(0, limit);
+        }
 
         logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
         logHitGroup(resultToRerank, verbose);
