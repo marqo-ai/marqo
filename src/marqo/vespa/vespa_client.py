@@ -242,7 +242,7 @@ class VespaClient:
         }
 
         # Use default timeout if not already set.
-        vespa_timeout_ms = timeout if timeout is not None else self.default_search_timeout_ms
+        vespa_timeout_ms = timeout if timeout else self.default_search_timeout_ms
         query['timeout'] = f"{vespa_timeout_ms}ms"
 
         # Set httpx timeout to be slightly longer than Vespa timeout to avoid early termination of the request.
