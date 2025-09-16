@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
+import httpx
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -125,6 +126,36 @@ class TestVespaClient(unittest.TestCase):
         # Should return empty response without making any requests
         self.assertEqual(len(result.responses), 0)
         self.assertFalse(result.errors)
+
+    def test_query_httpx_timeout_configuration_small_vespa_timeout(self):
+        """Test that httpx read timeout is set to max(5.0, (vespa_timeout + 1000) / 1000) for Vespa timeouts"""
+        def mock_post(*args, **kwargs):
+            # Return a mock response
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
+            return mock_response
+
+        test_cases = [
+            (1000, 5.0, "Vespa timeout 1000ms -> httpx timeout 5.0s"),
+            (1, 5.0, "Vespa timeout 1ms -> httpx timeout 5.0s"),
+            (6000, 7.0, "Vespa timeout 6000ms -> httpx timeout 7.0s"),
+            (None, 5.0, "Vespa timeout None -> Default to 1000 -> httpx timeout 5.0s"),
+        ]
+
+        for vespa_timeout_ms, httpx_read_timeout_second, msg in test_cases:
+            with self.subTest(msg=msg):
+                with patch.object(httpx.Client, 'post', side_effect=mock_post) as mock_query:
+                    self.vespa_client.query(
+                        yql="select * from sources * where test;",
+                        timeout=vespa_timeout_ms
+                    )
+
+                    timeout_obj = mock_query.call_args.kwargs["timeout"]
+                    self.assertEqual(timeout_obj.read, httpx_read_timeout_second)
+                    self.assertEqual(5.0, timeout_obj.connect)
+                    self.assertEqual(5.0, timeout_obj.write)
+                    self.assertEqual(5.0, timeout_obj.pool)
 
 
 if __name__ == '__main__':

@@ -240,18 +240,23 @@ class VespaClient:
             **kwargs
         }
 
+        vespa_timeout_ms = timeout if timeout else self.default_search_timeout_ms
         # Use default timeout if not already set.
         if timeout:
-            query['timeout'] = f"{timeout}ms"
+            query['timeout'] = f"{vespa_timeout_ms}ms"
         else:
-            query['timeout'] = f"{self.default_search_timeout_ms}ms"
+            query['timeout'] = f"{vespa_timeout_ms}ms"
+        # Set httpx timeout to be slightly longer than Vespa timeout to avoid early termination of the request.
+        # However, we set it to be at least 5 seconds to avoid any regression.
+        httpx_read_timeout_second = max((vespa_timeout_ms + 1000) / 1000, 5.0)
+        httpx_client_timeout = httpx.Timeout(5.0, read=httpx_read_timeout_second)
 
         query = {key: value for key, value in query.items() if value is not None}
 
         logger.debug(f'Query: {query}')
 
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', json=query)
+            resp = self.http_client.post(f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout)
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
