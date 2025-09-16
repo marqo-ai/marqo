@@ -214,7 +214,7 @@ class VespaClient:
                          f"The convergence status is {self._get_convergence_status()}")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
+              query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
         """
         Query Vespa.
         Args:
@@ -223,6 +223,7 @@ class VespaClient:
             ranking: Ranking profile to use
             model_restrict: Schema to restrict the query to
             query_features: Query features
+            timeout: The Vespa query timeout in milliseconds. If not set, the default timeout will be used.
             **kwargs: Additional query parameters
         Returns:
             Query result as a VespaQueryResult object
@@ -240,7 +241,7 @@ class VespaClient:
             **kwargs
         }
 
-        vespa_timeout_ms = timeout if timeout else self.default_search_timeout_ms
+        vespa_timeout_ms: int = timeout if timeout else self.default_search_timeout_ms
         # Use default timeout if not already set.
         if timeout:
             query['timeout'] = f"{vespa_timeout_ms}ms"
