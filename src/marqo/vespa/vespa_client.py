@@ -241,12 +241,10 @@ class VespaClient:
             **kwargs
         }
 
-        vespa_timeout_ms: int = timeout if timeout else self.default_search_timeout_ms
         # Use default timeout if not already set.
-        if timeout:
-            query['timeout'] = f"{vespa_timeout_ms}ms"
-        else:
-            query['timeout'] = f"{vespa_timeout_ms}ms"
+        vespa_timeout_ms = timeout if timeout is not None else self.default_search_timeout_ms
+        query['timeout'] = f"{vespa_timeout_ms}ms"
+
         # Set httpx timeout to be slightly longer than Vespa timeout to avoid early termination of the request.
         # However, we set it to be at least 5 seconds to avoid any regression.
         httpx_read_timeout_second = max((vespa_timeout_ms + 1000) / 1000, 5.0)
