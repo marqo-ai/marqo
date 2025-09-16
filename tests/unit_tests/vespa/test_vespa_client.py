@@ -142,7 +142,7 @@ class TestVespaClient(unittest.TestCase):
             (0, 5.0, "1000ms", "Vespa timeout 0ms -> Default to 1000 -> httpx timeout 5.0s"),
         ]
 
-        for provided_vespa_timeout_ms, httpx_read_timeout_second, sent_vespa_timeout_ms, msg in test_cases:
+        for provided_vespa_timeout_ms, httpx_read_timeout_second, expected_vespa_timeout_ms, msg in test_cases:
             with self.subTest(msg=msg):
                 with patch.object(httpx.Client, 'post', side_effect=mock_post) as mock_query:
                     self.vespa_client.query(
@@ -152,8 +152,8 @@ class TestVespaClient(unittest.TestCase):
 
                     timeout_obj = mock_query.call_args.kwargs["timeout"]
                     vespa_time_out = mock_query.call_args.kwargs["json"]["timeout"]
-                    self.assertEqual(sent_vespa_timeout_ms, vespa_time_out)
-                    self.assertEqual(timeout_obj.read, httpx_read_timeout_second)
+                    self.assertEqual(expected_vespa_timeout_ms, vespa_time_out)
+                    self.assertEqual(httpx_read_timeout_second, timeout_obj.read)
                     self.assertEqual(5.0, timeout_obj.connect)
                     self.assertEqual(5.0, timeout_obj.write)
                     self.assertEqual(5.0, timeout_obj.pool)
