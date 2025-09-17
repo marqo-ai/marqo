@@ -224,6 +224,7 @@ public class HybridSearcher extends Searcher {
         // --- Update the query hits, offset and targetHits, if sort or relevance cut-off is used
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
+        boolean isDisjunctionSearch = retrievalMethod.equals("disjunction");
 
         query =
                 updateQueryHitsOffsetsAndTargetHits(
@@ -231,10 +232,11 @@ public class HybridSearcher extends Searcher {
                         relevantCandidates,
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
-                        isSortByEnabled);
+                        isSortByEnabled,
+                        isDisjunctionSearch);
 
         HitGroup hitsForPostProcessing;
-        if (retrievalMethod.equals("disjunction")) {
+        if (isDisjunctionSearch) {
             Result resultLexical, resultTensor;
             Query queryLexical =
                     createSubQuery(
@@ -320,6 +322,9 @@ public class HybridSearcher extends Searcher {
             sortCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
+            // when we do disjunction search or use relevance cutoff, the offset is set to 0, so we
+            // need to trim previous pages
+            boolean needToTrimPreviousPages = isDisjunctionSearch || isRelevanceCutoffMethodEnabled;
             processedHits =
                     postProcessResults(
                             hitsForPostProcessing,
@@ -327,6 +332,7 @@ public class HybridSearcher extends Searcher {
                             rerankDepthGlobal,
                             limit,
                             offset,
+                            needToTrimPreviousPages,
                             verbose);
         }
 
@@ -415,11 +421,13 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Updates the query hits, offsets, and targetHits based on the provided parameters.
-     * @param query the query to update.
-     * @param relevantCandidates the number of relevant candidates found in the probe search.
-     * @param sortByMinSortCandidates the minimum number of candidates required for sorting, from Marqo
+     *
+     * @param query                    the query to update.
+     * @param relevantCandidates       the number of relevant candidates found in the probe search.
+     * @param sortByMinSortCandidates  the minimum number of candidates required for sorting, from Marqo
      * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
-     * @param isSortByEnabled whether sorting is enabled.
+     * @param isSortByEnabled          whether sorting is enabled.
+     * @param isDisjunctionSearch      whether the retrieval method is disjunction
      * @return The updated query with new hits, offsets, and targetHits.
      */
     public Query updateQueryHitsOffsetsAndTargetHits(
@@ -427,17 +435,12 @@ public class HybridSearcher extends Searcher {
             Integer relevantCandidates,
             Integer sortByMinSortCandidates,
             boolean isRelevanceCutoffEnabled,
-            boolean isSortByEnabled) {
+            boolean isSortByEnabled,
+            boolean isDisjunctionSearch) {
 
         // Validate input parameters
         if (!isRelevanceCutoffEnabled && !isSortByEnabled) {
-            // For disjunction hybrid search, we need to set offset to 0 to handle the pagination
-            // correctly
-            // TODO the logic to extract retrievalMethod is duplicated here to reduce the effort of
-            //   changing method signature. We will do a refactoring in the near future
-            String retrievalMethod =
-                    query.properties().getString("marqo__hybrid.retrievalMethod", "");
-            if ("disjunction".equalsIgnoreCase(retrievalMethod)) {
+            if (isDisjunctionSearch) {
                 query.setHits(query.getOffset() + query.getHits());
                 query.setOffset(0);
             }
@@ -953,30 +956,10 @@ public class HybridSearcher extends Searcher {
             Integer rerankDepthGlobal,
             int limit,
             int offset,
+            boolean needToTrimPreviousPages,
             boolean verbose) {
-        // Check if we need special pagination handling
-        // TODO the logic to extract retrievalMethod and relevanceCutoffMethod is duplicated here to
-        //  reduce the effort of changing method signature. We will do a refactoring in the near
-        //  future to improve this
-        String retrievalMethod = query.properties().getString("marqo__hybrid.retrievalMethod", "");
-        String relevanceCutoffMethod =
-                query.properties().getString("marqo__hybrid.relevanceCutoff.method", null);
-        boolean needsToTrim =
-                "disjunction".equalsIgnoreCase(retrievalMethod) || relevanceCutoffMethod != null;
 
-        // Step 1: Apply pagination BEFORE reranking if needed
-        //        if (needsToTrim) {
-        //            // We fetched (offset + limit) results from position 0
-        //            // Now trim to remove the first 'offset' results
-        //            hitsForPostProcessing.trim(offset, hitsForPostProcessing.size() - offset);
-        //            logIfVerbose(
-        //                    String.format(
-        //                            "Applied pre-rerank pagination: removed first %d results",
-        // offset),
-        //                    verbose);
-        //        }
-
-        // Step 2: Split original hits into 2 lists: result to rerank and excess hits
+        // Step 1: Split original hits into 2 lists: result to rerank and excess hits
         // Excess hits will not be reranked, and will be added back after reranking the other
         // results
         HitGroup resultToRerank = new HitGroup();
@@ -986,6 +969,8 @@ public class HybridSearcher extends Searcher {
         // If rerank count global is not set, rerank all hits
         if (rerankDepthGlobal == null) {
             rerankDepthGlobal = hitsForPostProcessing.size();
+        } else if (needToTrimPreviousPages) {
+            rerankDepthGlobal = rerankDepthGlobal + offset;
         }
         for (Hit hit : hitsForPostProcessing) {
             if (idx < rerankDepthGlobal) {
@@ -1007,7 +992,7 @@ public class HybridSearcher extends Searcher {
             logHitGroup(excessHits, verbose);
         }
 
-        // Step 3: Apply global score modifiers and rerank
+        // Step 2: Apply global score modifiers and rerank
         // Skip whole process if global modifier weight tensors don't exist in query
         Tensor queryMultWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
@@ -1025,13 +1010,13 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Rescored result list (UNSORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
-        // Step 4: Sort
+        // Step 3: Sort
         resultToRerank.sort();
 
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
-        // Step 5: Add excess hits if needed
+        // Step 4: Add excess hits if needed
         if (limit > rerankDepthGlobal) {
             // Add excess hits to the end of reranked results then sort
             logIfVerbose(
@@ -1042,8 +1027,8 @@ public class HybridSearcher extends Searcher {
             resultToRerank.addAll(excessHits.asList());
         }
 
-        // Step 6: Final trim to limit (pagination was already applied if needed)
-        if (needsToTrim) {
+        // Step 5: Final trim to limit (pagination was already applied if needed)
+        if (needToTrimPreviousPages) {
             logIfVerbose(
                     String.format(
                             "Final trimming result list from offset %s and limit: %d",
