@@ -974,14 +974,18 @@ public class HybridSearcher extends Searcher {
             // rerankDepthGlobal to make sure global score modifiers are applied to current page
             rerankDepthGlobal = rerankDepthGlobal + offset;
         }
+        // Calculate total hits needed: when needToTrimPreviousPages is true, we need offset + limit
+        // hits
+        int totalHitsNeeded = needToTrimPreviousPages ? offset + limit : limit;
+
         for (Hit hit : hitsForPostProcessing) {
             if (idx < rerankDepthGlobal) {
                 resultToRerank.add(hit);
-            } else if (idx < limit) {
-                // Total hits to return caps out at limit
+            } else if (idx < totalHitsNeeded) {
+                // Total hits to process should be offset + limit when trimming previous pages
                 excessHits.add(hit);
             } else {
-                // Ignore all hits after limit
+                // Ignore all hits after totalHitsNeeded
                 break;
             }
             idx++;

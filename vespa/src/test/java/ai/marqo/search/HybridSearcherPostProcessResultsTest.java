@@ -225,4 +225,44 @@ class HybridSearcherPostProcessResultsTest {
         assertThat(result.get(1).getId().toString()).isEqualTo("hit_1");
         assertThat(result.get(4).getId().toString()).isEqualTo("hit_4");
     }
+
+    @Test
+    @DisplayName("Test 6: Sufficient hits processed for pagination with offset")
+    void testPostProcessResults_PaginationBugFix_ProcessesSufficientHits() {
+        // This test verifies the fix for the pagination bug where insufficient hits
+        // were processed when needToTrimPreviousPages=true with large offset
+
+        // Arrange
+        HitGroup inputHits = createTestHitGroup(20); // 20 hits
+        Query query = createTestQuery();
+
+        int limit = 5;
+        int offset = 10; // Large offset
+        Integer rerankDepthGlobal = 8; // Small rerank depth (less than offset + limit)
+        boolean needToTrimPreviousPages = true;
+        boolean verbose = false;
+
+        // Act
+        HitGroup result =
+                hybridSearcher.postProcessResults(
+                        inputHits,
+                        query,
+                        rerankDepthGlobal,
+                        limit,
+                        offset,
+                        needToTrimPreviousPages,
+                        verbose);
+
+        // Assert
+        // Should return exactly 5 hits even with large offset
+        // Before the bug fix, this would return fewer than 5 hits because
+        // the loop was incorrectly capped at 'limit' instead of 'offset + limit'
+        assertThat(result.size()).isEqualTo(5);
+
+        // Verify we get hits from the correct range (offset 10, limit 5)
+        // After reranking with adjusted depth (8 + 10 = 18), hits should be sorted by relevance
+        assertThat(result.get(0).getId().toString()).isEqualTo("hit_10");
+        assertThat(result.get(1).getId().toString()).isEqualTo("hit_11");
+        assertThat(result.get(4).getId().toString()).isEqualTo("hit_14");
+    }
 }
