@@ -107,6 +107,11 @@ LOGGING_CONFIG = {
             "handlers": ["default"],  # change this to a different handler if security is a concern
             "level": "WARNING",  # slow query at warning level, failed query at error level
             "propagate": False,
+        },
+        "metrics": {
+            "handlers": ["default"],
+            "level": "INFO",  # Always log out metrics in INFO level, ignoring the root log level.
+            "propagate": False,
         }
     },
     "root": {
