@@ -970,6 +970,8 @@ public class HybridSearcher extends Searcher {
         if (rerankDepthGlobal == null) {
             rerankDepthGlobal = hitsForPostProcessing.size();
         } else if (needToTrimPreviousPages) {
+            // When previous pages are also in search result, we need to increase the original
+            // rerankDepthGlobal to make sure global score modifiers are applied to current page
             rerankDepthGlobal = rerankDepthGlobal + offset;
         }
         for (Hit hit : hitsForPostProcessing) {
