@@ -1016,14 +1016,14 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Rescored result list (UNSORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
-        // Step 3: Sort
+        // Step 3: Sort  TODO should only sort after applying global score modifiers
         resultToRerank.sort();
 
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
         // Step 4: Add excess hits if needed
-        if (limit > rerankDepthGlobal) {
+        if (totalHitsNeeded > rerankDepthGlobal) {
             // Add excess hits to the end of reranked results then sort
             logIfVerbose(
                     String.format(
