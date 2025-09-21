@@ -23,8 +23,5 @@ COPY src ./src
 ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose port
-EXPOSE 8983
-
 # Run with gunicorn and uvicorn worker
 CMD ["uvicorn", "marqo_model_management_container.main:app", "--host", "0.0.0.0", "--port", "8883"]

@@ -1,10 +1,9 @@
 from pathlib import Path
 from urllib.parse import urlparse
 
+import botocore.exceptions
 import fsspec
 from tqdm import tqdm
-
-import botocore.exceptions
 
 from marqo_model_management_container.errors.common import ModelDownloadError
 
@@ -55,6 +54,9 @@ class TritonModelDownloader:
                 "Please ensure your AWS credentials are configured correctly. You can mount "
                 "your AWS credentials file into the container /root/.aws/credentials. Alternatively, "
                 "you can provide the model files via a publicly accessible URL ") from e
+        except FileNotFoundError as e:
+            raise ModelDownloadError(f"The specified model file was not found: {path}. Please check "
+                                     f"the provided source and ensure the container has access to it ") from e
         size = info.get("size", None)
         with fs.open(path, "rb") as fsrc, open(dest, "wb") as fdst, tqdm(
                 total=size,

@@ -21,6 +21,7 @@ services:
     image: marqo-model-management-container:test
     build: .
     stdin_open: true
+    tty: true
     environment:
       LOG_LEVEL: "INFO"
       MARQO_MODELS_TO_PRELOAD: "[]"
