@@ -17,17 +17,6 @@ class DataType(StrEnum):
     TYPE_BF16 = "TYPE_BF16"
 
 
-class ModelLocation(AppBaseModel):
-    """
-    ModelLocation defines where the model files are located.
-
-    Attributes:
-        urls (list[str]): A list of URLs where the model files can be found. It can be a url to a local file system or
-        a s3 URI. If your onnx model is split into multiple files, you can provide multiple urls.
-    """
-    urls: list[str] = Field(..., validation_alias='urls', min_length=1, max_length=5)
-
-
 class ModelInput(AppBaseModel):
     """
     ModelInput defines the input of the model.
@@ -63,13 +52,14 @@ class TritonModelProperties(AppBaseModel):
     Attributes:
         name (str): The name of the model.
         max_batch_size (int): The maximum batch size for the model. Default is 8
-        location (ModelLocation): The location of the model files.
+        sources (list[str]): A list of sources for the model. It can be a local path, a URL, or a s3 URI.
+            1 to 5 sources can be provided if the model consists of multiple files.
         input (list[ModelInput]): A list of input definitions for the model.
         output (list[ModelOutput]): A list of output definitions for the model. Currently only
             supports a single output for embeddings models.
     """
     name: str
     max_batch_size: int = Field(8, validation_alias='maxBatchSize', gt=0, le=128)
-    location: ModelLocation
+    sources: list[str] = Field(..., validation_alias='urls', min_length=1, max_length=5)
     input: list[ModelInput] = Field(..., validation_alias='input')
     output: list[ModelOutput] = Field(..., validation_alias='output', min_length=1, max_length=1)

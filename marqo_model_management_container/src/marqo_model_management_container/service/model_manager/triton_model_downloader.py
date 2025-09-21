@@ -22,19 +22,17 @@ class TritonModelDownloader:
 
     def __init__(
         self,
-        urls: list[str],
+        sources: list[str],
         base_dir: str,
         model_name: str,
         config_pbtxt: str | None = None,
         overwrite: bool = False,
     ):
-        self.urls = list(urls)
+        self.sources= sources
         self.base_dir = Path(base_dir)
         self.model_name = model_name
         self.config_pbtxt = config_pbtxt
         self.overwrite = overwrite
-
-    # ----------------- internals -----------------
 
     def _version_dir(self) -> Path:
         root = (self.base_dir / self.model_name).resolve()
@@ -46,8 +44,6 @@ class TritonModelDownloader:
     @staticmethod
     def _basename_from_uri(uri: str) -> str:
         return Path(urlparse(uri).path).name or "model.onnx"
-
-    # ----------------- public API -----------------
 
     def _download_with_progress(self, fs, path: str, dest: Path, chunk_size: int = 1024 * 1024):
         """Download a file with a tqdm progress bar."""
@@ -73,7 +69,7 @@ class TritonModelDownloader:
 
     def prepare_and_download(self) -> list[Path]:
         version_dir = self._version_dir()
-        srcs = self.urls
+        srcs = self.sources
 
         out_paths: list[Path] = []
         for uri in srcs:

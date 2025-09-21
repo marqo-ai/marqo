@@ -24,7 +24,7 @@ class ModelManager:
     def load_model(self, triton_model_properties: TritonModelProperties) -> None:
         logger.info(f"Loading model: {triton_model_properties.model_dump_json()}")
         TritonModelDownloader(
-            urls=triton_model_properties.location.urls,
+            sources=triton_model_properties.sources,
             base_dir=self.model_base_dir,
             model_name=triton_model_properties.name,
             config_pbtxt=self.generate_config_pbtxt_file(triton_model_properties),
