@@ -9,7 +9,7 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.inference.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 from marqo.inference.triton_inference.triton.channel_args import ChannelArgs
 import json
-from
+
 
 logger = logging.get_logger(__name__)
 
