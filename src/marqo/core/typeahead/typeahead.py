@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 
 import blake3
 
-from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
+from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION, CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.typeahead import (
     TypeaheadRequest, TypeaheadResponse, TypeaheadSuggestion,
@@ -66,19 +66,20 @@ class Typeahead:
             retrieval_terms = []
             ranking_terms = []
             for token in tokens:
+                escaped_token = self._escape_token(token)
                 if len(token) < request.min_fuzzy_match_length:
                     # Use exact prefix matching for short tokens
                     retrieval_terms.append(
-                        f"query_words contains ({{prefix:true}}\"{token}\")"
+                        f"query_words contains ({{prefix:true}}\"{escaped_token}\")"
                     )
                 else:
                     # Use fuzzy matching for longer tokens
                     retrieval_terms.append(
                         f"query_words contains "
-                        f"({{maxEditDistance:{request.fuzzy_edit_distance}, prefix:true}}fuzzy(\"{token}\"))"
+                        f"({{maxEditDistance:{request.fuzzy_edit_distance}, prefix:true}}fuzzy(\"{escaped_token}\"))"
                     )
 
-                ranking_terms.append(f"query_index contains \"{token}\"")
+                ranking_terms.append(f"query_index contains \"{escaped_token}\"")
 
             # Create single YQL query that ORs all token conditions
             yql_retrieval = " OR ".join(retrieval_terms)
@@ -308,6 +309,23 @@ class Typeahead:
                 query_results.append(TypeaheadQuery(**fields))
         
         return TypeaheadGetQueriesResponse(queries=query_results)
+
+    def _escape_token(self, token: str) -> str:
+        """Escape special characters in a token for Vespa YQL queries.
+
+        Args:
+            token: The token to escape
+
+        Returns:
+            The escaped token
+        """
+        escaped = []
+        for char in token:
+            if char in CHARACTERS_TO_BE_ESCAPED_IN_VESPA:
+                escaped.append('\\' + char)
+            else:
+                escaped.append(char)
+        return ''.join(escaped)
 
     def _generate_query_hash(self, query: str) -> str:
         """Generate a 128-bit blake3 hash for a query string.

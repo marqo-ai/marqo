@@ -456,6 +456,48 @@ class TestTypeaheadIntegration(MarqoTestCase):
 
         self._assert_version_error_message(context.exception, self.index_220_name, "2.22.0")
 
+    # G. Special Character Handling Tests
+    def test_typeahead_with_special_characters_in_user_input(self):
+        """Test typeahead search handles special characters in user input without causing Vespa 500 errors."""
+        self._index_test_queries()
+
+        # Test user input queries with special characters that should NOT cause Vespa 500 errors
+        user_input_test_cases = [
+            # Single special characters
+            '"',
+            '\\',
+            # Queries with quotes
+            'a"b"c',
+            'a"b"',
+            '"b"c',
+            '"bc',
+            'bc"',
+            # Queries with backslashes
+            'Path\\to\\file',
+            '\\',
+            '\\\\',
+            'a\\b',
+            '\\a',
+            'b\\',
+            # Mixed special characters
+            'Program "with spaces"\\folder',
+            '"\\',
+            '\\"',
+        ]
+
+        for user_query in user_input_test_cases:
+            with self.subTest(user_query=user_query):
+                request = TypeaheadRequest(q=user_query, limit=10)
+                # This should NOT raise a 500 error from Vespa (main goal of the fix)
+                try:
+                    response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+                    # Just verify we get a response without error
+                    self.assertIsNotNone(response)
+                    self.assertGreaterEqual(len(response.suggestions), 0)
+                    print(user_query, response.suggestions)
+                except Exception as e:
+                    self.fail(f"User input query '{user_query}' caused an error: {e}")
+
     def _assert_version_error_message(self, exception: UnsupportedFeatureError, index_name: str, version: str):
         """Helper method to verify the error message contains expected information."""
         error_message = str(exception)
