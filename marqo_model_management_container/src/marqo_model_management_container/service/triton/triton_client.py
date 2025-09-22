@@ -16,7 +16,7 @@ class TritonClient:
         try:
             res = self.client.post(f"{self.url}/v2/repository/models/{model_name}/load", timeout=httpx.Timeout(5, read=30))
         except TimeoutException:
-            raise DependencyTimeoutError('Triton timed out when trying to unload model ')
+            raise DependencyTimeoutError('Triton timed out when trying to load model ')
         except (ConnectError, NetworkError) as e:
             raise DependencyUnavailableError('Triton is unavailable') from e
 
@@ -30,7 +30,7 @@ class TritonClient:
             res = self.client.post(f"{self.url}/v2/repository/models/{model_name}/unload",
                                    timeout=httpx.Timeout(5, read=30))
         except TimeoutException:
-            raise DependencyTimeoutError('Triton timed out when trying to load model ')
+            raise DependencyTimeoutError('Triton timed out when trying to unload model ')
         except (ConnectError, NetworkError) as e:
             raise DependencyUnavailableError('Triton is unavailable') from e
 
