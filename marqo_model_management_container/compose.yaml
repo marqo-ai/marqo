@@ -41,7 +41,7 @@ volumes:
      driver_opts:
        type: none
        o: bind
-       device: /Users/abireo/code/marqo/marqo_model_management_container/cache/models
+       device: <> # <== path to local model repository
 
 networks:
   mmc-net:
