@@ -494,7 +494,6 @@ class TestTypeaheadIntegration(MarqoTestCase):
                     # Just verify we get a response without error
                     self.assertIsNotNone(response)
                     self.assertGreaterEqual(len(response.suggestions), 0)
-                    print(user_query, response.suggestions)
                 except Exception as e:
                     self.fail(f"User input query '{user_query}' caused an error: {e}")
 
