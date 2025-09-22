@@ -19,13 +19,11 @@ class TritonClient:
             raise DependencyTimeoutError('Triton timed out when trying to load model ')
         except (ConnectError, NetworkError) as e:
             raise DependencyUnavailableError('Triton is unavailable') from e
-        except HTTPError as e:
-            raise DependencyBadGatewayError('Triton is unavailable') from e
 
         try:
             res.raise_for_status()
         except HTTPStatusError as e:
-            raise ModelLoadingError(f'Failed to load model. Original error: {res.json()["error"]}') from e
+            raise ModelLoadingError(f'Failed to load model. Original error: {res.json().get("error")}') from e
 
     def unload_model(self, model_name: str):
         try:
@@ -35,13 +33,11 @@ class TritonClient:
             raise DependencyTimeoutError('Triton timed out when trying to load model ')
         except (ConnectError, NetworkError) as e:
             raise DependencyUnavailableError('Triton is unavailable') from e
-        except HTTPError as e:
-            raise DependencyBadGatewayError('Triton is unavailable') from e
 
         try:
             res.raise_for_status()
         except HTTPStatusError as e:
-            raise ModelLoadingError(f'Failed to unload model. Original error: {res.json()["error"]}') from e
+            raise ModelLoadingError(f'Failed to unload model. Original error: {res.json().get("error")}') from e
 
     def get_loaded_models(self) -> list[str]:
         """

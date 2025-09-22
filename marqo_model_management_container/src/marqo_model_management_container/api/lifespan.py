@@ -26,8 +26,6 @@ async def lifespan(app: FastAPI):
     res = on_start(cfg, s)
     if inspect.isawaitable(res):
         await res
-    try:
-        yield
-    finally:
-        if inspect.isawaitable(res):
-            await res
+
+    # 5. Application runs
+    yield
