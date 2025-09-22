@@ -22,7 +22,7 @@ The Marqo Model Management Container is a FastAPI-based service that manages mac
 ### Running the Application
 - Development: `PYTHONPATH=./src python -m marqo_model_management_container.main`
 - Docker: Build with `docker build -t marqo-model-management .`
-- Application runs on port 8883 by default (8080 in Docker)
+- Application runs on port 8883 by default
 
 ## Architecture
 
