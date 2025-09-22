@@ -326,7 +326,8 @@ class SortByTest {
         verify(spy, times(1))
                 .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
         verify(spy, never())
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(
+                        any(), any(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean());
     }
 
     /*
@@ -345,7 +346,8 @@ class SortByTest {
         doReturn(null).when(spy).extractTensorRankFeature(any(), contains("add_weights_global"));
         doReturn(new HitGroup())
                 .when(spy)
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(
+                        any(), any(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean());
 
         Query q = new Query("?q");
         q.properties().set("hits", 1);
@@ -356,7 +358,8 @@ class SortByTest {
 
         spy.search(q, makeEmptyExec());
 
-        verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
+        verify(spy, times(1))
+                .postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 
@@ -746,17 +749,31 @@ class SortByTest {
     class UpdateQueryHitsOffsetsAndTargetHitsTest {
 
         @Test
-        void shouldReturnOriginalQueryWhenNeitherFeatureEnabled() {
+        void shouldReturnOriginalQueryWhenNeitherFeatureEnabledAndNotDisjunctionSearch() {
             HybridSearcher searcher = new HybridSearcher();
             Query originalQuery = new Query("?q=test&hits=10&offset=5");
 
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(
-                            originalQuery, 100, 200, false, false);
+                            originalQuery, 100, 200, false, false, false);
 
             assertThat(result).isSameAs(originalQuery);
             assertThat(result.getHits()).isEqualTo(10);
             assertThat(result.getOffset()).isEqualTo(5);
+        }
+
+        @Test
+        void shouldUpdateHitsForDisjunctionSearch() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query originalQuery = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            originalQuery, 100, 200, false, false, true);
+
+            assertThat(result).isSameAs(originalQuery);
+            assertThat(result.getHits()).isEqualTo(15);
+            assertThat(result.getOffset()).isEqualTo(0);
         }
 
         @Test
@@ -767,7 +784,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.updateQueryHitsOffsetsAndTargetHits(
-                                            query, null, null, true, false))
+                                            query, null, null, true, false, true))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "Either relevantCandidates or sortByMinSortCandidates must be"
@@ -780,7 +797,8 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 20, null, true, false, true);
 
             // Should use Math.min(relevantCandidates, limit+offset) = Math.min(20, 15) = 15
             assertThat(result.getHits()).isEqualTo(15);
@@ -793,7 +811,7 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false, true);
 
             // Should use Math.min(relevantCandidates, limit+offset) = Math.min(8, 15) = 8
             assertThat(result.getHits()).isEqualTo(8);
@@ -806,7 +824,8 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 20, false, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, null, 20, false, true, true);
 
             // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(20, 15) = 20
             assertThat(result.getHits()).isEqualTo(20);
@@ -819,7 +838,8 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 30, false, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, null, 30, false, true, false);
 
             // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(30, 15) = 15
             assertThat(result.getHits()).isEqualTo(30);
@@ -832,7 +852,8 @@ class SortByTest {
             Query query = new Query("?q=test&hits=10&offset=5");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 8, false, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, null, 8, false, true, false);
 
             // Should use Math.max(sortByMinSortCandidates, limit+offset) = Math.max(8, 15) = 15
             assertThat(result.getHits()).isEqualTo(15);
@@ -844,7 +865,8 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 25, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 25, true, true, false);
 
             // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(30, 25)
             // = 30
@@ -857,7 +879,8 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 25, 30, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 25, 30, true, true, false);
 
             // Should use Math.max(relevantCandidates, sortByMinSortCandidates) = Math.max(25, 30)
             // = 30
@@ -876,7 +899,8 @@ class SortByTest {
                                     + " hnsw.exploreAdditionalHits: 1950}");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 20, null, true, false, false);
 
             // Should use Math.min(newHits, currentTensorTargetHits) = Math.min(15, 50) = 15
             String updatedYql = result.properties().getString("marqo__yql.tensor");
@@ -897,7 +921,8 @@ class SortByTest {
                                     + " hnsw.exploreAdditionalHits: 1950}");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 60, false, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, null, 60, false, true, false);
 
             // Should use Math.max(newHits, currentTensorTargetHits) = Math.max(60, 50) = 60
             String updatedYql = result.properties().getString("marqo__yql.tensor");
@@ -917,7 +942,8 @@ class SortByTest {
                             "select * from sources * where {targetHits: 40,"
                                     + " hnsw.exploreAdditionalHits: 1960}");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 35, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 30, 35, true, true, false);
 
             // newHits = Math.max(30, 35) = 35
             // newTensorTargetHits = Math.max(35, 40) = 40
@@ -940,7 +966,7 @@ class SortByTest {
             assertThatThrownBy(
                             () ->
                                     searcher.updateQueryHitsOffsetsAndTargetHits(
-                                            query, 20, null, true, false))
+                                            query, 20, null, true, false, false))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining(
                             "The targetHits in the tensor query should not be smaller than"
@@ -955,7 +981,8 @@ class SortByTest {
             query.properties().set("marqo__yql.tensor", "");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 20, null, true, false);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 20, null, true, false, false);
 
             assertThat(result.getHits()).isEqualTo(15);
             assertThat(result.getOffset()).isEqualTo(0);
@@ -974,7 +1001,8 @@ class SortByTest {
                                     + " hnsw.exploreAdditionalHits: 1900, param2: true}");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, null, 150, false, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, null, 150, false, true, false);
 
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql)
@@ -996,7 +1024,8 @@ class SortByTest {
                             "select * from sources * where {targetHits: 60,"
                                     + " hnsw.exploreAdditionalHits: 1940}");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true, false);
 
             // newHits = Math.max(40, 45) = 45
             // newTensorTargetHits = Math.max(45, 60) = 60 (keeps existing higher value)
@@ -1018,7 +1047,8 @@ class SortByTest {
                             "select * from sources * where {targetHits: 30,"
                                     + " hnsw.exploreAdditionalHits: 1970}");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 45, true, true, false);
 
             // newHits = Math.max(40, 45) = 45
             // newTensorTargetHits = Math.max(45, 30) = 45 (uses new higher value)
@@ -1035,7 +1065,8 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=5&offset=2");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 40, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 40, 40, true, true, false);
 
             // Should use Math.max(40, 40) = 40
             assertThat(result.getHits()).isEqualTo(40);
@@ -1052,7 +1083,8 @@ class SortByTest {
                             "select * from sources * where {queryVector: [1,2,3], targetHits: 50,"
                                     + " hnsw.exploreAdditionalHits: 1950, threshold: 0.8}");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 35, 40, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 35, 40, true, true, false);
 
             // newHits = Math.max(35, 40) = 40
             // newTensorTargetHits = Math.max(40, 50) = 50
@@ -1069,7 +1101,8 @@ class SortByTest {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=1&offset=0");
 
-            Query result = searcher.updateQueryHitsOffsetsAndTargetHits(query, 1, 1, true, true);
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 1, 1, true, true, false);
 
             // Should use Math.max(1, 1) = 1
             assertThat(result.getHits()).isEqualTo(1);
@@ -1087,7 +1120,8 @@ class SortByTest {
                                     + " hnsw.exploreAdditionalHits: 1000}");
 
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 500, 750, true, true);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 500, 750, true, true, false);
 
             // newHits = Math.max(500, 750) = 750
             // newTensorTargetHits = Math.max(750, 1000) = 1000
@@ -1114,7 +1148,8 @@ class SortByTest {
 
             // Call with relevantCandidates = 0, which should result in hits = 0 but targetHits = 1
             Query result =
-                    searcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 0, null, true, false, false);
 
             // Verify hits is set to 0 (original relevantCandidates value)
             assertThat(result.getHits()).isEqualTo(0);
@@ -1142,12 +1177,9 @@ class SortByTest {
             // - Uses Math.max instead of Math.min for tensorTargetHits
             Query result =
                     searcher.updateQueryHitsOffsetsAndTargetHits(
-                            query,
-                            8,
-                            12,
-                            true,
-                            true // relevantCandidates < limit+offset, but with sortBy enabled
-                            );
+                            query, 8, 12, true,
+                            true, // relevantCandidates < limit+offset, but with sortBy enabled
+                            true);
 
             // Should use Math.max(8, 12) = 12 (not Math.min like pure relevance cutoff)
             assertThat(result.getHits()).isEqualTo(12);
