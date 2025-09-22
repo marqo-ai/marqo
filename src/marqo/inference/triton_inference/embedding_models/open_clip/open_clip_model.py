@@ -1,12 +1,10 @@
-import os
-from pickle import UnpicklingError
-
-import numpy as np
 import open_clip
+import os
 import torch
 from PIL.Image import Image
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
+from pickle import UnpicklingError
 from pydantic.v1 import ValidationError
 from torchvision.transforms import Compose
 
@@ -18,9 +16,9 @@ from marqo.inference.native_inference.embedding_models.abstract_clip_model impor
 from marqo.inference.native_inference.embedding_models.hf_tokenizer import HFTokenizer
 from marqo.inference.native_inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, \
     ImagePreprocessor
+from marqo.logging import get_logger
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.logging import get_logger
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 

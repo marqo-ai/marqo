@@ -24,6 +24,7 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 from marqo.inference.triton_inference.triton.triton_grpc_client import TritonGRPCClient
+from marqo_model_management_container.service.triton import triton_client
 
 logger = get_logger(__name__)
 _available_models = dict()
@@ -41,7 +42,8 @@ def load_model(
     validated_model_properties = model_properties
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
     _update_available_models(
-        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings=True, model_auth=model_auth
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings=True,
+        model_auth=model_auth, triton_client=triton_client
     )
     model = _available_models[model_cache_key][AvailableModelsKey.model]
     return model
@@ -153,7 +155,8 @@ def _create_model_cache_key(model_name: str, device: str, model_properties: dict
 
 
 def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
-                             device: str, normalize_embeddings: bool, model_auth: ModelAuth = None) -> None:
+                             device: str, normalize_embeddings: bool, model_auth: ModelAuth = None,
+                             triton_client = None) -> None:
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
@@ -174,7 +177,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                         model_name, validated_model_properties,
                         device=device,
                         calling_func=_update_available_models.__name__,
-                        model_auth=model_auth
+                        model_auth=model_auth,
+                        triton_client=triton_client
                     ),
                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                     AvailableModelsKey.model_size: model_size
@@ -356,6 +360,7 @@ def _load_model(
         device=device,
         model_properties=model_properties,
         model_auth=model_auth,
+        triton_client=triton_client
     )
 
     model.load()

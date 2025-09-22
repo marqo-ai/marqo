@@ -3,7 +3,7 @@ from marqo.core.exceptions import DeviceError
 from marqo.inference.triton_inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.inference.triton_inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.inference.triton_inference.embedding_models.multilingual_clip_model import MultilingualCLIPModel
-from marqo.inference.triton_inference.embedding_models.open_clip_model import OpenCLIPModel
+from marqo.inference.triton_inference.embedding_models.open_clip.open_clip_model import OpenCLIPModel
 from marqo.inference.triton_inference.embedding_models.random_model import RandomModel
 from marqo.inference.triton_inference.inference_pipeline.hugging_face_model_inference_pipeline import \
     HuggingFaceModelInferencePipeline
