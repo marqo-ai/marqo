@@ -56,7 +56,7 @@ class Settings(BaseSettings):
         if isinstance(v, list):
             return v
         raise ValueError(
-            f"MARQO_MODELS_TO_PRELOAD must be a JSON array with valid TritonModelProperties"
+            "MARQO_MODELS_TO_PRELOAD must be a JSON array with valid TritonModelProperties"
         )
 
     @field_validator("log_level", mode="before")

@@ -1,11 +1,11 @@
 from pathlib import Path
-from urllib.parse import urlparse
 
 import botocore.exceptions
 import fsspec
 from tqdm import tqdm
 
 from marqo_model_management_container.errors.common import ModelDownloadError
+from .url_parser import get_base_filename
 
 
 class TritonModelDownloader:
@@ -20,14 +20,14 @@ class TritonModelDownloader:
     """
 
     def __init__(
-        self,
-        sources: list[str],
-        base_dir: str,
-        model_name: str,
-        config_pbtxt: str | None = None,
-        overwrite: bool = False,
+            self,
+            sources: list[str],
+            base_dir: str,
+            model_name: str,
+            config_pbtxt: str | None = None,
+            overwrite: bool = False,
     ):
-        self.sources= sources
+        self.sources = sources
         self.base_dir = Path(base_dir)
         self.model_name = model_name
         self.config_pbtxt = config_pbtxt
@@ -39,10 +39,6 @@ class TritonModelDownloader:
         if self.config_pbtxt is not None:
             (root / "config.pbtxt").write_text(self.config_pbtxt)
         return root / "1"
-
-    @staticmethod
-    def _basename_from_uri(uri: str) -> str:
-        return Path(urlparse(uri).path).name or "model.onnx"
 
     def _download_with_progress(self, fs, path: str, dest: Path, chunk_size: int = 1024 * 1024):
         """Download a file with a tqdm progress bar."""
@@ -64,10 +60,10 @@ class TritonModelDownloader:
                 unit_scale=True,
                 unit_divisor=1024,
                 desc=dest.name,
-            ) as bar:
-                for chunk in iter(lambda: fsrc.read(chunk_size), b""):
-                    fdst.write(chunk)
-                    bar.update(len(chunk))
+        ) as bar:
+            for chunk in iter(lambda: fsrc.read(chunk_size), b""):
+                fdst.write(chunk)
+                bar.update(len(chunk))
 
     def prepare_and_download(self) -> list[Path]:
         version_dir = self._version_dir()
@@ -75,7 +71,7 @@ class TritonModelDownloader:
 
         out_paths: list[Path] = []
         for uri in srcs:
-            fname = self._basename_from_uri(uri)
+            fname = get_base_filename(uri)
             dest = version_dir / fname
 
             if dest.exists() and not self.overwrite:

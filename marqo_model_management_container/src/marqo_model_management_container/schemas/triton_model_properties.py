@@ -1,9 +1,9 @@
 from enum import StrEnum
-from typing import Callable
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from marqo_model_management_container.schemas.app_models import AppBaseModel
+from ..service.model_manager.url_parser import get_base_filename
 
 
 class DataType(StrEnum):
@@ -60,6 +60,17 @@ class TritonModelProperties(AppBaseModel):
     """
     name: str
     max_batch_size: int = Field(8, validation_alias='maxBatchSize', gt=0, le=128)
-    sources: list[str] = Field(..., validation_alias='urls', min_length=1, max_length=5)
+    sources: list[str] = Field(..., validation_alias='sources', min_length=1, max_length=5)
     input: list[ModelInput] = Field(..., validation_alias='input')
     output: list[ModelOutput] = Field(..., validation_alias='output', min_length=1, max_length=1)
+
+    @field_validator('sources', mode="after")
+    @classmethod
+    def _validate_sources(cls, values: list[str]) -> list[str]:
+        """All sources must point to a model.onnx file, or a model.onnx.data file."""
+        for v in values:
+            base_filename = get_base_filename(v)
+            if not (base_filename == "model.onnx" or base_filename.startswith("model.onnx.data")):
+                raise ValueError(f"All sources must point to a model.onnx file, or a model.onnx.data file. "
+                                 f"Received invalid source: {v}")
+        return values

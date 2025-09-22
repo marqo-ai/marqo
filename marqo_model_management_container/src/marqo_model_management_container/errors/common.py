@@ -5,6 +5,10 @@ class ValidationAppError(AppError):
     http_status = http.HTTP_400_BAD_REQUEST
     code = "VALIDATION_ERROR"
 
+class InvalidArgumentError(AppError):
+    http_status = http.HTTP_400_BAD_REQUEST
+    code = "INVALID_ARGUMENT"
+
 class ForbiddenError(AppError):
     http_status = http.HTTP_403_FORBIDDEN
     code = "FORBIDDEN"

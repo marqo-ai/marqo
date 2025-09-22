@@ -1,9 +1,38 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi import Request
+from fastapi.routing import APIRoute
 
+from marqo_model_management_container.core.logging import get_logger
 from ..config import Config, get_config
 from ..schemas.load_model_request import LoadModelRequest
 
-router = APIRouter(prefix="/v1", tags=["v1"])
+logger = get_logger(__name__)
+
+
+class MarqoCustomRoute(APIRoute):
+    """This is a custom route that logs the error and raises it.
+
+    The log will include the stack trace of the error for debugging purposes.
+    The raised error will be handled by the exception handlers. We DO NOT handle the error here.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_route_handler(self):
+        original_route_handler = super().get_route_handler()
+
+        async def marqo_custom_route_handler(request: Request):
+            try:
+                return await original_route_handler(request)
+            except Exception as exc:
+                logger.error(str(exc), exc_info=True)
+                raise exc
+
+        return marqo_custom_route_handler
+
+
+router = APIRouter(prefix="/v1", tags=["v1"], route_class=MarqoCustomRoute)
 
 
 @router.post("/models/load")
@@ -28,4 +57,3 @@ def unload_model(
     :return: 200 OK if the model was unloaded successfully or if the model was not found
     """
     cfg.model_manager.unload_model(model_name, remove_files=remove_files)
-

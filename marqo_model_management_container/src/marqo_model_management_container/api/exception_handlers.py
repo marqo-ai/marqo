@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, Request
@@ -7,7 +8,7 @@ from starlette.responses import Response
 
 from ..contracts.problem import Problem
 from ..errors.base import AppError
-from ..errors.common import ValidationAppError, InternalServerError
+from ..errors.common import InternalServerError, InvalidArgumentError
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -31,7 +32,7 @@ def _problem_response(request: Request, exc: AppError) -> Response:
         RFC 7807 format.
     """
     body = Problem(
-        title=exc.__class__.__name__,
+        title=str(exc.__class__.__name__),
         status=exc.http_status,
         code=exc.code,
         detail=str(exc),
@@ -43,13 +44,23 @@ def _problem_response(request: Request, exc: AppError) -> Response:
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
-    extras = _normalize_validation_errors(exc)
-    # Surface as 400 using your ValidationAppError
+    """
+    Normalise the FastAPI/Pydantic validation errors into a tidy, client-friendly payload.
+
+    :param request: the incoming request
+    :param exc: the raised RequestValidationError or ValidationError
+    :return: A JSONResponse with Problem+JSON content type and 400 status code.
+    """
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
+
     return _problem_response(
         request,
-        ValidationAppError(
-            "Invalid request",
-            extras=extras,
+        InvalidArgumentError(
+            message=json.dumps(error_messages),
         ),
     )
 
