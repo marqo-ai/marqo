@@ -317,8 +317,6 @@ class TestCollapseFields(MarqoTestCase):
                 # Test that the hit count returns the count of unique collapse field value
                 self.assertEqual(3, res['totalHits'])
 
-
-
     @pytest.mark.skip_for_multinode("Pagination result is not consistent across different Vespa infrastructures")
     def test_pagination(self):
         """Test that pagination works with search with collapse field"""
@@ -335,7 +333,7 @@ class TestCollapseFields(MarqoTestCase):
         )
 
         test_cases = [
-            # (RetrievalMethod.Disjunction, RankingMethod.RRF),  # FIXME dup can only be fixed by pagination fix
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
             (RetrievalMethod.Lexical, RankingMethod.Lexical),
             # (RetrievalMethod.Lexical, RankingMethod.Tensor),  # FIXME dup and missing doc
             (RetrievalMethod.Tensor, RankingMethod.Tensor),
@@ -352,7 +350,9 @@ class TestCollapseFields(MarqoTestCase):
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
                         rankingMethod=ranking_method,
-                        rerankDepthTensor=100,  # set a large value to expand the tensor retrieval set
+                        # set a large value to expand the tensor retrieval set,
+                        # this is required to make the pagination stable
+                        rerankDepthTensor=100,
                     ),
                     collapse_field_name="parent_id",
                     result_count=6
