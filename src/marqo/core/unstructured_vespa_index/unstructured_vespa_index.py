@@ -137,7 +137,7 @@ class UnstructuredVespaIndex(VespaIndex):
             f"approximate:{str(marqo_query.approximate)}, "
             f'hnsw.exploreAdditionalHits:{additional_hits}'
             f"}}"
-            f"nearestNeighbor({field_to_search}, {query_input_embedding_parameter})"
+            f"nearestNeighbor({field_to_search}, {query_input_embedding_parameter})"    # TODO: This should be the retrieval vector. Ranking vector can be not here.
             f")"
         )
 
