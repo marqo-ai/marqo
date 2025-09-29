@@ -1,0 +1,33 @@
+[project]
+name = "marqo-inference-container"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "blake3>=1.0.6",
+    "cachetools>=6.2.0",
+    "fastapi>=0.117.1",
+    "hf-transfer>=0.1.9",
+    "httpx>=0.28.1",
+    "more-itertools>=10.8.0",
+    "msgpack>=1.1.1",
+    "msgpack-numpy>=0.4.8",
+    "nltk>=3.9.1",
+    "open-clip-torch>=3.2.0",
+    "opentelemetry-api>=1.37.0",
+    "opentelemetry-sdk>=1.37.0",
+    "orjson>=3.11.3",
+    "pillow>=11.3.0",
+    "pycurl>=7.45.7",
+    "pydantic>=2.11.9",
+    "pydantic-settings>=2.11.0",
+    "python-json-logger>=3.3.0",
+    "readerwriterlock>=1.0.9",
+    "semver>=3.0.4",
+    "torch>=2.8.0",
+    "transformers>=4.56.2",
+    "tritonclient[grpc,http]>=2.60.0",
+    "uvicorn>=0.37.0",
+    "validators>=0.35.0",
+]

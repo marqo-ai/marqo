@@ -1,66 +1,76 @@
-from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text, \
-    download_and_preprocess_media
-from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
-from marqo.inference.native_inference.inference_pipeline.abstract_inference_pipeline import AbstractInferencePipeline
-from marqo.inference.type import *
+from typing import List, Tuple, Union
 
-LanguagebindPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
+from numpy import ndarray
+
+from marqo_inference_container.schemas.api import InferenceErrorModel, InferenceRequest, InferenceResult, Modality, \
+    TextPreprocessingConfig
+from marqo_inference_container.services.triton_inference.content_preprocessing import split_prefix_preprocess_text
+from marqo_inference_container.services.triton_inference.embedding_models.hugging_face.hugging_face_model import \
+    HuggingFaceModel
+from marqo_inference_container.services.triton_inference.inference_pipeline.abstract_inference_pipeline import \
+    AbstractInferencePipeline
+
+HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
 
-class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
+class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
+    """
+    A class that handles the inference pipeline for HuggingFace models.
 
-    VALID_CONTENT_TO_ENCODE_TYPE = (str, Tensor)
-    MAX_BATCH_SIZE = 8
+    This class is responsible for the content preprocessing, encoding, and formatting the results for HuggingFace models.
 
-    def __init__(self, model: LanguagebindModel, inference_request: InferenceRequest):
+    Attributes:
+        VALID_CONTENT_TO_ENCODE_TYPE (tuple): The valid content type to passed to the model.encode method,
+            this is a model specific type. In this case, it is a string.
+        MAX_BATCH_SIZE (int): The maximum batch size to encode the content.
+    """
+    VALID_CONTENT_TO_ENCODE_TYPE = (str, )
+    MAX_BATCH_SIZE = 32
+
+    def __init__(self, model: HuggingFaceModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
 
+
     def run_pipeline(self) -> InferenceResult:
-        preprocessed_content_list: List[LanguagebindPreprocessedContent] = self._content_preprocessing()
+        preprocessed_content_list: List[HuggingFacePreprocessedContent] = self._content_preprocessing()
 
         embeddings: List[ndarray] = self._encode_processed_content(preprocessed_content_list)
 
         formated_result: InferenceResult = self.format_results(preprocessed_content_list, embeddings)
         return formated_result
 
-    def _content_preprocessing(self) -> List[LanguagebindPreprocessedContent]:
+    def _content_preprocessing(self) -> List[HuggingFacePreprocessedContent]:
         """
         Preprocess the content based on the modality.
 
+        If it is a text modality, the content will be split, prefixed, and preprocessed as required by the
+        preprocessing_config.
+
+        However, if it's an image, audio, or video modality, this normally means the content is a URL from the
+        search request. In this case, we just use a default TextPreprocessingConfig to preprocess the content.
+
         Returns:
-            List[LanguagebindPreprocessedContent]: The preprocessed content.
+            List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
-
-        modality = self.inference_request.modality
-        supported_modalities = self.model.model_properties.supportedModalities
-
-        if modality not in supported_modalities:
-            raise UnsupportedModalityError(
-                f"The model does not support the requested modality. "
-                f"The supported modalities are: {supported_modalities}, "
-                f"but received '{modality}'. Please check your documents or queries, remove the unsupported content, "
-                f"and try again"
-            )
-
-        if modality == Modality.TEXT:
+        if self.inference_request.modality == Modality.TEXT:
             results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config
             )
-        elif modality in [Modality.IMAGE, Modality.AUDIO, Modality.VIDEO]:
-            results = download_and_preprocess_media(
+        elif self.inference_request.modality in [Modality.IMAGE, Modality.AUDIO, Modality.VIDEO]:
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
-                self.inference_request.preprocessing_config,
-                self.inference_request.return_individual_error
+                TextPreprocessingConfig() # Use a default TextPreprocessingConfig
             )
         else:
+            # TODO - Raise an unsupported modality error
             raise ValueError(f"Unsupported modality: {self.inference_request.modality}")
         return results
 
-    def _encode_processed_content(self, preprocessed_content_list: List[LanguagebindPreprocessedContent]) -> List[
-        ndarray]:
+    def _encode_processed_content(self, preprocessed_content_list: List[HuggingFacePreprocessedContent]) \
+            -> List[ndarray]:
         """
         Encode the preprocessed content into embeddings.
 
@@ -70,13 +80,14 @@ class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
         Returns:
             List[ndarray]: The embeddings. Each embedding is a numpy array with (Dimension, ) shape.
         """
-        content_to_encode: List[Tensor] = self._collect_valid_content_to_encode(preprocessed_content_list)
+        content_to_encode: List[str] = self._collect_valid_content_to_encode(preprocessed_content_list)
+
         if not content_to_encode:
             return []
 
         embeddings: List[ndarray] = []
         for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-            batch: List[Tensor] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+            batch: List[str] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
             batch_embeddings: List[ndarray] = self.model.encode(
                 inputs=batch,
                 modality=self.inference_request.modality,
@@ -89,7 +100,8 @@ class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
 
         return embeddings
 
-    def _collect_valid_content_to_encode(self, preprocessed_content: list[LanguagebindPreprocessedContent]) -> list[Tensor]:
+    def _collect_valid_content_to_encode(self, preprocessed_content: list[HuggingFacePreprocessedContent]) \
+            -> list[str]:
         """
         Collect the valid content to encode from the preprocessed content. Each individual content can be
         an InferenceError, or a list of tuples with the original text and the preprocessed content. The
@@ -106,7 +118,6 @@ class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
             unexpected content type.
         """
         valid_content_to_encode = []
-
         for chunk in preprocessed_content:
             if isinstance(chunk, list):
                 for _, content_to_encode in chunk:
@@ -114,8 +125,8 @@ class LanguagebindModelInferencePipeline(AbstractInferencePipeline):
                         valid_content_to_encode.append(content_to_encode)
                     else:
                         raise ValueError(
-                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but got "
-                            f"{type(content_to_encode)}"
+                            f"Expected {self.VALID_CONTENT_TO_ENCODE_TYPE} but "
+                            f"got {type(content_to_encode)}"
                         )
             elif isinstance(chunk, InferenceErrorModel):
                 continue
