@@ -173,15 +173,16 @@ class TestIndexManagement(MarqoTestCase):
         app._service_xml.add_schema(index_with_230_version.schema_name)
         app._store.save_file(app._service_xml.to_xml(), app._SERVICES_XML_FILE)
         app._persist_index_settings()
+        app._marqo_config_store.update_version(index_with_230_version.marqo_version)
+        app._store.save_file(app._marqo_config_store.get().json(), app._MARQO_CONFIG_FILE)
         app._deploy()
 
         index = self.index_management.get_index(index_with_230_version.name)
         self.assertIsNone(index.typeahead_schema_name)
 
         # Now bootstrap again - this should add the missing typeahead schema
-        with patch('marqo.version.get_version', return_value='2.24.1'):
-            bootstrapped = self.index_management.bootstrap_vespa()
-            self.assertTrue(bootstrapped)
+        bootstrapped = self.index_management.bootstrap_vespa()
+        self.assertTrue(bootstrapped)
         
         # Verify that the typeahead schema was added
         downloaded_app = self.vespa_client.download_application()
