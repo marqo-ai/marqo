@@ -160,4 +160,4 @@ def eject_model(model_name: str, model_device: str, config: Config = Depends(get
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8881)
+    uvicorn.run(app, host="localhost", port=8884)

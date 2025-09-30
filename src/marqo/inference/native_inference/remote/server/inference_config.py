@@ -2,7 +2,7 @@ from marqo import logging
 from marqo.core.inference.api import ModelManager
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.device_manager import DeviceManager
-from marqo.inference.triton_inference.model_manager.model_manager import ModelManager
+from marqo.inference.triton_inference.model_manager.model_manager import TritonModelManager
 from marqo.inference.native_inference.local_inference import NativeInferenceLocal
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
@@ -18,7 +18,7 @@ class Config:
     def __init__(self):
         # TODO load env vars to this class and expose them as properties
         triton_grpc_client: TritonGRPCClient = self._instantiate_triton_grpc_client()
-        self.model_manager: ModelManager = ModelManager(triton_grpc_client)
+        self.model_manager: TritonModelManager = TritonModelManager(triton_grpc_client)
         inference = NativeInferenceLocal(model_manager=self.model_manager, triton_grpc_client=triton_grpc_client)
 
         # initialise inference cache

@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Literal
 
@@ -11,7 +11,7 @@ class ModelBaseModel(BaseModel):
     )
 
 
-class DataType(StrEnum):
+class DataType(str, Enum):
     TYPE_FP64 = "TYPE_FP64"
     TYPE_FP32 = "TYPE_FP32"
     TYPE_FP16 = "TYPE_FP16"
@@ -59,15 +59,15 @@ class TritonModelProperties(ModelBaseModel):
         max_batch_size (int): The maximum batch size for the model. Default is 8
         sources (list[str]): A list of sources for the model. It can be a local path, a URL, or a s3 URI.
             1 to 5 sources can be provided if the model consists of multiple files.
-        input (list[ModelInput]): A list of input definitions for the model.
         output (list[ModelOutput]): A list of output definitions for the model. Currently only
             supports a single output for embeddings models.
+        input (list[ModelInput]): A list of input definitions for the model. Supports 1 to 3 inputs.
     """
     name: str
     max_batch_size: int = Field(8, validation_alias='maxBatchSize', gt=0, le=128)
     sources: list[str] = Field(..., validation_alias='sources', min_length=1, max_length=5)
-    input: list[ModelInput] = Field(..., validation_alias='input')
     output: list[ModelOutput] = Field(..., validation_alias='output', min_length=1, max_length=1)
+    input: list[ModelInput] = Field(..., validation_alias='input', min_length=1, max_length=3)
 
     @field_validator('sources', mode="after")
     @classmethod

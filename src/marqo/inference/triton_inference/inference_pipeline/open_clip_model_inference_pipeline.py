@@ -9,7 +9,7 @@ OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]
 
 class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
-    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor,)
+    VALID_CONTENT_TO_ENCODE_TYPE = (Tensor, str) # Tensor for images, str for text
     MAX_BATCH_SIZE = 16
 
     def __init__(self, model: OpenCLIPModel, inference_request: InferenceRequest):

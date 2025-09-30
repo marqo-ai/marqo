@@ -35,21 +35,28 @@ class TritonGRPCClient:
             url = url.replace("https://", "")
         return url
 
-    def encode(self, model_name: str, inputs: ndarray, input_type: InputType) -> ndarray:
+    def encode(
+            self, model_name: str, infer_inputs: list[grpc.InferInput], infer_outputs: list[grpc.InferRequestedOutput]) \
+            -> grpc.InferResult:
         """
         Encode the input data using the specified model.
 
         Args:
             model_name: The name of the model to be used for encoding.
-            inputs: The input data to be encoded.
-            input_type: The type of the input data.
-
+            infer_inputs: A list of infer input data.
+            infer_outputs: A list of infer output data
         Returns:
-            The encoded output data.
+            The gRPC inference result containing the encoded data.
         """
+
+        return self.client.infer(
+            model_name=model_name, inputs=infer_inputs, outputs=infer_outputs,
+            compression_algorithm=self.grpc_compression_algorithm
+        )
+
         inputs = np.ascontiguousarray(inputs, dtype=input_type.dtype)
 
-        input_tensor = grpc.InferInput(name="input", shape=list(inputs.shape), datatype=input_type.code)
+        input_tensor = grpc.InferInput(name="input", shape=list(inputs.shape), datatype="INT32")
         input_tensor.set_data_from_numpy(inputs)
 
         output_tensor = grpc.InferRequestedOutput(name="output")

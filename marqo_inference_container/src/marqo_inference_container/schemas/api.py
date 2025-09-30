@@ -28,13 +28,13 @@ class ChunkConfig(AppImmutableBaseModel):
     split_overlap: int = Field(ge=0, alias='splitOverlap')
 
     @model_validator(mode="after")
-    def check_split_length_greater_than_overlap(cls, values):
-        split_length = values.get('split_length')
-        split_overlap = values.get('split_overlap')
+    def check_split_length_greater_than_overlap(self):
+        split_length = self.split_length
+        split_overlap = self.split_overlap
         if split_length is not None and split_overlap is not None:
             if split_length <= split_overlap:
                 raise ValueError('split_length must be greater than split_overlap')
-        return values
+        return self
 
 
 class TextChunkConfig(ChunkConfig):

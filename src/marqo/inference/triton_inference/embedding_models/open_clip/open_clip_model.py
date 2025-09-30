@@ -1,12 +1,11 @@
+import numpy as np
 import open_clip
-import os
 import torch
 from PIL.Image import Image
-from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
-from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
-from pickle import UnpicklingError
+from open_clip.transform import image_transform_v2
 from pydantic.v1 import ValidationError
 from torchvision.transforms import Compose
+from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
 
 from marqo import marqo_docs
 from marqo.exceptions import InternalError
@@ -14,8 +13,10 @@ from marqo.inference.model_download.model_download import download_model
 from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPModel
 from marqo.inference.native_inference.embedding_models.abstract_clip_model import AbstractCLIPPreprocessor
 from marqo.inference.native_inference.embedding_models.hf_tokenizer import HFTokenizer
-from marqo.inference.native_inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, \
-    ImagePreprocessor
+from marqo.inference.triton_inference.embedding_models.open_clip.open_clip_model_properties import \
+    OpenCLIPModelProperties
+from marqo.inference.triton_inference.model_manager.model_manager import TritonModelManager
+from marqo.inference.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 from marqo.logging import get_logger
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
@@ -34,18 +35,16 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
         super().__init__(tokenizer, image_preprocessor)
         self.device = device
 
-    def _tokenize_text(self, inputs: list[str]) -> List[Tensor]:
+    def _tokenize_text(self, inputs: list[str]) -> list[str]:
         """
         Preprocess the text using the tokenizer.
         Args:
             inputs: A list of strings to preprocess.
 
         Returns:
-            A list of preprocessed images in the form of tensors.
-            Each tensor has the shape (N, M) where N is the batch_size,
-             M is the length of the tokenized text.
+            A list of strings. We leave the model.encode_text to handle the tokenization.
         """
-        return [self.tokenizer(text).to(self.device) for text in inputs]
+        return inputs
 
     def _preprocess_image(self, inputs: list[Image]) -> List[Tensor]:
         """
@@ -65,14 +64,17 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
 class OpenCLIPModel(AbstractCLIPModel):
     def __init__(
             self,
-            device: Optional[str] = None,
+            triton_client,
             model_properties: Optional[Dict] = None,
             model_auth: Optional[ModelAuth] = None,
+            model_manager = None,
     ) -> None:
 
-        super().__init__(device=device, model_properties=model_properties, model_auth=model_auth)
+        super().__init__(device="cpu", model_properties=model_properties, model_auth=model_auth)
 
         self.model_properties = self._build_model_properties(model_properties)
+        self.triton_client: TritonGRPCClient = triton_client
+        self.model_manager: TritonModelManager = model_manager
 
         self.image_preprocessor_config = None
 
@@ -86,15 +88,11 @@ class OpenCLIPModel(AbstractCLIPModel):
 
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
-        if self.model_properties.url is not None or self.model_properties.model_location is not None or \
-                self.model_properties.localpath is not None:
-            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_checkpoint()
-            self.tokenizer = self._load_tokenizer_from_checkpoint()
-        elif self.model_properties.name.startswith(HF_HUB_PREFIX):
-            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_hf_repo()
+        if self.model_properties.name.startswith(HF_HUB_PREFIX):
+            _, self.image_preprocessor = self._load_model_and_image_preprocessor_from_hf_repo()
             self.tokenizer = self._load_tokenizer_from_hf_repo()
         elif self.model_properties.name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
-            self.model, self.image_preprocessor = self._load_model_and_image_preprocessor_from_open_clip_repo()
+            _, self.image_preprocessor = self._load_model_and_image_preprocessor_from_open_clip_repo()
             self.tokenizer = self._load_tokenizer_from_open_clip_repo()
         else:
             raise InvalidModelPropertiesError(
@@ -102,9 +100,20 @@ class OpenCLIPModel(AbstractCLIPModel):
                 f"Check {marqo_docs.bring_your_own_model()} "
                 f"for more details on the supported methods to open_clip model "
             )
-        self.model = self.model.to(self.device)
-        self.model.eval()
+
+        self.model = self._load_triton_model()
         self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.image_preprocessor, device=self.device)
+
+    def _load_triton_model(self) -> None:
+        self.model_manager.load_model(
+            self.model_properties.triton_image_encoder.model_dump(by_alias=True)
+        )
+
+        self.model_manager.load_model(
+            self.model_properties.triton_text_encoder.model_dump(by_alias=True)
+        )
+
+        return True
 
     def get_preprocessor(self) -> OpenCLIPPreprocessor:
         return self.preprocessor
@@ -125,124 +134,6 @@ class OpenCLIPModel(AbstractCLIPModel):
 
     def _load_image_preprocessor(self) -> Callable:
         return image_transform_v2(self.image_preprocessor_config)
-
-    def _aggregate_image_preprocessor_config(self) -> PreprocessCfg:
-        """Aggregate the image preprocessor configuration for the open_clip model."""
-
-        if self.model_properties.image_preprocessor in [ImagePreprocessor.OpenCLIP, ImagePreprocessor.OpenAI]:
-            base_image_preprocess_config = _pcfg()
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.SigLIP]:
-            base_image_preprocess_config = _slpcfg()
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.CLIPA]:
-            base_image_preprocess_config = _apcfg()
-        else:
-            raise ValueError(f"Invalid image preprocessor {self.model_properties.image_preprocessor}")
-
-        aggregated_image_preprocess_config = PreprocessCfg(
-            **merge_preprocess_dict(
-                base_image_preprocess_config, self.model_properties.dict(exclude_none=True)
-            )
-        )
-
-        return aggregated_image_preprocess_config
-
-    def _load_model_and_image_preprocessor_from_checkpoint(self) -> Tuple[torch.nn.Module, Compose]:
-        """Load the model and image preprocessor from a checkpoint file.
-
-        The checkpoint file can be provided through a URL or a model_location object.
-        """
-        # Load the image preprocessor
-        if self.model_properties.localpath:
-            if os.path.exists(self.model_properties.localpath):
-                self.model_path = self.model_properties.localpath
-            else:
-                raise InvalidModelPropertiesError(
-                    f"The localpath '{self.model_properties.localpath}' does not exist. "
-                    f"Please provide a valid localpath to load the model. If you are running Marqo in a container, "
-                    f"make sure the localpath is mounted correctly."
-                )
-        elif self.model_properties.model_location:
-            self.model_path = self._download_from_repo()
-        elif self.model_properties.url:
-            self.model_path = download_model(url=self.model_properties.url)
-        else:
-            raise InternalError("One of 'localpath', 'model_location', or 'url' must be provided to load the model.")
-
-        logger.info(f"The name of the custom clip model is {self.model_properties.name}. We use open_clip loader")
-
-        try:
-            self.image_preprocessor_config = self._aggregate_image_preprocessor_config()
-            preprocess = image_transform_v2(self.image_preprocessor_config, is_train=False)
-            model = self._create_model()
-            return model, preprocess
-        except Exception as e:
-            # RuntimeError is raised by torch 1.12.1, UnpicklingError is raised by torch 1.13.1
-            if isinstance(e, (RuntimeError, UnpicklingError)) and "The file might be corrupted" in str(e):
-                try:
-                    os.remove(self.model_path)
-                except Exception as remove_e:
-                    raise RuntimeError(
-                        f"Marqo encountered an error while attempting to delete a corrupted file '{self.model_path}'. "
-                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance "
-                        f"with a new one. \n "
-                        f"Error message: `{str(remove_e)}`"
-                    )
-                raise InvalidModelPropertiesError(
-                    f"Marqo encountered a corrupted file when loading open_clip file '{self.model_path}'. "
-                    f"Marqo has removed this file from the disk. "
-                    f"Some possible causes are: "
-                    f"1. the file was not a valid open_clip checkpoint, "
-                    f"2. the file was corrupted during download or incompletely downloaded, "
-                    f"3. you may have tried to load a clip model even though model_properties['type'] is set to 'open_clip' "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}")
-            # It is tricky to cacth the error when loading clip model using type = open_clip. Different pytorch version will raise different error.
-            elif isinstance(e, (AttributeError, RuntimeError)) or (
-                    "This could be because the operator doesn't exist for this backend" in str(e)):
-                raise InvalidModelPropertiesError(
-                    f"Marqo encountered an error when loading custom open_clip model '{self.model_properties.name}' with "
-                    f"model properties = '{self.model_properties.dict()}'. "
-                    f"The error message is {str(e)}. "
-                    f"You may have tried to load a clip model even though model_properties['type'] is set to 'open_clip' "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}"
-                )
-            else:
-                raise RuntimeError(
-                    f"Marqo encountered an error when loading custom open_clip model {self.model_properties.name} with "
-                    f"model properties = {self.model_properties.dict()}. "
-                    f"The error message is {str(e)}. "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}"
-                )
-
-    def _create_model(self):
-        try:
-            return open_clip.create_model(
-                model_name=self.model_properties.name,
-                jit=self.model_properties.jit,
-                pretrained=self.model_path,
-                precision=self.model_properties.precision,
-                device=self.device,
-                cache_dir=ModelCache.clip_cache_path,
-            )
-        except UnpicklingError as e:
-            if "Weights only load failed" in str(e):
-                logger.warning(f'Marqo encountered an error when loading only weights of custom open_clip model '
-                               f'{self.model_properties.name} with model properties = {self.model_properties.dict()}.'
-                               f'Will load again with `weights_only = False`')
-
-                return open_clip.create_model(
-                    model_name=self.model_properties.name,
-                    jit=self.model_properties.jit,
-                    pretrained=self.model_path,
-                    precision=self.model_properties.precision,
-                    device=self.device,
-                    cache_dir=ModelCache.clip_cache_path,
-                    load_weights_only=False,
-                )
-            else:
-                raise e
 
     def _load_model_and_image_preprocessor_from_hf_repo(self) -> Tuple[torch.nn.Module, Compose]:
         """Load the model and image preprocessor from a hf_repo.
@@ -314,37 +205,72 @@ class OpenCLIPModel(AbstractCLIPModel):
                 f' filepath `{model_file_path}`')
         return model_file_path
 
+
     def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
-        images = torch.cat(images, dim=0)
 
-        with torch.no_grad():
-            if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(images).to(torch.float32)
-            else:
-                outputs = self.model.encode_image(images).to(torch.float32)
+        images = torch.cat(images, dim=0).numpy().astype(self.model_properties.image_input_numpy_type)
+        inputs = np.ascontiguousarray(images, dtype=self.model_properties.image_input_numpy_type)
 
-        if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
-        return self._convert_output(outputs)
+        input_tensor = InferInput(
+            name=self.model_properties.triton_image_encoder.input[0].name,
+            shape=list(inputs.shape),
+            datatype=self.model_properties.image_input_triton_type
+        )
+        input_tensor.set_data_from_numpy(inputs)
 
-    def encode_text(self, text: List[Tensor], normalize=True) -> List[ndarray]:
-        text = torch.cat(text, dim=0)
+        output_tensor = InferRequestedOutput(
+            name=self.model_properties.triton_image_encoder.output[0].name
+        )
 
-        if self.model is None:
-            self.load()
-        with torch.no_grad():
-            if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_text(text).to(torch.float32)
-            else:
-                outputs = self.model.encode_text(text).to(torch.float32)
+        response: InferResult  = self.triton_client.encode(
+            model_name=self.model_properties.triton_image_encoder.name,
+            infer_inputs=[input_tensor],
+            infer_outputs=[output_tensor]
+        )
+
+        # Do a copy to ensure it is writable
+        embeddings = response.as_numpy(self.model_properties.triton_image_encoder.output[0].name).copy()
 
         if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
+            embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
-        return self._convert_output(outputs)
+        if embeddings.shape != (len(images), self.model_properties.dimensions):
+            raise InternalError(
+                f"The shape of the text embeddings {embeddings.shape} does not match the expected shape "
+                f"({len(images)}, {self.model_properties.dimensions})"
+            )
+        return [embeddings[i] for i in range(embeddings.shape[0])]
+
+    def encode_text(self, text: list[str], normalize=True) -> List[ndarray]:
+        tokenized_text = self.tokenizer(text).reshape(len(text), -1).numpy()
+        inputs = np.ascontiguousarray(tokenized_text, dtype=self.model_properties.text_input_numpy_type)
+
+        input_tensor = InferInput(
+            name=self.model_properties.triton_text_encoder.input[0].name,
+            shape=list(inputs.shape),
+            datatype=self.model_properties.text_input_triton_type
+        )
+        input_tensor.set_data_from_numpy(inputs)
+
+        output_tensor = InferRequestedOutput(
+            name=self.model_properties.triton_text_encoder.output[0].name
+        )
+
+        response: InferResult  = self.triton_client.encode(
+            model_name=self.model_properties.triton_text_encoder.name,
+            infer_inputs=[input_tensor],
+            infer_outputs=[output_tensor]
+        )
+
+        # Do a copy to ensure it is writable
+        embeddings = response.as_numpy(self.model_properties.triton_text_encoder.output[0].name).copy()
+
+        if normalize:
+            embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        if embeddings.shape != (len(text), self.model_properties.dimensions):
+            raise InternalError(
+                f"The shape of the text embeddings {embeddings.shape} does not match the expected shape "
+                f"({len(text)}, {self.model_properties.dimensions})"
+            )
+        return [embeddings[i] for i in range(embeddings.shape[0])]
