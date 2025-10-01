@@ -22,7 +22,7 @@ _MODEL_IO_LOCK = threading.Lock()
 
 
 @contextmanager
-def _model_op_guard(lock: threading.Lock, timeout: int = 2):
+def _model_op_guard(lock: threading.Lock, timeout: float = 2.0):
     """Try to acquire the lock for model operations. Wait for up to 2 seconds to avoid
     bursts of requests causing immediate failures.
 
