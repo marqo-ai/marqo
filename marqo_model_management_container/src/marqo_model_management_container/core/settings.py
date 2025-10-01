@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     )
 
     triton_url: str = Field("http://localhost:8000", validation_alias='TRITON_URL')
-    marqo_models_to_preload: list[TritonModelProperties] = (
-        Field(list, validation_alias='MARQO_MODELS_TO_PRELOAD', description="A JSON array of TritonModelProperties"))
+    marqo_models_to_preload: list[TritonModelProperties] = Field(
+        default_factory=list, validation_alias='MARQO_MODELS_TO_PRELOAD',
+        description="A JSON array of TritonModelProperties", min_length=0, max_length=3
+    )
     model_base_dir: str = Field(
         "./cache/models", validation_alias='MODEL_BASE_DIR'
     )
@@ -50,7 +52,10 @@ class Settings(BaseSettings):
 try:
     _settings = Settings()
 except (SettingsError, ValidationError) as e:
-    raise EnvironmentVariablesParsingError(f"Error parsing environment variables: {e}. Marqo will exit.") from e
+    raise EnvironmentVariablesParsingError(
+        f"Error parsing environment variables: {e}. "
+        f"Marqo model management container will exit."
+    ) from e
 
 
 def get_settings() -> Settings:

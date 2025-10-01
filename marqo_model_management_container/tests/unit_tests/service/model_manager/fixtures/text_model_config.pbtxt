@@ -1,0 +1,25 @@
+name: "text-model"
+backend: "onnxruntime"
+max_batch_size: 32
+
+input [
+
+  {
+    name: "tokens"
+    data_type: TYPE_INT32
+    dims: [512]
+  }
+
+]
+
+output [
+
+  {
+    name: "embeddings"
+    data_type: TYPE_FP16
+    dims: [768]
+  }
+
+]
+
+dynamic_batching { }

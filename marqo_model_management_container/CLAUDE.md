@@ -87,6 +87,7 @@ Environment variables (see `env.example`):
 - All configuration should be environment-variable driven
 - Use structured logging with request IDs
 - Models are downloaded to `MODEL_BASE_DIR` and organized by model name
+- Always import everything at the top of the file, avoid inline imports unless necessary to prevent circular dependencies
 
 ### Detailed Test Development Guidelines
 - Each source package should have a corresponding test package
@@ -97,3 +98,7 @@ Environment variables (see `env.example`):
 - When using assertEqual, put the expected value first, and the actual value second
 - When using subtests, group all the test cases into a list of tuples first with message, input, expected output, then loop through the list and call self.subTest for each case
 - Add doc string if possible to explain the purpose of the test case
+- When doing assert on the expected values, be more specific, e.g. check the length of a list, check if a string contains a substring, check if the value is of a certain type, etc. Avoid generic assertTrue, assertFalse, assertNone, assertNotNone unless absolutely necessary
+- When you need to test things regarding environment variables, take care of the .env file in the root folder as it may affect the test results. So make sure to set the environment variables explicitly in the test case if needed
+- Avoid testing non-public methods unless absolutely necessary. If you need to test a private method, consider if it should be made public or if the functionality can be tested through a public method
+- In unit tests, avoid using time.sleep or any other blocking calls that may slow down the test execution. Instead, use mocking to simulate delays or timeouts

@@ -22,13 +22,13 @@ _MODEL_IO_LOCK = threading.Lock()
 
 
 @contextmanager
-def _model_op_guard(lock: threading.Lock):
+def _model_op_guard(lock: threading.Lock, timeout: int = 2):
     """Try to acquire the lock for model operations. Wait for up to 2 seconds to avoid
     bursts of requests causing immediate failures.
 
     Raise OperationConflictError if the lock cannot be acquired.
     """
-    acquired = lock.acquire(timeout=2)
+    acquired = lock.acquire(timeout=timeout)
     if not acquired:
         raise OperationConflictError(
             "Another model load/unload operation is in progress. Please try again later"

@@ -1,0 +1,25 @@
+name: "large-batch-model"
+backend: "onnxruntime"
+max_batch_size: 128
+
+input [
+
+  {
+    name: "input_data"
+    data_type: TYPE_FP16
+    dims: [1, 512, 768]
+  }
+
+]
+
+output [
+
+  {
+    name: "output_data"
+    data_type: TYPE_FP16
+    dims: [1, 512, 768]
+  }
+
+]
+
+dynamic_batching { }

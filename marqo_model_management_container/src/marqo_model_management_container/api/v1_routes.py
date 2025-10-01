@@ -4,7 +4,7 @@ from fastapi.routing import APIRoute
 
 from marqo_model_management_container.core.logging import get_logger
 from ..config import Config, get_config
-from ..schemas.load_model_request import LoadModelRequest
+from ..schemas.api_models import LoadModelRequest, LoadModelResponse, UnloadModelRequest
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ class MarqoCustomRoute(APIRoute):
 router = APIRouter(prefix="/v1", tags=["v1"], route_class=MarqoCustomRoute)
 
 
-@router.post("/models/load")
+@router.post("/models/load", response_model=LoadModelResponse)
 def load_model(payload: LoadModelRequest, cfg: Config = Depends(get_config)):
     """
     Load a model into the Triton Inference Server.
@@ -43,9 +43,10 @@ def load_model(payload: LoadModelRequest, cfg: Config = Depends(get_config)):
     :return: 200 OK if the model was loaded successfully
     """
     cfg.model_manager.load_model(payload.triton_model_properties)
+    return LoadModelResponse(message=f"Model '{payload.triton_model_properties.name}' loaded successfully.")
 
 
-@router.post("/models/{model_name}/unload")
+@router.post("/models/{model_name}/unload", response_model=UnloadModelRequest)
 def unload_model(
         model_name: str, remove_files: bool = Query(False, alias="remove-files"),
         cfg: Config = Depends(get_config)
@@ -57,3 +58,4 @@ def unload_model(
     :return: 200 OK if the model was unloaded successfully or if the model was not found
     """
     cfg.model_manager.unload_model(model_name, remove_files=remove_files)
+    return UnloadModelRequest(message=f"Model '{model_name}' unloaded successfully.")

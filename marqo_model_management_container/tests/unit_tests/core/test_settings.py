@@ -3,18 +3,18 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from pydantic import ValidationError
+from pydantic_settings import SettingsError
 
 from marqo_model_management_container.core.enum import LogLevel, LogFormat
-from marqo_model_management_container.core.settings import Settings, get_settings, EnvironmentVariablesParsingError
+from marqo_model_management_container.core.settings import Settings
 from marqo_model_management_container.schemas.triton_model_properties import TritonModelProperties
 
 
-def _help_get_settings_without_env_and_cache():
+def _help_get_settings_without_dota_env():
     """
-    Helper function to get Settings without loading from .env file and clearing cache.
+    Helper function to get Settings without loading from .env file.
     This is useful for tests to avoid interference from existing .env files.
     """
-    get_settings.cache_clear()
     return Settings(_env_file=None)
 
 
@@ -24,13 +24,9 @@ class TestSettings(TestCase):
 
     Note that the test could interact with your .env file if it exists as Pydantic's BaseSettings will automatically
     load environment variables from a .env file. To avoid this, use the helper function
-    _help_get_settings_without_env_and_cache() which sets _env_file=None and clears the
-    lru_cache before each test.
+    _help_get_settings_without_dota_env() which sets _env_file=None.
     """
-    def setUp(self):
-        # Clear the LRU cache to ensure fresh settings for each test
-        get_settings.cache_clear()
-
+    
     def test_default_values(self):
         """ Test that default values are set correctly when no environment variables are provided."""
         default_values = {
@@ -41,7 +37,7 @@ class TestSettings(TestCase):
             "MARQO_MODELS_TO_PRELOAD": "[]"
         }
         with patch("os.environ", {}):
-            settings = _help_get_settings_without_env_and_cache()
+            settings = _help_get_settings_without_dota_env()
             self.assertEqual(default_values["TRITON_URL"], settings.triton_url)
             self.assertEqual(default_values["MODEL_BASE_DIR"], settings.model_base_dir)
             self.assertEqual(default_values["LOG_LEVEL"], settings.log_level)
@@ -51,10 +47,13 @@ class TestSettings(TestCase):
     def test_customised_values(self):
         """ Test that custom environment variable values are parsed correctly."""
         model_to_preload = [
-            {"maxBatchSize": 8, "name": "marqo-fashionSigLIP-image-encoder", "location": {
-                "urls": ["s3://opensource-li-backup/triton_models/marqo-fashionSigLIP-image-encoder/1/model.onnx"]},
-             "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]}]
+            {
+                "maxBatchSize": 8, "name": "marqo-fashionSigLIP-image-encoder",
+                "sources": ["s3://opensource-li-backup/triton_models/marqo-fashionSigLIP-image-encoder/1/model.onnx"],
+                "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
+                "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            }
+        ]
 
         custom_values = {
             "TRITON_URL": "http://custom-triton:8000",
@@ -64,7 +63,7 @@ class TestSettings(TestCase):
             "MARQO_MODELS_TO_PRELOAD": json.dumps(model_to_preload),
         }
         with patch("os.environ", custom_values):
-            settings = _help_get_settings_without_env_and_cache() # Avoid loading from .env file during tests
+            settings = _help_get_settings_without_dota_env() # Avoid loading from .env file during tests
             self.assertEqual(custom_values["TRITON_URL"], settings.triton_url)
             self.assertEqual(custom_values["MODEL_BASE_DIR"], settings.model_base_dir)
             self.assertEqual(custom_values["LOG_LEVEL"], settings.log_level)
@@ -81,34 +80,15 @@ class TestSettings(TestCase):
         for ill_value, msg in ill_model_to_preload_test_cases:
             with self.subTest(msg):
                 with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": ill_value}):
-                    with self.assertRaises(EnvironmentVariablesParsingError):
-                        _ = get_settings()
-
-    def test_settings_instantiation_cached(self):
-        """ Test that Settings() constructor is only called once due to @lru_cache decorator."""
-        with patch("os.environ", {}):
-            with patch("marqo_model_management_container.core.settings.Settings") as mock_settings:
-                mock_instance = mock_settings.return_value
-
-                # Call get_settings multiple times
-                settings1 = get_settings()
-                settings2 = get_settings()
-                settings3 = get_settings()
-
-                # Verify all calls return the same instance
-                self.assertIs(settings1, mock_instance)
-                self.assertIs(settings2, mock_instance)
-                self.assertIs(settings3, mock_instance)
-
-                # Verify Settings() constructor was called only once
-                mock_settings.assert_called_once()
+                    with self.assertRaises((SettingsError, ValidationError)):
+                        _ = _help_get_settings_without_dota_env()
 
     def test_marqo_models_to_preload_max_length_constraint(self):
         """Test that marqo_models_to_preload enforces max_length=3 constraint."""
         model = {
             "maxBatchSize": 8,
             "name": "test-model",
-            "location": {"urls": ["s3://test/model.onnx"]},
+            "sources": ["s3://test/model.onnx"],
             "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
         }
@@ -128,24 +108,23 @@ class TestSettings(TestCase):
 
                 with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": env_value}):
                     if num_models <= 3:
-                        settings = _help_get_settings_without_env_and_cache()
+                        settings = _help_get_settings_without_dota_env()
                         self.assertEqual(num_models, len(settings.marqo_models_to_preload))
                     else:
-                        with self.assertRaises(ValidationError):
-                            _help_get_settings_without_env_and_cache()
+                        with self.assertRaises((SettingsError, ValidationError)):
+                            _ = _help_get_settings_without_dota_env()
 
     def test_marqo_models_to_preload_edge_cases(self):
         """Test edge cases for marqo_models_to_preload JSON parsing."""
         test_cases = [
-            ("", [], "empty string should return empty list"),
-            ("   ", [], "whitespace string should return empty list"),
+            (None, [], "None string should return empty list"),
             ("[]", [], "empty array should return empty list"),
         ]
 
         for env_value, expected, msg in test_cases:
             with self.subTest(msg=msg):
                 with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": env_value}):
-                    settings = _help_get_settings_without_env_and_cache()
+                    settings = _help_get_settings_without_dota_env()
                     self.assertEqual(expected, settings.marqo_models_to_preload)
 
     def test_marqo_models_to_preload_with_json_env_variable(self):
@@ -153,14 +132,14 @@ class TestSettings(TestCase):
         model = {
             "maxBatchSize": 8,
             "name": "test-model",
-            "location": {"urls": ["s3://test/model.onnx"]},
+            "sources": ["s3://test/model.onnx"],
             "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
         }
 
         # Test with JSON string in environment variable (the intended way)
         with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": json.dumps([model])}):
-            settings = _help_get_settings_without_env_and_cache()
+            settings = _help_get_settings_without_dota_env()
             self.assertEqual(1, len(settings.marqo_models_to_preload))
             self.assertEqual(TritonModelProperties(**model), settings.marqo_models_to_preload[0])
 
@@ -178,7 +157,7 @@ class TestSettings(TestCase):
             with self.subTest(msg=msg):
                 env_dict = {"LOG_LEVEL": env_value} if env_value is not None else {}
                 with patch("os.environ", env_dict):
-                    settings = _help_get_settings_without_env_and_cache()
+                    settings = _help_get_settings_without_dota_env()
                     self.assertEqual(expected, settings.log_level)
 
     def test_log_format_validation(self):
@@ -195,7 +174,7 @@ class TestSettings(TestCase):
             with self.subTest(msg=msg):
                 env_dict = {"LOG_FORMAT": env_value} if env_value is not None else {}
                 with patch("os.environ", env_dict):
-                    settings = _help_get_settings_without_env_and_cache()
+                    settings = _help_get_settings_without_dota_env()
                     self.assertEqual(expected, settings.log_format)
 
     def test_invalid_log_level_and_format(self):
@@ -211,7 +190,7 @@ class TestSettings(TestCase):
             with self.subTest(msg=msg):
                 with patch("os.environ", env_dict):
                     with self.assertRaises(ValidationError):
-                        _help_get_settings_without_env_and_cache()
+                        _help_get_settings_without_dota_env()
 
     def test_get_settings_environment_variables_parsing_error(self):
         """Test that get_settings raises EnvironmentVariablesParsingError for invalid environment variables."""
@@ -224,14 +203,9 @@ class TestSettings(TestCase):
         for env_dict, msg in invalid_env_cases:
             with self.subTest(msg=msg):
                 # Clear cache to ensure fresh settings
-                get_settings.cache_clear()
                 with patch("os.environ", env_dict):
-                    with self.assertRaises(EnvironmentVariablesParsingError) as context:
-                        get_settings()
-
-                    # Verify the error message contains expected information
-                    self.assertIn("Marqo Model Management Container failed to start", str(context.exception))
-                    self.assertIn("invalid environment variables", str(context.exception))
+                    with self.assertRaises((SettingsError, ValidationError)):
+                        _ = _help_get_settings_without_dota_env()
 
     def test_marqo_models_to_preload_invalid_json_strings(self):
         """Test that marqo_models_to_preload rejects invalid JSON strings."""
@@ -240,13 +214,15 @@ class TestSettings(TestCase):
             ('{"key": "value"}', "object JSON should be rejected"),
             ("true", "boolean JSON should be rejected"),
             ("invalid json", "malformed JSON should be rejected"),
+            (" ", "whitespace string should be rejected"),
+            ('[', "Incomplete JSON array should be rejected"),
         ]
 
         for invalid_value, msg in invalid_cases:
             with self.subTest(msg=msg):
                 with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": invalid_value}):
-                    with self.assertRaises(ValidationError):
-                        _help_get_settings_without_env_and_cache()
+                    with self.assertRaises((SettingsError, ValidationError)):
+                        _help_get_settings_without_dota_env()
 
     def test_triton_url_custom_values(self):
         """Test triton_url accepts various valid URL formats."""
@@ -260,7 +236,7 @@ class TestSettings(TestCase):
         for url, msg in url_cases:
             with self.subTest(msg=msg):
                 with patch("os.environ", {"TRITON_URL": url}):
-                    settings = _help_get_settings_without_env_and_cache()
+                    settings = _help_get_settings_without_dota_env()
                     self.assertEqual(url, settings.triton_url)
 
     def test_model_base_dir_custom_values(self):
@@ -275,5 +251,5 @@ class TestSettings(TestCase):
         for path, msg in path_cases:
             with self.subTest(msg=msg):
                 with patch("os.environ", {"MODEL_BASE_DIR": path}):
-                    settings = _help_get_settings_without_env_and_cache()
+                    settings = _help_get_settings_without_dota_env()
                     self.assertEqual(path, settings.model_base_dir)

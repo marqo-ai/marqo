@@ -1,9 +1,8 @@
 import httpx
+from httpx import TimeoutException, ConnectError, NetworkError, HTTPStatusError
 
-from httpx import TimeoutException, ConnectError, NetworkError, HTTPError, HTTPStatusError
+from marqo_model_management_container.errors.common import DependencyTimeoutError, DependencyUnavailableError
 from .errors import ModelLoadingError
-from marqo_model_management_container.errors.common import DependencyTimeoutError, DependencyUnavailableError, \
-    DependencyBadGatewayError
 
 
 class TritonClient:
