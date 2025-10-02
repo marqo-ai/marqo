@@ -92,14 +92,14 @@ class AudioPreprocessingConfig(PreprocessingConfig):
     max_media_size_bytes: int = Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @model_validator(mode="after")
-    def validate_chunk_config(cls, values):
-        should_chunk = values.get('should_chunk')
-        chunk_config = values.get('chunk_config')
+    def validate_chunk_config(self):
+        should_chunk = self.should_chunk
+        chunk_config = self.chunk_config
         if should_chunk and chunk_config is None:
             raise ValueError("`chunk_config` must be provided when `should_chunk` is True.")
         if not should_chunk and chunk_config is not None:
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
-        return values
+        return self
 
 
 class VideoPreprocessingConfig(PreprocessingConfig):
@@ -111,14 +111,14 @@ class VideoPreprocessingConfig(PreprocessingConfig):
     max_media_size_bytes: int = Field(ge=1, default=387973120, alias='maxMediaSizeBytes')
 
     @model_validator(mode="after")
-    def validate_chunk_config(cls, values):
-        should_chunk = values.get('should_chunk')
-        chunk_config = values.get('chunk_config')
+    def validate_chunk_config(self):
+        should_chunk = self.should_chunk
+        chunk_config = self.chunk_config
         if should_chunk and chunk_config is None:
             raise ValueError("`chunk_config` must be provided when `should_chunk` is True.")
         if not should_chunk and chunk_config is not None:
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
-        return values
+        return self
 
 
 PreprocessingConfigType = Union[

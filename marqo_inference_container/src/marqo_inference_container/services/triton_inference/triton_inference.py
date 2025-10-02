@@ -1,13 +1,13 @@
-from marqo_inference_container.errors.inference_errors import InferenceError
-
+from marqo_inference_container.errors.common_errors import InternalError
 from marqo_inference_container.schemas.api import *
-from marqo_inference_container.services.triton_inference.embedding_models.hugging_face.hugging_face_model import \
-    HuggingFaceModel
-from marqo_inference_container.services.triton_inference.embedding_models.open_clip.open_clip_model import OpenCLIPModel
+from marqo_inference_container.services.triton_inference.embedding_models import OpenCLIPModel, HuggingFaceModel, \
+    RandomModel
 from marqo_inference_container.services.triton_inference.inference_pipeline.hugging_face_model_inference_pipeline import \
     HuggingFaceModelInferencePipeline
 from marqo_inference_container.services.triton_inference.inference_pipeline.open_clip_model_inference_pipeline import (
     OpenCLIPModelInferencePipeline)
+from marqo_inference_container.services.triton_inference.inference_pipeline.random_model_inference_pipeline import \
+    RandomModelInferencePipeline
 from marqo_inference_container.services.triton_inference.model_manager.load_model import load_model
 
 
@@ -30,5 +30,7 @@ class TritonInference(Inference):
             return OpenCLIPModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, HuggingFaceModel):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
+        elif isinstance(model, RandomModel):
+            return RandomModelInferencePipeline(model, request).run_pipeline()
         else:
-            raise ValueError(f"Model type {type(model)} not supported")
+            raise InternalError(f"Model type '{model.__name__}' not supported.")

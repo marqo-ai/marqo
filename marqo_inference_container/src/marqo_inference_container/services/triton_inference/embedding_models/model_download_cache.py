@@ -1,9 +1,13 @@
 import os
 
+from marqo_inference_container.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def _get_project_root() -> str:
     project_root =  os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../'))
-    print(f"Project root determined as: {project_root}")
+    logger.info(f'The project root is {project_root}')
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../'))
 
 

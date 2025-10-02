@@ -45,8 +45,22 @@ class MarqoInferenceCache:
             A cache instance based on the cache type and size. None if the cache_size is 0.
 
         Raises:
-            EnvVarError: If the cache size or type is invalid.
+            EnvironmentVariableParsingError: If the cache size or type is invalid.
         """
+        from marqo_inference_container.errors.common_errors import EnvironmentVariableParsingError
+
+        # Validate cache size
+        if not isinstance(cache_size, int) or cache_size <= 0:
+            raise EnvironmentVariableParsingError(
+                f"Invalid cache size: {cache_size}. Must be a positive integer."
+            )
+
+        # Validate cache type
+        if cache_type not in self._CACHE_TYPES_MAPPING:
+            raise EnvironmentVariableParsingError(
+                f"Invalid cache type: {cache_type}. Valid types are: {list(self._CACHE_TYPES_MAPPING.keys())}"
+            )
+
         cache = self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
         logger.info(f'Built inference cache with type {cache_type} and size {cache_size}')
         return cache

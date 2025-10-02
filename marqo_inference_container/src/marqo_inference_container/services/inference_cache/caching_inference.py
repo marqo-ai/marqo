@@ -22,7 +22,7 @@ class CachingInference(Inference):
         if self.should_skip_cache(request):
             return self.delegate.vectorise(request)
 
-        model_cache_key = self.model_cache_key(request.model_config.model_properties)
+        model_cache_key = self.model_cache_key(request.model_config_.model_properties)
 
         cached_result: List[Tuple[int, str, np.ndarray]] = []
         contents_to_vectorise: List[str] = []
