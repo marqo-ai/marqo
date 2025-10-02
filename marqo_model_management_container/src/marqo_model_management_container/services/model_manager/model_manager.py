@@ -5,15 +5,15 @@ from jinja2 import Environment, PackageLoader
 
 from marqo_model_management_container.core.logging import get_logger
 from marqo_model_management_container.schemas.triton_model_properties import TritonModelProperties
-from marqo_model_management_container.service.model_manager.triton_model_downloader import TritonModelDownloader
-from marqo_model_management_container.service.triton.triton_client import TritonClient
-from marqo_model_management_container.errors.common import OperationConflictError
+from marqo_model_management_container.services.model_manager.triton_model_downloader import TritonModelDownloader
+from marqo_model_management_container.services.triton.triton_client import TritonClient
+from ..errors import ModelOperationInProgressError
 from contextlib import contextmanager
 
 logger = get_logger(__name__)
 
 env = Environment(
-    loader=PackageLoader('marqo_model_management_container.service.model_manager',
+    loader=PackageLoader('marqo_model_management_container.services.model_manager',
                          'templates')
 )
 template = env.get_template('config_pbtxt_template.jinja2')
@@ -26,11 +26,11 @@ def _model_op_guard(lock: threading.Lock, timeout: float = 2.0):
     """Try to acquire the lock for model operations. Wait for up to 2 seconds to avoid
     bursts of requests causing immediate failures.
 
-    Raise OperationConflictError if the lock cannot be acquired.
+    Raise ModelOperationInProgressError if it can not acquire the lock.
     """
     acquired = lock.acquire(timeout=timeout)
     if not acquired:
-        raise OperationConflictError(
+        raise ModelOperationInProgressError(
             "Another model load/unload operation is in progress. Please try again later"
         )
     try:

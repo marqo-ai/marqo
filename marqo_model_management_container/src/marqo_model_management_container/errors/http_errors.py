@@ -40,8 +40,3 @@ class DependencyTimeoutError(AppError):
 class DependencyBadGatewayError(AppError):
     http_status = http.HTTP_502_BAD_GATEWAY
     code = "DEPENDENCY_BAD_GATEWAY"
-
-class ModelDownloadError(AppError):
-    """Raised when there is an error downloading a model."""
-    http_status = 400
-    code = "MODEL_DOWNLOAD_ERROR"

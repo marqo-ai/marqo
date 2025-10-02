@@ -4,9 +4,9 @@ from unittest.mock import Mock, patch, MagicMock
 import httpx
 from httpx import TimeoutException, ConnectError, NetworkError, HTTPStatusError
 
-from marqo_model_management_container.service.triton.triton_client import TritonClient
-from marqo_model_management_container.service.triton.errors import ModelLoadingError
-from marqo_model_management_container.errors.common import DependencyTimeoutError, DependencyUnavailableError
+from marqo_model_management_container.services.triton.triton_client import TritonClient
+from marqo_model_management_container.services.errors import ModelDownloadFailedError
+from marqo_model_management_container.services.errors import TritonCommunicationError, TritonModelLoadError
 
 
 class TestTritonClient(TestCase):
@@ -38,7 +38,7 @@ class TestTritonClient(TestCase):
                 client = TritonClient(url=url)
                 self.assertEqual(url, client.url)
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_success(self, mock_client_class):
         """Test successful model loading."""
         mock_response = Mock()
@@ -56,51 +56,51 @@ class TestTritonClient(TestCase):
         )
         mock_response.raise_for_status.assert_called_once()
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_timeout(self, mock_client_class):
-        """Test load_model raises DependencyTimeoutError on timeout."""
+        """Test load_model raises TritonCommunicationError on timeout."""
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(side_effect=TimeoutException("Timeout"))
         mock_client_class.return_value = mock_client_instance
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(DependencyTimeoutError) as context:
+        with self.assertRaises(TritonCommunicationError) as context:
             client.load_model("test-model")
 
         self.assertIn("Triton timed out", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_connection_error(self, mock_client_class):
-        """Test load_model raises DependencyUnavailableError on connection error."""
+        """Test load_model raises TritonCommunicationError on connection error."""
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(side_effect=ConnectError("Connection failed"))
         mock_client_class.return_value = mock_client_instance
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(DependencyUnavailableError) as context:
+        with self.assertRaises(TritonCommunicationError) as context:
             client.load_model("test-model")
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_network_error(self, mock_client_class):
-        """Test load_model raises DependencyUnavailableError on network error."""
+        """Test load_model raises TritonCommunicationError on network error."""
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(side_effect=NetworkError("Network error"))
         mock_client_class.return_value = mock_client_instance
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(DependencyUnavailableError) as context:
+        with self.assertRaises(TritonCommunicationError) as context:
             client.load_model("test-model")
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_http_status_error(self, mock_client_class):
-        """Test load_model raises ModelLoadingError on HTTP status error."""
+        """Test load_model raises TritonModelLoadError on HTTP status error."""
         mock_response = Mock()
         mock_response.json = Mock(return_value={"error": "Model not found"})
         mock_response.raise_for_status = Mock(
@@ -112,13 +112,13 @@ class TestTritonClient(TestCase):
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(ModelLoadingError) as context:
+        with self.assertRaises(TritonModelLoadError) as context:
             client.load_model("test-model")
 
         self.assertIn("Failed to load model", str(context.exception))
         self.assertIn("Model not found", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_unload_model_success(self, mock_client_class):
         """Test successful model unloading."""
         mock_response = Mock()
@@ -136,37 +136,37 @@ class TestTritonClient(TestCase):
         )
         mock_response.raise_for_status.assert_called_once()
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_unload_model_timeout(self, mock_client_class):
-        """Test unload_model raises DependencyTimeoutError on timeout."""
+        """Test unload_model raises TritonCommunicationError on timeout."""
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(side_effect=TimeoutException("Timeout"))
         mock_client_class.return_value = mock_client_instance
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(DependencyTimeoutError) as context:
+        with self.assertRaises(TritonCommunicationError) as context:
             client.unload_model("test-model")
 
         self.assertIn("Triton timed out", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_unload_model_connection_error(self, mock_client_class):
-        """Test unload_model raises DependencyUnavailableError on connection error."""
+        """Test unload_model raises TritonCommunicationError on connection error."""
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(side_effect=ConnectError("Connection failed"))
         mock_client_class.return_value = mock_client_instance
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(DependencyUnavailableError) as context:
+        with self.assertRaises(TritonCommunicationError) as context:
             client.unload_model("test-model")
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_unload_model_http_status_error(self, mock_client_class):
-        """Test unload_model raises ModelLoadingError on HTTP status error."""
+        """Test unload_model raises TritonModelLoadError on HTTP status error."""
         mock_response = Mock()
         mock_response.json = Mock(return_value={"error": "Model is not loaded"})
         mock_response.raise_for_status = Mock(
@@ -178,7 +178,7 @@ class TestTritonClient(TestCase):
 
         client = TritonClient(url=self.url)
 
-        with self.assertRaises(ModelLoadingError) as context:
+        with self.assertRaises(TritonModelLoadError) as context:
             client.unload_model("test-model")
 
         self.assertIn("Failed to unload model", str(context.exception))
@@ -189,7 +189,7 @@ class TestTritonClient(TestCase):
         with self.assertRaises(NotImplementedError):
             self.client.get_loaded_models()
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_load_model_with_various_model_names(self, mock_client_class):
         """Test load_model with various model name formats."""
         test_cases = [
@@ -214,7 +214,7 @@ class TestTritonClient(TestCase):
                 call_args = mock_client_instance.post.call_args
                 self.assertEqual(expected_url, call_args[0][0])
 
-    @patch('marqo_model_management_container.service.triton.triton_client.httpx.Client')
+    @patch('marqo_model_management_container.services.triton.triton_client.httpx.Client')
     def test_timeout_configuration(self, mock_client_class):
         """Test that timeout is configured correctly for requests."""
         mock_response = Mock()

@@ -3,8 +3,8 @@ from unittest.mock import patch, MagicMock
 
 from marqo_model_management_container.config import Config, get_config
 from marqo_model_management_container.core.settings import Settings
-from marqo_model_management_container.service.triton.triton_client import TritonClient
-from marqo_model_management_container.service.model_manager.model_manager import ModelManager
+from marqo_model_management_container.services.triton.triton_client import TritonClient
+from marqo_model_management_container.services.model_manager.model_manager import ModelManager
 
 
 class TestConfig(TestCase):

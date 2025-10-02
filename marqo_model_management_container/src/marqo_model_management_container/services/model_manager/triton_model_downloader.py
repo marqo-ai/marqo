@@ -4,7 +4,7 @@ import botocore.exceptions
 import fsspec
 from tqdm import tqdm
 
-from marqo_model_management_container.errors.common import ModelDownloadError
+from ..errors import ModelDownloadFailedError
 from .url_parser import get_base_filename
 
 
@@ -17,6 +17,15 @@ class TritonModelDownloader:
         ├─ config.pbtxt   (optional)
         └─ 1/
            └─ *           (downloaded files)
+
+    Attributes:
+        sources (list[str]): List of URIs to download model files from.
+        base_dir (str): Base directory where models are stored.
+        model_name (str): Name of the model.
+        config_pbtxt (str | None): Optional config.pbtxt content for Triton.
+        overwrite (bool): Whether to overwrite existing files.
+    Methods:
+        prepare_and_download() -> list[Path]: Prepares directories and downloads files.
     """
 
     def __init__(
@@ -41,17 +50,20 @@ class TritonModelDownloader:
         return root / "1"
 
     def _download_with_progress(self, fs, path: str, dest: Path, chunk_size: int = 1024 * 1024):
-        """Download a file with a tqdm progress bar."""
+        """Download a file with a tqdm progress bar.
+
+        :raise: ModelDownloadFailedError: If download fails due to missing credentials or file not found.
+        """
         try:
             info = fs.info(path)
         except botocore.exceptions.NoCredentialsError as e:
-            raise ModelDownloadError(
+            raise ModelDownloadFailedError(
                 "Marqo cannot find your AWS credentials to download the model from S3. "
                 "Please ensure your AWS credentials are configured correctly. You can mount "
                 "your AWS credentials file into the container /root/.aws/credentials. Alternatively, "
                 "you can provide the model files via a publicly accessible URL ") from e
         except FileNotFoundError as e:
-            raise ModelDownloadError(f"The specified model file was not found: {path}. Please check "
+            raise ModelDownloadFailedError(f"The specified model file was not found: {path}. Please check "
                                      f"the provided source and ensure the container has access to it ") from e
         size = info.get("size", None)
         with fs.open(path, "rb") as fsrc, open(dest, "wb") as fdst, tqdm(

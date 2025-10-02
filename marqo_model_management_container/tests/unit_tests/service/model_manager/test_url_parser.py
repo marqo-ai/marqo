@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from marqo_model_management_container.service.model_manager.url_parser import get_base_filename
+from marqo_model_management_container.services.model_manager.url_parser import get_base_filename
 
 
 class TestGetBaseFilename(TestCase):

@@ -11,20 +11,23 @@ from starlette.requests import Request
 from marqo_model_management_container.api.exception_handlers import (
     register_exception_handlers,
     validation_error_handler,
-    internal_error_handler,
+    service_error_handler,
     app_error_handler,
     catch_all_handler,
+    map_service_errors_to_http_errors,
     _problem_response,
     _normalize_validation_errors,
 )
 from marqo_model_management_container.errors.base import AppError
-from marqo_model_management_container.errors.common import (
+from marqo_model_management_container.errors.http_errors import (
     InternalServerError,
     InvalidArgumentError,
     NotFoundError,
     OperationConflictError,
     DependencyTimeoutError,
 )
+import marqo_model_management_container.errors.http_errors as http_errors
+import marqo_model_management_container.services.errors as service_errors
 
 
 class TestExceptionHandlers(TestCase):
@@ -50,12 +53,12 @@ class TestExceptionHandlers(TestCase):
             handlers = [args[1] for args in call_args_list]
 
             self.assertIn(RequestValidationError, exception_types)
-            self.assertIn(InternalServerError, exception_types)
+            self.assertIn(service_errors.ServiceError, exception_types)
             self.assertIn(AppError, exception_types)
             self.assertIn(Exception, exception_types)
 
             self.assertIn(validation_error_handler, handlers)
-            self.assertIn(internal_error_handler, handlers)
+            self.assertIn(service_error_handler, handlers)
             self.assertIn(app_error_handler, handlers)
             self.assertIn(catch_all_handler, handlers)
 
@@ -162,19 +165,66 @@ class TestExceptionHandlers(TestCase):
         self.assertEqual("field required", error_messages[0]["msg"])
         self.assertEqual("value_error.missing", error_messages[0]["type"])
 
-    @pytest.mark.anyio
-    async def test_internal_error_handler(self):
-        """Test internal_error_handler returns generic error message."""
-        error = InternalServerError("Database connection failed")
+    def test_map_service_errors_to_http_errors(self):
+        """Test mapping of service errors to HTTP errors."""
+        test_cases = [
+            (service_errors.ModelDownloadFailedError("Download failed"), InvalidArgumentError, 400),
+            (service_errors.ModelOperationInProgressError("Operation in progress"), OperationConflictError, 409),
+            (service_errors.TritonCommunicationError("Triton error"), http_errors.DependencyBadGatewayError, 502),
+            (service_errors.InternalServerError("Internal error"), InternalServerError, 500),
+        ]
 
-        response = await internal_error_handler(self.mock_request, error)
+        for service_error, expected_http_error_class, expected_status in test_cases:
+            with self.subTest(service_error_type=type(service_error).__name__):
+                http_error = map_service_errors_to_http_errors(service_error)
+                self.assertIsInstance(http_error, expected_http_error_class)
+                self.assertEqual(expected_status, http_error.http_status)
+                self.assertEqual(service_error.message, str(http_error))
+
+    def test_map_service_errors_to_http_errors_unknown_error(self):
+        """Test that unknown service errors map to InternalServerError."""
+        # Create a custom service error that's not in the mapping
+        class UnknownServiceError(service_errors.ServiceError):
+            pass
+
+        unknown_error = UnknownServiceError("Unknown error")
+        http_error = map_service_errors_to_http_errors(unknown_error)
+
+        self.assertIsInstance(http_error, InternalServerError)
+        self.assertEqual(500, http_error.http_status)
+        self.assertEqual("Unknown error", str(http_error))
+
+    @pytest.mark.anyio
+    async def test_service_error_handler(self):
+        """Test service_error_handler maps service errors to HTTP errors."""
+        error = service_errors.InternalServerError("Database connection failed")
+
+        response = await service_error_handler(self.mock_request, error)
 
         self.assertEqual(500, response.status_code)
         body = json.loads(response.body)
         self.assertEqual(500, body["status"])
         self.assertEqual("INTERNAL_ERROR", body["code"])
-        # Should return generic message, not the original error message
-        self.assertEqual("An unexpected error occurred.", body["detail"])
+        self.assertEqual("Database connection failed", body["detail"])
+
+    @pytest.mark.anyio
+    async def test_service_error_handler_different_service_errors(self):
+        """Test service_error_handler with different service error types."""
+        test_cases = [
+            (service_errors.ModelDownloadFailedError("Download failed"), 400, "INVALID_ARGUMENT"),
+            (service_errors.ModelOperationInProgressError("Operation in progress"), 409, "OPERATION_CONFLICT"),
+            (service_errors.TritonCommunicationError("Triton error"), 502, "DEPENDENCY_BAD_GATEWAY"),
+            (service_errors.InternalServerError("Internal error"), 500, "INTERNAL_ERROR"),
+        ]
+
+        for service_error, expected_status, expected_code in test_cases:
+            with self.subTest(service_error_type=type(service_error).__name__):
+                response = await service_error_handler(self.mock_request, service_error)
+
+                self.assertEqual(expected_status, response.status_code)
+                body = json.loads(response.body)
+                self.assertEqual(expected_status, body["status"])
+                self.assertEqual(expected_code, body["code"])
 
     @pytest.mark.anyio
     async def test_app_error_handler(self):
