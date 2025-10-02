@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import Field, field_validator
 
 from marqo_model_management_container.schemas.app_models import AppBaseModel
-from ..service.model_manager.url_parser import get_base_filename
+from ..services.model_manager.url_parser import get_base_filename
 
 
 class DataType(StrEnum):

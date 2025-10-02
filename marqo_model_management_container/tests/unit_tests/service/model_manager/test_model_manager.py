@@ -4,10 +4,10 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.mock import Mock, patch, MagicMock, call
 
-from marqo_model_management_container.service.model_manager.model_manager import ModelManager, _model_op_guard
-from marqo_model_management_container.service.triton.triton_client import TritonClient
+from marqo_model_management_container.services.model_manager.model_manager import ModelManager, _model_op_guard
+from marqo_model_management_container.services.triton.triton_client import TritonClient
 from marqo_model_management_container.schemas.triton_model_properties import TritonModelProperties
-from marqo_model_management_container.errors.common import OperationConflictError
+from marqo_model_management_container.services.errors import ModelOperationInProgressError
 
 
 class TestModelOpGuard(TestCase):
@@ -26,12 +26,12 @@ class TestModelOpGuard(TestCase):
         lock.release()
 
     def test_model_op_guard_raises_on_lock_timeout(self):
-        """Test that _model_op_guard raises OperationConflictError when lock cannot be acquired."""
+        """Test that _model_op_guard raises ModelOperationInProgressError when lock cannot be acquired."""
         lock = threading.Lock()
         lock.acquire()  # Pre-acquire the lock
 
         try:
-            with self.assertRaises(OperationConflictError) as context:
+            with self.assertRaises(ModelOperationInProgressError) as context:
                 with _model_op_guard(lock, timeout=0.1):
                     pass
 
@@ -84,7 +84,7 @@ class TestModelManager(TestCase):
         self.assertEqual("/tmp/test", manager.model_base_dir)
         self.assertEqual(self.mock_triton_client, manager.triton_client)
 
-    @patch('marqo_model_management_container.service.model_manager.model_manager.TritonModelDownloader')
+    @patch('marqo_model_management_container.services.model_manager.model_manager.TritonModelDownloader')
     def test_load_model_success(self, mock_downloader_class):
         """Test successful model loading."""
         mock_downloader = Mock()
@@ -108,7 +108,7 @@ class TestModelManager(TestCase):
         # Verify triton client was called
         self.mock_triton_client.load_model.assert_called_once_with("test-model")
 
-    @patch('marqo_model_management_container.service.model_manager.model_manager.TritonModelDownloader')
+    @patch('marqo_model_management_container.services.model_manager.model_manager.TritonModelDownloader')
     def test_load_model_generates_config_pbtxt(self, mock_downloader_class):
         """Test that load_model generates config.pbtxt."""
         mock_downloader = Mock()
@@ -221,7 +221,7 @@ class TestModelManager(TestCase):
         self.assertIn("TYPE_FP32", config_pbtxt)
         self.assertIn("TYPE_INT64", config_pbtxt)
 
-    @patch('marqo_model_management_container.service.model_manager.model_manager.TritonModelDownloader')
+    @patch('marqo_model_management_container.services.model_manager.model_manager.TritonModelDownloader')
     def test_load_model_with_different_model_properties(self, mock_downloader_class):
         """Test load_model with various model configurations."""
         test_models = [

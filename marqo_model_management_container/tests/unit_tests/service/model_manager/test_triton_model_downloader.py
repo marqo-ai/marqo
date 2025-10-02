@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch, MagicMock, mock_open
 
 import botocore.exceptions
 
-from marqo_model_management_container.service.model_manager.triton_model_downloader import TritonModelDownloader
-from marqo_model_management_container.errors.common import ModelDownloadError
+from marqo_model_management_container.services.model_manager.triton_model_downloader import TritonModelDownloader
+from marqo_model_management_container.services.errors import ModelDownloadFailedError
 
 
 class TestTritonModelDownloader(TestCase):
@@ -55,8 +55,8 @@ class TestTritonModelDownloader(TestCase):
 
         self.assertIsNone(downloader.config_pbtxt)
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.write_text')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.write_text')
     def test_version_dir_creates_directory_structure(self, mock_write_text, mock_mkdir):
         """Test _version_dir creates correct directory structure."""
         downloader = TritonModelDownloader(
@@ -78,8 +78,8 @@ class TestTritonModelDownloader(TestCase):
         self.assertIn("test-model", str(version_dir))
         self.assertIn("1", str(version_dir))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.write_text')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.write_text')
     def test_version_dir_without_config_pbtxt(self, mock_write_text, mock_mkdir):
         """Test _version_dir without config_pbtxt."""
         downloader = TritonModelDownloader(
@@ -98,7 +98,7 @@ class TestTritonModelDownloader(TestCase):
         mock_write_text.assert_not_called()
 
     @patch('builtins.open', new_callable=mock_open)
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.tqdm')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.tqdm')
     def test_download_with_progress_success(self, mock_tqdm, mock_file):
         """Test _download_with_progress downloads file successfully."""
         mock_fs = Mock()
@@ -125,7 +125,7 @@ class TestTritonModelDownloader(TestCase):
         mock_fs.open.assert_called_once()
 
     def test_download_with_progress_no_credentials_error(self):
-        """Test _download_with_progress raises ModelDownloadError on NoCredentialsError."""
+        """Test _download_with_progress raises ModelDownloadFailedError on NoCredentialsError."""
         mock_fs = Mock()
         mock_fs.info = Mock(side_effect=botocore.exceptions.NoCredentialsError())
 
@@ -135,13 +135,13 @@ class TestTritonModelDownloader(TestCase):
             model_name=self.model_name
         )
 
-        with self.assertRaises(ModelDownloadError) as context:
+        with self.assertRaises(ModelDownloadFailedError) as context:
             downloader._download_with_progress(mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx"))
 
         self.assertIn("AWS credentials", str(context.exception))
 
     def test_download_with_progress_file_not_found_error(self):
-        """Test _download_with_progress raises ModelDownloadError on FileNotFoundError."""
+        """Test _download_with_progress raises ModelDownloadFailedError on FileNotFoundError."""
         mock_fs = Mock()
         mock_fs.info = Mock(side_effect=FileNotFoundError("File not found"))
 
@@ -151,14 +151,14 @@ class TestTritonModelDownloader(TestCase):
             model_name=self.model_name
         )
 
-        with self.assertRaises(ModelDownloadError) as context:
+        with self.assertRaises(ModelDownloadFailedError) as context:
             downloader._download_with_progress(mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx"))
 
         self.assertIn("not found", str(context.exception))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.exists')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.exists')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
     @patch.object(TritonModelDownloader, '_download_with_progress')
     @patch.object(TritonModelDownloader, '_version_dir')
     def test_prepare_and_download_single_source(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
@@ -183,9 +183,9 @@ class TestTritonModelDownloader(TestCase):
         self.assertEqual(1, len(out_paths))
         self.assertIn("model.onnx", str(out_paths[0]))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.exists')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.exists')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
     @patch.object(TritonModelDownloader, '_download_with_progress')
     @patch.object(TritonModelDownloader, '_version_dir')
     def test_prepare_and_download_multiple_sources(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
@@ -209,7 +209,7 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths
         self.assertEqual(2, len(out_paths))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.exists')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.exists')
     @patch.object(TritonModelDownloader, '_download_with_progress')
     @patch.object(TritonModelDownloader, '_version_dir')
     def test_prepare_and_download_skips_existing_files(self, mock_version_dir, mock_download, mock_exists):
@@ -232,9 +232,9 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths still returned
         self.assertEqual(1, len(out_paths))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.exists')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.exists')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
     @patch.object(TritonModelDownloader, '_download_with_progress')
     @patch.object(TritonModelDownloader, '_version_dir')
     def test_prepare_and_download_overwrites_existing_files(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
@@ -259,9 +259,9 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths returned
         self.assertEqual(1, len(out_paths))
 
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.exists')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('marqo_model_management_container.service.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.exists')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.Path.mkdir')
+    @patch('marqo_model_management_container.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
     @patch.object(TritonModelDownloader, '_download_with_progress')
     @patch.object(TritonModelDownloader, '_version_dir')
     def test_prepare_and_download_with_various_sources(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):

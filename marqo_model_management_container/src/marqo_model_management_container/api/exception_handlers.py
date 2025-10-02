@@ -6,14 +6,33 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
+import marqo_model_management_container.errors.http_errors as http_errors
+import marqo_model_management_container.services.errors as service_errors
 from ..contracts.problem import Problem
 from ..errors.base import AppError
-from ..errors.common import InternalServerError, InvalidArgumentError
+
+
+def map_service_errors_to_http_errors(service_exception: service_errors.ServiceError) -> AppError:
+    """
+    Map service-layer errors to appropriate HTTP errors.
+    """
+    service_to_http_error_map = [
+        ((service_errors.ModelDownloadFailedError, ), http_errors.InvalidArgumentError),
+        ((service_errors.ModelOperationInProgressError, ), http_errors.OperationConflictError),
+        ((service_errors.TritonCommunicationError, ), http_errors.DependencyBadGatewayError),
+        ((service_errors.InternalServerError, ), http_errors.InternalServerError),
+    ]
+
+    for service_error_classes, http_error_class in service_to_http_error_map:
+        if isinstance(service_exception, service_error_classes):
+            return http_error_class(service_exception.message)
+
+    return http_errors.InternalServerError(service_exception.message)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
-    app.add_exception_handler(InternalServerError, internal_error_handler)
+    app.add_exception_handler(service_errors.ServiceError, service_error_handler)
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, catch_all_handler)
 
@@ -59,14 +78,19 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
     return _problem_response(
         request,
-        InvalidArgumentError(
+        http_errors.InvalidArgumentError(
             message=json.dumps(error_messages),
         ),
     )
 
 
-async def internal_error_handler(request: Request, exc: InternalServerError) -> Response:
-    return _problem_response(request, InternalServerError("An unexpected error occurred."))
+async def service_error_handler(request: Request, exc: service_errors.ServiceError) -> Response:
+    """
+    Catch transport-agnostic service/domain errors and map them to HTTP-aware AppErrors.
+    """
+    app_err = map_service_errors_to_http_errors(exc)
+    # (Optional) log original exception & stacktrace here
+    return _problem_response(request, app_err)
 
 
 async def app_error_handler(request: Request, exc: AppError) -> Response:
@@ -74,7 +98,7 @@ async def app_error_handler(request: Request, exc: AppError) -> Response:
 
 
 async def catch_all_handler(request: Request, exc: Exception) -> Response:
-    return _problem_response(request, InternalServerError("An unexpected error occurred."))
+    return _problem_response(request, http_errors.InternalServerError("An unexpected error occurred."))
 
 
 def _normalize_validation_errors(exc: RequestValidationError) -> Dict[str, Any]:
