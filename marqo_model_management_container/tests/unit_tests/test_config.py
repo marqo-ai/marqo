@@ -1,10 +1,10 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo_model_management_container.config import Config, get_config
+from marqo_model_management_container.config import Config
 from marqo_model_management_container.core.settings import Settings
-from marqo_model_management_container.services.triton.triton_client import TritonClient
 from marqo_model_management_container.services.model_manager.model_manager import ModelManager
+from marqo_model_management_container.services.triton.triton_client import TritonClient
 
 
 class TestConfig(TestCase):
@@ -80,32 +80,6 @@ class TestConfig(TestCase):
                             model_base_dir=path,
                             triton_client=mock_triton_instance
                         )
-
-    def test_get_config_returns_config_instance(self):
-        """Test that get_config() returns a Config instance."""
-        with patch("os.environ", {}):
-            with patch("marqo_model_management_container.config.get_settings") as mock_get_settings:
-                mock_settings = Settings(_env_file=None)
-                mock_get_settings.return_value = mock_settings
-
-                config = get_config()
-
-                self.assertIsInstance(config, Config)
-                mock_get_settings.assert_called_once()
-
-    def test_get_config_uses_get_settings(self):
-        """Test that get_config() calls get_settings() to retrieve settings."""
-        with patch("marqo_model_management_container.config.get_settings") as mock_get_settings:
-            mock_settings = MagicMock(spec=Settings)
-            mock_settings.triton_url = "http://localhost:8000"
-            mock_settings.model_base_dir = "./cache/models"
-            mock_get_settings.return_value = mock_settings
-
-            with patch("marqo_model_management_container.config.TritonClient"), \
-                 patch("marqo_model_management_container.config.ModelManager"):
-                config = get_config()
-
-                mock_get_settings.assert_called_once()
 
     def test_config_components_are_accessible(self):
         """Test that Config components (triton_client, model_manager) are accessible and of correct type."""
