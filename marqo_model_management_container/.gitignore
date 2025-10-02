@@ -172,3 +172,6 @@ test-reports/
 # Temporary files
 *.tmp
 *.temp
+
+# Dockerfile
+compose.yaml
