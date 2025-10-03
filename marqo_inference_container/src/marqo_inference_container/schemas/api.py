@@ -135,9 +135,8 @@ class ModelConfig(AppImmutableBaseModel):
 class InferenceRequest(AppImmutableBaseModel):
     modality: Modality
     contents: List[str] = Field(min_length=1)
-    device: Optional[str] = Field(default=None)
     model_config_: ModelConfig = Field(alias='modelConfig')
-    preprocessing_config: TextPreprocessingConfig | ImagePreprocessingConfig = Field(validation_alias='preprocessingConfig', discriminator='modality')
+    preprocessing_config: TextPreprocessingConfig | ImagePreprocessingConfig = Field(alias='preprocessingConfig', discriminator='modality')
     use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
     return_individual_error: bool = Field(default=True, alias='returnIndividualError')

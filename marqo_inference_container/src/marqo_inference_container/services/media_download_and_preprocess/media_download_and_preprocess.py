@@ -10,7 +10,7 @@ from PIL.Image import Image
 from torch import Tensor
 
 from marqo_inference_container.api.telemetry import RequestMetrics, RequestMetricsStore
-from marqo_inference_container.errors.inference_errors import MediaDownloadError, PreprocessingError
+from marqo_inference_container.services.errors import MediaDownloadError, PreprocessingError
 from marqo_inference_container.schemas.api import (
     Modality,
     ImagePreprocessingConfig,

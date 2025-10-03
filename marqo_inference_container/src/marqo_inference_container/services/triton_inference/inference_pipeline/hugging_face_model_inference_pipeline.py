@@ -91,12 +91,12 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             batch_embeddings: List[ndarray] = self.model.encode(
                 inputs=batch,
                 modality=self.inference_request.modality,
-                normalize=self.inference_request.model_config.normalize_embeddings
+                normalize=self.inference_request.model_config_.normalize_embeddings
             )
             embeddings.extend(batch_embeddings)
 
         if len(embeddings) != len(content_to_encode):
-            raise ValueError("The number of embeddings does not match the number of contents")
+            raise Inter("The number of embeddings does not match the number of contents")
 
         return embeddings
 

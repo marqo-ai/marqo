@@ -1,6 +1,8 @@
-from marqo.inference.triton_inference.embedding_models.hugging_face.hugging_face_model_properties import HuggingFaceModelProperties
-from marqo.inference.triton_inference.embedding_models.open_clip.open_clip_model_properties import OpenCLIPModelProperties
 from typing import Union
+
+from marqo_inference_container.services.errors import InvalidModelPropertiesError
+from marqo_inference_container.services.triton_inference.embedding_models import HuggingFaceModelProperties, \
+    OpenCLIPModelProperties, HuggingFaceModel, OpenCLIPModel
 
 
 def parse_model_properties(model_properties: dict) -> Union[HuggingFaceModelProperties, OpenCLIPModelProperties]:
@@ -16,9 +18,22 @@ def parse_model_properties(model_properties: dict) -> Union[HuggingFaceModelProp
         ValueError: If the model type is not supported.
     """
     model_type = model_properties.get("type")
-    if model_type == "hugging_face":
-        return HuggingFaceModelProperties(**model_properties),
+    if model_type == "hf":
+        return HuggingFaceModelProperties(**model_properties)
     elif model_type == "open_clip":
         return OpenCLIPModelProperties(**model_properties)
     else:
-        raise ValueError(f"Unsupported model type: {model_type}")
+        raise InvalidModelPropertiesError(f"Unsupported model type: {model_type}")
+
+
+def get_model_loader(model_properties: dict):
+    """
+    Parse the model properties and return the appropriate model class.
+    """
+    model_type = model_properties.get("type")
+    if model_type == "hf":
+        return HuggingFaceModel
+    elif model_type == "open_clip":
+        return OpenCLIPModel
+    else:
+        raise InvalidModelPropertiesError(f"Unsupported model type: {model_type}")

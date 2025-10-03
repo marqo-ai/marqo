@@ -1,26 +1,29 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List
 
 from numpy import ndarray
 
 from marqo_inference_container.schemas.api import Modality
+from marqo_inference_container.services.triton_inference.model_manager.model_management_client import ModelManagementClient
+from marqo_inference_container.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
-    def __init__(self, model_properties: dict, device: str, model_auth: Optional = None):
+    def __init__(self, model_properties: dict, model_management_client: ModelManagementClient, triton_client: TritonGRPCClient):
         """Load the model with the given properties.
 
         Args:
             model_properties (dict): The properties of the model.
-            device (str): The device to load the model on.
-            model_auth (dict): The authentication information for the model.
+            model_management_client(ModelManagementClient): The client communicating with the
+                marqo_model_management_container
+            triton_client (TritonGRPCClient): The gRPC client to use for communicating with the Triton Inference Server.
         """
 
         self.model_properties = model_properties
-        self.device = device
-        self.model_auth = model_auth
+        self.model_management_client = model_management_client
+        self.triton_client = triton_client
 
     def load(self):
         """Load the model and check if the necessary component are loaded.
@@ -65,4 +68,13 @@ class AbstractEmbeddingModel(ABC):
     @abstractmethod
     def get_preprocessor(self):
         """Get the preprocessor for the model."""
+        pass
+
+    @abstractmethod
+    def unload(self, remove_files: bool = False):
+        """Unload the model from the Triton Inference Server.
+
+        Args:
+            remove_files (bool): Whether to remove the model files from disk after unloading.
+        """
         pass

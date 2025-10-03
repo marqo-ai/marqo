@@ -54,6 +54,6 @@ class HuggingFaceModelProperties(BaseModelProperties):
     name: str
     tokens: int = 128
     note: Optional[str] = None
-    pooling_method: PoolingMethod = Field(..., validation_alias="poolingMethod")
+    pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
     type: Literal["hf"]
     triton_text_encoder: HFTritonModelProperties = Field(..., alias="tritonTextEncoder")

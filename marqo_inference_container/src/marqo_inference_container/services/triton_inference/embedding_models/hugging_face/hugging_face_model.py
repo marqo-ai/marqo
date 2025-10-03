@@ -1,4 +1,4 @@
-from typing import List, Optional, Callable
+from typing import List, Callable
 
 import numpy as np
 from numpy import ndarray
@@ -6,16 +6,16 @@ from pydantic import ValidationError
 from transformers import (AutoTokenizer)
 from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
 
-from marqo_inference_container.errors.common_errors import InternalError
-from marqo_inference_container.errors.inference_errors import InvalidModelPropertiesError
 from marqo_inference_container.schemas.api import Modality
+from marqo_inference_container.services.errors import InternalServerError, InvalidModelPropertiesError
 from marqo_inference_container.services.triton_inference.embedding_models.abstract_embedding_model import \
     AbstractEmbeddingModel
 from marqo_inference_container.services.triton_inference.embedding_models.abstract_preprocessor import \
     AbstractPreprocessor
 from marqo_inference_container.services.triton_inference.embedding_models.hugging_face.hugging_face_model_properties import (
     HuggingFaceModelProperties, PoolingMethod)
-from marqo_inference_container.services.triton_inference.model_manager.model_manager import TritonModelManager
+from marqo_inference_container.services.triton_inference.model_manager.model_management_client import ModelManagementClient
+from marqo_inference_container.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 
 
 class HuggingFacePreprocessor(AbstractPreprocessor):
@@ -34,19 +34,18 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
     def __init__(
             self,
-            triton_client,
-            model_properties: Optional[dict] = None,
-            model_manager: Optional[TritonModelManager] = None,
+            model_properties: dict,
+            model_management_client: ModelManagementClient,
+            triton_client: TritonGRPCClient,
     ):
-        super().__init__(model_properties=model_properties, device="cpu", model_auth=None)
+        super().__init__(model_properties=model_properties, model_management_client=model_management_client, triton_client=triton_client)
 
         self.model_properties: HuggingFaceModelProperties = self._build_model_properties(model_properties)
-        self.model_manager: TritonModelManager = model_manager
-        self.triton_client = triton_client
 
         self._tokenizer = None
         self._pooling_func = None
         self._preprocessor = HuggingFacePreprocessor()
+        self._model = None
 
     def _build_model_properties(self, model_properties: dict) -> HuggingFaceModelProperties:
         """Convert the user input model_properties to HuggingFaceModelProperties."""
@@ -60,9 +59,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
     def _check_loaded_components(self):
         if self._tokenizer is None:
-            raise InternalError("Tokenizer is not loaded!")
+            raise InternalServerError("Tokenizer is not loaded!")
         if self._pooling_func is None:
-            raise InternalError("Pooling function is not loaded!")
+            raise InternalServerError("Pooling function is not loaded!")
 
     def _load_necessary_components(self):
         """Load the necessary components for the hf model.
@@ -74,12 +73,14 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_properties.name)
         self._pooling_func = self._load_pooling_method()
 
-        self._load_triton_model()
+        self.model = self._load_triton_model()
 
-    def _load_triton_model(self):
-        self.model_manager.load_model(
+    def _load_triton_model(self) -> bool:
+        """Load the model into Triton Inference Server using the model management client."""
+        self.model_management_client.load_model(
             model_properties=self.model_properties.triton_text_encoder.model_dump(by_alias=True)
         )
+        return True
 
     def _load_pooling_method(self) -> Callable:
         """Load the pooling method for the model."""
@@ -88,12 +89,12 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         elif self.model_properties.pooling_method == PoolingMethod.CLS:
             return self._cls_pool_func
         else:
-            raise InternalError(f"Invalid pooling method: {self.model_properties.pooling_method}")
+            raise InternalServerError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
     def encode(self, inputs: List[str], modality, normalize=True) -> List[ndarray]:
 
         if not isinstance(inputs, list) or not isinstance(inputs[0], str):
-            raise ValueError(f"The input data should be a list of strings, but received: {inputs}")
+            raise InternalServerError(f"The input data should be a list of strings, but received: {inputs}")
 
         # Tokenize the input texts
         encoded_input = self._tokenizer(
@@ -129,7 +130,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         return [single_ndarray for single_ndarray in embeddings]
 
     @staticmethod
-    def _average_pool_func(model_output, attention_mask):
+    def _average_pool_func(model_output: ndarray, attention_mask):
         """A pooling function that averages the hidden states of the model."""
         attn = attention_mask.astype(np.float32)  # [B, T]
         mask = attn[..., None]  # [B, T, 1]
@@ -139,9 +140,13 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         return emb
 
     @staticmethod
-    def _cls_pool_func(model_output, attention_mask=None):
+    def _cls_pool_func(model_output: ndarray, attention_mask):
         """A pooling function that extracts the CLS token from the model."""
         return model_output[0][:, 0]
 
     def get_preprocessor(self):
         return self._preprocessor
+
+    def unload(self, remove_files: bool = False):
+        for model in [self.model_properties.triton_text_encoder]:
+            self.model_management_client.unload_model(model.name, remove_files=remove_files)

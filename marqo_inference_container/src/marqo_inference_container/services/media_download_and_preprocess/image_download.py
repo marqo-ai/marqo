@@ -15,9 +15,9 @@ from torch import Tensor
 
 from marqo_inference_container import marqo_docs
 from marqo_inference_container.core.settings import get_settings
-from marqo_inference_container.errors.common_errors import InternalError
+from marqo_inference_container.services.errors import InternalServerError
 from marqo_inference_container.api.telemetry import RequestMetrics
-from marqo_inference_container.errors.inference_errors import ImageDownloadError
+from marqo_inference_container.services.errors import ImageDownloadError
 
 # TODO Merge this with the one in clip_utils in the future refactoring
 
@@ -269,7 +269,7 @@ def download_image_from_url(image_path: str, media_download_headers: dict, timeo
     """
 
     if not isinstance(timeout_ms, int):
-        raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
+        raise InternalServerError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
 
     try:
         encoded_url = encode_url(image_path)

@@ -1,0 +1,38 @@
+16/10/24 - All embeddings were generated with:
+- Marqo mainline head: 055237ae6c4a8121b4026650582f3a23bd416564 (2.12.2 release notes)
+- Python 3.8.20
+- open_clip_torch==2.24.0
+- torch==1.12.1
+- Ubuntu 22.04.4 LTS
+- g4dn.xlarge EC2 instance
+
+
+23/12/2024 - New embeddings generated (replacing old ones)
+- test_encoding.py: ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
+- test_large_model_encoding.py: [
+            'open_clip/ViT-L-14/laion400m_e32',
+            'Marqo/ViT-L-14.laion400m_e32',
+            'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
+            'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
+            'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
+            'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
+            'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+            'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k',
+            'open_clip/ViT-H-14-378-quickgelu/dfn5b',
+            'open_clip/ViT-SO400M-14-SigLIP-384/webli',
+            "visheratin/nllb-siglip-mrl-large",
+            "visheratin/nllb-clip-large-siglip",
+            "visheratin/nllb-siglip-mrl-base",
+            "visheratin/nllb-clip-base-siglip"
+        ]
+Environment Used
+- Deep Learning AMI GPU PyTorch 1.13.1 (Ubuntu 20.04) 20230530
+- g4dn.2xlarge
+- Python 3.8.20
+- All requirements downloaded from marqo & marqo-base with these commits:
+  - marqo: 5c458246c87d5ebbe81db536cef7d49a908111fa (Generate coverage report...)
+  - marqo-base: f82230153e770b28a5d91f4b538861718409f097 (Add hf_transfer to our dependencies)
+
+pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+pip install -r marqo/requirements.dev.txt
+pip install pytest==7.4.0

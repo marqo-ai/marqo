@@ -1,4 +1,4 @@
-from marqo_inference_container.errors.inference_errors import UnsupportedModelError
+from marqo_inference_container.services.errors import UnsupportedModelError
 
 _MODEL_REGISTRY: dict[str, dict] = {
     "marqo/marqo-fashionSigLIP": {
@@ -45,16 +45,16 @@ _MODEL_REGISTRY: dict[str, dict] = {
         }
     },
 
-    "hf/e5-small-v2": {
+    "hf/e5-base-v2": {
         "name": "intfloat/e5-base-v2",
         "dimensions": 768,
         "type": "hf",
         "poolingMethod": "mean",
         "tritonTextEncoder": {
             "maxBatchSize": 32,
-            "name": "e5-small-v2",
+            "name": "e5-base-v2-text-encoder",
             "sources": [
-                "https://huggingface.co/intfloat/e5-base-v2/resolve/main/onnx/model.onnx"],
+                "s3://marqo-opensource-models/infloat-e5-base-v2/model.onnx"],
             "input": [
                 {
                     "name": "input_ids",
@@ -82,6 +82,43 @@ _MODEL_REGISTRY: dict[str, dict] = {
         }
     },
 
+    "hf/e5-small-v2": {
+        "name": "intfloat/e5-small-v2",
+        "dimensions": 384,
+        "type": "hf",
+        "poolingMethod": "mean",
+        "tritonTextEncoder": {
+            "maxBatchSize": 32,
+            "name": "e5-small-v2-text-encoder",
+            "sources": [
+                "s3://marqo-opensource-models/infloat-e5-small-v2/model.onnx"],
+            "input": [
+                {
+                    "name": "input_ids",
+                    "dims": [-1],
+                    "dataType": "TYPE_INT64"
+                },
+                {
+                    "name": "attention_mask",
+                    "dims": [-1],
+                    "dataType": "TYPE_INT64"
+                },
+                {
+                    "name": "token_type_ids",
+                    "dims": [-1],
+                    "dataType": "TYPE_INT64"
+                }
+            ],
+            "output": [
+                {
+                    "name": "last_hidden_state",
+                    "dims": [-1, 384],
+                    "dataType": "TYPE_FP32"
+                }
+            ]
+        }
+    },
+
     "hf/all-MiniLM-L6-v2": {
         "name": "sentence-transformers/all-MiniLM-L6-v2",
         "dimensions": 384,
@@ -89,9 +126,9 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "poolingMethod": "mean",
         "tritonTextEncoder": {
             "maxBatchSize": 16,
-            "name": "all-MiniLM-L6-v2",
+            "name": "all-MiniLM-L6-v2-text-encoder",
             "sources": [
-                "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"],
+                "s3://marqo-opensource-models/sentence-transformers-all-minilm-l6-v2/model.onnx"],
             "input": [
                 {
                     "name": "input_ids",

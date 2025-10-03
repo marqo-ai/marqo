@@ -33,7 +33,7 @@ class ModelInput(ModelBaseModel):
     """
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., validation_alias='dataType')
+    data_type: DataType = Field(..., alias='dataType')
 
 
 class ModelOutput(ModelBaseModel):
@@ -47,7 +47,7 @@ class ModelOutput(ModelBaseModel):
     """
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., validation_alias='dataType')
+    data_type: DataType = Field(..., alias='dataType')
 
 
 class TritonModelProperties(ModelBaseModel):
@@ -64,10 +64,10 @@ class TritonModelProperties(ModelBaseModel):
         input (list[ModelInput]): A list of input definitions for the model. Supports 1 to 3 inputs.
     """
     name: str
-    max_batch_size: int = Field(8, validation_alias='maxBatchSize', gt=0, le=128)
-    sources: list[str] = Field(..., validation_alias='sources', min_length=1, max_length=5)
-    output: list[ModelOutput] = Field(..., validation_alias='output', min_length=1, max_length=1)
-    input: list[ModelInput] = Field(..., validation_alias='input', min_length=1, max_length=3)
+    max_batch_size: int = Field(8, alias='maxBatchSize', gt=0, le=128)
+    sources: list[str] = Field(..., alias='sources', min_length=1, max_length=5)
+    output: list[ModelOutput] = Field(..., alias='output', min_length=1, max_length=1)
+    input: list[ModelInput] = Field(..., alias='input', min_length=1, max_length=3)
 
     @field_validator('sources', mode="after")
     @classmethod

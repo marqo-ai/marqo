@@ -1,7 +1,7 @@
-from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo_inference_container.services.triton_inference.embedding_models.base_model_properties import BaseModelProperties
 
 
-class RandomModelProperties(MarqoBaseModelProperties):
+class RandomModelProperties(BaseModelProperties):
     """
     A class to represent the properties of a random model.
 

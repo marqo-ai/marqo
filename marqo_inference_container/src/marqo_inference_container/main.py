@@ -13,9 +13,10 @@ from .api.otel import bootstrap_otel
 from .api.telemetry import TelemetryMiddleware
 from .config import Config, get_config
 from .core.logging import get_logger
-from .errors.inference_errors import InferenceError
 from .on_start_script import on_start
 from .schemas.api import InferenceRequest
+from .services.errors import ServiceError
+from .services.triton_inference.model_manager import model_manager
 
 logger = get_logger(__name__)
 
@@ -104,7 +105,7 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
     # Generate embeddings
     try:
         result = config.local_inference.vectorise(inference_request)
-    except InferenceError as e:
+    except ServiceError as e:
         # TODO distinguish recoverable error from unrecoverable error, return different error code
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -135,7 +136,7 @@ def _check_content_type_msgpack(request):
 
 
 @app.get("/healthz", include_in_schema=False)
-def liveness_check(config: Config = Depends(get_config)) -> JSONResponse:
+def liveness_check() -> JSONResponse:
     """
     This liveness check endpoint does a quick status check, and error out if any component encounters unrecoverable
     issues. This only does a check on the cuda devices right now.
@@ -145,18 +146,17 @@ def liveness_check(config: Config = Depends(get_config)) -> JSONResponse:
         200 - if all checks pass
         500 - if any check fails
     """
-    config.device_manager.cuda_device_health_check()
     return JSONResponse(content={"status": "ok"}, status_code=200)
 
 
 @app.get("/models")
-def get_loaded_models(config: Config = Depends(get_config)):
-    return config.model_manager.get_loaded_models()
+def get_loaded_models(detailed: bool=False):
+    return model_manager.get_loaded_models(detailed=detailed)
 
 
 @app.delete("/models")
-def eject_model(model_name: str, model_device: str, config: Config = Depends(get_config)):
-    return config.model_manager.eject_model(model_name, model_device)
+def eject_model(model_name: str):
+    return model_manager.eject_model(model_name)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Callable, Tuple
+from typing import List, Callable, Tuple
 
 import numpy as np
 import open_clip
@@ -6,23 +6,24 @@ import torch
 from PIL.Image import Image
 from numpy import ndarray
 from open_clip.transform import image_transform_v2
-from pydantic.v1 import ValidationError
+from pydantic import ValidationError
 from torch import Tensor
 from torchvision.transforms import Compose
 from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
 
 from marqo_inference_container import marqo_docs
 from marqo_inference_container.core.logging import get_logger
-from marqo_inference_container.errors.common_errors import InternalError
-from marqo_inference_container.errors.common_errors import InvalidModelPropertiesError
-from marqo_inference_container.services.triton_inference.embedding_models.abstract_clip_model import AbstractCLIPModel
-from marqo_inference_container.services.triton_inference.embedding_models.abstract_clip_model import \
-    AbstractCLIPPreprocessor
+from marqo_inference_container.schemas.api import Modality
+from marqo_inference_container.services.errors import InternalServerError, InvalidModelPropertiesError
+from marqo_inference_container.services.triton_inference.embedding_models.abstract_embedding_model import \
+    AbstractEmbeddingModel
+from marqo_inference_container.services.triton_inference.embedding_models.abstract_preprocessor import \
+    AbstractPreprocessor
 from marqo_inference_container.services.triton_inference.embedding_models.model_download_cache import ModelDownloadCache
 from marqo_inference_container.services.triton_inference.embedding_models.open_clip.hf_tokenizer import HFTokenizer
 from marqo_inference_container.services.triton_inference.embedding_models.open_clip.open_clip_model_properties import \
     OpenCLIPModelProperties
-from marqo_inference_container.services.triton_inference.model_manager.model_manager import TritonModelManager
+from marqo_inference_container.services.triton_inference.model_manager.model_management_client import ModelManagementClient
 from marqo_inference_container.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 
 logger = get_logger(__name__)
@@ -31,11 +32,34 @@ HF_HUB_PREFIX = "hf-hub:"
 MARQO_OPEN_CLIP_REGISTRY_PREFIX = "open_clip/"
 
 
-class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
+class OpenCLIPPreprocessor(AbstractPreprocessor):
 
-    def __init__(self, tokenizer, image_preprocessor, device: str):
-        super().__init__(tokenizer, image_preprocessor)
-        self.device = device
+    def __init__(self, tokenizer, image_preprocessor):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.image_preprocessor = image_preprocessor
+
+    def preprocess(self, inputs: list, modality: Modality) -> list:
+        """
+        Preprocess the inputs based on the modality.
+        Args:
+            inputs: A list of inputs to preprocess. The individual elements of the list
+                is model specific.
+            modality: The modality of the input data. It can be either 'text' or 'image'.
+
+        Returns:
+            A list of preprocessed inputs. The individual elements of the list
+                is model specific.
+        """
+        if modality == Modality.TEXT:
+            return self._tokenize_text(inputs)
+        elif modality == Modality.IMAGE:
+            return self._preprocess_image(inputs)
+        else:
+            raise InternalServerError(
+                f"Unsupported modality: {modality}. Supported modalities are '{Modality.TEXT.value}'and "
+                f"'{Modality.IMAGE.value}', but received '{modality.value}' "
+            )
 
     def _tokenize_text(self, inputs: list[str]) -> list[str]:
         """
@@ -63,21 +87,17 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
         return [self.image_preprocessor(image).unsqueeze(0).to(self.device) for image in inputs]
 
 
-class OpenCLIPModel(AbstractCLIPModel):
+class OpenCLIPModel(AbstractEmbeddingModel):
     def __init__(
             self,
-            triton_client,
-            model_properties: Optional[Dict] = None,
-            model_auth=None,
-            model_manager=None,
+            model_properties: dict,
+            model_management_client: ModelManagementClient,
+            triton_client: TritonGRPCClient,
+
     ) -> None:
+        super().__init__(model_properties=model_properties, model_management_client=model_management_client, triton_client=triton_client)
 
-        super().__init__(device="cpu", model_properties=model_properties, model_auth=model_auth)
-
-        self.model_properties = self._build_model_properties(model_properties)
-        self.triton_client: TritonGRPCClient = triton_client
-        self.model_manager: TritonModelManager = model_manager
-
+        self.model_properties = self._build_model_properties(self.model_properties)
         self.image_preprocessor_config = None
 
     def _build_model_properties(self, model_properties: dict) -> OpenCLIPModelProperties:
@@ -104,17 +124,16 @@ class OpenCLIPModel(AbstractCLIPModel):
             )
 
         self.model = self._load_triton_model()
-        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.image_preprocessor, device=self.device)
+        self.preprocessor = OpenCLIPPreprocessor(self.tokenizer, self.image_preprocessor)
 
-    def _load_triton_model(self) -> None:
-        self.model_manager.load_model(
+    def _load_triton_model(self) -> bool:
+        self.model_management_client.load_model(
             self.model_properties.triton_image_encoder.model_dump(by_alias=True)
         )
 
-        self.model_manager.load_model(
+        self.model_management_client.load_model(
             self.model_properties.triton_text_encoder.model_dump(by_alias=True)
         )
-
         return True
 
     def get_preprocessor(self) -> OpenCLIPPreprocessor:
@@ -144,7 +163,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         """
         model, _, preprocess = open_clip.create_model_and_transforms(
             model_name=self.model_properties.name,
-            device=self.device,
+            device="cpu",
             cache_dir=ModelDownloadCache.open_clip_cache_path,
         )
         return model, preprocess
@@ -160,7 +179,7 @@ class OpenCLIPModel(AbstractCLIPModel):
         model, _, preprocess = open_clip.create_model_and_transforms(
             model_name=architecture,
             pretrained=pretrained,
-            device=self.device,
+            device="cpu",
             cache_dir=ModelDownloadCache.open_clip_cache_path
         )
         return model, preprocess
@@ -181,6 +200,17 @@ class OpenCLIPModel(AbstractCLIPModel):
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
         return open_clip.get_tokenizer(self.model_properties.name.split("/", 3)[1])
+
+    def encode(self, inputs: List, modality: Modality, normalize: bool) -> List[ndarray]:
+        if modality == Modality.TEXT:
+            return self.encode_text(inputs, normalize=normalize)
+        elif modality == Modality.IMAGE:
+            return self.encode_image(inputs, normalize=normalize)
+        else:
+            raise InternalServerError(
+                f"Unsupported modality: {modality}. Supported modalities are '{Modality.TEXT.value}'and "
+                f"'{Modality.IMAGE.value}', but received '{modality.value}' "
+            )
 
     def encode_image(self, images: List[Tensor], normalize=True) -> List[ndarray]:
 
@@ -211,7 +241,7 @@ class OpenCLIPModel(AbstractCLIPModel):
             embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
         if embeddings.shape != (len(images), self.model_properties.dimensions):
-            raise InternalError(
+            raise InternalServerError(
                 f"The shape of the text embeddings {embeddings.shape} does not match the expected shape "
                 f"({len(images)}, {self.model_properties.dimensions})"
             )
@@ -245,8 +275,12 @@ class OpenCLIPModel(AbstractCLIPModel):
             embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
         if embeddings.shape != (len(text), self.model_properties.dimensions):
-            raise InternalError(
+            raise InternalServerError(
                 f"The shape of the text embeddings {embeddings.shape} does not match the expected shape "
                 f"({len(text)}, {self.model_properties.dimensions})"
             )
         return [embeddings[i] for i in range(embeddings.shape[0])]
+
+    def unload(self, remove_files: bool = False):
+        for model in [self.model_properties.triton_image_encoder, self.model_properties.triton_text_encoder]:
+            self.model_management_client.unload_model(model.name, remove_files=remove_files)
