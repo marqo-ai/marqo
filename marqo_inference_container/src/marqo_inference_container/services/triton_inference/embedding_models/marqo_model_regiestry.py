@@ -205,7 +205,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "name": "timm-ViT-L-16-SigLIP2-256-text-encoder",
             "sources": [
                 "s3://marqo-opensource-models/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx",
-                "s3://marqo-opensource-models/timm-ViT-L-16-SigLIP2-256/text-encoder/weights.bin"
+                "s3://marqo-opensource-models/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx.data"
             ],
             "input": [
                 {
