@@ -553,7 +553,7 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     return model_properties
 
 
-def get_triton_model_properties(model_name: str) -> dict:
+def get_triton_model_properties_from_registry(model_name: str) -> dict:
     _MODEL_REGISTRY: dict[str, dict] = {
         "Marqo/marqo-fashionCLIP": {
             "name": "hf-hub:Marqo/marqo-fashionCLIP",
