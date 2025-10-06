@@ -334,7 +334,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
                 "output": [
                     {
                         "name": "output",
-                        "dims": [768],
+                        "dims": [512],
                         "dataType": "TYPE_FP32"
                     }
                 ]
