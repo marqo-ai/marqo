@@ -280,6 +280,15 @@ public class HybridSearcher extends Searcher {
 
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
+                hitsForPostProcessing =
+                        rrf(
+                                resultTensor.hits(),
+                                resultLexical.hits(),
+                                rrf_k,
+                                alpha,
+                                verbose,
+                                collapse);
+
                 if (offset > 0) {
                     // Simulate previous page result. Please note that the tensor result might not
                     // be accurate unless
@@ -332,25 +341,13 @@ public class HybridSearcher extends Searcher {
 
                     // Remove previous page results
                     for (Hit hit : hitsOfPreviousPages) {
-                        resultTensor.hits().remove(hit.getId());
-                        resultLexical.hits().remove(hit.getId());
+                        hitsForPostProcessing.remove(hit.getId());
                     }
-                    logIfVerbose("Tensor Hit Group after removing previous page result: ", verbose);
-                    logHitGroup(resultTensor.hits(), verbose);
-
                     logIfVerbose(
-                            "Lexical Hit Group after removing previous page result: ", verbose);
-                    logHitGroup(resultLexical.hits(), verbose);
+                            "hitsForPostProcessing after removing previous page result: ", verbose);
+                    logHitGroup(hitsForPostProcessing, verbose);
                 }
 
-                hitsForPostProcessing =
-                        rrf(
-                                resultTensor.hits(),
-                                resultLexical.hits(),
-                                rrf_k,
-                                alpha,
-                                verbose,
-                                collapse);
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
@@ -395,7 +392,7 @@ public class HybridSearcher extends Searcher {
                             rerankDepthGlobal,
                             limit,
                             offset,
-                            needToTrimPreviousPages,
+                            isRelevanceCutoffMethodEnabled,
                             verbose);
         }
 

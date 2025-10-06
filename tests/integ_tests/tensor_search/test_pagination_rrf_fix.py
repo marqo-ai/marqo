@@ -52,7 +52,7 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
             rankingMethod=RankingMethod.RRF,
             queryTensor='machine learning',
             queryLexical='EXACT QUERY',
-            # verbose=True,
+            verbose=True,
         )
 
     def tearDown(self):
@@ -182,22 +182,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
 
-        After fusion:
-        doc_B1: 0.016208
-        doc_B2: 0.015823
-        doc_B4: 0.014734   (MISSED)
-        doc_B3: 0.014690   (MISSED)
-        doc_B5: 0.014412   (MISSED)
-        doc_T1: 0.011111   <- Start from here  (DUP)
-        doc_T2: 0.010938   (DUP)
-        doc_T3: 0.010769   (DUP)
-        doc_T4: 0.010606
-        doc_T5: 0.010294
-        doc_L1: 0.004839   <- Trimmed off from here
-        doc_L2: 0.004762
-        doc_L3: 0.004688
-        doc_L4: 0.004615
-        doc_L5: 0.004478
+        After fusion:                                     After fix:           In previous pages?
+        doc_B1: 0.016208                                  doc_B1: 0.016208     yes
+        doc_B2: 0.015823                                  doc_B2: 0.015823     yes
+        doc_B4: 0.014734   (MISSED)                       doc_B4: 0.014734
+        doc_B3: 0.014690   (MISSED)                       doc_B3: 0.014690
+        doc_B5: 0.014412   (MISSED)                       doc_B5: 0.014412
+        doc_T1: 0.011111   <- Start from here  (DUP)      doc_T1: 0.011111     yes
+        doc_T2: 0.010938   (DUP)                          doc_T2: 0.010938     yes
+        doc_T3: 0.010769   (DUP)                          doc_T3: 0.010769     yes
+        doc_T4: 0.010606                                  doc_T4: 0.010606
+        doc_T5: 0.010294                                  doc_T5: 0.010294
+        doc_L1: 0.004839   <- Trimmed off from here       doc_L1: 0.004839     <- Trimmed off from here
+        doc_L2: 0.004762                                  doc_L2: 0.004762
+        doc_L3: 0.004688                                  doc_L3: 0.004688
+        doc_L4: 0.004615                                  doc_L4: 0.004615
+        doc_L5: 0.004478                                  doc_L5: 0.004478
 
         =======================================================
         Page 3:
@@ -218,22 +218,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                                       doc_L4: 0.009459
                                       doc_L2: 0.009333
 
-        After fusion:
-        doc_B1: 0.016208
-        doc_B2: 0.015823
-        doc_B4: 0.014734    (MISSED)
-        doc_L1: 0.014698    (MISSED)
-        doc_B3: 0.014690    (MISSED)
-        doc_B5: 0.014412    (MISSED)
-        doc_L3: 0.014277    (MISSED)
-        doc_L5: 0.014200    (MISSED)
-        doc_L2: 0.014095    (MISSED)
-        doc_L4: 0.014074    (MISSED)
-        doc_T1: 0.011111    <- Start from here (DUP)
-        doc_T2: 0.010938    (DUP)
-        doc_T3: 0.010769    (DUP)
-        doc_T4: 0.010606    (DUP)
-        doc_T5: 0.010294    (DUP)
+        After fusion:                                      After Fix:          In previous pages?
+        doc_B1: 0.016208                                   doc_B1: 0.016208    yes
+        doc_B2: 0.015823                                   doc_B2: 0.015823    yes
+        doc_B4: 0.014734    (MISSED)                       doc_B4: 0.014734    yes
+        doc_L1: 0.014698    (MISSED)                       doc_L1: 0.014698
+        doc_B3: 0.014690    (MISSED)                       doc_B3: 0.014690    yes
+        doc_B5: 0.014412    (MISSED)                       doc_B5: 0.014412    yes
+        doc_L3: 0.014277    (MISSED)                       doc_L3: 0.014277
+        doc_L5: 0.014200    (MISSED)                       doc_L5: 0.014200
+        doc_L2: 0.014095    (MISSED)                       doc_L2: 0.014095    
+        doc_L4: 0.014074    (MISSED)                       doc_L4: 0.014074
+        doc_T1: 0.011111    <- Start from here (DUP)       doc_T1: 0.011111    yes
+        doc_T2: 0.010938    (DUP)                          doc_T2: 0.010938    yes
+        doc_T3: 0.010769    (DUP)                          doc_T3: 0.010769    yes
+        doc_T4: 0.010606    (DUP)                          doc_T4: 0.010606    yes
+        doc_T5: 0.010294    (DUP)                          doc_T5: 0.010294    yes
         """
         # Test with page size 5 for clean 3-page pagination (15 docs = 3 pages)
         page_size = 5
@@ -261,9 +261,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         # Page 1
         self.assertEqual(['doc_B1', 'doc_B2', 'doc_T1', 'doc_T2', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
         # Page 2
-        self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
+        # self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
+        self.assertEqual(['doc_B4', 'doc_B3', 'doc_B5', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
         # Page 3
-        self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        # self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_unstable_tensor_ranking(self):
@@ -326,22 +328,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
 
-        After fusion:
-        doc_B1: 0.015856
-        doc_B2: 0.015459
-        doc_B3: 0.014690   (MISSED)
-        doc_B4: 0.014580   (MISSED)
-        doc_B5: 0.014412   (MISSED)
-        doc_T5: 0.011475   <- Start from here
-        doc_T2: 0.011290   (DUP)
-        doc_T1: 0.010769   (DUP)
-        doc_T3: 0.010606   (DUP)
-        doc_T4: 0.010448
-        doc_L1: 0.004839   <- Trimmed off from here
-        doc_L2: 0.004762
-        doc_L3: 0.004688
-        doc_L4: 0.004615
-        doc_L5: 0.004478
+        After fusion:                                   After fix:           In previous pages?
+        doc_B1: 0.015856                                doc_B1: 0.015856     yes
+        doc_B2: 0.015459                                doc_B2: 0.015459     yes
+        doc_B3: 0.014690   (MISSED)                     doc_B3: 0.014690
+        doc_B4: 0.014580   (MISSED)                     doc_B4: 0.014580
+        doc_B5: 0.014412   (MISSED)                     doc_B5: 0.014412
+        doc_T5: 0.011475   <- Start from here           doc_T5: 0.011475     (yes) -> supposed to be no
+        doc_T2: 0.011290   (DUP)                        doc_T2: 0.011290     yes
+        doc_T1: 0.010769   (DUP)                        doc_T1: 0.010769     yes
+        doc_T3: 0.010606   (DUP)                        doc_T3: 0.010606     (no) -> supposed to be yes
+        doc_T4: 0.010448                                doc_T4: 0.010448
+        doc_L1: 0.004839   <- Trimmed off from here     doc_L1: 0.004839     <- Trimmed off from here
+        doc_L2: 0.004762                                doc_L2: 0.004762
+        doc_L3: 0.004688                                doc_L3: 0.004688
+        doc_L4: 0.004615                                doc_L4: 0.004615
+        doc_L5: 0.004478                                doc_L5: 0.004478
 
         =======================================================
         Page 3:
@@ -362,22 +364,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                                       doc_L4: 0.009459
                                       doc_L2: 0.009333
 
-        After fusion:
-        doc_B1: 0.015856
-        doc_B2: 0.015459
-        doc_L1: 0.014698    (MISSED)
-        doc_B3: 0.014690    (MISSED)
-        doc_B4: 0.014580    (MISSED)
-        doc_B5: 0.014412    (MISSED)
-        doc_L3: 0.014277    (MISSED)
-        doc_L5: 0.014200    (MISSED)
-        doc_L2: 0.014095    (MISSED)
-        doc_L4: 0.014074    (MISSED)
-        doc_T5: 0.011475    <- Start from here (DUP)
-        doc_T2: 0.011290    (DUP)
-        doc_T1: 0.010769    (DUP)
-        doc_T3: 0.010606    (DUP)
-        doc_T4: 0.010448    (DUP)
+        After fusion:                                    After fix:           In previous pages?
+        doc_B1: 0.015856                                 doc_B1: 0.015856     yes
+        doc_B2: 0.015459                                 doc_B2: 0.015459     yes
+        doc_L1: 0.014698    (MISSED)                     doc_L1: 0.014698
+        doc_B3: 0.014690    (MISSED)                     doc_B3: 0.014690     yes
+        doc_B4: 0.014580    (MISSED)                     doc_B4: 0.014580     yes
+        doc_B5: 0.014412    (MISSED)                     doc_B5: 0.014412     yes
+        doc_L3: 0.014277    (MISSED)                     doc_L3: 0.014277
+        doc_L5: 0.014200    (MISSED)                     doc_L5: 0.014200
+        doc_L2: 0.014095    (MISSED)                     doc_L2: 0.014095
+        doc_L4: 0.014074    (MISSED)                     doc_L4: 0.014074
+        doc_T5: 0.011475    <- Start from here (DUP)     doc_T5: 0.011475     yes
+        doc_T2: 0.011290    (DUP)                        doc_T2: 0.011290     yes
+        doc_T1: 0.010769    (DUP)                        doc_T1: 0.010769     yes
+        doc_T3: 0.010606    (DUP)                        doc_T3: 0.010606     yes
+        doc_T4: 0.010448    (DUP)                        doc_T4: 0.010448     yes
         """
         # Test with page size 5 for clean 3-page pagination (15 docs = 3 pages)
         page_size = 5
@@ -409,11 +411,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         # Page 1
         self.assertEqual(['doc_B1', 'doc_T2', 'doc_B2', 'doc_T1', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
         # Page 2
-        self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
-                         [h['_id'] for h in all_paginated_hits[5:-5]])
+        # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
+        self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
         # Page 3
-        self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
-                         [h['_id'] for h in all_paginated_hits[-5:]])
+        # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[-5:]])
+        self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_global_modifiers_no_rerank_depth(self):
