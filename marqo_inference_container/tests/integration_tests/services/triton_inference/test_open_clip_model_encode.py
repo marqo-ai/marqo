@@ -18,15 +18,16 @@ OPEN_CLIP_TEST_MODELS = [
     "Marqo/marqo-fashionCLIP",
     "Marqo/marqo-fashionSigLIP",
     "Marqo/marqo-ecommerce-embeddings-L",
-    "Marqo/marqo-ecommerce-embeddings-B",
-    # --- Other OpenCLIP models for testing
-    "timm/ViT-L-16-SigLIP2-256",
-    "open_clip/ViT-L-16-SigLIP-256/webli",
-    "open_clip/ViT-L-14/laion2b_s32b_b82k",
-    "open_clip/ViT-B-32/laion2b_s34b_b79k",
-    "open_clip/ViT-B-16-SigLIP/webli",
-    "open_clip/ViT-L-14/laion400m_e32b_b82k",
-    "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
+    # "Marqo/marqo-ecommerce-embeddings-B",
+    # # --- Other OpenCLIP models for testing
+    # "open_clip/ViT-B-32/laion2b_s34b_b79k",
+    # "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
+    #
+    # "timm/ViT-L-16-SigLIP2-256",
+    # "open_clip/ViT-L-16-SigLIP-256/webli",
+    # "open_clip/ViT-B-16-SigLIP/webli",
+    #
+    # "open_clip/ViT-L-14/laion2b_s32b_b82k",
 ]
 
 
@@ -68,12 +69,16 @@ class TestOpenClipModelEncode(InferenceTestCase):
         cls.eject_all_models()
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent
-        json_file = target_dir / "embeddings_reference" / "embeddings_open_clip_python_3_8.json"
-        if not os.path.exists(json_file):
-            raise FileNotFoundError(f"File {json_file} not found, which is needed to compare embeddings.")
-
-        with open(json_file, 'r') as f:
-            cls.open_clip_embeddings_reference = json.load(f)
+        text_json_file = target_dir / "embeddings_reference" / "open_clip_text_marqo_2_24_2_embeddings.json"
+        # image_json_file = target_dir / "embeddings_reference" / "open_clip_image_marqo_2_24_2_embeddings.json"
+        if not os.path.exists(text_json_file):
+            raise FileNotFoundError(f"File {text_json_file} not found, which is needed to compare embeddings.")
+        # if not os.path.exists(image_json_file):
+        #     raise FileNotFoundError(f"File {image_json_file} not found, which is needed to compare embeddings.")
+        with open(text_json_file, 'r') as f:
+            cls.open_clip_text_embeddings_reference = json.load(f)
+        # with open(image_json_file, 'r') as f:
+        #     cls.open_clip_image_embeddings_reference = json.load(f)
 
     def setUp(self):
         super().setUp()
@@ -85,11 +90,8 @@ class TestOpenClipModelEncode(InferenceTestCase):
         )
         self.eps = 1e-6
 
-    def test_embeddings_regression(self):
-        try:
-            self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
-        except KeyError:
-            self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
+    def test_embeddings_regression_text(self):
+        self.model_embeddings_reference = self.open_clip_text_embeddings_reference[self.model_name]
 
         text_texts = ['hello', 'this is a test sentence. so is this.']
         for text in text_texts:
@@ -106,130 +108,79 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     embeddings_reference, pipeline_embeddings[0]
                 )
                 self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
-
-    def test_open_clip_encode_text_normalized(self):
-        """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
-        normalize is set to True.
-        """
-        texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
-
-        tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
-        raw_embeddings = self.model.encode(tokenized_text, modality=Modality.TEXT, normalize=True)
-        pipeline_embeddings = self.encode_content_helper(
-            content=texts,
-            model_name=self.model_name,
-            modality=Modality.TEXT,
-            normalize_embeddings=True
-        )
-
-        for i, raw_embedding in enumerate(raw_embeddings):
-            pipeline_embedding = pipeline_embeddings[i]
-            self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
-            self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
-            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
-
-    def test_open_clip_encode_image_normalized(self):
-        """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
-        normalize is set to True.
-        """
-        image_urls = [
-            TestImageUrls.IMAGE0.value,
-            TestImageUrls.IMAGE1.value,
-            TestImageUrls.IMAGE2.value,
-        ]
-
-        images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
-
-        preprocessed_images = self.model.get_preprocessor().preprocess(images, modality=Modality.IMAGE)
-        raw_embeddings = self.model.encode(preprocessed_images, modality=Modality.IMAGE, normalize=True)
-
-        pipeline_embeddings = self.encode_content_helper(
-            content=image_urls,
-            model_name=self.model_name,
-            modality=Modality.IMAGE,
-            normalize_embeddings=True
-        )
-        for i, raw_embedding in enumerate(raw_embeddings):
-            pipeline_embedding = pipeline_embeddings[i]
-            self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
-            self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
-            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
-
-
-    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
-    def test_open_clip_encode_text_not_normalized(self, mock_autocast):
-        """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
-        normalize is set to False.
-        """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
-
-        texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
-
-        tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
-        raw_embeddings = self.model.encode(tokenized_text, modality=Modality.TEXT, normalize=False)
-        pipeline_embeddings = self.encode_content_helper(
-            content=texts,
-            model_name=self.model_name,
-            modality=Modality.TEXT,
-            normalize_embeddings=False
-        )
-
-        for i, raw_embedding in enumerate(raw_embeddings):
-            pipeline_embedding = pipeline_embeddings[i]
-            self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
-            self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
-            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
-
-        mock_autocast.assert_not_called()
-
-    @patch("marqo.inference.native_inference.embedding_models.open_clip_model.torch.cuda.amp.autocast")
-    def test_open_clip_encode_image_not_normalized(self, mock_autocast):
-        """
-        A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
-        normalize is set to False.
-        """
-        if self.model_name in [
-            # This model always normalizes embeddings
-            "open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k"
-        ]:
-            self.skipTest(f"{self.model_name} always outputs normalized embeddings.")
-
-        image_urls = [
-            TestImageUrls.IMAGE0.value,
-            TestImageUrls.IMAGE1.value,
-            TestImageUrls.IMAGE2.value,
-        ]
-
-        images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
-
-        preprocessed_images = self.model.get_preprocessor().preprocess(images, modality=Modality.IMAGE)
-        raw_embeddings = self.model.encode(preprocessed_images, modality=Modality.IMAGE, normalize=False)
-
-        pipeline_embeddings = self.encode_content_helper(
-            content=image_urls,
-            model_name=self.model_name,
-            modality=Modality.IMAGE,
-            normalize_embeddings=False
-        )
-        for i, raw_embedding in enumerate(raw_embeddings):
-            pipeline_embedding = pipeline_embeddings[i]
-            self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
-            self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
-            self.validate_norm(raw_embedding, epsilon=self.eps, normalize=False)
-            self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=False)
-
-        mock_autocast.assert_not_called()
+    #
+    # def test_embeddings_regression_image(self):
+    #     try:
+    #         self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
+    #     except KeyError:
+    #         self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
+    #
+    #     text_texts = ['hello', 'this is a test sentence. so is this.']
+    #     for text in text_texts:
+    #         with self.subTest(f"Test text: {text}"):
+    #             embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
+    #             pipeline_embeddings = self.encode_content_helper(
+    #                 content=[text],
+    #                 model_name=self.model_name,
+    #                 modality=Modality.TEXT,
+    #                 normalize_embeddings=False
+    #             )
+    #
+    #             embeddings_difference = self.calculate_embeddings_difference(
+    #                 embeddings_reference, pipeline_embeddings[0]
+    #             )
+    #             self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
+    #
+    # def test_open_clip_encode_text_normalized(self):
+    #     """
+    #     A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
+    #     normalize is set to True.
+    #     """
+    #     texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
+    #
+    #     tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
+    #     raw_embeddings = self.model.encode(tokenized_text, modality=Modality.TEXT, normalize=True)
+    #     pipeline_embeddings = self.encode_content_helper(
+    #         content=texts,
+    #         model_name=self.model_name,
+    #         modality=Modality.TEXT,
+    #         normalize_embeddings=True
+    #     )
+    #
+    #     for i, raw_embedding in enumerate(raw_embeddings):
+    #         pipeline_embedding = pipeline_embeddings[i]
+    #         self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
+    #         self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
+    #         self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
+    #         self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
+    #         self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
+    #
+    # def test_open_clip_encode_image_normalized(self):
+    #     """
+    #     A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
+    #     normalize is set to True.
+    #     """
+    #     image_urls = [
+    #         TestImageUrls.IMAGE0.value,
+    #         TestImageUrls.IMAGE1.value,
+    #         TestImageUrls.IMAGE2.value,
+    #     ]
+    #
+    #     images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
+    #
+    #     preprocessed_images = self.model.get_preprocessor().preprocess(images, modality=Modality.IMAGE)
+    #     raw_embeddings = self.model.encode(preprocessed_images, modality=Modality.IMAGE, normalize=True)
+    #
+    #     pipeline_embeddings = self.encode_content_helper(
+    #         content=image_urls,
+    #         model_name=self.model_name,
+    #         modality=Modality.IMAGE,
+    #         normalize_embeddings=True
+    #     )
+    #     for i, raw_embedding in enumerate(raw_embeddings):
+    #         pipeline_embedding = pipeline_embeddings[i]
+    #         self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
+    #         self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
+    #         self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
+    #         self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
+    #         self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)

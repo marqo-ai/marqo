@@ -35,6 +35,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "marqo>=3.18.0",
     "parameterized>=0.9.0",
     "pytest>=8.4.2",
 ]

@@ -1441,6 +1441,21 @@ wheels = [
 ]
 
 [[package]]
+name = "marqo"
+version = "3.18.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1f/be/b241aa8fbeea3eb8bb4384884f024f4f9704b8fb1d4836a85be53c0ce868/marqo-3.18.0.tar.gz", hash = "sha256:4b138104afc2bdf43903be8ccd31bec4dfe7c9664fdefc53537f014b86dd3fec", size = 42352, upload-time = "2025-08-22T04:57:53.785Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/8c/a7a669c3380c2d772cce9c2ed52b8deda4a6d62170c8a1c4b7ad02c7c174/marqo-3.18.0-py3-none-any.whl", hash = "sha256:f16612cfa13158037074a6584aa03c2e9ba9e63ff7c0b260b649c989aa60275d", size = 40261, upload-time = "2025-08-22T04:57:52.791Z" },
+]
+
+[[package]]
 name = "marqo-inference-container"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1475,6 +1490,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "marqo" },
     { name = "parameterized" },
     { name = "pytest" },
 ]
@@ -1511,6 +1527,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "marqo", specifier = ">=3.18.0" },
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pytest", specifier = ">=8.4.2" },
 ]

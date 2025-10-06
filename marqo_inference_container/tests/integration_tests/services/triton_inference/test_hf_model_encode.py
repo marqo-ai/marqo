@@ -12,7 +12,7 @@ from tests.integration_tests.test_case import InferenceTestCase
 HF_TEST_MODELS = [
     "hf/e5-base-v2",
     "hf/e5-small-v2",
-    # "hf/all-MiniLM-L6-v2"
+    "hf/all-MiniLM-L6-v2"
 ]
 
 
