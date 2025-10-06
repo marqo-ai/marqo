@@ -1,7 +1,7 @@
 import numpy as np
 
-from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 from marqo_inference_container.schemas.api import *
+from tests.integration_tests.test_case import InferenceTestCase
 
 
 class TestOpenCLIPInferencePipeline(InferenceTestCase):
