@@ -412,7 +412,7 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         self.assertEqual(['doc_B1', 'doc_T2', 'doc_B2', 'doc_T1', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
         # Page 2
         # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
-        self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
+        self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', 'doc_T5', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
         # Page 3
         # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[-5:]])
         self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])

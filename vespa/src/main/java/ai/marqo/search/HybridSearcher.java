@@ -161,6 +161,8 @@ public class HybridSearcher extends Searcher {
                 query.properties().getInteger("marqo__hybrid.rerankDepthGlobal", null);
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
+        boolean retrieveTensorLastPage =
+                query.properties().getBoolean("marqo__hybrid.retrieveTensorLastPage", false);
         Integer timeout = query.properties().getInteger("timeout", 1000);
 
         // Relevance Cut-off Parameters
@@ -237,7 +239,7 @@ public class HybridSearcher extends Searcher {
 
         HitGroup hitsForPostProcessing;
         if (isDisjunctionSearch) {
-            Result resultLexical, resultTensor;
+            Result resultLexical, resultTensor, resultTensorLastPage = null;
             Query queryLexical =
                     createSubQuery(
                             query,
@@ -253,9 +255,33 @@ public class HybridSearcher extends Searcher {
             Future<Result> futureLexical = asyncExecutionLexical.search(queryLexical);
             AsyncExecution asyncExecutionTensor = new AsyncExecution(execution);
             Future<Result> futureTensor = asyncExecutionTensor.search(queryTensor);
+
+            Future<Result> futureTensorLastPage = null;
+            if (retrieveTensorLastPage && offset > 0) {
+                String tensorYQL = queryTensor.properties().getString("yql", "");
+                int currentTensorTargetHits = extractCurrentTargetHits(tensorYQL);
+                int currentExploreAdditionalHits = extractCurrentExploreAdditionalHits(tensorYQL);
+                int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
+                String tensorYQLUpdated = overwriteTargetHits(tensorYQL, offset, efSearch);
+
+                Query queryTensorLastPage = queryTensor.clone();
+                queryTensorLastPage.properties().set("yql", tensorYQLUpdated);
+                queryTensorLastPage.setHits(offset);
+                logIfVerbose(
+                        String.format(
+                                "Get last page tensor result with limit %d and YQL: %s",
+                                offset, tensorYQLUpdated),
+                        verbose);
+                futureTensorLastPage = new AsyncExecution(execution).search(queryTensorLastPage);
+            }
+
             try {
                 resultLexical = futureLexical.get(timeout, TimeUnit.MILLISECONDS);
                 resultTensor = futureTensor.get(timeout, TimeUnit.MILLISECONDS);
+
+                if (retrieveTensorLastPage && futureTensorLastPage != null) {
+                    resultTensorLastPage = futureTensorLastPage.get(timeout, TimeUnit.MILLISECONDS);
+                }
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 throw new RuntimeException(
                         "Hybrid search disjunction timeout error. Current timeout: "
@@ -271,12 +297,14 @@ public class HybridSearcher extends Searcher {
                 return new Result(query, combinedErrors);
             }
 
-            logIfVerbose(
-                    "LEXICAL RESULTS: "
-                            + resultLexical.toString()
-                            + " || TENSOR RESULTS: "
-                            + resultTensor.toString(),
-                    verbose);
+            String resultSummary =
+                    String.format(
+                            "LEXICAL RESULTS: %s || TENSOR RESULTS: %s",
+                            resultLexical, resultTensor);
+            if (resultTensorLastPage != null) {
+                resultSummary += " TENSOR RESULTS LAST PAGE: " + resultTensorLastPage;
+            }
+            logIfVerbose(resultSummary, verbose);
 
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
@@ -297,15 +325,30 @@ public class HybridSearcher extends Searcher {
                     // TODO Ideally we will need to do another tensor search with targetHit=offset
                     // TODO Also consider the case of pinned docs and excluded docs
 
-                    logIfVerbose(
-                            String.format("Offset is %d, Simulate previous page result: ", offset),
-                            verbose);
+                    HitGroup tensorHitsPreviousPages;
 
-                    HitGroup tensorHitsPreviousPages = resultTensor.hits().clone();
-                    tensorHitsPreviousPages.trim(0, offset);
-                    logIfVerbose(
-                            String.format("Tensor Hit Group is trimmed to %d", offset), verbose);
-                    logHitGroup(tensorHitsPreviousPages, verbose);
+                    if (resultTensorLastPage != null) {
+                        logIfVerbose(
+                                String.format(
+                                        "Offset is %d, Got previous page result from extra tensor"
+                                                + " search: ",
+                                        offset),
+                                verbose);
+                        tensorHitsPreviousPages = resultTensorLastPage.hits();
+                        logHitGroup(tensorHitsPreviousPages, verbose);
+                    } else {
+                        logIfVerbose(
+                                String.format(
+                                        "Offset is %d, Simulate previous page result: ", offset),
+                                verbose);
+
+                        tensorHitsPreviousPages = resultTensor.hits().clone();
+                        tensorHitsPreviousPages.trim(0, offset);
+                        logIfVerbose(
+                                String.format("Tensor Hit Group is trimmed to %d", offset),
+                                verbose);
+                        logHitGroup(tensorHitsPreviousPages, verbose);
+                    }
 
                     HitGroup lexicalHitsPreviousPages = resultLexical.hits().clone();
                     lexicalHitsPreviousPages.trim(0, offset);
