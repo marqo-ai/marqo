@@ -368,11 +368,17 @@ public class HybridSearcher extends Searcher {
                     logIfVerbose("Simulated previous page candidates (after rrf): ", verbose);
                     logHitGroup(candidateHitsOfPreviousPages, verbose);
 
+                    Integer rerankDepthLastPage = null;
+                    if (rerankDepthGlobal != null) {
+                        // deduce the rerankDepthGlobal used by last page
+                        rerankDepthLastPage = Math.max(0, offset - limit) + rerankDepthGlobal;
+                    }
+
                     HitGroup hitsOfPreviousPages =
                             postProcessResults(
                                     candidateHitsOfPreviousPages,
                                     query,
-                                    rerankDepthGlobal,
+                                    rerankDepthLastPage,
                                     offset,
                                     0,
                                     false,
