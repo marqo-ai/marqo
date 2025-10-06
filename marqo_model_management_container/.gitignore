@@ -175,3 +175,4 @@ test-reports/
 
 # Dockerfile
 compose.yaml
+compose.cloud.yaml

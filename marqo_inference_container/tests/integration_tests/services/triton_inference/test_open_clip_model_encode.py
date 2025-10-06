@@ -18,16 +18,16 @@ OPEN_CLIP_TEST_MODELS = [
     "Marqo/marqo-fashionCLIP",
     "Marqo/marqo-fashionSigLIP",
     "Marqo/marqo-ecommerce-embeddings-L",
-    # "Marqo/marqo-ecommerce-embeddings-B",
-    # # --- Other OpenCLIP models for testing
-    # "open_clip/ViT-B-32/laion2b_s34b_b79k",
-    # "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
-    #
-    # "timm/ViT-L-16-SigLIP2-256",
-    # "open_clip/ViT-L-16-SigLIP-256/webli",
-    # "open_clip/ViT-B-16-SigLIP/webli",
-    #
-    # "open_clip/ViT-L-14/laion2b_s32b_b82k",
+    "Marqo/marqo-ecommerce-embeddings-B",
+    # --- Other OpenCLIP models for testing
+    "open_clip/ViT-B-32/laion2b_s34b_b79k",
+    "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
+
+    "timm/ViT-L-16-SigLIP2-256",
+    "open_clip/ViT-L-16-SigLIP-256/webli",
+    "open_clip/ViT-B-16-SigLIP/webli",
+
+    "open_clip/ViT-L-14/laion2b_s32b_b82k",
 ]
 
 
