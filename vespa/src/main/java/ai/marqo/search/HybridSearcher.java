@@ -280,6 +280,69 @@ public class HybridSearcher extends Searcher {
 
             // Execute fusion ranking on the two result sets.
             if (rankingMethod.equals("rrf")) {
+                if (offset > 0) {
+                    // Simulate previous page result. Please note that the tensor result might not
+                    // be accurate unless
+                    // rerankDepthTensor in previous page request is larger than offset+limit of
+                    // this request.
+                    // TODO Ideally we will need to do another tensor search with targetHit=offset
+                    // TODO Also consider the case of pinned docs and excluded docs
+
+                    logIfVerbose(
+                            String.format("Offset is %d, Simulate previous page result: ", offset),
+                            verbose);
+
+                    HitGroup tensorHitsPreviousPages = resultTensor.hits().clone();
+                    tensorHitsPreviousPages.trim(0, offset);
+                    logIfVerbose(
+                            String.format("Tensor Hit Group is trimmed to %d", offset), verbose);
+                    logHitGroup(tensorHitsPreviousPages, verbose);
+
+                    HitGroup lexicalHitsPreviousPages = resultLexical.hits().clone();
+                    lexicalHitsPreviousPages.trim(0, offset);
+                    logIfVerbose(
+                            String.format("Lexical Hit Group is trimmed to %d", offset), verbose);
+                    logHitGroup(lexicalHitsPreviousPages, verbose);
+
+                    // Apply RRF and global ranking on simulated previous page result
+                    HitGroup candidateHitsOfPreviousPages =
+                            rrf(
+                                    tensorHitsPreviousPages,
+                                    lexicalHitsPreviousPages,
+                                    rrf_k,
+                                    alpha,
+                                    verbose,
+                                    collapse);
+                    logIfVerbose("Simulated previous page candidates (after rrf): ", verbose);
+                    logHitGroup(candidateHitsOfPreviousPages, verbose);
+
+                    HitGroup hitsOfPreviousPages =
+                            postProcessResults(
+                                    candidateHitsOfPreviousPages,
+                                    query,
+                                    rerankDepthGlobal,
+                                    offset,
+                                    0,
+                                    false,
+                                    verbose);
+                    logIfVerbose(
+                            "Simulated previous page result (after global ranking and trimming): ",
+                            verbose);
+                    logHitGroup(hitsOfPreviousPages, verbose);
+
+                    // Remove previous page results
+                    for (Hit hit : hitsOfPreviousPages) {
+                        resultTensor.hits().remove(hit.getId());
+                        resultLexical.hits().remove(hit.getId());
+                    }
+                    logIfVerbose("Tensor Hit Group after removing previous page result: ", verbose);
+                    logHitGroup(resultTensor.hits(), verbose);
+
+                    logIfVerbose(
+                            "Lexical Hit Group after removing previous page result: ", verbose);
+                    logHitGroup(resultLexical.hits(), verbose);
+                }
+
                 hitsForPostProcessing =
                         rrf(
                                 resultTensor.hits(),

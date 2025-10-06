@@ -83,6 +83,7 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                 "title": f"{tensor_terms[i]} tensor_document_{i+1}",
                 "doc_type": "tensor_only",
                 "score_boost": i+1,   # the boost should reverse the order
+                f"tensor_score_boost_{tensor_terms[i].split()[0]}": 1,  # score modifier to change ranking of tensor search
             }
             docs.append(doc)
 
@@ -263,6 +264,156 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
         # Page 3
         self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+
+    @pytest.mark.skip_for_multinode
+    def test_disjunction_rrf_pagination_with_unstable_tensor_ranking(self):
+        """
+        Test that disjunction+RRF pagination produces no duplicates between pages.
+        Verifies ranking consistency and proper pagination behavior.
+
+        Lexical search score:         Tensor search score:
+        doc_B1: 1.5657032529354344    doc_B2: 0.8774912556666549
+        doc_L1: 1.5310213335683778    doc_B1: 0.8624316166639774
+        doc_L2: 1.4957020935493452    doc_T1: 0.8551202270206154
+        doc_L3: 1.4403238705575117    doc_T2: 0.8550448320679322  <- will boost by 1, goes to the top in the first page result
+        doc_L4: 1.3410214926606240    doc_T3: 0.8523972952471728
+        doc_B3: 1.2495362288065737    doc_T4: 0.8500947166713401
+        doc_L5: 1.1111902054958356    doc_B4: 0.8500164585022059
+        doc_B5: 1.0981049722627436    doc_T5: 0.8471093151792289  <- will boost by 2, so it goes to the top, but only when we query page 2
+        doc_B2: 0.9400916280884359    doc_B3: 0.8368122835299188
+        doc_B4: 0.4681934225728979    doc_B5: 0.8334305830362274
+                                      doc_L1: 0.8316111466678087
+                                      doc_L5: 0.8288859450924600
+                                      doc_L3: 0.8269666625377193
+                                      doc_L4: 0.8263098149586303
+                                      doc_L2: 0.8257278463225931
+
+        Pagination with page size 5: with alpha=0.7, rrf_k=60
+        tensor rrf score = alpha * (1.0 / (rank + k))
+        lexical rrf score = (1-alpha) * (1.0 / (rank + k))
+
+        ======================================================
+        Page 1:
+        Lexical search rrf score:     Tensor search rrf score:
+        doc_B1: 0.004918              doc_T2: 0.011475        
+        doc_L1: 0.004839              doc_B2: 0.011290        
+        doc_L2: 0.004762              doc_B1: 0.011111        
+        doc_L3: 0.004688              doc_T1: 0.010938        
+        doc_L4: 0.004615              doc_T3: 0.010769        
+
+        After fusion:
+        doc_B1: 0.016029   <- In both, highest ranking
+        doc_T2: 0.011475
+        doc_B2: 0.011290
+        doc_T1: 0.010938
+        doc_T3: 0.010769
+        doc_L1: 0.004839   <- Trimmed off from here
+        doc_L2: 0.004762
+        doc_L3: 0.004688
+        doc_L4: 0.004615
+
+        =======================================================
+        Page 2:
+        Lexical search rrf score:     Tensor search rrf score:
+        doc_B1: 0.004918              doc_T5: 0.011475
+        doc_L1: 0.004839              doc_T2: 0.011290
+        doc_L2: 0.004762              doc_B2: 0.011111
+        doc_L3: 0.004688              doc_B1: 0.010938
+        doc_L4: 0.004615              doc_T1: 0.010769
+        doc_B3: 0.004545              doc_T3: 0.010606
+        doc_L5: 0.004478              doc_T4: 0.010448
+        doc_B5: 0.004412              doc_B4: 0.010294
+        doc_B2: 0.004348              doc_B3: 0.010145
+        doc_B4: 0.004286              doc_B5: 0.01
+
+        After fusion:
+        doc_B1: 0.015856
+        doc_B2: 0.015459
+        doc_B3: 0.014690   (MISSED)
+        doc_B4: 0.014580   (MISSED)
+        doc_B5: 0.014412   (MISSED)
+        doc_T5: 0.011475   <- Start from here
+        doc_T2: 0.011290   (DUP)
+        doc_T1: 0.010769   (DUP)
+        doc_T3: 0.010606   (DUP)
+        doc_T4: 0.010448
+        doc_L1: 0.004839   <- Trimmed off from here
+        doc_L2: 0.004762
+        doc_L3: 0.004688
+        doc_L4: 0.004615
+        doc_L5: 0.004478
+
+        =======================================================
+        Page 3:
+        Lexical search rrf score:     Tensor search rrf score:
+        doc_B1: 0.004918              doc_T5: 0.011475
+        doc_L1: 0.004839              doc_T2: 0.011290
+        doc_L2: 0.004762              doc_B2: 0.011111
+        doc_L3: 0.004688              doc_B1: 0.010938
+        doc_L4: 0.004615              doc_T1: 0.010769
+        doc_B3: 0.004545              doc_T3: 0.010606
+        doc_L5: 0.004478              doc_T4: 0.010448
+        doc_B5: 0.004412              doc_B4: 0.010294
+        doc_B2: 0.004348              doc_B3: 0.010145
+        doc_B4: 0.004286              doc_B5: 0.01
+                                      doc_L1: 0.009859
+                                      doc_L5: 0.009722
+                                      doc_L3: 0.009589
+                                      doc_L4: 0.009459
+                                      doc_L2: 0.009333
+
+        After fusion:
+        doc_B1: 0.015856
+        doc_B2: 0.015459
+        doc_L1: 0.014698    (MISSED)
+        doc_B3: 0.014690    (MISSED)
+        doc_B4: 0.014580    (MISSED)
+        doc_B5: 0.014412    (MISSED)
+        doc_L3: 0.014277    (MISSED)
+        doc_L5: 0.014200    (MISSED)
+        doc_L2: 0.014095    (MISSED)
+        doc_L4: 0.014074    (MISSED)
+        doc_T5: 0.011475    <- Start from here (DUP)
+        doc_T2: 0.011290    (DUP)
+        doc_T1: 0.010769    (DUP)
+        doc_T3: 0.010606    (DUP)
+        doc_T4: 0.010448    (DUP)
+        """
+        # Test with page size 5 for clean 3-page pagination (15 docs = 3 pages)
+        page_size = 5
+        all_paginated_hits = []
+
+        # Collect all pages
+        for page_num in range(3):  # 3 pages for 15 docs with page size 5
+            offset = page_num * page_size
+
+            self.hp_rrf.scoreModifiersTensor = ScoreModifierLists(
+                add_to_score=[
+                    ScoreModifierOperator(field_name="tensor_score_boost_deep", weight=1),  # boost T2 by 1
+                    ScoreModifierOperator(field_name="tensor_score_boost_data", weight=2),  # boost T5 by 2
+                ]
+            )
+
+            page_res = tensor_search.search(
+                search_method="HYBRID",
+                hybrid_parameters=self.hp_rrf,
+                config=self.config,
+                index_name=self.index_unstructured.name,
+                result_count=page_size,
+                offset=offset,
+                text=None
+            )
+
+            all_paginated_hits.extend(page_res["hits"])
+
+        # Page 1
+        self.assertEqual(['doc_B1', 'doc_T2', 'doc_B2', 'doc_T1', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
+        # Page 2
+        self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
+                         [h['_id'] for h in all_paginated_hits[5:-5]])
+        # Page 3
+        self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
+                         [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_global_modifiers_no_rerank_depth(self):
