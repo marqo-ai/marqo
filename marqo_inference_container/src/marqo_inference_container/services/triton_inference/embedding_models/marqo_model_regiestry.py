@@ -52,7 +52,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "tritonImageEncoder": {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-image-encoder",
-            "sources": ["s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx"],
+            "sources": ["s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx",
+                        "s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx.data"],
             "input": [
                 {
                     "name": "input",
