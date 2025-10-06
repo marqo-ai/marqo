@@ -84,7 +84,7 @@ class OpenCLIPPreprocessor(AbstractPreprocessor):
              H and W are the height and width of the image.
         """
         # Need unsqueeze(0) to add the batch dimension
-        return [self.image_preprocessor(image).unsqueeze(0).to(self.device) for image in inputs]
+        return [self.image_preprocessor(image).unsqueeze(0) for image in inputs]
 
 
 class OpenCLIPModel(AbstractEmbeddingModel):
