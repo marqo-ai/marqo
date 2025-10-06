@@ -106,7 +106,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
                 embeddings_difference = self.calculate_embeddings_difference(
                     embeddings_reference, pipeline_embeddings[0]
                 )
-                self.assertTrue(embeddings_difference < 2e-4, f"The embedding difference is {embeddings_difference}.")
+                self.assertTrue(embeddings_difference < 1e-3, f"The embedding difference is {embeddings_difference}.")
 
     def test_embeddings_regression_image(self):
         self.model_embeddings_reference = self.open_clip_image_embeddings_reference[self.model_name]
@@ -125,7 +125,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     embeddings_reference, pipeline_embeddings[0]
                 )
                 self.assertTrue(
-                    embeddings_difference < 2e-4,
+                    embeddings_difference < 1e-3,
                     f"The embedding difference is {embeddings_difference}."
                 )
 

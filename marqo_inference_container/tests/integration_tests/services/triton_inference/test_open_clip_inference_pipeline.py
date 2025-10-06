@@ -18,13 +18,13 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
 
     def test_inference_text_no_chunk_no_prefix(self):
         """Test that the pipeline returns the embeddings for the two texts without chunking or prefix."""
-        model_name = "marqo/marqo-fashionSigLIP"
+        model_name = "Marqo/marqo-fashionSigLIP"
         text_inference_request = InferenceRequest(
             modality="language",
             contents=["text", "very long long long long text"],
             device="cpu",
             model_config_=ModelConfig(
-                model_name="marqo/marqo-fashionSigLIP",
+                model_name=model_name,
                 model_properties=self.get_model_properties_from_registry(model_name),
                 normalize_embeddings=True
             ),
