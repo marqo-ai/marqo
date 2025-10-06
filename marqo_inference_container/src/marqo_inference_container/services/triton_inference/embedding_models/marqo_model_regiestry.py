@@ -455,7 +455,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
     },
 
     "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k": {
-        "name": "xlm-roberta-base-ViT-B-32",
+        "name": "open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k",
         "dimensions": 512,
         "type": "open_clip",
         "tritonImageEncoder": {
