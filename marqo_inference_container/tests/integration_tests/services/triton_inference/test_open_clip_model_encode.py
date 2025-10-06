@@ -70,15 +70,15 @@ class TestOpenClipModelEncode(InferenceTestCase):
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent
         text_json_file = target_dir / "embeddings_reference" / "open_clip_text_marqo_2_24_2_embeddings.json"
-        # image_json_file = target_dir / "embeddings_reference" / "open_clip_image_marqo_2_24_2_embeddings.json"
+        image_json_file = target_dir / "embeddings_reference" / "open_clip_image_marqo_2_24_2_embeddings.json"
         if not os.path.exists(text_json_file):
             raise FileNotFoundError(f"File {text_json_file} not found, which is needed to compare embeddings.")
-        # if not os.path.exists(image_json_file):
-        #     raise FileNotFoundError(f"File {image_json_file} not found, which is needed to compare embeddings.")
+        if not os.path.exists(image_json_file):
+            raise FileNotFoundError(f"File {image_json_file} not found, which is needed to compare embeddings.")
         with open(text_json_file, 'r') as f:
             cls.open_clip_text_embeddings_reference = json.load(f)
-        # with open(image_json_file, 'r') as f:
-        #     cls.open_clip_image_embeddings_reference = json.load(f)
+        with open(image_json_file, 'r') as f:
+            cls.open_clip_image_embeddings_reference = json.load(f)
 
     def setUp(self):
         super().setUp()
@@ -93,10 +93,9 @@ class TestOpenClipModelEncode(InferenceTestCase):
     def test_embeddings_regression_text(self):
         self.model_embeddings_reference = self.open_clip_text_embeddings_reference[self.model_name]
 
-        text_texts = ['hello', 'this is a test sentence. so is this.']
-        for text in text_texts:
+        for text, embeddings in self.model_embeddings_reference.items():
             with self.subTest(f"Test text: {text}"):
-                embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
+                embeddings_reference = np.array(embeddings).reshape(-1)
                 pipeline_embeddings = self.encode_content_helper(
                     content=[text],
                     model_name=self.model_name,
@@ -108,28 +107,24 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     embeddings_reference, pipeline_embeddings[0]
                 )
                 self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
-    #
-    # def test_embeddings_regression_image(self):
-    #     try:
-    #         self.model_embeddings_reference = self.open_clip_embeddings_reference[self.model_name]
-    #     except KeyError:
-    #         self.skipTest(reason=f"Model {self.model_name} not found in the embeddings reference file.")
-    #
-    #     text_texts = ['hello', 'this is a test sentence. so is this.']
-    #     for text in text_texts:
-    #         with self.subTest(f"Test text: {text}"):
-    #             embeddings_reference = np.array(self.model_embeddings_reference[text]).reshape(-1)
-    #             pipeline_embeddings = self.encode_content_helper(
-    #                 content=[text],
-    #                 model_name=self.model_name,
-    #                 modality=Modality.TEXT,
-    #                 normalize_embeddings=False
-    #             )
-    #
-    #             embeddings_difference = self.calculate_embeddings_difference(
-    #                 embeddings_reference, pipeline_embeddings[0]
-    #             )
-    #             self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
+
+    def test_embeddings_regression_image(self):
+        self.model_embeddings_reference = self.open_clip_image_embeddings_reference[self.model_name]
+
+        for image_url, embeddings in self.model_embeddings_reference.items():
+            with self.subTest(f"Test image url: {image_url}"):
+                embeddings_reference = np.array(embeddings).reshape(-1)
+                pipeline_embeddings = self.encode_content_helper(
+                    content=[image_url],
+                    model_name=self.model_name,
+                    modality=Modality.IMAGE,
+                    normalize_embeddings=False
+                )
+
+                embeddings_difference = self.calculate_embeddings_difference(
+                    embeddings_reference, pipeline_embeddings[0]
+                )
+                self.assertTrue(embeddings_difference < 1e-4, embeddings_reference)
     #
     # def test_open_clip_encode_text_normalized(self):
     #     """
