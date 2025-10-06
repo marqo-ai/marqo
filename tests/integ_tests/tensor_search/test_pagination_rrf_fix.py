@@ -629,19 +629,19 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
 
-        After fusion:                                         After fix:            In previous pages?
-        doc_B5: 15.014412  (MISSED)                           doc_B5: 15.014412
-        doc_B4: 14.014734  (MISSED)                           doc_B4: 14.014734
-        doc_B3: 13.014690  (MISSED)                           doc_B3: 13.014690
-        doc_B2: 12.015823                                     doc_B2: 12.015823     yes
-        doc_B1: 11.016208                                     doc_B1: 11.016208     yes
-        doc_L2: 7.004762   <- Start from here (DUP)           doc_L2: 7.004762      yes
-        doc_L1: 6.004839   (DUP)                              doc_L1: 6.004839      yes
-        doc_T5: 5.010294                                      doc_T5: 5.010294
-        doc_T4: 4.010606                                      doc_T4: 4.010606
-        doc_T3: 3.010769   (DUP)                              doc_T3: 3.010769      yes
-        doc_T2: 2.010938   <- Trimmed off from here           doc_T2: 2.010938      <- Trimmed off from here
-        doc_T1: 1.011111                                      doc_T1: 1.011111
+        After fusion:                                         After fix: Before GSM             After GSM:
+        doc_B5: 15.014412  (MISSED)                           doc_B1: 0.016208   <- 1st page    doc_B5: 15.014412
+        doc_B4: 14.014734  (MISSED)                           doc_B2: 0.015823   <- 1st page    doc_B4: 14.014734
+        doc_B3: 13.014690  (MISSED)                           doc_B4: 0.014734                  doc_B3: 13.014690
+        doc_B2: 12.015823                                     doc_B3: 0.014690                  doc_T5: 5.010294
+        doc_B1: 11.016208                                     doc_B5: 0.014412                  doc_T4: 4.010606
+        doc_L2: 7.004762   <- Start from here (DUP)           doc_T1: 0.011111                  doc_T2: 2.010938  <- Trimmed off from here
+        doc_L1: 6.004839   (DUP)                              doc_T2: 0.010938                  doc_T1: 1.011111  <- GSM stops here
+        doc_T5: 5.010294                                      doc_T3: 0.010769   <- 1st page    doc_L3: 0.004688
+        doc_T4: 4.010606                                      doc_T4: 0.010606                  doc_L4: 0.004615
+        doc_T3: 3.010769   (DUP)                              doc_T5: 0.010294                  doc_L5: 0.004478
+        doc_T2: 2.010938   <- Trimmed off from here           doc_L1: 0.004839   <- 1st page
+        doc_T1: 1.011111                                      doc_L2: 0.004762   <- 1st page
         doc_L3: 0.004688   <- global reranking will not reach doc_L3: 0.004688
         doc_L4: 0.004615      13th element                    doc_L4: 0.004615
         doc_L5: 0.004478                                      doc_L5: 0.004478
@@ -665,22 +665,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                                       doc_L4: 0.009459
                                       doc_L2: 0.009333
 
-        After fusion: (global score modifiers applied to all docs)    After fix:            In previous pages?
-        doc_B5: 15.014412  (MISSED)                                   doc_B5: 15.014412     yes
-        doc_B4: 14.014734  (MISSED)                                   doc_B4: 14.014734     yes
-        doc_B3: 13.014690  (MISSED)                                   doc_B3: 13.014690     yes
-        doc_B2: 12.015823                                             doc_B2: 12.015823     yes
-        doc_B1: 11.016208                                             doc_B1: 11.016208     yes
-        doc_L5: 10.014200  (MISSED)                                   doc_L5: 10.014200
-        doc_L4: 9.014074   (MISSED)                                   doc_L4: 9.014074      
-        doc_L3: 8.014277   (MISSED)                                   doc_L3: 8.014277
-        doc_L2: 7.014095                                              doc_L2: 7.014095      yes
-        doc_L1: 6.014698                                              doc_L1: 6.014698      yes
-        doc_T5: 5.010294   <- Start from here (DUP)                   doc_T5: 5.010294      yes
-        doc_T4: 4.010606   (DUP)                                      doc_T4: 4.010606      yes
-        doc_T3: 3.010769   (DUP)                                      doc_T3: 3.010769      yes
-        doc_T2: 2.010938                                              doc_T2: 2.010938
-        doc_T1: 1.011111                                              doc_T1: 1.011111
+        After fusion: (global score modifiers applied to all docs)  After fix: before GSM               After GSM:
+        doc_B5: 15.014412  (MISSED)                                 doc_B1: 0.016208  <- 1st 2 pages    doc_L5: 10.014200
+        doc_B4: 14.014734  (MISSED)                                 doc_B2: 0.015823  <- 1st 2 pages    doc_L4: 9.014074            
+        doc_B3: 13.014690  (MISSED)                                 doc_B4: 0.014734  <- 1st 2 pages    doc_L3: 8.014277            
+        doc_B2: 12.015823                                           doc_L1: 0.014698  <- 1st 2 pages    doc_T2: 2.010938
+        doc_B1: 11.016208                                           doc_B3: 0.014690  <- 1st 2 pages    doc_T1: 1.011111
+        doc_L5: 10.014200  (MISSED)                                 doc_B5: 0.014412  <- 1st 2 pages
+        doc_L4: 9.014074   (MISSED)                                 doc_L3: 0.014277
+        doc_L3: 8.014277   (MISSED)                                 doc_L5: 0.014200
+        doc_L2: 7.014095                                            doc_L2: 0.014095  <- 1st 2 pages
+        doc_L1: 6.014698                                            doc_L4: 0.014074
+        doc_T5: 5.010294   <- Start from here (DUP)                 doc_T1: 0.011111
+        doc_T4: 4.010606   (DUP)                                    doc_T2: 0.010938
+        doc_T3: 3.010769   (DUP)                                    doc_T3: 0.010769  <- 1st 2 pages
+        doc_T2: 2.010938                                            doc_T4: 0.010606  <- 1st 2 pages
+        doc_T1: 1.011111                                            doc_T5: 0.010294  <- 1st 2 pages
         """
         # Test with page size 5 for clean 3-page pagination
         page_size = 5
@@ -781,22 +781,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
 
-        After fusion:
-        doc_B5: 15.014412  (MISSED)
-        doc_B4: 14.014734  (MISSED)
-        doc_B3: 13.014690  (MISSED)
-        doc_B2: 12.015823
-        doc_B1: 11.016208
-        doc_T3: 3.010769   <- Start from here (DUP)
-        doc_T2: 2.010938   (DUP)
-        doc_T1: 1.011111   (DUP)
-        doc_T4: 0.010606   <- global reranking will not reach 9th element (rerankDepthGlobal = 5 + 3)
-        doc_T5: 0.010294
-        doc_L1: 0.004839   <- Trimmed off from here
-        doc_L2: 0.004762
-        doc_L3: 0.004688
-        doc_L4: 0.004615
-        doc_L5: 0.004478
+        After fusion and GSM:                                    After fix: (before GSM)               After GSM
+        doc_B5: 15.014412  (MISSED)                              doc_B1: 0.016208   <- 1st page        doc_B5: 15.014412
+        doc_B4: 14.014734  (MISSED)                              doc_B2: 0.015823   <- 1st page        doc_B4: 14.014734
+        doc_B3: 13.014690  (MISSED)                              doc_B4: 0.014734                      doc_B3: 13.014690  <- GSM stops here
+        doc_B2: 12.015823                                        doc_B3: 0.014690                      doc_T4: 0.010606
+        doc_B1: 11.016208                                        doc_B5: 0.014412                      doc_T5: 0.010294
+        doc_T3: 3.010769   <- Start from here (DUP)              doc_T1: 0.011111   <- 1st page        doc_L1: 0.004839   <- Trimmed off from here
+        doc_T2: 2.010938   (DUP)                                 doc_T2: 0.010938   <- 1st page        doc_L2: 0.004762
+        doc_T1: 1.011111   (DUP)                                 doc_T3: 0.010769   <- 1st page        doc_L3: 0.004688
+        doc_T4: 0.010606   <- global reranking will not reach    doc_T4: 0.010606                      doc_L4: 0.004615
+        doc_T5: 0.010294        9th element (RDG = 5 + 3)        doc_T5: 0.010294                      doc_L5: 0.004478
+        doc_L1: 0.004839   <- Trimmed off from here              doc_L1: 0.004839
+        doc_L2: 0.004762                                         doc_L2: 0.004762
+        doc_L3: 0.004688                                         doc_L3: 0.004688
+        doc_L4: 0.004615                                         doc_L4: 0.004615
+        doc_L5: 0.004478                                         doc_L5: 0.004478
 
         =======================================================
         Page 3:
@@ -817,22 +817,22 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                                       doc_L4: 0.009459
                                       doc_L2: 0.009333
 
-        After fusion: (global score modifiers applied to all docs)
-        doc_B5: 15.014412  (MISSED)
-        doc_B4: 14.014734  (MISSED)
-        doc_B3: 13.014690  (MISSED)
-        doc_B2: 12.015823
-        doc_B1: 11.016208
-        doc_L5: 10.014200  (MISSED)
-        doc_L4: 9.014074   (MISSED)
-        doc_L3: 8.014277   (MISSED)
-        doc_L2: 7.014095   (MISSED)
-        doc_L1: 6.014698   (MISSED)
-        doc_T3: 3.010769   (DUP)
-        doc_T2: 2.010938   (DUP)
-        doc_T1: 1.011111   (DUP)
-        doc_T4: 0.010606   <- global reranking will not reach 14th element (rerankDepthGlobal = 10 + 3)  (DUP)
-        doc_T5: 0.010294   (DUP)
+        After fusion: (global score modifiers applied to all docs)  After fix: Before GSM              After GSM
+        doc_B5: 15.014412  (MISSED)                                 doc_B1: 0.016208  <- 1st 2 pages   doc_L5: 10.014200
+        doc_B4: 14.014734  (MISSED)                                 doc_B2: 0.015823  <- 1st 2 pages   doc_L3: 8.014277
+        doc_B3: 13.014690  (MISSED)                                 doc_B4: 0.014734  <- 1st 2 pages   doc_L1: 6.014698   <- GSM stops here
+        doc_B2: 12.015823                                           doc_L1: 0.014698                   doc_L2: 0.014095
+        doc_B1: 11.016208                                           doc_B3: 0.014690  <- 1st 2 pages   doc_L4: 0.014074
+        doc_L5: 10.014200  (MISSED)                                 doc_B5: 0.014412  <- 1st 2 pages
+        doc_L4: 9.014074   (MISSED)                                 doc_L3: 0.014277
+        doc_L3: 8.014277   (MISSED)                                 doc_L5: 0.014200
+        doc_L2: 7.014095   (MISSED)                                 doc_L2: 0.014095
+        doc_L1: 6.014698   (MISSED)                                 doc_L4: 0.014074
+        doc_T3: 3.010769   (DUP)                                    doc_T1: 0.011111  <- 1st 2 pages
+        doc_T2: 2.010938   (DUP)                                    doc_T2: 0.010938  <- 1st 2 pages
+        doc_T1: 1.011111   (DUP)                                    doc_T3: 0.010769  <- 1st 2 pages
+        doc_T4: 0.010606   <- global reranking will not reach 14th  doc_T4: 0.010606  <- 1st 2 pages
+        doc_T5: 0.010294   (DUP)  \\ element (RDG = 10 + 3)  (DUP)  doc_T5: 0.010294  <- 1st 2 pages
         """
         # Test with page size 5 for clean 3-page pagination
         page_size = 5
@@ -864,9 +864,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         self.assertEqual(['doc_B2', 'doc_B1', 'doc_T1', 'doc_T2', 'doc_T3'],
                          [h['_id'] for h in all_paginated_hits[:5]])
         # Page 2
-        self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
+        # self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
+        self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T4', 'doc_T5'],
                          [h['_id'] for h in all_paginated_hits[5:-5]])
         # Page 3
-        self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
+        # self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
+        self.assertEqual(['doc_L5', 'doc_L3', 'doc_L1', 'doc_L2', 'doc_L4'],
                          [h['_id'] for h in all_paginated_hits[-5:]])
         

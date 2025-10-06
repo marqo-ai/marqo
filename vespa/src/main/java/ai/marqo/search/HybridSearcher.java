@@ -318,11 +318,7 @@ public class HybridSearcher extends Searcher {
                                 collapse);
 
                 if (offset > 0) {
-                    // Simulate previous page result. Please note that the tensor result might not
-                    // be accurate unless
-                    // rerankDepthTensor in previous page request is larger than offset+limit of
-                    // this request.
-                    // TODO Ideally we will need to do another tensor search with targetHit=offset
+                    // Simulate previous page result.
                     // TODO Also consider the case of pinned docs and excluded docs
 
                     HitGroup tensorHitsPreviousPages;
