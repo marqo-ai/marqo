@@ -35,7 +35,10 @@ class TritonClient:
         try:
             res.raise_for_status()
         except HTTPStatusError as e:
-            raise TritonModelLoadError(f'Failed to unload model. Original error: {res.json().get("error")}') from e
+            raise TritonModelLoadError(
+                f'Failed to unload model "{model_name}". '
+                f'Original error: {res.json().get("error")}'
+            ) from e
 
     def get_loaded_models(self) -> list[str]:
         """
