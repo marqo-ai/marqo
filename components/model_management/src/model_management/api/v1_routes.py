@@ -4,7 +4,7 @@ from fastapi.routing import APIRoute
 
 from model_management.core.logging import get_logger
 from ..config import Config, get_config
-from ..schemas.api_models import LoadModelRequest, LoadModelResponse, UnloadModelRequest
+from ..schemas.api_models import LoadModelRequest, LoadModelResponse, UnloadModelResponse
 
 logger = get_logger(__name__)
 
@@ -46,7 +46,7 @@ def load_model(payload: LoadModelRequest, cfg: Config = Depends(get_config)):
     return LoadModelResponse(message=f"Model '{payload.triton_model_properties.name}' loaded successfully.")
 
 
-@router.post("/models/{model_name}/unload", response_model=UnloadModelRequest)
+@router.post("/models/{model_name}/unload", response_model=UnloadModelResponse)
 def unload_model(
         model_name: str, remove_files: bool = Query(False, alias="remove-files"),
         cfg: Config = Depends(get_config)
@@ -58,4 +58,4 @@ def unload_model(
     :return: 200 OK if the model was unloaded successfully or if the model was not found
     """
     cfg.model_manager.unload_model(model_name, remove_files=remove_files)
-    return UnloadModelRequest(message=f"Model '{model_name}' unloaded successfully.")
+    return UnloadModelResponse(message=f"Model '{model_name}' unloaded successfully.")

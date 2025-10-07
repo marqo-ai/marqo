@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from model_management.schemas.api_models import (
     LoadModelRequest,
     LoadModelResponse,
-    UnloadModelRequest,
+    UnloadModelResponse,
 )
 from model_management.schemas.triton_model_properties import TritonModelProperties
 
@@ -137,7 +137,7 @@ class TestUnloadModelRequest(TestCase):
 
     def test_unload_model_request_with_valid_data(self):
         """Test UnloadModelRequest creation with valid message."""
-        request = UnloadModelRequest(message="Model unloaded successfully")
+        request = UnloadModelResponse(message="Model unloaded successfully")
 
         self.assertEqual("Model unloaded successfully", request.message)
         self.assertIsInstance(request.message, str)
@@ -145,11 +145,11 @@ class TestUnloadModelRequest(TestCase):
     def test_unload_model_request_missing_required_field(self):
         """Test that UnloadModelRequest raises ValidationError when message is missing."""
         with self.assertRaises(ValidationError):
-            UnloadModelRequest()
+            UnloadModelResponse()
 
     def test_unload_model_request_serialization(self):
         """Test that UnloadModelRequest can be serialized and deserialized."""
-        request1 = UnloadModelRequest(message="Unload complete")
+        request1 = UnloadModelResponse(message="Unload complete")
 
         # Serialize to dict
         request_dict = request1.model_dump()
@@ -157,12 +157,12 @@ class TestUnloadModelRequest(TestCase):
         self.assertEqual("Unload complete", request_dict["message"])
 
         # Deserialize from dict
-        request2 = UnloadModelRequest(**request_dict)
+        request2 = UnloadModelResponse(**request_dict)
         self.assertEqual(request1.message, request2.message)
 
     def test_unload_model_request_json_serialization(self):
         """Test JSON serialization and deserialization of UnloadModelRequest."""
-        request1 = UnloadModelRequest(message="Unloading model")
+        request1 = UnloadModelResponse(message="Unloading model")
 
         # Serialize to JSON
         json_str = request1.model_dump_json()
@@ -174,7 +174,7 @@ class TestUnloadModelRequest(TestCase):
         self.assertEqual("Unloading model", json_data["message"])
 
         # Deserialize from JSON
-        request2 = UnloadModelRequest.model_validate_json(json_str)
+        request2 = UnloadModelResponse.model_validate_json(json_str)
         self.assertEqual(request1.message, request2.message)
 
     def test_unload_model_request_with_various_messages(self):
@@ -188,5 +188,5 @@ class TestUnloadModelRequest(TestCase):
 
         for message in test_cases:
             with self.subTest(message=message):
-                request = UnloadModelRequest(message=message)
+                request = UnloadModelResponse(message=message)
                 self.assertEqual(message, request.message)

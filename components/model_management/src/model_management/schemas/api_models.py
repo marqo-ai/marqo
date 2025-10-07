@@ -11,5 +11,5 @@ class LoadModelResponse(AppBaseModel):
     message: str = Field(..., description="A message indicating the result of the load model operation.")
 
 
-class UnloadModelRequest(AppBaseModel):
+class UnloadModelResponse(AppBaseModel):
     message: str = Field(..., description="A message indicating the result of the unload model operation.")

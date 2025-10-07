@@ -10,11 +10,11 @@ from starlette.requests import Request
 
 from model_management.api.exception_handlers import (
     register_exception_handlers,
-    validation_error_handler,
-    service_error_handler,
-    app_error_handler,
-    catch_all_handler,
-    map_service_errors_to_http_errors,
+    _validation_error_handler,
+    _service_error_handler,
+    _app_error_handler,
+    _catch_all_handler,
+    _map_service_errors_to_http_errors,
     _problem_response,
     _normalize_validation_errors,
 )
@@ -57,10 +57,10 @@ class TestExceptionHandlers(TestCase):
             self.assertIn(AppError, exception_types)
             self.assertIn(Exception, exception_types)
 
-            self.assertIn(validation_error_handler, handlers)
-            self.assertIn(service_error_handler, handlers)
-            self.assertIn(app_error_handler, handlers)
-            self.assertIn(catch_all_handler, handlers)
+            self.assertIn(_validation_error_handler, handlers)
+            self.assertIn(_service_error_handler, handlers)
+            self.assertIn(_app_error_handler, handlers)
+            self.assertIn(_catch_all_handler, handlers)
 
     def test_problem_response_basic_app_error(self):
         """Test _problem_response converts basic AppError to Problem JSON response."""
@@ -135,7 +135,7 @@ class TestExceptionHandlers(TestCase):
         ]
 
         # Call the async handler synchronously - it doesn't actually await anything
-        response = asyncio.run(validation_error_handler(self.mock_request, mock_validation_error))
+        response = asyncio.run(_validation_error_handler(self.mock_request, mock_validation_error))
 
         self.assertEqual(400, response.status_code)
         self.assertEqual("application/problem+json", response.media_type)
@@ -153,7 +153,7 @@ class TestExceptionHandlers(TestCase):
             {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
         ]
 
-        response = asyncio.run(validation_error_handler(self.mock_request, mock_validation_error))
+        response = asyncio.run(_validation_error_handler(self.mock_request, mock_validation_error))
         body = json.loads(response.body)
 
         # Detail should be a JSON string of error messages
@@ -175,7 +175,7 @@ class TestExceptionHandlers(TestCase):
 
         for service_error, expected_http_error_class, expected_status in test_cases:
             with self.subTest(service_error_type=type(service_error).__name__):
-                http_error = map_service_errors_to_http_errors(service_error)
+                http_error = _map_service_errors_to_http_errors(service_error)
                 self.assertIsInstance(http_error, expected_http_error_class)
                 self.assertEqual(expected_status, http_error.http_status)
                 self.assertEqual(service_error.message, str(http_error))
@@ -187,7 +187,7 @@ class TestExceptionHandlers(TestCase):
             pass
 
         unknown_error = UnknownServiceError("Unknown error")
-        http_error = map_service_errors_to_http_errors(unknown_error)
+        http_error = _map_service_errors_to_http_errors(unknown_error)
 
         self.assertIsInstance(http_error, InternalServerError)
         self.assertEqual(500, http_error.http_status)
@@ -197,7 +197,7 @@ class TestExceptionHandlers(TestCase):
         """Test service_error_handler maps service errors to HTTP errors."""
         error = service_errors.InternalServerError("Database connection failed")
 
-        response = asyncio.run(service_error_handler(self.mock_request, error))
+        response = asyncio.run(_service_error_handler(self.mock_request, error))
 
         self.assertEqual(500, response.status_code)
         body = json.loads(response.body)
@@ -216,7 +216,7 @@ class TestExceptionHandlers(TestCase):
 
         for service_error, expected_status, expected_code in test_cases:
             with self.subTest(service_error_type=type(service_error).__name__):
-                response = asyncio.run(service_error_handler(self.mock_request, service_error))
+                response = asyncio.run(_service_error_handler(self.mock_request, service_error))
 
                 self.assertEqual(expected_status, response.status_code)
                 body = json.loads(response.body)
@@ -233,7 +233,7 @@ class TestExceptionHandlers(TestCase):
 
         for error, expected_status in test_cases:
             with self.subTest(error_type=type(error).__name__):
-                response = asyncio.run(app_error_handler(self.mock_request, error))
+                response = asyncio.run(_app_error_handler(self.mock_request, error))
 
                 self.assertEqual(expected_status, response.status_code)
                 self.assertEqual("application/problem+json", response.media_type)
@@ -244,7 +244,7 @@ class TestExceptionHandlers(TestCase):
         """Test catch_all_handler converts generic exceptions to InternalServerError."""
         generic_error = ValueError("Unexpected error")
 
-        response = asyncio.run(catch_all_handler(self.mock_request, generic_error))
+        response = asyncio.run(_catch_all_handler(self.mock_request, generic_error))
 
         self.assertEqual(500, response.status_code)
         body = json.loads(response.body)
@@ -263,7 +263,7 @@ class TestExceptionHandlers(TestCase):
 
         for exc in test_cases:
             with self.subTest(exception_type=type(exc).__name__):
-                response = asyncio.run(catch_all_handler(self.mock_request, exc))
+                response = asyncio.run(_catch_all_handler(self.mock_request, exc))
 
                 self.assertEqual(500, response.status_code)
                 body = json.loads(response.body)
