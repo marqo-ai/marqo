@@ -1059,6 +1059,83 @@ wheels = [
 ]
 
 [[package]]
+name = "inference-orchestrator"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "blake3" },
+    { name = "cachetools" },
+    { name = "fastapi" },
+    { name = "hf-transfer" },
+    { name = "httpx" },
+    { name = "more-itertools" },
+    { name = "msgpack" },
+    { name = "msgpack-numpy" },
+    { name = "nltk" },
+    { name = "notebook" },
+    { name = "open-clip-torch" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "orjson" },
+    { name = "pillow" },
+    { name = "pycurl" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-json-logger" },
+    { name = "readerwriterlock" },
+    { name = "semver" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "tritonclient", extra = ["grpc", "http"] },
+    { name = "uvicorn" },
+    { name = "validators" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "marqo" },
+    { name = "parameterized" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "blake3", specifier = ">=1.0.6" },
+    { name = "cachetools", specifier = ">=6.2.0" },
+    { name = "fastapi", specifier = ">=0.117.1" },
+    { name = "hf-transfer", specifier = ">=0.1.9" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "more-itertools", specifier = ">=10.8.0" },
+    { name = "msgpack", specifier = ">=1.1.1" },
+    { name = "msgpack-numpy", specifier = ">=0.4.8" },
+    { name = "nltk", specifier = ">=3.9.1" },
+    { name = "notebook", specifier = ">=7.4.7" },
+    { name = "open-clip-torch", specifier = ">=3.2.0" },
+    { name = "opentelemetry-api", specifier = ">=1.37.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
+    { name = "orjson", specifier = ">=3.11.3" },
+    { name = "pillow", specifier = ">=11.3.0" },
+    { name = "pycurl", specifier = ">=7.45.7" },
+    { name = "pydantic", specifier = ">=2.11.9" },
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "python-json-logger", specifier = ">=3.3.0" },
+    { name = "readerwriterlock", specifier = ">=1.0.9" },
+    { name = "semver", specifier = ">=3.0.4" },
+    { name = "torch", specifier = ">=2.8.0" },
+    { name = "transformers", specifier = ">=4.56.2" },
+    { name = "tritonclient", extras = ["grpc", "http"], specifier = ">=2.60.0" },
+    { name = "uvicorn", specifier = ">=0.37.0" },
+    { name = "validators", specifier = ">=0.35.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "marqo", specifier = ">=3.18.0" },
+    { name = "parameterized", specifier = ">=0.9.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1453,83 +1530,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1f/be/b241aa8fbeea3eb8bb4384884f024f4f9704b8fb1d4836a85be53c0ce868/marqo-3.18.0.tar.gz", hash = "sha256:4b138104afc2bdf43903be8ccd31bec4dfe7c9664fdefc53537f014b86dd3fec", size = 42352, upload-time = "2025-08-22T04:57:53.785Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/8c/a7a669c3380c2d772cce9c2ed52b8deda4a6d62170c8a1c4b7ad02c7c174/marqo-3.18.0-py3-none-any.whl", hash = "sha256:f16612cfa13158037074a6584aa03c2e9ba9e63ff7c0b260b649c989aa60275d", size = 40261, upload-time = "2025-08-22T04:57:52.791Z" },
-]
-
-[[package]]
-name = "marqo-inference-container"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "blake3" },
-    { name = "cachetools" },
-    { name = "fastapi" },
-    { name = "hf-transfer" },
-    { name = "httpx" },
-    { name = "more-itertools" },
-    { name = "msgpack" },
-    { name = "msgpack-numpy" },
-    { name = "nltk" },
-    { name = "notebook" },
-    { name = "open-clip-torch" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-sdk" },
-    { name = "orjson" },
-    { name = "pillow" },
-    { name = "pycurl" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-json-logger" },
-    { name = "readerwriterlock" },
-    { name = "semver" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "tritonclient", extra = ["grpc", "http"] },
-    { name = "uvicorn" },
-    { name = "validators" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "marqo" },
-    { name = "parameterized" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "blake3", specifier = ">=1.0.6" },
-    { name = "cachetools", specifier = ">=6.2.0" },
-    { name = "fastapi", specifier = ">=0.117.1" },
-    { name = "hf-transfer", specifier = ">=0.1.9" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "more-itertools", specifier = ">=10.8.0" },
-    { name = "msgpack", specifier = ">=1.1.1" },
-    { name = "msgpack-numpy", specifier = ">=0.4.8" },
-    { name = "nltk", specifier = ">=3.9.1" },
-    { name = "notebook", specifier = ">=7.4.7" },
-    { name = "open-clip-torch", specifier = ">=3.2.0" },
-    { name = "opentelemetry-api", specifier = ">=1.37.0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
-    { name = "orjson", specifier = ">=3.11.3" },
-    { name = "pillow", specifier = ">=11.3.0" },
-    { name = "pycurl", specifier = ">=7.45.7" },
-    { name = "pydantic", specifier = ">=2.11.9" },
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "python-json-logger", specifier = ">=3.3.0" },
-    { name = "readerwriterlock", specifier = ">=1.0.9" },
-    { name = "semver", specifier = ">=3.0.4" },
-    { name = "torch", specifier = ">=2.8.0" },
-    { name = "transformers", specifier = ">=4.56.2" },
-    { name = "tritonclient", extras = ["grpc", "http"], specifier = ">=2.60.0" },
-    { name = "uvicorn", specifier = ">=0.37.0" },
-    { name = "validators", specifier = ">=0.35.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "marqo", specifier = ">=3.18.0" },
-    { name = "parameterized", specifier = ">=0.9.0" },
-    { name = "pytest", specifier = ">=8.4.2" },
 ]
 
 [[package]]

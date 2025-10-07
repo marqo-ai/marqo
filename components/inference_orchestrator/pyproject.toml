@@ -1,5 +1,5 @@
 [project]
-name = "marqo-inference-container"
+name = "inference-orchestrator"
 version = "0.1.0"
 description = "Inference orchestrator for Marqo"
 readme = "README.md"
