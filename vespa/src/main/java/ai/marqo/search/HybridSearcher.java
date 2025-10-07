@@ -161,9 +161,23 @@ public class HybridSearcher extends Searcher {
                 query.properties().getInteger("marqo__hybrid.rerankDepthGlobal", null);
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
-        boolean retrieveTensorLastPage =
-                query.properties().getBoolean("marqo__hybrid.retrieveTensorLastPage", false);
         Integer timeout = query.properties().getInteger("timeout", 1000);
+
+        // trimAndFuse: retrieve [offset, offset+limit) from both lexical and tensor, fuse, apply
+        // GSM, trim to [0, limit)
+        // fuseAndTrim: retrieve [0, offset+limit) from both lexical and tensor, fuse, apply GSM,
+        // trim to [offset, offset+limit)
+        // fuseAndExclude: retrieve [0, offset+limit) from both lexical and tensor, fuse; fuse again
+        // with [0, offset) to deduce last pages, exclude last pages, apply GSM, trim to [0, limit)
+        // fuseAndExcludeWithExtraTensorSearch: same as above, but use result of an extra tensor
+        // search [0, offset) when deducing last page
+        // (TBD) excludeAndFuseWithState: retrieve [0, offset+limit) from both lexical and tensor,
+        // remove all docs in state from both result, fuse, apply GSM, trim to [0, limit)
+        String paginationMode =
+                query.properties().getString("marqo__hybrid.paginationMode", "trimAndFuse");
+        boolean shouldRetrieveTensorLastPage =
+                "fuseAndExcludeWithExtraTensorSearch".equals(paginationMode);
+        boolean shouldExcludeLastPages = paginationMode.startsWith("fuseAndExclude");
 
         // Relevance Cut-off Parameters
         String relevanceCutoffMethod =
@@ -235,7 +249,7 @@ public class HybridSearcher extends Searcher {
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled,
-                        isDisjunctionSearch);
+                        isDisjunctionSearch && !"trimAndFuse".equals(paginationMode));
 
         HitGroup hitsForPostProcessing;
         if (isDisjunctionSearch) {
@@ -257,7 +271,7 @@ public class HybridSearcher extends Searcher {
             Future<Result> futureTensor = asyncExecutionTensor.search(queryTensor);
 
             Future<Result> futureTensorLastPage = null;
-            if (retrieveTensorLastPage && offset > 0) {
+            if (shouldRetrieveTensorLastPage && offset > 0) {
                 String tensorYQL = queryTensor.properties().getString("yql", "");
                 int currentTensorTargetHits = extractCurrentTargetHits(tensorYQL);
                 int currentExploreAdditionalHits = extractCurrentExploreAdditionalHits(tensorYQL);
@@ -279,7 +293,7 @@ public class HybridSearcher extends Searcher {
                 resultLexical = futureLexical.get(timeout, TimeUnit.MILLISECONDS);
                 resultTensor = futureTensor.get(timeout, TimeUnit.MILLISECONDS);
 
-                if (retrieveTensorLastPage && futureTensorLastPage != null) {
+                if (shouldRetrieveTensorLastPage && futureTensorLastPage != null) {
                     resultTensorLastPage = futureTensorLastPage.get(timeout, TimeUnit.MILLISECONDS);
                 }
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
@@ -317,7 +331,7 @@ public class HybridSearcher extends Searcher {
                                 verbose,
                                 collapse);
 
-                if (offset > 0) {
+                if (shouldExcludeLastPages && offset > 0) {
                     // Simulate previous page result.
                     // TODO Also consider the case of pinned docs and excluded docs
 
@@ -367,6 +381,9 @@ public class HybridSearcher extends Searcher {
                     Integer rerankDepthLastPage = null;
                     if (rerankDepthGlobal != null) {
                         // deduce the rerankDepthGlobal used by last page
+                        // TODO this is a best effort, since rerankDepthGlobal can be fixed, or
+                        // multiply (offset+limit) by a factor. We might need a smarter way to do
+                        // this.
                         rerankDepthLastPage = Math.max(0, offset - limit) + rerankDepthGlobal;
                     }
 
@@ -429,7 +446,9 @@ public class HybridSearcher extends Searcher {
             // If sortBy is not set, we use the default post-processing
             // when we do disjunction search or use relevance cutoff, the offset is set to 0, so we
             // need to trim previous pages
-            boolean needToTrimPreviousPages = isDisjunctionSearch || isRelevanceCutoffMethodEnabled;
+            boolean needToTrimPreviousPages =
+                    isDisjunctionSearch && "fuseAndTrim".equals(paginationMode)
+                            || isRelevanceCutoffMethodEnabled;
             processedHits =
                     postProcessResults(
                             hitsForPostProcessing,
@@ -437,7 +456,7 @@ public class HybridSearcher extends Searcher {
                             rerankDepthGlobal,
                             limit,
                             offset,
-                            isRelevanceCutoffMethodEnabled,
+                            needToTrimPreviousPages,
                             verbose);
         }
 
@@ -532,7 +551,7 @@ public class HybridSearcher extends Searcher {
      * @param sortByMinSortCandidates  the minimum number of candidates required for sorting, from Marqo
      * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
      * @param isSortByEnabled          whether sorting is enabled.
-     * @param isDisjunctionSearch      whether the retrieval method is disjunction
+     * @param shouldResetOffsetLimit   whether we need to set offset to 0 and limit to offset+limit
      * @return The updated query with new hits, offsets, and targetHits.
      */
     public Query updateQueryHitsOffsetsAndTargetHits(
@@ -541,11 +560,11 @@ public class HybridSearcher extends Searcher {
             Integer sortByMinSortCandidates,
             boolean isRelevanceCutoffEnabled,
             boolean isSortByEnabled,
-            boolean isDisjunctionSearch) {
+            boolean shouldResetOffsetLimit) {
 
         // Validate input parameters
         if (!isRelevanceCutoffEnabled && !isSortByEnabled) {
-            if (isDisjunctionSearch) {
+            if (shouldResetOffsetLimit) {
                 query.setHits(query.getOffset() + query.getHits());
                 query.setOffset(0);
             }

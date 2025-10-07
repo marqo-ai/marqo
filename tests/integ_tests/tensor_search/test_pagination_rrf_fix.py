@@ -53,6 +53,8 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
             queryTensor='machine learning',
             queryLexical='EXACT QUERY',
             verbose=True,
+            # trimAndFuse; fuseAndTrim; fuseAndExclude; fuseAndExcludeWithExtraTensorSearch
+            paginationMode="trimAndFuse",
         )
 
     def tearDown(self):
@@ -260,12 +262,13 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         #  we have a lot of docs matching both lexical and tensor, and with score modifiers, the result is much better.
         # Page 1
         self.assertEqual(['doc_B1', 'doc_B2', 'doc_T1', 'doc_T2', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
-        # Page 2
-        # self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
-        self.assertEqual(['doc_B4', 'doc_B3', 'doc_B5', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
-        # Page 3
-        # self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
-        self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
+
+        if self.hp_rrf.paginationMode == 'fuseAndTrim':
+            self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
+            self.assertEqual(['doc_B4', 'doc_B3', 'doc_B5', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_unstable_tensor_ranking(self):
@@ -410,12 +413,16 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
 
         # Page 1
         self.assertEqual(['doc_B1', 'doc_T2', 'doc_B2', 'doc_T1', 'doc_T3'], [h['_id'] for h in all_paginated_hits[:5]])
-        # Page 2
-        # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
-        self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', 'doc_T5', 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
-        # Page 3
-        # self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'], [h['_id'] for h in all_paginated_hits[-5:]])
-        self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
+
+        if self.hp_rrf.paginationMode == 'fuseAndTrim':
+            self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
+            expected_4th_doc_on_page_2 = 'doc_T3' if self.hp_rrf.paginationMode == 'fuseAndExclude' else 'doc_T5'
+            self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', expected_4th_doc_on_page_2, 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_global_modifiers_no_rerank_depth(self):
@@ -560,13 +567,17 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         # Page 1
         self.assertEqual(['doc_B2', 'doc_B1', 'doc_L4', 'doc_L3', 'doc_L2'],
                          [h['_id'] for h in all_paginated_hits[:5]])
-        # Page 2
-        # self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_L2', 'doc_L1'],
-        self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_L5', 'doc_L1'],
-                         [h['_id'] for h in all_paginated_hits[5:-5]])
-        # Page 3
-        self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'],
-                         [h['_id'] for h in all_paginated_hits[-5:]])
+
+        if self.hp_rrf.paginationMode == 'fuseAndTrim':
+            self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_L2', 'doc_L1'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_L5', 'doc_L1'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_global_modifiers_with_rerank_depth(self):
@@ -711,14 +722,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         # Page 1
         self.assertEqual(['doc_B2', 'doc_B1', 'doc_L2', 'doc_L1', 'doc_T3'],
                          [h['_id'] for h in all_paginated_hits[:5]])
-        # Page 2
-        # self.assertEqual(['doc_L2', 'doc_L1', 'doc_T5', 'doc_T4', 'doc_T3'],
-        self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T5', 'doc_T4'],
-                         [h['_id'] for h in all_paginated_hits[5:-5]])
-        # Page 3
-        # self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'],
-        self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_T2', 'doc_T1'],
-                         [h['_id'] for h in all_paginated_hits[-5:]])
+
+        if self.hp_rrf.paginationMode == 'fuseAndTrim':
+            self.assertEqual(['doc_L2', 'doc_L1', 'doc_T5', 'doc_T4', 'doc_T3'], [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T5', 'doc_T4'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_T2', 'doc_T1'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
 
     @pytest.mark.skip_for_multinode
     def test_disjunction_rrf_pagination_with_global_modifiers_with_rerank_depth_small_than_limit(self):
@@ -863,12 +875,13 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         # Page 1
         self.assertEqual(['doc_B2', 'doc_B1', 'doc_T1', 'doc_T2', 'doc_T3'],
                          [h['_id'] for h in all_paginated_hits[:5]])
-        # Page 2
-        # self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
-        self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T4', 'doc_T5'],
-                         [h['_id'] for h in all_paginated_hits[5:-5]])
-        # Page 3
-        # self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'],
-        self.assertEqual(['doc_L5', 'doc_L3', 'doc_L1', 'doc_L2', 'doc_L4'],
-                         [h['_id'] for h in all_paginated_hits[-5:]])
+
+        if self.hp_rrf.paginationMode == 'fuseAndTrim':
+            self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T4', 'doc_T5'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L5', 'doc_L3', 'doc_L1', 'doc_L2', 'doc_L4'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         

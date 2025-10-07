@@ -40,6 +40,9 @@ class HybridParameters(StrictBaseModel):
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
 
+    # trimAndFuse; fuseAndTrim; fuseAndExclude; fuseAndExcludeWithExtraTensorSearch
+    paginationMode: str = "trimAndFuse"
+
     @root_validator(pre=False)
     def validate_properties(cls, values):
         # alpha can only be defined for RRF and NormalizeLinear

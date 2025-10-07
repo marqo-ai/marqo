@@ -604,7 +604,8 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
 
-            'marqo__hybrid.retrieveTensorLastPage': True
+            # trimAndFuse; fuseAndTrim; fuseAndExclude; fuseAndExcludeWithExtraTensorSearch
+            'marqo__hybrid.paginationMode': marqo_query.hybrid_parameters.paginationMode,
         }
 
         query = {k: v for k, v in query.items() if v is not None}
@@ -689,7 +690,9 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-
+        # TODO  rerank_depth and additional_hits does not need to be calculated per field
+        #   Also, it might be better to pass rerank_depth_tensor and ef_search with a templated YQL to
+        #   HybridSearcher because we might need to change them based on relevance cutoff or sort by
         if marqo_query.rerank_depth_tensor is not None:
             rerank_depth = max(marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset)
         else:
