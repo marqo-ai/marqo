@@ -24,4 +24,4 @@ ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Run with gunicorn and uvicorn worker
-CMD ["uvicorn", "marqo_inference_container.main:app", "--host", "0.0.0.0", "--port", "8884"]
+CMD ["uvicorn", "inference_orchestrator.main:app", "--host", "0.0.0.0", "--port", "8884"]

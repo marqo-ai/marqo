@@ -1,7 +1,7 @@
 [project]
 name = "marqo-inference-container"
 version = "0.1.0"
-description = "Add your description here"
+description = "Inference orchestrator for Marqo"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
