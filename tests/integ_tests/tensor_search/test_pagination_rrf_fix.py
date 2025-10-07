@@ -54,7 +54,7 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
             queryLexical='EXACT QUERY',
             verbose=True,
             # trimAndFuse; fuseAndTrim; fuseAndExclude; fuseAndExcludeWithExtraTensorSearch
-            paginationMode="trimAndFuse",
+            paginationMode="fuseAndExcludeWithExtraTensorSearch",
         )
 
     def tearDown(self):
@@ -171,15 +171,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_L4: 0.004615
 
         =======================================================
-        Page 2:
-        Lexical search rrf score:     Tensor search rrf score:
-        doc_B1: 0.004918              doc_B2: 0.011475
-        doc_L1: 0.004839              doc_B1: 0.011290
-        doc_L2: 0.004762              doc_T1: 0.011111
-        doc_L3: 0.004688              doc_T2: 0.010938
-        doc_L4: 0.004615              doc_T3: 0.010769
-        doc_B3: 0.004545              doc_T4: 0.010606
-        doc_L5: 0.004478              doc_B4: 0.010448
+        Page 2:                                                      Page 2: trimAndFuse
+        Lexical search rrf score:     Tensor search rrf score:       Lexical search rrf score:     Tensor search rrf score:        After fusion
+        doc_B1: 0.004918              doc_B2: 0.011475               doc_B3: 0.004918              doc_T4: 0.011475                doc_B4: 0.015905
+        doc_L1: 0.004839              doc_B1: 0.011290               doc_L5: 0.004839              doc_B4: 0.011290                doc_B3: 0.015856
+        doc_L2: 0.004762              doc_T1: 0.011111               doc_B5: 0.004762              doc_T5: 0.011111                doc_B5: 0.015531
+        doc_L3: 0.004688              doc_T2: 0.010938               doc_B2: 0.004688              doc_B3: 0.010938                doc_T4: 0.011475
+        doc_L4: 0.004615              doc_T3: 0.010769               doc_B4: 0.004615              doc_B5: 0.010769                doc_T5: 0.011111
+        doc_B3: 0.004545              doc_T4: 0.010606                                                                             doc_L5: 0.004839  <- Trimmed off from here
+        doc_L5: 0.004478              doc_B4: 0.010448                                                                             doc_B2: 0.004688
         doc_B5: 0.004412              doc_T5: 0.010294
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
@@ -266,6 +266,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         if self.hp_rrf.paginationMode == 'fuseAndTrim':
             self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_T1', 'doc_T2', 'doc_T3', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode == 'timeAndFuse':
+            self.assertEqual(['doc_B4', 'doc_B3', 'doc_B5', 'doc_T4', 'doc_T5'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L1', 'doc_L5', 'doc_L3', 'doc_L4', 'doc_L2'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
             self.assertEqual(['doc_B4', 'doc_B3', 'doc_B5', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_L1', 'doc_L3', 'doc_L5', 'doc_L2', 'doc_L4'], [h['_id'] for h in all_paginated_hits[-5:]])
@@ -318,15 +323,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_L4: 0.004615
 
         =======================================================
-        Page 2:
-        Lexical search rrf score:     Tensor search rrf score:
-        doc_B1: 0.004918              doc_T5: 0.011475
-        doc_L1: 0.004839              doc_T2: 0.011290
-        doc_L2: 0.004762              doc_B2: 0.011111
-        doc_L3: 0.004688              doc_B1: 0.010938
-        doc_L4: 0.004615              doc_T1: 0.010769
-        doc_B3: 0.004545              doc_T3: 0.010606
-        doc_L5: 0.004478              doc_T4: 0.010448
+        Page 2:                                                    Page 2: trimAndFuse
+        Lexical search rrf score:     Tensor search rrf score:     Lexical search rrf score:     Tensor search rrf score:        After fusion
+        doc_B1: 0.004918              doc_T5: 0.011475             doc_B3: 0.004918              doc_T3: 0.011475                doc_B3: 0.015856
+        doc_L1: 0.004839              doc_T2: 0.011290             doc_L5: 0.004839              doc_T4: 0.011290                doc_B4: 0.015726
+        doc_L2: 0.004762              doc_B2: 0.011111             doc_B5: 0.004762              doc_B4: 0.011111                doc_B5: 0.015531
+        doc_L3: 0.004688              doc_B1: 0.010938             doc_B2: 0.004688              doc_B3: 0.010938                doc_T3: 0.011475  (DUP)
+        doc_L4: 0.004615              doc_T1: 0.010769             doc_B4: 0.004615              doc_B5: 0.010769                doc_T4: 0.011290
+        doc_B3: 0.004545              doc_T3: 0.010606                                                                           doc_L5: 0.004839  <- Trimmed off from here
+        doc_L5: 0.004478              doc_T4: 0.010448                                                                           doc_B2: 0.004688
         doc_B5: 0.004412              doc_B4: 0.010294
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
@@ -419,6 +424,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                              [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_T5', 'doc_T2', 'doc_T1', 'doc_T3', 'doc_T4'],
                              [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode == 'trimAndFuse':
+            self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', 'doc_T3', 'doc_T4'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L1', 'doc_L5', 'doc_L3', 'doc_L4', 'doc_L2'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
             expected_4th_doc_on_page_2 = 'doc_T3' if self.hp_rrf.paginationMode == 'fuseAndExclude' else 'doc_T5'
             self.assertEqual(['doc_B3', 'doc_B4', 'doc_B5', expected_4th_doc_on_page_2, 'doc_T4'], [h['_id'] for h in all_paginated_hits[5:-5]])
@@ -472,15 +482,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_T1: 1.011111
 
         =======================================================
-        Page 2:
-        Lexical search rrf score:     Tensor search rrf score:
-        doc_B1: 0.004918              doc_B2: 0.011475
-        doc_L1: 0.004839              doc_B1: 0.011290
-        doc_L2: 0.004762              doc_T1: 0.011111
-        doc_L3: 0.004688              doc_T2: 0.010938
-        doc_L4: 0.004615              doc_T3: 0.010769
-        doc_B3: 0.004545              doc_T4: 0.010606
-        doc_L5: 0.004478              doc_B4: 0.010448
+        Page 2:                                                             Page 2: trimAndFuse
+        Lexical search rrf score:     Tensor search rrf score:              Lexical search rrf score:     Tensor search rrf score:        After fusion
+        doc_B1: 0.004918              doc_B2: 0.011475                      doc_B3: 0.004918              doc_T4: 0.011475                doc_B5: 15.015531
+        doc_L1: 0.004839              doc_B1: 0.011290                      doc_L5: 0.004839              doc_B4: 0.011290                doc_B4: 14.015905
+        doc_L2: 0.004762              doc_T1: 0.011111                      doc_B5: 0.004762              doc_T5: 0.011111                doc_B3: 13.015856
+        doc_L3: 0.004688              doc_T2: 0.010938                      doc_B2: 0.004688              doc_B3: 0.010938                doc_B2: 12.004688  (DUP)
+        doc_L4: 0.004615              doc_T3: 0.010769                      doc_B4: 0.004615              doc_B5: 0.010769                doc_L5: 10.004839
+        doc_B3: 0.004545              doc_T4: 0.010606                                                                                    doc_T5: 5.011111   <- Trimmed off from here
+        doc_L5: 0.004478              doc_B4: 0.010448                                                                                    doc_T4: 4.011475
         doc_B5: 0.004412              doc_T5: 0.010294
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
@@ -573,6 +583,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
                              [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'],
                              [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode == 'trimAndFuse':
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_B2', 'doc_L5'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_L2', 'doc_L1'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
             self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_L5', 'doc_L1'],
                              [h['_id'] for h in all_paginated_hits[5:-5]])
@@ -627,15 +642,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_L4: 0.004615
 
         =======================================================
-        Page 2:
-        Lexical search rrf score:     Tensor search rrf score:
-        doc_B1: 0.004918              doc_B2: 0.011475
-        doc_L1: 0.004839              doc_B1: 0.011290
-        doc_L2: 0.004762              doc_T1: 0.011111
-        doc_L3: 0.004688              doc_T2: 0.010938
-        doc_L4: 0.004615              doc_T3: 0.010769
-        doc_B3: 0.004545              doc_T4: 0.010606
-        doc_L5: 0.004478              doc_B4: 0.010448
+        Page 2:                                                         Page 2: trimAndFuse
+        Lexical search rrf score:     Tensor search rrf score:          Lexical search rrf score:     Tensor search rrf score:        After fusion
+        doc_B1: 0.004918              doc_B2: 0.011475                  doc_B3: 0.004918              doc_T4: 0.011475                doc_B5: 15.015531
+        doc_L1: 0.004839              doc_B1: 0.011290                  doc_L5: 0.004839              doc_B4: 0.011290                doc_B4: 14.015905
+        doc_L2: 0.004762              doc_T1: 0.011111                  doc_B5: 0.004762              doc_T5: 0.011111                doc_B3: 13.015856
+        doc_L3: 0.004688              doc_T2: 0.010938                  doc_B2: 0.004688              doc_B3: 0.010938                doc_B2: 12.004688  (DUP)
+        doc_L4: 0.004615              doc_T3: 0.010769                  doc_B4: 0.004615              doc_B5: 0.010769                doc_L5: 10.004839
+        doc_B3: 0.004545              doc_T4: 0.010606                                                                                doc_T5: 5.011111   <- Trimmed off from here
+        doc_L5: 0.004478              doc_B4: 0.010448                                                                                doc_T4: 4.011475
         doc_B5: 0.004412              doc_T5: 0.010294
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
@@ -726,6 +741,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         if self.hp_rrf.paginationMode == 'fuseAndTrim':
             self.assertEqual(['doc_L2', 'doc_L1', 'doc_T5', 'doc_T4', 'doc_T3'], [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_T5', 'doc_T4', 'doc_T3', 'doc_T2', 'doc_T1'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode == 'trimAndFuse':
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_B2', 'doc_L5'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L5', 'doc_L4', 'doc_L3', 'doc_L2', 'doc_L1'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
             self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T5', 'doc_T4'],
                              [h['_id'] for h in all_paginated_hits[5:-5]])
@@ -780,15 +800,15 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         doc_L4: 0.004615
 
         =======================================================
-        Page 2:
-        Lexical search rrf score:     Tensor search rrf score:
-        doc_B1: 0.004918              doc_B2: 0.011475
-        doc_L1: 0.004839              doc_B1: 0.011290
-        doc_L2: 0.004762              doc_T1: 0.011111
-        doc_L3: 0.004688              doc_T2: 0.010938
-        doc_L4: 0.004615              doc_T3: 0.010769
-        doc_B3: 0.004545              doc_T4: 0.010606
-        doc_L5: 0.004478              doc_B4: 0.010448
+        Page 2:                                                        Page 2: trimAndFuse
+        Lexical search rrf score:     Tensor search rrf score:         Lexical search rrf score:     Tensor search rrf score:        After fusion
+        doc_B1: 0.004918              doc_B2: 0.011475                 doc_B3: 0.004918              doc_T4: 0.011475                doc_B5: 15.015531
+        doc_L1: 0.004839              doc_B1: 0.011290                 doc_L5: 0.004839              doc_B4: 0.011290                doc_B4: 14.015905
+        doc_L2: 0.004762              doc_T1: 0.011111                 doc_B5: 0.004762              doc_T5: 0.011111                doc_B3: 13.015856   <- GSM stops here
+        doc_L3: 0.004688              doc_T2: 0.010938                 doc_B2: 0.004688              doc_B3: 0.010938                doc_T4: 0.011475
+        doc_L4: 0.004615              doc_T3: 0.010769                 doc_B4: 0.004615              doc_B5: 0.010769                doc_T5: 0.011111
+        doc_B3: 0.004545              doc_T4: 0.010606                                                                               doc_L5: 0.004839  <- Trimmed off from here
+        doc_L5: 0.004478              doc_B4: 0.010448                                                                               doc_B2: 0.004688
         doc_B5: 0.004412              doc_T5: 0.010294
         doc_B2: 0.004348              doc_B3: 0.010145
         doc_B4: 0.004286              doc_B5: 0.01
@@ -879,6 +899,11 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
         if self.hp_rrf.paginationMode == 'fuseAndTrim':
             self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[5:-5]])
             self.assertEqual(['doc_T3', 'doc_T2', 'doc_T1', 'doc_T4', 'doc_T5'], [h['_id'] for h in all_paginated_hits[-5:]])
+        elif self.hp_rrf.paginationMode == 'trimAndFuse':
+            self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T4', 'doc_T5'],
+                             [h['_id'] for h in all_paginated_hits[5:-5]])
+            self.assertEqual(['doc_L5', 'doc_L3', 'doc_L1', 'doc_L4', 'doc_L2'],
+                             [h['_id'] for h in all_paginated_hits[-5:]])
         elif self.hp_rrf.paginationMode.startswith('fuseAndExclude'):
             self.assertEqual(['doc_B5', 'doc_B4', 'doc_B3', 'doc_T4', 'doc_T5'],
                              [h['_id'] for h in all_paginated_hits[5:-5]])
