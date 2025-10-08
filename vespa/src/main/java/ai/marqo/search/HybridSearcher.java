@@ -274,19 +274,35 @@ public class HybridSearcher extends Searcher {
             if (shouldRetrieveTensorLastPage && offset > 0) {
                 String tensorYQL = queryTensor.properties().getString("yql", "");
                 int currentTensorTargetHits = extractCurrentTargetHits(tensorYQL);
-                int currentExploreAdditionalHits = extractCurrentExploreAdditionalHits(tensorYQL);
-                int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
-                String tensorYQLUpdated = overwriteTargetHits(tensorYQL, offset, efSearch);
 
-                Query queryTensorLastPage = queryTensor.clone();
-                queryTensorLastPage.properties().set("yql", tensorYQLUpdated);
-                queryTensorLastPage.setHits(offset);
-                logIfVerbose(
-                        String.format(
-                                "Get last page tensor result with limit %d and YQL: %s",
-                                offset, tensorYQLUpdated),
-                        verbose);
-                futureTensorLastPage = new AsyncExecution(execution).search(queryTensorLastPage);
+                // TODO ideally, we should pass in the targetHit override, and whether it's fixed
+                if (currentTensorTargetHits > offset + limit) {
+                    // the targetHit is probably overridden, the tensor search result should be
+                    // stable
+                    logIfVerbose(
+                            String.format(
+                                    "TargetHits=%d, larger than (offset+limit)=%d. It's probably"
+                                            + " overridden, no need to do another tensor retrieval",
+                                    currentTensorTargetHits, offset + limit),
+                            verbose);
+                } else {
+                    int currentExploreAdditionalHits =
+                            extractCurrentExploreAdditionalHits(tensorYQL);
+                    int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
+                    String tensorYQLUpdated = overwriteTargetHits(tensorYQL, offset, efSearch);
+
+                    Query queryTensorLastPage = queryTensor.clone();
+                    queryTensorLastPage.setHits(offset);
+                    queryTensorLastPage.properties().set("yql", tensorYQLUpdated);
+
+                    logIfVerbose(
+                            String.format(
+                                    "Get last page tensor result with limit %d and YQL: %s",
+                                    offset, tensorYQLUpdated),
+                            verbose);
+                    futureTensorLastPage =
+                            new AsyncExecution(execution).search(queryTensorLastPage);
+                }
             }
 
             try {
@@ -402,9 +418,27 @@ public class HybridSearcher extends Searcher {
                     logHitGroup(hitsOfPreviousPages, verbose);
 
                     // Remove previous page results
+                    // TODO handle collapse fields
+                    Set<String> docIdsOfPreviousPages = new HashSet<>();
                     for (Hit hit : hitsOfPreviousPages) {
-                        hitsForPostProcessing.remove(hit.getId());
+                        // id from different replicas are different, we need to trim replica to get
+                        // the internal id
+                        String extractedDocId = extractDocIdFromHitId(hit.getId().toString());
+                        docIdsOfPreviousPages.add(extractedDocId);
                     }
+
+                    if (!docIdsOfPreviousPages.isEmpty()) {
+                        HitGroup hitsForPostProcessingWithoutPreviousPages = new HitGroup();
+                        for (Hit hit : hitsForPostProcessing.asList()) {
+                            String extractedDocId = extractDocIdFromHitId(hit.getId().toString());
+                            if (!docIdsOfPreviousPages.contains(extractedDocId)) {
+                                hitsForPostProcessingWithoutPreviousPages.add(hit);
+                            }
+                        }
+                        // TODO check if there's any other metadata to copy over
+                        hitsForPostProcessing = hitsForPostProcessingWithoutPreviousPages;
+                    }
+
                     logIfVerbose(
                             "hitsForPostProcessing after removing previous page result: ", verbose);
                     logHitGroup(hitsForPostProcessing, verbose);

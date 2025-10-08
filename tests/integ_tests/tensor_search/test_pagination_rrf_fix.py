@@ -52,7 +52,7 @@ class TestRRFPaginationPartialFix(MarqoTestCase):
             rankingMethod=RankingMethod.RRF,
             queryTensor='machine learning',
             queryLexical='EXACT QUERY',
-            verbose=True,
+            # verbose=True,
             # trimAndFuse; fuseAndTrim; fuseAndExclude; fuseAndExcludeWithExtraTensorSearch
             paginationMode="fuseAndExcludeWithExtraTensorSearch",
         )
