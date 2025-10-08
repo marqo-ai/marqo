@@ -36,9 +36,21 @@ dependencies = [
 [dependency-groups]
 dev = [
     "marqo>=3.18.0",
+    "opentelemetry-test-utils>=0.58b0",
     "parameterized>=0.9.0",
     "pytest>=8.4.2",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
+
+[tool.uv.sources]
+# Only override the index for Linux
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

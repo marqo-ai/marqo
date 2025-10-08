@@ -1,12 +1,12 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import base64
+import unittest
 from io import BytesIO
+from unittest.mock import patch, MagicMock
 
 from PIL import Image, UnidentifiedImageError
 
 from inference_orchestrator.services.media_download_and_preprocess.image_download import (
-    is_base64_image, load_image_from_path, format_and_load_CLIP_image
+    load_image_from_path, format_and_load_CLIP_image
 )
 
 

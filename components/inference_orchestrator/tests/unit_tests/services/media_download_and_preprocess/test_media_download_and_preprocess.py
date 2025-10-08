@@ -9,7 +9,7 @@ from inference_orchestrator.services.media_download_and_preprocess.media_downloa
     process_batch
 )
 from inference_orchestrator.api.telemetry import RequestMetrics
-from inference_orchestrator.errors.inference_errors import MediaDownloadError, InferenceError
+from inference_orchestrator.services.errors import *
 
 
 class TestMediaDownloadAndPreprocess(TestCase):

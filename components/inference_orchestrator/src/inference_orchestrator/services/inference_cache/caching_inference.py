@@ -1,7 +1,5 @@
-import hashlib
-from typing import Tuple, List, Optional
-
 import blake3
+import hashlib
 import numpy as np
 import orjson
 
@@ -102,7 +100,6 @@ class CachingInference(Inference):
     def should_skip_cache(self, request):
         return (
             not request.use_inference_cache
-            or request.device  # device is only specified to debug embedding, skip caching
             or request.modality not in [Modality.TEXT, Modality.IMAGE]  # we support text and image modalities
             or request.preprocessing_config.should_chunk  # we do not support caching chunks
         )

@@ -4,6 +4,7 @@ from typing import Optional, Union, TypeVar
 
 from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.core.settings import get_settings
+from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.services.inference_cache.abstract_cache import MarqoAbstractCache
 from inference_orchestrator.services.inference_cache.enums import MarqoCacheType
 from inference_orchestrator.services.inference_cache.marqo_lfu_cache import MarqoLFUCache
@@ -47,7 +48,6 @@ class MarqoInferenceCache:
         Raises:
             EnvironmentVariableParsingError: If the cache size or type is invalid.
         """
-        from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 
         # Validate cache size
         if not isinstance(cache_size, int) or cache_size <= 0:

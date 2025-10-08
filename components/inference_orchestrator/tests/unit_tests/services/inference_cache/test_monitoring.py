@@ -5,6 +5,7 @@ from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import Metric
+from opentelemetry.test.globals_test import reset_metrics_globals
 
 from inference_orchestrator.services.inference_cache.monitoring import OTELCacheStatsCollector
 
@@ -13,6 +14,7 @@ class TestOTELCacheStatsCollector(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up a single meter provider for all tests in this class."""
+        reset_metrics_globals()
         cls.reader = InMemoryMetricReader()
         cls.provider = MeterProvider(metric_readers=[cls.reader])
         metrics.set_meter_provider(cls.provider)

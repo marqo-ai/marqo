@@ -1,11 +1,10 @@
 from abc import ABC
 from abc import abstractmethod
 from enum import Enum
-from typing import Any, List, Tuple
-from typing import Optional, Dict, Literal, Union
-
 from numpy import ndarray
 from pydantic import StrictStr, model_validator, ConfigDict, BaseModel, Field
+from typing import Any, List, Tuple
+from typing import Optional, Dict, Literal, Union
 
 from .base_model import AppImmutableBaseModel
 
@@ -136,7 +135,7 @@ class InferenceRequest(AppImmutableBaseModel):
     modality: Modality
     contents: List[str] = Field(min_length=1)
     model_config_: ModelConfig = Field(alias='modelConfig')
-    preprocessing_config: TextPreprocessingConfig | ImagePreprocessingConfig = Field(alias='preprocessingConfig', discriminator='modality')
+    preprocessing_config: Union[TextPreprocessingConfig, ImagePreprocessingConfig] = Field(alias='preprocessingConfig', discriminator='modality')
     use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
     return_individual_error: bool = Field(default=True, alias='returnIndividualError')

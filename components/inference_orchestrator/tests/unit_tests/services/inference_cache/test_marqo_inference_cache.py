@@ -10,7 +10,7 @@ from inference_orchestrator.services.inference_cache.marqo_inference_cache impor
 
 class TestMarqoInferenceCache(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch('marqo_inference_container.services.inference_cache.marqo_inference_cache.OTELCacheStatsCollector')
+        patcher = mock.patch("inference_orchestrator.services.inference_cache.marqo_inference_cache.OTELCacheStatsCollector")
         self.mock_collector_class = patcher.start()
         self.addCleanup(patcher.stop)
         self.mock_collector = self.mock_collector_class.return_value

@@ -59,27 +59,23 @@ class TestCachingInferenceShouldSkip(TestCase):
         )
 
     def test_should_skip_when_use_inference_cache_is_false(self):
-        req = self.base_request.copy(update={'use_inference_cache': False})
-        self.assertTrue(self.caching_inference.should_skip_cache(req))
-
-    def test_should_skip_when_device_set(self):
-        req = self.base_request.copy(update={'device': 'cpu'})
+        req = self.base_request.model_copy(update={'use_inference_cache': False})
         self.assertTrue(self.caching_inference.should_skip_cache(req))
 
     def test_should_skip_when_non_text_image_modality(self):
         for modality in [Modality.VIDEO, Modality.AUDIO]:
             with self.subTest(modality=modality):
-                req = self.base_request.copy(update={'modality': modality})
+                req = self.base_request.model_copy(update={'modality': modality})
                 self.assertTrue(self.caching_inference.should_skip_cache(req))
 
     def test_should_skip_when_chunking_enabled(self):
-        req = self.base_request.copy(update={'preprocessing_config': TextPreprocessingConfig(
+        req = self.base_request.model_copy(update={'preprocessing_config': TextPreprocessingConfig(
             should_chunk=True, chunk_config=TextChunkConfig(split_length=2, split_overlap=1, split_method='word'))})
         self.assertTrue(self.caching_inference.should_skip_cache(req))
 
     def test_should_not_skip_when_all_condition_clear(self):
         for modality in [Modality.TEXT, Modality.IMAGE]:
-            req = self.base_request.copy(update={'modality': modality})
+            req = self.base_request.model_copy(update={'modality': modality})
             self.assertFalse(self.caching_inference.should_skip_cache(req))
 
 
@@ -191,7 +187,7 @@ class TestCachingInferenceVectorise(TestCase):
         arr2 = np.array([2])
         delegate_result = InferenceResult(result=[[('a', arr1), ('a_part2', arr2)]])
         self.mock_delegate.vectorise.return_value = delegate_result
-        req = self.base_request.copy(update={'contents': ['a']})
+        req = self.base_request.model_copy(update={'contents': ['a']})
         with self.assertRaises(RuntimeError) as ctx:
             self.ci.vectorise(req)
         self.assertIn('does not support chunking', str(ctx.exception))
@@ -233,7 +229,7 @@ class TestCachingInferenceBase64Images(TestCase):
         delegate_result = InferenceResult(result=[[(self.base64_png, embedding1)], [(self.url_image, embedding2)]])
         self.mock_delegate.vectorise.return_value = delegate_result
         
-        mixed_req = self.base_request.copy(update={'contents': [self.base64_png, self.url_image]})
+        mixed_req = self.base_request.model_copy(update={'contents': [self.base64_png, self.url_image]})
         result = self.caching_inference.vectorise(mixed_req)
         
         # Verify cache operations
@@ -266,7 +262,7 @@ class TestCachingInferenceBase64Images(TestCase):
         delegate_result = InferenceResult(result=[[(self.url_image, url_embedding)]])
         self.mock_delegate.vectorise.return_value = delegate_result
         
-        mixed_req = self.base_request.copy(update={'contents': [self.base64_png, self.url_image]})
+        mixed_req = self.base_request.model_copy(update={'contents': [self.base64_png, self.url_image]})
         result = self.caching_inference.vectorise(mixed_req)
         
         # Should call delegate with only URL (base64 was cached)
@@ -290,7 +286,7 @@ class TestCachingInferenceBase64Images(TestCase):
         delegate_result = InferenceResult(result=[[(self.base64_png, embedding1)], [(self.base64_jpeg, embedding2)]])
         self.mock_delegate.vectorise.return_value = delegate_result
         
-        multi_base64_req = self.base_request.copy(update={'contents': [self.base64_png, self.base64_jpeg]})
+        multi_base64_req = self.base_request.model_copy(update={'contents': [self.base64_png, self.base64_jpeg]})
         result = self.caching_inference.vectorise(multi_base64_req)
         
         # Should cache both images
