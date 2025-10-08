@@ -221,16 +221,14 @@ class TestStatsDMiddleware(unittest.TestCase):
 
                 with TestClient(app) as client:
                     client.get("/test")
-                    with TestClient(app) as client:
-                        client.get("/test")
 
-                        timings = _extract(stub, "timing", "request.duration_ms")
-                        self.assertTrue(any(f"status_code:{expected_str}" in m for m in timings),
-                                       f"Expected 'status_code:{expected_str}' in metrics, got: {timings}")
-                        # Ensure it doesn't contain enum representation
-                        for timing in timings:
-                            if "status_code:" in timing:
-                                status_part = [part for part in timing.split("|#")[1].split(",") if "status_code:" in part][0]
-                                status_value = status_part.split(":")[1]
-                                self.assertEqual(status_value, expected_str,
-                                               f"Status code should be '{expected_str}', got '{status_value}'")
+                    timings = _extract(stub, "timing", "request.duration_ms")
+                    self.assertTrue(any(f"status_code:{expected_str}" in m for m in timings),
+                                   f"Expected 'status_code:{expected_str}' in metrics, got: {timings}")
+                    # Ensure it doesn't contain enum representation
+                    for timing in timings:
+                        if "status_code:" in timing:
+                            status_part = [part for part in timing.split("|#")[1].split(",") if "status_code:" in part][0]
+                            status_value = status_part.split(":")[1]
+                            self.assertEqual(status_value, expected_str,
+                                           f"Status code should be '{expected_str}', got '{status_value}'")
