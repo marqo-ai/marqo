@@ -215,7 +215,6 @@ class TestStatsDMiddleware(unittest.TestCase):
                 @app.get("/test")
                 async def test_endpoint():
                     # Create a response with IntEnum status_code
-                    response = JSONResponse({"ok": True})
                     response.status_code = return_enum
                     return response
 
