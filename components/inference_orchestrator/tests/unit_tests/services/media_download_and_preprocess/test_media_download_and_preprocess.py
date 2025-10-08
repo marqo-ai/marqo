@@ -64,22 +64,6 @@ class TestMediaDownloadAndPreprocess(TestCase):
         self.assertEqual([10, 15], reduced["media_download.image.thread_time"])
         self.assertEqual([20, 25], reduced["media_download.image.url1"],)
 
-    @unittest.skip("Function _enable_video_gpu_acceleration not in new architecture")
-    def test_enable_video_gpu_acceleration_true(self):
-        pass
-
-    @unittest.skip("Function _threaded_download_and_preprocess_audio_and_video not in new architecture")
-    def test_threaded_download_and_preprocess_audio_success(self):
-        pass
-
-    @unittest.skip("Function _threaded_download_and_preprocess_audio_and_video not in new architecture")
-    def test_threaded_download_and_preprocess_video_success(self):
-        pass
-
-    @unittest.skip("Function _threaded_download_and_preprocess_audio_and_video not in new architecture")
-    def test_threaded_download_and_preprocess_audio_error(self):
-        pass
-
     @unittest.skip("Test references old marqo module paths")
     def test_process_batch_raises_on_thread_error(self):
         pass
