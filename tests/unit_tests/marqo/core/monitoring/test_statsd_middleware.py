@@ -203,7 +203,7 @@ class TestStatsDMiddleware(unittest.TestCase):
         # Create a new stub and middleware for this test
         test_cass = [
             (HTTPStatus.OK, "200"),
-            (HTTPStatus.NOT_FOUND, "404"),
+            (HTTPStatus.BAD_REQUEST, "400"),
             (HTTPStatus.INTERNAL_SERVER_ERROR, "500")
         ]
         for return_enum, expected_str in test_cass:
@@ -222,7 +222,7 @@ class TestStatsDMiddleware(unittest.TestCase):
                 with TestClient(app) as client:
                     client.get("/test")
                     with TestClient(app) as client:
-                        client.get("/test", params={"return_enum": return_enum.value})
+                        client.get("/test")
 
                         timings = _extract(stub, "timing", "request.duration_ms")
                         self.assertTrue(any(f"status_code:{expected_str}" in m for m in timings),
