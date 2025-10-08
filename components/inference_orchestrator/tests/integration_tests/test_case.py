@@ -3,13 +3,13 @@ from unittest.mock import patch, Mock
 
 import numpy as np
 
-from marqo_inference_container.api.telemetry import RequestMetricsStore
-from marqo_inference_container.config import get_config
-from marqo_inference_container.schemas.api import *
-from marqo_inference_container.services.triton_inference.embedding_models.marqo_model_regiestry import \
+from inference_orchestrator.api.telemetry import RequestMetricsStore
+from inference_orchestrator.config import get_config
+from inference_orchestrator.schemas.api import *
+from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import \
     get_model_properties
-from marqo_inference_container.services.triton_inference.triton_inference import TritonInference
-from marqo_inference_container.services.triton_inference.model_manager import model_manager
+from inference_orchestrator.services.triton_inference.triton_inference import TritonInference
+from inference_orchestrator.services.triton_inference.model_manager import model_manager
 
 
 class TestImageUrls(str, Enum):

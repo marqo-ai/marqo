@@ -2,14 +2,14 @@ import unittest
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo_inference_container.schemas.api import *
-from marqo_inference_container.services.media_download_and_preprocess.media_download_and_preprocess import (
+from inference_orchestrator.schemas.api import *
+from inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess import (
     threaded_download_and_preprocess_content,
     reduce_thread_metrics,
     process_batch
 )
-from marqo_inference_container.api.telemetry import RequestMetrics
-from marqo_inference_container.errors.inference_errors import MediaDownloadError, InferenceError
+from inference_orchestrator.api.telemetry import RequestMetrics
+from inference_orchestrator.errors.inference_errors import MediaDownloadError, InferenceError
 
 
 class TestMediaDownloadAndPreprocess(TestCase):

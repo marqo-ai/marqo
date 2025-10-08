@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 from parameterized import parameterized_class
 
-from marqo_inference_container.schemas.api import *
-from marqo_inference_container.services.media_download_and_preprocess.image_download import load_image_from_path
-from marqo_inference_container.services.triton_inference.model_manager.model_manager import load_model
+from inference_orchestrator.schemas.api import *
+from inference_orchestrator.services.media_download_and_preprocess.image_download import load_image_from_path
+from inference_orchestrator.services.triton_inference.model_manager.model_manager import load_model
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 OPEN_CLIP_TEST_MODELS = [

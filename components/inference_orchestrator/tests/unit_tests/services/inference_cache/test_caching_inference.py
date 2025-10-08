@@ -4,11 +4,11 @@ from unittest.mock import Mock
 import blake3
 import numpy as np
 
-from marqo_inference_container.schemas.api import (
+from inference_orchestrator.schemas.api import (
     Inference, InferenceRequest, ModelConfig, TextPreprocessingConfig, TextChunkConfig,
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig, Modality
 )
-from marqo_inference_container.services.inference_cache.caching_inference import CachingInference
+from inference_orchestrator.services.inference_cache.caching_inference import CachingInference
 
 
 class TestCachingInferenceModelCacheKey(TestCase):

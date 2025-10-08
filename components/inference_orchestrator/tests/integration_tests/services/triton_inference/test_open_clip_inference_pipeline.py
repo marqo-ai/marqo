@@ -1,6 +1,6 @@
 import numpy as np
 
-from marqo_inference_container.schemas.api import *
+from inference_orchestrator.schemas.api import *
 from tests.integration_tests.test_case import InferenceTestCase
 
 

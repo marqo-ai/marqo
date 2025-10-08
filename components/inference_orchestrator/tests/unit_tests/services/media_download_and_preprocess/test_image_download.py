@@ -5,7 +5,7 @@ from io import BytesIO
 
 from PIL import Image, UnidentifiedImageError
 
-from marqo_inference_container.services.media_download_and_preprocess.image_download import (
+from inference_orchestrator.services.media_download_and_preprocess.image_download import (
     is_base64_image, load_image_from_path, format_and_load_CLIP_image
 )
 

@@ -3,9 +3,9 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
-from marqo_inference_container.errors.common_errors import EnvironmentVariableParsingError
-from marqo_inference_container.services.inference_cache.enums import MarqoCacheType
-from marqo_inference_container.services.inference_cache.marqo_inference_cache import MarqoInferenceCache
+from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
+from inference_orchestrator.services.inference_cache.enums import MarqoCacheType
+from inference_orchestrator.services.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
 class TestMarqoInferenceCache(unittest.TestCase):

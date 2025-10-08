@@ -6,7 +6,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import Metric
 
-from marqo_inference_container.services.inference_cache.monitoring import OTELCacheStatsCollector
+from inference_orchestrator.services.inference_cache.monitoring import OTELCacheStatsCollector
 
 
 class TestOTELCacheStatsCollector(unittest.TestCase):

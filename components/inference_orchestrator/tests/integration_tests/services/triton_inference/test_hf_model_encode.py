@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import numpy as np
 
-from marqo_inference_container.schemas.api import Modality
-from marqo_inference_container.services.triton_inference.model_manager.model_manager import load_model, get_available_models
+from inference_orchestrator.schemas.api import Modality
+from inference_orchestrator.services.triton_inference.model_manager.model_manager import load_model, get_available_models
 from tests.integration_tests.test_case import InferenceTestCase
 
 HF_TEST_MODELS = [
