@@ -1,9 +1,10 @@
-from typing import Dict, List, Optional, Tuple
-import unittest
+from http import HTTPStatus
 
+import unittest
 from fastapi import FastAPI, HTTPException
 from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
+from typing import Dict, List, Optional, Tuple
 
 from marqo.core.monitoring import statsd_middleware as sm
 
@@ -196,14 +197,36 @@ class TestStatsDMiddleware(unittest.TestCase):
         )
 
     def test_status_code_tag_is_string_integer(self):
-        """Ensure status_code tag is always a stringified integer, not float."""
-        resp = self.client.post("/indexes/foo/search")
-        self.assertEqual(resp.status_code, 200)
+        """Ensure status_code tag is always a plain integer string, not an Enum representation."""
+        # Create a mock response with an IntEnum-like status_code
+        # This simulates cases where status_code could be an IntEnum subclass
+        # Create a new stub and middleware for this test
+        stub = _StubStatsD()
+        app = FastAPI()
+        app.add_middleware(sm.StatsDMiddleware, statsd_client=stub)
+    
+        @app.get("/test")
+        async def test_endpoint():
+            # Create a response with IntEnum status_code
+            response = JSONResponse({"ok": True})
+            response.status_code = HTTPStatus.OK  # This is an IntEnum, not a plain int
+            return response
 
-        # Extract all timing metrics
-        timings = _extract(self.stub, "timing", "request.duration_ms")
+        with TestClient(app) as client:
+            client.get("/test")
 
-        # Verify status_code tag is present and is a string integer (not "200.0")
-        self.assertTrue(any("status_code:200" in m for m in timings))
-        # Ensure it's not accidentally stringified as a float
-        self.assertFalse(any("status_code:200.0" in m for m in timings))
+        # Extract timing metrics
+        timings = _extract(stub, "timing", "request.duration_ms")
+
+        # Verify status_code tag is "200" (plain integer string), not "HTTPStatus.OK" or similar
+        self.assertTrue(any("status_code:200" in m for m in timings),
+                       f"Expected 'status_code:200' in metrics, got: {timings}")
+        # Ensure it doesn't contain enum representation
+        for timing in timings:
+            if "status_code:" in timing:
+                # Extract the status_code value
+                status_part = [part for part in timing.split("|#")[1].split(",") if "status_code:" in part][0]
+                status_value = status_part.split(":")[1]
+                # Should be exactly "200", not contain any enum representation
+                self.assertEqual(status_value, "200",
+                               f"Status code should be '200', got '{status_value}'")
