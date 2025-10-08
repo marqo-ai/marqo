@@ -194,3 +194,16 @@ class TestStatsDMiddleware(unittest.TestCase):
             sanitize("/indexes/foo/documents/get-batch"),
             "/indexes/foo/documents/get-batch",
         )
+
+    def test_status_code_tag_is_string_integer(self):
+        """Ensure status_code tag is always a stringified integer, not float."""
+        resp = self.client.post("/indexes/foo/search")
+        self.assertEqual(resp.status_code, 200)
+
+        # Extract all timing metrics
+        timings = _extract(self.stub, "timing", "request.duration_ms")
+
+        # Verify status_code tag is present and is a string integer (not "200.0")
+        self.assertTrue(any("status_code:200" in m for m in timings))
+        # Ensure it's not accidentally stringified as a float
+        self.assertFalse(any("status_code:200.0" in m for m in timings))
