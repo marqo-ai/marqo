@@ -40,6 +40,15 @@ class TestImageUrls(str, Enum):
     HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
     HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
 
+    # --- Image URLs for testing different image formats ---
+    # These images are tested with OpenCLIP Encode
+    BMP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_bmp_image.png'
+    TIFF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_tiff_image.tiff'
+    GIF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_gif_image.gif'
+    PNG_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_png_image.png'
+    JPG_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_jpg_image.jpg'
+    WEBP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_webp_image.webp'
+
 
 class TestAudioUrls(str, Enum):
     __test__ = False
