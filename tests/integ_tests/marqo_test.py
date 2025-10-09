@@ -42,12 +42,12 @@ class TestImageUrls(str, Enum):
 
     # --- Image URLs for testing different image formats ---
     # These images are tested with OpenCLIP Encode
-    BMP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_bmp_image.bmp'
-    TIFF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_tiff_image.tiff'
-    GIF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_gif_image.gif'
-    PNG_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_png_image.png'
-    JPG_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_jpg_image.jpg'
-    WEBP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_webp_image.webp'
+    BMP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_bmp_image.bmp'
+    TIFF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_tiff_image.tiff'
+    GIF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_gif_image.gif'
+    PNG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_png_image.png'
+    JPG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_jpg_image.jpg'
+    WEBP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_webp_image.webp'
 
 
 class TestAudioUrls(str, Enum):
