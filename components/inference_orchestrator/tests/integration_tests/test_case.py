@@ -32,7 +32,7 @@ class InferenceTestCase(TestCase):
         """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
         """
         cls.mock_request = Mock()
-        cls.patcher = patch('marqo_inference_container.api.telemetry.RequestMetricsStore._get_request')
+        cls.patcher = patch('inference_orchestrator.api.telemetry.RequestMetricsStore._get_request')
         cls.mock_get_request = cls.patcher.start()
         cls.mock_get_request.return_value = cls.mock_request
         RequestMetricsStore.set_in_request(cls.mock_request)
@@ -41,7 +41,7 @@ class InferenceTestCase(TestCase):
     def setUpClass(cls) -> None:
         cls.configure_request_metrics()
         cls.config = get_config()
-        cls.inference = cls.config.local_inference
+        cls.inference = cls.config.inference
 
     def validate_norm(self, embedding: ndarray, epsilon: float = 1e-6, normalize: bool = True):
         if normalize:
