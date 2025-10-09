@@ -42,7 +42,7 @@ class TestImageUrls(str, Enum):
 
     # --- Image URLs for testing different image formats ---
     # These images are tested with OpenCLIP Encode
-    BMP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_bmp_image.png'
+    BMP_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_bmp_image.bmp'
     TIFF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_tiff_image.tiff'
     GIF_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_gif_image.gif'
     PNG_IMAGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/sample_png_image.png'
