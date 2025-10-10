@@ -1,9 +1,11 @@
-import torch
-from unittest import TestCase
 from unittest.mock import patch
-from marqo.inference.native_inference.content_preprocessing import split_prefix_preprocess_text
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from marqo.core.inference.api import TextPreprocessingConfig, TextChunkConfig
+
+import torch
+
+from inference_orchestrator.schemas.api import TextPreprocessingConfig, TextChunkConfig
+from inference_orchestrator.services.triton_inference.content_preprocessing import split_prefix_preprocess_text
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from tests.integration_tests.test_case import InferenceTestCase
 
 
 class CLIPPreprocessor(AbstractPreprocessor):
@@ -26,7 +28,7 @@ def faulty_preprocess_side_effect(inputs, modality="language"):
     return [torch.ones(size=(1, 12))] * (len(inputs) - 1)  # One less output
 
 
-class TestSplitPrefixPreprocessText(TestCase):
+class TestSplitPrefixPreprocessText(InferenceTestCase):
 
     @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
     def test_split_prefix_preprocess_text_with_prefix(self, mock_preprocess):

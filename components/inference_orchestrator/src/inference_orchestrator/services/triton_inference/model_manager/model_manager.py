@@ -37,14 +37,15 @@ def _model_op_guard(lock: threading.Lock, timeout: float = 2.0):
 
 
 def load_model(
-        model_name: str, model_properties: dict, triton_client: TritonGRPCClient, model_management_client: ModelManagementClient
+        model_name: str, model_properties: dict, triton_client: TritonGRPCClient, model_management_client: ModelManagementClient,
+        timeout: float = 2.0
 ) -> Union[OpenCLIPModel, OpenCLIPModelProperties]:
     """
     Load a model based on the provided model name and properties.
     If the model is already loaded, it retrieves it from the cache.
     """
     model_cache_key = _create_model_cache_key(model_name, model_properties)
-    with _model_op_guard(lock):
+    with _model_op_guard(lock, timeout=timeout):
         _update_available_models(
             model_cache_key, model_name, model_properties,
             triton_client=triton_client, model_management_client=model_management_client
@@ -167,7 +168,7 @@ def eject_model(model_name: str) -> dict:
         Future_Change:
             expose cache related functions to the client
     """
-    with _model_op_guard(lock):
+    with _model_op_guard(lock, timeout=2.0):
         for model_cache_key in list(_available_models.keys()):
             if model_cache_key.startswith(model_name):
                 get_available_models()[model_cache_key].unload()

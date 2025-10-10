@@ -2,7 +2,6 @@ import time
 from typing import Dict
 
 import nltk
-import torch
 
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import \
     get_model_properties
@@ -20,7 +19,6 @@ logger = get_logger(__name__)
 def on_start(config: Config):
     to_run_on_start = (
         DownloadStartText(),
-        CUDAAvailable(),
         CheckNLTKTokenizers(),
         CacheModels(config),
         DownloadFinishText(),
@@ -33,31 +31,6 @@ def on_start(config: Config):
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
-
-
-class CUDAAvailable:
-    # TODO [Refactoring device logic] move this logic to device manager
-    """checks the status of cuda
-    """
-    logger = get_logger('CUDA device summary')
-
-    def run(self):
-        def id_to_device(id):
-            if id < 0:
-                return ['cpu']
-            return [torch.cuda.get_device_name(id)]
-
-        device_count = 0 if not torch.cuda.is_available() else torch.cuda.device_count()
-
-        # use -1 for cpu
-        device_ids = [-1]
-        device_ids += list(range(device_count))
-
-        device_names = []
-        for device_id in device_ids:
-            device_names.append({'id': device_id, 'name': id_to_device(device_id)})
-
-        self.logger.info(f"Found devices {device_names}")
 
 
 class CacheModels:
@@ -79,11 +52,6 @@ class CacheModels:
             elif isinstance(model, dict):
                 model_name = model["model"]
 
-            if model_name in {"no_model"}:
-                self.logger.info(
-                    f"Skipping preloading of '{model_name}' because the model does not require preloading.")
-                continue
-
             self.logger.debug(f"Loading model: {model}")
 
             # warm it up
@@ -103,7 +71,7 @@ class CacheModels:
             self.logger.info(message)
         self.logger.info("completed loading models")
 
-    def _preload_model(self, model, content, device):
+    def _preload_model(self, model, content):
         """
             Calls vectorise for a model once. This will load in the model if it isn't already loaded.
             If `model` is a str, it should be a model name in the registry
@@ -128,12 +96,11 @@ class CacheModels:
                 model_properties=model["modelProperties"],
             )
 
-        _ = self.config.local_inference.vectorise(InferenceRequest(
+        _ = self.config.inference.vectorise(InferenceRequest(
             modality=Modality.TEXT,
             contents=[content],
-            model_config=model_config,
+            model_config_=model_config,
             preprocessing_config=TextPreprocessingConfig(),
-            device=device
         ))
 
     def _load_model_properties_from_model_registry(self, model_name: str) -> Dict[str, str]:

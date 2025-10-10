@@ -1,10 +1,11 @@
 from abc import ABC
 from abc import abstractmethod
 from enum import Enum
-from numpy import ndarray
-from pydantic import StrictStr, model_validator, ConfigDict, BaseModel, Field
 from typing import Any, List, Tuple
 from typing import Optional, Dict, Literal, Union
+
+from numpy import ndarray
+from pydantic import StrictStr, model_validator, ConfigDict, BaseModel, Field
 
 from .base_model import AppImmutableBaseModel
 

@@ -1,26 +1,29 @@
+from typing import Union
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
-from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
+
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
+from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
+from .enum import LogLevel, LogFormat
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        validate_assignment=True,
         populate_by_name=True,
         env_file=".env",
         env_file_encoding="utf-8",
-        frozen=True
+        frozen=True,
+        extra="ignore",
     )
 
     marqo_inference_cache_size: int = Field(0, alias="MARQO_INFERENCE_CACHE_SIZE")
     marqo_inference_cache_type: str = Field("LRU", alias="MARQO_INFERENCE_CACHE_TYPE")
     marqo_triton_url: str = Field("http://localhost:8001", alias="MARQO_TRITON_URL")
-    marqo_triton_grpc_client_configs: str | None = Field(None, alias="MARQO_TRITON_GRPC_CLIENT_CONFIGS")
     marqo_model_management_container_url: str = Field("http://localhost:8883", alias="MARQO_MODEL_MANAGEMENT_CONTAINER_URL")
-    marqo_models_to_preload: list[str | dict] = Field(default_factory=list, alias="MARQO_MODELS_TO_PRELOAD")
-    marqo_log_level: str = Field("INFO", alias="MARQO_LOG_LEVEL")
-    marqo_log_format: str = Field("plain", alias="MARQO_LOG_FORMAT")
+    marqo_models_to_preload: list[Union[str, dict]] = Field(default_factory=list, alias="MARQO_MODELS_TO_PRELOAD")
+    marqo_log_level: LogLevel = Field(LogLevel.INFO, alias="MARQO_LOG_LEVEL")
+    marqo_log_format: LogFormat = Field(LogFormat.PLAIN, alias="MARQO_LOG_FORMAT")
     marqo_metrics_export_interval: int = Field(30, ge=0, alias="MARQO_METRICS_EXPORT_INTERVAL")
     channel_args: ChannelArgs = Field(default_factory=ChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS")
 
@@ -36,6 +39,24 @@ class Settings(BaseSettings):
                         f"Your custom model {preload_model_in_v} is missing 'model' key."
                         f"To add a custom model, it must be a dict with keys 'model' and 'modelProperties' "
                     )
+        return v
+
+    @field_validator("marqo_log_level", mode="before")
+    @classmethod
+    def validate_and_set_log_level(cls, v):
+        if v is None:
+            return "INFO"
+        if isinstance(v, str):
+            return v.upper()
+        return v
+
+    @field_validator("marqo_log_format", mode="before")
+    @classmethod
+    def validate_and_set_log_format(cls, v):
+        if v is None:
+            return "PLAIN"
+        if isinstance(v, str):
+            return v.upper()
         return v
 
 

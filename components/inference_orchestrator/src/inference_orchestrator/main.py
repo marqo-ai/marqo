@@ -104,7 +104,7 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
 
     # Generate embeddings
     try:
-        result = config.local_inference.vectorise(inference_request)
+        result = config.inference.vectorise(inference_request)
     except ServiceError as e:
         # TODO distinguish recoverable error from unrecoverable error, return different error code
         raise HTTPException(
