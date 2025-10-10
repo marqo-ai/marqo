@@ -21,24 +21,20 @@ from marqo.inference.type import *
 from marqo.s2_inference.errors import S2InferenceError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.no_model_utils import NO_MODEL
-from marqo.inference.triton_inference.triton.triton_grpc_client import TritonGRPCClient
 
 
 class NativeInferenceLocal(Inference):
 
-    def __init__(self, device_manager: DeviceManager, triton_grpc_client: TritonGRPCClient):
+    def __init__(self, device_manager: DeviceManager):
         self.device_manager = device_manager
-        self.triton_grpc_client = triton_grpc_client
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         try:
-            # Note this method does not actually load the model, but only loads the model preprocessing methods
-            # The real model is in the Triton server
             model = load_model(
                 model_name=request.model_config.model_name,
                 model_properties=request.model_config.model_properties,
                 model_auth=request.model_config.model_auth,
-                device=self.device_manager.pick_and_validate_device(device=request.device),
+                device=self.device_manager.pick_and_validate_device(device=request.device)
             )
         except (S2InferenceError, DeviceError) as e:
             raise inference_api_exceptions.ModelError(str(e)) from e

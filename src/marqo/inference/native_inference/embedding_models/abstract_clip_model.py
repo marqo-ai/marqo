@@ -96,5 +96,5 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
             return [single_ndarray for single_ndarray in output.cpu().numpy()]
 
     @staticmethod
-    def normalize(outputs: ndarray) -> ndarray:
+    def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)

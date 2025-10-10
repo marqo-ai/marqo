@@ -30,7 +30,7 @@ MODEL_PROPERTIES = load_model_properties()
 lock = threading.Lock()
 
 
-def load_model(model_name: str, model_properties: dict, model_auth: Optional[ModelAuth], device: str, triton_grpc_client) -> AbstractEmbeddingModel:
+def load_model(model_name: str, model_properties: dict, model_auth: Optional[ModelAuth], device: str) -> AbstractEmbeddingModel:
     """
     Load the model and preprocessor if not already loaded
     """
