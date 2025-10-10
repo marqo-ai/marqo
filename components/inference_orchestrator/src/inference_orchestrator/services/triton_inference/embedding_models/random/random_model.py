@@ -44,6 +44,9 @@ class RandomModel(AbstractEmbeddingModel):
     def load(self):
         pass
 
+    def unload(self, remove_model: bool = False):
+        pass
+
     def _build_model_properties(self) -> RandomModelProperties:
         return RandomModelProperties(**self.model_properties)
 

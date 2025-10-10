@@ -1,6 +1,7 @@
 from .hugging_face.hugging_face_model_properties import HuggingFaceModelProperties
 from .open_clip.open_clip_model_properties import OpenCLIPModelProperties
 from .random.random_model_properties import RandomModelProperties
+from .random.random_model import RandomModel
 from .hugging_face.hugging_face_model import HuggingFaceModel
 from .open_clip.open_clip_model import OpenCLIPModel
 from .abstract_embedding_model import AbstractEmbeddingModel

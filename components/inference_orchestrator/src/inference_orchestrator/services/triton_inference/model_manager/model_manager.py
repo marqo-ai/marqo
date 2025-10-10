@@ -6,7 +6,7 @@ from tritonclient.grpc import InferenceServerClient as TritonGRPCClient
 from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.services.errors import InvalidModelPropertiesError, ModelOperationInProgressError
 from inference_orchestrator.services.triton_inference.embedding_models import OpenCLIPModelProperties, \
-    OpenCLIPModel, HuggingFaceModel
+    OpenCLIPModel, HuggingFaceModel, RandomModelProperties, RandomModel
 from inference_orchestrator.services.triton_inference.embedding_models.model_properties_parser import \
     get_model_loader
 from inference_orchestrator.services.triton_inference.model_manager.model_management_client import ModelManagementClient
@@ -39,7 +39,7 @@ def _model_op_guard(lock: threading.Lock, timeout: float = 2.0):
 def load_model(
         model_name: str, model_properties: dict, triton_client: TritonGRPCClient, model_management_client: ModelManagementClient,
         timeout: float = 2.0
-) -> Union[OpenCLIPModel, OpenCLIPModelProperties]:
+) -> Union[OpenCLIPModel, HuggingFaceModel, RandomModel]:
     """
     Load a model based on the provided model name and properties.
     If the model is already loaded, it retrieves it from the cache.

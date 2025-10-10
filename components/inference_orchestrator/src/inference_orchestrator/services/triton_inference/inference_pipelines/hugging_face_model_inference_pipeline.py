@@ -7,7 +7,7 @@ from inference_orchestrator.schemas.api import InferenceErrorModel, InferenceReq
 from inference_orchestrator.services.triton_inference.content_preprocessing import split_prefix_preprocess_text
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model import \
     HuggingFaceModel
-from inference_orchestrator.services.triton_inference.inference_pipeline.abstract_inference_pipeline import \
+from inference_orchestrator.services.triton_inference.inference_pipelines.abstract_inference_pipeline import \
     AbstractInferencePipeline
 
 HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]

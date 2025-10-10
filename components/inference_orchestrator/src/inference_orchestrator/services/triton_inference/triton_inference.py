@@ -1,10 +1,12 @@
 from inference_orchestrator.services.errors import InternalServerError
 from inference_orchestrator.schemas.api import *
-from inference_orchestrator.services.triton_inference.embedding_models import OpenCLIPModel, HuggingFaceModel
-from inference_orchestrator.services.triton_inference.inference_pipeline.hugging_face_model_inference_pipeline import \
+from inference_orchestrator.services.triton_inference.embedding_models import OpenCLIPModel, HuggingFaceModel, RandomModel
+from inference_orchestrator.services.triton_inference.inference_pipelines.hugging_face_model_inference_pipeline import \
     HuggingFaceModelInferencePipeline
-from inference_orchestrator.services.triton_inference.inference_pipeline.open_clip_model_inference_pipeline import (
+from inference_orchestrator.services.triton_inference.inference_pipelines.open_clip_model_inference_pipeline import (
     OpenCLIPModelInferencePipeline)
+from inference_orchestrator.services.triton_inference.inference_pipelines.random_model_inference_pipeline import \
+    RandomModelInferencePipeline
 from inference_orchestrator.services.triton_inference.model_manager.model_manager import load_model
 
 
@@ -26,5 +28,7 @@ class TritonInference(Inference):
             return OpenCLIPModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, HuggingFaceModel):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
+        elif isinstance(model, RandomModel):
+            return RandomModelInferencePipeline(model, request).run_pipeline()
         else:
-            raise InternalServerError(f"Model type '{model.__name__}' not supported.")
+            raise InternalServerError(f"Model not supported.")

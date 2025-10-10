@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from inference_orchestrator.schemas.api import *
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face import HuggingFaceModel
-from inference_orchestrator.services.triton_inference.inference_pipeline import HuggingFaceModelInferencePipeline
+from inference_orchestrator.services.triton_inference.inference_pipelines import HuggingFaceModelInferencePipeline
 
 
 class TestHuggingFaceModelInferencePipeline(unittest.TestCase):
@@ -13,7 +13,7 @@ class TestHuggingFaceModelInferencePipeline(unittest.TestCase):
         self.mock_model_config = MagicMock(spec=ModelConfig)
         self.mock_model.get_preprocessor.return_value = MagicMock()
 
-    @patch("inference_orchestrator.services.triton_inference.inference_pipeline.hugging_face_model_inference_pipeline.split_prefix_preprocess_text")
+    @patch("inference_orchestrator.services.triton_inference.inference_pipelines.hugging_face_model_inference_pipeline.split_prefix_preprocess_text")
     def test_content_preprocessing_text_modality(self, mock_split_preprocess):
         """Ensure that the content preprocessing is done correctly for text modalities."""
         inference_request = InferenceRequest(

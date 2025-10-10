@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+
 from numpy import ndarray
-from inference_orchestrator.schemas.api import InferenceRequest, InferenceResult, InferenceErrorModel
+
+from inference_orchestrator.schemas.api import InferenceResult, InferenceErrorModel
 
 
 class AbstractInferencePipeline(ABC):
