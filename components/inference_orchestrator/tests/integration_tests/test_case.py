@@ -1,18 +1,22 @@
+from enum import StrEnum
+from typing import List, Optional, Union
 from unittest import TestCase
 from unittest.mock import patch, Mock
 
 import numpy as np
+from numpy import ndarray
 
 from inference_orchestrator.api.telemetry import RequestMetricsStore
 from inference_orchestrator.config import get_config
-from inference_orchestrator.schemas.api import *
+from inference_orchestrator.schemas.api import InferenceRequest, InferenceResult, ModelConfig, Modality, \
+    TextPreprocessingConfig, ImagePreprocessingConfig
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import \
     get_model_properties
-from inference_orchestrator.services.triton_inference.triton_inference import TritonInference
 from inference_orchestrator.services.triton_inference.model_manager import model_manager
+from inference_orchestrator.services.triton_inference.triton_inference import TritonInference
 
 
-class TestImageUrls(str, Enum):
+class TestImageUrls(StrEnum):
     __test__ = False  # Prevent pytest from collecting this class as a test
     IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
     IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'

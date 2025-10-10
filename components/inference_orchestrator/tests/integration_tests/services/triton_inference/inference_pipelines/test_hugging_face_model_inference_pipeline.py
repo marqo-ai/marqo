@@ -1,7 +1,9 @@
 import numpy as np
+from numpy import ndarray
 
+from inference_orchestrator.schemas.api import InferenceRequest, InferenceResult, ModelConfig, Modality, \
+    TextPreprocessingConfig, ImagePreprocessingConfig
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
-from inference_orchestrator.schemas.api import *
 
 
 class TestHuggingfaceModelInferencePipeline(InferenceTestCase):
