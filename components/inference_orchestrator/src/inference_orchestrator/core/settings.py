@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):
+        """Validates that each custom model in the list has both 'model' and 'modelProperties' keys.
+        Settings will automatically parse the JSON string from the environment variable into a list of dicts or strings,
+        and a JasonDecodeError will be raised if the string is not valid JSON before reaching this point.
+        """
         for preload_model_in_v in v:
             if isinstance(v, str):
                 continue
@@ -43,7 +47,7 @@ class Settings(BaseSettings):
 
     @field_validator("marqo_log_level", mode="before")
     @classmethod
-    def validate_and_set_log_level(cls, v):
+    def _validate_and_set_log_level(cls, v):
         if v is None:
             return "INFO"
         if isinstance(v, str):
@@ -52,7 +56,7 @@ class Settings(BaseSettings):
 
     @field_validator("marqo_log_format", mode="before")
     @classmethod
-    def validate_and_set_log_format(cls, v):
+    def _validate_and_set_log_format(cls, v):
         if v is None:
             return "PLAIN"
         if isinstance(v, str):
