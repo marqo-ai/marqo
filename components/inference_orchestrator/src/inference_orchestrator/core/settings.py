@@ -1,6 +1,6 @@
 from typing import Union
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
 
 try:
     _settings = Settings()
-except SettingsError as e:
+except (SettingsError, ValidationError) as e:
     raise EnvironmentVariableParsingError(
         f"Error parsing environment variables during the start on. Original error: {e}"
     ) from e
