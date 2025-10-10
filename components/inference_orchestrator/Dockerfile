@@ -26,5 +26,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Download NLTK data
 RUN uv run python -m nltk.downloader punkt
 
-# Run with gunicorn and uvicorn worker
-CMD ["uvicorn", "inference_orchestrator.main:app", "--host", "0.0.0.0", "--port", "8884"]
+ENV MARQO_HOST=0.0.0.0
+
+CMD ["sh", "-c", "uvicorn inference_orchestrator.main:app --host ${MARQO_HOST} --port 8884"]
