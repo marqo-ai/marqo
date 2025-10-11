@@ -26,3 +26,7 @@ class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):
 
 class MarqoBaseModelV2(pydantic.BaseModel):
     model_config = ConfigDict(validate_by_name=True, validate_assignment=True)
+
+
+class MarqoStrictModelV2(MarqoBaseModelV2):
+    model_config = ConfigDict(**MarqoBaseModelV2.model_config, extra="forbid")

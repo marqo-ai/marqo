@@ -207,6 +207,21 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
+    def update_index_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+        """
+        Update index settings and schema by settings dict.
+        Args:
+            index_name: Name of the index to update
+            settings_dict: Settings dict to update the index
+        Raises:
+            IndexNotFoundError: If an index does not exist
+        """
+        pass
+        existing_index = self.get_index(index_name)
+        # TODO - Finish this method
+
+
+
     def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
         """
         Update index settings and schema

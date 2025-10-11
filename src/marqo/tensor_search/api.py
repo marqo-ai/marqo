@@ -1,34 +1,30 @@
 """The API entrypoint for Tensor Search"""
 import json
-from contextlib import asynccontextmanager
-from typing import List, Type, Any, TypeVar
-
 import pydantic
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+from typing import List, Type, Any, TypeVar
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
-from marqo.api.models.embed_request import EmbedRequest
-from marqo.api.models.get_batch_documents_request import GetBatchDocumentsRequest
-from marqo.api.models.health_response import HealthResponse
-from marqo.api.models.recommend_query import RecommendQuery
-from marqo.api.models.rollback_request import RollbackRequest
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models import UpdateIndexSettingsBodyParams, HealthResponse, RecommendQuery, GetBatchDocumentsRequest, \
+    EmbedRequest, AddDocsBodyParams, RollbackRequest, UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.monitoring import memory_profiler
+from marqo.core.monitoring.statsd_client import StatsDClient
+from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -41,8 +37,6 @@ from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
-from marqo.core.monitoring.statsd_client import StatsDClient
-from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
@@ -550,6 +544,18 @@ def update_documents(
         index_name=index_name, partial_documents=body.documents)
 
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+
+
+@app.patch("/indexes/{index_name}/index-settings")
+def update_index_settings(index_name: str, body_dict: dict, marqo_config: config.Config = Depends(get_config)):
+    body = parse_request_object(UpdateIndexSettingsBodyParams, body_dict)
+
+    res = marqo_config.index_management.update_index_settings(
+        index_name=index_name,
+        new_settings=body
+    )
+
+    return JSONResponse(content={"message": "Index settings update is successful."}, headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
