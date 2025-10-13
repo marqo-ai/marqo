@@ -40,7 +40,7 @@ class StatsDMiddleware(BaseHTTPMiddleware):
         tags = {
             "path": path_tag,
             "method": request.method,
-            "status_code": str(response.status_code),
+            "status_code": str(int(response.status_code)),
         }
 
         # latency

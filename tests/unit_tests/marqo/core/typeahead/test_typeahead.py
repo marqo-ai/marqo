@@ -782,5 +782,102 @@ class TestTypeaheadGetQueries(unittest.TestCase):
         self.assertEqual(result.queries[0].query, "found query")
 
 
+class TestTypeaheadEscaping(unittest.TestCase):
+    """Test cases for the special character escaping functionality."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_vespa_client = Mock(spec=VespaClient)
+        self.mock_index_management = Mock(spec=IndexManagement)
+        self.typeahead = Typeahead(
+            vespa_client=self.mock_vespa_client,
+            index_management=self.mock_index_management
+        )
+
+    def test_escape_token_no_special_chars(self):
+        """Test escaping tokens with no special characters."""
+        # Simple strings should not be modified
+        test_cases = [
+            "hello",
+            "world",
+            "123",
+            "test_query",
+            "simple-text",
+            "with spaces",
+            "",
+        ]
+
+        for token in test_cases:
+            with self.subTest(token=token):
+                result = self.typeahead._escape_token(token)
+                self.assertEqual(result, token)
+
+    def test_escape_token_quotes(self):
+        """Test escaping tokens with double quotes."""
+        test_cases = [
+            ('"', '\\"'),
+            ('hello"world', 'hello\\"world'),
+            ('"start', '\\"start'),
+            ('end"', 'end\\"'),
+            ('""', '\\"\\"'),
+            ('say "hello"', 'say \\"hello\\"'),
+        ]
+
+        for input_token, expected in test_cases:
+            with self.subTest(input_token=input_token):
+                result = self.typeahead._escape_token(input_token)
+                self.assertEqual(result, expected)
+
+    def test_escape_token_backslashes(self):
+        """Test escaping tokens with backslashes."""
+        test_cases = [
+            ('\\', '\\\\'),
+            ('hello\\world', 'hello\\\\world'),
+            ('\\start', '\\\\start'),
+            ('end\\', 'end\\\\'),
+            ('\\\\', '\\\\\\\\'),
+            ('path\\to\\file', 'path\\\\to\\\\file'),
+        ]
+
+        for input_token, expected in test_cases:
+            with self.subTest(input_token=input_token):
+                result = self.typeahead._escape_token(input_token)
+                self.assertEqual(result, expected)
+
+    def test_escape_token_mixed_special_chars(self):
+        """Test escaping tokens with both quotes and backslashes."""
+        test_cases = [
+            ('"\\', '\\"\\\\'),
+            ('"hello\\world"', '\\"hello\\\\world\\"'),
+            ('C:\\Program Files\\"test"', 'C:\\\\Program Files\\\\\\"test\\"'),
+            ('a"b\\c"d', 'a\\"b\\\\c\\"d'),
+        ]
+
+        for input_token, expected in test_cases:
+            with self.subTest(input_token=input_token):
+                result = self.typeahead._escape_token(input_token)
+                self.assertEqual(result, expected)
+
+    def test_escape_token_preserves_other_chars(self):
+        """Test that escaping preserves other special characters."""
+        # Characters that are NOT in CHARACTERS_TO_BE_ESCAPED_IN_VESPA should be preserved
+        test_cases = [
+            "hello!world",
+            "test@example.com",
+            "price$100",
+            "50%off",
+            "a+b=c",
+            "question?",
+            "array[0]",
+            "function()",
+            "hash#tag",
+        ]
+
+        for token in test_cases:
+            with self.subTest(token=token):
+                result = self.typeahead._escape_token(token)
+                self.assertEqual(result, token)
+
+
 if __name__ == "__main__":
     unittest.main()
