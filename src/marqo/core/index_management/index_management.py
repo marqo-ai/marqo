@@ -16,6 +16,7 @@ from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.vespa_client import VespaClient
@@ -161,7 +162,8 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        index_to_create: List[Tuple[str, MarqoIndex]] = []
+        index_to_create: List[Tuple[str, str, MarqoIndex]] = []
+
         for request in marqo_index_requests:
             # set the default prefixes if not provided
             if request.model.text_query_prefix is None:
@@ -170,13 +172,23 @@ class IndexManagement:
                 request.model.text_chunk_prefix = request.model.get_default_text_chunk_prefix()
 
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
-            index_to_create.append((schema, marqo_index))
-            logger.debug(f'Creating index {str(request.name)} with schema:\n{schema}')
+            logger.debug(f'Creating index {request.name} with schema:\n{schema}')
+
+            typeahead_schema, updated_marqo_index = TypeaheadVespaSchema(marqo_index).generate_schema()
+            logger.debug(
+                f'Creating typeahead schema for index {request.name} with schema: '
+                f'{updated_marqo_index.typeahead_schema_name}'
+            )
+
+            index_to_create.append((schema, typeahead_schema, updated_marqo_index))
 
         with self._vespa_deployment_lock():
-            self._get_vespa_application().batch_add_index_setting_and_schema(index_to_create)
+            vespa_app = self._get_vespa_application()
 
-        return [index for _, index in index_to_create]
+            # Deploy schemas and index settings (this will deploy everything together)
+            vespa_app.batch_add_index_setting_and_schema(index_to_create)
+
+        return [index for _, _, index in index_to_create]
 
     def delete_index_by_name(self, index_name: str) -> None:
         """
@@ -266,23 +278,25 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        existing_index = self.get_index(marqo_index.name)
-        if not isinstance(existing_index, SemiStructuredMarqoIndex):
-            # This is just a sanity check, it should not happen since we do not expose this method to end user.
-            raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
-                                f'can not be updated.')
-
-        def is_subset(dict_a, dict_b):
-            # check if dict_a is a subset of dict_b
-            return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
-
-        if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
-                is_subset(marqo_index.field_map, existing_index.field_map) and
-                    is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
-            logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
-            return
-
+        # !!! Please note that we need to acquire the lock before retrieving the index setting so that we know the
+        # index setting we get is up-to-date. If another process is updating the index, we will wait until it finishes
         with self._vespa_deployment_lock():
+            existing_index = self.get_index(marqo_index.name)
+            if not isinstance(existing_index, SemiStructuredMarqoIndex):
+                # This is just a sanity check, it should not happen since we do not expose this method to end user.
+                raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
+                                    f'can not be updated.')
+
+            def is_subset(dict_a, dict_b):
+                # check if dict_a is a subset of dict_b
+                return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
+
+            if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
+                    is_subset(marqo_index.field_map, existing_index.field_map) and
+                    is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
+                logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
+                return
+
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
             logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)

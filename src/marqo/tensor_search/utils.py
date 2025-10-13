@@ -1,6 +1,7 @@
 import copy
 import datetime
 import functools
+import inspect
 import json
 import os
 import pathlib
@@ -9,10 +10,12 @@ from typing import (
     List, Optional, Union, Sequence, Dict, Tuple
 )
 
+import semver
 from fastapi import HTTPException
 
 from marqo import logging
 from marqo.api import exceptions, configs
+from marqo.core.exceptions import InternalError, UnsupportedFeatureError
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
 from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
@@ -402,6 +405,43 @@ def enable_ops_api():
             if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_OPS_API).lower() != 'true':
                 raise HTTPException(status_code=403,
                                     detail="This API endpoint is disabled. Please set MARQO_ENABLE_OPS_API to true to enable it.")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator_function
+
+
+def check_feature_support(min_marqo_version: semver.Version, feature_name: str,
+                          index_name_param: str = "index_name"):
+    def get_index(index_name: str):
+        from marqo.tensor_search.api import get_config
+        from marqo.tensor_search.index_meta_cache import get_index
+        index_management = get_config().index_management
+        return get_index(index_management, index_name)
+
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # merge position args and keyword args
+            sig = inspect.signature(func)
+            bound_args = sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+
+            if index_name_param not in bound_args.arguments:
+                raise InternalError(f'Missing {index_name_param} param in function {func.__name__}`')
+
+            index_name = bound_args.arguments[index_name_param]
+
+            marqo_index = get_index(index_name)
+            if marqo_index.parsed_marqo_version() < min_marqo_version:
+                raise UnsupportedFeatureError(
+                    f"{feature_name} functionality is not supported for index '{marqo_index.name}'. "
+                    f"This index was created with Marqo {marqo_index.marqo_version}, but this feature "
+                    f"requires indexes created with Marqo {min_marqo_version} or later. "
+                    f"Please recreate the index with a newer version of Marqo to use this features."
+                )
+
             return func(*args, **kwargs)
 
         return wrapper

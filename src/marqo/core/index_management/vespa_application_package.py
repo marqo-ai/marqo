@@ -14,9 +14,11 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from marqo.base_model import ImmutableBaseModel
+from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError, \
     ApplicationRollbackError
 from marqo.core.models import MarqoIndex
+from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 import marqo.logging
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
@@ -639,6 +641,9 @@ class VespaApplicationPackage:
         self._service_xml.config_components()
         self._marqo_config_store.update_version(to_version)
 
+        # Add typeahead schemas for existing indexes created by Marqo 2.23.0+ that don't have them
+        self._add_missing_typeahead_schemas()
+
         logger.debug(f'Persisting services.xml file: {self._service_xml}')
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE, backup=backup)
 
@@ -693,14 +698,20 @@ class VespaApplicationPackage:
         self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
         self._deploy()
 
-    def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, MarqoIndex]]) -> None:
-        for schema, index in indexes:
+    def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, str, MarqoIndex]]) -> None:
+        for schema, typeahead_schema, index in indexes:
             if self.has_index(index.name):
                 raise IndexExistsError(f"Index {index.name} already exists")
 
+            # Add index settings and schema
             self._index_setting_store.save_index_setting(index)
             self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
             self._service_xml.add_schema(index.schema_name)
+
+            # Add typeahead schema if provided
+            if index.typeahead_schema_name:
+                self._store.save_file(typeahead_schema, 'schemas', f'{index.typeahead_schema_name}.sd')
+                self._service_xml.add_schema(index.typeahead_schema_name)
 
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
@@ -714,6 +725,9 @@ class VespaApplicationPackage:
             self._index_setting_store.delete_index_setting(index.name)
             self._store.remove_file('schemas', f'{index.schema_name}.sd')
             self._service_xml.remove_schema(index.schema_name)
+            if index.typeahead_schema_name is not None:
+                self._store.remove_file('schemas', f'{index.typeahead_schema_name}.sd')
+                self._service_xml.remove_schema(index.typeahead_schema_name)
 
         self._add_schema_removal_override()
         self._persist_index_settings()
@@ -752,6 +766,42 @@ class VespaApplicationPackage:
         index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
         self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
         self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
+
+    def _add_missing_typeahead_schemas(self) -> None:
+        """
+        Add typeahead schemas for existing indexes that don't have them.
+        This method is called during bootstrap to add typeahead schemas to indexes
+        created by Marqo 2.23.0+ that are missing their typeahead schemas.
+        """
+
+        index_setting_changed = False
+
+        for _, index in self._index_setting_store._index_settings.items():
+            if (index.typeahead_schema_name is not None or
+                    index.parsed_marqo_version() < MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION):
+                # already has typeahead schema or the version is too old
+                continue
+
+            # Generate typeahead schema
+            typeahead_schema, updated_index = TypeaheadVespaSchema(index).generate_schema()
+            logger.debug(
+                f'Creating typeahead schema for index {index.name} with schema: '
+                f'{updated_index.typeahead_schema_name}'
+            )
+
+            # Save the typeahead schema file
+            self._store.save_file(typeahead_schema, 'schemas', f'{updated_index.typeahead_schema_name}.sd')
+            # Add to services.xml
+            self._service_xml.add_schema(updated_index.typeahead_schema_name)
+            # Update the index settings with typeahead_schema_name
+            self._index_setting_store.save_index_setting(
+                updated_index.copy(update={"version": updated_index.version + 1}))
+
+            index_setting_changed = True
+            logger.info(f"Added typeahead schema for index {index.name}")
+
+        if index_setting_changed:
+            self._persist_index_settings()
 
     def _configure_query_profiles(self, backup: VespaAppBackup) -> None:
         content = textwrap.dedent(

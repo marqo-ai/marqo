@@ -1,9 +1,10 @@
-from typing import Dict, List, Optional, Tuple
-import unittest
+from http import HTTPStatus
 
+import unittest
 from fastapi import FastAPI, HTTPException
 from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
+from typing import Dict, List, Optional, Tuple
 
 from marqo.core.monitoring import statsd_middleware as sm
 
@@ -176,3 +177,58 @@ class TestStatsDMiddleware(unittest.TestCase):
 
         timings = _extract(self.stub, "timing", "request.duration_ms")
         self.assertTrue(any("status_code:404" in m for m in timings))
+
+    def test_sanitize_path(self):
+        """Test the _sanitize_path method for various scenarios."""
+        sanitize = sm.StatsDMiddleware._sanitize_path
+
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/abc123"),
+            "/indexes/foo/documents/<document_id>",
+        )
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/delete-batch"),
+            "/indexes/foo/documents/delete-batch",
+        )
+
+        self.assertEqual(
+            sanitize("/indexes/foo/documents/get-batch"),
+            "/indexes/foo/documents/get-batch",
+        )
+
+    def test_status_code_tag_is_string_integer(self):
+        """Ensure status_code tag is always a plain integer string, not an Enum representation."""
+        # Create a mock response with an IntEnum-like status_code
+        # This simulates cases where status_code could be an IntEnum subclass
+        # Create a new stub and middleware for this test
+        test_cass = [
+            (HTTPStatus.OK, "200"),
+            (HTTPStatus.BAD_REQUEST, "400"),
+            (HTTPStatus.INTERNAL_SERVER_ERROR, "500")
+        ]
+        for return_enum, expected_str in test_cass:
+            with self.subTest(msg=f"status_code tag for {return_enum}"):
+                stub = _StubStatsD()
+                app = FastAPI()
+                app.add_middleware(sm.StatsDMiddleware, statsd_client=stub)
+
+                @app.get("/test")
+                async def test_endpoint():
+                    # Create a response with IntEnum status_code
+                    response = JSONResponse({"message": "test"})
+                    response.status_code = return_enum
+                    return response
+
+                with TestClient(app) as client:
+                    client.get("/test")
+
+                    timings = _extract(stub, "timing", "request.duration_ms")
+                    self.assertTrue(any(f"status_code:{expected_str}" in m for m in timings),
+                                   f"Expected 'status_code:{expected_str}' in metrics, got: {timings}")
+                    # Ensure it doesn't contain enum representation
+                    for timing in timings:
+                        if "status_code:" in timing:
+                            status_part = [part for part in timing.split("|#")[1].split(",") if "status_code:" in part][0]
+                            status_value = status_part.split(":")[1]
+                            self.assertEqual(status_value, expected_str,
+                                           f"Status code should be '{expected_str}', got '{status_value}'")

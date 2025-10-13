@@ -34,7 +34,7 @@ class HFTritonModelProperties(TritonModelProperties):
         names = [inp.name for inp in v]
         expected_names = ["last_hidden_state"]
         if names != expected_names:
-            raise ValueError(f"Hugging Face models must have inputs named {expected_names}. Received {names}.")
+            raise ValueError(f"Hugging Face models must have output named {expected_names}. Received {names}.")
         return v
 
 

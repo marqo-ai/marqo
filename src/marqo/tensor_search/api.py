@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pydantic import ValidationError
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from typing import List, Type, Any, TypeVar
@@ -22,6 +23,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
 from marqo.core.monitoring.statsd_client import StatsDClient
 from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
@@ -68,9 +70,9 @@ def generate_config() -> config.Config:
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
     if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
+        # !!!Please note that these imports are deliberately put here since we only need them in COMBINED mode
         import marqo.inference.native_inference.remote.server.inference_config as inference_config
         from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
-
         native_inference_local_config = inference_config.Config()
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference
@@ -740,6 +742,90 @@ def schema_validation(index_name: str, settings_object: dict):
             "index": index_name
         }
     )
+
+
+# No throttling config here. Throttling will be deprecated and removed from Marqo soon.
+@app.post("/indexes/{index_name}/suggestions")
+def get_suggestions(index_name: str, suggestion_request: TypeaheadRequest,
+                    marqo_config: config.Config = Depends(get_config)):
+    """
+    Get query suggestions for typeahead functionality.
+    """
+    response = marqo_config.typeahead.get_suggestions(index_name, suggestion_request)
+
+    return ORJSONResponse(content=response.model_dump(by_alias=True))
+
+
+@app.post("/indexes/{index_name}/suggestions/queries")
+def index_queries(index_name: str, typeahead_index_request: TypeaheadIndexingRequest,
+                  marqo_config: config.Config = Depends(get_config)):
+    """
+    Index queries for typeahead suggestions.
+    
+    Args:
+        index_name: Name of the index to add queries to
+        typeahead_index_request: Request object to index the query suggestions
+    """
+    result = marqo_config.typeahead.index_queries(index_name, typeahead_index_request)
+
+    return ORJSONResponse(content=result.model_dump(by_alias=True))
+
+
+@app.delete("/indexes/{index_name}/suggestions/queries/delete-all", include_in_schema=False)
+@utils.enable_batch_apis()
+def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Delete all queries from the typeahead index.
+    
+    Args:
+        index_name: Name of the index to delete queries from
+    """
+    # Delete all queries
+    marqo_config.typeahead.delete_all_queries(index_name)
+
+    return JSONResponse("All queries deleted successfully")
+
+
+@app.delete("/indexes/{index_name}/suggestions/queries")
+def delete_queries(index_name: str, queries: List[str], marqo_config: config.Config = Depends(get_config)):
+    """
+    Delete specific queries from the typeahead index.
+    
+    Args:
+        index_name: Name of the index to delete queries from
+        queries: list containing queries to delete:
+    """
+    # Delete specific queries
+    marqo_config.typeahead.delete_queries(index_name, queries)
+
+    return JSONResponse("Queries deleted successfully")
+
+
+@app.get("/indexes/{index_name}/suggestions/stats")
+def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Get statistics about the typeahead queries for an index.
+    
+    Args:
+        index_name: Name of the index to get stats for
+    """
+    stats = marqo_config.typeahead.get_stats(index_name)
+
+    return ORJSONResponse(content=stats.model_dump(by_alias=True))
+
+
+@app.get("/indexes/{index_name}/suggestions/queries")
+def get_queries(index_name: str, queries: List[str], marqo_config: config.Config = Depends(get_config)):
+    """
+    Get specific queries from the typeahead index by query strings.
+    
+    Args:
+        index_name: Name of the index to get queries from
+        queries: List of query strings to retrieve
+    """
+    result = marqo_config.typeahead.get_queries(index_name, queries)
+    
+    return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 
 @app.get('/memory', include_in_schema=False)
