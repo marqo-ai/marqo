@@ -219,9 +219,10 @@ class IndexManagement:
             settings_dict: Settings dict to update the index, currently only modelProperties can be updated.
         Raises:
             IndexNotFoundError: If an index does not exist
-            InvalidArgumentError: If the updated settings are invalid
+            UnsupportedFeatureError: If the updated modelProperties results in dimension change
         """
         if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):
+            # Should not happen since we validate the settings in the API layer
             raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
                                 f"Provided settings: {list(settings_dict.keys())}")
 
