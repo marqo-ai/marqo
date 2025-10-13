@@ -211,12 +211,17 @@ class IndexManagement:
 
     def update_index_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
         """
-        Update index settings and schema by settings dict.
+        Update index settings and schema by settings dict. Currently only modelProperties can be updated.
+
+        When calling this method, you must consider the scenario distributed Marqo instances. Some Marqo instances
+        could still be running the old version so the updated modelProperties must be compatible with the old version.
+
         Args:
             index_name: Name of the index to update
-            settings_dict: Settings dict to update the index
+            settings_dict: Settings dict to update the index, currently only modelProperties can be updated.
         Raises:
             IndexNotFoundError: If an index does not exist
+            InvalidArgumentError: If the updated settings are invalid
         """
         if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):
             raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
@@ -224,9 +229,10 @@ class IndexManagement:
 
         existing_index = self.get_index(index_name)
         if not isinstance(existing_index, SemiStructuredMarqoIndex):
-            # This is just a sanity check, it should not happen since we do not expose this method to end user.
-            raise InternalError(f'Index {existing_index.name} created by Marqo version {existing_index.version} '
-                                f'can not be updated.')
+            raise InvalidArgumentError(
+                f'Index {existing_index.name} created by Marqo version {existing_index.version} '
+                f'can not be updated.'
+            )
 
         updated_index = existing_index.copy()
         if "modelProperties" in settings_dict:
