@@ -128,15 +128,18 @@ class TestOpenClipModelEncode(InferenceTestCase):
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
-    def test_open_clip_encode_image_normalized(self):
+    def test_open_clip_encode_image_normalized_and_supported_image_format(self):
         """
         A test to ensure that the open clip model generates the same embeddings as the pipeline for image inputs when
-        normalize is set to True.
+        normalize is set to True, and that the images are in a supported format (JPEG/PNG).
         """
         image_urls = [
-            TestImageUrls.IMAGE0.value,
-            TestImageUrls.IMAGE1.value,
-            TestImageUrls.IMAGE2.value,
+            TestImageUrls.BMP_IMAGE.value,
+            TestImageUrls.TIFF_IMAGE.value,
+            TestImageUrls.GIF_IMAGE.value,
+            TestImageUrls.PNG_IMAGE.value,
+            TestImageUrls.JPG_IMAGE.value,
+            TestImageUrls.WEBP_IMAGE.value,
         ]
 
         images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
