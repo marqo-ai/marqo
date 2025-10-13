@@ -22,6 +22,7 @@ from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
+from model_management.errors.http_errors import InvalidArgumentError
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -230,6 +231,11 @@ class IndexManagement:
         updated_index = existing_index.copy()
         if "modelProperties" in settings_dict:
             updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
+            if updated_index.model.get_dimension() != existing_index.model.get_dimension():
+                raise InvalidArgumentError(
+                    "The model dimension of the updated modelProperties does not match the existing one. "
+                    "Model dimension can not be changed once the index is created "
+                )
 
         with self._vespa_deployment_lock():
             schema = SemiStructuredVespaSchema.generate_vespa_schema(updated_index)
