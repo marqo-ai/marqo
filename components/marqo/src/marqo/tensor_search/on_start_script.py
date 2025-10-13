@@ -1,9 +1,8 @@
 from marqo import config, version
 from marqo import marqo_docs
-from marqo.connections import redis_driver
+from marqo.logging import get_logger
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -12,7 +11,6 @@ def on_start(config: config.Config):
     to_run_on_start = (
         BootstrapVespa(config),
         PopulateCache(config),
-        InitializeRedis("localhost", 6379),
         PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
@@ -54,19 +52,6 @@ class PopulateCache:
     def run(self):
         logger.debug('Starting index cache refresh thread')
         index_meta_cache.start_refresh_thread(self.config)
-
-
-class InitializeRedis:
-
-    def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
-
-    def run(self):
-        logger.debug('Initializing Redis')
-        # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
-        if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
-            redis_driver.init_from_app(self.host, self.port)
 
 
 class PrintVersion:

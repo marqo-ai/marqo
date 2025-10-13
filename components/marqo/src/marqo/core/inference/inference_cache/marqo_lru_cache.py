@@ -3,7 +3,7 @@ from typing import Hashable, Any
 from cachetools import LRUCache
 from readerwriterlock import rwlock
 
-from marqo.inference.inference_cache.abstract_cache import MarqoAbstractCache
+from marqo.core.inference.inference_cache.abstract_cache import MarqoAbstractCache
 
 
 class MarqoLRUCache(MarqoAbstractCache):

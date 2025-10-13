@@ -1,45 +1,26 @@
-# Stage 1: Build the Java package using Maven
-FROM maven:3.8.7-openjdk-18-slim as maven_build
+FROM python:3.11-slim AS base
 
-WORKDIR /app/vespa
-# Copy only the pom.xml and any other files required for dependency resolution
-COPY vespa/pom.xml /app/vespa/
-# Download dependencies (this layer will be cached if pom.xml hasn't changed)
-RUN mvn dependency:go-offline
-
-COPY vespa/src /app/vespa/src
-# Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
-RUN mvn clean package -T 1C
-
-# Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:52 as base_image
-
-# Allow mounting volume containing data and configs for vespa
-VOLUME /opt/vespa/var
-# Allow mounting volume to expose vespa logs
-VOLUME /opt/vespa/logs
-# This is required when mounting var folder from an older version of vespa (>30 minor version gap)
-# See https://docs.vespa.ai/en/operations-selfhosted/live-upgrade.html for details
-ENV VESPA_SKIP_UPGRADE_CHECK true
-
-ARG TARGETPLATFORM
-ARG COMMITHASH
 WORKDIR /app
 
-# TODO This is temporary change to install the packages in requirements.txt file, will be moved to base image in the future
-COPY requirements.txt requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
-RUN rm requirements.txt
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+ && rm -rf /var/mlib/apt/lists/*
 
-# Stage 3: Final stage that builds on the base image
-FROM base_image
+# Install uv
+RUN pip install --no-cache-dir uv
 
-COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
+# Copy project metadata
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies from lockfile
+RUN uv sync --no-dev
+
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
-ENV PYTHONPATH "${PYTHONPATH}:/app"
+ENV PYTHONPATH=/app/src
 RUN chmod +x ./run_marqo.sh
 RUN echo $COMMITHASH > build_info.txt
 CMD ["./run_marqo.sh"]

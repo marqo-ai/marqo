@@ -8,7 +8,7 @@ import orjson
 from marqo.core.inference.api import Inference, InferenceRequest, InferenceResult, Modality, \
     InferenceErrorModel
 from marqo.core.inference.modality_utils import is_base64_image
-from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
+from marqo.core.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
 class CachingInference(Inference):

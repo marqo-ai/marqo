@@ -5,16 +5,10 @@ from typing import List, Type, Any, TypeVar
 
 import pydantic
 import uvicorn
-
-
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
-from marqo.core.inference.inference_cache.caching_inference import CachingInference
-from marqo.core.inference.native_inference.remote.client.inference_client import NativeInferenceClient
-from marqo.core.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
-from pydantic import ValidationError
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -29,6 +23,9 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_client.inference_client import InferenceClient
+from marqo.core.inference.model_manager_client.model_manager_client import ModelManagerClient
 from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
 from marqo.core.monitoring.statsd_client import StatsDClient
@@ -72,37 +69,28 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
-        # !!!Please note that these imports are deliberately put here since we only need them in COMBINED mode
-        import marqo.inference.native_inference.remote.server.inference_config as inference_config
-        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
-        native_inference_local_config = inference_config.Config()
-        inference_on_start(native_inference_local_config)  # pre-warm the model
-        inference = native_inference_local_config.local_inference
-        model_manager = native_inference_local_config.model_manager
-        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
-    else:
-        inference = NativeInferenceClient(
-            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
-            pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
-            timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
-        )
-        model_manager = ModelManagerClient(
-            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
-        )
+    inference = InferenceClient(
+        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+        timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
+    )
 
-        # initialise inference cache
-        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
-        if inference_cache_size > 0:  # enable inference cache
-            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
-            caching_inference = CachingInference(
-                delegate=inference,
-                cache_size=inference_cache_size,
-                cache_type=inference_cache_type
-            )
-            return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
-        else:
-            return config.Config(vespa_client, inference, model_manager, zookeeper_client)
+    model_manager = ModelManagerClient(
+        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+    )
+
+    # initialise inference cache
+    inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
+    if inference_cache_size > 0:  # enable inference cache
+        inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
+        caching_inference = CachingInference(
+            delegate=inference,
+            cache_size=inference_cache_size,
+            cache_type=inference_cache_type
+        )
+        return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
+    else:
+        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -119,6 +107,7 @@ async def lifespan(app: FastAPI):
 
     otel_shutdown_hook()
     get_config().stop_and_close_zookeeper_client()
+
 
 app = FastAPI(
     title="Marqo",
@@ -311,6 +300,7 @@ def parse_request_object(obj_type: Type[T], obj: Any) -> T:
     except pydantic.v1.ValidationError as e:
         raise RequestValidationError(errors=e.errors()) from e
 
+
 @app.get("/", summary="Basic information")
 def root():
     return {"message": "Welcome to Marqo",
@@ -436,8 +426,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 facets=search_query.facets,
                 track_total_hits=search_query.trackTotalHits,
                 language=search_query.language,
-                relevance_cutoff= search_query.relevance_cutoff,
-                sort_by = search_query.sort_by,
+                relevance_cutoff=search_query.relevance_cutoff,
+                sort_by=search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,
                 collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None
             )
@@ -552,7 +542,8 @@ def update_documents(
 
 
 @app.patch("/indexes/{index_name}/index-settings")
-def update_index_settings(index_name: str, body: UpdateIndexSettingsBodyParams, marqo_config: config.Config = Depends(get_config)):
+def update_index_settings(index_name: str, body: UpdateIndexSettingsBodyParams,
+                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
     res = marqo_config.index_management.update_index_settings_by_settings_dict(
         index_name=index_name,
@@ -679,7 +670,8 @@ def batch_create_indexes(index_settings_with_name_list: List[dict],
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in
+                      index_settings_with_name_list]
 
     marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
@@ -827,7 +819,7 @@ def get_queries(index_name: str, queries: List[str], marqo_config: config.Config
         queries: List of query strings to retrieve
     """
     result = marqo_config.typeahead.get_queries(index_name, queries)
-    
+
     return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 

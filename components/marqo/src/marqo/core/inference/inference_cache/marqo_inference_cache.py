@@ -4,11 +4,11 @@ from typing import Optional, Union, TypeVar
 
 from marqo import logging
 from marqo.api.exceptions import EnvVarError
-from marqo.inference.inference_cache.abstract_cache import MarqoAbstractCache
-from marqo.inference.inference_cache.enums import MarqoCacheType
-from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
-from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
-from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector, CacheStatsCollector
+from marqo.core.inference.inference_cache.abstract_cache import MarqoAbstractCache
+from marqo.core.inference.inference_cache.enums import MarqoCacheType
+from marqo.core.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
+from marqo.core.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
+from marqo.core.inference.inference_cache.monitoring import OTELCacheStatsCollector, CacheStatsCollector
 
 T = TypeVar("T")
 logger = logging.get_logger(__name__)

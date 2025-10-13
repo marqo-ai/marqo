@@ -15,9 +15,8 @@ from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 
-# TODO refactor to remove dep to s2_inference
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
+import marqo.core.inference.api.exceptions as inference_exceptions
+from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties, validate_model_properties
 
 logger = get_logger(__name__)
 
@@ -183,10 +182,11 @@ class Model(MarqoBaseModel):
         custom = values.get('custom')
         if properties and custom:
             try:
-                s2_inference.validate_model_properties(model_name, properties)
+                validate_model_properties(properties)
             except InvalidModelPropertiesError as e:
                 raise ValueError(
-                    f'Invalid model properties for model={model_name}. Reason: {e}.')
+                    f'Invalid model properties for model={model_name}. Reason: {e}.'
+                )
         return values
 
     def dict(self, *args, **kwargs):
@@ -226,16 +226,12 @@ class Model(MarqoBaseModel):
 
             model_name = self.name
             try:
-                self.properties = s2_inference.get_model_properties_from_registry(model_name)
-            except UnknownModelError:
+                self.properties = get_model_properties(model_name)
+            except inference_exceptions.UnsupportedModelError:
                 raise InvalidArgumentError(
                     f'Could not find model properties for model={model_name}. '
                     f'Please check that the model name is correct. '
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
-            except InvalidModelPropertiesError as e:
-                raise InvalidArgumentError(
-                    f'Invalid model properties for model={model_name}. Reason: {e}.'
-                )
 
     def get_text_query_prefix(self, request_level_prefix: Optional[str] = None) -> str:
         if request_level_prefix is not None:

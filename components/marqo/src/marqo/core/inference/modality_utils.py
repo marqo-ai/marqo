@@ -1,6 +1,5 @@
 import io
 import os
-import base64
 from contextlib import contextmanager
 from typing import Optional, Union, List
 from urllib.parse import urlparse

@@ -1,10 +1,10 @@
-import orjson
 import time
 from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import orjson
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response

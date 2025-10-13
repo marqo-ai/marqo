@@ -34,3 +34,13 @@ class MediaExceedsMaxSizeError(InferenceError):
 class MediaMismatchError(InferenceError):
     """Raised when the media does not match the expected type"""
     pass
+
+
+class UnsupportedModelError(InferenceError):
+    """Raised when the specified model is not recognized or supported"""
+    pass
+
+
+class InvalidModelPropertiesError(InferenceError):
+    """Raised when the provided model properties are invalid or not supported"""
+    pass
