@@ -76,7 +76,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         )
         self._pooling_func = self._load_pooling_method()
 
-        self.model = self._load_triton_model()
+        self._model = self._load_triton_model()
 
     def _load_triton_model(self) -> bool:
         """Load the model into Triton Inference Server using the model management client."""
