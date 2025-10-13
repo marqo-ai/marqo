@@ -40,11 +40,11 @@ class OpenCLIPTritonModelProperties(TritonModelProperties):
     def validate_output(cls, v: list):
         output_length = len(v)
         if output_length != 1:
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder must have exactly 1 input. "
+            raise ValueError(f"For OpenCLIP models, triton_text_encoder must have exactly 1 output. "
                              f"Received '{v}' with '{output_length}' inputs.")
 
         if v[0].name != "output":
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder input must be named 'input'. "
+            raise ValueError(f"For OpenCLIP models, triton_text_encoder output must be named 'output'. "
                              f"Received '{v[0].name}' instead.")
         return v
 

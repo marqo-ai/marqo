@@ -46,6 +46,7 @@ def is_base64_image(s: str) -> bool:
     if s.startswith("data:image/"):
         return True
 
+    return False
 
 def _is_image(inputs: Union[str, List[Union[str, Image, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
