@@ -25,6 +25,7 @@ from inference_orchestrator.services.triton_inference.embedding_models.open_clip
     OpenCLIPModelProperties
 from inference_orchestrator.services.triton_inference.model_manager.model_management_client import ModelManagementClient
 from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
+from ..model_download_cache import ModelDownloadCache
 
 logger = get_logger(__name__)
 
@@ -196,7 +197,7 @@ class OpenCLIPModel(AbstractEmbeddingModel):
             return HFTokenizer(self.model_properties.tokenizer)
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_properties.name)
+        return open_clip.get_tokenizer(self.model_properties.name, cache_dir=ModelDownloadCache.hf_cache_path)
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
         return open_clip.get_tokenizer(self.model_properties.name.split("/", 3)[1])

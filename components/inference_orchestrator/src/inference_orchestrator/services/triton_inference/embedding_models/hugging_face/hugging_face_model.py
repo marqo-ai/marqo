@@ -1,10 +1,9 @@
-from typing import List, Callable
-
 import numpy as np
 from numpy import ndarray
 from pydantic import ValidationError
 from transformers import (AutoTokenizer)
 from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
+from typing import List, Callable
 
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.errors import InternalServerError, InvalidModelPropertiesError
@@ -16,6 +15,7 @@ from inference_orchestrator.services.triton_inference.embedding_models.hugging_f
     HuggingFaceModelProperties, PoolingMethod)
 from inference_orchestrator.services.triton_inference.model_manager.model_management_client import ModelManagementClient
 from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
+from ..model_download_cache import ModelDownloadCache
 
 
 class HuggingFacePreprocessor(AbstractPreprocessor):
@@ -70,7 +70,10 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             InvalidModelPropertiesError: If the model properties are invalid or incomplete.
         """
 
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_properties.name)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self.model_properties.name,
+            cache_dir=ModelDownloadCache.hf_cache_path
+        )
         self._pooling_func = self._load_pooling_method()
 
         self.model = self._load_triton_model()

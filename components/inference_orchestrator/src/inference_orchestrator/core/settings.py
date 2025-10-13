@@ -1,11 +1,13 @@
-from typing import Union
-
+from pathlib import Path
 from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
+from typing import Union
 
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
 from .enum import LogLevel, LogFormat
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent # to src/
 
 
 class Settings(BaseSettings):
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
     marqo_log_format: LogFormat = Field(LogFormat.PLAIN, alias="MARQO_LOG_FORMAT")
     marqo_metrics_export_interval: int = Field(30, ge=0, alias="MARQO_METRICS_EXPORT_INTERVAL")
     channel_args: ChannelArgs = Field(default_factory=ChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS")
+    marqo_model_cache_path: str = Field(default="/.cache", alias="MARQO_MODEL_CACHE_PATH")
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):
