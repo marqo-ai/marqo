@@ -409,7 +409,7 @@ class StructuredVespaIndex(VespaIndex):
             'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} '
                    f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
             'model_restrict': self._marqo_index.schema_name,
-            'timeout': '5s'
+            'timeout': 5000
         }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
