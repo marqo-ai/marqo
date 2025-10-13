@@ -1,9 +1,10 @@
 import asyncio
 import functools
+import json
 import os
-import sys
+import time
 import unittest
-from unittest.mock import patch, Mock, AsyncMock, ANY
+from unittest.mock import Mock, patch
 
 import httpcore
 import httpx
@@ -13,13 +14,13 @@ import vespa.application as pyvespa
 from marqo.tensor_search.api import generate_config
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import concurrency
-from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError, VespaNotConvergedError
-from marqo.vespa.models import VespaDocument, QueryResult
-from marqo.vespa.models.get_document_response import GetBatchResponse, GetBatchDocumentResponse, Document
+from marqo.vespa.exceptions import (VespaError, VespaNotConvergedError,
+                                    VespaStatusError, VespaTimeoutError)
+from marqo.vespa.models import QueryResult, VespaDocument
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from tests.integ_tests.marqo_test import AsyncMarqoTestCase, MarqoTestCase
+from tests.integ_tests.marqo_test import AsyncMarqoTestCase
 
 
 class TestVespaClient(AsyncMarqoTestCase):
@@ -838,3 +839,30 @@ class TestVespaClient(AsyncMarqoTestCase):
                 )
 
         assert mock_delete.call_count == 1
+
+    def test_httpx_client_should_not_timeout_before_vespa_timeout(self):
+        """Test that httpx client will not time out before Vespa timeout"""
+        def delayed_vespa_504(*args, **kwargs):
+            time.sleep(7)  # emulate Vespa taking ~7s
+            payload = {
+                "root": {
+                    "relevance": 0.0,
+                    "errors": [{
+                        "code": 8,
+                        "summary": "Error in search reply.",
+                        "message": "Search request soft doomed during query setup and initialization."
+                    }]
+                }
+            }
+            req = httpx.Request("POST", "http://dummy/search/")
+            return httpx.Response(status_code=504, content=json.dumps(payload).encode(), request=req)
+
+        query_client = VespaClient("http://localhost:8080","http://localhost:8080",
+                                   "http://localhost:8080","content_default")
+
+        with patch.object(httpx.Client, "post", side_effect=delayed_vespa_504):
+            with self.assertRaisesStrict(VespaTimeoutError):
+                query_client.query(
+                    yql="select * from sources * where title contains 'Title 1';",
+                    timeout=7000 # 7 seconds Vespa timeout, 8 seconds httpx timeout
+                )
