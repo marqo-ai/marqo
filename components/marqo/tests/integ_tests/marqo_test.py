@@ -14,15 +14,14 @@ from starlette.applications import Starlette
 from marqo import config, version
 from marqo.config import Config
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.inference.native_inference.device_manager import DeviceManager
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
-from marqo.inference.native_inference.load_model import NativeModelManager
-from marqo.inference.native_inference.local_inference import NativeInferenceLocal
+from marqo.core.inference.model_manager_client.model_manager_client import ModelManagerClient
+from marqo.core.inference.inference_client.inference_client import InferenceClient
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -109,8 +108,8 @@ class MarqoTestCase(unittest.TestCase):
                                                deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
-                                   inference=NativeInferenceLocal(DeviceManager()),
-                                   model_manager=NativeModelManager(),
+                                   inference=InferenceClient(base_url="http://localhost:8884"),
+                                   model_manager=ModelManagerClient(base_url="http://localhost:8884"),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)

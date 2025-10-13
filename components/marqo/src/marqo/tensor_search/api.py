@@ -39,7 +39,6 @@ from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
-from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
@@ -390,7 +389,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 
 @app.post("/indexes/{index_name}/search")
-@throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     """
@@ -439,7 +437,6 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
 
 
 @app.post("/indexes/{index_name}/recommend")
-@throttle(RequestType.SEARCH)
 def recommend(query_dict: dict, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
     """
@@ -476,7 +473,6 @@ def recommend(query_dict: dict, index_name: str,
 
 
 @app.post("/indexes/{index_name}/embed")
-@throttle(RequestType.SEARCH)
 def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
     """
@@ -499,7 +495,6 @@ def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(a
 
 
 @app.post("/indexes/{index_name}/documents")
-@throttle(RequestType.INDEX)
 def add_or_replace_documents(
         index_name: str,
         body_dict: dict,
@@ -522,7 +517,6 @@ def add_or_replace_documents(
 
 
 @app.patch("/indexes/{index_name}/documents")
-@throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
         index_name: str,
         body_dict: dict,
