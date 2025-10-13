@@ -164,5 +164,4 @@ scripts/vespa_local/multinode/hosts.xml
 
 # Docker compose files and environment files as
 # they may contain sensitive informatio
-**/compose.yaml
 **/.env

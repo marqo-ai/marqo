@@ -1,6 +1,3 @@
-# An example docker-compose file to run Triton Inference Server with Marqo Model Management Container (MMC).
-# Make sure to replace the placeholder for the model repository path before running.
-
 services:
   triton:
     image: nvcr.io/nvidia/tritonserver:25.08-py3
@@ -32,7 +29,7 @@ services:
       MODEL_BASE_DIR: /models
     volumes:
       - modelrepo:/models
-      # - ~/.aws/credentials:/root/.aws/credentials
+      - ~/.aws/credentials:/root/.aws/credentials # Uncomment if you don't have credentials
     ports:
       - "8883:8883"
     networks: [mmc-net]
@@ -44,7 +41,7 @@ volumes:
      driver_opts:
        type: none
        o: bind
-       # device: <> <== path to local model repository
+       device: ./.cache # <== path to local model repository, adjust as needed
 
 networks:
   mmc-net:
