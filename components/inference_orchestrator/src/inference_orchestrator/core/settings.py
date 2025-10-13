@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     marqo_log_format: LogFormat = Field(LogFormat.PLAIN, alias="MARQO_LOG_FORMAT")
     marqo_metrics_export_interval: int = Field(30, ge=0, alias="MARQO_METRICS_EXPORT_INTERVAL")
     channel_args: ChannelArgs = Field(default_factory=ChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS")
-    marqo_model_cache_path: str = Field(default="/.cache", alias="MARQO_MODEL_CACHE_PATH")
+    marqo_model_cache_path: str = Field(default="/root/.cache", alias="MARQO_MODEL_CACHE_PATH")
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):

@@ -1,0 +1,406 @@
+{# semi_structured_vespa_schema_template_2_16.sd.jinja2 -#}
+schema {{ index.schema_name }} {
+    document {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__version_uuid type string {
+                indexing: attribute | summary
+        }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        {# Reserved fields for bool, int and float fields -#}
+        field marqo__int_fields type map<string, long> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__bool_fields type map<string, byte> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                                attribute: fast-search
+                                rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__float_fields type map<string, double> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__short_string_fields type map<string, string> {
+            {#- indexing:summary is left out here since each short string has a corresponding lexical field  #}
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        {# All int and float fields will be added score modifiers -#}
+        field marqo__score_modifiers type tensor<double>(p{}) {
+            indexing: attribute | summary
+        }
+
+        field marqo__multimodal_params type map<string, string> {
+            indexing: summary
+        }
+
+        {% if collapse_field -%}
+        field {{ collapse_field.name }} type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        {% endif -%}
+
+        {% for lexical_field in index.lexical_fields -%}
+        field {{ lexical_field.lexical_field_name }} type string {
+            {%- if lexical_field.language %}
+            indexing {
+                "{{ lexical_field.language }}" | set_language;
+                index | summary;
+            }
+            {%- else %}
+            indexing: index | summary
+            {%- endif %}
+            index: enable-bm25
+            {%- if lexical_field.stemming %}
+            stemming: {{ lexical_field.stemming.value }}
+            {%- endif %}
+        }
+        {% endfor -%}
+
+        {% for string_array_field in index.string_array_fields -%}
+        field {{ string_array_field.string_array_field_name }} type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        {% endfor -%}
+
+        {% for field in index.tensor_fields -%}
+        field {{ field.chunk_field_name }} type array<string> {
+            indexing: summary
+        }
+
+        field {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: {{ index.distance_metric.value }}
+            }
+            index {
+                hnsw {
+                    max-links-per-node: {{ index.hnsw_config.m }}
+                    neighbors-to-explore-at-insert: {{ index.hnsw_config.ef_construction }}
+                }
+            }
+        }
+        {% endfor -%}
+
+        field marqo__vector_count type int {
+            indexing: attribute | summary
+        }
+    }
+
+    {% if index.lexical_field_map -%}
+    fieldset default {
+        fields: {{ ", ".join(index.lexical_field_map.keys()) }}
+    }
+    {% endif -%}
+
+    rank-profile base_rank_profile inherits default {
+        inputs {
+            {% for lexical_field in index.lexical_fields -%}
+            query({{ lexical_field.lexical_field_name }}): 0
+            {% endfor -%}
+            {% for field in index.tensor_fields -%}
+            query({{ field.embeddings_field_name }}): 0
+            {% endfor -%}
+            query(marqo__bm25_aggregator): 0
+            query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__mult_weights_lexical) tensor<double>(p{})
+            query(marqo__add_weights_lexical) tensor<double>(p{})
+            query(marqo__mult_weights_tensor) tensor<double>(p{})
+            query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
+            query(marqo__sort_field_weights_0) tensor<double>(p{})
+            query(marqo__sort_field_weights_1) tensor<double>(p{})
+            query(marqo__sort_field_weights_2) tensor<double>(p{})
+        }
+
+        function mult_modifier(mult_weights) {
+            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod))
+        }
+        function add_modifier(add_weights) {
+            expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
+        }
+        function modify(score, mult_weights, add_weights) {
+            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+        }
+        function global_mult_modifier() {
+            expression: mult_modifier(query(marqo__mult_weights_global))
+        }
+        function global_add_modifier() {
+            expression: add_modifier(query(marqo__add_weights_global))
+        }
+
+        {% macro max_score(score_macro, fields) -%}
+            {%- set length = fields|length -%}
+            {%- if length == 0 -%}
+                0
+            {%- elif length == 1 -%}
+                {{ score_macro(fields[0]) }}
+            {%- else -%}
+                max({{ max_score(score_macro, fields[0:1]) }}, {{ max_score(score_macro, fields[1:]) }})
+            {%- endif -%}
+        {% endmacro -%}
+
+        {% macro lexical_score(field) -%}
+            if (query({{ field.lexical_field_name }}) > 0, bm25({{ field.lexical_field_name }}), 0)
+        {%- endmacro -%}
+
+        {% macro embedding_score(field) -%}
+            if (query({{ field.embeddings_field_name }}) > 0, closeness(field, {{ field.embeddings_field_name }}), 0)
+        {%- endmacro -%}
+
+        {% macro sum_score(score_macro, fields) -%}
+            {%- set add = joiner(" + ") -%}
+            {%- for field in fields -%}{{ add() }}{{ score_macro(field) }}{%- endfor -%}
+        {% endmacro -%}
+
+        {% if index.lexical_fields -%}
+        function lexical_score_sum() {
+            expression: {{ sum_score(lexical_score, index.lexical_fields) }}
+        }
+
+        {% macro count_lexical_fields() -%}
+            {%- set add = joiner(" + ") -%}
+            {%- for field in index.lexical_fields -%}{{ add() }}if (query({{ field.lexical_field_name }}) > 0, 1, 0){%- endfor -%}
+        {% endmacro -%}
+        function lexical_score_avg() {
+            expression: ({{ sum_score(lexical_score, index.lexical_fields) }}) / max(1, {{ count_lexical_fields() }})
+        }
+
+        function lexical_score_max() {
+            expression: {{ max_score(lexical_score, index.lexical_fields) }}
+        }
+
+        function lexical_score() {
+            expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (query(marqo__bm25_aggregator) == 1, lexical_score_avg(), lexical_score_max()))
+        }
+        {% endif -%}
+
+        {# We provide this function even without the tensor field to support embed requests -#}
+        function embedding_score() {
+            expression: {{ max_score(embedding_score, index.tensor_fields) }}
+        }
+
+        function sort_field_value(sort_weights) {
+            expression: if (count(sort_weights * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(sort_weights * attribute(marqo__score_modifiers), prod))
+        }
+
+        function sort_field_value_0() {
+            expression: sort_field_value(query(marqo__sort_field_weights_0))
+        }
+
+        function sort_field_value_1() {
+            expression: sort_field_value(query(marqo__sort_field_weights_1))
+        }
+
+        function sort_field_value_2() {
+            expression: sort_field_value(query(marqo__sort_field_weights_2))
+        }
+
+        {% if collapse_field -%}
+        function collapse_field_hash() {
+            expression: attribute({{ collapse_field.name }})
+        }
+        {% endif -%}
+        match-features {
+            global_mult_modifier
+            global_add_modifier
+            sort_field_value_0
+            sort_field_value_1
+            sort_field_value_2
+            {% if collapse_field %}collapse_field_hash{% endif %}
+        }
+    }
+
+    {% if index.lexical_fields -%}
+    rank-profile bm25 inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+    {% if collapse_field -%}
+    rank-profile bm25_diversity inherits bm25 {
+        diversity {
+            attribute: {{ collapse_field.name }}
+            min-groups: {{ collapse_field.min_groups }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
+    {% endif -%}
+
+    {# We provide this rank profile even without the tensor field to support embed requests -#}
+    rank-profile embedding_similarity inherits base_rank_profile {
+        first-phase {
+            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+        }
+        {% if index.tensor_fields -%}
+        match-features inherits base_rank_profile {
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
+        }
+        {%- endif %}
+    }
+
+    {% if collapse_field -%}
+    rank-profile embedding_similarity_diversity inherits embedding_similarity {
+        diversity {
+            attribute: {{ collapse_field.name }}
+            min-groups: {{ collapse_field.min_groups }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
+
+    {% if index.lexical_fields and index.tensor_fields -%}
+    rank-profile hybrid_custom_searcher inherits default {
+        inputs {
+            query(marqo__fields_to_rank_lexical) tensor<int8>(p{})
+            query(marqo__fields_to_rank_tensor) tensor<int8>(p{})
+            query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__mult_weights_lexical) tensor<double>(p{})
+            query(marqo__add_weights_lexical) tensor<double>(p{})
+            query(marqo__mult_weights_tensor) tensor<double>(p{})
+            query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
+            query(marqo__sort_field_weights_0) tensor<double>(p{})
+            query(marqo__sort_field_weights_1) tensor<double>(p{})
+            query(marqo__sort_field_weights_2) tensor<double>(p{})
+        }
+    }
+
+    rank-profile hybrid_bm25_then_embedding_similarity inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+        second-phase {
+            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+        }
+        match-features inherits base_rank_profile {
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
+        }
+    }
+
+    rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+
+    {% if collapse_field -%}
+    rank-profile hybrid_bm25_then_embedding_similarity_diversity inherits hybrid_bm25_then_embedding_similarity {
+        diversity {
+            attribute: {{ collapse_field.name }}
+            min-groups: {{ collapse_field.min_groups }}
+        }
+    }
+
+    rank-profile hybrid_embedding_similarity_then_bm25_diversity inherits hybrid_embedding_similarity_then_bm25 {
+        diversity {
+            attribute: {{ collapse_field.name }}
+            min-groups: {{ collapse_field.min_groups }}
+        }
+        second-phase {
+            expression: firstPhase
+        }
+    }
+    {% endif -%}
+
+    {%- endif %}
+
+    document-summary all-non-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        {% if collapse_field -%}
+        summary {{ collapse_field.name }} type string {}
+        {% endif -%}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
+        {%- for lexical_field in index.lexical_fields %}
+        summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
+        {%- endfor %}
+        {%- for field in index.tensor_fields %}
+        summary {{ field.chunk_field_name }} type array<string> {}
+        {%- endfor %}
+    }
+
+    document-summary all-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        {% if collapse_field -%}
+        summary {{ collapse_field.name }} type string {}
+        {% endif -%}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
+        {%- for lexical_field in index.lexical_fields %}
+        summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
+        {%- endfor %}
+        {%- for field in index.tensor_fields %}
+        summary {{ field.chunk_field_name }} type array<string> {}
+        summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
+        {%- endfor %}
+    }
+}
