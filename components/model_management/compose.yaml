@@ -36,8 +36,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  # You can mount a local directory here for persistent storage of models to avoid re-downloading them
   modelrepo:
 
 networks:
   mmc-net:
-
