@@ -37,11 +37,6 @@ services:
 
 volumes:
   modelrepo:
-     driver: local
-     driver_opts:
-       type: none
-       o: bind
-       device: ./.cache # <== path to local model repository, adjust as needed
 
 networks:
   mmc-net:
