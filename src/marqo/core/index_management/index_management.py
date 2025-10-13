@@ -1,17 +1,15 @@
+import semver
 from contextlib import contextmanager
 from typing import List, Tuple
 from typing import Optional
-
-import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
-from marqo.core.exceptions import OperationConflictError
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, OperationConflictError, \
+    ZookeeperLockNotAcquiredError, InternalError, UnsupportedFeatureError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
     ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
@@ -22,7 +20,6 @@ from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
-from model_management.errors.http_errors import InvalidArgumentError
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -209,9 +206,10 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
-    def update_index_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+    def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
         """
-        Update index settings and schema by settings dict. Currently only modelProperties can be updated.
+        Update index settings by settings dict. No schema update. Currently only modelProperties can be updated.
+        Do not increment the version of the index in this method.
 
         When calling this method, you must consider the scenario distributed Marqo instances. Some Marqo instances
         could still be running the old version so the updated modelProperties must be compatible with the old version.
@@ -228,25 +226,17 @@ class IndexManagement:
                                 f"Provided settings: {list(settings_dict.keys())}")
 
         existing_index = self.get_index(index_name)
-        if not isinstance(existing_index, SemiStructuredMarqoIndex):
-            raise InvalidArgumentError(
-                f'Index {existing_index.name} created by Marqo version {existing_index.version} '
-                f'can not be updated.'
-            )
-
         updated_index = existing_index.copy()
         if "modelProperties" in settings_dict:
             updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
             if updated_index.model.get_dimension() != existing_index.model.get_dimension():
-                raise InvalidArgumentError(
-                    "The model dimension of the updated modelProperties does not match the existing one. "
-                    "Model dimension can not be changed once the index is created "
+                raise UnsupportedFeatureError(
+                    "Updating modelProperties resulting in dimension change is not supported "
                 )
 
         with self._vespa_deployment_lock():
-            schema = SemiStructuredVespaSchema.generate_vespa_schema(updated_index)
-            logger.debug(f'Updating index {updated_index.name} with schema:\n{schema}')
-            self._get_vespa_application().update_index_setting_and_schema(updated_index, schema)
+            logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
+            self._get_vespa_application().update_index_setting(updated_index)
 
     def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
         """
