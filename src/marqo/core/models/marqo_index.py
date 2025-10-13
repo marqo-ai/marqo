@@ -226,7 +226,7 @@ class Model(MarqoBaseModel):
 
             model_name = self.name
             try:
-                self.properties = s2_inference.get_triton_model_properties_from_registry(model_name)
+                self.properties = s2_inference.get_model_properties_from_registry(model_name)
             except UnknownModelError:
                 raise InvalidArgumentError(
                     f'Could not find model properties for model={model_name}. '
