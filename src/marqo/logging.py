@@ -90,7 +90,7 @@ LOGGING_CONFIG = {
         },
         "uvicorn.access": {
             "handlers": ["access"],
-            "level": "INFO",  # access log should be printed out even when root log level is higher than info
+            "level": LOG_LEVEL,  # access log level also changes with root log level now
             "propagate": False,
         },
         "httpx": {
@@ -106,6 +106,11 @@ LOGGING_CONFIG = {
         "marqo_query": {
             "handlers": ["default"],  # change this to a different handler if security is a concern
             "level": "WARNING",  # slow query at warning level, failed query at error level
+            "propagate": False,
+        },
+        "metrics": {
+            "handlers": ["default"],
+            "level": "INFO",  # Always log out metrics in INFO level, ignoring the root log level.
             "propagate": False,
         }
     },

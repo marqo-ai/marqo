@@ -5,11 +5,13 @@ from typing import Dict
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from pathlib import PurePosixPath
 
 from marqo.core.monitoring.statsd_client import StatsDClient
 
 _DOCS_RE = re.compile(r"/indexes/[^/]+/documents$")
-_DOCUMENT_ID_RE = re.compile(r"(/documents/)[^/]+")
+
+FIXED_DOC_SUBPATHS = {"delete-batch", "get-batch"}
 
 
 class StatsDMiddleware(BaseHTTPMiddleware):
@@ -38,7 +40,7 @@ class StatsDMiddleware(BaseHTTPMiddleware):
         tags = {
             "path": path_tag,
             "method": request.method,
-            "status_code": str(response.status_code),
+            "status_code": str(int(response.status_code)),
         }
 
         # latency
@@ -64,7 +66,10 @@ class StatsDMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _sanitize_path(path: str) -> str:
         """
-        Replace the document-id segment in …/documents/{id} with <document_id>
-        so we don’t create a high-cardinality CloudWatch dimension.
+        Replace the document-id segment in …/documents/{id} with <document_id>,
+        but skip known fixed subpaths like …/documents/delete-batch.
         """
-        return _DOCUMENT_ID_RE.sub(r"\1<document_id>", path)
+        p = PurePosixPath(path)
+        if p.parent.name == "documents" and p.name not in FIXED_DOC_SUBPATHS:
+            return str(p.parent / "<document_id>")
+        return path

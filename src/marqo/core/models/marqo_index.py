@@ -287,6 +287,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     """
     name: str
     schema_name: str
+    typeahead_schema_name: Optional[str] = None
     type: IndexType  # We need this so that we can deserialize the correct subclass
     model: Model
     normalize_embeddings: bool

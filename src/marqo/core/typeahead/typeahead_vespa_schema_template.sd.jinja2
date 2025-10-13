@@ -1,0 +1,56 @@
+schema {{ schema_name }} {
+
+    document {{ schema_name }} {
+
+        field query type string {
+            indexing: summary | attribute
+        }
+
+        field query_words type array<string> {
+            indexing: attribute
+            attribute: fast-search
+            rank: filter
+        }
+
+        field query_index type string {
+            indexing: index
+            index: enable-bm25
+            stemming: none
+            normalizing: none
+        }
+
+        field popularity type double {
+            indexing: summary | attribute
+        }
+
+        field metadata type map<string, double> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field last_updated_at type long {
+            indexing: attribute
+            attribute: fast-access
+        }
+    }
+
+    fieldset default {
+        fields: query_words
+    }
+
+    rank-profile suggestions-rank-profile inherits default {
+        inputs {
+            query(popularity_weight) float: 1.0
+            query(bm25_weight) float: 1.0
+        }
+        first-phase {
+            expression: query(popularity_weight) * attribute(popularity) + query(bm25_weight) * bm25(query_index)
+        }
+    }
+
+}

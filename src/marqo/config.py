@@ -8,6 +8,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import Inference, ModelManager
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
+from marqo.core.typeahead.typeahead import Typeahead
 from marqo.logging import get_logger
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
@@ -47,6 +48,7 @@ class Config:
         self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management, self.inference)
         self.embed = Embed(vespa_client, self.index_management, self.inference)
+        self.typeahead = Typeahead(vespa_client, self.index_management)
 
         self.model_manager = model_manager
 
