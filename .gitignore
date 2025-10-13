@@ -161,3 +161,7 @@ scripts/vespa_local/hosts.xml
 scripts/vespa_local/multinode/docker-compose.yml
 scripts/vespa_local/multinode/services.xml
 scripts/vespa_local/multinode/hosts.xml
+
+# Docker compose files and environment files as
+# they may contain sensitive informatio
+**/.env
