@@ -31,6 +31,7 @@ class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
+    _ALLOWED_MODIFIED_SETTINGS = {"modelProperties"}
 
     def __init__(self,
                  vespa_client: VespaClient,
@@ -216,11 +217,39 @@ class IndexManagement:
         Raises:
             IndexNotFoundError: If an index does not exist
         """
-        pass
+        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):
+            raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
+                                f"Provided settings: {list(settings_dict.keys())}")
+
         existing_index = self.get_index(index_name)
-        # TODO - Finish this method
+        if not isinstance(existing_index, SemiStructuredMarqoIndex):
+            # This is just a sanity check, it should not happen since we do not expose this method to end user.
+            raise InternalError(f'Index {existing_index.name} created by Marqo version {existing_index.version} '
+                                f'can not be updated.')
 
+        updated_index = existing_index.copy()
+        if "modelProperties" in settings_dict:
+            updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
 
+        with self._vespa_deployment_lock():
+            schema = SemiStructuredVespaSchema.generate_vespa_schema(updated_index)
+            logger.debug(f'Updating index {updated_index.name} with schema:\n{schema}')
+            self._get_vespa_application().update_index_setting_and_schema(updated_index, schema)
+
+    def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
+        """
+        Create a new MarqoIndex object with updated model properties.
+
+        Args:
+            index: The index object to update.
+            model_properties: A dictionary of model properties to update.
+
+        Returns:
+            A new MarqoIndex object with updated model properties.
+        """
+        index.model.properties = model_properties
+        index.model.custom = True  # Mark the model as custom if model properties are updated
+        return index
 
     def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
         """

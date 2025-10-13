@@ -547,15 +547,14 @@ def update_documents(
 
 
 @app.patch("/indexes/{index_name}/index-settings")
-def update_index_settings(index_name: str, body_dict: dict, marqo_config: config.Config = Depends(get_config)):
-    body = parse_request_object(UpdateIndexSettingsBodyParams, body_dict)
-
-    res = marqo_config.index_management.update_index_settings(
+def update_index_settings(index_name: str, body: UpdateIndexSettingsBodyParams, marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    res = marqo_config.index_management.update_index_by_settings_dict(
         index_name=index_name,
-        new_settings=body
+        settings_dict=body.model_dump(by_alias=True)
     )
 
-    return JSONResponse(content={"message": "Index settings update is successful."}, headers=res.get_header_dict())
+    return JSONResponse(content={"message": "Index settings update is successful."})
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

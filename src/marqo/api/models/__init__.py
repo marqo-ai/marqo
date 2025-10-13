@@ -1,5 +1,5 @@
 from .add_docs_objects import AddDocsBodyParams
-from embed_request import EmbedRequest
+from .embed_request import EmbedRequest
 from .update_documents import UpdateDocumentsBodyParams
 from .update_index_settings import UpdateIndexSettingsBodyParams
 from .recommend_query import RecommendQuery
