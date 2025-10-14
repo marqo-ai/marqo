@@ -49,6 +49,9 @@ pythonpath = ["src", "."]
 torch = [
   { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
 ]
+torchvision = [
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
