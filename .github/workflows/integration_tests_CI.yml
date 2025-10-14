@@ -82,7 +82,7 @@ jobs:
       matrix:
         part: [ 0, 1, 2 ] # Zero-based index for JSON list access
 
-    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/spot=false"
     
     timeout-minutes: 60
     env:
