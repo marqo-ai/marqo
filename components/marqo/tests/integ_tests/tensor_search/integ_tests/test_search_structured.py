@@ -657,8 +657,6 @@ class TestSearchStructured(MarqoTestCase):
             ),
         )
 
-        print(res)
-
         # meta fields are always returned
         meta_fields = {"_id", "_score", "_highlights"}
 
@@ -671,7 +669,7 @@ class TestSearchStructured(MarqoTestCase):
         )
             + tuple([([field], {field}) for field in doc.keys()])  # one field
             + tuple((random_fields, set(random_fields)) for random_fields in
-                    [random.sample(doc.keys(), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
+                    [random.sample(list(doc.keys()), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for attributes_to_retrieve, expected_fields in test_cases:
@@ -793,9 +791,14 @@ class TestSearchStructured(MarqoTestCase):
             config=self.config, index_name=self.default_image_index,
             text="A hippo in the water", result_count=3,
         )
-        assert len(res['hits']) == 2
-        assert {hit['image_field_1'] for hit in res['hits']} == {url_2, url_1}
-        assert {hit['_highlights'][0]['image_field_1'] for hit in res['hits']} == {url_2, url_1}
+
+        hits = res["hits"]
+
+        self.assertEqual(2, len(res["hits"]))
+        self.assertEqual(
+            {url_1, url_2}, {hits[0]["_highlights"]["image_field_1"][0], hits[1]["_highlights"]["image_field_1"][0]},
+            f"Got hits: {hits}"
+        )
 
     def test_multi_search(self):
         docs = [

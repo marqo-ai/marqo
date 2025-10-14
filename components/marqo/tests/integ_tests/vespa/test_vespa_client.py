@@ -170,7 +170,7 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Verify document deleted
 
         get_responses = [
-            self.pyvespa_client.get_data(data, schema=self.TEST_SCHEMA) for data in
+            self.pyvespa_client.get_data(data_id=data["id"], schema=self.TEST_SCHEMA) for data in
             [{"id": "doc1"}, {"id": "doc2"}]
         ]
         status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
@@ -191,7 +191,7 @@ class TestVespaClient(AsyncMarqoTestCase):
 
         # Verify document deleted
         get_responses = [
-            self.pyvespa_client.get_data(data, schema=self.TEST_SCHEMA) for data in  [{"id": "docx"}, {"id": "doc1"}]
+            self.pyvespa_client.get_data(data_id=data["id"], schema=self.TEST_SCHEMA) for data in  [{"id": "docx"}, {"id": "doc1"}]
         ]
         status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
 
