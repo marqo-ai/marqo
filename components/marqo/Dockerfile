@@ -16,6 +16,10 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies from lockfile
 RUN uv sync --no-dev
 
+# Install nltk data
+RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
+
+
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src

@@ -65,37 +65,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
             distance_metric=DistanceMetric.DotProduct
         )
 
-        structured_languagebind_index_request = cls.structured_marqo_index_request(
-            name="my-multimodal-index" + str(uuid.uuid4()).replace('-', ''),
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text),
-                FieldRequest(name="text_field_2", type=FieldType.Text),
-                FieldRequest(name="text_field_3", type=FieldType.Text),
-                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
-                FieldRequest(name="video_field_2", type=FieldType.VideoPointer),
-                FieldRequest(name="video_field_3", type=FieldType.VideoPointer),
-                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
-                FieldRequest(name="audio_field_2", type=FieldType.AudioPointer),
-                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
-                FieldRequest(name="image_field_2", type=FieldType.ImagePointer),
-                FieldRequest(
-                    name="multimodal_field",
-                    type=FieldType.MultimodalCombination,
-                    dependent_fields={
-                        "text_field_1": 0.1,
-                        "text_field_2": 0.1,
-                        "image_field_1": 0.5,
-                        "video_field_1": 0.1,
-                        "video_field_2": 0.1,
-                        "audio_field_1": 0.1
-                    }
-                )
-            ],
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            tensor_fields=["multimodal_field", "text_field_3",
-                        "video_field_3", "audio_field_2", "image_field_2"],
-            normalize_embeddings=True,
-        )
 
         semi_structured_image_index_request = cls.unstructured_marqo_index_request(
             name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
@@ -103,25 +72,10 @@ class TestAddDocumentsCombined(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        semi_structured_languagebind_index_request = cls.unstructured_marqo_index_request(
-            name="unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            treat_urls_and_pointers_as_images=True,
-            treat_urls_and_pointers_as_media=True
-        )
-
         unstructured_image_index_request = cls.unstructured_marqo_index_request(
             name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
             model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
-        )
-
-        unstructured_languagebind_index_request = cls.unstructured_marqo_index_request(
-            name="unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            treat_urls_and_pointers_as_images=True,
-            treat_urls_and_pointers_as_media=True,
             marqo_version='2.12.0'
         )
 
@@ -144,10 +98,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
             semi_structured_image_index_request,
             unstructured_image_index_request,
 
-            structured_languagebind_index_request,
-            semi_structured_languagebind_index_request,
-            unstructured_languagebind_index_request,
-
             unstructured_image_index_request_unnormalized,
             unstructured_text_index_request_unnormalized,
             structured_image_index_request_unnormalized,
@@ -155,14 +105,11 @@ class TestAddDocumentsCombined(MarqoTestCase):
         ])
 
         cls.structured_marqo_index_name = structured_image_index_request.name
-        cls.structured_languagebind_index_name = structured_languagebind_index_request.name
         cls.semi_structured_marqo_index_name = semi_structured_image_index_request.name
-        cls.semi_structured_languagebind_index_name = semi_structured_languagebind_index_request.name
         cls.structured_image_index_unnormalized_name = structured_image_index_request_unnormalized.name
         cls.structured_text_index_unnormalized_name = structured_text_index_request_unnormalized.name
 
         cls.unstructured_marqo_index_name = unstructured_image_index_request.name
-        cls.unstructured_languagebind_index_name = unstructured_languagebind_index_request.name
         cls.unstructured_image_index_unnormalized_name = unstructured_image_index_request_unnormalized.name
         cls.unstructured_text_index_unnormalized_name = unstructured_text_index_request_unnormalized.name
 

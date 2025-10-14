@@ -134,7 +134,7 @@ jobs:
 
           cd marqo/components/marqo
           uv sync --dev
-          uv run python -m nltk.downloader punkt_tab
+          uv run python -c "import nltk; nltk.download('punkt_tab')"
 
           set -o pipefail
           COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest ${{ env.MULTINODE_TEST_ARGS }} \
