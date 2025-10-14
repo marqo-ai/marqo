@@ -96,21 +96,18 @@ jobs:
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.11"
           cache: "pip"
 
-      - name: Checkout marqo-base for requirements
-        uses: actions/checkout@v3
-        with:
-          repository: marqo-ai/marqo-base
-          path: marqo-base
-
-      - name: Install dependencies
+      - name: Install uv
         run: |
-          pip install -r marqo/requirements.dev.txt
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # Override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y uv
+          
+      - name: Spin up the inference environment
+        run: |
+          cd marqo
+          docker compose -f .compose-inference.yaml up -d
 
       - name: Download nltk data
         run: |
@@ -159,9 +156,9 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
-          cd marqo
+          cd marqo/components/marqo
+          uv sync --dev
 
-          export PYTHONPATH="./src:."
           set -o pipefail
           COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
