@@ -166,7 +166,7 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
         # Setup request
         request = self.unstructured_marqo_index_request(
             name="test_index",
-            model=Model(name='hf/e5-small')
+            model=Model(name='hf/e5-small-v2')
         )
 
         # Setup mock returns

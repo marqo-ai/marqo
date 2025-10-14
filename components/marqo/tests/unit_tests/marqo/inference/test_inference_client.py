@@ -6,19 +6,19 @@ import numpy as np
 
 from marqo.core.inference.api import InferenceRequest, InferenceResult, InferenceError, Modality, ModelConfig, \
     TextPreprocessingConfig
-from src.marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
+from marqo.core.inference.inference_client.inference_client import InferenceClient
 import httpx
 import msgpack
 
 
 class TestNativeInferenceClient(unittest.TestCase):
     def setUp(self):
-        patcher = patch('src.marqo.inference.native_inference.remote.client.inference_client.httpx.Client')
+        patcher = patch('marqo.core.inference.inference_client.inference_client.httpx.Client')
         self.mock_httpx_client = patcher.start()
         self.addCleanup(patcher.stop)
 
         self.base_url = "http://mock-inference-service.com"
-        self.client = NativeInferenceClient(base_url=self.base_url)
+        self.client = InferenceClient(base_url=self.base_url)
 
         self.inference_request = InferenceRequest(
             contents=["test content"],
@@ -96,7 +96,7 @@ class TestNativeInferenceClient(unittest.TestCase):
         self.assertIn("Connection failed", str(context.exception))
         self.mock_httpx_client.return_value.post.assert_called_once()
 
-    @patch('src.marqo.inference.native_inference.remote.client.inference_client.msgpack.unpackb')
+    @patch('marqo.core.inference.inference_client.inference_client.msgpack.unpackb')
     def test_vectorise_invalid_msgpack_response(self, mock_unpackb):
         # Prepare mock successful response with invalid msgpack
         mock_response = MagicMock()

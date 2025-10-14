@@ -84,7 +84,7 @@ class TestValidateMappingsObject(unittest.TestCase):
             {
                 "description": "text field empty language",
                 "mapping": {"field": {"type": "text_field", "language": ""}},
-                "expected_error": "'' is too short",
+                "expected_error": "'' should be non-empty",
                 "exception_type": InvalidArgumentError
             },
             {

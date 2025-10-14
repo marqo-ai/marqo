@@ -96,7 +96,7 @@ class MarqoTestCase(TestCase):
             name: str,
             schema_name: Optional[str] = None,
             typeahead_schema_name: Optional[str] = None,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='hf/all-MiniLM-L6-v2'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,

@@ -7,7 +7,7 @@ from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import Metric
 from opentelemetry.test.globals_test import reset_metrics_globals
 
-from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector
+from marqo.core.inference.inference_cache.monitoring import OTELCacheStatsCollector
 
 
 class TestOTELCacheStatsCollector(unittest.TestCase):

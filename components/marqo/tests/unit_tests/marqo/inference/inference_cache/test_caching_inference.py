@@ -6,7 +6,7 @@ import numpy as np
 
 from marqo.core.inference.api import Inference, InferenceRequest, ModelConfig, TextPreprocessingConfig, TextChunkConfig, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig, Modality
-from marqo.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
 
 
 class TestCachingInferenceModelCacheKey(TestCase):

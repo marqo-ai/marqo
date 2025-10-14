@@ -161,7 +161,7 @@ class MarqoTestCase(unittest.TestCase):
             schema_name: str,
             fields: List[Field] = None,
             tensor_fields: List[TensorField] = None,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='hf/all-MiniLM-L6-v2'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
@@ -218,7 +218,7 @@ class MarqoTestCase(unittest.TestCase):
             cls,
             name: str,
             schema_name: str,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='hf/all-MiniLM-L6-v2'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
