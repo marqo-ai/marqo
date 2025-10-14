@@ -5,7 +5,7 @@
 # Like that: runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
 images:
   marqo-cpu-image:
-    ami: "ami-0b4a181b6b24152d5"
+    ami: "ami-0b8bc108d37bb85f3"
 
   marqo-gpu-image:
     ami: "ami-0be479c8e2b8dcc93"
