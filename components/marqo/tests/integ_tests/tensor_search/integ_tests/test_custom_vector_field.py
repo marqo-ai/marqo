@@ -1093,62 +1093,6 @@ class TestCustomVectorField(MarqoTestCase):
                 self.assertIn("Multimodal subfields must be strings", add_docs_res["items"][0]["error"])
 
 
-    @unittest.skip
-    def test_search_with_custom_vector_field_boosting(self):
-        """
-        SKIPPED WHILE BOOSTING IS NOT YET IMPLEMENTED.
-        Search for the doc, with boosting
-        """
-        mappings = {
-            "my_custom_vector_1": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_2": {
-                "type": "custom_vector"
-            },
-        }
-
-        self.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "doc0",
-                        "my_custom_vector_1": {
-                            "content": "vec 1",
-                            "vector": self.random_vector_1  # size is 512
-                        },
-                    },
-                    {
-                        "_id": "doc1",
-                        "my_custom_vector_2": {
-                            "content": "vec 2",
-                            "vector": self.random_vector_2  # size is 512
-                        },
-                    },
-                ],
-                device="cpu", mappings=mappings
-            )
-        )
-
-        # Normal search should favor doc0
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
-        )
-        assert res["hits"][0]["_id"] == "doc0"
-
-        # Search with boosting should favor doc1
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            boost={"my_custom_vector_2": [5, 1]}
-        )
-        assert res["hits"][0]["_id"] == "doc1"
-
-
 class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
     """
     Test suite for custom vector fields with indexes where `normalize_embeddings` was set to True at the time of index creation.
