@@ -29,12 +29,12 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True
         )
