@@ -31,8 +31,7 @@ jobs:
 
       - name: Install uv
         run: |
-          sudo apt-get update
-          sudo apt-get install -y uv
+          pip install uv
 
       - name: Install dependencies
         run: |
