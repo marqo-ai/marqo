@@ -14,6 +14,7 @@ dependencies = [
     "memory-profiler>=0.61.0",
     "msgpack>=1.1.2",
     "msgpack-numpy>=0.4.8",
+    "nltk>=3.9.2",
     "orjson>=3.11.3",
     "pillow>=11.3.0",
     "psutil>=7.1.0",
