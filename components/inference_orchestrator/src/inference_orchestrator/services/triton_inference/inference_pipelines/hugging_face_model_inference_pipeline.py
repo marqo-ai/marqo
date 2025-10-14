@@ -1,6 +1,7 @@
 from typing import List, Tuple, Union
 
 from numpy import ndarray
+from setuptools.errors import InternalError
 
 from inference_orchestrator.schemas.api import InferenceErrorModel, InferenceRequest, InferenceResult, Modality, \
     TextPreprocessingConfig
@@ -22,10 +23,8 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
     Attributes:
         VALID_CONTENT_TO_ENCODE_TYPE (tuple): The valid content type to passed to the model.encode method,
             this is a model specific type. In this case, it is a string.
-        MAX_BATCH_SIZE (int): The maximum batch size to encode the content.
     """
     VALID_CONTENT_TO_ENCODE_TYPE = (str, )
-    MAX_BATCH_SIZE = 32
 
     def __init__(self, model: HuggingFaceModel, inference_request: InferenceRequest):
         super().__init__(model = model, inference_request = inference_request)
@@ -86,8 +85,10 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             return []
 
         embeddings: List[ndarray] = []
-        for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-            batch: List[str] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+
+        max_batch_size = self.model.model_properties.triton_text_encoder.max_batch_size
+        for i in range(0, len(content_to_encode), max_batch_size):
+            batch: List[str] = content_to_encode[i:i + max_batch_size]
             batch_embeddings: List[ndarray] = self.model.encode(
                 inputs=batch,
                 modality=self.inference_request.modality,
@@ -96,7 +97,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             embeddings.extend(batch_embeddings)
 
         if len(embeddings) != len(content_to_encode):
-            raise Inter("The number of embeddings does not match the number of contents")
+            raise InternalError("The number of embeddings does not match the number of contents")
 
         return embeddings
 

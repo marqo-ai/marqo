@@ -74,8 +74,13 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
             return []
 
         embeddings: List[ndarray] = []
-        for i in range(0, len(content_to_encode), self.MAX_BATCH_SIZE):
-            batch: List[Tensor] = content_to_encode[i:i + self.MAX_BATCH_SIZE]
+
+        max_batch_size = self.model.mode_properties.triton_text_encoder.max_batch_size \
+            if self.inference_request.modality == Modality.TEXT \
+            else self.model.mode_properties.triton_image_encoder.max_batch_size
+
+        for i in range(0, len(content_to_encode), max_batch_size):
+            batch: List[Tensor] = content_to_encode[i:i + max_batch_size]
             batch_embeddings: List[ndarray] = self.model.encode(
                 inputs=batch,
                 modality=self.inference_request.modality,
