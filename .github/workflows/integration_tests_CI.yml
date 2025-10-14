@@ -106,7 +106,7 @@ jobs:
       - name: Spin up the inference environment
         run: |
           cd marqo
-          docker compose -f .compose-inference.yaml up -d
+          docker compose -f compose-inference.yaml up -d
 
       - name: Download nltk data
         run: |
