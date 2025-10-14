@@ -77,7 +77,7 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
 
         max_batch_size = self.model.model_properties.triton_text_encoder.max_batch_size \
             if self.inference_request.modality == Modality.TEXT \
-            else self.model.mode_properties.triton_image_encoder.max_batch_size
+            else self.model.model_properties.triton_image_encoder.max_batch_size
 
         for i in range(0, len(content_to_encode), max_batch_size):
             batch: List[Tensor] = content_to_encode[i:i + max_batch_size]
