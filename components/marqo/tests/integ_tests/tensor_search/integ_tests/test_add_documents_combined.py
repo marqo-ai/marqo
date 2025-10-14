@@ -7,8 +7,6 @@ import PIL
 import numpy as np
 import pytest
 import requests
-import torch
-from torch import Tensor
 
 import marqo.api.exceptions as api_exceptions
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
@@ -19,7 +17,6 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.inference.media_download_and_preprocess import streaming_media_processor
 from marqo.inference.native_inference.load_model import clear_loaded_models
-from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
