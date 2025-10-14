@@ -107,7 +107,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         default_image_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),

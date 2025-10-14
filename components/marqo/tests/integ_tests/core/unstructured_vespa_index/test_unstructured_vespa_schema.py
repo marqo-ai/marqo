@@ -63,7 +63,7 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
             with (self.subTest(f"Unstructured index with distance metric: {distance_metric.value}")):
                 test_marqo_index_request = self.unstructured_marqo_index_request(
                     name=index_name,
-                    model=Model(name="ViT-B/32"),
+                    model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
                     hnsw_config=HnswConfig(ef_construction=512, m=16),
                     distance_metric=distance_metric
                 )

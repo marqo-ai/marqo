@@ -160,7 +160,7 @@ class TestVespaClient(AsyncMarqoTestCase):
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
             {"id": "doc2", "fields": {"title": "Title 2", "contents": "Content 2"}}
         ]
-        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+        self.pyvespa_client.feed_iterable(documents, self.TEST_SCHEMA)
 
         resp = self.client.delete_document("doc1", self.TEST_SCHEMA)
 
@@ -168,10 +168,11 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(resp.id.split("::")[-1], "doc1")
 
         # Verify document deleted
-        get_responses = self.pyvespa_client.get_batch(
-            batch=[{"id": "doc1"}, {"id": "doc2"}],
-            schema=self.TEST_SCHEMA
-        )
+
+        get_responses = [
+            self.pyvespa_client.get_data(data, schema=self.TEST_SCHEMA) for data in
+            [{"id": "doc1"}, {"id": "doc2"}]
+        ]
         status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
 
         self.assertEqual(status, [{"doc1": 404}, {"doc2": 200}])
@@ -180,7 +181,7 @@ class TestVespaClient(AsyncMarqoTestCase):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
         ]
-        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+        self.pyvespa_client.feed_iterable(documents, self.TEST_SCHEMA)
 
         # Note it's still 200 if the document doesn't exist
         resp = self.client.delete_document("docx", self.TEST_SCHEMA)
@@ -189,10 +190,9 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(resp.id.split("::")[-1], "docx")
 
         # Verify document deleted
-        get_responses = self.pyvespa_client.get_batch(
-            batch=[{"id": "docx"}, {"id": "doc1"}],
-            schema=self.TEST_SCHEMA
-        )
+        get_responses = [
+            self.pyvespa_client.get_data(data, schema=self.TEST_SCHEMA) for data in  [{"id": "docx"}, {"id": "doc1"}]
+        ]
         status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
 
         self.assertEqual(status, [{"docx": 404}, {"doc1": 200}])
@@ -203,7 +203,7 @@ class TestVespaClient(AsyncMarqoTestCase):
             {"id": "doc2", "fields": {"title": "Title 1", "contents": "Content 1.1"}},
             {"id": "doc3", "fields": {"title": "Title 2"}}
         ]
-        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+        self.pyvespa_client.feed_iterable(documents, self.TEST_SCHEMA)
 
         result = self.client.query(
             yql="select * from sources * where title contains 'Title 1';",
@@ -224,7 +224,7 @@ class TestVespaClient(AsyncMarqoTestCase):
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
             {"id": "doc2", "fields": {"title": "Title 2"}}
         ]
-        self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
+        self.pyvespa_client.feed_iterable(documents, self.TEST_SCHEMA)
 
         result = self.client.query(
             yql="select * from sources * where title contains 'Title 3';",
