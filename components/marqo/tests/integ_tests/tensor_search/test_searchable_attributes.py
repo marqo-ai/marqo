@@ -17,7 +17,7 @@ class TestSearchableAttributes(MarqoTestCase):
         super().setUpClass()
 
         structured_text_index = cls.structured_marqo_index_request(
-            model = Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model = Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -31,7 +31,7 @@ class TestSearchableAttributes(MarqoTestCase):
         )
 
         semi_structured_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
         )
 
         cls.indexes = cls.create_indexes([

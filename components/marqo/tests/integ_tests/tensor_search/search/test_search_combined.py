@@ -68,7 +68,7 @@ class TestSearch(MarqoTestCase):
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -110,7 +110,7 @@ class TestSearch(MarqoTestCase):
 
         structured_default_text_index_encoded_name = cls.structured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -1352,7 +1352,7 @@ class TestSearchFuzz(MarqoTestCase):
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
