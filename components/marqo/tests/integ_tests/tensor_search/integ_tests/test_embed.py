@@ -46,7 +46,7 @@ class TestEmbed(MarqoTestCase):
 
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(

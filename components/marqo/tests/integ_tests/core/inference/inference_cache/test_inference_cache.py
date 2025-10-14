@@ -40,7 +40,7 @@ class TestInferenceCache(unittest.TestCase):
             modality=Modality.TEXT,
             contents=["a"],
             model_config=ModelConfig(
-                model_name="hf/all_datasets_v4_MiniLM-L6",
+                model_name="hf/all-MiniLM-L6-v2",
                 model_properties={
                     "name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
                     "dimensions": 384,

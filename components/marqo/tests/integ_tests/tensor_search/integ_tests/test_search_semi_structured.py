@@ -32,7 +32,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
         default_text_index_encoded_name = cls.unstructured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', '')

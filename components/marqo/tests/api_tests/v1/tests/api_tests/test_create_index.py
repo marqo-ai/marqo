@@ -256,7 +256,7 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_create_simple_structured_index(self):
         self.client.create_index(index_name=self.index_name, type="structured",
-                                 model="hf/all_datasets_v4_MiniLM-L6",
+                                 model="hf/all-MiniLM-L6-v2",
                                  all_fields=[{"name": "test", "type": "text",
                                               "features": ["lexical_search"]}],
                                  tensor_fields=["test"])
