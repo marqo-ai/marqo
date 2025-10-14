@@ -18,35 +18,70 @@ class TestGetSettings(MarqoTestCase):
         unstructured_default_index = IndexSettings().to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         structured_default_index = IndexSettings(
-                type=IndexType.Structured,
-                allFields=[
-                    FieldRequest(name='field1', type=FieldType.Text),
-                    FieldRequest(name='field2', type=FieldType.Text),
-                ],
-                tensorFields=[]
-            ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+            type=IndexType.Structured,
+            allFields=[
+                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field2', type=FieldType.Text),
+            ],
+            tensorFields=[]
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         unstructured_custom_index = IndexSettings(
-                type=IndexType.Unstructured,
-                model='ViT-B/32',
-                normalizeEmbeddings=False,
-                textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
-            ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+            type=IndexType.Unstructured,
+            model='open_clip/ViT-B-32/laion2b_s34b_b79k',
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         unstructured_marqtune_index = IndexSettings(
             model='marqtune/model-id/release-checkpoint',
             modelProperties={
                 "isMarqtuneModel": True,
-                "name": "ViT-B-32",
+                "name": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "dimensions": 512,
-                "model_location": {
-                    "s3": {
-                        "Bucket": "marqtune-public-bucket",
-                        "Key": "marqo-test-open-clip-model/epoch_1.pt",
-                    },
-                    "auth_required": False
-                },
                 "type": "open_clip",
+                "tritonImageEncoder": {
+                    "maxBatchSize": 8,
+                    "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-image-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/image-encoder/model.onnx"],
+                    "input": [
+                        {
+                            "name": "input",
+                            "dims": [3, 224, 224],
+                            "dataType": "TYPE_FP32"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "output",
+                            "dims": [512],
+                            "dataType": "TYPE_FP32"
+                        }
+                    ]
+                },
+                "tritonTextEncoder": {
+                    "maxBatchSize": 16,
+                    "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-text-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/text-encoder/model.onnx",
+                    ],
+                    "input": [
+                        {
+                            "name": "input",
+                            "dims": [77],
+                            "dataType": "TYPE_INT32"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "output",
+                            "dims": [512],
+                            "dataType": "TYPE_FP32"
+                        }
+                    ]
+                }
+
             },
             normalizeEmbeddings=False,
             textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
@@ -57,56 +92,104 @@ class TestGetSettings(MarqoTestCase):
             model='marqtune/model-id/release-checkpoint',
             modelProperties={
                 "dimensions": 384,
-                "model_location": {
-                    "s3": {
-                        "Bucket": "marqtune-public-bucket",
-                        "Key": "marqo-test-hf-model/epoch_1.zip",
-                    },
-                    "auth_required": False
-                },
+                "name": "intfloat/e5-small-v2",
                 "type": "hf",
+                "poolingMethod": "mean",
+                "tritonTextEncoder": {
+                    "maxBatchSize": 32,
+                    "name": "e5-small-v2-text-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/infloat-e5-small-v2/model.onnx"],
+                    "input": [
+                        {
+                            "name": "input_ids",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
+                        },
+                        {
+                            "name": "attention_mask",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
+                        },
+                        {
+                            "name": "token_type_ids",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "last_hidden_state",
+                            "dims": [-1, 384],
+                            "dataType": "TYPE_FP32"
+                        }
+                    ]
+                }
             },
             normalizeEmbeddings=False,
             textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
         ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         structured_custom_index = IndexSettings(
-                type=IndexType.Structured,
-                allFields=[
-                    FieldRequest(name='field1', type=FieldType.Text),
-                    FieldRequest(name='field2', type=FieldType.Text),
-                ],
-                tensorFields=[],
-                model='ViT-B/32',
-                normalizeEmbeddings=False,
-                textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
-            ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
-
+            type=IndexType.Structured,
+            allFields=[
+                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field2', type=FieldType.Text),
+            ],
+            tensorFields=[],
+            model='open_clip/ViT-B-16-SigLIP/webli',
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         structured_marqtune_index = IndexSettings(
-                type=IndexType.Structured,
-                allFields=[
-                    FieldRequest(name='field1', type=FieldType.Text),
-                    FieldRequest(name='field2', type=FieldType.Text),
-                ],
-                tensorFields=[],
+            type=IndexType.Structured,
+            allFields=[
+                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field2', type=FieldType.Text),
+            ],
+            tensorFields=[],
             model='marqtune/model-id/release-checkpoint',
             modelProperties={
-                    "isMarqtuneModel": True,
-                    "dimensions": 384,
-                    "model_location": {
-                        "s3": {
-                            "Bucket": "marqtune-public-bucket",
-                            "Key": "marqo-test-hf-model/epoch_1.zip",
+                "isMarqtuneModel": True,
+                "name": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimensions": 384,
+                "type": "hf",
+                "poolingMethod": "mean",
+                "tritonTextEncoder": {
+                    "maxBatchSize": 16,
+                    "name": "all-MiniLM-L6-v2-text-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/sentence-transformers-all-minilm-l6-v2/model.onnx"],
+                    "input": [
+                        {
+                            "name": "input_ids",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
                         },
-                        "auth_required": False
-                    },
-                    "trustRemoteCode": True,
-                    "type": "hf",
-                },
-                normalizeEmbeddings=False,
-                textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
-            ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+                        {
+                            "name": "attention_mask",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
+                        },
+                        {
+                            "name": "token_type_ids",
+                            "dims": [-1],
+                            "dataType": "TYPE_INT64"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "name": "last_hidden_state",
+                            "dims": [-1, 384],
+                            "dataType": "TYPE_FP32"
+                        }
+                    ]
+                }
+            },
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
 
         cls.indexes = cls.create_indexes([
             unstructured_default_index,
@@ -155,8 +238,8 @@ class TestGetSettings(MarqoTestCase):
                     'model': 'hf/e5-base-v2',
                     'normalizeEmbeddings': True,
                     'textPreprocessing': {'splitLength': 2,
-                                        'splitMethod': TextSplitMethod.Sentence,
-                                        'splitOverlap': 0},
+                                          'splitMethod': TextSplitMethod.Sentence,
+                                          'splitOverlap': 0},
                     'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
@@ -169,7 +252,7 @@ class TestGetSettings(MarqoTestCase):
             retrieved_index = self.config.index_management.get_index(self.unstructured_default_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_unstructured_default_settings)
-        
+
         with self.subTest("Structured index default settings"):
             expected_structured_default_settings = \
                 {
@@ -207,11 +290,11 @@ class TestGetSettings(MarqoTestCase):
             retrieved_index = self.config.index_management.get_index(self.structured_default_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_structured_default_settings)
-        
+
     def test_custom_settings(self):
         """adding custom settings to the index should be reflected in the returned output
         """
-        
+
         with self.subTest("Unstructured index custom settings"):
             expected_unstructured_custom_settings = \
                 {
@@ -221,11 +304,11 @@ class TestGetSettings(MarqoTestCase):
                     },
                     'filterStringMaxLength': 50,
                     'imagePreprocessing': {},
-                    'model': 'ViT-B/32',
+                    'model': 'open_clip/ViT-B-32/laion2b_s34b_b79k',
                     'normalizeEmbeddings': False,
                     'textPreprocessing': {'splitLength': 3,
-                                        'splitMethod': TextSplitMethod.Word,
-                                        'splitOverlap': 1},
+                                          'splitMethod': TextSplitMethod.Word,
+                                          'splitOverlap': 1},
                     'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
@@ -237,7 +320,7 @@ class TestGetSettings(MarqoTestCase):
             retrieved_index = self.config.index_management.get_index(self.unstructured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
-        
+
         with self.subTest("Structured index custom settings"):
             expected_structured_custom_settings = \
                 {
@@ -258,7 +341,7 @@ class TestGetSettings(MarqoTestCase):
                         'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'imagePreprocessing': {},
-                    'model': 'ViT-B/32',
+                    'model': 'open_clip/ViT-B-32/laion2b_s34b_b79k',
                     'normalizeEmbeddings': False,
                     'tensorFields': [],
                     'textPreprocessing': {
@@ -360,15 +443,40 @@ class TestGetSettings(MarqoTestCase):
                     'imagePreprocessing': {},
                     'model': 'marqtune/model-id/release-checkpoint',
                     'modelProperties': {
-                        'dimensions': 384,
-                        'model_location': {
-                            'auth_required': False,
-                            's3': {
-                                'Bucket': 'marqtune-public-bucket',
-                                'Key': 'marqo-test-hf-model/epoch_1.zip'
-                            }
-                        },
-                        'type': 'hf'
+                        "dimensions": 384,
+                        "name": "intfloat/e5-small-v2",
+                        "type": "hf",
+                        "poolingMethod": "mean",
+                        "tritonTextEncoder": {
+                            "maxBatchSize": 32,
+                            "name": "e5-small-v2-text-encoder",
+                            "sources": [
+                                "s3://marqo-opensource-models/infloat-e5-small-v2/model.onnx"],
+                            "input": [
+                                {
+                                    "name": "input_ids",
+                                    "dims": [-1],
+                                    "dataType": "TYPE_INT64"
+                                },
+                                {
+                                    "name": "attention_mask",
+                                    "dims": [-1],
+                                    "dataType": "TYPE_INT64"
+                                },
+                                {
+                                    "name": "token_type_ids",
+                                    "dims": [-1],
+                                    "dataType": "TYPE_INT64"
+                                }
+                            ],
+                            "output": [
+                                {
+                                    "name": "last_hidden_state",
+                                    "dims": [-1, 384],
+                                    "dataType": "TYPE_FP32"
+                                }
+                            ]
+                        }
                     },
                     'normalizeEmbeddings': False,
                     'textPreprocessing': {'splitLength': 3,
