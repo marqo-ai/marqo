@@ -138,7 +138,9 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: uv run python marqo/components/marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
+        run: |
+          cd marqo/components/marqo
+          uv run python scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
 
       - name: Run Integration Tests
         run: |
