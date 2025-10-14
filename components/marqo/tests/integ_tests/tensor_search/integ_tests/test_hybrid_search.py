@@ -40,13 +40,8 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         semi_structured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
-        )
-
-        semi_structured_index_with_no_model = cls.unstructured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            normalize_embeddings=False
         )
 
         semi_structured_text_index_2_14 = cls.unstructured_marqo_index_request(
@@ -61,14 +56,8 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),  # Used to be ViT-B/32 in old structured tests
             treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
-        )
-
-        unstructured_index_with_no_model = cls.unstructured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            normalize_embeddings=False,
             marqo_version='2.12.0'
         )
 
@@ -78,7 +67,7 @@ class TestHybridSearch(MarqoTestCase):
 
         # STRUCTURED indexes
         structured_default_image_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -117,17 +106,6 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3", "text_tensor_only"]
         )
 
-        structured_index_with_no_model = cls.structured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            fields=[
-                FieldRequest(name='text_field_1', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-                FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
-                FieldRequest(name="custom_field_1", type=FieldType.CustomVector)
-            ],
-            tensor_fields=["text_field_1", "image_field_1", "custom_field_1"],
-            normalize_embeddings=False
-        )
-
         structured_index_empty = cls.structured_marqo_index_request(
             model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[],
@@ -159,39 +137,35 @@ class TestHybridSearch(MarqoTestCase):
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
-            unstructured_index_with_no_model,
             unstructured_index_2_10,
+
             structured_default_image_index,
             structured_text_index_score_modifiers,
-            structured_index_with_no_model,
             structured_index_empty,
             structured_index_2_9,
             structured_text_index_2_14,
             structured_index_one_tensor_field,
+
             semi_structured_default_text_index,
             semi_structured_default_image_index,
-            semi_structured_index_with_no_model,
             semi_structured_text_index_2_14
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         cls.unstructured_default_image_index = cls.indexes[1]
-        cls.unstructured_index_with_no_model = cls.indexes[2]
-        cls.unstructured_index_2_10 = cls.indexes[3]
+        cls.unstructured_index_2_10 = cls.indexes[2]
 
-        cls.structured_default_image_index = cls.indexes[4]
-        cls.structured_text_index_score_modifiers = cls.indexes[5]
-        cls.structured_index_with_no_model = cls.indexes[6]
-        cls.structured_index_empty = cls.indexes[7]
-        cls.structured_index_2_9 = cls.indexes[8]
-        cls.structured_text_index_2_14 = cls.indexes[9]
-        cls.structured_index_one_tensor_field = cls.indexes[10]
+        cls.structured_default_image_index = cls.indexes[3]
+        cls.structured_text_index_score_modifiers = cls.indexes[4]
+        cls.structured_index_empty = cls.indexes[5]
+        cls.structured_index_2_9 = cls.indexes[6]
+        cls.structured_text_index_2_14 = cls.indexes[7]
+        cls.structured_index_one_tensor_field = cls.indexes[8]
 
-        cls.semi_structured_default_text_index = cls.indexes[11]
-        cls.semi_structured_default_image_index = cls.indexes[12]
-        cls.semi_structured_index_with_no_model = cls.indexes[13]
-        cls.semi_structured_text_index_2_14 = cls.indexes[14]
+        cls.semi_structured_default_text_index = cls.indexes[9]
+        cls.semi_structured_default_image_index = cls.indexes[10]
+        cls.semi_structured_text_index_2_14 = cls.indexes[11]
 
     def setUp(self) -> None:
         super().setUp()
