@@ -1,5 +1,3 @@
-import unittest
-
 import math
 import os
 import random
@@ -11,21 +9,19 @@ import requests
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
-from marqo.vespa.exceptions import VespaStatusError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
-from marqo.tensor_search.models.search import SearchContext
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext
+from marqo.vespa.exceptions import VespaStatusError
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
-
-from marqo.tensor_search import index_meta_cache
 
 
 class TestSearchStructured(MarqoTestCase):
@@ -477,27 +473,6 @@ class TestSearchStructured(MarqoTestCase):
     # TODO: All filtering tests have been moved to test_search_combined.py
     # Do the same with all other tests.
 
-    @unittest.skip(reason='temporarily skip due to inference interface changes')
-    def test_set_device(self):
-        """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
-
-        mock_vectorise = mock.MagicMock()
-
-        # Get vector dimension of the default BERT model
-        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry("hf/all_datasets_v4_MiniLM-L6")["dimensions"]
-        mock_vectorise.return_value = [[0, ] * DEFAULT_MODEL_DIMENSION]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="some text",
-                search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
-            return True
-
-        assert run()
-        assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:123"
 
     def test_search_other_types_subsearch(self):
         self.add_documents(
