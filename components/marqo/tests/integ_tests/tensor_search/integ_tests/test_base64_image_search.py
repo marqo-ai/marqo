@@ -137,6 +137,8 @@ class TestBase64ImageSearch(MarqoTestCase):
                             hybrid_parameters=hybrid_parameters
                         )
 
+                        print(search_result)
+
                         # Verify results
                         self.assertIn('hits', search_result)
                         self.assertEqual(2, len(search_result['hits']))

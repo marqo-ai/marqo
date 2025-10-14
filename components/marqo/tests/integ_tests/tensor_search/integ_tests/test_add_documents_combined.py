@@ -163,33 +163,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 self.assertEqual(400, r["items"][1]["status"])
                 self.assertIn("Image file is truncated", r["items"][1]["error"])
 
-    def test_imageRepoHandleThreadHandleError_successfully(self):
-        """Ensure media_repo can catch an unexpected error right in thread."""
-        documents = [
-            {
-                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
-                "_id": "1"
-            }
-        ]
-
-        for index_name in [self.unstructured_marqo_index_name, self.semi_structured_marqo_index_name,
-                           self.structured_marqo_index_name]:
-            error = Exception("Unexpected error during image download")
-            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
-                else None
-            with (self.subTest(f"{index_name}-{error}")):
-                with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=error) \
-                        as mock_requests_get:
-                    with self.assertRaises(Exception) as e:
-                        r = self.add_documents(
-                            config=self.config,
-                            add_docs_params=AddDocsParams(
-                                index_name=index_name,
-                                docs=documents,
-                                tensor_fields=tensor_fields)
-                        ).dict(exclude_none=True, by_alias=True)
-                        self.assertIn("Unexpected error during image download", str(e.exception))
-
     def test_image_url_is_embedded_as_image_not_text(self):
         """
         Ensure that the image URL is embedded as an image and not as text

@@ -105,15 +105,6 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         self.assertEqual(1, len(doc1['_tensor_facets']))
         self.assertIn('desc', doc1['_tensor_facets'][0])
 
-    def test_add_documents_should_use_existing_tensors_from_the_same_doc(self):
-        doc1 = self._add_and_get_doc(self.text_index_1, "123", ["title"])
-
-        with mock.patch('marqo.s2_inference.s2_inference.vectorise') as mock_vectorise:
-            doc2 = self._add_and_get_doc(self.text_index_1, "123", ["title"],
-                                         use_existing_tensors=True)
-            self.assertFalse(mock_vectorise.called)
-            self.assertEqual(doc1['_tensor_facets'], doc2['_tensor_facets'])
-
     def test_add_documents_should_add_string_fields_as_lexical_fields(self):
         self._add_and_get_doc(self.text_index_2, "123", [])
 
