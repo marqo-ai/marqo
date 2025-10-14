@@ -14,7 +14,7 @@ from orjson import orjson
 
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig
-from marqo.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
 
 
 class RandomInferenceStub(Inference):

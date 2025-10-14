@@ -21,7 +21,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.vespa import exceptions as vespa_exceptions
