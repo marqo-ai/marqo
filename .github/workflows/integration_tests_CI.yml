@@ -134,7 +134,7 @@ jobs:
           echo "Installing maven"
           sudo apt-get install maven -y
           echo "Building Vespa components"
-          cd marqo/vespa
+          cd marqo/components/marqo/vespa
           mvn clean package
 
       - name: Start Vespa
