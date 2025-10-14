@@ -36,11 +36,10 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             marqo_version='2.12.0'
         )
-
 
         image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random'),

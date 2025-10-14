@@ -22,7 +22,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Custom settings indexes
         unstructured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
@@ -30,14 +30,14 @@ class TestCustomVectorField(MarqoTestCase):
         )
 
         semi_structured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular
         )
 
         structured_custom_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
             fields=[
