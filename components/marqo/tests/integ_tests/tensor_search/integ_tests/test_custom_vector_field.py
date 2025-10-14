@@ -185,7 +185,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         with self.assertRaises(pydantic.error_wrappers.ValidationError) as err:
             self.create_indexes([self.structured_marqo_index_request(
-                model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+                model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
                 normalize_embeddings=False,
                 distance_metric=DistanceMetric.Angular,
                 fields=[

@@ -31,7 +31,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         text_index_6 = cls.unstructured_marqo_index_request()
 
         test_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion2B-s32B-b79K'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 

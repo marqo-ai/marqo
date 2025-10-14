@@ -125,7 +125,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field', 'image_field_2'],
-            model=Model(name='open_clip/ViT-B-16/openai')
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k')
         )
         index_request_img_random = cls.structured_marqo_index_request(
             fields=[
