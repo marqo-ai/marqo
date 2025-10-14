@@ -8,14 +8,12 @@ import pytest
 
 from marqo.api.exceptions import BadRequestError
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.core.inference.api import Inference
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-import unittest
 
 
 class TestAddDocumentsSemiStructured(MarqoTestCase):
@@ -33,12 +31,6 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
-            treat_urls_and_pointers_as_images=True
-        )
-
         image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random'),
             treat_urls_and_pointers_as_images=True
@@ -48,14 +40,12 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             default_text_index,
             default_text_index_encoded_name,
             default_image_index,
-            image_index_with_chunking,
             image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
         cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
-        cls.image_index_with_chunking = image_index_with_chunking.name
         cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:

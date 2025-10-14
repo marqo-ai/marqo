@@ -30,9 +30,9 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
         text_index_6 = cls.unstructured_marqo_index_request()
 
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
+        test_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion2B-s32B-b79K'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
+            image_preprocessing=ImagePreProcessing(),
             treat_urls_and_pointers_as_images=True
         )
 
@@ -43,7 +43,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
             text_index_4,
             text_index_5,
             text_index_6,
-            image_index_with_chunking,
+            test_image_index,
         ])
 
         cls.text_index_1 = text_index_1.name
@@ -52,7 +52,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         cls.text_index_4 = text_index_4.name
         cls.text_index_5 = text_index_5.name
         cls.text_index_6 = text_index_6.name
-        cls.image_index_with_chunking = image_index_with_chunking.name
+        cls.image_index = test_image_index.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -172,7 +172,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
     def test_add_documents_should_add_image_field_as_lexical_fields(self):
         self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.image_index_with_chunking,
+                index_name=self.image_index,
                 docs=[{
                     "title": "content 1",
                     "image_field": TestImageUrls.HIPPO_REALISTIC.value
@@ -183,14 +183,14 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
         res = tensor_search.search(
             text="hippo", search_method=SearchMethod.LEXICAL,
-            config=self.config, index_name=self.image_index_with_chunking,
+            config=self.config, index_name=self.image_index,
             searchable_attributes=['image_field']
         )
 
         self.assertEqual(1, len(res['hits']))
 
         updated_index = cast(SemiStructuredMarqoIndex,
-                             self.config.index_management.get_index(self.image_index_with_chunking))
+                             self.config.index_management.get_index(self.image_index))
         self.assertIn('image_field', updated_index.field_map.keys())
         self.assertIn('marqo__lexical_image_field', updated_index.lexical_field_map.keys())
 
