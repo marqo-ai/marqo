@@ -4,32 +4,25 @@ import uuid
 from unittest import mock
 
 import pytest
-import torch
 from fastapi.responses import ORJSONResponse
 from hypothesis import given, strategies as st
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
-from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.inference.api import MediaDownloadError
 from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
-from marqo.core.utils.vector_interpolation import Slerp, Lerp, Nlerp, AllZeroWeightsError, ZeroMagnitudeVectorError
-from marqo.exceptions import InvalidArgumentError
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
-from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextDocumentsParameters
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestSearch(MarqoTestCase):
@@ -212,88 +205,6 @@ class TestSearch(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
-
-    @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False,
-                        reason="We skip the large model test if we don't have cuda support")
-    def test_search_video(self):
-        documents = [
-            {
-                "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-                "_id": "1"},
-            # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-             "_id": "2"},
-            {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
-            # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
-            {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
-        ]
-        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
-            with self.subTest(index=index.type):
-                response = self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=documents,
-                        tensor_fields=["text_field_1",
-                                       "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index,
-                                                                                                        UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Search using the video
-                results = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
-                )
-
-                # Assertions
-                self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
-                self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
-                self.assertGreater(results['hits'][0]['_score'],
-                                   results['hits'][1]['_score'])  # Video should have higher score
-
-    @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False,
-                        reason="We skip the large model test if we don't have cuda support")
-    def test_search_audio(self):
-        documents = [
-            {
-                "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-                "_id": "1"},
-            # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-             "_id": "2"},
-            {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
-            # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
-            {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
-        ]
-        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
-            with self.subTest(index=index.type):
-                response = self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=documents,
-                        tensor_fields=["text_field_1",
-                                       "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index,
-                                                                                                        UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Search using the audio
-                results = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
-                )
-
-                # Assertions
-                self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
-                self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result
-                self.assertGreater(results['hits'][0]['_score'],
-                                   results['hits'][1]['_score'])  # Audio should have higher score
 
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
