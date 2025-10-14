@@ -26,30 +26,25 @@ jobs:
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.11"
           cache: "pip"
 
-      - name: Checkout marqo-base for requirements
-        uses: actions/checkout@v3
-        with:
-          repository: marqo-ai/marqo-base
-          path: marqo-base
+      - name: Install uv
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y uv
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
-          pip install -r marqo/requirements.dev.txt
-          python -m nltk.downloader punkt_tab
+          cd marqo/components/marqo
+          uv sync --dev
 
       - name: Run unit tests
         id: run_unit_tests
         run: |
-          cd marqo
-          export PYTHONPATH="./src:."
+          cd marqo/components/marqo
           set -o pipefail
-          pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+          uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/unit_tests/ | tee pytest_output.txt
 
