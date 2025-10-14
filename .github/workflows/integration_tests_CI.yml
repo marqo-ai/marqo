@@ -82,7 +82,7 @@ jobs:
       matrix:
         part: [ 0, 1, 2 ] # Zero-based index for JSON list access
 
-    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=ami-020524452d3943a94"
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=ami-0b8bc108d37bb85f3"
     
     timeout-minutes: 60
     env:
@@ -112,29 +112,6 @@ jobs:
 
       - name: Build Vespa
         run: |
-          sudo systemctl stop unattended-upgrades
-          sudo apt-get remove -y unattended-upgrades
-
-          # Function to wait for the dpkg lock to be released
-          function wait_for_dpkg_lock() {
-            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-              echo "Waiting for the dpkg lock to be released..."
-              sleep 5
-            done
-          }
-
-          # Wait for the dpkg lock before updating and installing
-          wait_for_dpkg_lock
-
-          echo "Updating package list"
-          sudo apt-get update -y
-
-          # Build Vespa components
-          echo "Installing jdk 17"
-          sudo apt-get install openjdk-17-jdk -y
-          echo "Installing maven"
-          sudo apt-get install maven -y
-          echo "Building Vespa components"
           cd marqo/components/marqo/vespa
           mvn clean package
 
