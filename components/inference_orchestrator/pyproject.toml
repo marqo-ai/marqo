@@ -27,6 +27,7 @@ dependencies = [
     "readerwriterlock>=1.0.9",
     "semver>=3.0.4",
     "torch>=2.8.0",
+    "torchvision>=0.23.0",
     "transformers>=4.56.2",
     "tritonclient[grpc,http]>=2.60.0",
     "uvicorn>=0.37.0",
