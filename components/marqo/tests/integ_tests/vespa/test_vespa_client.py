@@ -87,7 +87,7 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertIsNotNone(messages[1])
 
     def test_feed_batch_invalidFeedUrl_fails(self):
-        feed_client = VespaClient("http://localhost:8080", "http://localhost:8000",
+        feed_client = VespaClient("http://localhost:8080", "http://localhost:8009",
                                   "http://localhost:8080", "content_default")
         documents = [
             VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
@@ -97,7 +97,7 @@ class TestVespaClient(AsyncMarqoTestCase):
         res = feed_client.feed_batch(documents, self.TEST_SCHEMA)
         self.assertEqual(2, len(res.responses))
         for r in res.responses:
-            self.assertEqual(r.status, 500)
+            self.assertEqual(500, r.status)
             self.assertIn("Network Error", r.message)
 
     @pytest.mark.asyncio

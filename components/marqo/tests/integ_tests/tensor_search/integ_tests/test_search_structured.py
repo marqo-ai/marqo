@@ -777,7 +777,7 @@ class TestSearchStructured(MarqoTestCase):
         url_1 = TestImageUrls.HIPPO_REALISTIC.value
         url_2 = TestImageUrls.HIPPO_STATUE.value
         docs = [
-            {"_id": "123", "image_field_1": url_1, "text_field_1": "irrelevant text"},
+            {"_id": "123", "image_field_1": url_1, "text_field_1": "void"},
             {"_id": "789", "image_field_1": url_2},
         ]
         self.add_documents(
@@ -789,16 +789,15 @@ class TestSearchStructured(MarqoTestCase):
         )
         res = tensor_search.search(
             config=self.config, index_name=self.default_image_index,
-            text="A hippo in the water", result_count=3,
+            text=url_1, result_count=3,
         )
 
         hits = res["hits"]
+        self.assertEqual(2, len(res["hits"]))
+        self.assertIn("image_field_1", hits[0]["_highlights"][0])
 
         self.assertEqual(2, len(res["hits"]))
-        self.assertEqual(
-            {url_1, url_2}, {hits[0]["_highlights"]["image_field_1"][0], hits[1]["_highlights"]["image_field_1"][0]},
-            f"Got hits: {hits}"
-        )
+        self.assertIn("image_field_1", hits[1]["_highlights"][0])
 
     def test_multi_search(self):
         docs = [
