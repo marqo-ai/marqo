@@ -1,3 +1,11 @@
+"""
+This file should be exactly the same as the
+equivalent file in the Marqo repo:
+components/marqo/src/marqo/core/inference/embedding_models/marqo_model_registry.py.
+
+TODO - Have a single source of truth for this file that can be imported in both repos.
+"""
+
 from inference_orchestrator.services.errors import UnsupportedModelError
 
 _MODEL_REGISTRY: dict[str, dict] = {
@@ -52,8 +60,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "tritonImageEncoder": {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-image-encoder",
-            "sources": ["s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx",
-                        "s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx.data"],
+            "sources": ["s3://marqo-opensource-models/marqo-fashionSigLIP/image-encoder/model.onnx"],
             "input": [
                 {
                     "name": "input",
@@ -610,6 +617,38 @@ _MODEL_REGISTRY: dict[str, dict] = {
                 }
             ]
         }
+    },
+
+    "random": {
+        "name": "random",
+        "dimensions": 384,
+        "tokens": 128,
+        "type": "random",
+        "notes": ""
+    },
+
+    "random/large": {
+        "name": "random/large",
+        "dimensions": 768,
+        "tokens": 128,
+        "type": "random",
+        "notes": ""
+    },
+
+    "random/small": {
+        "name": "random/small",
+        "dimensions": 32,
+        "tokens": 128,
+        "type": "random",
+        "notes": ""
+    },
+
+    "random/medium": {
+        "name": "random/medium",
+        "dimensions": 128,
+        "tokens": 128,
+        "type": "random",
+        "notes": ""
     },
 }
 
