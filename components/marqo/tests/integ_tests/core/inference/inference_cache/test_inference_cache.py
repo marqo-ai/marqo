@@ -15,6 +15,7 @@ from orjson import orjson
 from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig
 from marqo.core.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties
 
 
 class RandomInferenceStub(Inference):
@@ -41,12 +42,7 @@ class TestInferenceCache(unittest.TestCase):
             contents=["a"],
             model_config=ModelConfig(
                 model_name="hf/all-MiniLM-L6-v2",
-                model_properties={
-                    "name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
-                    "dimensions": 384,
-                    "tokens": 128,
-                    "type": "hf"
-                }
+                model_properties=get_model_properties("hf/all-MiniLM-L6-v2")
             ),
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
             use_inference_cache=True
@@ -118,11 +114,8 @@ class TestInferenceCache(unittest.TestCase):
                 model_key1 = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
 
                 req_with_new_model = self.base_request.copy(update={"model_config": ModelConfig(
-                    model_name="hf/all-mpnet-base-v2",
-                    model_properties={
-                       "name": "sentence-transformers/all-mpnet-base-v2",
-                       "dimensions": 768, "tokens": 128, "type": "hf"
-                    }
+                    model_name="hf/e5-small-v2",
+                    model_properties=get_model_properties("hf/e5-small-v2")
                 )})
                 caching_inference.vectorise(req_with_new_model)
                 model_key2 = caching_inference.model_cache_key(req_with_new_model.model_config.model_properties)

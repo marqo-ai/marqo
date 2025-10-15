@@ -1,14 +1,12 @@
-import copy
 import json
 import os
 import unittest
 from unittest import mock
 
 import httpx
-import numpy as np
-from fastapi.responses import ORJSONResponse
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
+import pytest
 
+import marqo.api.exceptions as api_exception
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -17,14 +15,10 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
-import marqo.api.exceptions as api_exception
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
-import pytest
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
-import unittest
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -2255,9 +2249,14 @@ class TestHybridSearch(MarqoTestCase):
                     request=httpx.Request("POST", "http://localhost:8080/test-url/")
                 )
 
-                with unittest.mock.patch("httpx.Client.post") as mock_query:
-                    mock_query.return_value = mock_vespa_result
+                _original_post = httpx.Client.post
 
+                def selective_post(self, url, *args, **kwargs):
+                    if "search" in url:
+                        return mock_vespa_result
+                    return _original_post(self, url, *args, **kwargs)
+
+                with mock.patch("marqo.vespa.vespa_client.httpx.Client.post", autospec=True, side_effect=selective_post):
                     for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
                         with self.subTest(index=type(index)):
                             with self.assertRaises(vespa_exceptions.VespaStatusError) as e:

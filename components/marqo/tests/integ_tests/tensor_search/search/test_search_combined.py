@@ -1087,7 +1087,7 @@ class TestSearch(MarqoTestCase):
         for index_name in [self.structured_default_image_index, self.unstructured_default_image_index]:
             for query, msg in test_queries_list:
                 with self.subTest(f"{index_name} - {query}"):
-                    with self.assertRaises(MediaDownloadError) as e:
+                    with self.assertRaises(api_exceptions.InvalidArgError) as e:
                         tensor_search.search(
                             text=query, config=self.config, index_name=index_name.name,
                         )
