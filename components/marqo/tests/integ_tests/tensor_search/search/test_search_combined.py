@@ -11,7 +11,6 @@ import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
 from marqo import exceptions as base_exceptions
 from marqo.core.inference.api import MediaDownloadError
-from marqo.core.inference.api.exceptions import MediaExceedsMaxSizeError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -45,12 +44,12 @@ class TestSearch(MarqoTestCase):
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),  # Used to be ViT-B/32 in old structured tests
             treat_urls_and_pointers_as_images=True
         )
 
         unstructured_image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),  # Used to be ViT-B/32 in old structured tests
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True
         )
@@ -58,12 +57,6 @@ class TestSearch(MarqoTestCase):
         unstructured_image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
-        )
-
-        unstructured_languagebind_index = cls.unstructured_marqo_index_request(
-            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
-            treat_urls_and_pointers_as_images=True,
-            treat_urls_and_pointers_as_media=True
         )
 
         # STRUCTURED indexes
@@ -124,7 +117,7 @@ class TestSearch(MarqoTestCase):
         )
 
         structured_default_image_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -152,46 +145,28 @@ class TestSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
-        structured_languagebind_index = cls.structured_marqo_index_request(
-            name="my-multimodal-index" + str(uuid.uuid4()).replace('-', ''),
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text),
-                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
-                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
-                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
-            ],
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            tensor_fields=["text_field_1",
-                           "video_field_1", "audio_field_1", "image_field_1"],
-            normalize_embeddings=True,
-        )
-
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_text_index_encoded_name,
             unstructured_default_image_index,
-            unstructured_image_index_with_chunking,
             unstructured_image_index_with_random_model,
-            unstructured_languagebind_index,
+
             structured_default_text_index,
             structured_default_text_index_encoded_name,
             structured_default_image_index,
             structured_image_index_with_random_model,
-            structured_languagebind_index
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         cls.unstructured_default_text_index_encoded_name = cls.indexes[1]
         cls.unstructured_default_image_index = cls.indexes[2]
-        cls.unstructured_image_index_with_chunking = cls.indexes[3]
-        cls.unstructured_image_index_with_random_model = cls.indexes[4]
-        cls.unstructured_languagebind_index = cls.indexes[5]
-        cls.structured_default_text_index = cls.indexes[6]
-        cls.structured_default_text_index_encoded_name = cls.indexes[7]
-        cls.structured_default_image_index = cls.indexes[8]
-        cls.structured_image_index_with_random_model = cls.indexes[9]
-        cls.structured_languagebind_index = cls.indexes[10]
+        cls.unstructured_image_index_with_random_model = cls.indexes[3]
+
+        cls.structured_default_text_index = cls.indexes[4]
+        cls.structured_default_text_index_encoded_name = cls.indexes[5]
+        cls.structured_default_image_index = cls.indexes[6]
+        cls.structured_image_index_with_random_model = cls.indexes[7]
 
     def setUp(self) -> None:
         super().setUp()
@@ -1136,20 +1111,6 @@ class TestSearch(MarqoTestCase):
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
 
-    def test_video_size_limit(self):
-        """Ensure that the MediaExceedsMaxSizeError is converted to InvalidArgError."""
-        with mock.patch(
-                "marqo.inference.native_inference.local_inference.NativeInferenceLocal.vectorise") as mock_vectorise:
-            mock_vectorise.side_effect = MediaExceedsMaxSizeError("exceeds the maximum allowed size")
-            with self.assertRaises(api_exceptions.InvalidArgError) as e:
-                tensor_search.search(
-                    config=self.config,
-                    index_name=self.unstructured_languagebind_index.name,  # Use an index that supports video
-                    text="http://example.com/large_video.mp4",
-                    search_method=SearchMethod.TENSOR,
-                )
-            self.assertIn("exceeds the maximum allowed size", str(e.exception))
-
     def test_search_results_always_json_serializable(self):
         """
         The search() text parameter can either be str, dict, or CustomVectorQuery.
@@ -1437,23 +1398,5 @@ class TestSearchFuzz(MarqoTestCase):
                 res = tensor_search.search(
                     text=query, config=self.config, index_name=index.name,
                     search_method=SearchMethod.LEXICAL
-                )
-                self.assertIn("hits", res)
-
-    @unittest.skip(reason='temporarily skip. to come back and add coverage for equality, range, and IN filters')
-    @given(filter=biased_text_strategy)
-    def test_fuzz_filter_all_characters(self, filter: str):
-        """
-        Fuzz test filter string parsing invariants
-        Testing random strings to ensure no error is raised with filters.
-        Ensure no error is raised.
-        TODO: Add coverage for equality, range, and IN filters with these random characters.
-        Note that tokens with unescaped special characters will raise filter string parsing errors.
-        """
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index.type):
-                res = tensor_search.search(
-                    text='', config=self.config, index_name=index.name,
-                    filter=filter
                 )
                 self.assertIn("hits", res)

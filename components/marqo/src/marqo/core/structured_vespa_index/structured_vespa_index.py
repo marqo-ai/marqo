@@ -761,7 +761,7 @@ class StructuredVespaIndex(VespaIndex):
                     raise InvalidDataTypeError(
                         f"The IN filter operator is only supported for the following field types: "
                         f"{[t.value for t in STR_FIELD_TYPES + INT_FIELD_TYPES]}. However, '{marqo_field_name}' "
-                        f"is of unsupported type: '{marqo_field_type}'."
+                        f"is of unsupported type: '{marqo_field_type.value}'."
                     )
 
                 # Add comma if not the last element

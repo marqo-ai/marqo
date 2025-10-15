@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 from numpy import ndarray
-from pydantic.v1 import StrictStr, root_validator, Field
+from pydantic.v1 import StrictStr, root_validator, Field, validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType
@@ -15,6 +15,16 @@ class ModelConfig(ImmutableBaseModel):
     model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
     model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
     normalize_embeddings: bool = Field(default=True, alias='normalizeEmbeddings')
+
+    @validator('model_name')
+    @classmethod
+    def _validate_model_name(cls, v):
+        """Block 'no_model' from being used as a model name for vectorisation"""
+        if v == "no_model":
+            raise ValueError("'no_model' can not be used to vectorise. To use a 'no_model' index, you must provide "
+                             "embeddings for all documents or search queries")
+        return v
+
 
 
 class InferenceRequest(ImmutableBaseModel):

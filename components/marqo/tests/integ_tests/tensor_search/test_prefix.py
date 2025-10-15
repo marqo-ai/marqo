@@ -32,22 +32,22 @@ class TestPrefix(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
         unstructured_index_e5 = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/e5-small'),
+            model=Model(name='hf/e5-small-v2'),
             treat_urls_and_pointers_as_images=True
         )
         unstructured_index_multimodal = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 
         unstructured_index_with_model_default = cls.unstructured_marqo_index_request(
-            model=Model(name="test_prefix"),
+            model=Model(name="hf/e5-small-v2"),
             treat_urls_and_pointers_as_images=False,
         )
 
         unstructured_index_with_override = cls.unstructured_marqo_index_request(
             model=Model(
-                name="test_prefix",
+                name="hf/e5-small-v2",
                 text_chunk_prefix="index-override: ",
                 text_query_prefix="index-override: "
             ),
@@ -65,7 +65,7 @@ class TestPrefix(MarqoTestCase):
         )
 
         structured_multimodal_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="TITLE", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -221,79 +221,6 @@ class TestPrefix(MarqoTestCase):
                 self.assertTrue(np.allclose(embed_res_no_prefix["embeddings"][0],
                                             retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
 
-    @unittest.skip(reason='temporarily skip due to inference interface change: prefix?')
-    def test_prefix_multimodal(self):
-        """Ensures that vectorise is called on text list with prefixes, but image list without."""
-
-        for index in [self.unstructured_index_multimodal]:
-            with self.subTest(index=index.type):
-                # Add a multimodal doc with a text and image field
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=[{
-                            "Title": "Horse rider",
-                            "text_field": "hello",
-                            "image_field": TestImageUrls.IMAGE1.value,
-                            "_id": "1"
-                        }],
-                        device="cpu",
-                        text_chunk_prefix="passage: ",
-                        mappings={
-                            "multimodal_fields": {
-                                "type": "multimodal_combination",
-                                "weights": {"text_field": 0.5,
-                                            "image_field": 0.3}
-                            }} if isinstance(index, UnstructuredMarqoIndex) else None,
-                        tensor_fields=["multimodal_fields"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=[{
-                            "Title": "Horse rider",
-                            "text_field": "passage: hello",
-                            "image_field": TestImageUrls.IMAGE1.value,
-                            "_id": "2"
-                        },
-                            {
-                                "Title": "Horse rider",
-                                "text_field": "passage: passage: hello",
-                                "image_field": TestImageUrls.IMAGE1.value,
-                                "_id": "3"
-                            }],
-                        device="cpu",
-                        mappings={
-                            "multimodal_fields": {
-                                "type": "multimodal_combination",
-                                "weights": {"text_field": 0.5,
-                                            "image_field": 0.3}
-                            }} if isinstance(index, UnstructuredMarqoIndex) else None,
-                        tensor_fields=["multimodal_fields"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Get all documents (with vectors)
-                res = tensor_search.get_documents_by_ids(
-                    config=self.config, index_name=index.name, document_ids=["1", "2", "3"],
-                    show_vectors=True
-                ).dict(exclude_none=True, by_alias=True)
-
-                # Assert that the text field remains the same stored
-                self.assertEqual(res["results"][0]["text_field"], "hello")
-                # Assert that the text field embedding is equivalent to the embedding with the prefix
-                # FIXME this passes on Mac (arm CPU), but fails on amd64 CPU
-                self.assertTrue(np.allclose(res["results"][0]["_tensor_facets"][0]["_embedding"],
-                                            res["results"][1]["_tensor_facets"][0]["_embedding"]))
-
-                # Assert that no double prefixing happens in passage 1, so the embeddings of passage 1 != passage 3
-                self.assertFalse(np.allclose(res["results"][0]["_tensor_facets"][0]["_embedding"],
-                                             res["results"][2]["_tensor_facets"][0]["_embedding"]))
-
     def test_add_prefix_to_multimodal_queries(self):
         """Ensures that prefix gets added to each query."""
         for index in [self.unstructured_index_1, self.structured_text_index]:
@@ -314,55 +241,6 @@ class TestPrefix(MarqoTestCase):
                 prefixed_queries = tensor_search.add_prefix_to_queries(queries)
                 self.assertEqual(prefixed_queries[0].q, {"PREFIX: text query": 0.5,
                                                          TestImageUrls.HIPPO_REALISTIC.value: 0.5})
-
-    @unittest.skip(reason='temporarily skip due to unsupported model type: TEST')
-    def test_determine_text_chunk_prefix(self):
-        """
-        Ensures proper priority order is followed when determining the chunk prefix.
-        add docs request-level > index override-level > model default level
-        """
-
-        with self.subTest("All prefixes on (request level chosen)"):
-            result = self.unstructured_index_with_override.model.get_text_chunk_prefix("request-level")
-            self.assertEqual(result, "request-level")
-
-        with self.subTest("Request and model default on (request level chosen)"):
-            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix("request-level")
-            self.assertEqual(result, "request-level")
-
-        with self.subTest("Index override and model default on (index override chosen)"):
-            result = self.unstructured_index_with_override.model.get_text_chunk_prefix(None)
-            self.assertEqual(result, "index-override: ")
-
-        with self.subTest("Only model default on (model default chosen)"):
-            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix(None)
-            self.assertEqual(result, "test passage: ")
-
-        # doc_a should default to the override prefix
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.unstructured_index_with_override.name, docs=[{"_id": "doc_a", "text": "hello"}],
-            auto_refresh=True,
-            tensor_fields=["text"] if isinstance(self.unstructured_index_with_override,
-                                                 UnstructuredMarqoIndex) else None
-        ))
-
-        # Get all documents (with vectors)
-        res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.unstructured_index_with_override.name, document_ids=["doc_a"],
-            show_vectors=True
-        ).dict(exclude_none=True, by_alias=True)
-
-        # we hardcode the prefix into the text chunk and embed
-        embed_res = embed(
-            marqo_config=self.config, index_name=self.unstructured_index_with_override.name,
-            embedding_request_dict={"content": ["index-override: hello"]},
-            device="cpu"
-        )
-
-        # We assert that the embeddings are equal
-        with self.subTest("Embeddings are equal between overriden doc and direct embed"):
-            self.assertTrue(
-                np.allclose(embed_res["embeddings"][0], res["results"][0]["_tensor_facets"][0]["_embedding"]))
 
     def test_prefix_text_search(self):
         """Ensures that search query has prefix added to it for vectorisation."""
@@ -416,7 +294,7 @@ class TestPrefix(MarqoTestCase):
             schema_name="old_index",
             type=IndexType.Unstructured,
             model=Model(
-                name="hf/e5-small",
+                name="hf/e5-small-v2-v2",
                 text_chunk_prefix=None,
                 text_query_prefix=None
             ),

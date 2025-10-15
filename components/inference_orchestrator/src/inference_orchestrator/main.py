@@ -99,8 +99,12 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.errors()
+            detail=str(e)
         ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     # Generate embeddings
     try:

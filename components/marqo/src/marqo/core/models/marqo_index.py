@@ -182,8 +182,8 @@ class Model(MarqoBaseModel):
         custom = values.get('custom')
         if properties and custom:
             try:
-                validate_model_properties(properties)
-            except InvalidModelPropertiesError as e:
+                validate_model_properties(model_name, properties)
+            except ValueError as e:
                 raise ValueError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'
                 )

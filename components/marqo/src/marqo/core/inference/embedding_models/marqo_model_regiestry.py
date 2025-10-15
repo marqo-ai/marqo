@@ -1,4 +1,5 @@
 from ..api.exceptions import UnsupportedModelError
+from .no_model import validate_no_model
 
 _MODEL_REGISTRY: dict[str, dict] = {
     "Marqo/marqo-fashionCLIP": {
@@ -505,6 +506,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 768,
         "type": "hf",
         "poolingMethod": "mean",
+        "text_query_prefix": "query: ",
+        "text_chunk_prefix": "passage: ",
         "tritonTextEncoder": {
             "maxBatchSize": 32,
             "name": "e5-base-v2-text-encoder",
@@ -542,6 +545,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 384,
         "type": "hf",
         "poolingMethod": "mean",
+        "text_query_prefix": "query: ",
+        "text_chunk_prefix": "passage: ",
         "tritonTextEncoder": {
             "maxBatchSize": 32,
             "name": "e5-small-v2-text-encoder",
@@ -651,5 +656,23 @@ def get_model_properties(model_name: str) -> dict:
     return _MODEL_REGISTRY[model_name]
 
 
-def validate_model_properties(model_properties: dict):
-    pass
+def validate_model_properties(model_name:str, model_properties: dict) -> None:
+    """
+    This is a very basic validation to ensure the model properties have the required fields.
+    More thorough validation is done in the first vectorisation call.
+
+    Raise value error if validation fails.
+    """
+    if not isinstance(model_properties, dict):
+        raise ValueError("Model properties must be a dictionary.")
+
+    dimensions = model_properties.get("dimensions", None)
+    if not isinstance(dimensions, int) or dimensions < 1:
+        raise ValueError("Model dimensions must be a positive integer.")
+
+    model_type = model_properties.get("type", None)
+
+    if model_name == "no_model" or model_type == "no_model":
+        validate_no_model(model_name, model_properties)
+
+    return

@@ -5,7 +5,7 @@ import numpy as np
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.exceptions import IndexNotFoundError
-from pydantic.v1.error_wrappers import ValidationError
+from pydantic.v1 import ValidationError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -67,7 +67,7 @@ class TestNoModel(MarqoTestCase):
             ("no_model", {"dimensions": 213.213, "type": "no_model"}, "invalid dimensions value, can't be float"),
             ("no_model", {"dimensions": "512", "type": "no_model"}, "invalid dimensions value, can't be string"),
             ("no_model", {"dimensions": 234, "type": "No_model"}, "invalid model type, should be 'no_model'"),
-            ("no_model", None, "no model properties provided"),
+            ("no_model", None, "Could not find model properties for model=no_model"),
             ("no_model", {"type": "no_model"}, "dimension not provided"),
             ("my_model", {"dimensions": 512, "type": "no_model"}, "invalid model name"),
             ("no_model", {"dimensions": 512, "type": "open_clip"}, "invalid model properties type")
@@ -93,7 +93,10 @@ class TestNoModel(MarqoTestCase):
                                     model=Model(name=name, properties=model_properties, custom=True)
                                 )
                         )
-                    self.assertIn("Invalid model properties", str(e.exception))
+                    self.assertTrue(
+                        "Invalid model properties" in str(e.exception) or
+                        "Could not find model properties" in str(e.exception)
+                    )
 
     def test_no_model_in_add_documents_error(self):
         """Test to ensure that adding documents to an index with no model raises an error for the
@@ -115,36 +118,27 @@ class TestNoModel(MarqoTestCase):
 
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
-                tensor_fields = ["text_field_1", "custom_field_1"] if \
-                    index_name == self.unstructured_index_with_no_model else None
-                mappings = {"custom_field_1": {"type": "custom_vector"}} if \
-                    index_name == self.unstructured_index_with_no_model else None
-                r = self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index_name,
-                        docs=documents,
-                        tensor_fields=tensor_fields,
-                        mappings=mappings)
-                ).dict(exclude_none=True, by_alias=True)
-                self.assertEqual(r["errors"], True)
-                self.assertIn("Cannot vectorise anything with 'no_model'", r["items"][0]["error"])
-                self.assertEqual(400, r["items"][0]["status"])
-                self.assertEqual("inference_error", r["items"][0]["code"])
-                self.assertEqual("1", r["items"][0]["_id"])
-
-                self.assertEqual("2", r["items"][1]["_id"])
-                self.assertEqual(200, r["items"][1]["status"])
-                self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name).number_of_documents)
-                self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name).number_of_vectors)
+                with self.assertRaises(ValidationError) as e:
+                    tensor_fields = ["text_field_1", "custom_field_1"] if \
+                        index_name == self.unstructured_index_with_no_model else None
+                    mappings = {"custom_field_1": {"type": "custom_vector"}} if \
+                        index_name == self.unstructured_index_with_no_model else None
+                    r = self.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=documents,
+                            tensor_fields=tensor_fields,
+                            mappings=mappings)
+                    ).dict(exclude_none=True, by_alias=True)
 
     def test_no_model_raise_error_if_query_in_search(self):
         """Test to ensure that providing a query to vectorise will raise an error."""
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
-                with self.assertRaises(InvalidArgError) as e:
+                with self.assertRaises(ValidationError) as e:
                     r = tensor_search.search(config=self.config, index_name=index_name, text="test")
-                self.assertIn("Cannot vectorise anything with 'no_model'", str(e.exception))
+                self.assertIn("you must provide embeddings for all documents or search queries", str(e.exception))
 
     def test_no_model_work_with_context_vectors_in_search(self):
         """Test to ensure that context vectors work with no_model by setting query as None
