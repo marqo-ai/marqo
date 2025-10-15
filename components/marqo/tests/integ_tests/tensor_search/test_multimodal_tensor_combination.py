@@ -54,12 +54,12 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         )
 
         unstructured_multimodal_index = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             treat_urls_and_pointers_as_images=True,
         )
 
         unstructured_unnormalized_multimodal_index = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False
         )
@@ -134,7 +134,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         )
 
         structured_multimodal_index = cls.structured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             fields=[
                 FieldRequest(name="Title", type=FieldType.Text),
                 FieldRequest(name="text_field", type=FieldType.Text),
@@ -150,7 +150,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         )
 
         structured_unnormalized_multimodal_index = cls.structured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             normalize_embeddings=False,
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text),
