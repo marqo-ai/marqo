@@ -1,5 +1,4 @@
 from ..api.exceptions import UnsupportedModelError
-from .no_model import validate_no_model
 
 _MODEL_REGISTRY: dict[str, dict] = {
     "Marqo/marqo-fashionCLIP": {
@@ -654,3 +653,7 @@ def get_model_properties(model_name: str) -> dict:
     if model_name not in _MODEL_REGISTRY:
         raise UnsupportedModelError(f"Model {model_name} is not registered.")
     return _MODEL_REGISTRY[model_name]
+
+
+def validate_model_properties(properties: dict) -> None:
+    pass
