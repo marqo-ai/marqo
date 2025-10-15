@@ -179,7 +179,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             {"yql": f"select * from sources {self.default_text_index} where true limit 0"}
         ).json["root"]["fields"]["totalCount"]
 
-        assert count == len(docs)
+        self.assertEqual(count, len(docs))
 
     def test_add_docs_response_format(self):
         add_res = self.add_documents(
@@ -204,21 +204,21 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 device="cpu", tensor_fields=[]
             )
         ).dict(exclude_none=True, by_alias=True)
-        assert "errors" in add_res
-        assert "processingTimeMs" in add_res
-        assert "index_name" in add_res
-        assert "items" in add_res
+        self.assertIn("errors", add_res)
+        self.assertIn("processingTimeMs", add_res)
+        self.assertIn("index_name", add_res)
+        self.assertIn("items", add_res)
 
-        assert add_res["processingTimeMs"] > 0
-        assert add_res["errors"] is True
-        assert add_res["index_name"] == self.default_text_index
+        self.assertGreater(add_res["processingTimeMs"], 0)
+        self.assertTrue(add_res["errors"])
+        self.assertEqual(add_res["index_name"], self.default_text_index)
 
         for item in add_res["items"]:
-            assert "_id" in item
-            assert "status" in item
-            assert (item['status'] == 200) ^ ("error" in item and "code" in item)
+            self.assertIn("_id", item)
+            self.assertIn("status", item)
+            self.assertTrue((item['status'] == 200) ^ ("error" in item and "code" in item))
 
-        assert [item['status'] for item in add_res["items"]] == [200, 200, 400]
+        self.assertEqual([item['status'] for item in add_res["items"]], [200, 200, 400])
 
     def test_add_documents_validation(self):
         """
@@ -253,10 +253,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                             tensor_fields=["title"]
                         )
                     ).dict(exclude_none=True, by_alias=True)
-                    assert add_res['errors'] is True
-                    assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
-                    assert all([item['status'] == 200
-                                for item in add_res['items'] if item['_id'].startswith('to_pass')])
+                    self.assertTrue(add_res['errors'])
+                    self.assertTrue(all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')]))
+                    self.assertTrue(all([item['status'] == 200
+                                for item in add_res['items'] if item['_id'].startswith('to_pass')]))
 
     def test_add_documents_id_validation(self):
         """
@@ -285,16 +285,16 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                             use_existing_tensors=use_existing_tensors_flag, device="cpu", tensor_fields=["title"]
                         )
                     ).dict(exclude_none=True, by_alias=True)
-                    assert add_res[
-                               'errors'] is True, f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'
+                    self.assertTrue(add_res['errors'],
+                               f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}')
                     succeeded_count = 0
                     for item in add_res['items']:
                         if item['status'] == 200:
                             succeeded_count += 1
                         else:
-                            assert 'Document _id must be a string type' in item['error']
+                            self.assertIn('Document _id must be a string type', item['error'])
 
-                    assert succeeded_count == bad_doc_arg[1]
+                    self.assertEqual(succeeded_count, bad_doc_arg[1])
 
     def test_add_documents_list_success(self):
         good_docs = [
@@ -309,7 +309,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                     tensor_fields=[],
                 )
             ).dict(exclude_none=True, by_alias=True)
-            assert add_res['errors'] is False
+            self.assertFalse(add_res['errors'])
 
     def test_add_documents_list_data_type_validation(self):
         """These bad docs should return errors"""
@@ -332,10 +332,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                         tensor_fields=[],
                     )
                 ).dict(exclude_none=True, by_alias=True)
-                assert add_res['errors'] is True
-                assert all(['error' in item for item in add_res['items']])
-                assert all(['Unstructured Marqo index only supports string lists.' in item['message']
-                            for item in add_res['items']])
+                self.assertTrue(add_res['errors'])
+                self.assertTrue(all(['error' in item for item in add_res['items']]))
+                self.assertTrue(all(['Unstructured Marqo index only supports string lists.' in item['message']
+                            for item in add_res['items']]))
 
     def test_add_documents_empty(self):
         """
@@ -435,10 +435,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                                                 index_name=self.default_text_index, document_id="789",
                                                 show_vectors=True)
 
-        assert len(resp[enums.TensorField.tensor_facets]) == 1
-        assert enums.TensorField.embedding in resp[enums.TensorField.tensor_facets][0]
-        assert "title" in resp[enums.TensorField.tensor_facets][0]
-        assert "desc" not in resp[enums.TensorField.tensor_facets][0]
+        self.assertEqual(len(resp[enums.TensorField.tensor_facets]), 1)
+        self.assertIn(enums.TensorField.embedding, resp[enums.TensorField.tensor_facets][0])
+        self.assertIn("title", resp[enums.TensorField.tensor_facets][0])
+        self.assertNotIn("desc", resp[enums.TensorField.tensor_facets][0])
 
     def test_doc_too_large(self):
         max_size = 400000
@@ -456,14 +456,16 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                     device="cpu", tensor_fields=["desc"]
                 )).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
-            assert update_res['errors']
-            assert 'error' in items[0] and 'error' in items[2]
-            assert 'doc_too_large' == items[0]['code'] and ('doc_too_large' == items[0]['code'])
-            assert items[1]['status'] == 200
-            assert 'error' not in items[1]
+            self.assertTrue(update_res['errors'])
+            self.assertIn('error', items[0])
+            self.assertIn('error', items[2])
+            self.assertEqual('doc_too_large', items[0]['code'])
+            self.assertEqual('doc_too_large', items[2]['code'])
+            self.assertEqual(items[1]['status'], 200)
+            self.assertNotIn('error', items[1])
             return True
 
-        assert run()
+        self.assertTrue(run())
 
     def test_doc_too_large_single_doc(self):
         max_size = 400000
@@ -479,12 +481,12 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                     use_existing_tensors=True, device="cpu", tensor_fields=[])
             ).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
-            assert update_res['errors']
-            assert 'error' in items[0]
-            assert 'doc_too_large' == items[0]['code']
+            self.assertTrue(update_res['errors'])
+            self.assertIn('error', items[0])
+            self.assertEqual('doc_too_large', items[0]['code'])
             return True
 
-        assert run()
+        self.assertTrue(run())
 
     def test_doc_too_large_none_env_var(self):
         """
@@ -502,12 +504,12 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                         use_existing_tensors=True, device="cpu", tensor_fields=["desc"]
                     )).dict(exclude_none=True, by_alias=True)
                 items = update_res['items']
-                assert not update_res['errors']
-                assert 'error' not in items[0]
-                assert items[0]['status'] == 200
+                self.assertFalse(update_res['errors'])
+                self.assertNotIn('error', items[0])
+                self.assertEqual(items[0]['status'], 200)
                 return True
 
-            assert run()
+            self.assertTrue(run())
 
     def test_remove_tensor_field(self):
         """
@@ -531,8 +533,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.default_text_index, document_id='123', show_vectors=True)
-        assert doc_w_facets[enums.TensorField.tensor_facets] == []
-        assert 'title' not in doc_w_facets
+        self.assertEqual(doc_w_facets[enums.TensorField.tensor_facets], [])
+        self.assertNotIn('title', doc_w_facets)
 
     def test_add_documents_exceeded_max_doc_count(self):
         max_docs = 128
@@ -587,8 +589,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.default_text_index, document_id='123', show_vectors=True)
-        assert doc_w_facets[enums.TensorField.tensor_facets] == []
-        assert 'desc' in doc_w_facets
+        self.assertEqual(doc_w_facets[enums.TensorField.tensor_facets], [])
+        self.assertIn('desc', doc_w_facets)
 
     def test_index_doc_on_empty_ix(self):
         """
@@ -603,11 +605,11 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         )
         doc_w_facets = tensor_search.get_document_by_id(
             self.config, index_name=self.default_text_index, document_id='123', show_vectors=True)
-        assert len(doc_w_facets[enums.TensorField.tensor_facets]) == 1
-        assert 'title' in doc_w_facets[enums.TensorField.tensor_facets][0]
-        assert 'desc' not in doc_w_facets[enums.TensorField.tensor_facets][0]
-        assert 'title' in doc_w_facets
-        assert 'desc' in doc_w_facets
+        self.assertEqual(len(doc_w_facets[enums.TensorField.tensor_facets]), 1)
+        self.assertIn('title', doc_w_facets[enums.TensorField.tensor_facets][0])
+        self.assertNotIn('desc', doc_w_facets[enums.TensorField.tensor_facets][0])
+        self.assertIn('title', doc_w_facets)
+        self.assertIn('desc', doc_w_facets)
 
     def test_various_image_count(self):
         hippo_url = TestImageUrls.HIPPO_REALISTIC.value
@@ -620,19 +622,19 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 show_vectors=True
             ).dict(exclude_none=True, by_alias=True)
             for d in get_res['results']:
-                assert d['_found'] is True
-                assert d['title'] == title_value
-                assert d['location'] == hippo_url
-                assert {'_embedding', 'location', 'title'} == functools.reduce(lambda x, y: x.union(y),
+                self.assertTrue(d['_found'])
+                self.assertEqual(d['title'], title_value)
+                self.assertEqual(d['location'], hippo_url)
+                self.assertEqual({'_embedding', 'location', 'title'}, functools.reduce(lambda x, y: x.union(y),
                                                                                [list(facet.keys()) for facet in
-                                                                                d['_tensor_facets']], set())
+                                                                                d['_tensor_facets']], set()))
                 for facet in d['_tensor_facets']:
                     if 'location' in facet:
-                        assert facet['location'] == hippo_url
+                        self.assertEqual(facet['location'], hippo_url)
                     elif 'title' in facet:
-                        assert facet['title'] == title_value
-                    assert isinstance(facet['_embedding'], list)
-                    assert len(facet['_embedding']) > 0
+                        self.assertEqual(facet['title'], title_value)
+                    self.assertIsInstance(facet['_embedding'], list)
+                    self.assertGreater(len(facet['_embedding']), 0)
             return True
 
         doc_counts = 1, 2, 25
@@ -651,10 +653,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             ).dict(exclude_none=True, by_alias=True)
             print(res1)
             self.assertEqual(
-                c,
                 self.config.monitoring.get_index_stats_by_name(
                     index_name=self.image_index_with_random_model
                 ).number_of_documents,
+                c
             )
             self.assertFalse(res1['errors'])
             self.assertTrue(_check_get_docs(doc_count=c, title_value='blah'))
@@ -848,7 +850,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 self._assert_field_types(vespa_fields, ['string_array', 'string_array2'], [MarqoFieldTypes.STRING_ARRAY, MarqoFieldTypes.STRING_ARRAY], id)
             if id in ['2', '3']:
                 self._assert_field_types(vespa_fields, field_names, field_types, id)
-            if id is '2':
+            if id == '2':
                 self._assert_field_types(vespa_fields, ['lexical_field'], [MarqoFieldTypes.STRING], id)
 
     def test_original_document_has_correct_field_types_tensor_field(self):
