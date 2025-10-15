@@ -876,9 +876,9 @@ class TestSearchSemiStructured(MarqoTestCase):
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     index_name=self.default_text_index.name,
-                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
+                    docs=[{"title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
                           for _ in range(batch_size)],
-                    tensor_fields=["Title"]
+                    tensor_fields=["title"]
                 )
             )
         self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index.name).
