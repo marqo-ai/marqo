@@ -195,12 +195,11 @@ class TestOpenClipModelEncode(InferenceTestCase):
             normalize_embeddings=True
         )
 
-        num_embeddings = len(embeddings)
-        for i in range(num_embeddings):
-            for j in range(i + 1, num_embeddings):
+        for i in range(len(embeddings)):
+            for j in range(i + 1, len(embeddings)):
                 with self.subTest(f"Comparing embeddings for inputs {inputs[i]} and {inputs[j]}"):
                     self.assertFalse(
-                        np.allclose(num_embeddings[i], num_embeddings[j]),
+                        np.allclose(embeddings[i], embeddings[j]),
                         f"Embeddings for inputs {inputs[i]} and {inputs[j]} are the same, which is a bug."
                     )
 
