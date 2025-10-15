@@ -145,10 +145,10 @@ class TestSearchSemiStructured(MarqoTestCase):
                 index_name=self.default_text_index.name,
                 docs=[
                     {"_id": "12345",
-                     "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
-                    {"_id": "abc12334", "Title": "Grandma Jo's family recipe. ",
-                     "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
-                tensor_fields=["Desc", "Title", "Steps"],
+                     "desc": "The Guardian is newspaper, read in the UK and other places around the world"},
+                    {"_id": "abc12334", "title": "Grandma Jo's family recipe. ",
+                     "steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
+                tensor_fields=["desc", "title", "steps"],
             )
         )
 
