@@ -341,7 +341,7 @@ class TestGetSettings(MarqoTestCase):
                         'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'imagePreprocessing': {},
-                    'model': 'open_clip/ViT-B-32/laion2b_s34b_b79k',
+                    'model': 'open_clip/ViT-B-16-SigLIP/webli',
                     'normalizeEmbeddings': False,
                     'tensorFields': [],
                     'textPreprocessing': {

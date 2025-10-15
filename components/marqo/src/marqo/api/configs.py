@@ -71,7 +71,7 @@ def default_env_vars() -> dict:
         EnvVars.STATSD_COMMON_TAGS: "",
 
         # Inference Client config (In API)
-        EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8881",
+        EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8884",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
         EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
 
