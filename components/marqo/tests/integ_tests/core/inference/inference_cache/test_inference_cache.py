@@ -125,7 +125,7 @@ class TestInferenceCache(unittest.TestCase):
 
                 self.assertIsNotNone(cached_embedding_model_1)
                 self.assertIsNotNone(cached_embedding_model_2)
-                self.assertNotEqual(cached_embedding_model_1, cached_embedding_model_2)
+                self.assertFalse(np.allclose(cached_embedding_model_1, cached_embedding_model_2))
 
     def test_inference_cache_is_thread_safe(self):
         """Test if the cache is thread-safe by simulating concurrent reads and writes."""
