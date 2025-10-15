@@ -43,32 +43,22 @@ class TestSearchSemiStructured(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
-            treat_urls_and_pointers_as_images=True
-        )
-
         image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
         )
 
-
         cls.indexes = cls.create_indexes([
             default_text_index,
             default_text_index_encoded_name,
             default_image_index,
-            image_index_with_chunking,
             image_index_with_random_model,
         ])
 
         cls.default_text_index = cls.indexes[0]
         cls.default_text_index_encoded_name = cls.indexes[1]
         cls.default_image_index = cls.indexes[2]
-        cls.image_index_with_chunking = cls.indexes[3]
-        cls.image_index_with_random_model = cls.indexes[4]
-
+        cls.image_index_with_random_model = cls.indexes[3]
 
     def setUp(self) -> None:
         super().setUp()
@@ -84,7 +74,7 @@ class TestSearchSemiStructured(MarqoTestCase):
     # TODO - Test approximate parameter
     # TODO - Test graceful degradation detection with approximate=False
     # TODO - Test timeout parameter
-    
+
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tests = [
@@ -93,50 +83,26 @@ class TestSearchSemiStructured(MarqoTestCase):
         ]
         for index, desc in tests:
             with self.subTest(desc):
-                add_docs_res = self.add_documents(config=self.config,
-                                   add_docs_params=AddDocsParams(
-                                                index_name=index.name,
-                                                docs=[
-                                                    {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
-                                                     "_id": "5678", "finally": "some field efgh "},
-                                                    {"abc": "shouldn't really match ", "other_field": "Nope.....",
-                                                     "_id": "1234", "finally": "Random text here efgh "},
-                                                ],
-                                                tensor_fields=["abc", "other_field", "finally"],
-                                            )
-                                   )
+                add_docs_res = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"abc": "Exact match hehehe efgh ",
+                             "other_field": "baaadd efgh ",
+                             "_id": "5678", "finally": "some field efgh "},
+                            {"abc": "shouldn't really match ", "other_field": "Nope.....",
+                             "_id": "1234", "finally": "Random text here efgh "},
+                        ],
+                        tensor_fields=["abc", "other_field", "finally"],
+                    )
+                )
 
                 search_res = tensor_search.search(
                     config=self.config, index_name=index.name,
                     text=" efgh ", result_count=10, device="cpu", search_method=SearchMethod.TENSOR
                 )
                 assert len(search_res['hits']) == 2
-
-    #
-    # def test_search_with_searchable_attributes_max_attributes_is_none(self):
-    #     # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
-    #     add_docs_caller(
-    #         config=self.config, index_name=self.default_text_index.name, docs=[
-    #             {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #             {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #         ], )
-    #     tensor_search.search(
-    #         config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
-    #         searchable_attributes=["other field"]
-    #     )
-    #
-    # @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
-    # def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
-    #     with self.assertRaises(InvalidArgError):
-    #         add_docs_caller(
-    #             config=self.config, index_name=self.default_text_index.name, docs=[
-    #                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #             ], )
-    #         tensor_search.search(
-    #             config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe"
-    #         )
-    #
 
     @staticmethod
     def strip_marqo_fields(doc, strip_id=False):
@@ -825,7 +791,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index.name,
                 docs=[doc],
-                tensor_fields=["short_string_field" , "custom_vector_field", "multimodal_combo_field"],
+                tensor_fields=["short_string_field", "custom_vector_field", "multimodal_combo_field"],
                 mappings={
                     "custom_vector_field": {"type": "custom_vector"},
                     "multimodal_combo_field": {
@@ -1313,7 +1279,7 @@ class TestSearchSemiStructured(MarqoTestCase):
 
     def test_search_with_content_double_colon(self):
         docs = [
-            {"_id": "1", "text_field": "::my_text"} # This should work properly
+            {"_id": "1", "text_field": "::my_text"}  # This should work properly
         ]
         self.add_documents(
             config=self.config,
@@ -1335,30 +1301,30 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_search_returned_documents(self):
         """A test to ensure that the returned are not missing/adding any unexpected fields"""
         full_fields_document = ({
-            "_id": "full_fields",
-            "text_field": "some text",
-            "int_field": 1,
-            "float_field": 2.0,
-            "bool_field": True,
-            "list_field": ["a", "b","c"],
-            "string_bool_field": "True",
-            "string_int_field": "1",
-            "string_float_field": "1.2",
-            "string_list_field": "['a', 'b', 'c']"
-        }, "full-fields document")
+                                    "_id": "full_fields",
+                                    "text_field": "some text",
+                                    "int_field": 1,
+                                    "float_field": 2.0,
+                                    "bool_field": True,
+                                    "list_field": ["a", "b", "c"],
+                                    "string_bool_field": "True",
+                                    "string_int_field": "1",
+                                    "string_float_field": "1.2",
+                                    "string_list_field": "['a', 'b', 'c']"
+                                }, "full-fields document")
 
         partial_fields_document = ({
-            "_id": "partial_field",
-            "text_field": "some text",
-            "float_field": 1.0,
-            "bool_field": True,
-            "list_field": ["a", "b", "c"],
-        }, "partial-fields document")
+                                       "_id": "partial_field",
+                                       "text_field": "some text",
+                                       "float_field": 1.0,
+                                       "bool_field": True,
+                                       "list_field": ["a", "b", "c"],
+                                   }, "partial-fields document")
 
         no_field_documents = ({
-            "_id": "no_field",
-            "text_field": "some text"
-        }, "no-field document")
+                                  "_id": "no_field",
+                                  "text_field": "some text"
+                              }, "no-field document")
 
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
@@ -1405,7 +1371,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index.name,
                                                search_method=SearchMethod.LEXICAL)
-                    
+
     def test_special_characters_in_map_score_modifiers(self):
         special_characters = SPECIAL_CHARACTERS
 
@@ -1433,7 +1399,8 @@ class TestSearchSemiStructured(MarqoTestCase):
                 )
 
                 score_modifiers = ScoreModifierLists(**{
-                    "add_to_score": [{"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
+                    "add_to_score": [
+                        {"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
                 })
 
                 res = tensor_search.search(
@@ -1508,7 +1475,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 }
             }
         ]
-        
+
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
@@ -1517,7 +1484,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 tensor_fields=["title"]
             )
         )
-        
+
         test_cases = [
             ("metadata.score:[0 TO 1]", ["doc1", "doc2", "doc3"]),
             ("metadata.score:[0.0 TO 1.0]", ["doc1", "doc2", "doc3"]),
@@ -1526,7 +1493,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             ("metadata.rank:[15.0 TO 20]", ["doc2", "doc3"]),
             ("metadata.rank:[0 TO 9]", []),
         ]
-        
+
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for filter_string, expected in test_cases:
                 with self.subTest(f"search_method={search_method}, filter={filter_string}"):
@@ -1540,7 +1507,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                     actual_ids = set([hit["_id"] for hit in search_res["hits"]])
                     self.assertEqual(len(search_res["hits"]), len(expected),
                                      f"Failed count check for filter '{filter_string}'.")
-                    self.assertEqual(actual_ids, set(expected), 
+                    self.assertEqual(actual_ids, set(expected),
                                      f"Failed ID match for filter '{filter_string}'")
 
     def test_search_incomplete_response_processed_correctly(self):
@@ -1564,7 +1531,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             )
         )
         with mock.patch.object(self.config.vespa_client, "query") as mock_query:
-        # mock the VespaClient.query method to return real response and modify the response
+            # mock the VespaClient.query method to return real response and modify the response
             def wrapper(*args, **kwargs):
                 # Call the real method
                 response = real_query(*args, **kwargs)
@@ -1580,7 +1547,8 @@ class TestSearchSemiStructured(MarqoTestCase):
                 return response
 
             mock_query.side_effect = wrapper
-            result = tensor_search.search(config=self.config, text="sample text", index_name=self.default_text_index.name, search_method=SearchMethod.LEXICAL)
+            result = tensor_search.search(config=self.config, text="sample text",
+                                          index_name=self.default_text_index.name, search_method=SearchMethod.LEXICAL)
             self.assertNotIn("int_field_1", result["hits"][0])
             self.assertIn("int_field_2", result["hits"][0])
 
