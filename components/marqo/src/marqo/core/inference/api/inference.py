@@ -16,16 +16,6 @@ class ModelConfig(ImmutableBaseModel):
     model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
     normalize_embeddings: bool = Field(default=True, alias='normalizeEmbeddings')
 
-    @validator('model_name')
-    @classmethod
-    def _validate_model_name(cls, v):
-        """Block 'no_model' from being used as a model name for vectorisation"""
-        if v == "no_model":
-            raise ValueError("'no_model' can not be used to vectorise. To use a 'no_model' index, you must provide "
-                             "embeddings for all documents or search queries")
-        return v
-
-
 
 class InferenceRequest(ImmutableBaseModel):
     modality: Modality
