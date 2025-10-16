@@ -46,4 +46,4 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-pythonpath = ["src", "../..", "."] # add ../.. as we have ./scripts there
+pythonpath = ["src",  "."]

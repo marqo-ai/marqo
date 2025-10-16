@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 import requests
 import argparse
 
-load_dotenv("../../.venv", verbose=True)
+load_dotenv("../../../../.venv", verbose=True) # Root of the monorepo
 
 VESPA_VERSION = os.getenv('VESPA_VERSION', '8.513.17')
 VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
