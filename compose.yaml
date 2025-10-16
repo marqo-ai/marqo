@@ -75,7 +75,7 @@ services:
       VESPA_QUERY_URL: "http://host.docker.internal:8080"
       ZOOKEEPER_HOSTS: "host.docker.internal:2181"
     ports:
-      - "8880:8880"
+      - "8882:8882"
     networks: [marqo-net]
     extra_hosts:
       - "host.docker.internal:host-gateway"
