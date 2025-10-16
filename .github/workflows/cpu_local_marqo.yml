@@ -74,7 +74,7 @@ jobs:
 
       - name: Start vespa
         run: |
-          uv run python ../../../scripts/vespa_local/vespa_local.py full-start
+          uv run python ../../../../../scripts/vespa_local/vespa_local.py full-start
 
       - name: Build the Docker Image
         working-directory: ${{ github.workspace }}
