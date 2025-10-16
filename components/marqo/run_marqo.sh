@@ -166,8 +166,6 @@ fi
 cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
 uv run uvicorn ./src/marqo/tensor_search/api:app --host "$MARQO_HOST" --port 8882 --workers $MARQO_API_WORKERS --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
 
-esac
-
 # Capture the PID of the last background process
 export api_pid=$!
 # Wait for the Uvicorn process to terminate
