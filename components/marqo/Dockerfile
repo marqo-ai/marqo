@@ -1,5 +1,5 @@
 # Stage 1: Build the Java package using Maven
-FROM maven:3.8.7-openjdk-18-slim as maven_build
+FROM maven:3.8.7-openjdk-18-slim AS maven_build
 
 WORKDIR /app/vespa
 # Copy only the pom.xml and any other files required for dependency resolution
@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv
 RUN pip install --no-cache-dir uv
 
-from base
+FROM base
 
 COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
 # Copy project metadata
