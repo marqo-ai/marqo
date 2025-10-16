@@ -84,4 +84,4 @@ jobs:
 
       - name: Run Integration Tests - CPU Local Marqo
         run: |          
-          pytest tests/
+          uv run pytest tests/
