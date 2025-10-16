@@ -31,6 +31,7 @@ dependencies = [
 dev = [
     "diff-cover>=9.7.1",
     "docker>=7.1.0",
+    "dotenv>=0.9.9",
     "hypothesis>=6.140.3",
     "opentelemetry-test-utils>=0.58b0",
     "pytest>=8.4.2",
@@ -45,4 +46,4 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-pythonpath = ["src"]
+pythonpath = ["src", "../..", "."] # add ../.. as we have ./scripts there
