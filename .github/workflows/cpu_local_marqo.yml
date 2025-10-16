@@ -81,6 +81,10 @@ jobs:
         run: |
           docker compose build --quiet
           docker compose up -d --quiet-pull
+          until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
+            sleep 0.1
+          done
+          echo "Marqo is up"
 
       - name: Run Integration Tests - CPU Local Marqo
         run: |          
