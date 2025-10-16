@@ -46,3 +46,8 @@ dev = [
 testpaths = ["tests"]
 addopts = "-ra"
 pythonpath = ["src"]
+
+[tool.uv.workspace]
+members = [
+    "tests/api_tests",
+]

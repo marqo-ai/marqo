@@ -69,14 +69,16 @@ services:
       MARQO_MAX_CUDA_MODEL_MEMORY: "10"
       MARQO_MODE: "API"
       MARQO_MODELS_TO_PRELOAD: "[]"
-      MARQO_REMOTE_INFERENCE_URL: "http://localhost:8884"
-      VESPA_CONFIG_URL: "http://vespa:19071"
-      VESPA_DOCUMENT_URL: "http://vespa:8080"
-      VESPA_QUERY_URL: "http://vespa:8080"
-      ZOOKEEPER_HOSTS: "vespa:2181"
+      MARQO_REMOTE_INFERENCE_URL: "http://mioc:8884"
+      VESPA_CONFIG_URL: "http://host.docker.internal:19071"
+      VESPA_DOCUMENT_URL: "http://host.docker.internal:8080"
+      VESPA_QUERY_URL: "http://host.docker.internal:8080"
+      ZOOKEEPER_HOSTS: "host.docker.internal:2181"
     ports:
       - "8880:8880"
     networks: [marqo-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   mmc:
@@ -109,17 +111,6 @@ services:
     ports:
       - "8884:8884"
     networks: [marqo-net]
-    restart: unless-stopped
-
-  vespa:
-    image: vespaengine/vespa:${VESPA_VERSION:-latest}
-    container_name: vespa
-    hostname: vespa
-    ports:
-      - "8080:8080"
-      - "19071:19071"
-      - "2181:2181"
-    networks: [ marqo-net ]
     restart: unless-stopped
 
 volumes:

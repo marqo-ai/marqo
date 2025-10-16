@@ -58,10 +58,13 @@ jobs:
           python-version: "3.9"
           cache: "pip"
 
-      - name: Install Dependencies
+      - name: install uv
         run: |
-          pip install -r requirements.txt
-          pip install pytest-rerunfailures
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          uv sync
 
       - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
@@ -69,20 +72,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Start vespa
+        run: |
+          uv run python ../../../scripts/vespa_local/vespa_local.py full-start
+
       - name: Build the Docker Image
         working-directory: ${{ github.workspace }}
         run: |
           docker compose build --quiet
           docker compose up -d --quiet-pull
-
-      - name: Pause for SSH (up to 30 minutes)
-        run: |
-          echo "Pausing up to 60 minutes to debug..."
-          for i in $(seq 1 60); do
-            date
-            echo "Minute $i/60 — still waiting..."
-            sleep 60
-          done
 
       - name: Run Integration Tests - CPU Local Marqo
         run: |          
