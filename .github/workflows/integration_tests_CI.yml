@@ -148,9 +148,9 @@ jobs:
         with:
           name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
           path: |
-            marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
-            marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
-            marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+            marqo/components/marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            marqo/components/marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            marqo/components/marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
           include-hidden-files: true
 
   Merge-Coverage:
@@ -162,7 +162,7 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          path: marqo
+          path: marqo/components/marqo
 
       - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
