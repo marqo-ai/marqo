@@ -5,6 +5,7 @@ WORKDIR /app
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libmagic1 \
  && rm -rf /var/mlib/apt/lists/*
 
 # Install uv
@@ -23,7 +24,10 @@ RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
+# Set Python path
 ENV PYTHONPATH=/app/src
+ENV PATH="/app/.venv/bin:$PATH"
+
 RUN chmod +x ./run_marqo.sh
 RUN echo $COMMITHASH > build_info.txt
 CMD ["./run_marqo.sh"]
