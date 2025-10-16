@@ -30,7 +30,7 @@ import requests
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "../../../../.venv")) # Root of the monorepo
+load_dotenv(os.path.join(os.path.dirname(__file__), "../../../../.venv"), verbose=True) # Root of the monorepo
 
 VESPA_VERSION = os.getenv('VESPA_VERSION', '8.513.17')
 VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
