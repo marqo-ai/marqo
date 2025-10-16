@@ -75,6 +75,15 @@ jobs:
           docker compose build --quiet
           docker compose up -d --quiet-pull
 
+      - name: Pause for SSH (up to 30 minutes)
+        run: |
+          echo "Pausing up to 60 minutes to debug..."
+          for i in $(seq 1 60); do
+            date
+            echo "Minute $i/60 — still waiting..."
+            sleep 60
+          done
+
       - name: Run Integration Tests - CPU Local Marqo
         run: |          
           pytest tests/
