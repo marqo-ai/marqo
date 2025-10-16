@@ -6,7 +6,7 @@ name: marqo-all-components
 
 services:
   triton-gpu:
-    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    image: nvcr.io/nvidia/tritonserver:${TRITON_VERSION:-25.08-py3}
     command:
       [
         "tritonserver",
@@ -112,7 +112,7 @@ services:
     restart: unless-stopped
 
   vespa:
-    image: vespaengine/vespa:${VESPA_VERSION}
+    image: vespaengine/vespa:${VESPA_VERSION:-latest}
     container_name: vespa
     hostname: vespa
     ports:
