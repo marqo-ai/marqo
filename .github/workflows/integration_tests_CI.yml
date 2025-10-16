@@ -91,8 +91,6 @@ jobs:
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
-        with:
-          path: marqo
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -106,18 +104,17 @@ jobs:
           
       - name: Spin up the inference environment
         run: |
-          cd marqo
           docker compose -f compose-inference.yaml build --quiet
           docker compose -f compose-inference.yaml up -d --quiet-pull
 
       - name: Build Vespa
         run: |
-          cd marqo/components/marqo/vespa
+          cd components/marqo/vespa
           mvn clean -q package
 
       - name: Start Vespa
         run: |
-          uv run python scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
+          uv run python ./scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
 
       - name: Run Integration Tests
         run: |
@@ -131,7 +128,7 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
-          cd marqo/components/marqo
+          cd components/marqo
           uv sync --dev
           uv run python -c "import nltk; nltk.download('punkt_tab')"
 
@@ -147,9 +144,9 @@ jobs:
         with:
           name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
           path: |
-            marqo/components/marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
-            marqo/components/marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
-            marqo/components/marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+            components/marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            components/marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            components/marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
           include-hidden-files: true
 
   Merge-Coverage:
