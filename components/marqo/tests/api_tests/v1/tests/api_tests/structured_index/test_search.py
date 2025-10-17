@@ -52,7 +52,7 @@ class TestStructuredSearch(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},

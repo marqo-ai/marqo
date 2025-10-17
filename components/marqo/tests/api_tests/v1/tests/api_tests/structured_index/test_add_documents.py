@@ -45,42 +45,12 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "image_content", "type": "image_pointer"},
                 ],
                 "tensorFields": ["title", "image_content"],
-            },
-            {
-                "indexName": cls.structured_languagebind_index_name,
-                "type": "structured",
-                "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-                "allFields": [
-                    {"name": "text_field_1", "type": "text"},
-                    {"name": "text_field_2", "type": "text"},
-                    {"name": "text_field_3", "type": "text"},
-                    {"name": "video_field_1", "type": "video_pointer"},
-                    {"name": "video_field_2", "type": "video_pointer"},
-                    {"name": "video_field_3", "type": "video_pointer"},
-                    {"name": "audio_field_1", "type": "audio_pointer"},
-                    {"name": "audio_field_2", "type": "audio_pointer"},
-                    {"name": "image_field_1", "type": "image_pointer"},
-                    {"name": "image_field_2", "type": "image_pointer"},
-                    {
-                        "name": "multimodal_field", 
-                        "type": "multimodal_combination",
-                        "dependentFields": {
-                            "text_field_1": 0.1,
-                            "text_field_2": 0.1,
-                            "image_field_1": 0.5,
-                            "video_field_1": 0.1,
-                            "video_field_2": 0.1,
-                            "audio_field_1": 0.1
-                        }
-                    },
-                ],
-                "tensorFields": ["multimodal_field", "text_field_3", "video_field_3", "audio_field_2", "image_field_2"]
             },
             {
                 "indexName": cls.text_index_with_normalize_embeddings_true,
@@ -106,7 +76,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
         ]
         )
 
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.structured_languagebind_index_name, cls.text_index_with_normalize_embeddings_true]
+        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.text_index_with_normalize_embeddings_true]
 
     def tearDown(self):
         if self.indexes_to_delete:

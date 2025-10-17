@@ -42,7 +42,7 @@ class TestStructuredHybridSearch(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "text_field_1", "type": "text", "features": ["filter", "lexical_search"]},
                     {"name": "text_field_2", "type": "text", "features": ["filter", "lexical_search"]},
@@ -61,7 +61,7 @@ class TestStructuredHybridSearch(MarqoTestCase):
             {
                 "indexName": cls.unstructured_image_index_name,
                 "type": "unstructured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
             }
         ])
 

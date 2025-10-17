@@ -95,17 +95,16 @@ class ModelManager(ABC):
         pass
 
     @abstractmethod
-    def eject_model(self, model_name: str, device: str) -> dict:
+    def eject_model(self, model_name: str) -> dict:
         """
         Eject a model from the model cache
 
         Args:
             model_name (str): the name of the model
-            device (str): the device the model is loaded to
 
         Returns: The result of the rejection, in following format:
           {"result": "success",
-           "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+           "message": f"successfully eject model_name `{model_name}` "}
 
         Raises:
             ModelError: If model is not found or not in the model cache

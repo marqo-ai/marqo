@@ -37,7 +37,7 @@ class TestStructuredGetStats(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "image_content", "type": "image_pointer"},
