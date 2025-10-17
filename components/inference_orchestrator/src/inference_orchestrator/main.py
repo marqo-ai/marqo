@@ -24,7 +24,7 @@ msgpack_numpy.patch()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI, config=Depends(get_config)):
     # Instantiate OpenTelemetry
     otel_shutdown_hook = bootstrap_otel(app, service_name="marqo-inference")
 
@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     yield
 
     otel_shutdown_hook()
+    config.triton_client.close()
 
 
 app = FastAPI(

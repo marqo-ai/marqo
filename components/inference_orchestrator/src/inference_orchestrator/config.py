@@ -23,7 +23,7 @@ class Config:
     def _instantiate_triton_grpc_client(self) -> TritonGRPCClient:
         triton_url = self._settings.marqo_triton_url
         return TritonGRPCClient(
-            url=triton_url, channel_args=self._settings.channel_args
+            url=triton_url, triton_channel_args=self._settings.channel_args
         )
 
     def _instantiate_model_management_client(self) -> ModelManagementClient:
