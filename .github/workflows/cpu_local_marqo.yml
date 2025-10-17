@@ -86,6 +86,6 @@ jobs:
           done
           echo "Marqo is up"
 
-      - name: Run Integration Tests - CPU Local Marqo
+      - name: Run API Tests - CPU
         run: |          
           uv run pytest tests/

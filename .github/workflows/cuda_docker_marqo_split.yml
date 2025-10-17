@@ -47,11 +47,8 @@ jobs:
     runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
-        working-directory: tests/api_tests/v1
-    
-
+        working-directory: components/marqo/tests/api_tests/v1
     steps:
-
       - name: Checkout Marqo repo
         uses: actions/checkout@v3
 
@@ -61,8 +58,13 @@ jobs:
           python-version: "3.9"
           cache: "pip"
 
-      - name: Install Dependencies
-        run: pip install -r requirements.txt
+      - name: install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          uv sync
 
       - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
@@ -70,16 +72,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Run CUDA Integration Tests - CUDA Docker Marqo
+      - name: Start vespa
         run: |
-          CUSTOM_TEST_IMG="${{ github.event.inputs.image_identifier }}"
-          export TESTING_CONFIGURATION=CUDA_DOCKER_MARQO
-          export MARQO_API_TESTS_ROOT=$(pwd)
-          export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          
-          bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
+          uv run python ../../../scripts/vespa_local/vespa_local.py full-start
 
-          bash scripts/start_cuda_docker_marqo_split.sh $MARQO_IMAGE_NAME
-          df -k
-          pytest tests/
+      - name: Build the Docker Image
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker compose build --quiet
+          docker compose up --profile gpu -d --quiet-pull 
+          until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
+            sleep 0.1
+          done
+          echo "Marqo is up"
+
+      - name: Run API Tests - CUDA
+        run: |          
+          export TESTING_CONFIGURATION=CUDA_DOCKER_MARQO
+          uv run pytest tests/
 
