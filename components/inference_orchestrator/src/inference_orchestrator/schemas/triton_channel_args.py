@@ -2,7 +2,7 @@ from inference_orchestrator.schemas.base_model import AppBaseModel
 from typing import Literal, Optional
 
 
-class ChannelArgs(AppBaseModel):
+class TritonChannelArgs(AppBaseModel):
     """
     A class to hold the arguments for a channel in Triton Inference Server.
 
@@ -31,8 +31,6 @@ class ChannelArgs(AppBaseModel):
             for reconnect attempts.
         grpc_enable_retries (int): If true, enables automatic retries on failed
             streams.
-        grpc_keepalive_timeout_ms (int): The time (in milliseconds) the sender of the
-            keepalive ping waits for an acknowledgment.
     Methods:
         build_channel_args: Builds the channel arguments for Triton Inference Server.
     """
@@ -48,7 +46,6 @@ class ChannelArgs(AppBaseModel):
     grpc_initial_reconnect_backoff_ms: int = 500
     grpc_max_reconnect_backoff_ms: int = 10_000
     grpc_enable_retries: int = 1
-    grpc_keepalive_timeout_ms: int = 5_000
     grpc_compression_algorithm: Optional[Literal["gzip", "deflate"]] = None
 
     def build_channel_args(self) -> list[tuple[str, int]]:
@@ -61,14 +58,28 @@ class ChannelArgs(AppBaseModel):
         return [
             ("grpc.keepalive_time_ms", self.grpc_keep_alive_time_ms),
             ("grpc.keepalive_timeout_ms", self.grpc_keep_alive_timeout_ms),
-            ("grpc.keepalive_permit_without_calls", self.grpc_keep_alive_permit_without_calls),
-            ("grpc.http2.max_pings_without_data", self.grpc_http2_max_pings_without_data),
-            ("grpc.http2.min_time_between_pings_ms", self.grpc_http2_min_time_between_pings_ms),
-            ("grpc.http2.min_ping_interval_without_data_ms", self.grpc_http2_min_ping_interval_without_data_ms),
+            (
+                "grpc.keepalive_permit_without_calls",
+                self.grpc_keep_alive_permit_without_calls,
+            ),
+            (
+                "grpc.http2.max_pings_without_data",
+                self.grpc_http2_max_pings_without_data,
+            ),
+            (
+                "grpc.http2.min_time_between_pings_ms",
+                self.grpc_http2_min_time_between_pings_ms,
+            ),
+            (
+                "grpc.http2.min_ping_interval_without_data_ms",
+                self.grpc_http2_min_ping_interval_without_data_ms,
+            ),
             ("grpc.max_receive_message_length", self.grpc_max_receive_message_length),
             ("grpc.max_send_message_length", self.grpc_max_send_message_length),
-            ("grpc.initial_reconnect_backoff_ms", self.grpc_initial_reconnect_backoff_ms),
+            (
+                "grpc.initial_reconnect_backoff_ms",
+                self.grpc_initial_reconnect_backoff_ms,
+            ),
             ("grpc.max_reconnect_backoff_ms", self.grpc_max_reconnect_backoff_ms),
             ("grpc.enable_retries", self.grpc_enable_retries),
-            ("grpc.keepalive_timeout_ms", self.grpc_keepalive_timeout_ms),
         ]

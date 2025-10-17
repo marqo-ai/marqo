@@ -4,10 +4,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 from typing import Union
 
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
-from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
+from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 from .enum import LogLevel, LogFormat
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent # to src/
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
 
 
 class Settings(BaseSettings):
@@ -22,13 +22,23 @@ class Settings(BaseSettings):
     marqo_inference_cache_size: int = Field(0, alias="MARQO_INFERENCE_CACHE_SIZE")
     marqo_inference_cache_type: str = Field("LRU", alias="MARQO_INFERENCE_CACHE_TYPE")
     marqo_triton_url: str = Field("http://localhost:8001", alias="MARQO_TRITON_URL")
-    marqo_model_management_container_url: str = Field("http://localhost:8883", alias="MARQO_MODEL_MANAGEMENT_CONTAINER_URL")
-    marqo_models_to_preload: list[Union[str, dict]] = Field(default_factory=list, alias="MARQO_MODELS_TO_PRELOAD")
+    marqo_model_management_container_url: str = Field(
+        "http://localhost:8883", alias="MARQO_MODEL_MANAGEMENT_CONTAINER_URL"
+    )
+    marqo_models_to_preload: list[Union[str, dict]] = Field(
+        default_factory=list, alias="MARQO_MODELS_TO_PRELOAD"
+    )
     marqo_log_level: LogLevel = Field(LogLevel.INFO, alias="MARQO_LOG_LEVEL")
     marqo_log_format: LogFormat = Field(LogFormat.PLAIN, alias="MARQO_LOG_FORMAT")
-    marqo_metrics_export_interval: int = Field(30, ge=0, alias="MARQO_METRICS_EXPORT_INTERVAL")
-    channel_args: ChannelArgs = Field(default_factory=ChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS")
-    marqo_model_cache_path: str = Field(default="/root/.cache", alias="MARQO_MODEL_CACHE_PATH")
+    marqo_metrics_export_interval: int = Field(
+        30, ge=0, alias="MARQO_METRICS_EXPORT_INTERVAL"
+    )
+    channel_args: TritonChannelArgs = Field(
+        default_factory=TritonChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS"
+    )
+    marqo_model_cache_path: str = Field(
+        default="/root/.cache", alias="MARQO_MODEL_CACHE_PATH"
+    )
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):
@@ -37,11 +47,14 @@ class Settings(BaseSettings):
         and a JasonDecodeError will be raised if the string is not valid JSON before reaching this point.
         """
         for preload_model_in_v in v:
-            if isinstance(v, str):
+            if isinstance(preload_model_in_v, str):
                 continue
 
             if isinstance(preload_model_in_v, dict):
-                if "model" not in preload_model_in_v or "modelProperties" not in preload_model_in_v:
+                if (
+                    "model" not in preload_model_in_v
+                    or "modelProperties" not in preload_model_in_v
+                ):
                     raise ValueError(
                         f"Your custom model {preload_model_in_v} is missing 'model' key."
                         f"To add a custom model, it must be a dict with keys 'model' and 'modelProperties' "
