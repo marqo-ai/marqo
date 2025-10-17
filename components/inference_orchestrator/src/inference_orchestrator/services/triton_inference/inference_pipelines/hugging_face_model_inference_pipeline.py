@@ -1,5 +1,7 @@
 from typing import List, Tuple, Union
 
+from numpy import ndarray
+
 from inference_orchestrator.schemas.api import (
     InferenceErrorModel,
     InferenceRequest,
@@ -7,14 +9,16 @@ from inference_orchestrator.schemas.api import (
     Modality,
     TextPreprocessingConfig,
 )
+from inference_orchestrator.services.content_preprocessing import (
+    split_prefix_preprocess_text,
+)
+from inference_orchestrator.services.errors import InternalServerError
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model import (
     HuggingFaceModel,
 )
 from inference_orchestrator.services.triton_inference.inference_pipelines.abstract_inference_pipeline import (
     AbstractInferencePipeline,
 )
-from numpy import ndarray
-from inference_orchestrator.services.errors import InternalServerError
 
 HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
@@ -65,7 +69,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
         if self.inference_request.modality == Modality.TEXT:
-            results = self.split_prefix_preprocess_text(
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config,
@@ -75,7 +79,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             Modality.AUDIO,
             Modality.VIDEO,
         ]:
-            results = self.split_prefix_preprocess_text(
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 TextPreprocessingConfig(),  # Use a default TextPreprocessingConfig

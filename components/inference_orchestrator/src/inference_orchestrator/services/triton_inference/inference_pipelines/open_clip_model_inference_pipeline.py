@@ -9,6 +9,10 @@ from inference_orchestrator.schemas.api import (
     InferenceResult,
     Modality,
 )
+from inference_orchestrator.services.content_preprocessing import (
+    download_and_preprocess_media,
+    split_prefix_preprocess_text,
+)
 from inference_orchestrator.services.triton_inference.embedding_models.open_clip.open_clip_model import (
     OpenCLIPModel,
 )
@@ -48,13 +52,13 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
         if self.inference_request.modality == Modality.TEXT:
-            results = self.split_prefix_preprocess_text(
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config,
             )
         elif self.inference_request.modality == Modality.IMAGE:
-            results = self.download_and_preprocess_media(
+            results = download_and_preprocess_media(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config,

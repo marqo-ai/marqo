@@ -18,7 +18,6 @@ from inference_orchestrator.services.triton_inference.embedding_models.abstract_
     AbstractPreprocessor,
 )
 
-
 PreprocessedContent = list[tuple[str, Union[str, any]]]
 
 

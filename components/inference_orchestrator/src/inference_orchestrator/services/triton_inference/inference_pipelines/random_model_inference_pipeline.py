@@ -8,13 +8,15 @@ from inference_orchestrator.schemas.api import (
     InferenceResult,
     Modality,
 )
+from inference_orchestrator.services.content_preprocessing import (
+    split_prefix_preprocess_text,
+)
 from inference_orchestrator.services.triton_inference.embedding_models.random.random_model import (
     RandomModel,
 )
 from inference_orchestrator.services.triton_inference.inference_pipelines.abstract_inference_pipeline import (
     AbstractInferencePipeline,
 )
-
 
 RandomModelPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
@@ -45,7 +47,7 @@ class RandomModelInferencePipeline(AbstractInferencePipeline):
             List[RandomModelPreprocessedContent]: The preprocessed content.
         """
         if self.inference_request.modality == Modality.TEXT:
-            results = self.split_prefix_preprocess_text(
+            results = split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config,
