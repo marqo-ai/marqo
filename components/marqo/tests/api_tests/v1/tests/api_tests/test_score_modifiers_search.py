@@ -19,12 +19,12 @@ class TestScoreModifierSearch(MarqoTestCase):
             {
                 "indexName": cls.unstructured_score_modifier_index_name,
                 "type": "unstructured",
-                "model": "open_clip/ViT-B-32/laion400m_e31"
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k"
             },
             {
                 "indexName": cls.structured_score_modifier_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/laion400m_e31",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "text_field", "type": "text", "features": ["lexical_search"]},
                     {"name": "image_field", "type": "image_pointer"},
