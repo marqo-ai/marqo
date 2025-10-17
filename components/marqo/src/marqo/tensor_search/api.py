@@ -621,12 +621,12 @@ def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
 
 
 @app.delete("/models")
-def eject_model(model_name: str, model_device: str, marqo_config: config.Config = Depends(get_config)):
+def eject_model(model_name: str, marqo_config: config.Config = Depends(get_config)):
     """
     Eject a model from a specific device. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
-    return marqo_config.model_manager.eject_model(model_name=model_name, device=model_device)
+    return marqo_config.model_manager.eject_model(model_name=model_name)
 
 
 @app.get("/device/cpu")
