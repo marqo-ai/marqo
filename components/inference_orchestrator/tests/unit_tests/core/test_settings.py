@@ -2,12 +2,11 @@ import os
 from unittest import TestCase
 from unittest.mock import patch
 
+from pydantic import ValidationError
+
 from inference_orchestrator.core.enum import LogFormat, LogLevel
 from inference_orchestrator.core.settings import Settings, get_settings
-from inference_orchestrator.services.triton_inference.triton.channel_args import (
-    ChannelArgs,
-)
-from pydantic import ValidationError
+from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 
 
 class TestSettings(TestCase):
@@ -26,7 +25,7 @@ class TestSettings(TestCase):
             self.assertEqual(LogLevel.INFO, settings.marqo_log_level)
             self.assertEqual(LogFormat.PLAIN, settings.marqo_log_format)
             self.assertEqual(30, settings.marqo_metrics_export_interval)
-            self.assertIsInstance(settings.channel_args, ChannelArgs)
+            self.assertIsInstance(settings.channel_args, TritonChannelArgs)
 
     def test_custom_values_via_environment_variables(self):
         """Test that Settings can be initialized with custom values from environment variables"""
@@ -233,10 +232,10 @@ class TestSettings(TestCase):
         self.assertIn("greater than or equal to 0", str(context.exception).lower())
 
     def test_channel_args_default(self):
-        """Test that channel_args uses default ChannelArgs"""
+        """Test that channel_args uses default TritonChannelArgs"""
         with patch.dict(os.environ, {}, clear=True):
             settings = Settings(_env_file=None)
-            self.assertIsInstance(settings.channel_args, ChannelArgs)
+            self.assertIsInstance(settings.channel_args, TritonChannelArgs)
             self.assertEqual(20_000, settings.channel_args.grpc_keep_alive_time_ms)
 
     def test_channel_args_custom_via_json(self):

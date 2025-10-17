@@ -20,19 +20,20 @@ class TestModelManager(TestCase):
         model_manager.clear_loaded_models()
 
     def test_create_model_cache_key(self):
-        """Test that model cache keys are created correctly"""
+        """Test that model cache keys are created correctly.
+        The hash suffix is hardcoded to detect changes in the key generation algorithm"""
         test_cases = [
             (
                 "model1",
                 {"name": "test", "dimensions": 512, "type": "clip", "tokens": 77},
-                "model1||test||512||clip||77||",
+                "model1||c8e6",
             ),
             (
                 "model2",
                 {"name": "bert", "dimensions": 768, "type": "hf"},
-                "model2||bert||768||hf||||",
+                "model2||c663",
             ),
-            ("model3", {}, "model3||||||||||"),
+            ("model3", {}, "model3||6e46"),
         ]
 
         for model_name, model_properties, expected_key in test_cases:
@@ -117,15 +118,15 @@ class TestModelManager(TestCase):
         mock_model1 = Mock()
         mock_model2 = Mock()
 
-        model_manager._available_models["model1||test||512||clip||77||"] = mock_model1
-        model_manager._available_models["model2||bert||768||hf||||"] = mock_model2
+        model_manager._available_models["model1||test"] = mock_model1
+        model_manager._available_models["model2||bert"] = mock_model2
 
         result = model_manager.get_loaded_models(detailed=False)
 
         self.assertIn("models", result)
         self.assertEqual(2, len(result["models"]))
-        self.assertIn({"model_name": "model1"}, result["models"])
-        self.assertIn({"model_name": "model2"}, result["models"])
+        self.assertIn({"model_name": "model1||test"}, result["models"])
+        self.assertIn({"model_name": "model2||bert"}, result["models"])
 
     def test_get_loaded_models_detailed(self):
         """Test get_loaded_models returns model names with properties"""
@@ -166,8 +167,7 @@ class TestModelManager(TestCase):
         mock_loader = Mock(return_value=mock_model)
         mock_get_model_loader.return_value = mock_loader
 
-        model_name = "test-model"
-        model_properties = {"name": "test", "dimensions": 512, "type": "clip"}
+        model_properties = {"name": "test", "dimensions": 512, "type": "open_clip"}
         model_cache_key = "test-model||test||512||clip||||"
 
         # Ensure the model is not in the cache
@@ -175,7 +175,6 @@ class TestModelManager(TestCase):
 
         model_manager._update_available_models(
             model_cache_key,
-            model_name,
             model_properties,
             triton_client=mock_triton_client,
             model_management_client=mock_management_client,
@@ -197,15 +196,14 @@ class TestModelManager(TestCase):
     def test_update_available_models_existing_model(self, mock_get_model_loader):
         """Test that _update_available_models does not reload existing models"""
         mock_existing_model = Mock()
-        model_cache_key = "test-model||test||512||clip||||"
+        model_cache_key = "test-model||test"
 
         # Add the model to the cache
         model_manager._available_models[model_cache_key] = mock_existing_model
 
         model_manager._update_available_models(
             model_cache_key,
-            "test-model",
-            {},
+            dict(),
             triton_client=Mock(),
             model_management_client=Mock(),
         )
@@ -231,8 +229,8 @@ class TestModelManager(TestCase):
         mock_model = Mock()
 
         model_name = "test-model"
-        model_properties = {"name": "test", "dimensions": 512, "type": "clip"}
-        model_cache_key = "test-model||test||512||clip||||"
+        model_properties = {"name": "test", "dimensions": 512, "type": "open_clip"}
+        model_cache_key = "test-model||f2c6"
 
         # Pre-populate the cache (simulating what _update_available_models does)
         model_manager._available_models[model_cache_key] = mock_model
@@ -247,7 +245,6 @@ class TestModelManager(TestCase):
         # Verify _update_available_models was called with correct parameters
         mock_update.assert_called_once_with(
             model_cache_key,
-            model_name,
             model_properties,
             triton_client=mock_triton_client,
             model_management_client=mock_management_client,
@@ -262,12 +259,12 @@ class TestModelManager(TestCase):
     def test_eject_model_success(self, mock_get_loader):
         """Test eject_model removes a model from the cache"""
         mock_model = Mock()
-        model_cache_key = "test-model||test||512||clip||||"
+        model_cache_key = "test-model||dfsc"
 
         # Add the model to the cache
         model_manager._available_models[model_cache_key] = mock_model
 
-        result = model_manager.eject_model("test-model")
+        result = model_manager.eject_model("test-model||dfsc")
 
         # Verify the model was unloaded
         mock_model.unload.assert_called_once()
@@ -277,7 +274,7 @@ class TestModelManager(TestCase):
 
         # Verify the success response
         self.assertEqual("success", result["result"])
-        self.assertIn("test-model", result["message"])
+        self.assertIn("test-model||dfsc", result["message"])
 
     def test_eject_model_not_found(self):
         """Test eject_model when model is not in cache"""
@@ -293,18 +290,18 @@ class TestModelManager(TestCase):
         mock_model2 = Mock()
 
         # Add two models with the same prefix
-        model_manager._available_models["test||v1||512||clip||||"] = mock_model1
-        model_manager._available_models["test||v2||768||hf||||"] = mock_model2
+        model_manager._available_models["test1||dfdc"] = mock_model1
+        model_manager._available_models["test2||sads"] = mock_model2
 
-        model_manager.eject_model("test")
+        model_manager.eject_model("test1||dfdc")
 
         # Only the first model should be ejected
         mock_model1.unload.assert_called_once()
         mock_model2.unload.assert_not_called()
 
         # Only the first model should be removed
-        self.assertNotIn("test||v1||512||clip||||", model_manager._available_models)
-        self.assertIn("test||v2||768||hf||||", model_manager._available_models)
+        self.assertNotIn("test1||dfdc", model_manager._available_models)
+        self.assertIn("test2||sads", model_manager._available_models)
 
     def test_model_op_guard_success(self):
         """Test _model_op_guard successfully acquires and releases lock"""
@@ -410,11 +407,9 @@ class TestModelManager(TestCase):
         mock_loader = Mock(return_value=mock_model)
         mock_get_loader.return_value = mock_loader
 
-        model_name = "test-model"
-        model_properties = {"name": "test", "type": "clip"}
+        model_properties = {"name": "test", "type": "open_clip"}
 
         result = model_manager._load_model(
-            model_name,
             model_properties,
             triton_client=mock_triton_client,
             model_management_client=mock_management_client,

@@ -4,6 +4,14 @@ from unittest.mock import MagicMock, Mock, patch
 import msgpack
 import numpy as np
 from fastapi.testclient import TestClient
+from starlette import status
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
+    HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+    HTTP_422_UNPROCESSABLE_ENTITY,
+)
+
 from inference_orchestrator.main import app
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
@@ -14,13 +22,6 @@ from inference_orchestrator.schemas.api import (
     TextPreprocessingConfig,
 )
 from inference_orchestrator.services.errors import ServiceError
-from starlette import status
-from starlette.status import (
-    HTTP_200_OK,
-    HTTP_400_BAD_REQUEST,
-    HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-    HTTP_422_UNPROCESSABLE_ENTITY,
-)
 
 
 class TestInferenceAPI(unittest.TestCase):
@@ -226,3 +227,18 @@ class TestInferenceAPI(unittest.TestCase):
             )
 
         mock_otel_shutdown_hook.assert_called_once()
+
+    @patch("inference_orchestrator.main.get_config")
+    def test_lifespan_integration_shutdown_triton_client(self, mock_get_config):
+        mock_triton_client = Mock()
+        mock_config = Mock()
+        mock_config.triton_client = mock_triton_client
+        mock_get_config.return_value = mock_config
+
+        # Use FastAPI TestClient to simulate making a request to the app
+        with TestClient(app) as _:
+            # Ensure get_config was called
+            mock_get_config.assert_called()
+
+        # Ensure the triton client close method was called during shutdown
+        mock_triton_client.close.assert_called_once()

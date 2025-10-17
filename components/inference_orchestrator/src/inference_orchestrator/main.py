@@ -15,7 +15,7 @@ from .config import Config, get_config
 from .core.logging import get_logger
 from .on_start_script import on_start
 from .schemas.api import InferenceRequest
-from .services.errors import ServiceError, InternalServerError
+from .services.errors import InternalServerError, ServiceError
 from .services.triton_inference.model_manager import model_manager
 
 logger = get_logger(__name__)
@@ -24,7 +24,7 @@ msgpack_numpy.patch()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, config=Depends(get_config)):
+async def lifespan(app: FastAPI):
     # Instantiate OpenTelemetry
     otel_shutdown_hook = bootstrap_otel(app, service_name="marqo-inference")
 
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI, config=Depends(get_config)):
     yield
 
     otel_shutdown_hook()
-    config.triton_client.close()
+    get_config().triton_client.close()
 
 
 app = FastAPI(

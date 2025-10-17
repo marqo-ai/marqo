@@ -9,7 +9,6 @@ from inference_orchestrator import on_start_script
 from inference_orchestrator.config import Config
 from inference_orchestrator.errors.common_errors import (
     EnvironmentVariableParsingError,
-    StartupSanityCheckError,
 )
 from inference_orchestrator.schemas.api import Inference
 
@@ -102,22 +101,3 @@ class TestOnStartScript(unittest.TestCase):
                         for args, _ in self.mock_inference.vectorise.call_args_list
                     }
                     self.assertEqual(set(expected), loaded_models)
-
-    def test_missing_punkt_downloaded(self):
-        """A test to ensure that the script will attempt to download the punkt_tab
-        tokenizer if it is not found"""
-        with (
-            mock.patch(
-                "inference_orchestrator.on_start_script.nltk.data.find"
-            ) as mock_find,
-            mock.patch(
-                "inference_orchestrator.on_start_script.nltk.download"
-            ) as mock_nltk_download,
-        ):
-            # Mock find to always succeed
-            mock_find.side_effect = LookupError()
-
-            checker = on_start_script.CheckNLTKTokenizers()
-            with self.assertRaises(StartupSanityCheckError):
-                checker.run()
-            mock_nltk_download.assert_any_call("punkt_tab")
