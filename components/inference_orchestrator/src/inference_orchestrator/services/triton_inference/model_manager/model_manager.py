@@ -7,6 +7,8 @@ from inference_orchestrator.services.errors import (
     InvalidModelPropertiesError,
     ModelOperationInProgressError,
 )
+from blake3 import blake3
+import orjson
 from inference_orchestrator.services.triton_inference.embedding_models import (
     HuggingFaceModel,
     OpenCLIPModel,
@@ -58,7 +60,6 @@ def load_model(
     with _model_op_guard(lock, timeout=timeout):
         _update_available_models(
             model_cache_key,
-            model_name,
             model_properties,
             triton_client=triton_client,
             model_management_client=model_management_client,
@@ -83,25 +84,16 @@ def _create_model_cache_key(model_name: str, model_properties: dict) -> str:
         str: _description_
     """
     # Changing the format of model cache key will also need to change eject_model api
-    model_cache_key = (
-        model_name
-        + "||"
-        + model_properties.get("name", "")
-        + "||"
-        + str(model_properties.get("dimensions", ""))
-        + "||"
-        + model_properties.get("type", "")
-        + "||"
-        + str(model_properties.get("tokens", ""))
-        + "||"
+    model_properties_serialized = orjson.dumps(
+        model_properties, option=orjson.OPT_SORT_KEYS
     )
-
+    model_properties_hash = blake3(model_properties_serialized).hexdigest()[:4]
+    model_cache_key = f"{model_name}||{model_properties_hash}"
     return model_cache_key
 
 
 def _update_available_models(
     model_cache_key: str,
-    model_name: str,
     model_properties: dict,
     triton_client: TritonGRPCClient,
     model_management_client: ModelManagementClient,
@@ -111,7 +103,6 @@ def _update_available_models(
     """
     if model_cache_key not in _available_models:
         _available_models[model_cache_key] = _load_model(
-            model_name,
             model_properties,
             triton_client=triton_client,
             model_management_client=model_management_client,
@@ -131,16 +122,15 @@ def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
 
 
 def _load_model(
-    model_name: str,
     model_properties: dict,
     triton_client: TritonGRPCClient,
     model_management_client: ModelManagementClient,
 ) -> Any:
-    """_summary_
+    """
+    Loads the model based on the provided properties.
+
 
     Args:
-        model_name (str): Actual model_name to be fetched from external library
-                        prefer passing it in the form of model_properties['name']
         model_properties (dict): _description_
         model_management_client (ModelManagementClient): _description_
         triton_client (TritonGRPCClient): _description_
@@ -177,8 +167,7 @@ def get_loaded_models(detailed: bool = False) -> Dict:
     """
     result = {"models": []}
     for model_cache_key, model in _available_models.items():
-        model_name = model_cache_key.split("||")[0]
-
+        model_name = model_cache_key
         if detailed:
             result["models"].append(
                 {
@@ -196,13 +185,15 @@ def get_loaded_models(detailed: bool = False) -> Dict:
 def eject_model(model_name: str) -> dict:
     """ejects a model from the loaded model cache
 
-    Future_Change:
-        expose cache related functions to the client
+    Args:
+        model_name (str): the name of the model to eject, including the properties hash suffix
+
+    Returns:
+        dict: result of the ejection operation
     """
     with _model_op_guard(lock, timeout=2.0):
-        for model_cache_key in list(_available_models.keys()):
-            if model_cache_key.startswith(model_name):
-                get_available_models()[model_cache_key].unload()
-                del _available_models[model_cache_key]
-                break
+        if model_name in _available_models:
+            _available_models[model_name].unload()
+            del _available_models[model_name]
+
     return {"result": "success", "message": f"Model {model_name} ejected successfully."}

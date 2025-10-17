@@ -39,26 +39,20 @@ def threaded_download_and_preprocess_content(
     metric_obj: Optional[RequestMetrics] = None,
     return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
-    (
-        """
+    """
     A thread calls this function to download media(images, audio, video) for its allocated contents.
-    
+
     Args:
         allocated_content: The content to be downloaded and preprocessed by this thread, normally a list of URLs.
         preprocessor: The preprocessor to be used for preprocessing the content. E.g., OpenCLIPPreprocessor
         preprocessing_config: The preprocessing configuration to be used for preprocessing the content.
         metric_obj: The telemetry object to be used for measuring the time taken for each thread.
-        return_individual_error: Whether to return individual errors or raise them. 
-            If True, individual errors are returned as a InferenceErrorModel object in the results list, 
+        return_individual_error: Whether to return individual errors or raise them.
+            If True, individual errors are returned as a InferenceErrorModel object in the results list,
             otherwise, they are raised.
     Returns:
         A list of preprocessed content.
     """
-        """
-
-    """
-    )
-
     modality = preprocessing_config.modality
 
     if modality == Modality.IMAGE:
