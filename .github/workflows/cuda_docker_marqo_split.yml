@@ -80,7 +80,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           docker compose build --quiet
-          docker compose up --profile gpu -d --quiet-pull 
+          docker compose --profile gpu up -d --quiet-pull 
           until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
             sleep 0.1
           done
