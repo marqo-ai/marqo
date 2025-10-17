@@ -1,7 +1,6 @@
 import time
 from typing import Dict, Union
 
-import nltk
 
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
     get_model_properties,
@@ -10,7 +9,6 @@ from inference_orchestrator.version import get_version
 from .config import Config
 from .core.logging import get_logger
 from .core.settings import get_settings
-from .errors.common_errors import StartupSanityCheckError
 from .schemas.api import (
     EmbeddingModelConfig,
     InferenceRequest,
@@ -24,14 +22,8 @@ logger = get_logger(__name__)
 
 def on_start(config: Config):
     to_run_on_start = (
-        DownloadStartText(),
-        CheckNLTKTokenizers(),
         CacheModels(config),
-        DownloadFinishText(),
         PrintVersion(),
-        # TODO do we still need banners? or a different banner?
-        MarqoWelcome(),
-        MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:
@@ -115,78 +107,6 @@ class CacheModels:
         return get_model_properties(model_name)
 
 
-class CheckNLTKTokenizers:
-    """Check if NLTK tokenizers are available, if not, download them.
-
-    NLTK tokenizers are included in the base-image, we do a sanity check to ensure they are available.
-    """
-
-    def run(self):
-        try:
-            nltk.data.find("tokenizers/punkt_tab")
-        except LookupError:
-            logger.info("NLTK punkt_tab tokenizer not found. Downloading...")
-            nltk.download("punkt_tab")
-
-        try:
-            nltk.data.find("tokenizers/punkt_tab")
-        except LookupError as e:
-            raise StartupSanityCheckError(
-                f"Marqo failed to download and download NLTK tokenizers. Original error: {e}"
-            ) from e
-
-
-class DownloadStartText:
-    def run(self):
-        print("\n")
-        print("###########################################################")
-        print("###########################################################")
-        print("###### STARTING DOWNLOAD OF MARQO ARTEFACTS################")
-        print("###########################################################")
-        print("###########################################################")
-        print("\n", flush=True)
-
-
-class DownloadFinishText:
-    def run(self):
-        print("\n")
-        print("###########################################################")
-        print("###########################################################")
-        print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
-        print("###########################################################")
-        print("###########################################################")
-        print("\n", flush=True)
-
-
 class PrintVersion:
     def run(self):
         print(f"Version: {get_version()}")
-
-
-class MarqoPhrase:
-    def run(self):
-        message = r"""
-     _____                                                   _        __              _                                     
-    |_   _|__ _ __  ___  ___  _ __   ___  ___  __ _ _ __ ___| |__    / _| ___  _ __  | |__  _   _ _ __ ___   __ _ _ __  ___ 
-      | |/ _ \ '_ \/ __|/ _ \| '__| / __|/ _ \/ _` | '__/ __| '_ \  | |_ / _ \| '__| | '_ \| | | | '_ ` _ \ / _` | '_ \/ __|
-      | |  __/ | | \__ \ (_) | |    \__ \  __/ (_| | | | (__| | | | |  _| (_) | |    | | | | |_| | | | | | | (_| | | | \__ \
-      |_|\___|_| |_|___/\___/|_|    |___/\___|\__,_|_|  \___|_| |_| |_|  \___/|_|    |_| |_|\__,_|_| |_| |_|\__,_|_| |_|___/
-
-        """
-
-        print(message, flush=True)
-
-
-class MarqoWelcome:
-    def run(self):
-        message = r"""   
-     __    __    ___  _        __   ___   ___ ___    ___      ______   ___       ___ ___   ____  ____   ___    ___   __ 
-    |  |__|  |  /  _]| |      /  ] /   \ |   |   |  /  _]    |      | /   \     |   |   | /    ||    \ /   \  /   \ |  |
-    |  |  |  | /  [_ | |     /  / |     || _   _ | /  [_     |      ||     |    | _   _ ||  o  ||  D  )     ||     ||  |
-    |  |  |  ||    _]| |___ /  /  |  O  ||  \_/  ||    _]    |_|  |_||  O  |    |  \_/  ||     ||    /|  Q  ||  O  ||__|
-    |  `  '  ||   [_ |     /   \_ |     ||   |   ||   [_       |  |  |     |    |   |   ||  _  ||    \|     ||     | __ 
-     \      / |     ||     \     ||     ||   |   ||     |      |  |  |     |    |   |   ||  |  ||  .  \     ||     ||  |
-      \_/\_/  |_____||_____|\____| \___/ |___|___||_____|      |__|   \___/     |___|___||__|__||__|\_|\__,_| \___/ |__|
-
-        """
-        print(message, flush=True)
