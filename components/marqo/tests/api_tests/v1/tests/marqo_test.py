@@ -95,8 +95,9 @@ class MarqoTestCase(unittest.TestCase):
 
         client = Client(**cls.client_settings)
         index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
-        loaded_model = requests.get(f"{cls._MARQO_URL}/models").json()["models"]
-        for model_name, model_properties in loaded_model.items():
+        loaded_models :list[dict] = requests.get(f"{cls._MARQO_URL}/models").json()["models"]
+        for model in loaded_models:
+            model_name = model["modelName"]
             try:
                 _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model_name}")
             except requests.exceptions.HTTPError as e:
