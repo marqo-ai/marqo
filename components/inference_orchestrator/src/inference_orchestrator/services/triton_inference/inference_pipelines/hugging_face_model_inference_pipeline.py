@@ -9,10 +9,10 @@ from inference_orchestrator.schemas.api import (
     Modality,
     TextPreprocessingConfig,
 )
-from inference_orchestrator.services.content_preprocessing import (
+from inference_orchestrator.services.errors import InternalServerError
+from inference_orchestrator.services.triton_inference.content_preprocessing import (
     split_prefix_preprocess_text,
 )
-from inference_orchestrator.services.errors import InternalServerError
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model import (
     HuggingFaceModel,
 )

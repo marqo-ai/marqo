@@ -9,7 +9,7 @@ from inference_orchestrator.schemas.api import (
     InferenceResult,
     Modality,
 )
-from inference_orchestrator.services.content_preprocessing import (
+from inference_orchestrator.services.triton_inference.content_preprocessing import (
     download_and_preprocess_media,
     split_prefix_preprocess_text,
 )

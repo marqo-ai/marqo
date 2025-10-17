@@ -8,7 +8,7 @@ from inference_orchestrator.schemas.api import (
     InferenceResult,
     Modality,
 )
-from inference_orchestrator.services.content_preprocessing import (
+from inference_orchestrator.services.triton_inference.content_preprocessing import (
     split_prefix_preprocess_text,
 )
 from inference_orchestrator.services.triton_inference.embedding_models.random.random_model import (
