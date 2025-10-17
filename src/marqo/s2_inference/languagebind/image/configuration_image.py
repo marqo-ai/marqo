@@ -60,30 +60,36 @@ class CLIPTextConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
+
     model_type = "clip_text_model"
 
     def __init__(
-            self,
-            vocab_size=49408,
-            hidden_size=512,
-            intermediate_size=2048,
-            projection_dim=512,
-            num_hidden_layers=12,
-            num_attention_heads=8,
-            max_position_embeddings=77,
-            hidden_act="quick_gelu",
-            layer_norm_eps=1e-5,
-            attention_dropout=0.0,
-            initializer_range=0.02,
-            initializer_factor=1.0,
-            # This differs from `CLIPTokenizer`'s default and from openai/clip
-            # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
-            pad_token_id=1,
-            bos_token_id=49406,
-            eos_token_id=49407,
-            **kwargs,
+        self,
+        vocab_size=49408,
+        hidden_size=512,
+        intermediate_size=2048,
+        projection_dim=512,
+        num_hidden_layers=12,
+        num_attention_heads=8,
+        max_position_embeddings=77,
+        hidden_act="quick_gelu",
+        layer_norm_eps=1e-5,
+        attention_dropout=0.0,
+        initializer_range=0.02,
+        initializer_factor=1.0,
+        # This differs from `CLIPTokenizer`'s default and from openai/clip
+        # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
+        pad_token_id=1,
+        bos_token_id=49406,
+        eos_token_id=49407,
+        **kwargs,
     ):
-        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
+        super().__init__(
+            pad_token_id=pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            **kwargs,
+        )
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -100,16 +106,24 @@ class CLIPTextConfig(PretrainedConfig):
         self.add_time_attn = False  ######################################
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
+    def from_pretrained(
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> "PretrainedConfig":
         cls._set_token_in_kwargs(kwargs)
 
-        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(
+            pretrained_model_name_or_path, **kwargs
+        )
 
         # get the text config dict if we are loading from CLIPConfig
         if config_dict.get("model_type") == "clip":
             config_dict = config_dict["text_config"]
 
-        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
+        if (
+            "model_type" in config_dict
+            and hasattr(cls, "model_type")
+            and config_dict["model_type"] != cls.model_type
+        ):
             logger.warning(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
                 f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
@@ -172,31 +186,30 @@ class CLIPVisionConfig(PretrainedConfig):
     model_type = "clip_vision_model"
 
     def __init__(
-            self,
-            hidden_size=768,
-            intermediate_size=3072,
-            projection_dim=512,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            num_channels=3,
-            image_size=224,
-            patch_size=32,
-            hidden_act="quick_gelu",
-            layer_norm_eps=1e-5,
-            attention_dropout=0.0,
-            initializer_range=0.02,
-            initializer_factor=1.0,
-
-            add_time_attn=False,  ################################
-            num_frames=1,  ################################
-            force_patch_dropout=0.0,  ################################
-            lora_r=2,  ################################
-            lora_alpha=16,  ################################
-            lora_dropout=0.0,  ################################
-            num_mel_bins=0.0,  ################################
-            target_length=0.0,  ################################
-            video_decode_backend='decord',  #########################
-            **kwargs,
+        self,
+        hidden_size=768,
+        intermediate_size=3072,
+        projection_dim=512,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        num_channels=3,
+        image_size=224,
+        patch_size=32,
+        hidden_act="quick_gelu",
+        layer_norm_eps=1e-5,
+        attention_dropout=0.0,
+        initializer_range=0.02,
+        initializer_factor=1.0,
+        add_time_attn=False,  ################################
+        num_frames=1,  ################################
+        force_patch_dropout=0.0,  ################################
+        lora_r=2,  ################################
+        lora_alpha=16,  ################################
+        lora_dropout=0.0,  ################################
+        num_mel_bins=0.0,  ################################
+        target_length=0.0,  ################################
+        video_decode_backend="decord",  #########################
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -225,16 +238,24 @@ class CLIPVisionConfig(PretrainedConfig):
         self.video_decode_backend = video_decode_backend  ################
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
+    def from_pretrained(
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> "PretrainedConfig":
         cls._set_token_in_kwargs(kwargs)
 
-        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(
+            pretrained_model_name_or_path, **kwargs
+        )
 
         # get the vision config dict if we are loading from CLIPConfig
         if config_dict.get("model_type") == "clip":
             config_dict = config_dict["vision_config"]
 
-        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
+        if (
+            "model_type" in config_dict
+            and hasattr(cls, "model_type")
+            and config_dict["model_type"] != cls.model_type
+        ):
             logger.warning(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
                 f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
@@ -293,7 +314,12 @@ class LanguageBindImageConfig(PretrainedConfig):
     is_composition = True
 
     def __init__(
-            self, text_config=None, vision_config=None, projection_dim=512, logit_scale_init_value=2.6592, **kwargs
+        self,
+        text_config=None,
+        vision_config=None,
+        projection_dim=512,
+        logit_scale_init_value=2.6592,
+        **kwargs,
     ):
         # If `_config_dict` exist, we use them for the backward compatibility.
         # We pop out these 2 attributes before calling `super().__init__` to avoid them being saved (which causes a lot
@@ -315,7 +341,11 @@ class LanguageBindImageConfig(PretrainedConfig):
 
             # Give a warning if the values exist in both `_text_config_dict` and `text_config` but being different.
             for key, value in _text_config_dict.items():
-                if key in text_config and value != text_config[key] and key not in ["transformers_version"]:
+                if (
+                    key in text_config
+                    and value != text_config[key]
+                    and key not in ["transformers_version"]
+                ):
                     # If specified in `text_config_dict`
                     if key in text_config_dict:
                         message = (
@@ -342,12 +372,17 @@ class LanguageBindImageConfig(PretrainedConfig):
             # convert keys to string instead of integer
             if "id2label" in _vision_config_dict:
                 _vision_config_dict["id2label"] = {
-                    str(key): value for key, value in _vision_config_dict["id2label"].items()
+                    str(key): value
+                    for key, value in _vision_config_dict["id2label"].items()
                 }
 
             # Give a warning if the values exist in both `_vision_config_dict` and `vision_config` but being different.
             for key, value in _vision_config_dict.items():
-                if key in vision_config and value != vision_config[key] and key not in ["transformers_version"]:
+                if (
+                    key in vision_config
+                    and value != vision_config[key]
+                    and key not in ["transformers_version"]
+                ):
                     # If specified in `vision_config_dict`
                     if key in vision_config_dict:
                         message = (
@@ -367,11 +402,15 @@ class LanguageBindImageConfig(PretrainedConfig):
 
         if text_config is None:
             text_config = {}
-            logger.info("`text_config` is `None`. Initializing the `CLIPTextConfig` with default values.")
+            logger.info(
+                "`text_config` is `None`. Initializing the `CLIPTextConfig` with default values."
+            )
 
         if vision_config is None:
             vision_config = {}
-            logger.info("`vision_config` is `None`. initializing the `CLIPVisionConfig` with default values.")
+            logger.info(
+                "`vision_config` is `None`. initializing the `CLIPVisionConfig` with default values."
+            )
 
         self.text_config = CLIPTextConfig(**text_config)
         self.vision_config = CLIPVisionConfig(**vision_config)
@@ -381,7 +420,9 @@ class LanguageBindImageConfig(PretrainedConfig):
         self.initializer_factor = 1.0
 
     @classmethod
-    def from_text_vision_configs(cls, text_config: CLIPTextConfig, vision_config: CLIPVisionConfig, **kwargs):
+    def from_text_vision_configs(
+        cls, text_config: CLIPTextConfig, vision_config: CLIPVisionConfig, **kwargs
+    ):
         r"""
         Instantiate a [`CLIPConfig`] (or a derived class) from clip text model configuration and clip vision model
         configuration.
@@ -390,7 +431,11 @@ class LanguageBindImageConfig(PretrainedConfig):
             [`CLIPConfig`]: An instance of a configuration object
         """
 
-        return cls(text_config=text_config.to_dict(), vision_config=vision_config.to_dict(), **kwargs)
+        return cls(
+            text_config=text_config.to_dict(),
+            vision_config=vision_config.to_dict(),
+            **kwargs,
+        )
 
     def to_dict(self):
         """

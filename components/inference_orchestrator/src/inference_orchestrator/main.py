@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import msgpack
 import msgpack_numpy
 import uvicorn
-from fastapi import FastAPI, Request, Response, Depends, HTTPException, Body
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
 from orjson import orjson
 from pydantic import ValidationError
 from starlette import status
@@ -26,7 +26,7 @@ msgpack_numpy.patch()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Instantiate OpenTelemetry
-    otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-inference')
+    otel_shutdown_hook = bootstrap_otel(app, service_name="marqo-inference")
 
     # Do the on_start tasks
     on_start(get_config())
@@ -37,15 +37,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title='Marqo Inference',
+    title="Marqo Inference",
     lifespan=lifespan,
-    verison="0.1.0"  # TODO replace with dynamic versioning from package (e.g., import version from marqo
+    verison="0.1.0",  # TODO replace with dynamic versioning from package (e.g., import version from marqo
 )
 app.add_middleware(TelemetryMiddleware)
 
 
-def _serialise_error(error_response: dict, status_code: int, media_type: str) -> Response:
-    if media_type == 'application/msgpack':
+def _serialise_error(
+    error_response: dict, status_code: int, media_type: str
+) -> Response:
+    if media_type == "application/msgpack":
         content = msgpack.packb(error_response, use_bin_type=True)
     else:
         content = orjson.dumps(error_response)
@@ -66,7 +68,9 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Encountered exception: {str(exc)}", exc_info=True)
     media_type = request.headers.get("Accept", "application/json")
     error_response = {"detail": str(exc)}
-    return _serialise_error(error_response, status.HTTP_500_INTERNAL_SERVER_ERROR, media_type)
+    return _serialise_error(
+        error_response, status.HTTP_500_INTERNAL_SERVER_ERROR, media_type
+    )
 
 
 @app.get("/", summary="Basic information")
@@ -74,12 +78,13 @@ def root():
     """
     Used for basic health check
     """
-    return {"message": "Welcome to Marqo Inference",
-            "version": app.version}
+    return {"message": "Welcome to Marqo Inference", "version": app.version}
 
 
 @app.post("/vectorise")
-def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = Depends(get_config)):
+def vectorise(
+    request: Request, raw_body: bytes = Body(...), config: Config = Depends(get_config)
+):
     """
     Vectorise a list of contents (str) in a given modality, using the model specified in the request.
     This endpoint expect the reqeust to be encoded in `application/msgpack` media type, and returns the
@@ -94,12 +99,11 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
     except (msgpack.ExtraData, msgpack.UnpackException) as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid MessagePack format: {str(e)}"
+            detail=f"Invalid MessagePack format: {str(e)}",
         ) from e
     except ValidationError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.errors()
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
         ) from e
 
     # Generate embeddings
@@ -109,12 +113,12 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
         # TODO distinguish recoverable error from unrecoverable error, return different error code
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"An error occurred during vectorisation. {e.message}"
+            detail=f"An error occurred during vectorisation. {e.message}",
         ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred during vectorisation. {str(e)}"
+            detail=f"An error occurred during vectorisation. {str(e)}",
         ) from e
 
     # Converts result to response
@@ -125,13 +129,13 @@ def vectorise(request: Request, raw_body: bytes = Body(...), config: Config = De
 
 
 def _check_content_type_msgpack(request):
-    expected_content_type = 'application/msgpack'
-    content_type = request.headers.get('Content-Type')
+    expected_content_type = "application/msgpack"
+    content_type = request.headers.get("Content-Type")
     if content_type != expected_content_type:
         logger.warning(f"Unsupported Content-Type: {content_type}")
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported Content-Type {content_type}. Expected '{expected_content_type}'."
+            detail=f"Unsupported Content-Type {content_type}. Expected '{expected_content_type}'.",
         )
 
 
@@ -150,7 +154,7 @@ def liveness_check() -> JSONResponse:
 
 
 @app.get("/models")
-def get_loaded_models(detailed: bool=False):
+def get_loaded_models(detailed: bool = False):
     return model_manager.get_loaded_models(detailed=detailed)
 
 

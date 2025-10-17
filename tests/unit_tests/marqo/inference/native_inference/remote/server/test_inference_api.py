@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 import msgpack
 import numpy as np
@@ -8,13 +8,20 @@ from starlette import status
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
-    HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+    HTTP_422_UNPROCESSABLE_ENTITY,
 )
 
 from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
-from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
-    InferenceResult, InferenceError
+from marqo.core.inference.api import (
+    Inference,
+    InferenceError,
+    InferenceRequest,
+    InferenceResult,
+    Modality,
+    ModelConfig,
+    TextPreprocessingConfig,
+)
 from marqo.inference.native_inference.remote.server import inference_api
 from marqo.inference.native_inference.remote.server.inference_api import app
 
@@ -26,28 +33,35 @@ class TestInferenceAPI(unittest.TestCase):
 
         self.mock_inference = MagicMock(spec=Inference)
         # Patch the _config dependency
-        patcher = patch('marqo.inference.native_inference.remote.server.inference_api._config')
+        patcher = patch(
+            "marqo.inference.native_inference.remote.server.inference_api._config"
+        )
         self.mock_config = patcher.start()
         self.addCleanup(patcher.stop)
 
         self.mock_config.local_inference = self.mock_inference
 
     def test_vectorise_success(self):
-        self.mock_inference.vectorise.side_effect = [InferenceResult(result=[[('chunk', np.array([0.1, 0.2, 0.3]))]])]
+        self.mock_inference.vectorise.side_effect = [
+            InferenceResult(result=[[("chunk", np.array([0.1, 0.2, 0.3]))]])
+        ]
 
         # Prepare a valid InferenceRequest
         inference_request = InferenceRequest(
             contents=["test content"],
             modality=Modality.TEXT,
-            model_config=ModelConfig(model_name='random'),
-            preprocessing_config=TextPreprocessingConfig()
+            model_config=ModelConfig(model_name="random"),
+            preprocessing_config=TextPreprocessingConfig(),
         )
         packed_data = msgpack.packb(inference_request.dict(), use_bin_type=True)
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/msgpack", "Accept": "application/msgpack"},
-            data=packed_data
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+            data=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -55,19 +69,28 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertIn("result", unpacked_response)
         self.assertEqual(1, len(unpacked_response["result"]))  # result for one content
         self.assertEqual(1, len(unpacked_response["result"][0]))  # only one chunk
-        self.assertEqual(2, len(unpacked_response["result"][0][0]))  # two elements, chunk key and embeddings
-        self.assertEqual("chunk", unpacked_response["result"][0][0][0])  # first element of first chunk
-        self.assertTrue(np.array_equal([0.1, 0.2, 0.3], unpacked_response["result"][0][0][1]))
+        self.assertEqual(
+            2, len(unpacked_response["result"][0][0])
+        )  # two elements, chunk key and embeddings
+        self.assertEqual(
+            "chunk", unpacked_response["result"][0][0][0]
+        )  # first element of first chunk
+        self.assertTrue(
+            np.array_equal([0.1, 0.2, 0.3], unpacked_response["result"][0][0][1])
+        )
         self.mock_inference.vectorise.assert_called_once_with(inference_request)
 
     def test_vectorise_invalid_msgpack_request(self):
         # Send invalid MessagePack data
-        invalid_data = b'not a valid msgpack'
+        invalid_data = b"not a valid msgpack"
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/msgpack", "Accept": "application/msgpack"},
-            data=invalid_data
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+            data=invalid_data,
         )
 
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
@@ -82,15 +105,24 @@ class TestInferenceAPI(unittest.TestCase):
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/msgpack", "Accept": "application/msgpack"},
-            data=packed_data
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+            data=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_ENTITY)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
-        self.assertEquals({'loc': ['modality'], 'msg': 'field required', 'type': 'value_error.missing'},
-                          unpacked_response["detail"][0])
+        self.assertEquals(
+            {
+                "loc": ["modality"],
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
+            unpacked_response["detail"][0],
+        )
 
     def test_vectorise_raise_inference_error(self):
         # Configure the mock to raise an Exception
@@ -99,21 +131,27 @@ class TestInferenceAPI(unittest.TestCase):
         inference_request = InferenceRequest(
             contents=["test content"],
             modality=Modality.TEXT,
-            model_config=ModelConfig(model_name='random'),
-            preprocessing_config=TextPreprocessingConfig()
+            model_config=ModelConfig(model_name="random"),
+            preprocessing_config=TextPreprocessingConfig(),
         )
         packed_data = msgpack.packb(inference_request.dict(), use_bin_type=True)
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/msgpack", "Accept": "application/msgpack"},
-            data=packed_data
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+            data=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
-        self.assertIn("An error occurred during vectorisation. Inference failed", unpacked_response["detail"])
+        self.assertIn(
+            "An error occurred during vectorisation. Inference failed",
+            unpacked_response["detail"],
+        )
 
     def test_vectorise_raise_exception_other_than_inference_error(self):
         self.mock_inference.vectorise.side_effect = ValueError("Some internal error")
@@ -121,15 +159,18 @@ class TestInferenceAPI(unittest.TestCase):
         inference_request = InferenceRequest(
             contents=["test content"],
             modality=Modality.TEXT,
-            model_config=ModelConfig(model_name='random'),
-            preprocessing_config=TextPreprocessingConfig()
+            model_config=ModelConfig(model_name="random"),
+            preprocessing_config=TextPreprocessingConfig(),
         )
         packed_data = msgpack.packb(inference_request.dict(), use_bin_type=True)
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/msgpack", "Accept": "application/msgpack"},
-            data=packed_data
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+            data=packed_data,
         )
 
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -141,15 +182,18 @@ class TestInferenceAPI(unittest.TestCase):
         inference_request = InferenceRequest(
             contents=["test content"],
             modality=Modality.TEXT,
-            model_config=ModelConfig(model_name='random'),
-            preprocessing_config=TextPreprocessingConfig()
+            model_config=ModelConfig(model_name="random"),
+            preprocessing_config=TextPreprocessingConfig(),
         )
         packed_data = msgpack.packb(inference_request.dict(), use_bin_type=True)
 
         response = self.client.post(
             "/vectorise",
-            headers={"Content-Type": "application/protobuf", "Accept": "application/msgpack"},
-            data=packed_data
+            headers={
+                "Content-Type": "application/protobuf",
+                "Accept": "application/msgpack",
+            },
+            data=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_415_UNSUPPORTED_MEDIA_TYPE)
@@ -162,28 +206,35 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
-    @patch("marqo.inference.native_inference.remote.server.inference_api.bootstrap_otel")
-    def test_lifespan_integration_bootstrap_and_shutdown_otel(self, mock_bootstrap_otel):
+    @patch(
+        "marqo.inference.native_inference.remote.server.inference_api.bootstrap_otel"
+    )
+    def test_lifespan_integration_bootstrap_and_shutdown_otel(
+        self, mock_bootstrap_otel
+    ):
         mock_otel_shutdown_hook = Mock()
         mock_bootstrap_otel.return_value = mock_otel_shutdown_hook
 
         # Use FastAPI TestClient to simulate making a request to the app
         with TestClient(inference_api.app) as _:
             # Ensure the shutdown hook was called and Zookeeper stop method was triggered
-            mock_bootstrap_otel.assert_called_once_with(inference_api.app, service_name='marqo-inference')
+            mock_bootstrap_otel.assert_called_once_with(
+                inference_api.app, service_name="marqo-inference"
+            )
 
         mock_otel_shutdown_hook.assert_called_once()
 
-    @unittest.skip(reason='not supported yet')
+    @unittest.skip(reason="not supported yet")
     def test_healthz_fails_if_exception_raised(self):
         for cuda_exception in [
-            CudaDeviceNotAvailableError('CUDA device(s) have become unavailable'),
-            CudaOutOfMemoryError('CUDA device cuda:0(Tesla T4) is out of memory')
+            CudaDeviceNotAvailableError("CUDA device(s) have become unavailable"),
+            CudaOutOfMemoryError("CUDA device cuda:0(Tesla T4) is out of memory"),
         ]:
             with self.subTest(cuda_exception):
-                with patch("marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
-                           side_effect=cuda_exception):
+                with patch(
+                    "marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
+                    side_effect=cuda_exception,
+                ):
                     response = self.client.get("/healthz")
                     self.assertEqual(response.status_code, 503)
-                    self.assertIn(cuda_exception.message, response.json()['message'])
-
+                    self.assertIn(cuda_exception.message, response.json()["message"])

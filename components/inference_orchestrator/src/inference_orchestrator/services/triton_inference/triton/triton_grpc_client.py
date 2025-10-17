@@ -1,8 +1,8 @@
-import numpy as np
-from tritonclient import grpc
-
 from inference_orchestrator.core.logging import get_logger
-from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
+from inference_orchestrator.services.triton_inference.triton.channel_args import (
+    ChannelArgs,
+)
+from tritonclient import grpc
 
 logger = get_logger(__name__)
 
@@ -10,8 +10,14 @@ logger = get_logger(__name__)
 class TritonGRPCClient:
     def __init__(self, url: str, channel_args: ChannelArgs):
         parsed_url = self._parse_url(url)
-        logger.info(f"Instantiating Triton GRPC client with URL: {parsed_url} and channel args: {channel_args}")
-        self.client = grpc.InferenceServerClient(url=parsed_url, verbose=False, channel_args=channel_args.build_channel_args())
+        logger.info(
+            f"Instantiating Triton GRPC client with URL: {parsed_url} and channel args: {channel_args}"
+        )
+        self.client = grpc.InferenceServerClient(
+            url=parsed_url,
+            verbose=False,
+            channel_args=channel_args.build_channel_args(),
+        )
         self.grpc_compression_algorithm = channel_args.grpc_compression_algorithm
 
     def _parse_url(self, url):
@@ -33,8 +39,11 @@ class TritonGRPCClient:
         return url
 
     def encode(
-            self, model_name: str, infer_inputs: list[grpc.InferInput], infer_outputs: list[grpc.InferRequestedOutput]) \
-            -> grpc.InferResult:
+        self,
+        model_name: str,
+        infer_inputs: list[grpc.InferInput],
+        infer_outputs: list[grpc.InferRequestedOutput],
+    ) -> grpc.InferResult:
         """
         Encode the input data using the specified model.
 
@@ -47,21 +56,8 @@ class TritonGRPCClient:
         """
 
         return self.client.infer(
-            model_name=model_name, inputs=infer_inputs, outputs=infer_outputs,
-            compression_algorithm=self.grpc_compression_algorithm
+            model_name=model_name,
+            inputs=infer_inputs,
+            outputs=infer_outputs,
+            compression_algorithm=self.grpc_compression_algorithm,
         )
-
-        inputs = np.ascontiguousarray(inputs, dtype=input_type.dtype)
-
-        input_tensor = grpc.InferInput(name="input", shape=list(inputs.shape), datatype="INT32")
-        input_tensor.set_data_from_numpy(inputs)
-
-        output_tensor = grpc.InferRequestedOutput(name="output")
-        response = self.client.infer(
-            model_name=model_name, inputs=[input_tensor], outputs=[output_tensor],
-            compression_algorithm=self.grpc_compression_algorithm
-        )
-        output_data = response.as_numpy("output")
-        if output_data.shape[0] != inputs.shape[0]:
-            raise ValueError(f"Output data shape {output_data.shape} does not match input data shape {inputs.shape}")
-        return output_data

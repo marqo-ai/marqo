@@ -1,18 +1,9 @@
 import hashlib
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tests.integration_tests.test_case import InferenceTestCase
-
-import numpy as np
-from opentelemetry import metrics
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
-from opentelemetry.sdk.metrics._internal.point import MetricsData
-from opentelemetry.test.globals_test import reset_metrics_globals
-from orjson import orjson
-
 from typing import Any
 
+import numpy as np
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
     ImagePreprocessingConfig,
@@ -29,6 +20,14 @@ from inference_orchestrator.services.inference_cache.caching_inference import (
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
     get_model_properties,
 )
+from opentelemetry import metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
+from opentelemetry.sdk.metrics._internal.point import MetricsData
+from opentelemetry.test.globals_test import reset_metrics_globals
+from orjson import orjson
+
+from tests.integration_tests.test_case import InferenceTestCase
 
 
 class RandomInferenceStub(Inference):

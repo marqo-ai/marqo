@@ -1,5 +1,6 @@
-from .base_model_properties import DataType
 import numpy as np
+
+from .base_model_properties import DataType
 
 
 def convert_to_triton_data_type(dtype: DataType) -> str:

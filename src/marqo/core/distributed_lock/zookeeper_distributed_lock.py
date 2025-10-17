@@ -1,9 +1,14 @@
-from kazoo.exceptions import LockTimeout, ConnectionClosedError
+from kazoo.exceptions import ConnectionClosedError, LockTimeout
 from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.protocol.states import KazooState
 
-from marqo.core.distributed_lock.abstract_distributed_lock import AbstractDistributedLock
-from marqo.core.exceptions import BackendCommunicationError, ZookeeperLockNotAcquiredError
+from marqo.core.distributed_lock.abstract_distributed_lock import (
+    AbstractDistributedLock,
+)
+from marqo.core.exceptions import (
+    BackendCommunicationError,
+    ZookeeperLockNotAcquiredError,
+)
 from marqo.logging import get_logger
 from marqo.vespa.zookeeper_client import ZookeeperClient
 
@@ -15,10 +20,12 @@ _DEPLOYMENT_LOCK_PATH = "/marqo__deployment_lock"
 class ZookeeperDistributedLock(AbstractDistributedLock):
     """A concrete implementation of distributed lock using Zookeeper."""
 
-    def __init__(self, zookeeper_client: ZookeeperClient,
-                 path: str,
-                 acquire_timeout: float = 0,
-                 ):
+    def __init__(
+        self,
+        zookeeper_client: ZookeeperClient,
+        path: str,
+        acquire_timeout: float = 0,
+    ):
         """
         Initialize the deployment lock.
 
@@ -46,7 +53,9 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
             try:
                 self._zookeeper_client.start()
             except KazooTimeoutError as e:
-                raise BackendCommunicationError("Marqo cannot connect to Zookeeper") from e
+                raise BackendCommunicationError(
+                    "Marqo cannot connect to Zookeeper"
+                ) from e
         try:
             acquired = self._lock.acquire(timeout=self._acquire_timeout)
             if not acquired:
@@ -75,7 +84,9 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
         self.release()
 
 
-def get_deployment_lock(zookeeper_client: ZookeeperClient, acquire_timeout: float = 0) -> ZookeeperDistributedLock:
+def get_deployment_lock(
+    zookeeper_client: ZookeeperClient, acquire_timeout: float = 0
+) -> ZookeeperDistributedLock:
     """
     Get a deployment lock, used to lock the index creation/deletion operations.
 
@@ -86,4 +97,6 @@ def get_deployment_lock(zookeeper_client: ZookeeperClient, acquire_timeout: floa
     Returns:
         ZookeeperDistributedLock: The deployment lock.
     """
-    return ZookeeperDistributedLock(zookeeper_client, _DEPLOYMENT_LOCK_PATH, acquire_timeout)
+    return ZookeeperDistributedLock(
+        zookeeper_client, _DEPLOYMENT_LOCK_PATH, acquire_timeout
+    )

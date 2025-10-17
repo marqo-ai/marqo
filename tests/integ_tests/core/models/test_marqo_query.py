@@ -1,9 +1,13 @@
 import pytest
-from tests.integ_tests.marqo_test import MarqoTestCase
 
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.models.hybrid_parameters import (
+    HybridParameters,
+    RankingMethod,
+    RetrievalMethod,
+)
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @pytest.mark.unittest
@@ -16,7 +20,7 @@ class TestMarqoHybridQuery(MarqoTestCase):
             (RetrievalMethod.Tensor, RankingMethod.Lexical),
             (RetrievalMethod.Lexical, RankingMethod.Tensor),
             (RetrievalMethod.Tensor, RankingMethod.Tensor),
-            (RetrievalMethod.Lexical, RankingMethod.Lexical)
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
         ]:
             with self.assertRaises(ValueError) as e:
                 my_query = MarqoHybridQuery(
@@ -26,21 +30,21 @@ class TestMarqoHybridQuery(MarqoTestCase):
                         ScoreModifier(
                             field="my_field_1",
                             weight=1.0,
-                            type=ScoreModifierType.Multiply
+                            type=ScoreModifierType.Multiply,
                         ),
                         ScoreModifier(
-                            field="my_field_2",
-                            weight=1.0,
-                            type=ScoreModifierType.Add
-                        )
+                            field="my_field_2", weight=1.0, type=ScoreModifierType.Add
+                        ),
                     ],
                     hybrid_parameters=HybridParameters(
-                        retrievalMethod=retrieval_method,
-                        rankingMethod=ranking_method
-                    )
+                        retrievalMethod=retrieval_method, rankingMethod=ranking_method
+                    ),
                 )
 
-            self.assertIn("only supported for hybrid search if 'rankingMethod' is 'RRF'", str(e.exception))
+            self.assertIn(
+                "only supported for hybrid search if 'rankingMethod' is 'RRF'",
+                str(e.exception),
+            )
 
     def test_hybrid_query_with_searchable_attributes_fails(self):
         """
@@ -53,4 +57,6 @@ class TestMarqoHybridQuery(MarqoTestCase):
                 searchable_attributes=["my_field_1", "my_field_2"],
             )
 
-        self.assertIn("'searchableAttributes' cannot be used for hybrid search", str(e.exception))
+        self.assertIn(
+            "'searchableAttributes' cannot be used for hybrid search", str(e.exception)
+        )

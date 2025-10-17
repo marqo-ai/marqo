@@ -35,7 +35,7 @@ def instantiate_logger(s: Settings) -> None:
                     '"client_addr": "%(client_addr)s", '
                     '"request_line": "%(request_line)s", '
                     '"status_code": "%(status_code)s"}'
-                )
+                ),
             },
         },
         "handlers": {
@@ -50,8 +50,16 @@ def instantiate_logger(s: Settings) -> None:
             },
         },
         "loggers": {
-            "uvicorn": {"handlers": ["default"], "level": LOG_LEVEL, "propagate": False},
-            "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+            "uvicorn": {
+                "handlers": ["default"],
+                "level": LOG_LEVEL,
+                "propagate": False,
+            },
+            "uvicorn.access": {
+                "handlers": ["access"],
+                "level": "INFO",
+                "propagate": False,
+            },
             "httpx": {
                 "handlers": ["default"],
                 "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",

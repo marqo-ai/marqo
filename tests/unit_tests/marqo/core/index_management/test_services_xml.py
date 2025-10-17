@@ -11,36 +11,48 @@ from marqo.core.index_management.vespa_application_package import ServicesXml
 
 @pytest.mark.unittest
 class TestServicesXml(unittest.TestCase):
-
-    _TEMPLATE = Template(textwrap.dedent("""<?xml version="1.0" encoding="utf-8" ?>
+    _TEMPLATE = Template(
+        textwrap.dedent("""<?xml version="1.0" encoding="utf-8" ?>
             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
                 <content id="content_default" version="1.0">
                     <documents>$documents</documents>
                 </content>
             </services>
-        """))
+        """)
+    )
 
     def test_compare_element_should_return_true_when_equals_semantically(self):
-
-        xml1 = self._TEMPLATE.substitute(documents="""
+        xml1 = self._TEMPLATE.substitute(
+            documents="""
                     <document type="marqo__settings" mode="index"/>
                     <document type="marqo__existing_00index" mode="index"/>
-                """)
+                """
+        )
 
         # we changed the order of the document sub elements and its attributes in documents
         # This is still the same semantically
-        xml2 = self._TEMPLATE.substitute(documents="""
+        xml2 = self._TEMPLATE.substitute(
+            documents="""
                     <document type="marqo__existing_00index" mode="index"/>
                     <document mode="index" type="marqo__settings"></document>
-                """)
+                """
+        )
 
-        self.assertTrue(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents'))
-        self.assertTrue(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents/document'))
+        self.assertTrue(
+            ServicesXml(xml1).compare_element(ServicesXml(xml2), "content/documents")
+        )
+        self.assertTrue(
+            ServicesXml(xml1).compare_element(
+                ServicesXml(xml2), "content/documents/document"
+            )
+        )
 
     def test_compare_element_should_return_false_when_not_equal_semantically(self):
-        xml1 = self._TEMPLATE.substitute(documents="""
+        xml1 = self._TEMPLATE.substitute(
+            documents="""
                     <document type="marqo__existing_00index" mode="index"/>
-                """)
+                """
+        )
         # we changed the order of the document sub elements and its attributes in documents
         # This is still the same semantically
         for test_case in [
@@ -51,8 +63,16 @@ class TestServicesXml(unittest.TestCase):
         ]:
             with self.subTest():
                 xml2 = self._TEMPLATE.substitute(documents=test_case)
-                self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents'))
-                self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents/document'))
+                self.assertFalse(
+                    ServicesXml(xml1).compare_element(
+                        ServicesXml(xml2), "content/documents"
+                    )
+                )
+                self.assertFalse(
+                    ServicesXml(xml1).compare_element(
+                        ServicesXml(xml2), "content/documents/document"
+                    )
+                )
 
     def test_compare_element_should_detect_any_difference_in_multiple_elements(self):
         xml1 = """<?xml version="1.0" encoding="utf-8" ?>
@@ -79,7 +99,9 @@ class TestServicesXml(unittest.TestCase):
                     </services>
                 """
 
-        self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), '*/nodes'))
+        self.assertFalse(
+            ServicesXml(xml1).compare_element(ServicesXml(xml2), "*/nodes")
+        )
 
     def test_should_not_have_more_than_one_content_documents_element(self):
         xml = """<?xml version="1.0" encoding="utf-8" ?>
@@ -99,8 +121,10 @@ class TestServicesXml(unittest.TestCase):
 
         with self.assertRaises(InternalError) as e:
             ServicesXml(xml)
-        self.assertEqual('Multiple content/documents elements found in services.xml. Only one is allowed',
-                         str(e.exception))
+        self.assertEqual(
+            "Multiple content/documents elements found in services.xml. Only one is allowed",
+            str(e.exception),
+        )
 
     def test_should_have_one_content_document_element(self):
         xml = """<?xml version="1.0" encoding="utf-8" ?>
@@ -112,10 +136,14 @@ class TestServicesXml(unittest.TestCase):
 
         with self.assertRaises(InternalError) as e:
             ServicesXml(xml)
-        self.assertEqual('No content/documents element found in services.xml', str(e.exception))
+        self.assertEqual(
+            "No content/documents element found in services.xml", str(e.exception)
+        )
 
     def test_add_schema_should_skip_when_schema_exists(self):
-        xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
+        xml = self._TEMPLATE.substitute(
+            documents="""<document type="marqo__existing_00index" mode="index"/>"""
+        )
         service_xml = ServicesXml(xml)
         service_xml.add_schema("marqo__existing_00index")
         self._assertStringsEqualIgnoringWhitespace(xml, service_xml.to_xml())
@@ -124,25 +152,33 @@ class TestServicesXml(unittest.TestCase):
         xml = self._TEMPLATE.substitute(documents="""""")
         service_xml = ServicesXml(xml)
 
-        expected_xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
+        expected_xml = self._TEMPLATE.substitute(
+            documents="""<document type="marqo__existing_00index" mode="index"/>"""
+        )
         service_xml.add_schema("marqo__existing_00index")
 
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
 
     def test_remove_schema_should_skip_if_not_exist(self):
-        xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
+        xml = self._TEMPLATE.substitute(
+            documents="""<document type="marqo__existing_00index" mode="index"/>"""
+        )
         service_xml = ServicesXml(xml)
         service_xml.remove_schema("new_00schema")
         self._assertStringsEqualIgnoringWhitespace(xml, service_xml.to_xml())
 
     def test_remove_schema(self):
-        xml = self._TEMPLATE.substitute(documents="""
+        xml = self._TEMPLATE.substitute(
+            documents="""
             <document type="marqo__existing_00index" mode="index"/>
             <document type="new_00index" mode="index"/>
-        """)
+        """
+        )
         service_xml = ServicesXml(xml)
         service_xml.remove_schema("marqo__existing_00index")
-        expected_xml = self._TEMPLATE.substitute(documents="""<document type="new_00index" mode="index"/>""")
+        expected_xml = self._TEMPLATE.substitute(
+            documents="""<document type="new_00index" mode="index"/>"""
+        )
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
 
     def test_config_components(self):
@@ -392,7 +428,7 @@ class TestServicesXml(unittest.TestCase):
         """Custom assertion to compare strings ignoring whitespace."""
 
         def remove_whitespace(s: str) -> str:
-            return re.sub(r'\s+', '', s)
+            return re.sub(r"\s+", "", s)
 
         cleaned_s1 = remove_whitespace(s1)
         cleaned_s2 = remove_whitespace(s2)

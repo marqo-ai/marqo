@@ -1,12 +1,13 @@
 from unittest import TestCase
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import httpx
-from httpx import TimeoutException, ConnectError, NetworkError, HTTPStatusError
-
+from httpx import ConnectError, HTTPStatusError, NetworkError, TimeoutException
+from model_management.services.errors import (
+    TritonCommunicationError,
+    TritonModelLoadError,
+)
 from model_management.services.triton.triton_client import TritonClient
-from model_management.services.errors import ModelDownloadFailedError
-from model_management.services.errors import TritonCommunicationError, TritonModelLoadError
 
 
 class TestTritonClient(TestCase):
@@ -38,7 +39,7 @@ class TestTritonClient(TestCase):
                 client = TritonClient(url=url)
                 self.assertEqual(url, client.url)
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_success(self, mock_client_class):
         """Test successful model loading."""
         mock_response = Mock()
@@ -52,11 +53,11 @@ class TestTritonClient(TestCase):
 
         mock_client_instance.post.assert_called_once_with(
             f"{self.url}/v2/repository/models/test-model/load",
-            timeout=httpx.Timeout(5, read=30)
+            timeout=httpx.Timeout(5, read=30),
         )
         mock_response.raise_for_status.assert_called_once()
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_timeout(self, mock_client_class):
         """Test load_model raises TritonCommunicationError on timeout."""
         mock_client_instance = Mock()
@@ -70,7 +71,7 @@ class TestTritonClient(TestCase):
 
         self.assertIn("Triton timed out", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_connection_error(self, mock_client_class):
         """Test load_model raises TritonCommunicationError on connection error."""
         mock_client_instance = Mock()
@@ -84,7 +85,7 @@ class TestTritonClient(TestCase):
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_network_error(self, mock_client_class):
         """Test load_model raises TritonCommunicationError on network error."""
         mock_client_instance = Mock()
@@ -98,13 +99,15 @@ class TestTritonClient(TestCase):
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_http_status_error(self, mock_client_class):
         """Test load_model raises TritonModelLoadError on HTTP status error."""
         mock_response = Mock()
         mock_response.json = Mock(return_value={"error": "Model not found"})
         mock_response.raise_for_status = Mock(
-            side_effect=HTTPStatusError("400 Bad Request", request=Mock(), response=mock_response)
+            side_effect=HTTPStatusError(
+                "400 Bad Request", request=Mock(), response=mock_response
+            )
         )
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(return_value=mock_response)
@@ -118,7 +121,7 @@ class TestTritonClient(TestCase):
         self.assertIn("Failed to load model", str(context.exception))
         self.assertIn("Model not found", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_unload_model_success(self, mock_client_class):
         """Test successful model unloading."""
         mock_response = Mock()
@@ -132,11 +135,11 @@ class TestTritonClient(TestCase):
 
         mock_client_instance.post.assert_called_once_with(
             f"{self.url}/v2/repository/models/test-model/unload",
-            timeout=httpx.Timeout(5, read=30)
+            timeout=httpx.Timeout(5, read=30),
         )
         mock_response.raise_for_status.assert_called_once()
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_unload_model_timeout(self, mock_client_class):
         """Test unload_model raises TritonCommunicationError on timeout."""
         mock_client_instance = Mock()
@@ -150,7 +153,7 @@ class TestTritonClient(TestCase):
 
         self.assertIn("Triton timed out", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_unload_model_connection_error(self, mock_client_class):
         """Test unload_model raises TritonCommunicationError on connection error."""
         mock_client_instance = Mock()
@@ -164,13 +167,15 @@ class TestTritonClient(TestCase):
 
         self.assertIn("Triton is unavailable", str(context.exception))
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_unload_model_http_status_error(self, mock_client_class):
         """Test unload_model raises TritonModelLoadError on HTTP status error."""
         mock_response = Mock()
         mock_response.json = Mock(return_value={"error": "Model is not loaded"})
         mock_response.raise_for_status = Mock(
-            side_effect=HTTPStatusError("404 Not Found", request=Mock(), response=mock_response)
+            side_effect=HTTPStatusError(
+                "404 Not Found", request=Mock(), response=mock_response
+            )
         )
         mock_client_instance = Mock()
         mock_client_instance.post = Mock(return_value=mock_response)
@@ -189,7 +194,7 @@ class TestTritonClient(TestCase):
         with self.assertRaises(NotImplementedError):
             self.client.get_loaded_models()
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_load_model_with_various_model_names(self, mock_client_class):
         """Test load_model with various model name formats."""
         test_cases = [
@@ -214,7 +219,7 @@ class TestTritonClient(TestCase):
                 call_args = mock_client_instance.post.call_args
                 self.assertEqual(expected_url, call_args[0][0])
 
-    @patch('model_management.services.triton.triton_client.httpx.Client')
+    @patch("model_management.services.triton.triton_client.httpx.Client")
     def test_timeout_configuration(self, mock_client_class):
         """Test that timeout is configured correctly for requests."""
         mock_response = Mock()

@@ -1,6 +1,5 @@
 import httpx
-from httpx import TimeoutException, ConnectError, NetworkError, HTTPStatusError
-
+from httpx import ConnectError, HTTPStatusError, NetworkError, TimeoutException
 from inference_orchestrator.services.errors import (
     ModelManagementServiceUnavailableError,
     TritonModelLoadError,

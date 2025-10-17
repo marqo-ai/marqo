@@ -49,33 +49,16 @@ class TestIndexValidateSettings(unittest.TestCase):
                 "parameters": {"efConstruction": 128, "m": 16},
             },
             "allFields": [
+                {"features": ["lexical_search"], "name": "title", "type": "text"},
+                {"features": ["lexical_search"], "name": "description", "type": "text"},
                 {
-                    "features": [
-                        "lexical_search"
-                    ],
-                    "name": "title",
-                    "type": "text"
-                },
-                {
-                    "features": [
-                        "lexical_search"
-                    ],
-                    "name": "description",
-                    "type": "text"
-                },
-                {
-                    "dependent_fields": {
-                        "description": 0.3,
-                        "title": 0.7
-                    },
+                    "dependent_fields": {"description": 0.3, "title": 0.7},
                     "name": "title_and_description",
-                    "type": "multimodal_combination"
-                }
+                    "type": "multimodal_combination",
+                },
             ],
             "type": "structured",
-            "tensorFields": [
-                "title_and_description"
-            ]
+            "tensorFields": ["title_and_description"],
         }
         return test_data
 
@@ -122,5 +105,7 @@ class TestIndexValidateSettings(unittest.TestCase):
             IndexManagement.validate_index_settings("test_index", input_settings)
         self.assertIn("__root__", str(context.exception))
 
-        self.assertIn("Invalid field name 'dependent_fields'. See Create Index", 
-                      str(context.exception))
+        self.assertIn(
+            "Invalid field name 'dependent_fields'. See Create Index",
+            str(context.exception),
+        )

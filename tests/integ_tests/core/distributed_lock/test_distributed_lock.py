@@ -1,25 +1,30 @@
 from unittest.mock import patch
 
-from kazoo.exceptions import LockTimeout, ConnectionClosedError
+from kazoo.exceptions import ConnectionClosedError, LockTimeout
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
-from marqo.core.exceptions import BackendCommunicationError
+from marqo.core.distributed_lock.zookeeper_distributed_lock import (
+    ZookeeperDistributedLock,
+    get_deployment_lock,
+)
+from marqo.core.exceptions import (
+    BackendCommunicationError,
+    ZookeeperLockNotAcquiredError,
+)
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError
 
 
 class TestZookeeperDistributedLock(MarqoTestCase):
-
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
         try:
             cls.zookeeper_client.start(5)
         except KazooTimeoutError as e:
-            raise ConnectionError("Failed to connect to Zookeeper during the unit tests. "
-                                  "Please ensure the Zookeeper is configured and published ") from e
+            raise ConnectionError(
+                "Failed to connect to Zookeeper during the unit tests. "
+                "Please ensure the Zookeeper is configured and published "
+            ) from e
 
     @classmethod
     def tearDownClass(cls):
@@ -61,9 +66,11 @@ class TestZookeeperDistributedLock(MarqoTestCase):
 
     def test_distributed_lock_lockAcquisitionTimeout(self):
         """Test lock acquisition fails when timeout is reached."""
-        lock = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)  # Short timeout for the test
+        lock = get_deployment_lock(
+            self.zookeeper_client, self.acquire_timeout
+        )  # Short timeout for the test
         with self.assertRaises(ZookeeperLockNotAcquiredError):
-            with patch.object(lock._lock, 'acquire', side_effect=LockTimeout):
+            with patch.object(lock._lock, "acquire", side_effect=LockTimeout):
                 self.assertFalse(lock.acquire())
 
     def test_distributed_lock_repeatedAcquireRelease(self):
@@ -92,8 +99,10 @@ class TestZookeeperDistributedLock(MarqoTestCase):
     def test_distributed_lock_handleKazooTimeoutErrorGracefully(self):
         """Test the context manager handles Kazoo timeout error close gracefully."""
         lock = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)
-        with patch.object(lock._zookeeper_client, 'state', 'LOST'):
-            with patch.object(lock._zookeeper_client, 'start', side_effect=KazooTimeoutError):
+        with patch.object(lock._zookeeper_client, "state", "LOST"):
+            with patch.object(
+                lock._zookeeper_client, "start", side_effect=KazooTimeoutError
+            ):
                 with self.assertRaises(BackendCommunicationError):
                     with lock:
                         pass
@@ -102,7 +111,7 @@ class TestZookeeperDistributedLock(MarqoTestCase):
     def test_distributed_lock_handleConnectionClosedGracefully(self):
         """Test the context manager handles connection closed error gracefully."""
         lock = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)
-        with patch.object(lock._lock, 'acquire', side_effect=ConnectionClosedError):
+        with patch.object(lock._lock, "acquire", side_effect=ConnectionClosedError):
             with self.assertRaises(BackendCommunicationError):
                 with lock:
                     pass

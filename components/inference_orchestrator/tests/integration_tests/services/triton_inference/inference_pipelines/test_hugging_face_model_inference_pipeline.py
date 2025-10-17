@@ -1,14 +1,14 @@
 import numpy as np
-from numpy import ndarray
-
 from inference_orchestrator.schemas.api import (
+    EmbeddingModelConfig,
+    ImagePreprocessingConfig,
     InferenceRequest,
     InferenceResult,
-    EmbeddingModelConfig,
     Modality,
     TextPreprocessingConfig,
-    ImagePreprocessingConfig,
 )
+from numpy import ndarray
+
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 

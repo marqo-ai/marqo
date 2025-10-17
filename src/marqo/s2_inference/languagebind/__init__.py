@@ -14,24 +14,24 @@ from .video.processing_video import LanguageBindVideoProcessor
 from .video.tokenization_video import LanguageBindVideoTokenizer
 
 config_dict = {
-    'image': LanguageBindImageConfig,
-    'video': LanguageBindVideoConfig,
-    'audio': LanguageBindAudioConfig
+    "image": LanguageBindImageConfig,
+    "video": LanguageBindVideoConfig,
+    "audio": LanguageBindAudioConfig,
 }
 model_dict = {
-    'image': LanguageBindImage,
-    'video': LanguageBindVideo,
-    'audio': LanguageBindAudio
+    "image": LanguageBindImage,
+    "video": LanguageBindVideo,
+    "audio": LanguageBindAudio,
 }
 transform_dict = {
-    'video': LanguageBindVideoProcessor,
-    'audio': LanguageBindAudioProcessor,
-    'image': LanguageBindImageProcessor,
+    "video": LanguageBindVideoProcessor,
+    "audio": LanguageBindAudioProcessor,
+    "image": LanguageBindImageProcessor,
 }
 
 
 class LanguageBind(nn.Module):
-    def __init__(self, clip_type, use_temp=True, token=None, cache_dir='./cache_dir'):
+    def __init__(self, clip_type, use_temp=True, token=None, cache_dir="./cache_dir"):
         super(LanguageBind, self).__init__()
         self.use_temp = use_temp
         self.modality_encoder = {}
@@ -44,8 +44,8 @@ class LanguageBind(nn.Module):
             self.modality_proj[k] = model.visual_projection
             self.modality_scale[k] = model.logit_scale
             self.modality_config[k] = model.config
-        self.modality_encoder['language'] = model.text_model
-        self.modality_proj['language'] = model.text_projection
+        self.modality_encoder["language"] = model.text_model
+        self.modality_proj["language"] = model.text_projection
 
         self.modality_encoder = nn.ModuleDict(self.modality_encoder)
         self.modality_proj = nn.ModuleDict(self.modality_proj)
@@ -57,7 +57,7 @@ class LanguageBind(nn.Module):
             value = self.modality_proj[key](value)
             value = value / value.norm(p=2, dim=-1, keepdim=True)
             if self.use_temp:
-                if key != 'language':
+                if key != "language":
                     value = value * self.modality_scale[key].exp()
             outputs[key] = value
         return outputs

@@ -1,5 +1,6 @@
-from inference_orchestrator.schemas.base_model import AppBaseModel
 from typing import Literal, Optional
+
+from inference_orchestrator.schemas.base_model import AppBaseModel
 
 
 class TritonChannelArgs(AppBaseModel):

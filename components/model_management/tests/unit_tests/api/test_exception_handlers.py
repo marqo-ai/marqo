@@ -3,31 +3,29 @@ import json
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+import model_management.errors.http_errors as http_errors
+import model_management.services.errors as service_errors
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
-from starlette.requests import Request
-
 from model_management.api.exception_handlers import (
-    register_exception_handlers,
-    _validation_error_handler,
-    _service_error_handler,
     _app_error_handler,
     _catch_all_handler,
     _map_service_errors_to_http_errors,
-    _problem_response,
     _normalize_validation_errors,
+    _problem_response,
+    _service_error_handler,
+    _validation_error_handler,
+    register_exception_handlers,
 )
 from model_management.errors.base import AppError
 from model_management.errors.http_errors import (
+    DependencyTimeoutError,
     InternalServerError,
     InvalidArgumentError,
     NotFoundError,
     OperationConflictError,
-    DependencyTimeoutError,
 )
-import model_management.errors.http_errors as http_errors
-import model_management.services.errors as service_errors
+from starlette.requests import Request
 
 
 class TestExceptionHandlers(TestCase):
@@ -42,7 +40,7 @@ class TestExceptionHandlers(TestCase):
 
     def test_register_exception_handlers(self):
         """Test that all exception handlers are registered correctly."""
-        with patch.object(self.app, 'add_exception_handler') as mock_add_handler:
+        with patch.object(self.app, "add_exception_handler") as mock_add_handler:
             register_exception_handlers(self.app)
 
             self.assertEqual(4, mock_add_handler.call_count)
@@ -81,7 +79,10 @@ class TestExceptionHandlers(TestCase):
 
     def test_problem_response_with_extras(self):
         """Test _problem_response includes extras field when present."""
-        error = NotFoundError("Model not found", extras={"model_name": "test-model", "available_models": []})
+        error = NotFoundError(
+            "Model not found",
+            extras={"model_name": "test-model", "available_models": []},
+        )
 
         response = _problem_response(self.mock_request, error)
 
@@ -108,11 +109,31 @@ class TestExceptionHandlers(TestCase):
     def test_problem_response_different_error_types(self):
         """Test _problem_response handles different AppError subclasses correctly."""
         test_cases = [
-            (InvalidArgumentError("Bad input"), 400, "INVALID_ARGUMENT", "InvalidArgumentError"),
+            (
+                InvalidArgumentError("Bad input"),
+                400,
+                "INVALID_ARGUMENT",
+                "InvalidArgumentError",
+            ),
             (NotFoundError("Not found"), 404, "NOT_FOUND", "NotFoundError"),
-            (OperationConflictError("Conflict"), 409, "OPERATION_CONFLICT", "OperationConflictError"),
-            (InternalServerError("Server error"), 500, "INTERNAL_ERROR", "InternalServerError"),
-            (DependencyTimeoutError("Timeout"), 504, "DEPENDENCY_TIMEOUT", "DependencyTimeoutError"),
+            (
+                OperationConflictError("Conflict"),
+                409,
+                "OPERATION_CONFLICT",
+                "OperationConflictError",
+            ),
+            (
+                InternalServerError("Server error"),
+                500,
+                "INTERNAL_ERROR",
+                "InternalServerError",
+            ),
+            (
+                DependencyTimeoutError("Timeout"),
+                504,
+                "DEPENDENCY_TIMEOUT",
+                "DependencyTimeoutError",
+            ),
         ]
 
         for error, expected_status, expected_code, expected_title in test_cases:
@@ -130,12 +151,22 @@ class TestExceptionHandlers(TestCase):
         # Create a mock validation error
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
-            {"loc": ("body", "maxBatchSize"), "msg": "value is not a valid integer", "type": "type_error.integer"},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
+            {
+                "loc": ("body", "maxBatchSize"),
+                "msg": "value is not a valid integer",
+                "type": "type_error.integer",
+            },
         ]
 
         # Call the async handler synchronously - it doesn't actually await anything
-        response = asyncio.run(_validation_error_handler(self.mock_request, mock_validation_error))
+        response = asyncio.run(
+            _validation_error_handler(self.mock_request, mock_validation_error)
+        )
 
         self.assertEqual(400, response.status_code)
         self.assertEqual("application/problem+json", response.media_type)
@@ -150,10 +181,16 @@ class TestExceptionHandlers(TestCase):
         """Test validation_error_handler formats validation errors as JSON string."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
         ]
 
-        response = asyncio.run(_validation_error_handler(self.mock_request, mock_validation_error))
+        response = asyncio.run(
+            _validation_error_handler(self.mock_request, mock_validation_error)
+        )
         body = json.loads(response.body)
 
         # Detail should be a JSON string of error messages
@@ -167,10 +204,26 @@ class TestExceptionHandlers(TestCase):
     def test_map_service_errors_to_http_errors(self):
         """Test mapping of service errors to HTTP errors."""
         test_cases = [
-            (service_errors.ModelDownloadFailedError("Download failed"), InvalidArgumentError, 400),
-            (service_errors.ModelOperationInProgressError("Operation in progress"), OperationConflictError, 409),
-            (service_errors.TritonCommunicationError("Triton error"), http_errors.DependencyBadGatewayError, 502),
-            (service_errors.InternalServerError("Internal error"), InternalServerError, 500),
+            (
+                service_errors.ModelDownloadFailedError("Download failed"),
+                InvalidArgumentError,
+                400,
+            ),
+            (
+                service_errors.ModelOperationInProgressError("Operation in progress"),
+                OperationConflictError,
+                409,
+            ),
+            (
+                service_errors.TritonCommunicationError("Triton error"),
+                http_errors.DependencyBadGatewayError,
+                502,
+            ),
+            (
+                service_errors.InternalServerError("Internal error"),
+                InternalServerError,
+                500,
+            ),
         ]
 
         for service_error, expected_http_error_class, expected_status in test_cases:
@@ -182,6 +235,7 @@ class TestExceptionHandlers(TestCase):
 
     def test_map_service_errors_to_http_errors_unknown_error(self):
         """Test that unknown service errors map to InternalServerError."""
+
         # Create a custom service error that's not in the mapping
         class UnknownServiceError(service_errors.ServiceError):
             pass
@@ -208,15 +262,33 @@ class TestExceptionHandlers(TestCase):
     def test_service_error_handler_different_service_errors(self):
         """Test service_error_handler with different service error types."""
         test_cases = [
-            (service_errors.ModelDownloadFailedError("Download failed"), 400, "INVALID_ARGUMENT"),
-            (service_errors.ModelOperationInProgressError("Operation in progress"), 409, "OPERATION_CONFLICT"),
-            (service_errors.TritonCommunicationError("Triton error"), 502, "DEPENDENCY_BAD_GATEWAY"),
-            (service_errors.InternalServerError("Internal error"), 500, "INTERNAL_ERROR"),
+            (
+                service_errors.ModelDownloadFailedError("Download failed"),
+                400,
+                "INVALID_ARGUMENT",
+            ),
+            (
+                service_errors.ModelOperationInProgressError("Operation in progress"),
+                409,
+                "OPERATION_CONFLICT",
+            ),
+            (
+                service_errors.TritonCommunicationError("Triton error"),
+                502,
+                "DEPENDENCY_BAD_GATEWAY",
+            ),
+            (
+                service_errors.InternalServerError("Internal error"),
+                500,
+                "INTERNAL_ERROR",
+            ),
         ]
 
         for service_error, expected_status, expected_code in test_cases:
             with self.subTest(service_error_type=type(service_error).__name__):
-                response = asyncio.run(_service_error_handler(self.mock_request, service_error))
+                response = asyncio.run(
+                    _service_error_handler(self.mock_request, service_error)
+                )
 
                 self.assertEqual(expected_status, response.status_code)
                 body = json.loads(response.body)
@@ -274,7 +346,12 @@ class TestExceptionHandlers(TestCase):
         """Test _normalize_validation_errors with single validation error."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing", "input": None},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+                "input": None,
+            },
         ]
 
         result = _normalize_validation_errors(mock_validation_error)
@@ -290,9 +367,21 @@ class TestExceptionHandlers(TestCase):
         """Test _normalize_validation_errors with multiple validation errors."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
-            {"loc": ("body", "maxBatchSize"), "msg": "value is not a valid integer", "type": "type_error.integer"},
-            {"loc": ("body", "sources"), "msg": "ensure this value has at least 1 items", "type": "value_error.list.min_items"},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
+            {
+                "loc": ("body", "maxBatchSize"),
+                "msg": "value is not a valid integer",
+                "type": "type_error.integer",
+            },
+            {
+                "loc": ("body", "sources"),
+                "msg": "ensure this value has at least 1 items",
+                "type": "value_error.list.min_items",
+            },
         ]
 
         result = _normalize_validation_errors(mock_validation_error)
@@ -307,9 +396,21 @@ class TestExceptionHandlers(TestCase):
         """Test _normalize_validation_errors strips body/query/path prefixes from field paths."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "model", "name"), "msg": "field required", "type": "value_error.missing"},
-            {"loc": ("query", "limit"), "msg": "value is not a valid integer", "type": "type_error.integer"},
-            {"loc": ("path", "model_id"), "msg": "value is not a valid uuid", "type": "type_error.uuid"},
+            {
+                "loc": ("body", "model", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
+            {
+                "loc": ("query", "limit"),
+                "msg": "value is not a valid integer",
+                "type": "type_error.integer",
+            },
+            {
+                "loc": ("path", "model_id"),
+                "msg": "value is not a valid uuid",
+                "type": "type_error.uuid",
+            },
         ]
 
         result = _normalize_validation_errors(mock_validation_error)
@@ -322,8 +423,16 @@ class TestExceptionHandlers(TestCase):
         """Test _normalize_validation_errors creates field_errors mapping correctly."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
-            {"loc": ("body", "name"), "msg": "ensure this value has at most 100 characters", "type": "value_error.any_str.max_length"},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
+            {
+                "loc": ("body", "name"),
+                "msg": "ensure this value has at most 100 characters",
+                "type": "value_error.any_str.max_length",
+            },
         ]
 
         result = _normalize_validation_errors(mock_validation_error)
@@ -331,13 +440,20 @@ class TestExceptionHandlers(TestCase):
         self.assertIn("name", result["field_errors"])
         self.assertEqual(2, len(result["field_errors"]["name"]))
         self.assertIn("field required", result["field_errors"]["name"])
-        self.assertIn("ensure this value has at most 100 characters", result["field_errors"]["name"])
+        self.assertIn(
+            "ensure this value has at most 100 characters",
+            result["field_errors"]["name"],
+        )
 
     def test_normalize_validation_errors_excludes_none_values(self):
         """Test _normalize_validation_errors excludes None values from error entries."""
         mock_validation_error = MagicMock(spec=RequestValidationError)
         mock_validation_error.errors.return_value = [
-            {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
+            {
+                "loc": ("body", "name"),
+                "msg": "field required",
+                "type": "value_error.missing",
+            },
         ]
 
         result = _normalize_validation_errors(mock_validation_error)

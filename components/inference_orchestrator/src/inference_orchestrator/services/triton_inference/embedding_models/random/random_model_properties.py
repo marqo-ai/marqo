@@ -1,5 +1,8 @@
-from inference_orchestrator.services.triton_inference.embedding_models.base_model_properties import BaseModelProperties
 from typing import Literal
+
+from inference_orchestrator.services.triton_inference.embedding_models.base_model_properties import (
+    BaseModelProperties,
+)
 
 
 class RandomModelProperties(BaseModelProperties):
@@ -13,5 +16,6 @@ class RandomModelProperties(BaseModelProperties):
         type: The type of the model. It should be 'random'.
         note: A note about the model. It is optional.
     """
+
     name: str
     type: Literal["random"]

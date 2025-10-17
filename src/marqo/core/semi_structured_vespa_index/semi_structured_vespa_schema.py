@@ -1,18 +1,17 @@
 import os
 
-import semver
 from jinja2 import Environment, FileSystemLoader
 
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, MarqoIndex
+from marqo.core.models.marqo_index import MarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.vespa_index.vespa_schema import VespaSchema
 
 
 class SemiStructuredVespaSchema(VespaSchema):
-    FIELD_INDEX_PREFIX = 'marqo__lexical_'
-    FIELD_CHUNKS_PREFIX = 'marqo__chunks_'
-    FIELD_EMBEDDING_PREFIX = 'marqo__embeddings_'
-    FIELD_STRING_ARRAY_PREFIX = 'marqo__string_array_'
+    FIELD_INDEX_PREFIX = "marqo__lexical_"
+    FIELD_CHUNKS_PREFIX = "marqo__chunks_"
+    FIELD_EMBEDDING_PREFIX = "marqo__embeddings_"
+    FIELD_STRING_ARRAY_PREFIX = "marqo__string_array_"
 
     def __init__(self, index_request: UnstructuredMarqoIndexRequest):
         self._index_request = index_request
@@ -28,17 +27,23 @@ class SemiStructuredVespaSchema(VespaSchema):
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
         if marqo_index.index_supports_partial_updates:
-            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template_2_16.sd.jinja2")
+            vespa_schema_template = environment.get_template(
+                "semi_structured_vespa_schema_template_2_16.sd.jinja2"
+            )
         else:
-            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
+            vespa_schema_template = environment.get_template(
+                "semi_structured_vespa_schema_template.sd.jinja2"
+            )
 
         # simplify the logic in the template to just pass in the first collapse field if exists
-        collapse_field = marqo_index.collapse_fields[0] if marqo_index.collapse_fields else None
+        collapse_field = (
+            marqo_index.collapse_fields[0] if marqo_index.collapse_fields else None
+        )
 
         return vespa_schema_template.render(
             index=marqo_index,
             collapse_field=collapse_field,
-            dimension=str(marqo_index.model.get_dimension())
+            dimension=str(marqo_index.model.get_dimension()),
         )
 
     def _generate_marqo_index(self, schema_name: str) -> SemiStructuredMarqoIndex:

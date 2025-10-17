@@ -3,21 +3,29 @@ Comprehensive integration tests for language feature.
 Tests language functionality with different search methods and field configurations.
 Follows TestSearchSemiStructured pattern with focus on unstructured index testing.
 """
-import copy
-import os
-import uuid
-from unittest import mock
 
-from marqo.core.exceptions import UnsupportedFeatureError, AddDocumentsError
+import uuid
+
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
-from marqo.core.models.marqo_index import Model, FieldType, FieldFeature
+from marqo.core.models.facets_parameters import (
+    FacetsParameters,
+    FieldFacetsConfiguration,
+)
+from marqo.core.models.hybrid_parameters import (
+    HybridParameters,
+    RankingMethod,
+    RetrievalMethod,
+)
+from marqo.core.models.marqo_index import FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel, RelevanceCutoffMethod, \
-    MeanStdParameters
+from marqo.tensor_search.models.relevance_cutoff_model import (
+    MeanStdParameters,
+    RelevanceCutoffMethod,
+    RelevanceCutoffModel,
+)
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
@@ -31,100 +39,113 @@ class TestLanguage(MarqoTestCase):
         index_requests = []
 
         cls.three_fields_index = cls.unstructured_marqo_index_request(
-            name='test_three_fields_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_three_fields_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.three_fields_index)
 
         cls.language_change_different_index = cls.unstructured_marqo_index_request(
-            name='test_lang_change_diff_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_change_diff_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.language_change_different_index)
 
-        cls.language_change_default_to_specific_index = cls.unstructured_marqo_index_request(
-            name='test_lang_change_def_to_spec_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+        cls.language_change_default_to_specific_index = (
+            cls.unstructured_marqo_index_request(
+                name="test_lang_change_def_to_spec_"
+                + str(uuid.uuid4()).replace("-", ""),
+                model=Model(name="hf/e5-small-v2"),
+            )
         )
         index_requests.append(cls.language_change_default_to_specific_index)
 
-        cls.language_change_specific_to_default_index = cls.unstructured_marqo_index_request(
-            name='test_lang_change_spec_to_def_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+        cls.language_change_specific_to_default_index = (
+            cls.unstructured_marqo_index_request(
+                name="test_lang_change_spec_to_def_"
+                + str(uuid.uuid4()).replace("-", ""),
+                model=Model(name="hf/e5-small-v2"),
+            )
         )
         index_requests.append(cls.language_change_specific_to_default_index)
 
         # Create separate indexes for each language in the all_languages test
         cls.en_us_index = cls.unstructured_marqo_index_request(
-            name='test_lang_en_us_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_en_us_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.en_us_index)
 
         cls.es_index = cls.unstructured_marqo_index_request(
-            name='test_lang_es_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_es_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.es_index)
 
         cls.fr_index = cls.unstructured_marqo_index_request(
-            name='test_lang_fr_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_fr_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.fr_index)
 
         cls.de_index = cls.unstructured_marqo_index_request(
-            name='test_lang_de_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_de_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.de_index)
 
         cls.pt_br_index = cls.unstructured_marqo_index_request(
-            name='test_lang_pt_br_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_pt_br_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.pt_br_index)
 
         # Create a separate index for the language persistence test
         cls.language_persistence_index = cls.unstructured_marqo_index_request(
-            name='test_lang_persistence_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2')
+            name="test_lang_persistence_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.language_persistence_index)
 
         cls.facets_and_relevance_cutoff_index = cls.unstructured_marqo_index_request(
-            name='test_facets_and_relevance_cutoff_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2'),
+            name="test_facets_and_relevance_cutoff_"
+            + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
         )
         index_requests.append(cls.facets_and_relevance_cutoff_index)
 
         # Create a structured index for testing language search failure
         cls.structured_index = cls.structured_marqo_index_request(
-            name='test_structured_lang_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2'),
+            name="test_structured_lang_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
             fields=[
-                FieldRequest(name="title", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="content", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(
+                    name="title",
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                ),
+                FieldRequest(
+                    name="content",
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                ),
             ],
-            tensor_fields=["title", "content"]
+            tensor_fields=["title", "content"],
         )
         index_requests.append(cls.structured_index)
 
         # 2.16 unstructured index -- must support language
         cls.v216_unstructured_index = cls.unstructured_marqo_index_request(
-            name='test_v216_unstructured_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2'),
-            marqo_version='2.16.0',
+            name="test_v216_unstructured_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
+            marqo_version="2.16.0",
         )
         index_requests.append(cls.v216_unstructured_index)
 
         # 2.15 unstructured index -- must not support language
         cls.v215_unstructured_index = cls.unstructured_marqo_index_request(
-            name='test_v215_unstructured_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name='hf/e5-small-v2'),
-            marqo_version='2.15.0',
+            name="test_v215_unstructured_" + str(uuid.uuid4()).replace("-", ""),
+            model=Model(name="hf/e5-small-v2"),
+            marqo_version="2.15.0",
         )
         index_requests.append(cls.v215_unstructured_index)
 
@@ -140,64 +161,117 @@ class TestLanguage(MarqoTestCase):
         language_test_data = {
             "en-US": {
                 "docs": [
-                    {"_id": "en1", "title": "Running in the beautiful park", "content": "The athlete runs quickly"},
-                    {"_id": "en2", "title": "Running at the ocean", "content": "Swimming is excellent exercise"},
-                    {"_id": "en3", "title": "Reading interesting books",
-                     "content": "Books provide knowledge and entertainment"}
+                    {
+                        "_id": "en1",
+                        "title": "Running in the beautiful park",
+                        "content": "The athlete runs quickly",
+                    },
+                    {
+                        "_id": "en2",
+                        "title": "Running at the ocean",
+                        "content": "Swimming is excellent exercise",
+                    },
+                    {
+                        "_id": "en3",
+                        "title": "Reading interesting books",
+                        "content": "Books provide knowledge and entertainment",
+                    },
                 ],
-                "search_tests": [
-                    ("running", ["en1", "en2"]),
-                    ("books", ["en3"])
-                ]
+                "search_tests": [("running", ["en1", "en2"]), ("books", ["en3"])],
             },
             "es": {
                 "docs": [
-                    {"_id": "es1", "title": "Corriendo en el parque hermoso", "content": "El atleta corre rápidamente"},
-                    {"_id": "es2", "title": "Nadando en el océano", "content": "Nadar es excelente ejercicio"},
-                    {"_id": "es3", "title": "Leyendo libros interesantes",
-                     "content": "Los libros proporcionan conocimiento"}
+                    {
+                        "_id": "es1",
+                        "title": "Corriendo en el parque hermoso",
+                        "content": "El atleta corre rápidamente",
+                    },
+                    {
+                        "_id": "es2",
+                        "title": "Nadando en el océano",
+                        "content": "Nadar es excelente ejercicio",
+                    },
+                    {
+                        "_id": "es3",
+                        "title": "Leyendo libros interesantes",
+                        "content": "Los libros proporcionan conocimiento",
+                    },
                 ],
                 "search_tests": [
-                    ("Corriendo", ['es1']),
-                    ("Corriendo Nadando", ['es1', 'es2']),
-                ]
+                    ("Corriendo", ["es1"]),
+                    ("Corriendo Nadando", ["es1", "es2"]),
+                ],
             },
             "fr": {
                 "docs": [
-                    {"_id": "fr1", "title": "Courant dans le parc magnifique", "content": "L'athlète court rapidement"},
-                    {"_id": "fr2", "title": "Nageant dans l'océan", "content": "La natation est un excellent exercice"},
-                    {"_id": "fr3", "title": "Lisant des livres intéressants",
-                     "content": "Les livres fournissent des connaissances"}
+                    {
+                        "_id": "fr1",
+                        "title": "Courant dans le parc magnifique",
+                        "content": "L'athlète court rapidement",
+                    },
+                    {
+                        "_id": "fr2",
+                        "title": "Nageant dans l'océan",
+                        "content": "La natation est un excellent exercice",
+                    },
+                    {
+                        "_id": "fr3",
+                        "title": "Lisant des livres intéressants",
+                        "content": "Les livres fournissent des connaissances",
+                    },
                 ],
                 "search_tests": [
-                    ("Courant", ['fr1']),
-                    ("Courant Nageant livres", ['fr1', 'fr2', 'fr3']),
-                ]
+                    ("Courant", ["fr1"]),
+                    ("Courant Nageant livres", ["fr1", "fr2", "fr3"]),
+                ],
             },
             "de": {
                 "docs": [
-                    {"_id": "de1", "title": "Laufen im schönen Park", "content": "Der Athlet läuft schnell"},
-                    {"_id": "de2", "title": "Schwimmen im Ozean", "content": "Schwimmen ist ausgezeichnete Übung"},
-                    {"_id": "de3", "title": "Interessante Bücher lesen",
-                     "content": "Bücher bieten Wissen und Unterhaltung"}
+                    {
+                        "_id": "de1",
+                        "title": "Laufen im schönen Park",
+                        "content": "Der Athlet läuft schnell",
+                    },
+                    {
+                        "_id": "de2",
+                        "title": "Schwimmen im Ozean",
+                        "content": "Schwimmen ist ausgezeichnete Übung",
+                    },
+                    {
+                        "_id": "de3",
+                        "title": "Interessante Bücher lesen",
+                        "content": "Bücher bieten Wissen und Unterhaltung",
+                    },
                 ],
                 "search_tests": [
-                    ("Laufen", ['de1']),
-                    ("Schwimmen Bücher", ['de2', 'de3']),
-                    ("Schwimmen Bücher schönen", ['de1', 'de2', 'de3']),
-                ]
+                    ("Laufen", ["de1"]),
+                    ("Schwimmen Bücher", ["de2", "de3"]),
+                    ("Schwimmen Bücher schönen", ["de1", "de2", "de3"]),
+                ],
             },
             "pt-BR": {
                 "docs": [
-                    {"_id": "pt1", "title": "Correndo no parque bonito", "content": "O atleta corre rapidamente"},
-                    {"_id": "pt2", "title": "Nadando no oceano", "content": "Nadar é excelente exercício"},
-                    {"_id": "pt3", "title": "Lendo livros interessantes", "content": "Livros fornecem conhecimento"}
+                    {
+                        "_id": "pt1",
+                        "title": "Correndo no parque bonito",
+                        "content": "O atleta corre rapidamente",
+                    },
+                    {
+                        "_id": "pt2",
+                        "title": "Nadando no oceano",
+                        "content": "Nadar é excelente exercício",
+                    },
+                    {
+                        "_id": "pt3",
+                        "title": "Lendo livros interessantes",
+                        "content": "Livros fornecem conhecimento",
+                    },
                 ],
                 "search_tests": [
-                    ("Correndo", ['pt1']),
-                    ("Correndo oceano Lendo", ['pt1', 'pt2', 'pt3']),
-                ]
-            }
+                    ("Correndo", ["pt1"]),
+                    ("Correndo oceano Lendo", ["pt1", "pt2", "pt3"]),
+                ],
+            },
         }
 
         # Test each language with its own pre-created index
@@ -206,7 +280,7 @@ class TestLanguage(MarqoTestCase):
             "es": self.es_index,
             "fr": self.fr_index,
             "de": self.de_index,
-            "pt-BR": self.pt_br_index
+            "pt-BR": self.pt_br_index,
         }
 
         for language, test_data in language_test_data.items():
@@ -215,7 +289,7 @@ class TestLanguage(MarqoTestCase):
 
                 mappings = {
                     "title": {"type": "text_field", "language": language},
-                    "content": {"type": "text_field", "language": language}
+                    "content": {"type": "text_field", "language": language},
                 }
 
                 response = self.add_documents(
@@ -224,26 +298,36 @@ class TestLanguage(MarqoTestCase):
                         index_name=created_index.name,
                         docs=test_data["docs"],
                         tensor_fields=["title"],
-                        mappings=mappings
-                    )
+                        mappings=mappings,
+                    ),
                 )
 
                 # Check for errors in add_documents response
-                self.assertFalse(response.errors,
-                                 f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}")
+                self.assertFalse(
+                    response.errors,
+                    f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}",
+                )
 
                 # Test all three search methods
                 search_methods = [
                     (SearchMethod.LEXICAL, "lexical", None),
-                    (SearchMethod.HYBRID, "hybrid_lexical", HybridParameters(
-                        retrievalMethod=RetrievalMethod.Lexical,
-                        rankingMethod=RankingMethod.Lexical
-                    )),
-                    (SearchMethod.HYBRID, "hybrid_lexical", HybridParameters(
-                        retrievalMethod=RetrievalMethod.Lexical,
-                        rankingMethod=RankingMethod.Tensor
-                    )),
-                    (SearchMethod.HYBRID, "hybrid_rrf", None)
+                    (
+                        SearchMethod.HYBRID,
+                        "hybrid_lexical",
+                        HybridParameters(
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Lexical,
+                        ),
+                    ),
+                    (
+                        SearchMethod.HYBRID,
+                        "hybrid_lexical",
+                        HybridParameters(
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor,
+                        ),
+                    ),
+                    (SearchMethod.HYBRID, "hybrid_rrf", None),
                 ]
 
                 for search_method, method_name, hybrid_params in search_methods:
@@ -260,12 +344,19 @@ class TestLanguage(MarqoTestCase):
                                 )
 
                                 hit_ids = [hit["_id"] for hit in result["hits"]]
-                                if method_name == "lexical" or hybrid_params is not None:
-                                    self.assertEqual(sorted(hit_ids), sorted(expected_ids))
+                                if (
+                                    method_name == "lexical"
+                                    or hybrid_params is not None
+                                ):
+                                    self.assertEqual(
+                                        sorted(hit_ids), sorted(expected_ids)
+                                    )
                                 else:  # rrf can have other results
-                                    self.assertTrue(set(expected_ids).issubset(set(hit_ids)),
-                                                    f"Expected {expected_ids} in results for "
-                                                    f"{search_term} in {language} using {method_name}")
+                                    self.assertTrue(
+                                        set(expected_ids).issubset(set(hit_ids)),
+                                        f"Expected {expected_ids} in results for "
+                                        f"{search_term} in {language} using {method_name}",
+                                    )
 
     def test_index_with_three_text_fields_different_languages(self):
         """Test index with three text fields: French, Portuguese, and English (automatic detection)."""
@@ -274,14 +365,14 @@ class TestLanguage(MarqoTestCase):
                 "_id": "multi1",
                 "french_field": "Bonjour le monde français",
                 "portuguese_field": "Olá mundo português",
-                "english_field": "White dog"
+                "english_field": "White dog",
             },
             {
                 "_id": "multi2",
                 "french_field": "Chat noir français",
                 "portuguese_field": "Gato preto português",
-                "english_field": "Black cat"
-            }
+                "english_field": "Black cat",
+            },
         ]
 
         mappings = {
@@ -295,14 +386,18 @@ class TestLanguage(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.three_fields_index.name,
                 docs=docs,
-                tensor_fields=["english_field"],  # Make some lexical fields tensor fields but not all
-                mappings=mappings
-            )
+                tensor_fields=[
+                    "english_field"
+                ],  # Make some lexical fields tensor fields but not all
+                mappings=mappings,
+            ),
         )
 
         # Check for errors in add_documents response
-        self.assertFalse(response.errors,
-                         f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}")
+        self.assertFalse(
+            response.errors,
+            f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}",
+        )
 
         # Define test scenarios for different language content searches
         search_scenarios = [
@@ -315,13 +410,21 @@ class TestLanguage(MarqoTestCase):
         # Test each scenario with different search methods
         search_methods = [
             (SearchMethod.LEXICAL, "lexical", None),
-            (SearchMethod.HYBRID, "hybrid_lexical", HybridParameters(
-                retrievalMethod=RetrievalMethod.Lexical,
-                rankingMethod=RankingMethod.Lexical
-            )),
-            (SearchMethod.HYBRID, "hybrid_rrf", HybridParameters(
-                alpha=0  # lexical
-            ))
+            (
+                SearchMethod.HYBRID,
+                "hybrid_lexical",
+                HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Lexical,
+                ),
+            ),
+            (
+                SearchMethod.HYBRID,
+                "hybrid_rrf",
+                HybridParameters(
+                    alpha=0  # lexical
+                ),
+            ),
         ]
 
         for search_term, language, expected_ids in search_scenarios:
@@ -334,18 +437,23 @@ class TestLanguage(MarqoTestCase):
                             text=search_term,
                             search_method=search_method,
                             hybrid_parameters=hybrid_params,
-                            language=language
+                            language=language,
                         )
 
                         # Assert that we get some results
-                        self.assertGreater(len(result["hits"]), 0,
-                                           f"No results for {search_term} using {method_name}")
+                        self.assertGreater(
+                            len(result["hits"]),
+                            0,
+                            f"No results for {search_term} using {method_name}",
+                        )
 
                         # Check that expected IDs are in results
                         hit_ids = [hit["_id"] for hit in result["hits"]]
-                        self.assertTrue(set(expected_ids).issubset(set(hit_ids)),
-                                        f"Expected {expected_ids} in results for {search_term} "
-                                        f"using {method_name}")
+                        self.assertTrue(
+                            set(expected_ids).issubset(set(hit_ids)),
+                            f"Expected {expected_ids} in results for {search_term} "
+                            f"using {method_name}",
+                        )
 
         # Test tensor search, hybrid RRF on English
         search_methods = [SearchMethod.TENSOR, SearchMethod.HYBRID]
@@ -361,7 +469,7 @@ class TestLanguage(MarqoTestCase):
                 # Assert results in the exact order
                 self.assertGreater(len(result["hits"]), 0)
                 hits_ids = [hit["_id"] for hit in result["hits"]]
-                self.assertEqual(['multi1', 'multi2'], hits_ids)
+                self.assertEqual(["multi1", "multi2"], hits_ids)
 
     def test_language_tensor_lexical(self):
         """Test index with three text fields: French, Portuguese, and English (automatic detection)."""
@@ -393,45 +501,58 @@ class TestLanguage(MarqoTestCase):
                 index_name=self.three_fields_index.name,
                 docs=docs,
                 tensor_fields=["title"],
-                mappings=mappings
-            )
+                mappings=mappings,
+            ),
         )
 
-        self.assertFalse(response.errors,
-                         f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}")
+        self.assertFalse(
+            response.errors,
+            f"Failed to add documents: {response.errors if hasattr(response, 'errors') else 'Unknown error'}",
+        )
 
         result = tensor_search.search(
             config=self.config,
             index_name=self.three_fields_index.name,
-            text='dog collection connexions',
-            search_method='hybrid',
+            text="dog collection connexions",
+            search_method="hybrid",
             hybrid_parameters=HybridParameters(
-                retrievalMethod='tensor',
-                rankingMethod='lexical',
+                retrievalMethod="tensor",
+                rankingMethod="lexical",
             ),
-            language='fr'
+            language="fr",
         )
 
         # Verify the expected order when reranked lexically -- we've also verified this order is only
         # returned when the language is set to French
         self.assertGreater(len(result["hits"]), 0)
         hits_ids = [hit["_id"] for hit in result["hits"]]
-        self.assertEqual(['3', '2', '1'], hits_ids)
+        self.assertEqual(["3", "2", "1"], hits_ids)
 
     def test_lexical_hybrid_searchable_attributes(self):
         """Test lexical and hybrid lexical/lexical search with searchable_attributes and hybridParameters.searchableAttributesLexical."""
 
         # French documents from test_language_add_docs_and_search
         french_docs = [
-            {"_id": "fr1", "title": "Courant dans le parc magnifique", "content": "L'athlète court rapidement"},
-            {"_id": "fr2", "title": "Nageant dans l'océan", "content": "La natation est un excellent exercice"},
-            {"_id": "fr3", "title": "Lisant des livres intéressants",
-             "content": "Les livres fournissent des connaissances"}
+            {
+                "_id": "fr1",
+                "title": "Courant dans le parc magnifique",
+                "content": "L'athlète court rapidement",
+            },
+            {
+                "_id": "fr2",
+                "title": "Nageant dans l'océan",
+                "content": "La natation est un excellent exercice",
+            },
+            {
+                "_id": "fr3",
+                "title": "Lisant des livres intéressants",
+                "content": "Les livres fournissent des connaissances",
+            },
         ]
 
         mappings = {
             "title": {"type": "text_field", "language": "fr"},
-            "content": {"type": "text_field", "language": "fr"}
+            "content": {"type": "text_field", "language": "fr"},
         }
 
         # Add documents to French index
@@ -441,8 +562,8 @@ class TestLanguage(MarqoTestCase):
                 index_name=self.fr_index.name,
                 docs=french_docs,
                 tensor_fields=["title"],
-                mappings=mappings
-            )
+                mappings=mappings,
+            ),
         )
         self.assertFalse(response.errors, "Failed to add French documents")
 
@@ -454,7 +575,7 @@ class TestLanguage(MarqoTestCase):
                 "hybrid_searchable_attributes": ["title"],
                 "query": "Courant",
                 "expected_ids": ["fr1"],
-                "description": "Search for 'Courant' only in title field"
+                "description": "Search for 'Courant' only in title field",
             },
             {
                 "name": "content_only",
@@ -462,8 +583,8 @@ class TestLanguage(MarqoTestCase):
                 "hybrid_searchable_attributes": ["content"],
                 "query": "rapidement",
                 "expected_ids": ["fr1"],
-                "description": "Search for 'rapidement' only in content field"
-            }
+                "description": "Search for 'rapidement' only in content field",
+            },
         ]
 
         for case in test_cases:
@@ -476,7 +597,7 @@ class TestLanguage(MarqoTestCase):
                         text=case["query"],
                         search_method=SearchMethod.LEXICAL,
                         searchable_attributes=case["searchable_attributes"],
-                        language="fr"
+                        language="fr",
                     )
 
                     hit_ids = [hit["_id"] for hit in result["hits"]]
@@ -492,9 +613,11 @@ class TestLanguage(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrievalMethod=RetrievalMethod.Lexical,
                             rankingMethod=RankingMethod.Lexical,
-                            searchableAttributesLexical=case["hybrid_searchable_attributes"]
+                            searchableAttributesLexical=case[
+                                "hybrid_searchable_attributes"
+                            ],
                         ),
-                        language="fr"
+                        language="fr",
                     )
 
                     hit_ids = [hit["_id"] for hit in result["hits"]]
@@ -512,17 +635,19 @@ class TestLanguage(MarqoTestCase):
                 "second_docs": [{"_id": "change2", "title": "Titre en français"}],
                 "second_mappings": {"title": {"type": "text_field", "language": "fr"}},
                 "should_error": True,
-                "index": self.language_change_different_index
+                "index": self.language_change_different_index,
             },
             {
                 "name": "Default to specific language",
                 "description": "Error when field had default language first but specific language second time",
                 "first_docs": [{"_id": "default1", "title": "Default title"}],
                 "first_mappings": {},  # No mappings = default language
-                "second_docs": [{"_id": "specific1", "title": "Specific language title"}],
+                "second_docs": [
+                    {"_id": "specific1", "title": "Specific language title"}
+                ],
                 "second_mappings": {"title": {"type": "text_field", "language": "en"}},
                 "should_error": True,
-                "index": self.language_change_default_to_specific_index
+                "index": self.language_change_default_to_specific_index,
             },
             {
                 "name": "Specific to default language",
@@ -532,8 +657,8 @@ class TestLanguage(MarqoTestCase):
                 "second_docs": [{"_id": "default2", "title": "Default title"}],
                 "second_mappings": {},  # No mappings = default language
                 "should_error": False,
-                "index": self.language_change_specific_to_default_index
-            }
+                "index": self.language_change_specific_to_default_index,
+            },
         ]
 
         for scenario in language_change_scenarios:
@@ -546,11 +671,13 @@ class TestLanguage(MarqoTestCase):
                             index_name=scenario["index"].name,
                             docs=scenario["first_docs"],
                             tensor_fields=[],
-                            mappings=scenario["first_mappings"]
-                        )
+                            mappings=scenario["first_mappings"],
+                        ),
                     )
                     # First add should always succeed
-                    self.assertFalse(response1.errors, f"First add failed for {scenario['name']}")
+                    self.assertFalse(
+                        response1.errors, f"First add failed for {scenario['name']}"
+                    )
 
                 # Then try to add documents with different language configuration
                 with self.subTest(step="second_add"):
@@ -560,33 +687,41 @@ class TestLanguage(MarqoTestCase):
                             index_name=scenario["index"].name,
                             docs=scenario["second_docs"],
                             tensor_fields=[],
-                            mappings=scenario["second_mappings"]
-                        )
+                            mappings=scenario["second_mappings"],
+                        ),
                     )
 
                     # Check if result matches expectation
                     if scenario["should_error"]:
-                        self.assertTrue(response2.errors,
-                                        f"Expected error for {scenario['name']} but got success")
+                        self.assertTrue(
+                            response2.errors,
+                            f"Expected error for {scenario['name']} but got success",
+                        )
                     else:
-                        self.assertFalse(response2.errors,
-                                         f"Expected success for {scenario['name']} but got error")
+                        self.assertFalse(
+                            response2.errors,
+                            f"Expected success for {scenario['name']} but got error",
+                        )
 
                         # If successful, verify both documents exist
                         with self.subTest(step="verify_docs"):
                             doc1 = tensor_search.get_document_by_id(
                                 config=self.config,
                                 index_name=scenario["index"].name,
-                                document_id=scenario["first_docs"][0]["_id"]
+                                document_id=scenario["first_docs"][0]["_id"],
                             )
                             doc2 = tensor_search.get_document_by_id(
                                 config=self.config,
                                 index_name=scenario["index"].name,
-                                document_id=scenario["second_docs"][0]["_id"]
+                                document_id=scenario["second_docs"][0]["_id"],
                             )
 
-                            self.assertEqual(doc1["title"], scenario["first_docs"][0]["title"])
-                            self.assertEqual(doc2["title"], scenario["second_docs"][0]["title"])
+                            self.assertEqual(
+                                doc1["title"], scenario["first_docs"][0]["title"]
+                            )
+                            self.assertEqual(
+                                doc2["title"], scenario["second_docs"][0]["title"]
+                            )
 
     def test_field_language_override(self):
         """Test that field language is set in the schema, as others test could pass with good automatic detection."""
@@ -613,11 +748,13 @@ class TestLanguage(MarqoTestCase):
                 index_name=self.three_fields_index.name,
                 docs=docs,
                 tensor_fields=[],
-                mappings=mappings
-            )
+                mappings=mappings,
+            ),
         )
 
-        self.assertFalse(response.errors, "Should not have errors when adding documents")
+        self.assertFalse(
+            response.errors, "Should not have errors when adding documents"
+        )
 
         # Test Portuguese search
         res_pt = tensor_search.search(
@@ -625,7 +762,7 @@ class TestLanguage(MarqoTestCase):
             index_name=self.three_fields_index.name,
             text="mole",
             search_method=SearchMethod.LEXICAL,
-            language="pt"
+            language="pt",
         )
 
         # Test English search
@@ -634,7 +771,7 @@ class TestLanguage(MarqoTestCase):
             index_name=self.three_fields_index.name,
             text="mole",
             search_method=SearchMethod.LEXICAL,
-            language="en"
+            language="en",
         )
 
         hits_pt = [hit["_id"] for hit in res_pt["hits"]]
@@ -650,18 +787,10 @@ class TestLanguage(MarqoTestCase):
             {
                 "_id": "1",
                 "title": "Vestido Mole Perfeito",  # Portuguese
-                "size": "M"
+                "size": "M",
             },
-            {
-                "_id": "2",
-                "title": "Vestido Mole Confortável",
-                "size": "M"
-            },
-            {
-                "_id": "3",
-                "title": "Vestido Leve e Elegante",
-                "size": "S"
-            }
+            {"_id": "2", "title": "Vestido Mole Confortável", "size": "M"},
+            {"_id": "3", "title": "Vestido Leve e Elegante", "size": "S"},
         ]
 
         response = self.add_documents(
@@ -672,19 +801,20 @@ class TestLanguage(MarqoTestCase):
                 tensor_fields=["title"],
                 mappings={
                     "title": {"type": "text_field", "language": "pt"},
-                }
-            )
+                },
+            ),
         )
 
-        self.assertFalse(response.errors, "Should not have errors when adding documents")
+        self.assertFalse(
+            response.errors, "Should not have errors when adding documents"
+        )
 
-        cases = [
-            ("pt", True),
-            ("en", False)
-        ]
+        cases = [("pt", True), ("en", False)]
 
         for language, matches in cases:
-            with self.subTest(f"Testing facets and relevance cutoff for language: {language}"):
+            with self.subTest(
+                f"Testing facets and relevance cutoff for language: {language}"
+            ):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.facets_and_relevance_cutoff_index.name,
@@ -692,46 +822,70 @@ class TestLanguage(MarqoTestCase):
                     search_method="HYBRID",
                     language=language,
                     hybrid_parameters=HybridParameters(
-                        searchableAttributesLexical=['title'],
+                        searchableAttributesLexical=["title"],
                         retrievalMethod=RetrievalMethod.Lexical,
-                        rankingMethod=RankingMethod.Lexical
+                        rankingMethod=RankingMethod.Lexical,
                     ),
                     facets=FacetsParameters(
-                        fields={
-                            "size": FieldFacetsConfiguration(type='string')
-                        }
+                        fields={"size": FieldFacetsConfiguration(type="string")}
                     ),
-                    relevance_cutoff=RelevanceCutoffModel(method=RelevanceCutoffMethod.MeanStdDev,
-                                                          parameters=MeanStdParameters(stdDevFactor=-100)
-                                                          )
+                    relevance_cutoff=RelevanceCutoffModel(
+                        method=RelevanceCutoffMethod.MeanStdDev,
+                        parameters=MeanStdParameters(stdDevFactor=-100),
+                    ),
                 )
 
                 if matches:
-                    self.assertGreater(len(res["hits"]), 0, "Should find matches for 'mole'")
-                    self.assertGreater(len(res['facets']['size']), 0, "Should have facets for 'size'")
-                    self.assertGreater(res["_probeCandidates"], 0,
-                                       "Should have relevant candidates count greater than 0")
+                    self.assertGreater(
+                        len(res["hits"]), 0, "Should find matches for 'mole'"
+                    )
+                    self.assertGreater(
+                        len(res["facets"]["size"]), 0, "Should have facets for 'size'"
+                    )
+                    self.assertGreater(
+                        res["_probeCandidates"],
+                        0,
+                        "Should have relevant candidates count greater than 0",
+                    )
                 else:
-                    self.assertEqual(len(res["hits"]), 0, "Should find no matches for 'mole' in English")
-                    self.assertEqual(len(res['facets']), 0, "Should have no facets for 'size' in English")
-                    self.assertEqual(res["_probeCandidates"], 0,
-                                     "Should have no relevant candidates count in English")
+                    self.assertEqual(
+                        len(res["hits"]),
+                        0,
+                        "Should find no matches for 'mole' in English",
+                    )
+                    self.assertEqual(
+                        len(res["facets"]),
+                        0,
+                        "Should have no facets for 'size' in English",
+                    )
+                    self.assertEqual(
+                        res["_probeCandidates"],
+                        0,
+                        "Should have no relevant candidates count in English",
+                    )
 
     def test_structured_index_language_search_fails(self):
         """Test that searching with language parameter fails for structured indexes."""
 
         # Add documents to the structured index
         docs = [
-            {"_id": "doc1", "title": "Running in the park", "content": "Exercise is good for health"},
-            {"_id": "doc2", "title": "Swimming in the ocean", "content": "Water sports are fun"}
+            {
+                "_id": "doc1",
+                "title": "Running in the park",
+                "content": "Exercise is good for health",
+            },
+            {
+                "_id": "doc2",
+                "title": "Swimming in the ocean",
+                "content": "Water sports are fun",
+            },
         ]
 
         response = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.structured_index.name,
-                docs=docs
-            )
+                index_name=self.structured_index.name, docs=docs
+            ),
         )
 
         # Verify documents were added successfully
@@ -740,7 +894,7 @@ class TestLanguage(MarqoTestCase):
         # Test search methods with language parameter
         search_tests = [
             (SearchMethod.LEXICAL, "lexical", "running"),
-            (SearchMethod.HYBRID, "hybrid_default", "swimming")
+            (SearchMethod.HYBRID, "hybrid_default", "swimming"),
         ]
 
         for search_method, method_name, search_text in search_tests:
@@ -751,7 +905,7 @@ class TestLanguage(MarqoTestCase):
                         index_name=self.structured_index.name,
                         text=search_text,
                         search_method=search_method,
-                        language="en-US"
+                        language="en-US",
                     )
 
                 # Verify we get an appropriate error
@@ -760,15 +914,26 @@ class TestLanguage(MarqoTestCase):
     def test_v216_unstructured_index_supports_language_mapping(self):
         """Test that v2.16 unstructured index supports language mapping."""
         docs = [
-            {"_id": "v216_doc1", "title": "Corriendo en el parque hermoso", "content": "El atleta corre rápidamente"},
-            {"_id": "v216_doc2", "title": "Nadando en el océano", "content": "Nadar es excelente ejercicio"},
-            {"_id": "v216_doc3", "title": "Leyendo libros interesantes",
-             "content": "Los libros proporcionan conocimiento"}
+            {
+                "_id": "v216_doc1",
+                "title": "Corriendo en el parque hermoso",
+                "content": "El atleta corre rápidamente",
+            },
+            {
+                "_id": "v216_doc2",
+                "title": "Nadando en el océano",
+                "content": "Nadar es excelente ejercicio",
+            },
+            {
+                "_id": "v216_doc3",
+                "title": "Leyendo libros interesantes",
+                "content": "Los libros proporcionan conocimiento",
+            },
         ]
 
         mappings = {
             "title": {"type": "text_field", "language": "es"},
-            "content": {"type": "text_field", "language": "es"}
+            "content": {"type": "text_field", "language": "es"},
         }
 
         # Add documents with language mapping
@@ -778,12 +943,15 @@ class TestLanguage(MarqoTestCase):
                 index_name=self.v216_unstructured_index.name,
                 docs=docs,
                 tensor_fields=["title"],
-                mappings=mappings
-            )
+                mappings=mappings,
+            ),
         )
 
         # Verify documents were added successfully
-        self.assertFalse(response.errors, "Failed to add documents with language mapping to v2.16 index")
+        self.assertFalse(
+            response.errors,
+            "Failed to add documents with language mapping to v2.16 index",
+        )
 
         # Test search with language parameter
         result = tensor_search.search(
@@ -791,24 +959,34 @@ class TestLanguage(MarqoTestCase):
             index_name=self.v216_unstructured_index.name,
             text="Corriendo",
             search_method=SearchMethod.LEXICAL,
-            language="es"
+            language="es",
         )
 
         # Verify we get hits
-        self.assertGreater(len(result["hits"]), 0, "Expected hits for Spanish search on v2.16 index")
+        self.assertGreater(
+            len(result["hits"]), 0, "Expected hits for Spanish search on v2.16 index"
+        )
         hit_ids = [hit["_id"] for hit in result["hits"]]
         self.assertIn("v216_doc1", hit_ids, "Expected v216_doc1 in search results")
 
     def test_v215_unstructured_index_rejects_language_mapping(self):
         """Test that v2.15 unstructured index rejects language mapping."""
         docs = [
-            {"_id": "v215_doc1", "title": "Corriendo en el parque hermoso", "content": "El atleta corre rápidamente"},
-            {"_id": "v215_doc2", "title": "Nadando en el océano", "content": "Nadar es excelente ejercicio"}
+            {
+                "_id": "v215_doc1",
+                "title": "Corriendo en el parque hermoso",
+                "content": "El atleta corre rápidamente",
+            },
+            {
+                "_id": "v215_doc2",
+                "title": "Nadando en el océano",
+                "content": "Nadar es excelente ejercicio",
+            },
         ]
 
         mappings = {
             "title": {"type": "text_field", "language": "es"},
-            "content": {"type": "text_field", "language": "es"}
+            "content": {"type": "text_field", "language": "es"},
         }
 
         # Try to add documents with language mapping - this should fail
@@ -818,14 +996,14 @@ class TestLanguage(MarqoTestCase):
                 index_name=self.v215_unstructured_index.name,
                 docs=docs,
                 tensor_fields=["title"],
-                mappings=mappings
-            )
+                mappings=mappings,
+            ),
         )
 
         # Verify that adding documents with language mapping fails
         self.assertTrue(
             response.errors,
-            "Expected error when adding documents with language mapping to v2.15 index"
+            "Expected error when adding documents with language mapping to v2.15 index",
         )
 
         # Check the specific error message content in the response items
@@ -836,7 +1014,7 @@ class TestLanguage(MarqoTestCase):
         for error_item in error_items:
             self.assertIn(
                 "Language is only supported for indexes created with Marqo version 2.16.0 or later",
-                error_item.error
+                error_item.error,
             )
             self.assertIn("2.15.0", error_item.error)
 
@@ -850,14 +1028,15 @@ class TestLanguage(MarqoTestCase):
             index_name=self.language_persistence_index.name,
             docs=docs1,
             mappings=mappings1,
-            tensor_fields=[]
+            tensor_fields=[],
         )
 
         response1 = self.add_documents(
-            config=self.config,
-            add_docs_params=add_docs_params1
+            config=self.config, add_docs_params=add_docs_params1
         )
-        self.assertFalse(response1.errors, "Should not have errors when adding first document")
+        self.assertFalse(
+            response1.errors, "Should not have errors when adding first document"
+        )
 
         # Add second document to same field without specifying mappings
         # This should use the existing field configuration (language=pt)
@@ -866,14 +1045,15 @@ class TestLanguage(MarqoTestCase):
         add_docs_params2 = AddDocsParams(
             index_name=self.language_persistence_index.name,
             docs=docs2,
-            tensor_fields=[]
+            tensor_fields=[],
         )
 
         response2 = self.add_documents(
-            config=self.config,
-            add_docs_params=add_docs_params2
+            config=self.config, add_docs_params=add_docs_params2
         )
-        self.assertFalse(response2.errors, "Should not have errors when adding second document")
+        self.assertFalse(
+            response2.errors, "Should not have errors when adding second document"
+        )
 
         # Test that language=pt is still in effect for both documents
         # Search for "mole" with language=en should not find any hits (because both docs are pt)
@@ -885,13 +1065,16 @@ class TestLanguage(MarqoTestCase):
             searchable_attributes=["content"],
             result_count=10,
             offset=0,
-            language="en"
+            language="en",
         )
 
         # With language=en, "mole" should not match Portuguese "mole" documents
         en_ids = {hit["_id"] for hit in en_res["hits"]}
-        self.assertEqual(set(), en_ids,
-                         "Should not find any documents when searching with wrong language (en instead of pt)")
+        self.assertEqual(
+            set(),
+            en_ids,
+            "Should not find any documents when searching with wrong language (en instead of pt)",
+        )
 
         # Verify that searching with correct language (pt) finds both documents
         pt_res = tensor_search.search(
@@ -902,9 +1085,12 @@ class TestLanguage(MarqoTestCase):
             searchable_attributes=["content"],
             result_count=10,
             offset=0,
-            language="pt"
+            language="pt",
         )
 
         pt_ids = {hit["_id"] for hit in pt_res["hits"]}
-        self.assertEqual({"pt_doc1", "pt_doc2"}, pt_ids,
-                         "Should find both documents when searching with correct language (pt)")
+        self.assertEqual(
+            {"pt_doc1", "pt_doc2"},
+            pt_ids,
+            "Should find both documents when searching with correct language (pt)",
+        )

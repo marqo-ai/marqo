@@ -8,8 +8,8 @@ from unittest import mock
 from inference_orchestrator import on_start_script
 from inference_orchestrator.config import Config
 from inference_orchestrator.errors.common_errors import (
-    StartupSanityCheckError,
     EnvironmentVariableParsingError,
+    StartupSanityCheckError,
 )
 from inference_orchestrator.schemas.api import Inference
 

@@ -5,7 +5,9 @@ from pydantic.v1 import BaseModel
 
 class MarqoBaseModel(BaseModel):
     class Config:
-        allow_population_by_field_name = True  # accept both real name and alias (if present)
+        allow_population_by_field_name = (
+            True  # accept both real name and alias (if present)
+        )
         validate_assignment = True
 
 
@@ -29,7 +31,7 @@ class MarqoBaseModelV2(pydantic.BaseModel):
 
 
 class StrictBaseModelV2(MarqoBaseModelV2):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
 
 class ImmutableBaseModelV2(MarqoBaseModelV2):

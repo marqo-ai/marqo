@@ -12,25 +12,30 @@ inference.
 from typing import Union
 
 from inference_orchestrator.schemas.api import (
+    AudioPreprocessingConfig,
+    ImagePreprocessingConfig,
     Modality,
     TextPreprocessingConfig,
-    ImagePreprocessingConfig,
-    AudioPreprocessingConfig,
-    VideoPreprocessingConfig
+    VideoPreprocessingConfig,
 )
 from inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess import (
-    process_batch)
-from inference_orchestrator.services.media_download_and_preprocess.split_text import split_text, prefix_text_chunks
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import \
-    AbstractPreprocessor
+    process_batch,
+)
+from inference_orchestrator.services.media_download_and_preprocess.split_text import (
+    prefix_text_chunks,
+    split_text,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import (
+    AbstractPreprocessor,
+)
 
 PreprocessedContent = list[tuple[str, Union[str, any]]]
 
 
 def split_prefix_preprocess_text(
-        content: list[str],
-        preprocessor: AbstractPreprocessor,
-        preprocessing_config: TextPreprocessingConfig
+    content: list[str],
+    preprocessor: AbstractPreprocessor,
+    preprocessing_config: TextPreprocessingConfig,
 ) -> list[PreprocessedContent]:
     """
     The function that handles the chunking(splitting), prefixing, and preprocessing of text content.
@@ -86,7 +91,7 @@ def split_prefix_preprocess_text(
                 text,
                 split_by=preprocessing_config.chunk_config.split_method,
                 split_length=preprocessing_config.chunk_config.split_length,
-                split_overlap=preprocessing_config.chunk_config.split_overlap
+                split_overlap=preprocessing_config.chunk_config.split_overlap,
             )
             raw_content = chunks.copy()
 
@@ -94,11 +99,15 @@ def split_prefix_preprocess_text(
             prefixed_chunks = apply_prefix(chunks)
 
             # Preprocess chunks
-            preprocessed_chunks = preprocessor.preprocess(prefixed_chunks, Modality.TEXT)
+            preprocessed_chunks = preprocessor.preprocess(
+                prefixed_chunks, Modality.TEXT
+            )
 
             # Validation
             if len(prefixed_chunks) != len(preprocessed_chunks):
-                raise ValueError("The number of preprocessed texts does not match the number of chunks")
+                raise ValueError(
+                    "The number of preprocessed texts does not match the number of chunks"
+                )
 
             # Collect paired results
             results.append(list(zip(raw_content, preprocessed_chunks)))
@@ -111,22 +120,25 @@ def split_prefix_preprocess_text(
         preprocessed_content = preprocessor.preprocess(prefixed_content, Modality.TEXT)
 
         # Pair each raw input with its processed output
-        results = [[(raw_content[i], preprocessed_content[i])] for i in range(len(content))]
+        results = [
+            [(raw_content[i], preprocessed_content[i])] for i in range(len(content))
+        ]
 
     return results
 
 
 def download_and_preprocess_media(
-        content: list[str],
-        preprocessor: AbstractPreprocessor,
-        preprocessing_config: Union[ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig],
-        return_individual_error: bool = True
+    content: list[str],
+    preprocessor: AbstractPreprocessor,
+    preprocessing_config: Union[
+        ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig
+    ],
+    return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
-
     results = process_batch(
         content=content,
         preprocessor=preprocessor,
         preprocessing_config=preprocessing_config,
-        return_individual_error=return_individual_error
+        return_individual_error=return_individual_error,
     )
     return results

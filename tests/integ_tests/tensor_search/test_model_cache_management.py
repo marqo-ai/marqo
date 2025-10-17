@@ -3,21 +3,36 @@ import unittest
 import psutil
 import torch.cuda
 
-from marqo.api.exceptions import ModelNotInCacheError, HardwareCompatabilityError
+from marqo.api.exceptions import ModelNotInCacheError
 from marqo.s2_inference.reranking.model_utils import load_owl_vit
-from marqo.s2_inference.s2_inference import validate_model_properties, \
-    _create_model_cache_key, _update_available_models, clear_loaded_models, get_available_models
-from marqo.tensor_search.tensor_search import eject_model, get_loaded_models, get_cpu_info
+from marqo.s2_inference.s2_inference import (
+    _create_model_cache_key,
+    _update_available_models,
+    clear_loaded_models,
+    get_available_models,
+    validate_model_properties,
+)
+from marqo.tensor_search.tensor_search import (
+    eject_model,
+    get_cpu_info,
+    get_loaded_models,
+)
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 def load_model(model_name: str, device: str, model_properteis: dict = None) -> None:
     validated_model_properties = validate_model_properties(model_name, model_properteis)
-    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
-    _update_available_models(model_cache_key, model_name, validated_model_properties, device, True)
+    model_cache_key = _create_model_cache_key(
+        model_name, device, validated_model_properties
+    )
+    _update_available_models(
+        model_cache_key, model_name, validated_model_properties, device, True
+    )
 
 
-@unittest.skip(reason="Temporarily skipped due to the model loading change, should test load_model.py instead")
+@unittest.skip(
+    reason="Temporarily skipped due to the model loading change, should test load_model.py instead"
+)
 class TestModelCacheManagement(MarqoTestCase):
     def setUp(self) -> None:
         # We pre-define 2 dummy models for testing purpose
@@ -46,7 +61,10 @@ class TestModelCacheManagement(MarqoTestCase):
     def test_eject_model_cpu(self):
         for model_name in self.MODEL_LIST:
             res = eject_model(model_name, "cpu")
-            assert res["message"] == f"successfully eject model_name `{model_name}` from device `cpu`"
+            assert (
+                res["message"]
+                == f"successfully eject model_name `{model_name}` from device `cpu`"
+            )
             if (model_name, "cpu") in get_available_models():
                 raise AssertionError
 
@@ -70,7 +88,10 @@ class TestModelCacheManagement(MarqoTestCase):
             # check if we can eject the models
             for model_name in self.MODEL_LIST:
                 res = eject_model(model_name, "cuda")
-                assert res["message"] == f"successfully eject model_name `{model_name}` from device `cuda`"
+                assert (
+                    res["message"]
+                    == f"successfully eject model_name `{model_name}` from device `cuda`"
+                )
                 if (model_name, "cuda") in get_available_models():
                     raise AssertionError
 
@@ -104,11 +125,15 @@ class TestModelCacheManagement(MarqoTestCase):
             raise AssertionError
 
     def test_loaded_models(self):
-
         loaded_models = get_loaded_models()["models"]
-        loaded_models_keys = [_create_model_cache_key(dic["model_name"], dic["model_device"],
-                                                      validate_model_properties(dic["model_name"], None)) for dic in
-                              loaded_models]
+        loaded_models_keys = [
+            _create_model_cache_key(
+                dic["model_name"],
+                dic["model_device"],
+                validate_model_properties(dic["model_name"], None),
+            )
+            for dic in loaded_models
+        ]
         assert loaded_models_keys == list(get_available_models().keys())
 
     def test_edge_case_cuda(self):
@@ -122,8 +147,10 @@ class TestModelCacheManagement(MarqoTestCase):
 
                 for _device_id in range(torch.cuda.device_count()):
                     # cuda usage
-                    assert torch.cuda.memory_allocated(_device_id) < torch.cuda.get_device_properties(
-                        _device_id).total_memory
+                    assert (
+                        torch.cuda.memory_allocated(_device_id)
+                        < torch.cuda.get_device_properties(_device_id).total_memory
+                    )
                 # cpu usage
                 assert psutil.cpu_percent(1) < 100.0
                 # memory usage
@@ -153,7 +180,7 @@ class TestModelCacheManagement(MarqoTestCase):
                 "dimensions": 384,
                 "tokens": 128,
                 "type": "sbert",
-            }
+            },
         }
 
         generic_model_2 = {
@@ -163,7 +190,7 @@ class TestModelCacheManagement(MarqoTestCase):
                 "dimensions": 768,
                 "tokens": 512,
                 "type": "sbert",
-            }
+            },
         }
 
         generic_model_3 = {
@@ -173,13 +200,17 @@ class TestModelCacheManagement(MarqoTestCase):
                 "dimensions": 384,
                 "tokens": 128,
                 "type": "sbert",
-            }
+            },
         }
 
         generic_model_list = [generic_model_1, generic_model_2, generic_model_3]
 
         for generic_model in generic_model_list:
-            load_model(generic_model["model_name"], model_properteis=generic_model["model_properties"], device="cpu")
+            load_model(
+                generic_model["model_name"],
+                model_properteis=generic_model["model_properties"],
+                device="cpu",
+            )
 
         assert len(get_available_models()) == 3
 
@@ -189,8 +220,11 @@ class TestModelCacheManagement(MarqoTestCase):
 
         if self.CUDA_FLAG == True:
             for generic_model in generic_model_list:
-                load_model(generic_model["model_name"], model_properteis=generic_model["model_properties"],
-                           device="cuda")
+                load_model(
+                    generic_model["model_name"],
+                    model_properteis=generic_model["model_properties"],
+                    device="cuda",
+                )
 
             assert len(get_available_models()) == 3
 
@@ -205,9 +239,12 @@ class TestModelCacheManagement(MarqoTestCase):
 
         for model_name in self.MODEL_LIST:
             validated_model_properties = validate_model_properties(model_name, None)
-            model_cache_key = _create_model_cache_key(model_name, "cpu", validated_model_properties)
-            _update_available_models(model_cache_key, model_name, validated_model_properties,
-                                     "cpu", True)
+            model_cache_key = _create_model_cache_key(
+                model_name, "cpu", validated_model_properties
+            )
+            _update_available_models(
+                model_cache_key, model_name, validated_model_properties, "cpu", True
+            )
 
             if model_cache_key not in get_available_models():
                 raise AssertionError
@@ -226,8 +263,16 @@ class TestModelCacheManagement(MarqoTestCase):
         if self.CUDA_FLAG is True:
             for model_name in self.MODEL_LIST:
                 validated_model_properties = validate_model_properties(model_name, None)
-                model_cache_key = _create_model_cache_key(model_name, "cuda", validated_model_properties)
-                _update_available_models(model_cache_key, model_name, validated_model_properties, "cuda", True)
+                model_cache_key = _create_model_cache_key(
+                    model_name, "cuda", validated_model_properties
+                )
+                _update_available_models(
+                    model_cache_key,
+                    model_name,
+                    validated_model_properties,
+                    "cuda",
+                    True,
+                )
 
                 if model_cache_key not in get_available_models():
                     raise AssertionError
@@ -242,10 +287,12 @@ class TestModelCacheManagement(MarqoTestCase):
                     raise AssertionError
 
     def test_model_cache_management_with_text_reranker(self):
-        model_name = 'google/owlvit-base-patch32'
+        model_name = "google/owlvit-base-patch32"
 
-        _ = load_owl_vit('google/owlvit-base-patch32', "cpu")
-        model_cache_key = _create_model_cache_key(model_name, "cpu", model_properties=None)
+        _ = load_owl_vit("google/owlvit-base-patch32", "cpu")
+        model_cache_key = _create_model_cache_key(
+            model_name, "cpu", model_properties=None
+        )
 
         self.assertIn(model_cache_key, get_available_models())
         eject_model(model_name, "cpu")

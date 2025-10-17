@@ -25,12 +25,14 @@ class UnstructuredVespaSchema(VespaSchema):
     _EMBEDDINGS = unstructured_common.VESPA_DOC_EMBEDDINGS
 
     _RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
-    _RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
+    _RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = (
+        unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
+    )
 
     _QUERY_INPUT_EMBEDDING = "embedding_query"
 
-    _SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
-    _SUMMARY_ALL_VECTOR = 'all-vector-summary'
+    _SUMMARY_ALL_NON_VECTOR = "all-non-vector-summary"
+    _SUMMARY_ALL_VECTOR = "all-vector-summary"
 
     def __init__(self, index_request: UnstructuredMarqoIndexRequest):
         self._index_request = index_request
@@ -42,7 +44,9 @@ class UnstructuredVespaSchema(VespaSchema):
 
         return unstructured_schema, marqo_index
 
-    def _generate_unstructured_marqo_index(self, schema_name: str) -> UnstructuredMarqoIndex:
+    def _generate_unstructured_marqo_index(
+        self, schema_name: str
+    ) -> UnstructuredMarqoIndex:
         """This function converts the attribute self._index_request: UnstructuredMarqoIndexRequest
         into an instance of UnstructuredMarqoIndex.
         """
@@ -264,10 +268,10 @@ class UnstructuredVespaSchema(VespaSchema):
     def _generate_base_rank_profile(self, marqo_index: UnstructuredMarqoIndex):
         model_dim = marqo_index.model.get_dimension()
         score_modifier_expression = (
-            f'if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, '
-            f'  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) '
-            f'* score '
-            f'+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
+            f"if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, "
+            f"  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) "
+            f"* score "
+            f"+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)"
         )
 
         return textwrap.dedent(

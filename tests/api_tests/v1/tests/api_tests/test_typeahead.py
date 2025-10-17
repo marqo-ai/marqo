@@ -2,11 +2,13 @@ import json
 import uuid
 
 import requests
+
 from tests.marqo_test import MarqoTestCase
 
 
 class TestTypeahead(MarqoTestCase):
     """Test cases for typeahead functionality using direct HTTP requests."""
+
     # TODO Please note that all requests are sent directly to the HTTP endpoint instead of using marqo client.
     #   will address this when typeahead feature is added to pymarqo client
 
@@ -14,14 +16,18 @@ class TestTypeahead(MarqoTestCase):
     def setUpClass(cls):
         super().setUpClass()
 
-        cls.unstructured_index_name = "unstructured_typeahead_" + str(uuid.uuid4()).replace('-', '')
+        cls.unstructured_index_name = "unstructured_typeahead_" + str(
+            uuid.uuid4()
+        ).replace("-", "")
 
-        cls.create_indexes([
-            {
-                "indexName": cls.unstructured_index_name,
-                "type": "unstructured",
-            }
-        ])
+        cls.create_indexes(
+            [
+                {
+                    "indexName": cls.unstructured_index_name,
+                    "type": "unstructured",
+                }
+            ]
+        )
 
         cls.indexes_to_delete = [cls.unstructured_index_name]
 
@@ -39,7 +45,7 @@ class TestTypeahead(MarqoTestCase):
                 response = requests.post(
                     f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
                     headers={"Content-Type": "application/json"},
-                    data=json.dumps(invalid_request)
+                    data=json.dumps(invalid_request),
                 )
 
                 self.assertIn(response.status_code, [400, 422])
@@ -52,9 +58,14 @@ class TestTypeahead(MarqoTestCase):
             # {"queries": [{"query": "test"}]},  # Missing popularity is allowed, default is 1.0
             {"queries": [{"popularity": 1.0}]},  # Missing query
             {"queries": [{"query": "", "popularity": 1.0}]},  # Empty query
-            {"queries": [{"query": "abc", "popularity": "very popular"}]},  # Wrong type of popularity
-            {"queries": [{"query": "abc", "popularity": 1.0, "some_random_field": "hello"}]},  # Unsupported fields
-
+            {
+                "queries": [{"query": "abc", "popularity": "very popular"}]
+            },  # Wrong type of popularity
+            {
+                "queries": [
+                    {"query": "abc", "popularity": 1.0, "some_random_field": "hello"}
+                ]
+            },  # Unsupported fields
         ]
 
         for invalid_request in invalid_requests:
@@ -62,7 +73,7 @@ class TestTypeahead(MarqoTestCase):
                 response = requests.post(
                     f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
                     headers={"Content-Type": "application/json"},
-                    data=json.dumps(invalid_request)
+                    data=json.dumps(invalid_request),
                 )
 
                 self.assertIn(response.status_code, [400, 422])
@@ -73,13 +84,13 @@ class TestTypeahead(MarqoTestCase):
             "q": "test",
             "limit": 10,
             "fuzzyEditDistance": 2,
-            "minFuzzyMatchLength": 3
+            "minFuzzyMatchLength": 3,
         }
 
         response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request)
+            data=json.dumps(suggestion_request),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -94,11 +105,19 @@ class TestTypeahead(MarqoTestCase):
         # First, index some queries with a common prefix
         queries_request = {
             "queries": [
-                {"query": "machine learning algorithms", "popularity": 10.0, "metadata": {"hit_count": 3}},
+                {
+                    "query": "machine learning algorithms",
+                    "popularity": 10.0,
+                    "metadata": {"hit_count": 3},
+                },
                 {"query": "machine learning basics", "popularity": 8.0},
                 {"query": "machine learning tutorial", "popularity": 6.0},
-                {"query": "artificial intelligence", "popularity": 9.0, "metadata": {"hit_count": 500}},
-                {"query": "deep learning", "popularity": 7.0}
+                {
+                    "query": "artificial intelligence",
+                    "popularity": 9.0,
+                    "metadata": {"hit_count": 500},
+                },
+                {"query": "deep learning", "popularity": 7.0},
             ]
         }
 
@@ -106,7 +125,7 @@ class TestTypeahead(MarqoTestCase):
         index_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(queries_request)
+            data=json.dumps(queries_request),
         )
 
         # Should successfully index queries
@@ -118,7 +137,7 @@ class TestTypeahead(MarqoTestCase):
         # 1. Check stats after adding queries - should show 5 queries
         stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(stats_response.status_code, 200)
@@ -130,7 +149,7 @@ class TestTypeahead(MarqoTestCase):
         get_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(["artificial intelligence", "deep learning"])
+            data=json.dumps(["artificial intelligence", "deep learning"]),
         )
         self.assertEqual(get_response.status_code, 200)
         get_data = get_response.json()
@@ -143,15 +162,12 @@ class TestTypeahead(MarqoTestCase):
         self.assertEqual(get_data["queries"][1]["metadata"], {})
 
         # Now get suggestions for a prefix that should match
-        suggestion_request = {
-            "q": "machine",
-            "limit": 5
-        }
+        suggestion_request = {"q": "machine", "limit": 5}
 
         suggestion_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request)
+            data=json.dumps(suggestion_request),
         )
 
         # Should get successful response
@@ -175,26 +191,35 @@ class TestTypeahead(MarqoTestCase):
             self.assertIsInstance(suggestion["_score"], (int, float))
 
         # At least one suggestion should contain "machine"
-        machine_suggestions = [s for s in suggestions if "machine" in s["suggestion"].lower()]
+        machine_suggestions = [
+            s for s in suggestions if "machine" in s["suggestion"].lower()
+        ]
         self.assertGreaterEqual(len(machine_suggestions), 1)
 
         # Now we do a empty query, which should return top queries
         wildcard_suggestion_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps({"q": "", "limit": 3})
+            data=json.dumps({"q": "", "limit": 3}),
         )
 
         # Check if we return the top 3 queries ordered by popularity
         self.assertEqual(wildcard_suggestion_response.status_code, 200)
         wildcard_suggestion_data = wildcard_suggestion_response.json()
-        expected_results = ["machine learning algorithms", "artificial intelligence", "machine learning basics"]
-        self.assertListEqual(expected_results, [s["suggestion"] for s in wildcard_suggestion_data["suggestions"]])
+        expected_results = [
+            "machine learning algorithms",
+            "artificial intelligence",
+            "machine learning basics",
+        ]
+        self.assertListEqual(
+            expected_results,
+            [s["suggestion"] for s in wildcard_suggestion_data["suggestions"]],
+        )
 
         # 2. Delete all queries
         delete_response = requests.delete(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries/delete-all",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(delete_response.status_code, 200)
@@ -206,7 +231,7 @@ class TestTypeahead(MarqoTestCase):
         # 3. Check stats after deletion - should show 0 queries
         final_stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(final_stats_response.status_code, 200)
@@ -219,22 +244,20 @@ class TestTypeahead(MarqoTestCase):
         # Clear any existing queries first
         delete_response = requests.delete(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
         # Wait for deletion to complete
 
         # Index the same query twice with different popularities
         query_batch = {
-            "queries": [
-                {"query": "test duplicate query abc123", "popularity": 5.0}
-            ]
+            "queries": [{"query": "test duplicate query abc123", "popularity": 5.0}]
         }
 
         # Index first time
         first_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(query_batch)
+            data=json.dumps(query_batch),
         )
 
         self.assertEqual(first_response.status_code, 200)
@@ -246,7 +269,7 @@ class TestTypeahead(MarqoTestCase):
         # Check stats after first indexing
         stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(stats_response.status_code, 200)
@@ -256,42 +279,46 @@ class TestTypeahead(MarqoTestCase):
         # Index the same query again with different popularity
         query_batch_updated = {
             "queries": [
-                {"query": "test duplicate query abc123", "popularity": 10.0}  # Same query, different popularity
+                {
+                    "query": "test duplicate query abc123",
+                    "popularity": 10.0,
+                }  # Same query, different popularity
             ]
         }
 
         second_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(query_batch_updated)
+            data=json.dumps(query_batch_updated),
         )
 
         self.assertEqual(second_response.status_code, 200)
         second_data = second_response.json()
-        self.assertEqual(second_data["indexed"], 1)  # Should still report 1 indexed (updated)
+        self.assertEqual(
+            second_data["indexed"], 1
+        )  # Should still report 1 indexed (updated)
 
         # Wait for indexing to complete
 
         # Check final stats - should still be 1 unique query
         final_stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(final_stats_response.status_code, 200)
         final_stats_data = final_stats_response.json()
-        self.assertEqual(final_stats_data["indexedQueries"], 1)  # Should still be 1, not 2
+        self.assertEqual(
+            final_stats_data["indexedQueries"], 1
+        )  # Should still be 1, not 2
 
         # Verify the popularity was updated by checking suggestions
-        suggestion_request = {
-            "q": "test duplicate",
-            "limit": 5
-        }
+        suggestion_request = {"q": "test duplicate", "limit": 5}
 
         suggestion_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request)
+            data=json.dumps(suggestion_request),
         )
 
         self.assertEqual(suggestion_response.status_code, 200)
@@ -299,7 +326,9 @@ class TestTypeahead(MarqoTestCase):
         suggestions = suggestion_data["suggestions"]
 
         # Should find exactly one suggestion for our test query
-        test_suggestions = [s for s in suggestions if s["suggestion"] == "test duplicate query abc123"]
+        test_suggestions = [
+            s for s in suggestions if s["suggestion"] == "test duplicate query abc123"
+        ]
         self.assertEqual(len(test_suggestions), 1)
 
     def test_delete_specific_queries(self):
@@ -310,7 +339,7 @@ class TestTypeahead(MarqoTestCase):
                 {"query": "delete test query one", "popularity": 10.0},
                 {"query": "delete test query two", "popularity": 8.0},
                 {"query": "delete test query three", "popularity": 6.0},
-                {"query": "keep this query", "popularity": 9.0}
+                {"query": "keep this query", "popularity": 9.0},
             ]
         }
 
@@ -318,7 +347,7 @@ class TestTypeahead(MarqoTestCase):
         index_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(queries_request)
+            data=json.dumps(queries_request),
         )
 
         self.assertEqual(index_response.status_code, 200)
@@ -330,7 +359,7 @@ class TestTypeahead(MarqoTestCase):
         # Verify all queries were indexed
         stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(stats_response.status_code, 200)
@@ -341,13 +370,13 @@ class TestTypeahead(MarqoTestCase):
         queries_to_delete = [
             "delete test query one",
             "delete test query two",
-            "non-existent query"  # This will be silently ignored (no error tracking)
+            "non-existent query",  # This will be silently ignored (no error tracking)
         ]
 
         delete_response = requests.delete(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(queries_to_delete)
+            data=json.dumps(queries_to_delete),
         )
 
         self.assertEqual(delete_response.status_code, 200)
@@ -361,7 +390,7 @@ class TestTypeahead(MarqoTestCase):
         # Verify queries were deleted - should have 2 remaining (delete test query three + keep this query)
         final_stats_response = requests.get(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/stats",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(final_stats_response.status_code, 200)
@@ -371,13 +400,13 @@ class TestTypeahead(MarqoTestCase):
         # Verify correct queries remain by checking suggestions
         suggestion_request = {
             "q": "delete test query three",  # Search for specific remaining query
-            "limit": 10
+            "limit": 10,
         }
 
         suggestion_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request)
+            data=json.dumps(suggestion_request),
         )
 
         self.assertEqual(suggestion_response.status_code, 200)
@@ -385,11 +414,17 @@ class TestTypeahead(MarqoTestCase):
         suggestions = suggestion_data["suggestions"]
 
         # Should find "delete test query three" (not deleted) but not the 2 deleted ones
-        remaining_three_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query three"]
+        remaining_three_suggestions = [
+            s for s in suggestions if s["suggestion"] == "delete test query three"
+        ]
         self.assertEqual(len(remaining_three_suggestions), 1)  # Should remain
 
-        deleted_one_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query one"]
-        deleted_two_suggestions = [s for s in suggestions if s["suggestion"] == "delete test query two"]
+        deleted_one_suggestions = [
+            s for s in suggestions if s["suggestion"] == "delete test query one"
+        ]
+        deleted_two_suggestions = [
+            s for s in suggestions if s["suggestion"] == "delete test query two"
+        ]
 
         self.assertEqual(len(deleted_one_suggestions), 0)  # Should be gone
         self.assertEqual(len(deleted_two_suggestions), 0)  # Should be gone
@@ -401,7 +436,7 @@ class TestTypeahead(MarqoTestCase):
             "queries": [
                 {"query": "weight test high popularity", "popularity": 100.0},
                 {"query": "weight test low popularity", "popularity": 1.0},
-                {"query": "weight test medium popularity", "popularity": 50.0}
+                {"query": "weight test medium popularity", "popularity": 50.0},
             ]
         }
 
@@ -409,7 +444,7 @@ class TestTypeahead(MarqoTestCase):
         index_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions/queries",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(queries_request)
+            data=json.dumps(queries_request),
         )
 
         self.assertEqual(index_response.status_code, 200)
@@ -419,13 +454,13 @@ class TestTypeahead(MarqoTestCase):
             "q": "weight test",
             "limit": 10,
             "popularityWeight": 10.0,
-            "bm25Weight": 0.1
+            "bm25Weight": 0.1,
         }
 
         popularity_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request_popularity)
+            data=json.dumps(suggestion_request_popularity),
         )
 
         self.assertEqual(popularity_response.status_code, 200)
@@ -434,10 +469,11 @@ class TestTypeahead(MarqoTestCase):
 
         # Should have suggestions
         self.assertGreater(len(popularity_suggestions), 0)
-        
+
         # The high popularity query should be ranked highly when popularity weight is high
         high_popularity_suggestion = next(
-            (s for s in popularity_suggestions if "high popularity" in s["suggestion"]), None
+            (s for s in popularity_suggestions if "high popularity" in s["suggestion"]),
+            None,
         )
         self.assertIsNotNone(high_popularity_suggestion)
 
@@ -446,13 +482,13 @@ class TestTypeahead(MarqoTestCase):
             "q": "weight test",
             "limit": 10,
             "popularityWeight": 0.1,
-            "bm25Weight": 10.0
+            "bm25Weight": 10.0,
         }
 
         bm25_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request_bm25)
+            data=json.dumps(suggestion_request_bm25),
         )
 
         self.assertEqual(bm25_response.status_code, 200)
@@ -463,15 +499,12 @@ class TestTypeahead(MarqoTestCase):
         self.assertGreater(len(bm25_suggestions), 0)
 
         # Test without weights (should use defaults)
-        suggestion_request_default = {
-            "q": "weight test",
-            "limit": 10
-        }
+        suggestion_request_default = {"q": "weight test", "limit": 10}
 
         default_response = requests.post(
             f"{self._MARQO_URL}/indexes/{self.unstructured_index_name}/suggestions",
             headers={"Content-Type": "application/json"},
-            data=json.dumps(suggestion_request_default)
+            data=json.dumps(suggestion_request_default),
         )
 
         self.assertEqual(default_response.status_code, 200)

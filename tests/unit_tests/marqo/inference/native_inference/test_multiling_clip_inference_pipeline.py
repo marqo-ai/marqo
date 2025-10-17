@@ -6,18 +6,23 @@ import torch
 
 from marqo.core.inference.api import *
 from marqo.inference.native_inference.embedding_models.multilingual_clip_model import (
-    MultilingualCLIPModel, MultilingualCLIPTokenizerWrapper, MultilingualCLIPPreprocessor
+    MultilingualCLIPModel,
+    MultilingualCLIPPreprocessor,
+    MultilingualCLIPTokenizerWrapper,
 )
 from marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline import (
-    MultilingualCLIPModelInferencePipeline
+    MultilingualCLIPModelInferencePipeline,
 )
 from marqo.inference.type import Modality
 
 
 class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
-
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media")
+    @patch(
+        "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text"
+    )
+    @patch(
+        "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media"
+    )
     def test_content_preprocessing_text(self, mock_download, mock_split):
         model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
@@ -26,7 +31,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
             contents=["hello world"],
             preprocessing_config=TextPreprocessingConfig(),
             return_individual_error=False,
-            model_config=model_config
+            model_config=model_config,
         )
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -37,8 +42,12 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         mock_download.assert_not_called()
         self.assertEqual(result, [[("original text", "preprocessed text")]])
 
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text")
-    @patch("marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media")
+    @patch(
+        "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.split_prefix_preprocess_text"
+    )
+    @patch(
+        "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline.download_and_preprocess_media"
+    )
     def test_content_preprocessing_image(self, mock_download, mock_split):
         model = MagicMock(spec=MultilingualCLIPModel)
         model_config = MagicMock(spec=ModelConfig)
@@ -47,7 +56,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
             contents=["http://some.image/url.jpg"],
             preprocessing_config=ImagePreprocessingConfig(),
             return_individual_error=False,
-            model_config=model_config
+            model_config=model_config,
         )
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
@@ -65,7 +74,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
         preprocessed_content = [
             [("original", torch.tensor([1.0]))],
-            [("original2", torch.tensor([2.0]))]
+            [("original2", torch.tensor([2.0]))],
         ]
 
         collected = pipeline._collect_valid_content_to_encode(preprocessed_content)
@@ -80,7 +89,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
         preprocessed_content = [
             InferenceErrorModel(error_message="something went wrong"),
-            [("original", torch.tensor([1.0]))]
+            [("original", torch.tensor([1.0]))],
         ]
 
         collected = pipeline._collect_valid_content_to_encode(preprocessed_content)
@@ -93,9 +102,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
-        preprocessed_content = [
-            "invalid_content_type"
-        ]
+        preprocessed_content = ["invalid_content_type"]
 
         with self.assertRaises(ValueError) as cm:
             pipeline._collect_valid_content_to_encode(preprocessed_content)
@@ -119,9 +126,7 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
-        preprocessed_content = [
-            [("original", torch.tensor([1.0]))]
-        ]
+        preprocessed_content = [[("original", torch.tensor([1.0]))]]
 
         embeddings = pipeline._encode_processed_content(preprocessed_content)
 
@@ -131,7 +136,9 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
     def test_encode_processed_content_mismatch(self):
         model = MagicMock(spec=MultilingualCLIPModel)
-        model.encode.return_value = [np.array([0.1, 0.2])]  # Return fewer embeddings than inputs
+        model.encode.return_value = [
+            np.array([0.1, 0.2])
+        ]  # Return fewer embeddings than inputs
         inference_request = MagicMock()
         inference_request.modality = Modality.TEXT
         inference_request.model_config.normalize_embeddings = True
@@ -140,16 +147,18 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
 
         preprocessed_content = [
             [("original1", torch.tensor([1.0]))],
-            [("original2", torch.tensor([2.0]))]
+            [("original2", torch.tensor([2.0]))],
         ]
 
         with self.assertRaises(ValueError) as cm:
             pipeline._encode_processed_content(preprocessed_content)
         self.assertIn("number of embeddings does not match", str(cm.exception))
 
-    @patch.object(MultilingualCLIPModelInferencePipeline, '_content_preprocessing')
-    @patch.object(MultilingualCLIPModelInferencePipeline, '_encode_processed_content')
-    def test_run_pipeline(self, mock_encode_processed_content, mock_content_preprocessing):
+    @patch.object(MultilingualCLIPModelInferencePipeline, "_content_preprocessing")
+    @patch.object(MultilingualCLIPModelInferencePipeline, "_encode_processed_content")
+    def test_run_pipeline(
+        self, mock_encode_processed_content, mock_content_preprocessing
+    ):
         model = MagicMock(spec=MultilingualCLIPModel)
         inference_request = MagicMock()
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
@@ -180,17 +189,18 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
             contents=["This is a test sentence."],
             preprocessing_config=TextPreprocessingConfig(),
             return_individual_error=False,
-            model_config=MagicMock(spec=ModelConfig)
+            model_config=MagicMock(spec=ModelConfig),
         )
 
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
         with patch(
-                "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline."
-                "split_prefix_preprocess_text"
+            "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline."
+            "split_prefix_preprocess_text"
         ) as mock_split:
             mock_split.side_effect = lambda contents, preprocessor, config: [
-                [(contents[0], preprocessor.tokenize(contents[0]))]]
+                [(contents[0], preprocessor.tokenize(contents[0]))]
+            ]
             result = pipeline._content_preprocessing()
 
         tokenizer_wrapper.tokenize.assert_called_once_with("This is a test sentence.")
@@ -211,18 +221,23 @@ class TestMultilingualCLIPInferencePipeline(unittest.TestCase):
             contents=["http://some.image/url.jpg"],
             preprocessing_config=ImagePreprocessingConfig(),
             return_individual_error=False,
-            model_config=MagicMock(spec=ModelConfig)
+            model_config=MagicMock(spec=ModelConfig),
         )
 
         pipeline = MultilingualCLIPModelInferencePipeline(model, inference_request)
 
         with patch(
-                "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline."
-                "download_and_preprocess_media"
+            "marqo.inference.native_inference.inference_pipeline.multilingual_inference_pipeline."
+            "download_and_preprocess_media"
         ) as mock_download:
-            mock_download.side_effect = lambda contents, preprocessor, config, return_individual_error: [
-                [(contents[0], preprocessor._preprocess_image(contents[0]))]]
+            mock_download.side_effect = (
+                lambda contents, preprocessor, config, return_individual_error: [
+                    [(contents[0], preprocessor._preprocess_image(contents[0]))]
+                ]
+            )
             result = pipeline._content_preprocessing()
 
-        image_preprocessor._preprocess_image.assert_called_once_with("http://some.image/url.jpg")
+        image_preprocessor._preprocess_image.assert_called_once_with(
+            "http://some.image/url.jpg"
+        )
         self.assertTrue(torch.equal(result[0][0][1], torch.tensor([1.0])))

@@ -4,7 +4,10 @@ from typing import Dict, Optional
 
 import marqo.logging
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.utils import read_env_vars_and_defaults_ints, read_env_vars_and_defaults
+from marqo.tensor_search.utils import (
+    read_env_vars_and_defaults,
+    read_env_vars_and_defaults_ints,
+)
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -33,7 +36,9 @@ class StatsDClient:
         self._sock.setblocking(False)
 
         # Parse once; reused for every metric
-        self._common_tags = self._parse_common_tags(read_env_vars_and_defaults(EnvVars.STATSD_COMMON_TAGS))
+        self._common_tags = self._parse_common_tags(
+            read_env_vars_and_defaults(EnvVars.STATSD_COMMON_TAGS)
+        )
 
     def increment(
         self,
@@ -68,7 +73,6 @@ class StatsDClient:
         merged = {**self._common_tags, **(tags or {})}
         msg = f"{self.prefix}{metric}:{value_ms}|ms{self._encode_tags(merged)}"
         self._send(msg)
-
 
     @staticmethod
     def _parse_common_tags(raw: Optional[str]) -> Dict[str, str]:

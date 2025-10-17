@@ -1,12 +1,9 @@
 from typing import List, Tuple, Union
 
-from numpy import ndarray
-from torch import Tensor
-
 from inference_orchestrator.schemas.api import (
+    InferenceErrorModel,
     InferenceRequest,
     InferenceResult,
-    InferenceErrorModel,
     Modality,
 )
 from inference_orchestrator.services.triton_inference.content_preprocessing import (
@@ -19,6 +16,8 @@ from inference_orchestrator.services.triton_inference.embedding_models.open_clip
 from inference_orchestrator.services.triton_inference.inference_pipelines.abstract_inference_pipeline import (
     AbstractInferencePipeline,
 )
+from numpy import ndarray
+from torch import Tensor
 
 OpenCLIPPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, Tensor]]]
 

@@ -1,12 +1,16 @@
 import httpx
+import msgpack
+import msgpack_numpy
 from httpx import Timeout
 from pydantic.v1 import ValidationError
 
 from marqo import logging
-from marqo.core.inference.api import Inference, InferenceResult, InferenceRequest, InferenceError
-
-import msgpack
-import msgpack_numpy
+from marqo.core.inference.api import (
+    Inference,
+    InferenceError,
+    InferenceRequest,
+    InferenceResult,
+)
 
 msgpack_numpy.patch()
 
@@ -26,7 +30,9 @@ class NativeInferenceClient(Inference):
         """
         self.base_url = base_url.rstrip("/")
         limits = httpx.Limits(max_keepalive_connections=pool_size, max_connections=None)
-        self.client = httpx.Client(base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout))
+        self.client = httpx.Client(
+            base_url=base_url, limits=limits, timeout=Timeout(timeout=timeout)
+        )
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """
@@ -34,7 +40,10 @@ class NativeInferenceClient(Inference):
         and returns the deserialized inference result.
         """
         url = f"{self.base_url}/vectorise"
-        headers = {"Content-Type": "application/msgpack", "Accept": "application/msgpack"}
+        headers = {
+            "Content-Type": "application/msgpack",
+            "Accept": "application/msgpack",
+        }
 
         # Convert the request to a dict (honoring aliases) and then pack with MessagePack
         request_dict = request.dict(by_alias=True)
@@ -45,20 +54,37 @@ class NativeInferenceClient(Inference):
             response.raise_for_status()
         except httpx.HTTPError as e:
             # The error response is also msgpack encoded
-            if isinstance(e, httpx.HTTPStatusError) and e.response is not None and e.response.content:
+            if (
+                isinstance(e, httpx.HTTPStatusError)
+                and e.response is not None
+                and e.response.content
+            ):
                 try:
                     error_response = msgpack.unpackb(e.response.content, raw=False)
                     error_message = error_response["detail"]
-                except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError):
-                    logger.warning('Error parsing error message', exc_info=True)
-                    error_message = 'Error parsing error message in msgpack format'
+                except (
+                    msgpack.ExtraData,
+                    msgpack.UnpackException,
+                    msgpack.UnpackValueError,
+                ):
+                    logger.warning("Error parsing error message", exc_info=True)
+                    error_message = "Error parsing error message in msgpack format"
             else:
                 error_message = str(e)
-            raise InferenceError(f"HTTP error when calling remote inference service: {error_message}") from e
+            raise InferenceError(
+                f"HTTP error when calling remote inference service: {error_message}"
+            ) from e
 
         # Unpack the MessagePack response (with numpy support)
         try:
             result_dict = msgpack.unpackb(response.content, raw=False)
             return InferenceResult.parse_obj(result_dict)
-        except (msgpack.ExtraData, msgpack.UnpackException, msgpack.UnpackValueError, ValidationError) as e:
-            raise InferenceError(f"Error decoding MessagePack response: {str(e)}") from e
+        except (
+            msgpack.ExtraData,
+            msgpack.UnpackException,
+            msgpack.UnpackValueError,
+            ValidationError,
+        ) as e:
+            raise InferenceError(
+                f"Error decoding MessagePack response: {str(e)}"
+            ) from e

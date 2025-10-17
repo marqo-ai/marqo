@@ -1,7 +1,10 @@
 from unittest.mock import MagicMock
-from tests.unit_tests.marqo_test import MarqoTestCase
+
 from marqo.core.models.marqo_index import *
-from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
+from marqo.core.semi_structured_vespa_index.semi_structured_document import (
+    SemiStructuredVespaDocument,
+)
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestSemiStructuredPartialUpdate(MarqoTestCase):
@@ -11,7 +14,7 @@ class TestSemiStructuredPartialUpdate(MarqoTestCase):
         return SemiStructuredMarqoIndex(
             name="test_index",
             schema_name="test_schema",
-            model = MagicMock(spec=Model),
+            model=MagicMock(spec=Model),
             normalize_embeddings=True,
             text_preprocessing=MagicMock(spec=TextPreProcessing),
             image_preprocessing=MagicMock(spec=ImagePreProcessing),
@@ -38,20 +41,22 @@ class TestSemiStructuredPartialUpdate(MarqoTestCase):
 
     def test_uuid_is_not_included_for_index_before_2160(self):
         index_version_2150 = self._semistructured_index_creation_helper("2.15.0")
-        marqo_document ={
+        marqo_document = {
             "_id": "test_id",
             "test_field": "test text",
         }
-        vespa_document = (SemiStructuredVespaDocument.from_marqo_document(marqo_document, index_version_2150).
-                          to_vespa_document())
+        vespa_document = SemiStructuredVespaDocument.from_marqo_document(
+            marqo_document, index_version_2150
+        ).to_vespa_document()
         self.assertNotIn("marqo__version_uuid", vespa_document["fields"])
 
     def test_uuid_is_not_included_for_index_after_2160(self):
         index_version_21612 = self._semistructured_index_creation_helper("2.16.12")
-        marqo_document ={
+        marqo_document = {
             "_id": "test_id",
             "test_field": "test text",
         }
-        vespa_document = (SemiStructuredVespaDocument.from_marqo_document(marqo_document, index_version_21612).
-                          to_vespa_document())
+        vespa_document = SemiStructuredVespaDocument.from_marqo_document(
+            marqo_document, index_version_21612
+        ).to_vespa_document()
         self.assertIn("marqo__version_uuid", vespa_document["fields"])

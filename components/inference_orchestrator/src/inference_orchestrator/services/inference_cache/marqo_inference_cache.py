@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Optional, Union, TypeVar
+from typing import Optional, TypeVar, Union
 
 from inference_orchestrator.core.enum import MarqoCacheType
 from inference_orchestrator.core.logging import get_logger
@@ -15,8 +15,8 @@ from inference_orchestrator.services.inference_cache.marqo_lru_cache import (
     MarqoLRUCache,
 )
 from inference_orchestrator.services.inference_cache.monitoring import (
-    OTELCacheStatsCollector,
     CacheStatsCollector,
+    OTELCacheStatsCollector,
 )
 
 T = TypeVar("T")

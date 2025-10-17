@@ -56,15 +56,15 @@ class LanguageBindVideoTokenizer(CLIPTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            errors="replace",
-            unk_token="<|endoftext|>",
-            bos_token="<|startoftext|>",
-            eos_token="<|endoftext|>",
-            pad_token="<|endoftext|>",  # hack to enable padding
-            **kwargs,
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        unk_token="<|endoftext|>",
+        bos_token="<|startoftext|>",
+        eos_token="<|endoftext|>",
+        pad_token="<|endoftext|>",  # hack to enable padding
+        **kwargs,
     ):
         super(LanguageBindVideoTokenizer, self).__init__(
             vocab_file,
@@ -74,4 +74,5 @@ class LanguageBindVideoTokenizer(CLIPTokenizer):
             bos_token,
             eos_token,
             pad_token,  # hack to enable padding
-            **kwargs, )
+            **kwargs,
+        )

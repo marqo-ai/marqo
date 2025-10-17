@@ -5,25 +5,29 @@ import unittest
 from unittest import mock
 
 from marqo.api import exceptions
-from marqo.tensor_search import enums
-from marqo.tensor_search import utils
+from marqo.tensor_search import enums, utils
 
 
 class TestUtils(unittest.TestCase):
-
     def test__reduce_vectors(self):
-        assert {
-                   "__vector_abc": [1, 2, 3]
-               } == utils.truncate_dict_vectors({
-            "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]
-        }, new_length=3)
+        assert {"__vector_abc": [1, 2, 3]} == utils.truncate_dict_vectors(
+            {"__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]}, new_length=3
+        )
 
     def test__reduce_vectors_nested(self):
         assert {
-                   "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3]}]
-               } == utils.truncate_dict_vectors({
-            "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]}]
-        }, new_length=3)
+            "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3]}]
+        } == utils.truncate_dict_vectors(
+            {
+                "vs": [
+                    {
+                        "otherfield": "jkerhjbrbhj",
+                        "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8],
+                    }
+                ]
+            },
+            new_length=3,
+        )
 
     def test_construct_authorized_url(self):
         assert "https://admin:admin@localhost:9200" == utils.construct_authorized_url(
@@ -37,34 +41,24 @@ class TestUtils(unittest.TestCase):
 
     def test_merge_dicts(self):
         base = {
-            'lvl_0_a': {
-                'lvl_1_a': 'efgh',
-                'lvl_1_b': True
-            },
-            'lvl_0_b': 'abcd',
-            'lvl_0_c': 1234,
-            'lvl_0_d': ['abcdefgh']
+            "lvl_0_a": {"lvl_1_a": "efgh", "lvl_1_b": True},
+            "lvl_0_b": "abcd",
+            "lvl_0_c": 1234,
+            "lvl_0_d": ["abcdefgh"],
         }
         base_hash = hash(json.dumps(base))
         preferences = {
-            'lvl_0_a': {
-                'lvl_1_b': False,
-                'lvl_1_c': "abcabc"
-            },
-            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
-            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+            "lvl_0_a": {"lvl_1_b": False, "lvl_1_c": "abcabc"},
+            "lvl_0_d": [{"lvl_0_d_1": "cat dog"}],
+            "lvl_0_e": {"lvl1_0_d_1": {"jump": {"skip": "track"}}},
         }
         preferences_hash = hash(json.dumps(preferences))
         assert utils.merge_dicts(base, preferences) == {
-            'lvl_0_a': {
-                'lvl_1_a': 'efgh',
-                'lvl_1_b': False,
-                'lvl_1_c': "abcabc"
-            },
-            'lvl_0_b': 'abcd',
-            'lvl_0_c': 1234,
-            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
-            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+            "lvl_0_a": {"lvl_1_a": "efgh", "lvl_1_b": False, "lvl_1_c": "abcabc"},
+            "lvl_0_b": "abcd",
+            "lvl_0_c": 1234,
+            "lvl_0_d": [{"lvl_0_d_1": "cat dog"}],
+            "lvl_0_e": {"lvl1_0_d_1": {"jump": {"skip": "track"}}},
         }
         # assert that they didn't mutate
         assert preferences_hash == hash(json.dumps(preferences))
@@ -72,44 +66,37 @@ class TestUtils(unittest.TestCase):
 
     def test_merge_dicts_edge_cases(self):
         assert {} == utils.merge_dicts({}, {})
-        assert {'abc': '123', "zzz": {"wow": "cool"}} \
-               == utils.merge_dicts({'abc': '123', "zzz": {"wow": "cool"}}, {})
-        assert {'abc': '123', "zzz": {"wow": "cool"}} \
-               == utils.merge_dicts({}, {'abc': '123', "zzz": {"wow": "cool"}})
-        assert {'abc': '123', "zzz": {"wow": "cool"}} \
-               == utils.merge_dicts({'zzz': {"wow": "rough"}}, {'abc': '123', "zzz": {"wow": "cool"}})
+        assert {"abc": "123", "zzz": {"wow": "cool"}} == utils.merge_dicts(
+            {"abc": "123", "zzz": {"wow": "cool"}}, {}
+        )
+        assert {"abc": "123", "zzz": {"wow": "cool"}} == utils.merge_dicts(
+            {}, {"abc": "123", "zzz": {"wow": "cool"}}
+        )
+        assert {"abc": "123", "zzz": {"wow": "cool"}} == utils.merge_dicts(
+            {"zzz": {"wow": "rough"}}, {"abc": "123", "zzz": {"wow": "cool"}}
+        )
 
     def test_merge_nones(self):
         base = {
-            'lvl_0_a': {
-                'lvl_1_a': 'efgh',
-                'lvl_1_b': True
-            },
-            'lvl_0_b': 'abcd',
-            'lvl_0_c': 1234,
-            'lvl_0_d': ['abcdefgh'],
-            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+            "lvl_0_a": {"lvl_1_a": "efgh", "lvl_1_b": True},
+            "lvl_0_b": "abcd",
+            "lvl_0_c": 1234,
+            "lvl_0_d": ["abcdefgh"],
+            "lvl_0_e": {"lvl1_0_d_1": {"jump": {"skip": "track"}}},
         }
         base_hash = hash(json.dumps(base))
         preferences = {
-            'lvl_0_a': {
-                'lvl_1_b': None,
-                'lvl_1_c': "abcabc"
-            },
-            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
-            'lvl_0_e': None
+            "lvl_0_a": {"lvl_1_b": None, "lvl_1_c": "abcabc"},
+            "lvl_0_d": [{"lvl_0_d_1": "cat dog"}],
+            "lvl_0_e": None,
         }
         preferences_hash = hash(json.dumps(preferences))
         assert utils.merge_dicts(base, preferences) == {
-            'lvl_0_a': {
-                'lvl_1_a': 'efgh',
-                'lvl_1_b': True,
-                'lvl_1_c': "abcabc"
-            },
-            'lvl_0_b': 'abcd',
-            'lvl_0_c': 1234,
-            'lvl_0_d': [{'lvl_0_d_1': 'cat dog'}],
-            'lvl_0_e': {'lvl1_0_d_1': {'jump': {"skip": 'track'}}}
+            "lvl_0_a": {"lvl_1_a": "efgh", "lvl_1_b": True, "lvl_1_c": "abcabc"},
+            "lvl_0_b": "abcd",
+            "lvl_0_c": 1234,
+            "lvl_0_d": [{"lvl_0_d_1": "cat dog"}],
+            "lvl_0_e": {"lvl1_0_d_1": {"jump": {"skip": "track"}}},
         }
         # assert that they didn't mutate
         assert preferences_hash == hash(json.dumps(preferences))
@@ -117,7 +104,7 @@ class TestUtils(unittest.TestCase):
 
     def test_read_env_vars_and_defaults(self):
         """Make sure the priority order is expected
-        (environment vars > defaults else None) """
+        (environment vars > defaults else None)"""
         for key, mock_real_environ, default_vars, expected in [
             ("SOME_VAR", dict(), dict(), None),
             ("SOME_INT_VAR", {"SOME_INT_VAR": ""}, dict(), None),
@@ -125,7 +112,6 @@ class TestUtils(unittest.TestCase):
             ("SOME_VAR", {"SOME_VAR": "1234"}, dict(), "1234"),
             ("SOME_VAR", dict(), {"SOME_VAR": "1234"}, "1234"),
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": "333"}, "111"),
-
             # OK for default vals to be ints:
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, "111"),
             ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
@@ -143,7 +129,7 @@ class TestUtils(unittest.TestCase):
 
     def test_read_env_vars_and_defaults_ints(self):
         """Make sure the priority order is expected
-        (environment vars > defaults else None) """
+        (environment vars > defaults else None)"""
         for key, mock_real_environ, default_vars, expected in [
             ("SOME_INT_VAR", dict(), dict(), None),
             ("SOME_INT_VAR", {"SOME_INT_VAR": "1234"}, dict(), 1234),
@@ -153,7 +139,6 @@ class TestUtils(unittest.TestCase):
             ("SOME_INT_VAR", {"SOME_INT_VAR": "111"}, {"SOME_INT_VAR": "333"}, 111),
             ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": " 123 "}, 123),
             ("SOME_INT_VAR", {"SOME_INT_VAR": " 123 "}, dict(), 123),
-
             # OK for default vals to be ints:
             ("SOME_VAR", {"SOME_VAR": "111"}, {"SOME_VAR": 333}, 111),
             ("SOME_VAR", dict(), {"SOME_VAR": 1234}, 1234),
@@ -174,7 +159,7 @@ class TestUtils(unittest.TestCase):
         """Make sure a ConfigurationError is raised when the value cannot be parsed into an int."""
         for key, mock_real_environ, default_vars in [
             ("SOME_INT_VAR", {"SOME_INT_VAR": "not_an_int"}, dict()),
-            ("SOME_INT_VAR", {"SOME_INT_VAR": '1.3'}, dict()),
+            ("SOME_INT_VAR", {"SOME_INT_VAR": "1.3"}, dict()),
             ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": "not_an_int"}),
             ("SOME_INT_VAR", dict(), {"SOME_INT_VAR": "4.5"}),
         ]:
@@ -193,52 +178,67 @@ class TestUtils(unittest.TestCase):
     def test_parse_lexical_query(self):
         # 2-tuples of input text, and expected parse_lexical_query() output
         cases = [
-            ('just a string', ([], ['just', 'a', 'string'])),
-            ('just a "string"', (["string"], ['just', 'a'])),
-            ('just "a" string', (["a"], ['just', 'string'])),
-            ('"just" a string', (["just"], ['a', 'string'])),
-            ('just "a long long " string', (["a long long "], ['just', 'string'])),
-            ('"required 1 " not required " required2" again',
-             (["required 1 ", " required2"], ['not', 'required', 'again'])),
-            ('"just" "just" "" a string', (["just", "just"], ['a', 'string'])),
-
-            ('朋友你好', ([], ['朋友你好'])),
-            ('朋友 "你好"', (["你好"], ['朋友'])),
+            ("just a string", ([], ["just", "a", "string"])),
+            ('just a "string"', (["string"], ["just", "a"])),
+            ('just "a" string', (["a"], ["just", "string"])),
+            ('"just" a string', (["just"], ["a", "string"])),
+            ('just "a long long " string', (["a long long "], ["just", "string"])),
+            (
+                '"required 1 " not required " required2" again',
+                (["required 1 ", " required2"], ["not", "required", "again"]),
+            ),
+            ('"just" "just" "" a string', (["just", "just"], ["a", "string"])),
+            ("朋友你好", ([], ["朋友你好"])),
+            ('朋友 "你好"', (["你好"], ["朋友"])),
             # spaces get introduced, even though Chinese doesn't use them:
-            ('你好 "老" 朋友', (["老"], ['你好', '朋友'])),
-            ('"朋友" 你好', (["朋友"], ['你好'])),
-
-            ('', ([], [])),
+            ('你好 "老" 朋友', (["老"], ["你好", "朋友"])),
+            ('"朋友" 你好', (["朋友"], ["你好"])),
+            ("", ([], [])),
             ('"cookie"', (["cookie"], [])),
             ('"朋友"', (["朋友"], [])),
-
             # Badly formatted double quotes.
             # Treat every 2 as a pair, bad/unpaired quotes become whitespace.
             ('"', ([], [])),
-            ('"""hello', ([], ['hello'])),
-            ('""" python docstring appeared"""', ([], ['python', 'docstring', 'appeared'])),
+            ('"""hello', ([], ["hello"])),
+            (
+                '""" python docstring appeared"""',
+                ([], ["python", "docstring", "appeared"]),
+            ),
             ('""', ([], [])),
-            ('what about backticks `?', ([], ['what', 'about', 'backticks', '`?'])),
-            ('double  spaces  get  removed', ([], ['double', 'spaces', 'get', 'removed'])),
-            ('"go"od"', ([], ['go', 'od'])),
-            ('"ter"m1" term2', ([], ['ter','m1', 'term2'])),
-            ('"term1" "term2" "term3', (['term1', 'term2'], ['term3'])),
-            ('"term1" "term2" "ter"m3', (['term1', 'term2'], ['ter', 'm3'])),
-            ('"term 1" "term "2 "term 3"', (['term 1', 'term 3'], ['term', '2'])),  # good syntax in between bad syntax
-            ('"good', ([], ['good'])),      # Unpaired quotes
-            ('"朋友', ([], ['朋友'])),
+            ("what about backticks `?", ([], ["what", "about", "backticks", "`?"])),
+            (
+                "double  spaces  get  removed",
+                ([], ["double", "spaces", "get", "removed"]),
+            ),
+            ('"go"od"', ([], ["go", "od"])),
+            ('"ter"m1" term2', ([], ["ter", "m1", "term2"])),
+            ('"term1" "term2" "term3', (["term1", "term2"], ["term3"])),
+            ('"term1" "term2" "ter"m3', (["term1", "term2"], ["ter", "m3"])),
+            (
+                '"term 1" "term "2 "term 3"',
+                (["term 1", "term 3"], ["term", "2"]),
+            ),  # good syntax in between bad syntax
+            ('"good', ([], ["good"])),  # Unpaired quotes
+            ('"朋友', ([], ["朋友"])),
             # Combination: good terms, bad terms (opening and closing), escaped quotes, spaces.
-            ('hello "term1" " term 2 " space b"adterm" "badte"rm "term \\"3" "unfinished',
-             (['term1', ' term 2 ', 'term \\"3'], ['hello', 'space', 'b', 'adterm', 'badte', 'rm', 'unfinished'])),
-
+            (
+                'hello "term1" " term 2 " space b"adterm" "badte"rm "term \\"3" "unfinished',
+                (
+                    ["term1", " term 2 ", 'term \\"3'],
+                    ["hello", "space", "b", "adterm", "badte", "rm", "unfinished"],
+                ),
+            ),
             # on Lucene, these unusual structures seem to get passed straight through as well.
             # The quotes seem to be completely ignored (with and without quotes yields identical results,
             # including scores):
-            ('"go"od" a"', ([], ['go', 'od', 'a'])),
-            ('"sam"a', ([], ['sam', 'a'])),     # Good opening, bad closing
-            ('sa"ma" hello!', ([], ['sa', 'ma', 'hello!'])),    # Bad opening, good closing
-            ('"sam"?', ([], ['sam', '?'])),
-            ('"朋友"你好', ([], ['朋友', '你好'])),
+            ('"go"od" a"', ([], ["go", "od", "a"])),
+            ('"sam"a', ([], ["sam", "a"])),  # Good opening, bad closing
+            (
+                'sa"ma" hello!',
+                ([], ["sa", "ma", "hello!"]),
+            ),  # Bad opening, good closing
+            ('"sam"?', ([], ["sam", "?"])),
+            ('"朋友"你好', ([], ["朋友", "你好"])),
         ]
         for input, expected_output in cases:
             with self.subTest(input):
@@ -255,27 +255,35 @@ class TestUtils(unittest.TestCase):
         cases = [
             (
                 '\\" escaped quotes\\"  what happens here?',
-                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
+                ([], ['\\"', "escaped", 'quotes\\"', "what", "happens", "here?"]),
             ),
             ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
             # escaped backslash
-            ('\\\\hello', ([], ['\\\\hello'])),
+            ("\\\\hello", ([], ["\\\\hello"])),
             # escaped backslash before double quote (quote will be treated as whitespace)
-            ('\\\\"hello', ([], ['\\\\', 'hello'])),
+            ('\\\\"hello', ([], ["\\\\", "hello"])),
             # escaped backslash before double quote on both sides (quote will be treated as whitespace)
-            ('\\\\"hello\\\\"', ([], ['\\\\', 'hello\\\\'])),
+            ('\\\\"hello\\\\"', ([], ["\\\\", "hello\\\\"])),
             # escaped backslash before escaped double quote
             ('\\\\\\"hello', ([], ['\\\\\\"hello'])),
             # backslash to escape a normal character (removed)
-            ('\\a', ([], ['a'])),
+            ("\\a", ([], ["a"])),
             # stray unescaped backslash (removed)
-            ('\\\\"hello\\', ([], ['\\\\', 'hello'])),
+            ('\\\\"hello\\', ([], ["\\\\", "hello"])),
             # Combine all cases
-            ('single\\double\\\\triple\\\\\\quote"ba"d escaped\\" "proper double quote" stray\\',
-             (['proper double quote'],
-              ['singledouble\\\\triple\\\\quote', 'ba', 'd', 'escaped\\"', 'stray']
-              )
-             ),
+            (
+                'single\\double\\\\triple\\\\\\quote"ba"d escaped\\" "proper double quote" stray\\',
+                (
+                    ["proper double quote"],
+                    [
+                        "singledouble\\\\triple\\\\quote",
+                        "ba",
+                        "d",
+                        'escaped\\"',
+                        "stray",
+                    ],
+                ),
+            ),
         ]
         for input, expected_output in cases:
             with self.subTest(input):
@@ -295,7 +303,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsInstance(utils._get_marqo_root(), str)
 
     def test_get_marqo_root_returns_correct_path(self):
-        assert utils._get_marqo_root().endswith('/src/marqo')
+        assert utils._get_marqo_root().endswith("/src/marqo")
 
     def test_get_marqo_root_returns_existing_path(self):
         assert os.path.exists(utils._get_marqo_root())
@@ -317,7 +325,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsInstance(utils.get_marqo_root_from_env(), str)
 
     def test_get_marqo_root_from_env_returns_correct_path(self):
-        assert utils.get_marqo_root_from_env().endswith('/src/marqo')
+        assert utils.get_marqo_root_from_env().endswith("/src/marqo")
 
     def test_get_marqo_root_from_env_returns_existing_path(self):
         assert os.path.exists(utils.get_marqo_root_from_env())
@@ -347,7 +355,7 @@ class TestUtils(unittest.TestCase):
         def run():
             assert enums.EnvVars.MARQO_ROOT_PATH not in os.environ
             marqo_root = utils.get_marqo_root_from_env()
-            assert marqo_root.endswith('/src/marqo')
+            assert marqo_root.endswith("/src/marqo")
             assert os.environ[enums.EnvVars.MARQO_ROOT_PATH] == marqo_root
             return True
 

@@ -7,6 +7,7 @@ from marqo.core.monitoring import statsd_client as sc
 
 class CaptureStatsDClient(sc.StatsDClient):
     """A StatsDClient that captures sent messages instead of sending over UDP."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sent: List[bytes] = []
@@ -17,6 +18,7 @@ class CaptureStatsDClient(sc.StatsDClient):
 
 class TestStatsDClient:
     """Tests for the StatsDClient class."""
+
     def test_encode_tags_none(self):
         assert sc.StatsDClient._encode_tags(None) == ""
 

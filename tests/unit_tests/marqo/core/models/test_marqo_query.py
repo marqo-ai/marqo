@@ -1,32 +1,34 @@
 from unittest import TestCase
+
 from pydantic.v1 import ValidationError
 
+from marqo.core.models.facets_parameters import (
+    FacetsParameters,
+    FieldFacetsConfiguration,
+)
+from marqo.core.models.hybrid_parameters import (
+    HybridParameters,
+    RankingMethod,
+    RetrievalMethod,
+)
 from marqo.core.models.marqo_query import (
-    MarqoTensorQuery, MarqoQuery, MarqoHybridQuery, MarqoLexicalQuery
+    MarqoHybridQuery,
+    MarqoLexicalQuery,
+    MarqoQuery,
+    MarqoTensorQuery,
 )
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.core.search.search_filter import SearchFilter, EqualityTerm
-from marqo.core.models.hybrid_parameters import (
-    HybridParameters, RankingMethod, RetrievalMethod
-)
-from marqo.core.models.facets_parameters import (
-    FacetsParameters, FieldFacetsConfiguration
-)
+from marqo.core.search.search_filter import EqualityTerm, SearchFilter
 
 
 class TestMarqoTensorQuery(TestCase):
-
     def test_creation_with_all_values(self):
         """Test creating MarqoTensorQuery with all possible values."""
         score_modifier = ScoreModifier(
-            field="test_field",
-            weight=1.5,
-            type=ScoreModifierType.Multiply
+            field="test_field", weight=1.5, type=ScoreModifierType.Multiply
         )
 
-        filter_obj = SearchFilter(
-            EqualityTerm("field1", "value1", "field1:value1")
-        )
+        filter_obj = SearchFilter(EqualityTerm("field1", "value1", "field1:value1"))
 
         query = MarqoTensorQuery(
             index_name="test_index",
@@ -41,7 +43,7 @@ class TestMarqoTensorQuery(TestCase):
             ef_search=100,
             approximate=False,
             approximate_threshold=0.95,
-            rerank_depth_tensor=50
+            rerank_depth_tensor=50,
         )
 
         # Verify all fields are set correctly
@@ -68,7 +70,7 @@ class TestMarqoTensorQuery(TestCase):
         base_params = {
             "index_name": "test_index",
             "limit": 10,
-            "vector_query": [0.1, 0.2, 0.3]
+            "vector_query": [0.1, 0.2, 0.3],
         }
 
         required_fields = ["index_name", "limit", "vector_query"]
@@ -85,18 +87,13 @@ class TestMarqoTensorQuery(TestCase):
 
 
 class TestMarqoLexicalQuery(TestCase):
-
     def test_creation_with_all_values(self):
         """Test creating MarqoLexicalQuery with all possible values."""
         score_modifier = ScoreModifier(
-            field="test_field",
-            weight=1.5,
-            type=ScoreModifierType.Multiply
+            field="test_field", weight=1.5, type=ScoreModifierType.Multiply
         )
 
-        filter_obj = SearchFilter(
-            EqualityTerm("field1", "value1", "field1:value1")
-        )
+        filter_obj = SearchFilter(EqualityTerm("field1", "value1", "field1:value1"))
 
         query = MarqoLexicalQuery(
             index_name="test_index",
@@ -109,7 +106,7 @@ class TestMarqoLexicalQuery(TestCase):
             expose_facets=True,
             or_phrases=["phrase1", "phrase2"],
             and_phrases=["phrase3", "phrase4"],
-            language="en"
+            language="en",
         )
 
         # Verify all fields are set correctly
@@ -135,7 +132,7 @@ class TestMarqoLexicalQuery(TestCase):
             "index_name": "test_index",
             "limit": 10,
             "or_phrases": ["phrase1"],
-            "and_phrases": ["phrase2"]
+            "and_phrases": ["phrase2"],
         }
 
         required_fields = ["index_name", "limit", "or_phrases", "and_phrases"]
@@ -158,7 +155,7 @@ class TestMarqoLexicalQuery(TestCase):
             limit=10,
             or_phrases=[],
             and_phrases=["required phrase"],
-            language="en"
+            language="en",
         )
         self.assertEqual([], query1.or_phrases)
         self.assertEqual(["required phrase"], query1.and_phrases)
@@ -169,39 +166,32 @@ class TestMarqoLexicalQuery(TestCase):
             limit=10,
             or_phrases=["search phrase"],
             and_phrases=[],
-            language="es"
+            language="es",
         )
         self.assertEqual(["search phrase"], query2.or_phrases)
         self.assertEqual([], query2.and_phrases)
 
 
 class TestMarqoHybridQuery(TestCase):
-
     def test_creation_with_all_values(self):
         """Test creating MarqoHybridQuery with all possible values."""
         score_modifier = ScoreModifier(
-            field="test_field",
-            weight=1.5,
-            type=ScoreModifierType.Multiply
+            field="test_field", weight=1.5, type=ScoreModifierType.Multiply
         )
 
-        filter_obj = SearchFilter(
-            EqualityTerm("field1", "value1", "field1:value1")
-        )
+        filter_obj = SearchFilter(EqualityTerm("field1", "value1", "field1:value1"))
 
         hybrid_parameters = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
             alpha=0.7,
-            rrfK=100
+            rrfK=100,
         )
 
         facets = FacetsParameters(
-            fields={
-                "test_field": FieldFacetsConfiguration(type="string")
-            },
+            fields={"test_field": FieldFacetsConfiguration(type="string")},
             maxDepth=5,
-            maxResults=100
+            maxResults=100,
         )
 
         query = MarqoHybridQuery(
@@ -224,7 +214,7 @@ class TestMarqoHybridQuery(TestCase):
             global_rerank_depth=100,
             facets=facets,
             track_total_hits=True,
-            language="en"
+            language="en",
         )
 
         # Verify all fields are set correctly
@@ -262,12 +252,15 @@ class TestMarqoHybridQuery(TestCase):
             "limit": 10,
             "or_phrases": ["phrase1"],
             "and_phrases": ["phrase2"],
-            "hybrid_parameters": hybrid_parameters
+            "hybrid_parameters": hybrid_parameters,
         }
 
         required_fields = [
-            "index_name", "limit", "or_phrases", "and_phrases",
-            "hybrid_parameters"
+            "index_name",
+            "limit",
+            "or_phrases",
+            "and_phrases",
+            "hybrid_parameters",
         ]
 
         for required_field in required_fields:
@@ -283,14 +276,10 @@ class TestMarqoHybridQuery(TestCase):
     def test_score_modifiers_validation_with_rrf(self):
         """Test that score_modifiers is allowed with RRF ranking method."""
         score_modifier = ScoreModifier(
-            field="test_field",
-            weight=1.5,
-            type=ScoreModifierType.Multiply
+            field="test_field", weight=1.5, type=ScoreModifierType.Multiply
         )
 
-        hybrid_parameters = HybridParameters(
-            rankingMethod=RankingMethod.RRF
-        )
+        hybrid_parameters = HybridParameters(rankingMethod=RankingMethod.RRF)
 
         # Should work with RRF
         query = MarqoHybridQuery(
@@ -299,16 +288,14 @@ class TestMarqoHybridQuery(TestCase):
             or_phrases=["phrase1"],
             and_phrases=["phrase2"],
             hybrid_parameters=hybrid_parameters,
-            score_modifiers=[score_modifier]
+            score_modifiers=[score_modifier],
         )
         self.assertEqual([score_modifier], query.score_modifiers)
 
     def test_score_modifiers_validation_with_non_rrf(self):
         """Test that score_modifiers raises error with non-RRF ranking methods."""
         score_modifier = ScoreModifier(
-            field="test_field",
-            weight=1.5,
-            type=ScoreModifierType.Multiply
+            field="test_field", weight=1.5, type=ScoreModifierType.Multiply
         )
 
         non_rrf_methods = [RankingMethod.Tensor, RankingMethod.Lexical]
@@ -316,8 +303,7 @@ class TestMarqoHybridQuery(TestCase):
         for ranking_method in non_rrf_methods:
             with self.subTest(ranking_method=ranking_method):
                 hybrid_parameters = HybridParameters(
-                    retrievalMethod=RetrievalMethod.Tensor,
-                    rankingMethod=ranking_method
+                    retrievalMethod=RetrievalMethod.Tensor, rankingMethod=ranking_method
                 )
 
                 with self.assertRaises(ValidationError) as context:
@@ -327,11 +313,13 @@ class TestMarqoHybridQuery(TestCase):
                         or_phrases=["phrase1"],
                         and_phrases=["phrase2"],
                         hybrid_parameters=hybrid_parameters,
-                        score_modifiers=[score_modifier]
+                        score_modifiers=[score_modifier],
                     )
 
-                error_msg = ("'scoreModifiers' is only supported for hybrid "
-                             "search if 'rankingMethod' is 'RRF'")
+                error_msg = (
+                    "'scoreModifiers' is only supported for hybrid "
+                    "search if 'rankingMethod' is 'RRF'"
+                )
                 self.assertIn(error_msg, str(context.exception))
 
     def test_searchable_attributes_validation_fails(self):
@@ -345,10 +333,10 @@ class TestMarqoHybridQuery(TestCase):
                 or_phrases=["phrase1"],
                 and_phrases=["phrase2"],
                 hybrid_parameters=hybrid_parameters,
-                searchable_attributes=["field1", "field2"]
+                searchable_attributes=["field1", "field2"],
             )
 
         self.assertIn(
             "'searchableAttributes' cannot be used for hybrid search",
-            str(context.exception)
+            str(context.exception),
         )

@@ -2,21 +2,24 @@ import subprocess
 import time
 import uuid
 
-from marqo.errors import BackendCommunicationError, MarqoWebError
 from requests import HTTPError
 
+from marqo.errors import BackendCommunicationError, MarqoWebError
 from tests import marqo_test
 
 
 def is_container_stopped(container_name):
-    result = subprocess.run(["docker", "inspect", "-f", "{{.State.Status}}", container_name], capture_output=True, text=True)
+    result = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Status}}", container_name],
+        capture_output=True,
+        text=True,
+    )
     return result.stdout.strip() == "exited"
-
 
 
 class TestStartStop(marqo_test.MarqoTestCase):
     NUMBER_OF_RESTARTS = 3
-    INDEX_NAME = "test_start_stop_index" + str(uuid.uuid4()).replace('-', '')
+    INDEX_NAME = "test_start_stop_index" + str(uuid.uuid4()).replace("-", "")
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -49,39 +52,58 @@ class TestStartStop(marqo_test.MarqoTestCase):
         except MarqoWebError:
             pass
         self.client.create_index(index_name=self.INDEX_NAME)
-        self.client.index(self.INDEX_NAME).add_documents(documents=[d1, d2], tensor_fields=["Title"])
-        search_res_0 = self.client.index(self.INDEX_NAME).search(q="General nature facts")
-        assert (search_res_0["hits"][0]["_id"] == "fact_1") or (search_res_0["hits"][0]["_id"] == "fact_2")
+        self.client.index(self.INDEX_NAME).add_documents(
+            documents=[d1, d2], tensor_fields=["Title"]
+        )
+        search_res_0 = self.client.index(self.INDEX_NAME).search(
+            q="General nature facts"
+        )
+        assert (search_res_0["hits"][0]["_id"] == "fact_1") or (
+            search_res_0["hits"][0]["_id"] == "fact_2"
+        )
         assert len(search_res_0["hits"]) == 2
 
-        if sig == 'SIGTERM':
-            stop_marqo_res = subprocess.run(["docker", "stop", "marqo"], check=True, capture_output=True)
+        if sig == "SIGTERM":
+            stop_marqo_res = subprocess.run(
+                ["docker", "stop", "marqo"], check=True, capture_output=True
+            )
             assert "marqo" in str(stop_marqo_res.stdout)
-        elif sig == 'SIGINT':
-            stop_marqo_res = subprocess.run(["docker", "kill", "--signal=SIGINT", "marqo"], check=True,
-                                            capture_output=True)
+        elif sig == "SIGINT":
+            stop_marqo_res = subprocess.run(
+                ["docker", "kill", "--signal=SIGINT", "marqo"],
+                check=True,
+                capture_output=True,
+            )
             assert "marqo" in str(stop_marqo_res.stdout)
         elif sig == "SIGKILL":
-            stop_marqo_res = subprocess.run(["docker", "kill", "marqo"], check=True, capture_output=True)
+            stop_marqo_res = subprocess.run(
+                ["docker", "kill", "marqo"], check=True, capture_output=True
+            )
             assert "marqo" in str(stop_marqo_res.stdout)
         else:
-            raise ValueError(f"bad option used for sig: {sig}. Must be one of  ('SIGTERM', 'SIGINT', 'SIGKILL')")
+            raise ValueError(
+                f"bad option used for sig: {sig}. Must be one of  ('SIGTERM', 'SIGINT', 'SIGKILL')"
+            )
 
         # Polling the container status with timeout
         timeout = 60  # seconds
         start_time = time.time()
         while not is_container_stopped("marqo"):
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"Container 'marqo' failed to stop within {timeout} seconds.")
+                raise TimeoutError(
+                    f"Container 'marqo' failed to stop within {timeout} seconds."
+                )
             time.sleep(1)
 
         try:
             self.client.index(self.INDEX_NAME).search(q="General nature facts")
             raise AssertionError("Marqo is still accessible despite docker stopping!")
-        except BackendCommunicationError as mqe:
+        except BackendCommunicationError:
             pass
 
-        start_marqo_res = subprocess.run(["docker", "start", "marqo"], check=True, capture_output=True)
+        start_marqo_res = subprocess.run(
+            ["docker", "start", "marqo"], check=True, capture_output=True
+        )
         assert "marqo" in str(start_marqo_res.stdout)
 
         for i in range(NUMBER_OF_TRIES):
@@ -98,12 +120,16 @@ class TestStartStop(marqo_test.MarqoTestCase):
                 if "exceeds your S2Search free tier limit" in str(mqe):
                     raise mqe
                 if i + 1 >= NUMBER_OF_TRIES:
-                    raise AssertionError(f"Timeout waiting for Marqo to restart!")
+                    raise AssertionError("Timeout waiting for Marqo to restart!")
                 time.sleep(10)
 
-        search_res_1 = self.client.index(self.INDEX_NAME).search(q="General nature facts")
+        search_res_1 = self.client.index(self.INDEX_NAME).search(
+            q="General nature facts"
+        )
         assert search_res_1["hits"] == search_res_0["hits"]
-        assert (search_res_1["hits"][0]["_id"] == "fact_1") or (search_res_1["hits"][0]["_id"] == "fact_2")
+        assert (search_res_1["hits"][0]["_id"] == "fact_1") or (
+            search_res_1["hits"][0]["_id"] == "fact_2"
+        )
         return True
 
     def test_signal_term(self):

@@ -2,9 +2,12 @@ import traceback
 
 import pytest
 
-from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
+from tests.compatibility_tests.base_test_case.base_compatibility_test import (
+    BaseCompatibilityTestCase,
+)
 
-@pytest.mark.marqo_version('2.12.0')
+
+@pytest.mark.marqo_version("2.12.0")
 class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
     load_from_hf_index_name = "test_create_index_api_bring_your_own_model"
 
@@ -30,7 +33,9 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
         },
         "normalizeEmbeddings": True,
     }
-    load_from_public_url_with_custom_configurations_index_name = "test_create_index_api_public_url_custom_configurations"
+    load_from_public_url_with_custom_configurations_index_name = (
+        "test_create_index_api_public_url_custom_configurations"
+    )
     load_from_public_url_with_custom_configurations = {
         "treatUrlsAndPointersAsImages": True,
         "model": "my-own-clip-model",
@@ -43,7 +48,11 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
         },
         "normalizeEmbeddings": True,
     }
-    indexes_to_test_on = [load_from_hf_index_name, load_from_public_url_index_name, load_from_public_url_with_custom_configurations_index_name]
+    indexes_to_test_on = [
+        load_from_hf_index_name,
+        load_from_public_url_index_name,
+        load_from_public_url_with_custom_configurations_index_name,
+    ]
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -56,41 +65,55 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-
         all_results = {}
-        errors = [] # To store errors in case of failure
-        for index_name, settings in [(self.load_from_hf_index_name, self.load_from_hf_index_settings), (self.load_from_public_url_index_name, self.load_from_public_url_settings), (self.load_from_public_url_with_custom_configurations_index_name, self.load_from_public_url_with_custom_configurations)]:
+        errors = []  # To store errors in case of failure
+        for index_name, settings in [
+            (self.load_from_hf_index_name, self.load_from_hf_index_settings),
+            (self.load_from_public_url_index_name, self.load_from_public_url_settings),
+            (
+                self.load_from_public_url_with_custom_configurations_index_name,
+                self.load_from_public_url_with_custom_configurations,
+            ),
+        ]:
             try:
                 self.logger.debug(f"Creating index {index_name}")
-                self.client.create_index(index_name = index_name, settings_dict = settings)
+                self.client.create_index(index_name=index_name, settings_dict=settings)
                 all_results[index_name] = self.client.index(index_name).get_settings()
-            except Exception as e:
+            except Exception:
                 errors.append((index_name, traceback.format_exc()))
 
         if errors:
-            failure_message = "\n".join([
-                f"Failure in index {idx}, {error}"
-                for idx, error in errors
-            ])
-            self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
+            failure_message = "\n".join(
+                [f"Failure in index {idx}, {error}" for idx, error in errors]
+            )
+            self.logger.error(
+                f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail"
+            )
 
         self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()
-        test_failures = [] # To store test_failures in case of failure
+        test_failures = []  # To store test_failures in case of failure
 
-        for index_name in [self.load_from_hf_index_name, self.load_from_public_url_index_name, self.load_from_public_url_with_custom_configurations_index_name]:
+        for index_name in [
+            self.load_from_hf_index_name,
+            self.load_from_public_url_index_name,
+            self.load_from_public_url_with_custom_configurations_index_name,
+        ]:
             try:
                 expected_setting = expected_settings[index_name]
                 actual_setting = self.client.index(index_name).get_settings()
-                self.assertEqual(expected_setting, actual_setting, f"Index settings do not match expected settings, expected {expected_setting}, but got {actual_setting}")
-            except Exception as e:
+                self.assertEqual(
+                    expected_setting,
+                    actual_setting,
+                    f"Index settings do not match expected settings, expected {expected_setting}, but got {actual_setting}",
+                )
+            except Exception:
                 test_failures.append((index_name, traceback.format_exc()))
 
         if test_failures:
-            failure_message = "\n".join([
-                f"Failure in index {idx}: {error}"
-                for idx, error in test_failures
-            ])
+            failure_message = "\n".join(
+                [f"Failure in index {idx}: {error}" for idx, error in test_failures]
+            )
             self.fail(f"Some subtests failed:\n{failure_message}")

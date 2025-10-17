@@ -1,13 +1,12 @@
-from typing import List
-from typing import Optional, Union, Any, Sequence
+from typing import Any, List, Optional, Sequence, Union
 
 import numpy as np
-from pydantic.v1 import BaseModel, validator, root_validator
-from pydantic.v1 import Field
+from pydantic.v1 import BaseModel, Field, root_validator, validator
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
 from marqo.tensor_search.enums import EnvVars
+
 # TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
@@ -62,43 +61,50 @@ class AddDocsParams(BaseModel):
         Once set, media_download_thread_count is used for audio and video, image_download_thread_count is
         used for images, when sending inference requests to the inference server.
         """
-        image_count = values.get('image_download_thread_count')
-        media_count = values.get('media_download_thread_count')
+        image_count = values.get("image_download_thread_count")
+        media_count = values.get("media_download_thread_count")
         if media_count and image_count:
-            raise ValueError("Cannot set both 'image_download_thread_count' and 'media_download_thread_count'.")
+            raise ValueError(
+                "Cannot set both 'image_download_thread_count' and 'media_download_thread_count'."
+            )
         elif image_count is None and media_count is None:
             # Set default values for both
-            values['image_download_thread_count'] = (
-                read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-            values['media_download_thread_count'] = (
-                read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+            values["image_download_thread_count"] = read_env_vars_and_defaults_ints(
+                EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST
+            )
+            values["media_download_thread_count"] = read_env_vars_and_defaults_ints(
+                EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST
             )
         elif image_count is None and media_count is not None:
-            values['media_download_thread_count'] = media_count
-            values['image_download_thread_count'] = media_count
+            values["media_download_thread_count"] = media_count
+            values["image_download_thread_count"] = media_count
         elif image_count is not None and media_count is None:
-            values['media_download_thread_count'] = (
-                read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+            values["media_download_thread_count"] = read_env_vars_and_defaults_ints(
+                EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST
             )
-            values['image_download_thread_count'] = image_count
+            values["image_download_thread_count"] = image_count
         else:
-            raise ValueError("Invalid combination of image_download_thread_count and media_download_thread_count.")
+            raise ValueError(
+                "Invalid combination of image_download_thread_count and media_download_thread_count."
+            )
         return values
 
-    @validator('docs')
+    @validator("docs")
     def validate_docs(cls, docs):
         doc_count = len(docs)
 
-        max_doc = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE)
+        max_doc = read_env_vars_and_defaults_ints(
+            EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE
+        )
 
         if doc_count == 0:
             raise BadRequestError(message="Received empty add documents request")
         elif doc_count > max_doc:
             raise BadRequestError(
                 message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {max_doc}. "
-                        f"If using the Python client, break up your `add_documents` request into smaller batches using "
-                        f"its `client_batch_size` parameter. "
-                        f"See {marqo_docs.api_reference_document_body()} for more details."
+                f"If using the Python client, break up your `add_documents` request into smaller batches using "
+                f"its `client_batch_size` parameter. "
+                f"See {marqo_docs.api_reference_document_body()} for more details."
             )
 
         return docs

@@ -1,10 +1,10 @@
-import orjson
 import time
 from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import orjson
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 class TimerError(Exception):
     """An error occured whn operating on a metric timer (e.g. stopping a stopped timer)"""
+
     pass
 
 
@@ -26,18 +27,18 @@ class Timer:
     def start(self) -> None:
         """Start a new timer"""
         if self.start_time is not None:
-            logger.warning(f"'.start()' called on already running timer.")
+            logger.warning("'.start()' called on already running timer.")
         else:
             self.start_time = time.perf_counter()
 
     def stop(self) -> float:
         """Stop the timer, and report the elapsed time
-        
+
         Return time is in Ms.
         """
         if self.start_time is None:
             raise TimerError(
-                f"'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'."
+                "'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'."
             )
         else:
             elapsed_time = time.perf_counter() - self.start_time
@@ -110,14 +111,11 @@ class RequestMetrics:
         self.counter[k] += v
 
     def json(self):
-        return {
-            "counter": dict(self.counter),
-            "timesMs": dict(self.times)
-        }
+        return {"counter": dict(self.counter), "timesMs": dict(self.times)}
 
 
-class RequestMetricsStore():
-    current_request: ContextVar[Request] = ContextVar('current_request')
+class RequestMetricsStore:
+    current_request: ContextVar[Request] = ContextVar("current_request")
 
     METRIC_STORES: Dict[Request, RequestMetrics] = {}
 
@@ -137,7 +135,9 @@ class RequestMetricsStore():
         return cls.METRIC_STORES[r]
 
     @classmethod
-    def set_in_request(cls, r: Optional[Request] = None, metrics: Optional[RequestMetrics] = None) -> None:
+    def set_in_request(
+        cls, r: Optional[Request] = None, metrics: Optional[RequestMetrics] = None
+    ) -> None:
         """
         NOTE: this function should only be used in TelemetryMiddleware, and threading edge cases.
         """
@@ -153,16 +153,17 @@ class RequestMetricsStore():
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
     """
-    Responsible for starting a request-level metric object, capturing telemetry and injecting 
+    Responsible for starting a request-level metric object, capturing telemetry and injecting
     it into the Response payload. Metrics are only returned if the `DEFAULT_TELEMETRY_QUERY_PARAM`
-    query parameter is provided and it is  "true". Otherwise the request is not altered.    
+    query parameter is provided and it is  "true". Otherwise the request is not altered.
     """
 
     DEFAULT_TELEMETRY_QUERY_PARAM = "telemetry"
 
     def __init__(self, app, **options):
-        self.telemetry_flag: Optional[str] = options.pop("telemetery_flag",
-                                                         TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM)
+        self.telemetry_flag: Optional[str] = options.pop(
+            "telemetery_flag", TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM
+        )
         super().__init__(app, **options)
 
     def telemetry_enabled_for_request(self, request: Request) -> bool:
@@ -207,10 +208,11 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                     f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
                 )
                 get_logger(__name__).info(
-                    f"Telemetry data={orjson.dumps(telemetry).decode()}")
+                    f"Telemetry data={orjson.dumps(telemetry).decode()}"
+                )
 
         finally:
-            logger.debug('Clearing metrics for request')
+            logger.debug("Clearing metrics for request")
             RequestMetricsStore.clear_metrics_for(request)
 
         body = orjson.dumps(data)
@@ -220,5 +222,5 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             content=body,
             status_code=response.status_code,
             headers=dict(response.headers),
-            media_type=response.media_type
+            media_type=response.media_type,
         )

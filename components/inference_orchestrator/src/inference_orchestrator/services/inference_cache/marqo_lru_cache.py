@@ -1,9 +1,10 @@
-from typing import Hashable, Any
+from typing import Any, Hashable
 
 from cachetools import LRUCache
+from inference_orchestrator.services.inference_cache.abstract_cache import (
+    MarqoAbstractCache,
+)
 from readerwriterlock import rwlock
-
-from inference_orchestrator.services.inference_cache.abstract_cache import MarqoAbstractCache
 
 
 class MarqoLRUCache(MarqoAbstractCache):

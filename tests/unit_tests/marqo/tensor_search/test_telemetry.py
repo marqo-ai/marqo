@@ -6,19 +6,22 @@ import pytest
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, StreamingResponse
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.testclient import TestClient
 
-from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware, Timer, TimerError
+from marqo.tensor_search.telemetry import (
+    RequestMetricsStore,
+    TelemetryMiddleware,
+    Timer,
+    TimerError,
+)
 
 
 class TestTimer(unittest.TestCase):
-
     def setUp(self):
         self.timer = Timer()
 
-    @patch('time.perf_counter')
+    @patch("time.perf_counter")
     def test_timer_start_stop(self, mock_time):
         # Simulate the time progression
         mock_time.side_effect = [0.0, 1.0]
@@ -28,7 +31,7 @@ class TestTimer(unittest.TestCase):
         self.assertEqual(self.timer.start_time, 0.0)
 
         # Test warning if starting again without stopping
-        with self.assertLogs(level='WARNING') as cm:
+        with self.assertLogs(level="WARNING") as cm:
             self.timer.start()
         self.assertIn("'.start()' called on already running timer.", cm.output[0])
 
@@ -41,7 +44,7 @@ class TestTimer(unittest.TestCase):
         with self.assertRaises(TimerError):
             self.timer.stop()
 
-    @patch('time.perf_counter')
+    @patch("time.perf_counter")
     def test_timer_restart(self, mock_time):
         # Simulate the time progression, seconds
         mock_time.side_effect = [0.0, 1.0, 2.0, 4.0]
@@ -57,7 +60,6 @@ class TestTimer(unittest.TestCase):
 
 
 class TestRequestMetricsStore(unittest.TestCase):
-
     def setUp(self):
         RequestMetricsStore.METRIC_STORES = {}  # hard clear
         self.request = Request(scope={"type": "http"})
@@ -78,122 +80,126 @@ class TestRequestMetricsStore(unittest.TestCase):
         RequestMetricsStore.clear_metrics_for(self.request)
         self.assertEqual({}, RequestMetricsStore.METRIC_STORES)
 
-    @patch.object(Timer, 'start')
-    @patch.object(Timer, 'stop')
+    @patch.object(Timer, "start")
+    @patch.object(Timer, "stop")
     def test_time(self, mock_timer_stop, mock_timer_start):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         mock_timer_stop.return_value = 1.0
-        key = 'timer1'
+        key = "timer1"
         metric = RequestMetricsStore.for_request(self.request)
 
         with metric.time(key):
             pass
 
-        self.assertEqual(
-            metric.json(),
-            {
-                "counter": {},
-                "timesMs": {key: 1.0}
-            }
-        )
+        self.assertEqual(metric.json(), {"counter": {}, "timesMs": {key: 1.0}})
         mock_timer_start.assert_called_once()
         mock_timer_stop.assert_called_once()
 
-    @patch.object(Timer, 'start')
+    @patch.object(Timer, "start")
     def test_start(self, mock_timer_start):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         metric = RequestMetricsStore.for_request(self.request)
-        metric.start('timer1')
+        metric.start("timer1")
         mock_timer_start.assert_called_once()
 
-    @patch.object(Timer, 'stop')
+    @patch.object(Timer, "stop")
     def test_stop_success(self, mock_timer_stop):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         mock_timer_stop.return_value = 1.0
-        key = 'timer1'
+        key = "timer1"
         metric = RequestMetricsStore.for_request(self.request)
         elapsed_time = metric.stop(key)
-        self.assertEqual(
-            metric.json(),
-            {
-                "counter": {},
-                "timesMs": {key: 1.0}
-            }
-        )
+        self.assertEqual(metric.json(), {"counter": {}, "timesMs": {key: 1.0}})
         self.assertEqual(1.0, elapsed_time)
         mock_timer_stop.assert_called_once()
 
     def test_increment_counter_with_value(self):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
-        key = 'counter1'
+        key = "counter1"
         value = 5.0
         metric = RequestMetricsStore.for_request(self.request)
         metric.increment_counter(key, v=value)
         self.assertEqual(metric.counter, {key: value})
 
     def test_increment_counter_multiple_times(self):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
-        key = 'counter1'
+        key = "counter1"
         metric = RequestMetricsStore.for_request(self.request)
         metric.increment_counter(key)
         metric.increment_counter(key)
         self.assertEqual(metric.counter, {key: 2})
 
-    @patch.object(Timer, 'start')
-    @patch.object(Timer, 'stop')
+    @patch.object(Timer, "start")
+    @patch.object(Timer, "stop")
     def test_time_with_exception(self, mock_timer_stop, mock_timer_start):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         mock_timer_stop.return_value = 1.0
-        key = 'timer1'
+        key = "timer1"
         metric = RequestMetricsStore.for_request(self.request)
 
         with self.assertRaises(Exception):
             with metric.time(key):
                 raise Exception("Test exception")
 
-        self.assertEqual(
-            metric.json(),
-            {
-                "counter": {},
-                "timesMs": {key: 1.0}
-            }
-        )
+        self.assertEqual(metric.json(), {"counter": {}, "timesMs": {key: 1.0}})
         mock_timer_start.assert_called_once()
         mock_timer_stop.assert_called_once()
 
-    @patch.object(Timer, 'stop')
+    @patch.object(Timer, "stop")
     def test_stop_without_start(self, mock_timer_stop):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         mock_timer_stop.side_effect = TimerError
-        key = 'timer1'
+        key = "timer1"
         metric = RequestMetricsStore.for_request(self.request)
 
-        with self.assertLogs(level='WARNING') as cm:
+        with self.assertLogs(level="WARNING") as cm:
             metric.stop(key)
-        self.assertIn(f"timer {key} stopped incorrectly. Time not recorded.", cm.output[0])
+        self.assertIn(
+            f"timer {key} stopped incorrectly. Time not recorded.", cm.output[0]
+        )
 
-    @patch.object(Timer, 'stop')
+    @patch.object(Timer, "stop")
     def test_stop_fail(self, mock_timer_stop):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
         mock_timer_stop.side_effect = TimerError
-        key = 'timer1'
+        key = "timer1"
         metric = RequestMetricsStore.for_request(self.request)
-        with self.assertLogs(level='WARNING') as cm:
+        with self.assertLogs(level="WARNING") as cm:
             metric.stop(key)
-        self.assertIn(f"timer {key} stopped incorrectly. Time not recorded.", cm.output[0])
+        self.assertIn(
+            f"timer {key} stopped incorrectly. Time not recorded.", cm.output[0]
+        )
 
     def test_increment_counter_and_json(self):
-        RequestMetricsStore.set_in_request(r=self.request)  # As set by TelemetryMiddleware
+        RequestMetricsStore.set_in_request(
+            r=self.request
+        )  # As set by TelemetryMiddleware
 
-        key = 'key1'
+        key = "key1"
         metric = RequestMetricsStore.for_request(self.request)
         metric.increment_counter(key)
         metric.times[key] = 1.0
@@ -202,7 +208,6 @@ class TestRequestMetricsStore(unittest.TestCase):
 
 
 class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCase):
-
     def setUp(self):
         self.app = Starlette()
         self.app.add_middleware(TelemetryMiddleware)
@@ -213,7 +218,9 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
             return JSONResponse({"data": "test"})
 
         self.client = TestClient(self.app)
-        self.scope = {'type': 'http', }
+        self.scope = {
+            "type": "http",
+        }
         self.request = Request(self.scope)
 
     def test_telemetry_disabled(self):
@@ -238,9 +245,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         response = self.client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
         self.assertIn("counter", response.json()["telemetry"])
-        self.assertEqual(response.json()["telemetry"], {
-            "counter": {"key": 1.0}
-        })
+        self.assertEqual(response.json()["telemetry"], {"counter": {"key": 1.0}})
 
     @unittest.skip("Error running in GH Actions")
     def test_timing_usage(self):
@@ -291,7 +296,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertNotIn("telemetry", response.json())
 
     @pytest.mark.asyncio
-    @patch('starlette.testclient.TestClient.send')
+    @patch("starlette.testclient.TestClient.send")
     async def test_dispatch_no_telemetry(self, mock_send):
         # Mock the send function to return a mock response
         mock_send.return_value = Response()
@@ -299,7 +304,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         async def call_next(request):
             return Response()
 
-        self.scope = {'type': 'http', 'query_string': b'telemetry=false'}
+        self.scope = {"type": "http", "query_string": b"telemetry=false"}
         self.request = Request(self.scope)
 
         response = await self.middleware.dispatch(self.request, call_next)
@@ -307,23 +312,23 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertNotIn("telemetry", response.body.decode())
 
     @pytest.mark.asyncio
-    @patch('starlette.testclient.TestClient.send')
+    @patch("starlette.testclient.TestClient.send")
     async def test_dispatch_telemetry_not_dict(self, mock_send):
         mock_send.return_value = Response()
 
         async def call_next(request):
             return StreamingResponse(iter([json.dumps(["not", "a", "dict"]).encode()]))
 
-        self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
+        self.scope = {"type": "http", "query_string": b"telemetry=true"}
         self.request = Request(self.scope)
         response = await self.middleware.dispatch(self.request, call_next)
         self.assertIsInstance(response, Response)
         self.assertNotIn("telemetry", response.body.decode())
 
     @pytest.mark.asyncio
-    @patch('starlette.testclient.TestClient.send')
+    @patch("starlette.testclient.TestClient.send")
     async def test_dispatch_telemetry_dict(self, mock_send):
-        self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
+        self.scope = {"type": "http", "query_string": b"telemetry=true"}
         self.request = Request(self.scope)
 
         # Mock the send function to return a mock response
@@ -337,20 +342,24 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertIn("telemetry", response.body.decode())
 
     def test_telemetry_enabled_for_request(self):
-        self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
+        self.scope = {"type": "http", "query_string": b"telemetry=true"}
         self.request = Request(self.scope)
-        self.assertTrue(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
+        self.assertTrue(
+            TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request)
+        )
 
-        self.scope = {'type': 'http', 'query_string': b'telemetry=false'}
+        self.scope = {"type": "http", "query_string": b"telemetry=false"}
         self.request = Request(self.scope)
-        self.assertFalse(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
+        self.assertFalse(
+            TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request)
+        )
 
     @pytest.mark.asyncio
-    @patch('starlette.testclient.TestClient.send')
+    @patch("starlette.testclient.TestClient.send")
     async def test_dispatch_cleanup(self, mock_send):
         scopes = {
-            'telemetry_disabled': {'type': 'http', 'query_string': ''},
-            'telemetry_enabled': {'type': 'http', 'query_string': b'telemetry=true'},
+            "telemetry_disabled": {"type": "http", "query_string": ""},
+            "telemetry_enabled": {"type": "http", "query_string": b"telemetry=true"},
         }
         for test, scope in scopes.items():
             with self.subTest(test=test):
@@ -366,6 +375,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
                     return StreamingResponse(mock_streaming_content())
 
                 with patch(
-                        'marqo.tensor_search.telemetry.RequestMetricsStore.clear_metrics_for') as mock_clear_metrics_for:
+                    "marqo.tensor_search.telemetry.RequestMetricsStore.clear_metrics_for"
+                ) as mock_clear_metrics_for:
                     await self.middleware.dispatch(self.request, call_next)
                     mock_clear_metrics_for.assert_called_once_with(self.request)

@@ -5,6 +5,7 @@ from inference_orchestrator.services.triton_inference.embedding_models.marqo_mod
     get_model_properties,
 )
 from inference_orchestrator.version import get_version
+
 from .config import Config
 from .core.logging import get_logger
 from .core.settings import get_settings

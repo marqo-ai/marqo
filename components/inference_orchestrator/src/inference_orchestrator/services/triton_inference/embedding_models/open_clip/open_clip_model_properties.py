@@ -1,10 +1,11 @@
-from numpy import dtype
 from enum import Enum
-from pydantic import Field, field_validator, PrivateAttr, model_validator
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
+
+from numpy import dtype
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from ..base_model_properties import BaseModelProperties, TritonModelProperties
-from ..data_type_conversion import convert_to_triton_data_type, convert_to_numpy_dtype
+from ..data_type_conversion import convert_to_numpy_dtype, convert_to_triton_data_type
 
 
 class ImagePreprocessor(str, Enum):

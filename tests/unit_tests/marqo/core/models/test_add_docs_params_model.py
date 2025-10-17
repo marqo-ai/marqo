@@ -8,7 +8,6 @@ from marqo.tensor_search.enums import EnvVars
 
 
 class TestAddDocsParamsModel(TestCase):
-
     def setUp(self):
         self.sample_docs = [{"doc1": "value1"}, {"doc2": "value2"}]
 
@@ -19,7 +18,7 @@ class TestAddDocsParamsModel(TestCase):
             index_name="test_index",
             image_download_thread_count=None,
             media_download_thread_count=None,
-            device=None
+            device=None,
         )
 
         self.assertEqual(20, params.image_download_thread_count)
@@ -32,7 +31,7 @@ class TestAddDocsParamsModel(TestCase):
             index_name="test_index",
             image_download_thread_count=3,
             media_download_thread_count=None,
-            device=None
+            device=None,
         )
 
         self.assertEqual(3, params.image_download_thread_count)
@@ -45,7 +44,7 @@ class TestAddDocsParamsModel(TestCase):
             index_name="test_index",
             image_download_thread_count=None,
             media_download_thread_count=4,
-            device=None
+            device=None,
         )
 
         self.assertEqual(4, params.media_download_thread_count)
@@ -59,13 +58,12 @@ class TestAddDocsParamsModel(TestCase):
                 index_name="test_index",
                 image_download_thread_count=2,
                 media_download_thread_count=3,
-                device=None
+                device=None,
             )
         self.assertIn("Cannot set both", str(context.exception))
 
     @patch("marqo.core.models.add_docs_params.read_env_vars_and_defaults_ints")
     def test_env_vars_override_defaults(self, mock_read_env_vars):
-
         def mock_env_var_reader(key):
             if key == EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST:
                 return 15
@@ -82,7 +80,7 @@ class TestAddDocsParamsModel(TestCase):
             index_name="test_index",
             image_download_thread_count=None,
             media_download_thread_count=None,
-            device=None
+            device=None,
         )
 
         # Validate that environment values were respected

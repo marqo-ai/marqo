@@ -1,11 +1,11 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from pydantic.v1 import BaseModel, Field, root_validator
+from pydantic.v1 import BaseModel, Field
 
 
 class UpdateDocumentResponse(BaseModel):
     status: int
-    path_id: Optional[str] = Field(default=None, alias='pathId')
+    path_id: Optional[str] = Field(default=None, alias="pathId")
     id: Optional[str]
     message: Optional[str]
 

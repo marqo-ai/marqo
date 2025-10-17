@@ -2,11 +2,12 @@
 Our test suite is quite brittle. This helps the unit test suite navigate
 refactoring transitions in Marqo
 """
+
 from copy import deepcopy
 
 from marqo.config import Config
-from marqo.tensor_search.enums import EnvVars
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
@@ -21,12 +22,17 @@ def add_docs_caller(config: Config, **kwargs):
     # add_documents can never be called without setting device first
     if "device" not in kwargs:
         kwargs["device"] = "cpu"
-    
+
     return config.document.add_documents(add_docs_params=AddDocsParams(**kwargs))
 
 
-def add_docs_batched(config: Config,
-                     batch_size: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE), **kwargs):
+def add_docs_batched(
+    config: Config,
+    batch_size: int = read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE
+    ),
+    **kwargs,
+):
     """
     Helper function to batch large add_documents calls in testing
     Default batch size is the default max add docs count env var
@@ -38,4 +44,8 @@ def add_docs_batched(config: Config,
     del kwargs_without_docs["docs"]
 
     for i in range(0, len(docs), batch_size):
-        config.document.add_documents(add_docs_params=AddDocsParams(docs=docs[i:i+batch_size], **kwargs_without_docs))
+        config.document.add_documents(
+            add_docs_params=AddDocsParams(
+                docs=docs[i : i + batch_size], **kwargs_without_docs
+            )
+        )

@@ -4,9 +4,7 @@ import concurrent
 
 def _run_coroutine_in_thread(coro):
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(
-            asyncio.run, coro
-        )
+        future = executor.submit(asyncio.run, coro)
         return_value = future.result()
         return return_value
 

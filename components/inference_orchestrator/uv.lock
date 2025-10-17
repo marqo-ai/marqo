@@ -1133,8 +1133,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "isort" },
-    { name = "marqo" },
     { name = "opentelemetry-test-utils" },
     { name = "parameterized" },
     { name = "pre-commit" },
@@ -1174,8 +1172,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "isort", specifier = ">=7.0.0" },
-    { name = "marqo", specifier = ">=3.18.0" },
     { name = "opentelemetry-test-utils", specifier = ">=0.58b0" },
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
@@ -1259,15 +1255,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7c/1a/3c8edc664e06e6bd06cce40c6b22da5f1429aa4224d0c590f3be21c91ead/isoduration-20.11.0.tar.gz", hash = "sha256:ac2f9015137935279eac671f94f89eb00584f940f5dc49462a0c4ee692ba1bd9", size = 11649, upload-time = "2020-11-01T11:00:00.312Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl", hash = "sha256:b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042", size = 11321, upload-time = "2020-11-01T10:59:58.02Z" },
-]
-
-[[package]]
-name = "isort"
-version = "7.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/63/53/4f3c058e3bace40282876f9b553343376ee687f3c35a525dc79dbd450f88/isort-7.0.0.tar.gz", hash = "sha256:5513527951aadb3ac4292a41a16cbc50dd1642432f5e8c20057d414bdafb4187", size = 805049, upload-time = "2025-10-11T13:30:59.107Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/ed/e3705d6d02b4f7aea715a353c8ce193efd0b5db13e204df895d38734c244/isort-7.0.0-py3-none-any.whl", hash = "sha256:1bcabac8bc3c36c7fb7b98a76c8abb18e0f841a3ba81decac7691008592499c1", size = 94672, upload-time = "2025-10-11T13:30:57.665Z" },
 ]
 
 [[package]]
@@ -1571,21 +1558,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/80/0985960e4b89922cb5a0bac0ed39c5b96cbc1a536a99f30e8c220a996ed9/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:131a3c7689c85f5ad20f9f6fb1b866f402c445b220c19fe4308c0b147ccd2ad9", size = 24098, upload-time = "2024-10-18T15:21:40.813Z" },
     { url = "https://files.pythonhosted.org/packages/82/78/fedb03c7d5380df2427038ec8d973587e90561b2d90cd472ce9254cf348b/MarkupSafe-3.0.2-cp313-cp313t-win32.whl", hash = "sha256:ba8062ed2cf21c07a9e295d5b8a2a5ce678b913b45fdf68c32d95d6c1291e0b6", size = 15208, upload-time = "2024-10-18T15:21:41.814Z" },
     { url = "https://files.pythonhosted.org/packages/4f/65/6079a46068dfceaeabb5dcad6d674f5f5c61a6fa5673746f42a9f4c233b3/MarkupSafe-3.0.2-cp313-cp313t-win_amd64.whl", hash = "sha256:e444a31f8db13eb18ada366ab3cf45fd4b31e4db1236a4448f68778c1d1a5a2f", size = 15739, upload-time = "2024-10-18T15:21:42.784Z" },
-]
-
-[[package]]
-name = "marqo"
-version = "3.18.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "pydantic" },
-    { name = "requests" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/be/b241aa8fbeea3eb8bb4384884f024f4f9704b8fb1d4836a85be53c0ce868/marqo-3.18.0.tar.gz", hash = "sha256:4b138104afc2bdf43903be8ccd31bec4dfe7c9664fdefc53537f014b86dd3fec", size = 42352, upload-time = "2025-08-22T04:57:53.785Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/8c/a7a669c3380c2d772cce9c2ed52b8deda4a6d62170c8a1c4b7ad02c7c174/marqo-3.18.0-py3-none-any.whl", hash = "sha256:f16612cfa13158037074a6584aa03c2e9ba9e63ff7c0b260b649c989aa60275d", size = 40261, upload-time = "2025-08-22T04:57:52.791Z" },
 ]
 
 [[package]]

@@ -3,9 +3,11 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindModel
+from marqo.inference.native_inference.embedding_models.languagebind_model import (
+    LanguagebindModel,
+)
 from marqo.inference.native_inference.inference_pipeline.languagebind_model_inference_pipeline import (
-    LanguagebindModelInferencePipeline
+    LanguagebindModelInferencePipeline,
 )
 from marqo.inference.type import *
 
@@ -21,26 +23,35 @@ class TestLanguagebindModelInferencePipeline(TestCase):
         # Mock get_preprocessor to return a callable
         # That callable returns a list of Tensor mocks
         tensor_mock = Mock(spec=Tensor)
-        preprocessor_callable = Mock(return_value=[tensor_mock])  # returns list when called
+        preprocessor_callable = Mock(
+            return_value=[tensor_mock]
+        )  # returns list when called
         self.mock_model.get_preprocessor.return_value = preprocessor_callable
 
         self.mock_model.encode.return_value = [np.random.rand(768)]
 
         # Mock model_properties
         mock_model_properties = Mock()
-        mock_model_properties.supportedModalities = ["language", "image", "audio", "video"]
+        mock_model_properties.supportedModalities = [
+            "language",
+            "image",
+            "audio",
+            "video",
+        ]
         self.mock_model.model_properties = mock_model_properties
 
         # Valid configs
         self.model_config = ModelConfig(
             model_name="mock-model",
-            model_properties={"name": "mock-model", "dimensions": 768, "supported_modalities": ["language", "image"]},
-            normalize_embeddings=True
+            model_properties={
+                "name": "mock-model",
+                "dimensions": 768,
+                "supported_modalities": ["language", "image"],
+            },
+            normalize_embeddings=True,
         )
 
-        self.preprocessing_config = TextPreprocessingConfig(
-            should_chunk=False
-        )
+        self.preprocessing_config = TextPreprocessingConfig(should_chunk=False)
 
         self.inference_request_text = InferenceRequest(
             modality=Modality.TEXT,
@@ -48,12 +59,11 @@ class TestLanguagebindModelInferencePipeline(TestCase):
             model_config=self.model_config,
             preprocessing_config=self.preprocessing_config,
             return_individual_error=False,
-            device="cpu"
+            device="cpu",
         )
 
         self.pipeline = LanguagebindModelInferencePipeline(
-            model=self.mock_model,
-            inference_request=self.inference_request_text
+            model=self.mock_model, inference_request=self.inference_request_text
         )
 
     def test_collect_valid_content_to_encode_valid(self):
@@ -103,9 +113,9 @@ class TestLanguagebindModelInferencePipeline(TestCase):
         with self.assertRaises(ValueError):
             self.pipeline._encode_processed_content(preprocessed_content)
 
-    @patch.object(LanguagebindModelInferencePipeline, '_content_preprocessing')
-    @patch.object(LanguagebindModelInferencePipeline, '_encode_processed_content')
-    @patch.object(LanguagebindModelInferencePipeline, 'format_results')
+    @patch.object(LanguagebindModelInferencePipeline, "_content_preprocessing")
+    @patch.object(LanguagebindModelInferencePipeline, "_encode_processed_content")
+    @patch.object(LanguagebindModelInferencePipeline, "format_results")
     def test_run_pipeline(self, mock_format_results, mock_encode, mock_preprocess):
         """Test to ensure that the pipeline runs correctly."""
         mock_preprocess.return_value = [[("chunk", Mock(spec=Tensor))]]

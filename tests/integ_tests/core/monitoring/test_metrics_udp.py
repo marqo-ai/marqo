@@ -16,6 +16,7 @@ import marqo.core.monitoring.statsd_middleware as sm
 
 class _UDPSink:
     """A UDP sink that captures packets sent to it, thread-safe via _lock."""
+
     def __init__(self, host: str = "127.0.0.1", port: int = 0):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # ensure recvfrom() wakes up regularly so stop()/join() can’t hang
@@ -124,7 +125,11 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
                 # Return explicit JSONResponse so we control headers precisely
                 return JSONResponse(
                     content={"indexed": 1},
-                    headers={"x-count-success": "1", "x-count-failure": "0", "x-count-error": "0"},
+                    headers={
+                        "x-count-success": "1",
+                        "x-count-failure": "0",
+                        "x-count-error": "0",
+                    },
                     status_code=200,
                 )
 
@@ -189,7 +194,9 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         """Count how many packets match the given regex pattern."""
         return sum(1 for p in pkt if re.search(pattern, p))
 
-    def _wait_for_all_patterns(self, sink, patterns: List[str], timeout: float = 8.0) -> List[str]:
+    def _wait_for_all_patterns(
+        self, sink, patterns: List[str], timeout: float = 8.0
+    ) -> List[str]:
         deadline = time.time() + timeout
         while time.time() < deadline:
             pkt = sink.decoded()
@@ -209,9 +216,13 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         self.client.patch("/indexes/foo/documents")  # partial update
         self.client.get("/indexes/foo/documents/abc123")  # MUST redact id
         self.client.post("/indexes/foo/documents/delete-batch")  # MUST NOT redact
-        self.client.post("/indexes/foo/documents/delete-batch?telemetry=true")  # MUST NOT redact (even with query)
+        self.client.post(
+            "/indexes/foo/documents/delete-batch?telemetry=true"
+        )  # MUST NOT redact (even with query)
         self.client.post("/indexes/foo/documents/get-batch")  # MUST NOT redact
-        self.client.post("/indexes/foo/documents/get-batch?telemetry=true")  # MUST NOT redact (even with query)
+        self.client.post(
+            "/indexes/foo/documents/get-batch?telemetry=true"
+        )  # MUST NOT redact (even with query)
 
         self.client.get("/indexes/foo/stats")
         self.client.get("/indexes/foo/settings")
@@ -223,34 +234,27 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
 
         # Expected metric patterns
         patterns = [
-
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/search,method:POST,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/recommend,method:POST,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/embed,method:POST,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/bulk/search,method:POST,status_code:200",
-
             # documents collection endpoints (no redaction)
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:POST,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:GET,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents,method:PATCH,status_code:200",
-
             # single doc (redacted)
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200",
-
             # fixed subpaths (no redaction)
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/delete-batch,method:POST,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/get-batch,method:POST,status_code:200",
-
             # stats/settings
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/stats,method:GET,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/settings,method:GET,status_code:200",
-
             # models & devices
             r"request\.duration_ms:\d+\|ms\|#path:/models,method:GET,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/models,method:DELETE,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/device/cuda,method:GET,status_code:200",
             r"request\.duration_ms:\d+\|ms\|#path:/device/cpu,method:GET,status_code:200",
-
             # batch counters from POST /documents (headers-driven)
             r"batch\.success:1\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
             r"batch\.failure:0\|c\|#path:/indexes/foo/documents,method:POST,status_code:200",
@@ -271,20 +275,18 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         )
         # 2) We sent delete-batch twice (with and without ?telemetry=true),
         # so the normalized metric line should appear exactly twice.
-        delete_batch_pat = (
-            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/delete-batch,method:POST,status_code:200"
-        )
+        delete_batch_pat = r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/delete-batch,method:POST,status_code:200"
         self.assertEqual(
-            self._count(pkt, delete_batch_pat), 2,
+            self._count(pkt, delete_batch_pat),
+            2,
             msg=f"Expected exactly 2 delete-batch packets (query stripped)\nSeen:\n{pkt}",
         )
 
         # 3) Same for get-batch (also called twice).
-        get_batch_pat = (
-            r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/get-batch,method:POST,status_code:200"
-        )
+        get_batch_pat = r"request\.duration_ms:\d+\|ms\|#path:/indexes/foo/documents/get-batch,method:POST,status_code:200"
         self.assertEqual(
-            self._count(pkt, get_batch_pat), 2,
+            self._count(pkt, get_batch_pat),
+            2,
             msg=f"Expected exactly 2 get-batch packets (query stripped)\nSeen:\n{pkt}",
         )
 
@@ -295,6 +297,9 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
         self.sink.wait(n=1)
         pkt = self.sink.decoded()
         self.assertTrue(
-            _has(pkt, r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200"),
+            _has(
+                pkt,
+                r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200",
+            ),
             msg=f"Missing redacted packet\nSeen:\n{pkt}",
         )

@@ -1,7 +1,5 @@
 from typing import List, Tuple, Union
 
-from numpy import ndarray
-
 from inference_orchestrator.schemas.api import (
     InferenceErrorModel,
     InferenceRequest,
@@ -17,6 +15,7 @@ from inference_orchestrator.services.triton_inference.embedding_models.random.ra
 from inference_orchestrator.services.triton_inference.inference_pipelines.abstract_inference_pipeline import (
     AbstractInferencePipeline,
 )
+from numpy import ndarray
 
 RandomModelPreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 

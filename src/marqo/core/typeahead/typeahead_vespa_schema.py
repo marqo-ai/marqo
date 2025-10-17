@@ -14,19 +14,27 @@ class TypeaheadVespaSchema:
     def generate_schema(self) -> (str, MarqoIndex):
         """
         Generate a Vespa schema for typeahead functionality.
-        
+
         Returns:
             A tuple containing the Vespa schema name and the schema definition as a string.
         """
-        typeahead_schema_name = self._get_typeahead_schema_name(self.marqo_index.schema_name)
+        typeahead_schema_name = self._get_typeahead_schema_name(
+            self.marqo_index.schema_name
+        )
 
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
-        vespa_schema_template = environment.get_template("typeahead_vespa_schema_template.sd.jinja2")
+        vespa_schema_template = environment.get_template(
+            "typeahead_vespa_schema_template.sd.jinja2"
+        )
 
-        new_marqo_index = self.marqo_index.copy(deep=True, update={"typeahead_schema_name": typeahead_schema_name})
+        new_marqo_index = self.marqo_index.copy(
+            deep=True, update={"typeahead_schema_name": typeahead_schema_name}
+        )
 
-        return vespa_schema_template.render(schema_name=typeahead_schema_name), new_marqo_index
+        return vespa_schema_template.render(
+            schema_name=typeahead_schema_name
+        ), new_marqo_index
 
     def _get_typeahead_schema_name(self, schema_name: str) -> str:
         """

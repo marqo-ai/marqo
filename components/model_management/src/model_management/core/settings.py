@@ -1,10 +1,8 @@
-from pydantic import Field, field_validator, ValidationError
+from model_management.schemas.triton_model_properties import TritonModelProperties
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 
-from model_management.schemas.triton_model_properties import (
-    TritonModelProperties,
-)
-from .enum import LogLevel, LogFormat
+from .enum import LogFormat, LogLevel
 
 
 class EnvironmentVariablesParsingError(Exception):
@@ -13,22 +11,20 @@ class EnvironmentVariablesParsingError(Exception):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        extra="ignore",
-        case_sensitive=True,
-        env_file=".env",
-        env_file_encoding="utf-8"
+        extra="ignore", case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )
 
-    triton_url: str = Field("http://localhost:8000", validation_alias='TRITON_URL')
+    triton_url: str = Field("http://localhost:8000", validation_alias="TRITON_URL")
     marqo_models_to_preload: list[TritonModelProperties] = Field(
-        default_factory=list, validation_alias='MARQO_MODELS_TO_PRELOAD',
-        description="A JSON array of TritonModelProperties", min_length=0, max_length=3
+        default_factory=list,
+        validation_alias="MARQO_MODELS_TO_PRELOAD",
+        description="A JSON array of TritonModelProperties",
+        min_length=0,
+        max_length=3,
     )
-    model_base_dir: str = Field(
-        "./cache/models", validation_alias='MODEL_BASE_DIR'
-    )
-    log_level: LogLevel = Field(LogLevel.INFO, validation_alias='LOG_LEVEL')
-    log_format: LogFormat = Field(LogFormat.PLAIN, validation_alias='LOG_FORMAT')
+    model_base_dir: str = Field("./cache/models", validation_alias="MODEL_BASE_DIR")
+    log_level: LogLevel = Field(LogLevel.INFO, validation_alias="LOG_LEVEL")
+    log_format: LogFormat = Field(LogFormat.PLAIN, validation_alias="LOG_FORMAT")
 
     @field_validator("log_level", mode="before")
     @classmethod

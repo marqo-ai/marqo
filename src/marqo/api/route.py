@@ -12,6 +12,7 @@ class MarqoCustomRoute(APIRoute):
     The log will include the stack trace of the error for debugging purposes.
     The raised error will be handled by the exception handlers. We DO NOT handle the error here.
     """
+
     def get_route_handler(self):
         original_route_handler = super().get_route_handler()
 

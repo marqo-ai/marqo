@@ -1,16 +1,8 @@
-from typing import List, Callable, Tuple
+from typing import Callable, List, Tuple
 
 import numpy as np
 import open_clip
 import torch
-from PIL.Image import Image
-from numpy import ndarray
-from open_clip.transform import image_transform_v2
-from pydantic import ValidationError
-from torch import Tensor
-from torchvision.transforms import Compose
-from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
-
 from inference_orchestrator import marqo_docs
 from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.schemas.api import Modality
@@ -36,6 +28,14 @@ from inference_orchestrator.services.triton_inference.model_manager.model_manage
 from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import (
     TritonGRPCClient,
 )
+from numpy import ndarray
+from open_clip.transform import image_transform_v2
+from PIL.Image import Image
+from pydantic import ValidationError
+from torch import Tensor
+from torchvision.transforms import Compose
+from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
+
 from ..model_download_cache import ModelDownloadCache
 
 logger = get_logger(__name__)

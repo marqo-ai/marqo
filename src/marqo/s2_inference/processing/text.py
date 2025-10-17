@@ -3,11 +3,12 @@ from types import FunctionType
 from typing import List
 
 from more_itertools import windowed
+
 # sent_tokenize and word_tokenize requires the punkt_tab dataset
 from nltk.tokenize import sent_tokenize, word_tokenize
 
 
-def _splitting_functions(split_by: str, language: str='english') -> FunctionType:
+def _splitting_functions(split_by: str, language: str = "english") -> FunctionType:
     """_summary_
     selects a text splitting function based on the method provided by 'split_by'
     Args:
@@ -19,29 +20,30 @@ def _splitting_functions(split_by: str, language: str='english') -> FunctionType
         TypeError: _description_
 
     Returns:
-        _type_: function for splitting text based on the method provided 
+        _type_: function for splitting text based on the method provided
     """
     if not isinstance(split_by, str):
         raise TypeError(f"expected str received {type(split_by)}")
 
     MAPPING = {
-        'character':list,
-        'word': partial(word_tokenize, language=language),
-        'sentence':partial(sent_tokenize, language=language),
-        'passage':lambda x:x.split("\n\n")
+        "character": list,
+        "word": partial(word_tokenize, language=language),
+        "sentence": partial(sent_tokenize, language=language),
+        "passage": lambda x: x.split("\n\n"),
     }
 
     if split_by in MAPPING:
         return MAPPING[split_by]
-    
+
     # can also have a custom split but leave that for now
     raise KeyError(f"unexpected split_by type of {split_by}")
+
 
 def _reconstruct_single_list(segmented_text: List[str], seperator: str = " ") -> str:
     """_summary_
 
     Args:
-        segmented_text (List[str]): List of strings that were segmented 
+        segmented_text (List[str]): List of strings that were segmented
         seperator (str, optional): what to use as a seperator between tokens when re-joining into text. Defaults to " ".
 
     Returns:
@@ -49,7 +51,10 @@ def _reconstruct_single_list(segmented_text: List[str], seperator: str = " ") ->
     """
     return seperator.join([t for t in segmented_text if t is not None])
 
-def _reconstruct_multi_list(segmented_text_list: List[List[str]], seperator: str = " ") -> List[str]:
+
+def _reconstruct_multi_list(
+    segmented_text_list: List[List[str]], seperator: str = " "
+) -> List[str]:
     """_summary_
 
     Args:
@@ -65,11 +70,12 @@ def _reconstruct_multi_list(segmented_text_list: List[List[str]], seperator: str
         txt = _reconstruct_single_list(seg, seperator)
         if len(txt) > 0:
             results.append(txt)
-    
+
     return results
 
+
 def check_make_string_valid(text: str, coerce: bool = True) -> str:
-    """ does some simple validation and coercsion for empty strings
+    """does some simple validation and coercsion for empty strings
 
     Args:
         text (str): text of type str
@@ -83,7 +89,7 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
     """
     empty_string = " "
 
-    if text in [[], None, '', "", empty_string] and coerce:
+    if text in [[], None, "", "", empty_string] and coerce:
         return empty_string
 
     if text.isspace():
@@ -94,9 +100,16 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
 
     return text
 
-def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, split_overlap: int = 1, 
-               language: str = 'english', custom_seperator: str = None) -> List[str]:
-    """ splits a single piece of text into smaller sub-texts based on splitting method (split_by).
+
+def split_text(
+    text: str,
+    split_by: str = "sentence",
+    split_length: int = 2,
+    split_overlap: int = 1,
+    language: str = "english",
+    custom_seperator: str = None,
+) -> List[str]:
+    """splits a single piece of text into smaller sub-texts based on splitting method (split_by).
         for example, the text can can be split at the character, word, sentence or passage level.
         optionally it can be split with a custom splitting string
 
@@ -118,7 +131,7 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
     if split_length == 0:
         raise ValueError("split length must be > 0")
 
-    # simple validation and correction    
+    # simple validation and correction
     text = check_make_string_valid(text, coerce=True)
 
     # don't split if it is not worth splitting
@@ -127,8 +140,8 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
 
     # we need to treat character splitting differently
     if custom_seperator is None:
-        seperator = '' if split_by == 'character' else ' '
-    else: 
+        seperator = "" if split_by == "character" else " "
+    else:
         seperator = custom_seperator
 
     # determine how we want to split
@@ -136,16 +149,18 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
 
     # do the splitting
     split_text = _func(text)
-    
+
     # concatenate individual elements based on split_length & split_stride
-    segments = list(windowed(split_text, n=split_length, step=split_length - split_overlap))
+    segments = list(
+        windowed(split_text, n=split_length, step=split_length - split_overlap)
+    )
 
     # reconstruct the segments. there is potential for a lossy process here as we
     # assume a uniform seperator when reconstructing the sentences
     text_splits = _reconstruct_multi_list(segments, seperator)
 
-
     return text_splits
+
 
 def prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[str]:
     """
@@ -157,9 +172,8 @@ def prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[s
     """
     if not text_chunk_prefix:
         return text_splits
-    
+
     # Note that with this we directly concatenate the prefix to the text chunk
     # So we should make sure that there is a space between the prefix and the text
     # In text_chunk_prefix
     return [text_chunk_prefix + text for text in text_splits]
-

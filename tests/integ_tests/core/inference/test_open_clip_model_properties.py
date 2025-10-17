@@ -2,7 +2,10 @@ import unittest
 
 import pytest
 
-from marqo.inference.native_inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties
+from marqo.inference.native_inference.embedding_models.open_clip_model_properties import (
+    OpenCLIPModelProperties,
+)
+
 
 @pytest.mark.unittest
 class TestOpenCLIPModelProperties(unittest.TestCase):
@@ -17,15 +20,12 @@ class TestOpenCLIPModelProperties(unittest.TestCase):
                     "dimensions": 768,
                     "tokens": 256,
                     "modelLocation": {
-                        "hf": {
-                            "repoId": "test-repo-id",
-                            "filename": "test-filename"
-                        },
+                        "hf": {"repoId": "test-repo-id", "filename": "test-filename"},
                     },
                     "imagePreprocessor": "SigLIP",
                 },
-
-                "alias fields/camelCase"),
+                "alias fields/camelCase",
+            ),
             (
                 {
                     "name": "test-model",
@@ -33,15 +33,12 @@ class TestOpenCLIPModelProperties(unittest.TestCase):
                     "dimensions": 768,
                     "tokens": 256,
                     "model_location": {
-                        "hf": {
-                            "repo_id": "test-repo-id",
-                            "filename": "test-filename"
-                        },
+                        "hf": {"repo_id": "test-repo-id", "filename": "test-filename"},
                     },
                     "image_preprocessor": "SigLIP",
-
                 },
-                "original fields/snake_case"),
+                "original fields/snake_case",
+            ),
         )
 
         for model_properties, msg in test_cases:
@@ -54,10 +51,17 @@ class TestOpenCLIPModelProperties(unittest.TestCase):
                 self.assertEqual(open_clip_model_properties.precision, "fp32")
                 self.assertIsNone(open_clip_model_properties.url)
                 self.assertIsNone(open_clip_model_properties.localpath)
-                self.assertEqual(open_clip_model_properties.model_location.hf.repo_id, "test-repo-id")
-                self.assertEqual(open_clip_model_properties.model_location.hf.filename, "test-filename")
+                self.assertEqual(
+                    open_clip_model_properties.model_location.hf.repo_id, "test-repo-id"
+                )
+                self.assertEqual(
+                    open_clip_model_properties.model_location.hf.filename,
+                    "test-filename",
+                )
                 self.assertEqual(open_clip_model_properties.tokenizer, None)
-                self.assertEqual(open_clip_model_properties.image_preprocessor, "SigLIP")
+                self.assertEqual(
+                    open_clip_model_properties.image_preprocessor, "SigLIP"
+                )
                 self.assertEqual(open_clip_model_properties.mean, None)
                 self.assertEqual(open_clip_model_properties.std, None)
                 self.assertEqual(open_clip_model_properties.size, None)

@@ -3,17 +3,16 @@ from unittest.mock import Mock
 
 import blake3
 import numpy as np
-
 from inference_orchestrator.schemas.api import (
-    Inference,
-    InferenceRequest,
     EmbeddingModelConfig,
-    TextPreprocessingConfig,
-    TextChunkConfig,
-    InferenceResult,
-    InferenceErrorModel,
     ImagePreprocessingConfig,
+    Inference,
+    InferenceErrorModel,
+    InferenceRequest,
+    InferenceResult,
     Modality,
+    TextChunkConfig,
+    TextPreprocessingConfig,
 )
 from inference_orchestrator.services.inference_cache.caching_inference import (
     CachingInference,

@@ -4,13 +4,13 @@ from pydantic.v1 import BaseModel, Field
 
 
 class DeleteDocumentResponse(BaseModel):
-    path_id: str = Field(alias='pathId')
+    path_id: str = Field(alias="pathId")
     id: str
 
 
 class DeleteBatchDocumentResponse(BaseModel):
     status: int
-    path_id: str = Field(alias='pathId')
+    path_id: str = Field(alias="pathId")
     id: Optional[str]
     message: Optional[str]
 
@@ -21,5 +21,5 @@ class DeleteBatchResponse(BaseModel):
 
 
 class DeleteAllDocumentsResponse(BaseModel):
-    path_id: str = Field(alias='pathId')
-    document_count: int = Field(alias='documentCount')
+    path_id: str = Field(alias="pathId")
+    document_count: int = Field(alias="documentCount")

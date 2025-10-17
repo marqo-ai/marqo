@@ -1,18 +1,25 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from numpy import ndarray
-
 from inference_orchestrator.schemas.api import Modality
-from inference_orchestrator.services.triton_inference.model_manager.model_management_client import ModelManagementClient
-from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
+from inference_orchestrator.services.triton_inference.model_manager.model_management_client import (
+    ModelManagementClient,
+)
+from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import (
+    TritonGRPCClient,
+)
+from numpy import ndarray
 
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
-    def __init__(self, model_properties: dict, model_management_client: Optional[ModelManagementClient],
-                 triton_client: Optional[TritonGRPCClient]):
+    def __init__(
+        self,
+        model_properties: dict,
+        model_management_client: Optional[ModelManagementClient],
+        triton_client: Optional[TritonGRPCClient],
+    ):
         """Load the model with the given properties.
 
         Args:
@@ -50,7 +57,9 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def encode(self, inputs: List, modality: Modality, normalize: bool) -> List[ndarray]:
+    def encode(
+        self, inputs: List, modality: Modality, normalize: bool
+    ) -> List[ndarray]:
         """Encode the input data.
 
         Args:

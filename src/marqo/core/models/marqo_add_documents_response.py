@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Dict, Set
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic.v1 import Field, root_validator
 
@@ -20,7 +20,10 @@ class BatchResponseStats(MarqoBaseModel):
 
 class MarqoBaseDocumentsResponse(MarqoBaseModel):
     """A base documents API response model."""
-    _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats)
+
+    _batch_response_stats: BatchResponseStats = Field(
+        exclude=True, default_factory=BatchResponseStats
+    )
 
     def dict(self, *args, **kwargs) -> Dict[str, Any]:
         """Setting default exclude to exclude _batch_response_stats from the response.
@@ -29,11 +32,11 @@ class MarqoBaseDocumentsResponse(MarqoBaseModel):
         _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats). So we need
         to exclude it manually.
         """
-        exclude: Set[str] = kwargs.get('exclude', set())
+        exclude: Set[str] = kwargs.get("exclude", set())
         if not isinstance(exclude, set):
             raise TypeError("exclude must be a set")
-        exclude = exclude.union({'_batch_response_stats'})
-        kwargs['exclude'] = exclude
+        exclude = exclude.union({"_batch_response_stats"})
+        kwargs["exclude"] = exclude
         return super().dict(*args, **kwargs)
 
     def get_header_dict(self) -> Dict[str, str]:
@@ -45,6 +48,7 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
 
     This model takes the response from Marqo vector store and translate it to a user-friendly response.
     """
+
     status: int
     # This id can be any type as it might be used to hold an invalid id response
     id: Any = Field(alias="_id", default=None)
@@ -53,13 +57,13 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     code: Optional[str] = None
 
     @classmethod
-    def from_error(cls, doc_id: Optional[str], error: Any) -> 'MarqoAddDocumentsItem':
+    def from_error(cls, doc_id: Optional[str], error: Any) -> "MarqoAddDocumentsItem":
         return MarqoAddDocumentsItem(
-            id=doc_id if doc_id is not None else '',
+            id=doc_id if doc_id is not None else "",
             error=error.message,
             message=error.message,
             status=int(error.status_code or 400),
-            code=error.code
+            code=error.code,
         )
 
 
@@ -85,5 +89,5 @@ class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
                 else:
                     raise ValueError(f"Unexpected status code: {item.status}")
 
-        values['_batch_response_stats'] = batch_response_count
+        values["_batch_response_stats"] = batch_response_count
         return values

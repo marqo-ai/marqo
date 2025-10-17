@@ -1,25 +1,35 @@
 from contextlib import contextmanager
-from typing import List, Tuple
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
-from marqo import version, marqo_docs
+from marqo import marqo_docs, version
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
-from marqo.core.exceptions import OperationConflictError
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
-from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
-    ApplicationPackageDeploymentSessionStore
+from marqo.core.exceptions import (
+    ApplicationNotInitializedError,
+    IndexNotFoundError,
+    InternalError,
+    OperationConflictError,
+    ZookeeperLockNotAcquiredError,
+)
+from marqo.core.index_management.vespa_application_package import (
+    ApplicationPackageDeploymentSessionStore,
+    VespaApplicationFileStore,
+    VespaApplicationPackage,
+)
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import (
+    SemiStructuredVespaSchema,
+)
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
-from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.core.vespa_index.vespa_schema import (
+    for_marqo_index_request as vespa_schema_factory,
+)
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -28,19 +38,24 @@ logger = marqo.logging.get_logger(__name__)
 
 
 class IndexManagement:
-    _MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
-    _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
-    _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
-    _MARQO_CONFIG_DOC_ID = 'marqo__config'
+    _MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse(
+        "8.382.22"
+    )
+    _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse(
+        "8.396.18"
+    )
+    _MARQO_SETTINGS_SCHEMA_NAME = "marqo__settings"
+    _MARQO_CONFIG_DOC_ID = "marqo__config"
 
-    def __init__(self,
-                 vespa_client: VespaClient,
-                 zookeeper_client: Optional[ZookeeperClient] = None,
-                 enable_index_operations: bool = False,
-                 deployment_timeout_seconds: int = 60,
-                 convergence_timeout_seconds: int = 120,
-                 deployment_lock_timeout_seconds: float = 5,
-                 ):
+    def __init__(
+        self,
+        vespa_client: VespaClient,
+        zookeeper_client: Optional[ZookeeperClient] = None,
+        enable_index_operations: bool = False,
+        deployment_timeout_seconds: int = 60,
+        convergence_timeout_seconds: int = 120,
+        deployment_lock_timeout_seconds: float = 5,
+    ):
         """Instantiate an IndexManagement object.
 
         Args:
@@ -53,8 +68,11 @@ class IndexManagement:
             deployment_lock_timeout_seconds: Vespa deployment lock timeout in seconds
         """
         self.vespa_client = vespa_client
-        self._zookeeper_deployment_lock = get_deployment_lock(zookeeper_client, deployment_lock_timeout_seconds) \
-            if zookeeper_client else None
+        self._zookeeper_deployment_lock = (
+            get_deployment_lock(zookeeper_client, deployment_lock_timeout_seconds)
+            if zookeeper_client
+            else None
+        )
         self._enable_index_operations = enable_index_operations
         self._deployment_timeout_seconds = deployment_timeout_seconds
         self._convergence_timeout_seconds = convergence_timeout_seconds
@@ -91,12 +109,20 @@ class IndexManagement:
         # We skip the Vespa convergence check here so that Marqo instance can be bootstrapped even when Vespa is
         # not converged.
         to_version = version.get_version()
-        vespa_app_for_version_check = self._get_vespa_application(check_configured=False, need_binary_file_support=True,
-                                                                  check_for_application_convergence=False)
-        from_version = vespa_app_for_version_check.get_marqo_config().version \
-            if vespa_app_for_version_check.is_configured else None
+        vespa_app_for_version_check = self._get_vespa_application(
+            check_configured=False,
+            need_binary_file_support=True,
+            check_for_application_convergence=False,
+        )
+        from_version = (
+            vespa_app_for_version_check.get_marqo_config().version
+            if vespa_app_for_version_check.is_configured
+            else None
+        )
 
-        if from_version and semver.VersionInfo.parse(from_version) >= semver.VersionInfo.parse(to_version):
+        if from_version and semver.VersionInfo.parse(
+            from_version
+        ) >= semver.VersionInfo.parse(to_version):
             # skip bootstrapping if already bootstrapped to this version or later
             return False
 
@@ -105,13 +131,19 @@ class IndexManagement:
             # holding the distributed lock is that the Vespa application might be changed by other operations when
             # we wait for the lock. This time, we error out if the Vespa application is not converged, which reduces
             # the chance of running into race conditions.
-            vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True,
-                                                    check_for_application_convergence=True)
+            vespa_app = self._get_vespa_application(
+                check_configured=False,
+                need_binary_file_support=True,
+                check_for_application_convergence=True,
+            )
 
             # Only retrieving existing index when the vespa app is not configured and the index settings schema exists
-            existing_indexes = self._get_existing_indexes() if not vespa_app.is_configured and \
-                                                               vespa_app.has_schema(
-                                                                   self._MARQO_SETTINGS_SCHEMA_NAME) else None
+            existing_indexes = (
+                self._get_existing_indexes()
+                if not vespa_app.is_configured
+                and vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
+                else None
+            )
 
             vespa_app.bootstrap(to_version, existing_indexes)
 
@@ -144,7 +176,9 @@ class IndexManagement:
         """
         return self.batch_create_indexes([marqo_index_request])[0]
 
-    def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
+    def batch_create_indexes(
+        self, marqo_index_requests: List[MarqoIndexRequest]
+    ) -> List[MarqoIndex]:
         """
         Create multiple Marqo indexes as a single Vespa deployment, in a thread-safe manner.
 
@@ -168,17 +202,23 @@ class IndexManagement:
         for request in marqo_index_requests:
             # set the default prefixes if not provided
             if request.model.text_query_prefix is None:
-                request.model.text_query_prefix = request.model.get_default_text_query_prefix()
+                request.model.text_query_prefix = (
+                    request.model.get_default_text_query_prefix()
+                )
             if request.model.text_chunk_prefix is None:
-                request.model.text_chunk_prefix = request.model.get_default_text_chunk_prefix()
+                request.model.text_chunk_prefix = (
+                    request.model.get_default_text_chunk_prefix()
+                )
 
             schema, marqo_index = vespa_schema_factory(request).generate_schema()
-            logger.debug(f'Creating index {request.name} with schema:\n{schema}')
+            logger.debug(f"Creating index {request.name} with schema:\n{schema}")
 
-            typeahead_schema, updated_marqo_index = TypeaheadVespaSchema(marqo_index).generate_schema()
+            typeahead_schema, updated_marqo_index = TypeaheadVespaSchema(
+                marqo_index
+            ).generate_schema()
             logger.debug(
-                f'Creating typeahead schema for index {request.name} with schema: '
-                f'{updated_marqo_index.typeahead_schema_name}'
+                f"Creating typeahead schema for index {request.name} with schema: "
+                f"{updated_marqo_index.typeahead_schema_name}"
             )
 
             index_to_create.append((schema, typeahead_schema, updated_marqo_index))
@@ -217,7 +257,9 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
+            self._get_vespa_application().batch_delete_index_setting_and_schema(
+                index_names
+            )
 
     def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
         """
@@ -237,22 +279,33 @@ class IndexManagement:
             existing_index = self.get_index(marqo_index.name)
             if not isinstance(existing_index, SemiStructuredMarqoIndex):
                 # This is just a sanity check, it should not happen since we do not expose this method to end user.
-                raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
-                                    f'can not be updated.')
+                raise InternalError(
+                    f"Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} "
+                    f"can not be updated."
+                )
 
             def is_subset(dict_a, dict_b):
                 # check if dict_a is a subset of dict_b
                 return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
 
-            if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
-                    is_subset(marqo_index.field_map, existing_index.field_map) and
-                    is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
-                logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
+            if (
+                is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map)
+                and is_subset(marqo_index.field_map, existing_index.field_map)
+                and is_subset(
+                    marqo_index.name_to_string_array_field_map,
+                    existing_index.name_to_string_array_field_map,
+                )
+            ):
+                logger.debug(
+                    f"Another thread has updated the index {marqo_index.name} already."
+                )
                 return
 
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
-            logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
-            self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
+            logger.debug(f"Updating index {marqo_index.name} with schema:\n{schema}")
+            self._get_vespa_application().update_index_setting_and_schema(
+                marqo_index, schema
+            )
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
@@ -262,15 +315,19 @@ class IndexManagement:
         Returns:
             List of Marqo indexes
         """
-        batch_response = self.vespa_client.get_all_documents(self._MARQO_SETTINGS_SCHEMA_NAME, stream=True)
+        batch_response = self.vespa_client.get_all_documents(
+            self._MARQO_SETTINGS_SCHEMA_NAME, stream=True
+        )
         if batch_response.continuation:
             # TODO - Verify expected behaviour when streaming. Do we need to expect and handle pagination?
             raise InternalError("Unexpected continuation token received")
 
         return [
-            MarqoIndex.parse_raw(document.fields['settings'])
+            MarqoIndex.parse_raw(document.fields["settings"])
             for document in batch_response.documents
-            if not document.id.split('::')[-1].startswith(constants.MARQO_RESERVED_PREFIX)
+            if not document.id.split("::")[-1].startswith(
+                constants.MARQO_RESERVED_PREFIX
+            )
         ]
 
     def get_all_indexes(self) -> List[MarqoIndex]:
@@ -308,8 +365,12 @@ class IndexManagement:
         """
         return self._get_vespa_application().get_marqo_config().version
 
-    def _get_vespa_application(self, check_configured: bool = True, need_binary_file_support: bool = False,
-                               check_for_application_convergence: bool = True) -> VespaApplicationPackage:
+    def _get_vespa_application(
+        self,
+        check_configured: bool = True,
+        need_binary_file_support: bool = False,
+        check_for_application_convergence: bool = True,
+    ) -> VespaApplicationPackage:
         """
         Retrieve a Vespa application package. Depending on whether we need to handle binary files and the Vespa version,
         it uses different implementation of VespaApplicationStore.
@@ -329,36 +390,47 @@ class IndexManagement:
             # Please note that this warning message will only be logged out for OS users running Marqo on external
             # Vespa servers with version prior to 8.382.22. This will be displayed when Marqo starts up and before
             # each index CUD operation
-            logger.warning(f'Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version '
-                           f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. This could cause '
-                           f'unexpected behavior when bootstrapping Marqo. Please upgrade '
-                           f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
-                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
+            logger.warning(
+                f"Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version "
+                f"{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. This could cause "
+                f"unexpected behavior when bootstrapping Marqo. Please upgrade "
+                f"Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or "
+                f"later. Please see {marqo_docs.troubleshooting()} for more details."
+            )
 
-        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION:
+        if (
+            vespa_version
+            < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION
+        ):
             # Please note that this warning message will only be logged out for OS users running Marqo on external
             # Vespa servers with version prior to 8.396.18. This will be displayed when Marqo starts up and before
             # each index CUD operation
-            logger.warning(f'Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version '
-                           f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. You may encounter slower '
-                           f'response times when creating a Marqo index or adding documents to unstructured indexes. '
-                           f'Please upgrade Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
-                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
+            logger.warning(
+                f"Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version "
+                f"{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. You may encounter slower "
+                f"response times when creating a Marqo index or adding documents to unstructured indexes. "
+                f"Please upgrade Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or "
+                f"later. Please see {marqo_docs.troubleshooting()} for more details."
+            )
 
-        if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+        if (
+            need_binary_file_support
+            and vespa_version
+            < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES
+        ):
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
             application_package_store = VespaApplicationFileStore(
                 vespa_client=self.vespa_client,
                 deploy_timeout=self._deployment_timeout_seconds,
                 wait_for_convergence_timeout=self._convergence_timeout_seconds,
-                check_for_application_convergence=check_for_application_convergence
+                check_for_application_convergence=check_for_application_convergence,
             )
         else:
             application_package_store = ApplicationPackageDeploymentSessionStore(
                 vespa_client=self.vespa_client,
                 deploy_timeout=self._deployment_timeout_seconds,
                 wait_for_convergence_timeout=self._convergence_timeout_seconds,
-                check_for_application_convergence=check_for_application_convergence
+                check_for_application_convergence=check_for_application_convergence,
             )
 
         application = VespaApplicationPackage(application_package_store)
@@ -385,17 +457,25 @@ class IndexManagement:
             InternalError: If index_management object is not enabled for index operations
         """
         if not self._enable_index_operations:
-            raise InternalError("You index_management object is not enabled for index operations. ")
+            raise InternalError(
+                "You index_management object is not enabled for index operations. "
+            )
 
         if self._zookeeper_deployment_lock is None:
-            logger.warning(f"No Zookeeper client provided. "
-                           f"Concurrent index operations may result in race conditions. ")
+            logger.warning(
+                "No Zookeeper client provided. "
+                "Concurrent index operations may result in race conditions. "
+            )
             yield  # No lock, proceed without locking
         else:
             try:
                 with self._zookeeper_deployment_lock:
-                    logger.debug(f"Retrieved the distributed lock for index operations. ")
+                    logger.debug(
+                        "Retrieved the distributed lock for index operations. "
+                    )
                     yield
             except ZookeeperLockNotAcquiredError:
                 # TODO add a doclink for troubleshooting this issue
-                raise OperationConflictError("Your indexes are being updated. Please try again shortly.")
+                raise OperationConflictError(
+                    "Your indexes are being updated. Please try again shortly."
+                )

@@ -2,12 +2,11 @@ import json
 from unittest import TestCase
 from unittest.mock import patch
 
-from pydantic import ValidationError
-from pydantic_settings import SettingsError
-
-from model_management.core.enum import LogLevel, LogFormat
+from model_management.core.enum import LogFormat, LogLevel
 from model_management.core.settings import Settings
 from model_management.schemas.triton_model_properties import TritonModelProperties
+from pydantic import ValidationError
+from pydantic_settings import SettingsError
 
 
 def _help_get_settings_without_dota_env():
@@ -26,15 +25,15 @@ class TestSettings(TestCase):
     load environment variables from a .env file. To avoid this, use the helper function
     _help_get_settings_without_dota_env() which sets _env_file=None.
     """
-    
+
     def test_default_values(self):
-        """ Test that default values are set correctly when no environment variables are provided."""
+        """Test that default values are set correctly when no environment variables are provided."""
         default_values = {
             "TRITON_URL": "http://localhost:8000",
             "MODEL_BASE_DIR": "./cache/models",
             "LOG_LEVEL": "INFO",
             "LOG_FORMAT": "PLAIN",
-            "MARQO_MODELS_TO_PRELOAD": "[]"
+            "MARQO_MODELS_TO_PRELOAD": "[]",
         }
         with patch("os.environ", {}):
             settings = _help_get_settings_without_dota_env()
@@ -45,13 +44,18 @@ class TestSettings(TestCase):
             self.assertEqual([], settings.marqo_models_to_preload)
 
     def test_customised_values(self):
-        """ Test that custom environment variable values are parsed correctly."""
+        """Test that custom environment variable values are parsed correctly."""
         model_to_preload = [
             {
-                "maxBatchSize": 8, "name": "marqo-fashionSigLIP-image-encoder",
-                "sources": ["s3://opensource-li-backup/triton_models/marqo-fashionSigLIP-image-encoder/1/model.onnx"],
-                "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-                "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+                "maxBatchSize": 8,
+                "name": "marqo-fashionSigLIP-image-encoder",
+                "sources": [
+                    "s3://opensource-li-backup/triton_models/marqo-fashionSigLIP-image-encoder/1/model.onnx"
+                ],
+                "input": [
+                    {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+                ],
+                "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
             }
         ]
 
@@ -63,19 +67,27 @@ class TestSettings(TestCase):
             "MARQO_MODELS_TO_PRELOAD": json.dumps(model_to_preload),
         }
         with patch("os.environ", custom_values):
-            settings = _help_get_settings_without_dota_env() # Avoid loading from .env file during tests
+            settings = (
+                _help_get_settings_without_dota_env()
+            )  # Avoid loading from .env file during tests
             self.assertEqual(custom_values["TRITON_URL"], settings.triton_url)
             self.assertEqual(custom_values["MODEL_BASE_DIR"], settings.model_base_dir)
             self.assertEqual(custom_values["LOG_LEVEL"], settings.log_level)
             self.assertEqual(custom_values["LOG_FORMAT"], settings.log_format)
             self.assertEqual(1, len(settings.marqo_models_to_preload))
-            self.assertEqual(TritonModelProperties(**model_to_preload[0]), settings.marqo_models_to_preload[0])
+            self.assertEqual(
+                TritonModelProperties(**model_to_preload[0]),
+                settings.marqo_models_to_preload[0],
+            )
 
     def test_incorrect_models_to_preload(self):
         ill_model_to_preload_test_cases = [
             ("test", "not a json array"),
             ("{}", "not a json array"),
-            ('[{"maxBatchSize": 8, "name": "marqo-fashionSigLIP-image-encoder"}]', "incomplete model properties"),
+            (
+                '[{"maxBatchSize": 8, "name": "marqo-fashionSigLIP-image-encoder"}]',
+                "incomplete model properties",
+            ),
         ]
         for ill_value, msg in ill_model_to_preload_test_cases:
             with self.subTest(msg):
@@ -89,8 +101,10 @@ class TestSettings(TestCase):
             "maxBatchSize": 8,
             "name": "test-model",
             "sources": ["s3://test/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+            ],
+            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         }
 
         test_cases = [
@@ -98,18 +112,22 @@ class TestSettings(TestCase):
             (2, "two models should pass"),
             (3, "three models should pass"),
             (4, "four models should fail"),
-            (5, "five models should fail")
+            (5, "five models should fail"),
         ]
 
         for num_models, msg in test_cases:
             with self.subTest(msg=msg):
-                models = [dict(model, name=f"test-model-{i}") for i in range(num_models)]
+                models = [
+                    dict(model, name=f"test-model-{i}") for i in range(num_models)
+                ]
                 env_value = json.dumps(models)
 
                 with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": env_value}):
                     if num_models <= 3:
                         settings = _help_get_settings_without_dota_env()
-                        self.assertEqual(num_models, len(settings.marqo_models_to_preload))
+                        self.assertEqual(
+                            num_models, len(settings.marqo_models_to_preload)
+                        )
                     else:
                         with self.assertRaises((SettingsError, ValidationError)):
                             _ = _help_get_settings_without_dota_env()
@@ -133,23 +151,39 @@ class TestSettings(TestCase):
             "maxBatchSize": 8,
             "name": "test-model",
             "sources": ["s3://test/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+            ],
+            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         }
 
         # Test with JSON string in environment variable (the intended way)
         with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": json.dumps([model])}):
             settings = _help_get_settings_without_dota_env()
             self.assertEqual(1, len(settings.marqo_models_to_preload))
-            self.assertEqual(TritonModelProperties(**model), settings.marqo_models_to_preload[0])
+            self.assertEqual(
+                TritonModelProperties(**model), settings.marqo_models_to_preload[0]
+            )
 
     def test_log_level_validation(self):
         """Test log level validation with different cases and values."""
         test_cases = [
-            ("debug", LogLevel.DEBUG, "lowercase debug should be converted to uppercase"),
+            (
+                "debug",
+                LogLevel.DEBUG,
+                "lowercase debug should be converted to uppercase",
+            ),
             ("INFO", LogLevel.INFO, "uppercase INFO should remain uppercase"),
-            ("Warning", LogLevel.WARNING, "mixed case Warning should be converted to uppercase"),
-            ("error", LogLevel.ERROR, "lowercase error should be converted to uppercase"),
+            (
+                "Warning",
+                LogLevel.WARNING,
+                "mixed case Warning should be converted to uppercase",
+            ),
+            (
+                "error",
+                LogLevel.ERROR,
+                "lowercase error should be converted to uppercase",
+            ),
             (None, LogLevel.INFO, "None should default to INFO"),
         ]
 
@@ -163,9 +197,17 @@ class TestSettings(TestCase):
     def test_log_format_validation(self):
         """Test log format validation with different cases and values."""
         test_cases = [
-            ("plain", LogFormat.PLAIN, "lowercase plain should be converted to uppercase"),
+            (
+                "plain",
+                LogFormat.PLAIN,
+                "lowercase plain should be converted to uppercase",
+            ),
             ("JSON", LogFormat.JSON, "uppercase JSON should remain uppercase"),
-            ("Plain", LogFormat.PLAIN, "mixed case Plain should be converted to uppercase"),
+            (
+                "Plain",
+                LogFormat.PLAIN,
+                "mixed case Plain should be converted to uppercase",
+            ),
             ("json", LogFormat.JSON, "lowercase json should be converted to uppercase"),
             (None, LogFormat.PLAIN, "None should default to PLAIN"),
         ]
@@ -195,7 +237,10 @@ class TestSettings(TestCase):
     def test_get_settings_environment_variables_parsing_error(self):
         """Test that get_settings raises EnvironmentVariablesParsingError for invalid environment variables."""
         invalid_env_cases = [
-            ({"MARQO_MODELS_TO_PRELOAD": "invalid json"}, "invalid JSON in MARQO_MODELS_TO_PRELOAD"),
+            (
+                {"MARQO_MODELS_TO_PRELOAD": "invalid json"},
+                "invalid JSON in MARQO_MODELS_TO_PRELOAD",
+            ),
             ({"LOG_LEVEL": "INVALID_LEVEL"}, "invalid LOG_LEVEL"),
             ({"LOG_FORMAT": "INVALID_FORMAT"}, "invalid LOG_FORMAT"),
         ]
@@ -215,7 +260,7 @@ class TestSettings(TestCase):
             ("true", "boolean JSON should be rejected"),
             ("invalid json", "malformed JSON should be rejected"),
             (" ", "whitespace string should be rejected"),
-            ('[', "Incomplete JSON array should be rejected"),
+            ("[", "Incomplete JSON array should be rejected"),
         ]
 
         for invalid_value, msg in invalid_cases:

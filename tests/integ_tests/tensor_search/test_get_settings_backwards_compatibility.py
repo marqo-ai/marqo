@@ -1,11 +1,21 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
-from marqo.tensor_search import api
+
 from marqo.core.models.marqo_index import (
-    StructuredMarqoIndex, UnstructuredMarqoIndex, TextPreProcessing, ImagePreProcessing,
-    HnswConfig, Model, DistanceMetric, VectorNumericType, TextSplitMethod
+    DistanceMetric,
+    HnswConfig,
+    ImagePreProcessing,
+    Model,
+    StructuredMarqoIndex,
+    TextPreProcessing,
+    TextSplitMethod,
+    UnstructuredMarqoIndex,
+    VectorNumericType,
 )
+from marqo.tensor_search import api
+
 
 class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
     def setUp(self):
@@ -25,9 +35,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
             "model": Model(name="test_model", properties=None),
             "normalize_embeddings": True,
             "text_preprocessing": TextPreProcessing(
-                split_length=100,
-                split_overlap=0,
-                split_method=TextSplitMethod.Word
+                split_length=100, split_overlap=0, split_method=TextSplitMethod.Word
             ),
             "image_preprocessing": ImagePreProcessing(),
             "distance_metric": DistanceMetric.PrenormalizedAngular,
@@ -36,14 +44,19 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
             "marqo_version": "2.11.0",
             "created_at": 1234567890,
             "updated_at": 1234567890,
-            **kwargs
+            **kwargs,
         }
         return index_class(**common_params)
 
     def assert_common_settings(self, settings):
         expected_fields = [
-            "type", "model", "normalizeEmbeddings", "textPreprocessing",
-            "imagePreprocessing", "vectorNumericType", "annParameters"
+            "type",
+            "model",
+            "normalizeEmbeddings",
+            "textPreprocessing",
+            "imagePreprocessing",
+            "vectorNumericType",
+            "annParameters",
         ]
         for field in expected_fields:
             self.assertIn(field, settings)
@@ -53,10 +66,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
 
     def test_get_settings_pre_2_12_structured_index(self):
         mock_index = self.create_mock_index(
-            StructuredMarqoIndex,
-            type="structured",
-            fields=[],
-            tensor_fields=[]
+            StructuredMarqoIndex, type="structured", fields=[], tensor_fields=[]
         )
         self.mock_index_management.get_index.return_value = mock_index
 
@@ -75,7 +85,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
             type="unstructured",
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=False,
-            filter_string_max_length=200
+            filter_string_max_length=200,
         )
         self.mock_index_management.get_index.return_value = mock_index
 
@@ -91,7 +101,10 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
 
     def test_get_settings_index_not_found(self):
         from marqo.core.exceptions import IndexNotFoundError
-        self.mock_index_management.get_index.side_effect = IndexNotFoundError("Index not found")
+
+        self.mock_index_management.get_index.side_effect = IndexNotFoundError(
+            "Index not found"
+        )
 
         response = self.client.get("/indexes/non_existent_index/settings")
         self.assertEqual(response.status_code, 404)

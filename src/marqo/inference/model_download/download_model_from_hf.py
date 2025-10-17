@@ -1,17 +1,20 @@
-from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 from typing import Optional
+
 from huggingface_hub import hf_hub_download
-from marqo.logging import get_logger
 from huggingface_hub.utils import RepositoryNotFoundError
+
+from marqo.logging import get_logger
 from marqo.s2_inference.errors import ModelDownloadError
+from marqo.tensor_search.models.external_apis.hf import HfAuth, HfModelLocation
 
 logger = get_logger(__name__)
 
 
 def download_model_from_hf(
-        location: HfModelLocation,
-        auth: Optional[HfAuth] = None,
-        download_dir: Optional[str] = None):
+    location: HfModelLocation,
+    auth: Optional[HfAuth] = None,
+    download_dir: Optional[str] = None,
+):
     """Downloads a pretrained model from HF, if it doesn't exist locally. The basename of the
     location's filename is used as the local filename.
 
@@ -26,7 +29,9 @@ def download_model_from_hf(
     Returns:
         Path to the downloaded model
     """
-    download_kwargs = location.dict(exclude_unset=True) # Ignore unset values to avoid adding None to params
+    download_kwargs = location.dict(
+        exclude_unset=True
+    )  # Ignore unset values to avoid adding None to params
     if auth is not None:
         download_kwargs = {**download_kwargs, **auth.dict()}
     try:
@@ -38,4 +43,3 @@ def download_model_from_hf(
             "`hf` credentials and the index's model_location are correct. "
             "If the index's model_location is not correct, please create a new index with the corrected model_location"
         )
-

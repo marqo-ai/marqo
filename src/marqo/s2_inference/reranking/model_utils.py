@@ -1,29 +1,35 @@
 import datetime
-
-import numpy as np
 import os
 
+import numpy as np
+import torch
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from sentence_transformers import CrossEncoder
 from transformers import (
-    AutoTokenizer, 
     AutoModelForSequenceClassification,
-    OwlViTProcessor, 
+    AutoTokenizer,
     OwlViTForObjectDetection,
+    OwlViTProcessor,
     pipeline,
 )
 
-from optimum.onnxruntime import ORTModelForSequenceClassification
-from sentence_transformers import CrossEncoder
-import torch
-from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.s2_inference.types import *
-from marqo.s2_inference.s2_inference import (_create_model_cache_key, _float_tensor_to_list,
-                                             _nd_array_to_list, get_available_models)
-from marqo.s2_inference.configs import ModelCache
-
 from marqo.logging import get_logger
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.s2_inference import (
+    _create_model_cache_key,
+    _float_tensor_to_list,
+    _nd_array_to_list,
+    get_available_models,
+)
+from marqo.s2_inference.types import *
+from marqo.tensor_search.enums import AvailableModelsKey
+
 logger = get_logger(__name__)
 
-def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float]]) -> List[float]:
+
+def _convert_cross_encoder_output(
+    output: Union[FloatTensor, ndarray, List[float]],
+) -> List[float]:
     """converts the model outputs to a list of floats
 
     Args:
@@ -39,7 +45,7 @@ def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float
     if isinstance(output, (FloatTensor, Tensor)):
         output = output.squeeze()
         output = _float_tensor_to_list(output)
-    
+
     elif isinstance(output, ndarray):
         output = output.squeeze()
         output = _nd_array_to_list(output)
@@ -50,18 +56,22 @@ def _convert_cross_encoder_output(output: Union[FloatTensor, ndarray, List[float
         elif isinstance(output[0], ndarray):
             output = [_nd_array_to_list(_o) for _o in output]
         else:
-            raise TypeError(f"unsupported nested list with elements of type {type(output[0])}")
+            raise TypeError(
+                f"unsupported nested list with elements of type {type(output[0])}"
+            )
 
     else:
         raise TypeError(f"unsupported output type of {type(output)}")
 
     if _verify_model_outputs(output):
         return output
-    
-    raise TypeError(f"unable to convert input of type {type(output)} to a list of lists of floats")
+
+    raise TypeError(
+        f"unable to convert input of type {type(output)} to a list of lists of floats"
+    )
 
 
-def _verify_model_outputs(outputs: Union[List, ndarray,FloatTensor]) -> bool:
+def _verify_model_outputs(outputs: Union[List, ndarray, FloatTensor]) -> bool:
     """checks the outpus conforms to the standard of a list of floats or ints
 
     Args:
@@ -79,14 +89,17 @@ def _verify_model_outputs(outputs: Union[List, ndarray,FloatTensor]) -> bool:
     if len(outputs) == 0:
         return True
 
-    if isinstance(outputs[0], (ndarray, FloatTensor ,list)):
+    if isinstance(outputs[0], (ndarray, FloatTensor, list)):
         return False
 
     if isinstance(outputs[0], (float, int)):
         return True
 
-    raise TypeError(f"unknown output type of {type(outputs)} and {type(outputs[0])} expected list")
-    
+    raise TypeError(
+        f"unknown output type of {type(outputs)} and {type(outputs[0])} expected list"
+    )
+
+
 def _verify_model_inputs(list_of_lists: List[List]) -> bool:
     """check the format of the model inputs
 
@@ -97,6 +110,7 @@ def _verify_model_inputs(list_of_lists: List[List]) -> bool:
         bool: _description_
     """
     return all(isinstance(x, (list, tuple)) for x in list_of_lists)
+
 
 def convert_device_id_to_int(device: str):
     """maps the string device, 'cpu', 'cuda', 'cuda:#'
@@ -112,75 +126,86 @@ def convert_device_id_to_int(device: str):
     Returns:
         _type_: _description_
     """
-    if device[:4] not in ['cpu', 'cuda']:
+    if device[:4] not in ["cpu", "cuda"]:
         raise ValueError(f"expected one of cpu or cuda or cuda:# but received {device}")
 
-    if device == 'cpu':
+    if device == "cpu":
         return -1
-    
-    if device == 'cuda':
+
+    if device == "cuda":
         return 0
 
-    if device.startswith('cuda:'):
+    if device.startswith("cuda:"):
         # check if it is id'd by number
         if device[-1].isnumeric():
-            return int(device.replace('cuda:', ''))
-    
+            return int(device.replace("cuda:", ""))
+
     raise TypeError(f"unexpected device {device}")
 
+
 class DummyModel:
-    """ used for mocking the model
+    """used for mocking the model
 
     Returns:
         _type_: _description_
     """
+
     def __init__(self, *args, **kwargs) -> None:
         pass
 
     def predict(self, inputs: Iterable):
-
         return np.random.rand(len(inputs))
+
 
 class HFClassificationOnnx:
     """uses HF pipelines and optimum to load hf classification model
     (cross encoders) and uses it as onnx
     https://huggingface.co/docs/optimum/main/en/onnxruntime/modeling_ort
-    
+
     Raises:
         RuntimeError: _description_
 
     Returns:
         _type_: _description_
     """
-    
-    def __init__(self, model_name: str, device: str, max_length: int = 512) -> None:
 
+    def __init__(self, model_name: str, device: str, max_length: int = 512) -> None:
         self.model_name = model_name
         self.save_path = None
         self.device_string = device
         self.device = convert_device_id_to_int(device)
         self.max_length = max_length
-        self.tokenizer_kwargs = {'padding':True, 'truncation':True,  'max_length':self.max_length}
+        self.tokenizer_kwargs = {
+            "padding": True,
+            "truncation": True,
+            "max_length": self.max_length,
+        }
 
         # TODO load local version
-        #self.load_from_cache = load_from_cache
+        # self.load_from_cache = load_from_cache
 
-        self.model = ORTModelForSequenceClassification.from_pretrained(self.model_name, from_transformers=True)
+        self.model = ORTModelForSequenceClassification.from_pretrained(
+            self.model_name, from_transformers=True
+        )
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        
-        self.onnx_classifier = pipeline("text-classification", model=self.model, 
-                                        tokenizer=self.tokenizer, device=self.device)
+
+        self.onnx_classifier = pipeline(
+            "text-classification",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            device=self.device,
+        )
 
     def _get_save_name(self) -> None:
-        """generates the saeve name for local storage
-        """
-        self.save_path = os.path.join(ModelCache.onnx_cache_path, self.model_name + '_onnx')
+        """generates the saeve name for local storage"""
+        self.save_path = os.path.join(
+            ModelCache.onnx_cache_path, self.model_name + "_onnx"
+        )
         self.model_save_name = self.save_path
         self.tokenizer_save_name = self.save_path
 
     def save(self) -> None:
-        """saves the model locally
-        """
+        """saves the model locally"""
         logger.info(f"saving model to {self.model_save_name}")
         if self.save_path is None:
             self._get_save_name()
@@ -203,9 +228,11 @@ class HFClassificationOnnx:
             List[Dict]: _description_
         """
         if not _verify_model_inputs(inputs):
-            raise RuntimeError(f"expected list of lists, received {type(inputs)} of {type(inputs[0])}")
+            raise RuntimeError(
+                f"expected list of lists, received {type(inputs)} of {type(inputs[0])}"
+            )
 
-        return [{'text':pair[0], 'text_pair':pair[1]} for pair in inputs]
+        return [{"text": pair[0], "text_pair": pair[1]} for pair in inputs]
 
     @staticmethod
     def _parepare_outputs(outputs: Dict) -> ndarray:
@@ -217,7 +244,7 @@ class HFClassificationOnnx:
         Returns:
             ndarray: _description_
         """
-        return [float(pred['score']) for pred in outputs]
+        return [float(pred["score"]) for pred in outputs]
 
     def predict(self, inputs: List[Dict]) -> List[Dict]:
         """onnx predict method
@@ -239,8 +266,10 @@ class HFClassificationOnnx:
         return self.outputs
 
 
-def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int = 512) -> Dict:
-    """    
+def load_sbert_cross_encoder_model(
+    model_name: str, device: str, max_length: int = 512
+) -> Dict:
+    """
     https://huggingface.co/cross-encoder/ms-marco-TinyBERT-L-2
     scores = model.predict([('Query', 'Paragraph1'), ('Query', 'Paragraph2') , ('Query', 'Paragraph3')])
 
@@ -256,26 +285,36 @@ def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int
         model = get_available_models()[model_cache_key][AvailableModelsKey.model]
     else:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")
-        if model_name == '_testing':
+        if model_name == "_testing":
             model = DummyModel()
-            logger.warning('using the test model - << TESTING PURPOSES ONLY >>')
-        elif model_name.startswith('onnx/'):
-            model = HFClassificationOnnx(model_name.replace('onnx/', ''), device=device)
+            logger.warning("using the test model - << TESTING PURPOSES ONLY >>")
+        elif model_name.startswith("onnx/"):
+            model = HFClassificationOnnx(model_name.replace("onnx/", ""), device=device)
         else:
-            model = CrossEncoder(model_name, max_length=max_length, device=device, default_activation_function=torch.nn.Sigmoid())
-            if hasattr(model.tokenizer, 'model_max_length'):
+            model = CrossEncoder(
+                model_name,
+                max_length=max_length,
+                device=device,
+                default_activation_function=torch.nn.Sigmoid(),
+            )
+            if hasattr(model.tokenizer, "model_max_length"):
                 model_max_len = model.tokenizer.model_max_length
                 if max_length > model_max_len:
                     model.max_length = model_max_len
-                    logger.warning(f"specified max_length of {max_length} is greater than model max length of {model_max_len}, setting to model max length")
-        get_available_models()[model_cache_key] ={AvailableModelsKey.model: model, AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
+                    logger.warning(
+                        f"specified max_length of {max_length} is greater than model max length of {model_max_len}, setting to model max length"
+                    )
+        get_available_models()[model_cache_key] = {
+            AvailableModelsKey.model: model,
+            AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),
+        }
 
-    return {'model':model}
+    return {"model": model}
 
 
 def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
-    """    
-    
+    """
+
     features = tokenizer(['How many people live in Berlin?', 'How many people live in Berlin?'], ['Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.', 'New York City is famous for the Metropolitan Museum of Art.'],  padding=True, truncation=True, return_tensors="pt")
     with torch.no_grad():
         scores = model(**features).logits
@@ -290,17 +329,24 @@ def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
     model_cache_key = _create_model_cache_key(model_name, device)
 
     if model_cache_key in get_available_models():
-        model, tokenizer = get_available_models()[model_cache_key][AvailableModelsKey.model]
+        model, tokenizer = get_available_models()[model_cache_key][
+            AvailableModelsKey.model
+        ]
     else:
-        logger.info(f"loading {model_name} on device {device} and adding to cache...")    
-        model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
+        logger.info(f"loading {model_name} on device {device} and adding to cache...")
+        model = AutoModelForSequenceClassification.from_pretrained(model_name).to(
+            device
+        )
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        get_available_models()[model_cache_key] = {AvailableModelsKey.model:(model, tokenizer),
-                                                   AvailableModelsKey.most_recently_used_time: datetime.datetime.now()}
+        get_available_models()[model_cache_key] = {
+            AvailableModelsKey.model: (model, tokenizer),
+            AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),
+        }
 
     model.eval()
-    
-    return {'model':model, 'tokenizer':tokenizer}
+
+    return {"model": model, "tokenizer": tokenizer}
+
 
 def load_owl_vit(model_name: str, device: str) -> Dict:
     """loader for owl vit for image reranking
@@ -317,17 +363,22 @@ def load_owl_vit(model_name: str, device: str) -> Dict:
 
     if model_cache_key in get_available_models():
         logger.info(f"loading {model_cache_key} from cache...")
-        model, processor = get_available_models()[model_cache_key][AvailableModelsKey.model]
+        model, processor = get_available_models()[model_cache_key][
+            AvailableModelsKey.model
+        ]
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
         model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)
-        get_available_models()[model_cache_key] = {AvailableModelsKey.model: (model, processor),
-                                             AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
+        get_available_models()[model_cache_key] = {
+            AvailableModelsKey.model: (model, processor),
+            AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),
+        }
 
     model.eval()
 
     # TODO use a small class to store the different model pieces and configs
-    return {'model':model, 'processor':processor}
+    return {"model": model, "processor": processor}
+
 
 def _process_owl_inputs(processor, texts, images):
     """wrapper for processing the owl inputs
@@ -341,6 +392,7 @@ def _process_owl_inputs(processor, texts, images):
         _type_: _description_
     """
     return processor(text=texts, images=images, return_tensors="pt")
+
 
 def _predict_owl(model, processed_inputs, post_process_function, size):
     """helper to predict with owl
@@ -357,13 +409,14 @@ def _predict_owl(model, processed_inputs, post_process_function, size):
     with torch.no_grad():
         outputs = model(**processed_inputs)
         # there is a bug in the hf code https://github.com/huggingface/transformers/blob/v4.24.0/src/transformers/models/owlvit/feature_extraction_owlvit.py#L140
-        outputs.logits = outputs.logits.to('cpu')
-        outputs.pred_boxes = outputs.pred_boxes.to('cpu')
+        outputs.logits = outputs.logits.to("cpu")
+        outputs.pred_boxes = outputs.pred_boxes.to("cpu")
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
         target_sizes = torch.Tensor([size[::-1]])
         # Convert outputs (bounding boxes and class logits) to COCO API
         results = post_process_function(outputs=outputs, target_sizes=target_sizes)
         return results
+
 
 def process_owl_results(results: List) -> List:
     """wrapper for processing a list of results from owl-vit
@@ -380,6 +433,7 @@ def process_owl_results(results: List) -> List:
         rezs.append(rez)
     return rezs
 
+
 def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List, List]:
     """post-process the owl-vit results
 
@@ -391,14 +445,17 @@ def _process_owl_result(result: List[Dict], identifier: str) -> Tuple[List, List
         Tuple[List, List, List]: _description_
     """
     boxes, scores, _ = result[0]["boxes"], result[0]["scores"], result[0]["labels"]
- 
+
     boxes_round = []
     for i in range(len(boxes)):
         boxes_round.append([round(i, 2) for i in boxes[i].tolist()])
 
-    return boxes, scores, [identifier]*len(scores)
+    return boxes, scores, [identifier] * len(scores)
 
-def sort_owl_boxes_scores(boxes: List, scores: List, identifier: List) -> Tuple[List, List, List]:
+
+def sort_owl_boxes_scores(
+    boxes: List, scores: List, identifier: List
+) -> Tuple[List, List, List]:
     """sorts the lists based on  the scores
 
     Args:
@@ -414,8 +471,10 @@ def sort_owl_boxes_scores(boxes: List, scores: List, identifier: List) -> Tuple[
         Tuple[List, List, List]: _description_
     """
     if len(scores) != len(boxes):
-        # TODO use Marqo errors 
-        raise RuntimeError(f"expected each bbox to have a score. found {len(boxes)} boxes and {len(scores)} scores")
+        # TODO use Marqo errors
+        raise RuntimeError(
+            f"expected each bbox to have a score. found {len(boxes)} boxes and {len(scores)} scores"
+        )
 
     inds = scores.argsort(descending=True)
     boxes = boxes[inds]
@@ -423,12 +482,15 @@ def sort_owl_boxes_scores(boxes: List, scores: List, identifier: List) -> Tuple[
 
     if identifier is not None and len(identifier) != 0:
         if len(identifier) != len(boxes):
-            # TODO use Marqo errors 
-            raise RuntimeError(f"expected each bbox to have an identifier. " \
-                f"found {len(boxes)} boxes and {len(identifier)} identifiers")
+            # TODO use Marqo errors
+            raise RuntimeError(
+                f"expected each bbox to have an identifier. "
+                f"found {len(boxes)} boxes and {len(identifier)} identifiers"
+            )
         identifier = [identifier[i] for i in inds]
 
     return boxes, scores, identifier
+
 
 def _keep_top_k(input_list: List, k: int = 1):
     """return top-k of a list

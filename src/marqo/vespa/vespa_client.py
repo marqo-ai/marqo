@@ -1,56 +1,91 @@
 import asyncio
 import io
 import os
+import ssl
 import tarfile
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-from typing import Dict, Any, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
+import certifi
 import httpcore
 import httpx
 import orjson
-import ssl
-import certifi
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
+from marqo.core.semi_structured_vespa_index.common import (
+    VESPA_DOC_FIELD_TYPES,
+    VESPA_DOC_VERSION_UUID,
+)
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.marqo_docs import update_documents_response
-from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
-                                    VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
-from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchDocumentResponse, FeedBatchResponse, \
-    FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
+from marqo.vespa.exceptions import (
+    InvalidVespaApplicationError,
+    VespaActivationConflictError,
+    VespaError,
+    VespaNotConvergedError,
+    VespaStatusError,
+    VespaTimeoutError,
+)
+from marqo.vespa.models import (
+    Error,
+    FeedBatchDocumentResponse,
+    FeedBatchResponse,
+    FeedDocumentResponse,
+    QueryResult,
+    UpdateDocumentResponse,
+    UpdateDocumentsBatchResponse,
+    VespaDocument,
+)
 from marqo.vespa.models.application_metrics import ApplicationMetrics
-from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
-    DeleteBatchResponse, DeleteAllDocumentsResponse
-from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
-    GetBatchDocumentResponse
+from marqo.vespa.models.delete_document_response import (
+    DeleteAllDocumentsResponse,
+    DeleteBatchDocumentResponse,
+    DeleteBatchResponse,
+    DeleteDocumentResponse,
+)
+from marqo.vespa.models.get_document_response import (
+    GetBatchDocumentResponse,
+    GetBatchResponse,
+    GetDocumentResponse,
+    VisitDocumentsResponse,
+)
 
 logger = marqo.logging.get_logger(__name__)
 
 
 class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
-        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError,
-        'ACTIVATION_CONFLICT': VespaActivationConflictError
+        "INVALID_APPLICATION_PACKAGE": InvalidVespaApplicationError,
+        "ACTIVATION_CONFLICT": VespaActivationConflictError,
     }
 
     class _ConvergenceStatus:
-        def __init__(self, current_generation: int, wanted_generation: int, converged: bool):
+        def __init__(
+            self, current_generation: int, wanted_generation: int, converged: bool
+        ):
             self.current_generation = current_generation
             self.wanted_generation = wanted_generation
             self.converged = converged
 
-    def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, default_search_timeout_ms: int = 1000,
-                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10,
-                 delete_pool_size: int = 10, partial_update_pool_size: int = 10
-                 ):
+    def __init__(
+        self,
+        config_url: str,
+        document_url: str,
+        query_url: str,
+        content_cluster_name: str,
+        default_search_timeout_ms: int = 1000,
+        pool_size: int = 10,
+        feed_pool_size: int = 10,
+        get_pool_size: int = 10,
+        delete_pool_size: int = 10,
+        partial_update_pool_size: int = 10,
+    ):
         """
         Create a VespaClient object.
         Args:
@@ -65,11 +100,13 @@ class VespaClient:
             default_search_timeout_ms: Default timeout for search queries in milliseconds
             content_cluster_name: Name of the Vespa content cluster to use for document operations
         """
-        self.config_url = config_url.strip('/')
-        self.document_url = document_url.strip('/')
-        self.query_url = query_url.strip('/')
+        self.config_url = config_url.strip("/")
+        self.document_url = document_url.strip("/")
+        self.query_url = query_url.strip("/")
         self.http_client = httpx.Client(
-            limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
+            limits=httpx.Limits(
+                max_keepalive_connections=pool_size, max_connections=pool_size
+            )
         )
         self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
@@ -94,20 +131,22 @@ class VespaClient:
             application: Path to the Vespa application root directory
             timeout: Timeout in seconds
         """
-        endpoint = f'{self.config_url}/application/v2/tenant/default/prepareandactivate'
+        endpoint = f"{self.config_url}/application/v2/tenant/default/prepareandactivate"
 
         gzip_stream = self._gzip_compress(application)
 
         response = self.http_client.post(
             endpoint,
-            headers={'Content-Type': 'application/x-gzip'},
+            headers={"Content-Type": "application/x-gzip"},
             data=gzip_stream.read(),
-            timeout=timeout
+            timeout=timeout,
         )
 
         self._raise_for_status(response)
 
-    def create_deployment_session(self, check_for_application_convergence: bool = True) -> Tuple[str, str]:
+    def create_deployment_session(
+        self, check_for_application_convergence: bool = True
+    ) -> Tuple[str, str]:
         """
         Create a Vespa deployment session.
         Args:
@@ -126,11 +165,13 @@ class VespaClient:
             self.check_for_application_convergence()
 
         res = self._create_deploy_session(self.http_client)
-        content_base_url = res['content']
-        prepare_url = res['prepared']
+        content_base_url = res["content"]
+        prepare_url = res["prepared"]
         return content_base_url, prepare_url
 
-    def download_application(self, check_for_application_convergence: bool = False) -> str:
+    def download_application(
+        self, check_for_application_convergence: bool = False
+    ) -> str:
         """
         Args:
             check_for_application_convergence: check for the application to converge before downloading.
@@ -157,7 +198,7 @@ class VespaClient:
             self.check_for_application_convergence()
 
         with httpx.Client() as httpx_client:
-            session_id = self._create_deploy_session(httpx_client)['session-id']
+            session_id = self._create_deploy_session(httpx_client)["session-id"]
             return self._download_application(session_id, httpx_client)
 
     def check_for_application_convergence(self) -> None:
@@ -168,7 +209,7 @@ class VespaClient:
             VespaNotConvergedError: If the application has not converged
         """
         if not self.get_application_has_converged():
-            raise VespaNotConvergedError('Vespa application has not converged')
+            raise VespaNotConvergedError("Vespa application has not converged")
 
     def get_application_generation(self) -> int:
         """
@@ -204,17 +245,29 @@ class VespaClient:
                 if self.get_application_has_converged():
                     return
                 else:
-                    logger.debug('Waiting for Vespa application to converge')
+                    logger.debug("Waiting for Vespa application to converge")
                     time.sleep(1)
             # TODO Find out what exceptions is raised here
             except (httpx.TimeoutException, httpcore.TimeoutException):
-                logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
+                logger.error(
+                    "Marqo timed out waiting for Vespa application to converge. Will retry."
+                )
 
-        raise VespaError(f"Vespa application did not converge within {timeout} seconds. "
-                         f"The convergence status is {self._get_convergence_status()}")
+        raise VespaError(
+            f"Vespa application did not converge within {timeout} seconds. "
+            f"The convergence status is {self._get_convergence_status()}"
+        )
 
-    def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
+    def query(
+        self,
+        yql: str,
+        hits: int = 10,
+        ranking: str = None,
+        model_restrict: str = None,
+        query_features: Dict[str, Any] = None,
+        timeout: Optional[float] = None,
+        **kwargs,
+    ) -> QueryResult:
         """
         Query Vespa.
         Args:
@@ -228,22 +281,24 @@ class VespaClient:
         Returns:
             Query result as a VespaQueryResult object
         """
-        query_features_list = {
-            f'input.query({key})': value for key, value in query_features.items()
-        } if query_features else {}
+        query_features_list = (
+            {f"input.query({key})": value for key, value in query_features.items()}
+            if query_features
+            else {}
+        )
 
         query = {
-            'yql': yql,
-            'hits': hits,
-            'ranking': ranking,
-            'model.restrict': model_restrict,
+            "yql": yql,
+            "hits": hits,
+            "ranking": ranking,
+            "model.restrict": model_restrict,
             **query_features_list,
-            **kwargs
+            **kwargs,
         }
 
         # Use default timeout if not already set.
         vespa_timeout_ms = timeout if timeout else self.default_search_timeout_ms
-        query['timeout'] = f"{vespa_timeout_ms}ms"
+        query["timeout"] = f"{vespa_timeout_ms}ms"
 
         # Set httpx timeout to be slightly longer than Vespa timeout to avoid early termination of the request.
         # However, we set it to be at least 5 seconds to avoid any regression.
@@ -252,10 +307,12 @@ class VespaClient:
 
         query = {key: value for key, value in query.items() if value is not None}
 
-        logger.debug(f'Query: {query}')
+        logger.debug(f"Query: {query}")
 
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout)
+            resp = self.http_client.post(
+                f"{self.query_url}/search/", json=query, timeout=httpx_client_timeout
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -264,7 +321,9 @@ class VespaClient:
         resp_dict = orjson.loads(resp.text)
         return QueryResult(**resp_dict)
 
-    def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
+    def feed_document(
+        self, document: VespaDocument, schema: str, timeout: int = 60
+    ) -> FeedDocumentResponse:
         """
         Feed a document to Vespa.
 
@@ -277,9 +336,9 @@ class VespaClient:
             FeedResponse object
         """
         doc_id = document.id
-        data = {'fields': document.fields}
+        data = {"fields": document.fields}
 
-        end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+        end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
 
         resp = self.http_client.post(end_point, json=data, timeout=timeout)
 
@@ -287,11 +346,13 @@ class VespaClient:
 
         return FeedDocumentResponse(**resp.json())
 
-    def feed_batch(self,
-                   batch: List[VespaDocument],
-                   schema: str,
-                   concurrency: Optional[int] = None,
-                   timeout: int = 60) -> FeedBatchResponse:
+    def feed_batch(
+        self,
+        batch: List[VespaDocument],
+        schema: str,
+        concurrency: Optional[int] = None,
+        timeout: int = 60,
+    ) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently.
 
@@ -318,7 +379,9 @@ class VespaClient:
 
         return batch_response
 
-    def feed_batch_sync(self, batch: List[VespaDocument], schema: str) -> FeedBatchResponse:
+    def feed_batch_sync(
+        self, batch: List[VespaDocument], schema: str
+    ) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa sequentially.
 
@@ -343,8 +406,9 @@ class VespaClient:
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
-    def feed_batch_multithreaded(self, batch: List[VespaDocument], schema: str,
-                                 max_threads: int = 10) -> FeedBatchResponse:
+    def feed_batch_multithreaded(
+        self, batch: List[VespaDocument], schema: str, max_threads: int = 10
+    ) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently using a thread pool.
 
@@ -360,11 +424,19 @@ class VespaClient:
             List of FeedResponse objects
         """
         with httpx.Client(
-                limits=httpx.Limits(max_keepalive_connections=max_threads, max_connections=max_threads)) as sync_client:
+            limits=httpx.Limits(
+                max_keepalive_connections=max_threads, max_connections=max_threads
+            )
+        ) as sync_client:
             with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                responses = list(executor.map(
-                    lambda document: self._feed_document_sync(sync_client, document, schema, timeout=60), batch
-                ))
+                responses = list(
+                    executor.map(
+                        lambda document: self._feed_document_sync(
+                            sync_client, document, schema, timeout=60
+                        ),
+                        batch,
+                    )
+                )
 
         errors = False
         for response in responses:
@@ -385,7 +457,9 @@ class VespaClient:
             GetDocumentResponse object
         """
         try:
-            resp = self.http_client.get(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+            resp = self.http_client.get(
+                f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}"
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -393,11 +467,9 @@ class VespaClient:
 
         return GetDocumentResponse(**resp.json())
 
-    def get_all_documents(self,
-                          schema: str,
-                          stream=False,
-                          continuation: Optional[str] = None
-                          ) -> VisitDocumentsResponse:
+    def get_all_documents(
+        self, schema: str, stream=False, continuation: Optional[str] = None
+    ) -> VisitDocumentsResponse:
         """
         Get all documents in a schema.
         Args:
@@ -410,13 +482,13 @@ class VespaClient:
         """
         try:
             url = self._add_query_params(
-                url=f'{self.document_url}/document/v1/{schema}/{schema}/docid',
+                url=f"{self.document_url}/document/v1/{schema}/{schema}/docid",
                 query_params={
-                    'stream': str(stream).lower(),
-                    'continuation': continuation
-                }
+                    "stream": str(stream).lower(),
+                    "continuation": continuation,
+                },
             )
-            logger.debug(f'URL: {url}')
+            logger.debug(f"URL: {url}")
             resp = self.http_client.get(url)
         except httpx.HTTPError as e:
             raise VespaError(e) from e
@@ -425,12 +497,14 @@ class VespaClient:
 
         return VisitDocumentsResponse(**resp.json())
 
-    def get_batch(self,
-                  ids: List[str],
-                  schema: str,
-                  fields: Optional[List[str]] = None,
-                  concurrency: Optional[int] = None,
-                  timeout: int = 60) -> GetBatchResponse:
+    def get_batch(
+        self,
+        ids: List[str],
+        schema: str,
+        fields: Optional[List[str]] = None,
+        concurrency: Optional[int] = None,
+        timeout: int = 60,
+    ) -> GetBatchResponse:
         """
         Get a batch of documents by ID concurrently.
 
@@ -472,7 +546,9 @@ class VespaClient:
             schema: Schema to delete from
         """
         try:
-            resp = self.http_client.delete(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+            resp = self.http_client.delete(
+                f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}"
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -483,19 +559,23 @@ class VespaClient:
     def delete_all_docs(self, schema: str) -> DeleteAllDocumentsResponse:
         """Deletes all documents in the given index"""
         try:
-            resp = self.http_client.delete(f'{self.document_url}/document/v1/{schema}'
-                                           f'/{schema}/docid/?cluster={self.content_cluster_name}&selection=true')
+            resp = self.http_client.delete(
+                f"{self.document_url}/document/v1/{schema}"
+                f"/{schema}/docid/?cluster={self.content_cluster_name}&selection=true"
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
         self._raise_for_status(resp)
         return DeleteAllDocumentsResponse(**resp.json())
 
-    def delete_batch(self,
-                     ids: List[str],
-                     schema: str,
-                     concurrency: Optional[int] = None,
-                     timeout: int = 60) -> DeleteBatchResponse:
+    def delete_batch(
+        self,
+        ids: List[str],
+        schema: str,
+        concurrency: Optional[int] = None,
+        timeout: int = 60,
+    ) -> DeleteBatchResponse:
         """
         Delete a batch of documents by ID concurrently.
 
@@ -522,11 +602,14 @@ class VespaClient:
 
         return batch_response
 
-    def update_documents_batch(self, batch: List[VespaDocument],
-                               schema: str,
-                               concurrency: Optional[int] = None,
-                               timeout: int = 60,
-                               vespa_id_field: str = "marqo__id") -> UpdateDocumentsBatchResponse:
+    def update_documents_batch(
+        self,
+        batch: List[VespaDocument],
+        schema: str,
+        concurrency: Optional[int] = None,
+        timeout: int = 60,
+        vespa_id_field: str = "marqo__id",
+    ) -> UpdateDocumentsBatchResponse:
         """
         Partial update documents in batch concurrently.
 
@@ -552,7 +635,9 @@ class VespaClient:
             concurrency = self.partial_pool_size
 
         batch_response = conc.run_coroutine(
-            self._update_documents_batch_async(batch, schema, concurrency, timeout, vespa_id_field)
+            self._update_documents_batch_async(
+                batch, schema, concurrency, timeout, vespa_id_field
+            )
         )
 
         return batch_response
@@ -567,7 +652,7 @@ class VespaClient:
              A selected set of metrics for every service on all nodes for the application
         """
         try:
-            resp = self.http_client.get(f'{self.document_url}/metrics/v2/values')
+            resp = self.http_client.get(f"{self.document_url}/metrics/v2/values")
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -577,7 +662,9 @@ class VespaClient:
 
     def get_index_setting_by_name(self, index_name: str) -> Optional[MarqoIndex]:
         try:
-            resp = self.http_client.get(f'{self.document_url}/index-settings/{index_name}')
+            resp = self.http_client.get(
+                f"{self.document_url}/index-settings/{index_name}"
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -590,7 +677,7 @@ class VespaClient:
 
     def get_all_index_settings(self) -> List[MarqoIndex]:
         try:
-            resp = self.http_client.get(f'{self.document_url}/index-settings')
+            resp = self.http_client.get(f"{self.document_url}/index-settings")
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
@@ -600,10 +687,14 @@ class VespaClient:
         if isinstance(index_list, list):
             return [MarqoIndex.parse_obj(item) for item in index_list]
 
-        raise VespaError(f'Get all index settings returns invalid response: {index_list}')
+        raise VespaError(
+            f"Get all index settings returns invalid response: {index_list}"
+        )
 
     @classmethod
-    def translate_vespa_document_response(cls, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
+    def translate_vespa_document_response(
+        cls, status: int, message: Optional[str] = None
+    ) -> Tuple[int, Optional[str]]:
         """A helper function to translate Vespa document response into the expected status, message that
         is used in Marqo document API responses.
 
@@ -616,47 +707,73 @@ class VespaClient:
         vespa_status_code_to_marqo_doc_error_map = {
             200: (200, None),
             404: (404, "Document does not exist in the index"),
-            412: (400, "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details"), # Update documents get 412 from Vespa for document not found as we use condition
-            429: (429, "Marqo vector store received too many requests. Please try again later"),
+            412: (
+                400,
+                "Marqo vector store couldn't update the document. Please see: "
+                + update_documents_response()
+                + " for more details",
+            ),  # Update documents get 412 from Vespa for document not found as we use condition
+            429: (
+                429,
+                "Marqo vector store received too many requests. Please try again later",
+            ),
             507: (400, "Marqo vector store is out of memory or disk space"),
         }
 
         if status in vespa_status_code_to_marqo_doc_error_map:
             return vespa_status_code_to_marqo_doc_error_map[status]
-        elif status == 400 and isinstance(message, str) and "could not parse field" in message.lower():
+        elif (
+            status == 400
+            and isinstance(message, str)
+            and "could not parse field" in message.lower()
+        ):
             # TODO Block the invalid special characters before sending to Vespa
-            return 400, f"The document contains invalid characters in the fields. Original error: {message} "
+            return (
+                400,
+                f"The document contains invalid characters in the fields. Original error: {message} ",
+            )
         else:
-            logger.error(f"An unexpected error occurred from the Vespa document response. "
-                         f"status: {status}, message: {message}")
-            return 500, f"Marqo vector store returned an unexpected error with this document. Original error: {message}"
+            logger.error(
+                f"An unexpected error occurred from the Vespa document response. "
+                f"status: {status}, message: {message}"
+            )
+            return (
+                500,
+                f"Marqo vector store returned an unexpected error with this document. Original error: {message}",
+            )
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
             return url
 
-        query_string = '&'.join([f'{key}={value}' for key, value in query_params.items() if value])
-        return f'{url.strip("?")}?{query_string}'
+        query_string = "&".join(
+            [f"{key}={value}" for key, value in query_params.items() if value]
+        )
+        return f"{url.strip('?')}?{query_string}"
 
     def _gzip_compress(self, directory: str) -> io.BytesIO:
         """
         Gzip all files in the given directory and return an in-memory byte buffer.
         """
         byte_stream = io.BytesIO()
-        with tarfile.open(fileobj=byte_stream, mode='w:gz') as tar:
+        with tarfile.open(fileobj=byte_stream, mode="w:gz") as tar:
             for root, dirs, files in os.walk(directory):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, directory)  # archive name should be relative
+                    arcname = os.path.relpath(
+                        file_path, directory
+                    )  # archive name should be relative
                     tar.add(file_path, arcname=arcname)
 
         byte_stream.seek(0)
         return byte_stream
 
     def _create_deploy_session(self, httpx_client: httpx.Client) -> Dict:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
-                   f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
-                   f'/default/region/default/instance/default'
+        endpoint = (
+            f"{self.config_url}/application/v2/tenant/default/session?from="
+            f"{self.config_url}/application/v2/tenant/default/application/default/environment"
+            f"/default/region/default/instance/default"
+        )
 
         response = httpx_client.post(endpoint)
 
@@ -665,10 +782,10 @@ class VespaClient:
         return response.json()
 
     def get_content_url(self, content_base_url: str, *paths: str) -> str:
-        return f'{content_base_url}{"/".join(paths)}'
+        return f"{content_base_url}{'/'.join(paths)}"
 
     def list_contents(self, content_base_url: str) -> List[str]:
-        endpoint = f'{content_base_url}?recursive=true'
+        endpoint = f"{content_base_url}?recursive=true"
 
         response = self.http_client.get(endpoint)
 
@@ -677,7 +794,7 @@ class VespaClient:
         return response.json()
 
     def get_text_content(self, content_base_url: str, *path: str) -> str:
-        endpoint = f'{content_base_url}{"/".join(path)}'
+        endpoint = f"{content_base_url}{'/'.join(path)}"
 
         response = self.http_client.get(endpoint)
 
@@ -686,7 +803,7 @@ class VespaClient:
         return response.text
 
     def get_binary_content(self, content_base_url: str, *path: str) -> bytes:
-        endpoint = f'{content_base_url}{"/".join(path)}'
+        endpoint = f"{content_base_url}{'/'.join(path)}"
 
         response = self.http_client.get(endpoint)
 
@@ -694,15 +811,17 @@ class VespaClient:
 
         return response.content
 
-    def put_content(self, content_base_url: str, content: Union[str, bytes], *path: str) -> None:
-        endpoint = f'{content_base_url}{"/".join(path)}'
+    def put_content(
+        self, content_base_url: str, content: Union[str, bytes], *path: str
+    ) -> None:
+        endpoint = f"{content_base_url}{'/'.join(path)}"
 
         response = self.http_client.put(endpoint, content=content)
 
         self._raise_for_status(response)
 
     def delete_content(self, content_base_url: str, *path: str) -> None:
-        endpoint = f'{content_base_url}{"/".join(path)}'
+        endpoint = f"{content_base_url}{'/'.join(path)}"
 
         response = self.http_client.delete(endpoint)
 
@@ -723,16 +842,16 @@ class VespaClient:
         return response.json()
 
     def get_vespa_version(self) -> str:
-        endpoint = f'{self.config_url}/state/v1/version'
+        endpoint = f"{self.config_url}/state/v1/version"
 
         response = self.http_client.get(endpoint)
 
         self._raise_for_status(response)
 
-        return response.json()['version']
+        return response.json()["version"]
 
     def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
+        endpoint = f"{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true"
 
         response = httpx_client.get(endpoint)
 
@@ -740,15 +859,15 @@ class VespaClient:
 
         urls = response.json()
 
-        logger.debug(f'URLs: {urls}')
+        logger.debug(f"URLs: {urls}")
 
         def is_file(url: str) -> bool:
-            last_component = urlparse(url).path.split('/')[-1]
-            return '.' in last_component
+            last_component = urlparse(url).path.split("/")[-1]
+            return "." in last_component
 
         temp_dir = tempfile.mkdtemp()
 
-        logger.debug(f'Downloading application to {temp_dir}')
+        logger.debug(f"Downloading application to {temp_dir}")
 
         for url in urls:
             if not is_file(url):
@@ -756,11 +875,11 @@ class VespaClient:
 
             # Parse the URL
             parsed = urlparse(url)
-            path_parts = parsed.path.split('/')
+            path_parts = parsed.path.split("/")
 
             # Find the index for 'content' and use it as root
-            content_index = path_parts.index('content')
-            rel_path = os.path.join(*path_parts[content_index + 1:])
+            content_index = path_parts.index("content")
+            rel_path = os.path.join(*path_parts[content_index + 1 :])
             abs_path = os.path.join(temp_dir, rel_path)
 
             # Ensure directory exists before downloading
@@ -770,14 +889,16 @@ class VespaClient:
             self._raise_for_status(response)
 
             # Save the downloaded content
-            with open(abs_path, 'wb') as f:
+            with open(abs_path, "wb") as f:
                 f.write(response.content)
 
         return temp_dir
 
     def _get_convergence_status(self):
-        endpoint = f'{self.config_url}/application/v2/tenant/default/application/default/environment/default/region/' \
-                   f'default/instance/default/serviceconverge'
+        endpoint = (
+            f"{self.config_url}/application/v2/tenant/default/application/default/environment/default/region/"
+            f"default/instance/default/serviceconverge"
+        )
 
         response = self.http_client.get(endpoint)
 
@@ -786,23 +907,28 @@ class VespaClient:
         try:
             json = response.json()
             return self._ConvergenceStatus(
-                current_generation=json['currentGeneration'],
-                wanted_generation=json['wantedGeneration'],
-                converged=json['converged']
+                current_generation=json["currentGeneration"],
+                wanted_generation=json["wantedGeneration"],
+                converged=json["converged"],
             )
 
         except (JSONDecodeError, KeyError) as e:
-            raise VespaError(f'Unexpected response: {response.text}') from e
+            raise VespaError(f"Unexpected response: {response.text}") from e
 
-    async def _feed_batch_async(self, batch: List[VespaDocument],
-                                schema: str,
-                                connections: int, timeout: int) -> FeedBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections)) as async_client:
+    async def _feed_batch_async(
+        self, batch: List[VespaDocument], schema: str, connections: int, timeout: int
+    ) -> FeedBatchResponse:
+        async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_keepalive_connections=connections, max_connections=connections
+            )
+        ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._feed_document_async(semaphore, async_client, document, schema, timeout)
+                    self._feed_document_async(
+                        semaphore, async_client, document, schema, timeout
+                    )
                 )
                 for document in batch
             ]
@@ -818,16 +944,30 @@ class VespaClient:
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
-    async def _update_documents_batch_async(self, batch: List[VespaDocument],
-                                            schema: str,
-                                            connections: int, timeout: int,
-                                            vespa_id_field: str) -> UpdateDocumentsBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections)) as async_client:
+    async def _update_documents_batch_async(
+        self,
+        batch: List[VespaDocument],
+        schema: str,
+        connections: int,
+        timeout: int,
+        vespa_id_field: str,
+    ) -> UpdateDocumentsBatchResponse:
+        async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_keepalive_connections=connections, max_connections=connections
+            )
+        ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._update_document_async(semaphore, async_client, document, schema, timeout, vespa_id_field)
+                    self._update_document_async(
+                        semaphore,
+                        async_client,
+                        document,
+                        schema,
+                        timeout,
+                        vespa_id_field,
+                    )
                 )
                 for document in batch
             ]
@@ -843,25 +983,37 @@ class VespaClient:
 
         return UpdateDocumentsBatchResponse(responses=responses, errors=errors)
 
-    async def _update_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
-                                     document: VespaDocument, schema: str,
-                                     timeout: int, vespa_id_field: str) -> UpdateDocumentResponse:
+    async def _update_document_async(
+        self,
+        semaphore: asyncio.Semaphore,
+        async_client: httpx.AsyncClient,
+        document: VespaDocument,
+        schema: str,
+        timeout: int,
+        vespa_id_field: str,
+    ) -> UpdateDocumentResponse:
         doc_id = document.id
-        data = {'fields': document.fields}
+        data = {"fields": document.fields}
         types = document.field_types
         version_uuid = document.version_uuid
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
         async with semaphore:
-            end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
-            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
-            if types is not None: # Types will be none for structured index as we are not storing types at the time of Add docs.
+            end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false"
+            data["condition"] = f'{schema}.{vespa_id_field}=="{doc_id}"'
+            if (
+                types is not None
+            ):  # Types will be none for structured index as we are not storing types at the time of Add docs.
                 for key, value in types.items():
-                    data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}==\"{value}\")'
-                                          f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
+                    data["condition"] += (
+                        f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{"{key}"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{"{key}"}}=="{value}")'
+                        f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{"{key}"}}=="{MarqoFieldTypes.TENSOR.value}"))'
+                    )
             if version_uuid is not None:
-                data["condition"] += f' and {schema}.{VESPA_DOC_VERSION_UUID}=="{version_uuid}"'
+                data["condition"] += (
+                    f' and {schema}.{VESPA_DOC_VERSION_UUID}=="{version_uuid}"'
+                )
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
                 if resp.status_code == 412 and types is None and version_uuid is None:
@@ -871,7 +1023,12 @@ class VespaClient:
                     resp.status_code = 404
             except httpx.RequestError as e:
                 logger.error(e, exc_info=True)
-                return UpdateDocumentResponse(status=500, message="Network Error", id=doc_id, path_id=error_doc_path_id)
+                return UpdateDocumentResponse(
+                    status=500,
+                    message="Network Error",
+                    id=doc_id,
+                    path_id=error_doc_path_id,
+                )
 
         # Handle other exceptions
         try:
@@ -879,18 +1036,29 @@ class VespaClient:
         except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here, so we error out the whole batch
-                raise VespaError(cause=e, message=f"Unexpected response from Vespa: {resp.text}") from e
+                raise VespaError(
+                    cause=e, message=f"Unexpected response from Vespa: {resp.text}"
+                ) from e
 
             try:
                 self._raise_for_status(resp)
             except VespaStatusError as e:
                 logger.error(e, exc_info=True)
-                return UpdateDocumentResponse(status=resp.status_code, message=e.message, id=doc_id,
-                                              error_doc_path_id=error_doc_path_id)
+                return UpdateDocumentResponse(
+                    status=resp.status_code,
+                    message=e.message,
+                    id=doc_id,
+                    error_doc_path_id=error_doc_path_id,
+                )
 
-    async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
-                                   document: VespaDocument, schema: str,
-                                   timeout: int) -> FeedBatchDocumentResponse:
+    async def _feed_document_async(
+        self,
+        semaphore: asyncio.Semaphore,
+        async_client: httpx.AsyncClient,
+        document: VespaDocument,
+        schema: str,
+        timeout: int,
+    ) -> FeedBatchDocumentResponse:
         """An async method to feed a document to Vespa.
 
         Note: This method is used by the async feed batch method to feed documents concurrently. Unhandled exceptions
@@ -913,16 +1081,20 @@ class VespaClient:
             FeedDocumentResponse object
         """
         doc_id = document.id
-        data = {'fields': document.fields}
+        data = {"fields": document.fields}
 
         async with semaphore:
-            end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+            end_point = (
+                f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
+            )
             # Handle httpx.RequestError
             try:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:
                 logger.error(e, exc_info=True)
-                return FeedBatchDocumentResponse(status=500, message="Network Error", id=doc_id)
+                return FeedBatchDocumentResponse(
+                    status=500, message="Network Error", id=doc_id
+                )
 
         # Handle other exceptions
         try:
@@ -930,38 +1102,54 @@ class VespaClient:
         except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here, so we error out the whole batch
-                raise VespaError(cause=e, message=f"Unexpected response from Vespa: {resp.text}") from e
+                raise VespaError(
+                    cause=e, message=f"Unexpected response from Vespa: {resp.text}"
+                ) from e
 
             try:
                 self._raise_for_status(resp)
             except VespaStatusError as e:
                 logger.error(e, exc_info=True)
-                return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
+                return FeedBatchDocumentResponse(
+                    status=resp.status_code, message=e.message, id=doc_id
+                )
 
-    def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
-                            timeout: int) -> FeedBatchDocumentResponse:
+    def _feed_document_sync(
+        self,
+        sync_client: httpx.Client,
+        document: VespaDocument,
+        schema: str,
+        timeout: int,
+    ) -> FeedBatchDocumentResponse:
         doc_id = document.id
-        data = {'fields': document.fields}
+        data = {"fields": document.fields}
 
-        end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+        end_point = f"{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}"
 
         resp = sync_client.post(end_point, json=data, timeout=timeout)
 
         return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
 
-    async def _get_batch_async(self,
-                               ids: List[str],
-                               fields: Optional[List[str]],
-                               schema: str,
-                               connections: int, timeout: int) -> GetBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections),
-                                     verify=self.ssl_context
-                                     ) as async_client:
+    async def _get_batch_async(
+        self,
+        ids: List[str],
+        fields: Optional[List[str]],
+        schema: str,
+        connections: int,
+        timeout: int,
+    ) -> GetBatchResponse:
+        async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_keepalive_connections=connections, max_connections=connections
+            ),
+            verify=self.ssl_context,
+        ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._get_document_async(semaphore, async_client, id, fields, schema, timeout)
+                    self._get_document_async(
+                        semaphore, async_client, id, fields, schema, timeout
+                    )
                 )
                 for id in ids
             ]
@@ -977,23 +1165,26 @@ class VespaClient:
 
         return GetBatchResponse(responses=responses, errors=errors)
 
-    async def _get_document_async(self,
-                                  semaphore: asyncio.Semaphore,
-                                  async_client: httpx.AsyncClient,
-                                  id: str,
-                                  fields: Optional[List[str]],
-                                  schema: str,
-                                  timeout: int) -> GetBatchDocumentResponse:
+    async def _get_document_async(
+        self,
+        semaphore: asyncio.Semaphore,
+        async_client: httpx.AsyncClient,
+        id: str,
+        fields: Optional[List[str]],
+        schema: str,
+        timeout: int,
+    ) -> GetBatchDocumentResponse:
         async with semaphore:
             try:
                 if fields is not None:
                     resp = await async_client.get(
-                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}',
-                        timeout=timeout
+                        f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{','.join(fields)}",
+                        timeout=timeout,
                     )
                 else:
                     resp = await async_client.get(
-                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
+                        f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}",
+                        timeout=timeout,
                     )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
@@ -1003,17 +1194,20 @@ class VespaClient:
 
             self._raise_for_status(resp)
 
-    async def _get_document_async_with_specific_fields(self,
-                                  semaphore: asyncio.Semaphore,
-                                  async_client: httpx.AsyncClient,
-                                  id: str,
-                                  fields: List[str],
-                                  schema: str,
-                                  timeout: int) -> GetBatchDocumentResponse:
+    async def _get_document_async_with_specific_fields(
+        self,
+        semaphore: asyncio.Semaphore,
+        async_client: httpx.AsyncClient,
+        id: str,
+        fields: List[str],
+        schema: str,
+        timeout: int,
+    ) -> GetBatchDocumentResponse:
         async with semaphore:
             try:
                 resp = await async_client.get(
-                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}', timeout=timeout
+                    f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{','.join(fields)}",
+                    timeout=timeout,
                 )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
@@ -1023,17 +1217,20 @@ class VespaClient:
 
             self._raise_for_status(resp)
 
-
-    async def _delete_batch_async(self,
-                                  ids: List[str],
-                                  schema: str,
-                                  connections: int, timeout: int) -> DeleteBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections)) as async_client:
+    async def _delete_batch_async(
+        self, ids: List[str], schema: str, connections: int, timeout: int
+    ) -> DeleteBatchResponse:
+        async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_keepalive_connections=connections, max_connections=connections
+            )
+        ) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._delete_document_async(semaphore, async_client, id, schema, timeout)
+                    self._delete_document_async(
+                        semaphore, async_client, id, schema, timeout
+                    )
                 )
                 for id in ids
             ]
@@ -1049,15 +1246,19 @@ class VespaClient:
 
         return DeleteBatchResponse(responses=responses, errors=errors)
 
-    async def _delete_document_async(self,
-                                     semaphore: asyncio.Semaphore,
-                                     async_client: httpx.AsyncClient,
-                                     id: str,
-                                     schema: str,
-                                     timeout: int) -> DeleteBatchDocumentResponse:
+    async def _delete_document_async(
+        self,
+        semaphore: asyncio.Semaphore,
+        async_client: httpx.AsyncClient,
+        id: str,
+        schema: str,
+        timeout: int,
+    ) -> DeleteBatchDocumentResponse:
         async with semaphore:
             try:
-                resp = await async_client.delete(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
+                resp = await async_client.delete(
+                    f"{self.document_url}/document/v1/{schema}/{schema}/docid/{id}"
+                )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
 
@@ -1067,7 +1268,7 @@ class VespaClient:
         except JSONDecodeError:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here
-                raise VespaError(f'Unexpected response: {resp.text}')
+                raise VespaError(f"Unexpected response: {resp.text}")
 
             self._raise_for_status(resp)
 
@@ -1077,8 +1278,12 @@ class VespaClient:
         Check if the query error is a timeout error.
         """
 
-        if error.code == 8 and error.message == "Search request soft doomed during query setup and initialization.":
-            logger.warning('Detected soft doomed query')
+        if (
+            error.code == 8
+            and error.message
+            == "Search request soft doomed during query setup and initialization."
+        ):
+            logger.warning("Detected soft doomed query")
             return True
         if error.code == 12 and resp.status_code == 504:
             return True
@@ -1098,10 +1303,7 @@ class VespaClient:
         except httpx.HTTPStatusError as e:
             try:
                 result = QueryResult(**resp.json())
-                if (
-                        result.root.errors is not None
-                        and len(result.root.errors) > 0
-                ):
+                if result.root.errors is not None and len(result.root.errors) > 0:
                     for error in result.root.errors:
                         if not self._is_timeout_error(error, resp):
                             # Raise 500 if any error is not timeout
@@ -1129,16 +1331,20 @@ class VespaClient:
             response = e.response
             try:
                 json = response.json()
-                error_code = json['error-code']
-                message = json['message']
+                error_code = json["error-code"]
+                message = json["message"]
             except Exception:
                 raise VespaStatusError(message=response.text, cause=e) from e
 
             self._raise_for_error_code(error_code, message, e)
 
-    def _raise_for_error_code(self, error_code: str, message: str, cause: Exception) -> None:
+    def _raise_for_error_code(
+        self, error_code: str, message: str, cause: Exception
+    ) -> None:
         exception = self._VESPA_ERROR_CODE_TO_EXCEPTION.get(error_code, VespaError)
         if exception:
             raise exception(message=message, cause=cause) from cause
 
-        raise VespaStatusError(message=f'{error_code}: {message}', cause=cause) from cause
+        raise VespaStatusError(
+            message=f"{error_code}: {message}", cause=cause
+        ) from cause

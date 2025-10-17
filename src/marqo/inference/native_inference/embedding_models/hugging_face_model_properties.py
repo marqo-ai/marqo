@@ -5,12 +5,14 @@ from typing import Optional
 
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
-from pydantic.v1 import Field, validator, root_validator
+from pydantic.v1 import Field, root_validator, validator
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
-from marqo.s2_inference.configs import ModelCache
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import (
+    MarqoBaseModelProperties,
+)
 from marqo.logging import get_logger
+from marqo.s2_inference.configs import ModelCache
 from marqo.tensor_search.models.private_models import ModelLocation
 
 logger = get_logger(__name__)
@@ -25,6 +27,7 @@ class HuggingFaceModelFlags(ImmutableBaseModel):
     """
     Flags passed to transformers.AutoModel.from_pretrained()
     """
+
     trust_remote_code: Optional[bool] = None
     use_memory_efficient_attention: Optional[bool] = None
     unpad_inputs: Optional[bool] = None
@@ -34,6 +37,7 @@ class HuggingFaceTokenizerFlags(ImmutableBaseModel):
     """
     Flags passed to transformers.AutoTokenizer.from_pretrained()
     """
+
     trust_remote_code: Optional[bool] = None
 
 
@@ -54,6 +58,7 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
         trust_remote_code: Allow remote code execution.
     """
+
     name: Optional[str] = None
     tokens: int = 128
     url: Optional[str] = None
@@ -77,7 +82,7 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         pooling_method = values.get("pooling_method") or values.get("poolingMethod")
         if pooling_method is not None:
             return values
-        name = values.get('name')
+        name = values.get("name")
         if isinstance(name, str) and name:
             pooling_method = cls._infer_pooling_method_from_name(name)
         else:
@@ -99,16 +104,20 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         file_name = "1_Pooling/config.json"
 
         def log_warning_and_return_default():
-            logger.warning(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
+            logger.warning(
+                f"Could not infer pooling method from the model {name}. Defaulting to mean pooling."
+            )
             return PoolingMethod.Mean
 
         try:
-            file_path = hf_hub_download(repo_id, file_name, cache_dir=ModelCache.hf_cache_path)
+            file_path = hf_hub_download(
+                repo_id, file_name, cache_dir=ModelCache.hf_cache_path
+            )
         except HfHubHTTPError:
             return log_warning_and_return_default()
 
         try:
-            with open(file_path, 'r') as file:
+            with open(file_path, "r") as file:
                 content = json.loads(file.read())
         except JSONDecodeError:
             return log_warning_and_return_default()
@@ -130,8 +139,12 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         But 'url' and 'model_location' should not be provided together.
         """
         if values.get("url") and values.get("model_location"):
-            raise ValueError("Only one of 'url' and 'model_location' should be provided.")
+            raise ValueError(
+                "Only one of 'url' and 'model_location' should be provided."
+            )
         is_custom = values.get("url") or values.get("model_location")
         if not values.get("name") and not is_custom:
-            raise ValueError("At least one of 'name', 'url', or 'model_location' should be provided.")
+            raise ValueError(
+                "At least one of 'name', 'url', or 'model_location' should be provided."
+            )
         return values

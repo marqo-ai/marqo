@@ -1,10 +1,6 @@
-import numpy as np
-from numpy import ndarray
-from pydantic import ValidationError
-from transformers import AutoTokenizer
-from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
-from typing import List, Callable
+from typing import Callable, List
 
+import numpy as np
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.errors import (
     InternalServerError,
@@ -26,6 +22,11 @@ from inference_orchestrator.services.triton_inference.model_manager.model_manage
 from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import (
     TritonGRPCClient,
 )
+from numpy import ndarray
+from pydantic import ValidationError
+from transformers import AutoTokenizer
+from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
+
 from ..model_download_cache import ModelDownloadCache
 
 

@@ -36,8 +36,10 @@ class V2V0V2V1(Upgrade):
             logger.info("Adding Marqo config")
             self._add_marqo_version()
         except Exception as e:
-            raise Exception('Upgrade v20v21 failed. Partial changes may have been applied. This process is '
-                            'idempotent. A successful run is required to bring Marqo into a consistent state') from e
+            raise Exception(
+                "Upgrade v20v21 failed. Partial changes may have been applied. This process is "
+                "idempotent. A successful run is required to bring Marqo into a consistent state"
+            ) from e
 
         logger.info("Verifying upgrade")
         self._verify_query_profile()
@@ -48,14 +50,18 @@ class V2V0V2V1(Upgrade):
     def _create_query_profile(self):
         app = self.vespa_client.download_application()
 
-        settings_schema_exists = os.path.exists(os.path.join(app, 'schemas', f'{self.settings_schema}.sd'))
+        settings_schema_exists = os.path.exists(
+            os.path.join(app, "schemas", f"{self.settings_schema}.sd")
+        )
         if not settings_schema_exists:
-            raise api_exceptions.BadRequestError(f"Settings schema {self.settings_schema} does not exist. "
-                                                 f"Has Marqo been bootstraped?")
+            raise api_exceptions.BadRequestError(
+                f"Settings schema {self.settings_schema} does not exist. "
+                f"Has Marqo been bootstraped?"
+            )
 
-        profile_path = os.path.join(app, 'search/query-profiles', 'default.xml')
+        profile_path = os.path.join(app, "search/query-profiles", "default.xml")
         os.makedirs(os.path.dirname(profile_path), exist_ok=True)
-        with open(profile_path, 'w') as f:
+        with open(profile_path, "w") as f:
             f.write(self.default_query_profile)
 
         self.vespa_client.deploy_application(app)
@@ -65,20 +71,19 @@ class V2V0V2V1(Upgrade):
         self.vespa_client.feed_document(
             VespaDocument(
                 id=self.config_id,
-                fields={
-                    'settings': _MarqoConfig(version=version.get_version()).json()
-                }
+                fields={"settings": _MarqoConfig(version=version.get_version()).json()},
             ),
-            schema=self.settings_schema
+            schema=self.settings_schema,
         )
 
     def _verify_query_profile(self):
         app = self.vespa_client.download_application()
-        profile_path_exists = os.path.exists(os.path.join(app, 'search/query-profiles', 'default.xml'))
+        profile_path_exists = os.path.exists(
+            os.path.join(app, "search/query-profiles", "default.xml")
+        )
         if not profile_path_exists:
             raise api_exceptions.InternalError(
-                f"Query profile does not exist. "
-                f"Upgrade has not been applied correctly"
+                "Query profile does not exist. Upgrade has not been applied correctly"
             )
 
     def _verify_marqo_version(self):

@@ -2,36 +2,39 @@ import unittest
 import uuid
 
 import pytest
-from marqo.errors import MarqoWebError
 
+from marqo.errors import MarqoWebError
 from tests.marqo_test import MarqoTestCase
 
 
 class TestModlCacheManagement(MarqoTestCase):
-
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        cls.structured_index_name = "structured_" + str(uuid.uuid4()).replace('-', '')
-        cls.unstructured_index_name = "unstructured_" + str(uuid.uuid4()).replace('-', '')
+        cls.structured_index_name = "structured_" + str(uuid.uuid4()).replace("-", "")
+        cls.unstructured_index_name = "unstructured_" + str(uuid.uuid4()).replace(
+            "-", ""
+        )
 
-        cls.create_indexes([
-            {
-                "indexName": cls.structured_index_name,
-                "type": "structured",
-                "model": "hf/all-MiniLM-L6-v2",
-                "allFields": [
-                    {"name": "title", "type": "text"},
-                ],
-                "tensorFields": ["title"]
-            },
-            {
-                "indexName": cls.unstructured_index_name,
-                "model": "hf/all-MiniLM-L6-v2",
-                "type": "unstructured",
-            }
-        ])
+        cls.create_indexes(
+            [
+                {
+                    "indexName": cls.structured_index_name,
+                    "type": "structured",
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "allFields": [
+                        {"name": "title", "type": "text"},
+                    ],
+                    "tensorFields": ["title"],
+                },
+                {
+                    "indexName": cls.unstructured_index_name,
+                    "model": "hf/all-MiniLM-L6-v2",
+                    "type": "unstructured",
+                },
+            ]
+        )
 
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
@@ -42,7 +45,9 @@ class TestModlCacheManagement(MarqoTestCase):
             with self.subTest(index_name):
                 with self.assertRaises(MarqoWebError) as e:
                     _ = self.client.index(index_name).get_cuda_info()
-                self.assertIn("CUDA is not available on this instance", str(e.exception.message))
+                self.assertIn(
+                    "CUDA is not available on this instance", str(e.exception.message)
+                )
 
     def test_get_cpu_info(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
@@ -64,8 +69,13 @@ class TestModlCacheManagement(MarqoTestCase):
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
                 with self.assertRaises(MarqoWebError) as e:
-                    self.client.index(index_name).eject_model("void_model", "void_device")
-                self.assertIn("The model_name `void_model` device `void_device` is not cached or found", str(e.exception.message))
+                    self.client.index(index_name).eject_model(
+                        "void_model", "void_device"
+                    )
+                self.assertIn(
+                    "The model_name `void_model` device `void_device` is not cached or found",
+                    str(e.exception.message),
+                )
 
     def test_eject_model(self) -> None:
         # test eject a model that is cached
@@ -73,5 +83,7 @@ class TestModlCacheManagement(MarqoTestCase):
             with self.subTest(index_name):
                 # Do a search to ensure the model is cached
                 r = self.client.index(index_name).search("q", device="cpu")
-                res = self.client.index(index_name).eject_model("hf/all-MiniLM-L6-v2", "cpu")
+                res = self.client.index(index_name).eject_model(
+                    "hf/all-MiniLM-L6-v2", "cpu"
+                )
                 self.assertIn("successfully eject", str(res))

@@ -1,7 +1,8 @@
-from pydantic.v1.dataclasses import dataclass
 from typing import Optional
+
 from marqo.tensor_search.models.external_apis.abstract_classes import (
-    ObjectLocation, ExternalAuth
+    ExternalAuth,
+    ObjectLocation,
 )
 
 
@@ -14,4 +15,3 @@ class S3Auth(ExternalAuth):
 class S3Location(ObjectLocation):
     Bucket: str
     Key: str
-

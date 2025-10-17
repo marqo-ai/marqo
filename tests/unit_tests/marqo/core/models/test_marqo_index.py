@@ -3,10 +3,21 @@ import unittest
 from pydantic.v1 import ValidationError
 
 from marqo.core.models.marqo_index import (
-    Field, FieldType, FieldFeature, CollapseField, Stemming,
-    Model, TensorField, StringArrayField, HnswConfig,
-    TextPreProcessing, VideoPreProcessing, AudioPreProcessing, ImagePreProcessing,
-    TextSplitMethod, PatchMethod, VectorNumericType, DistanceMetric
+    AudioPreProcessing,
+    CollapseField,
+    Field,
+    FieldFeature,
+    FieldType,
+    HnswConfig,
+    ImagePreProcessing,
+    Model,
+    PatchMethod,
+    Stemming,
+    StringArrayField,
+    TensorField,
+    TextPreProcessing,
+    TextSplitMethod,
+    VideoPreProcessing,
 )
 from tests.unit_tests.marqo_test import MarqoTestCase
 
@@ -20,7 +31,7 @@ class TestField(unittest.TestCase):
             name="title",
             type=FieldType.Text,
             lexical_field_name=None,
-            filter_field_name=None
+            filter_field_name=None,
         )
         self.assertEqual(field.name, "title")
         self.assertEqual(field.type, FieldType.Text)
@@ -41,11 +52,13 @@ class TestField(unittest.TestCase):
             filter_field_name="description_filter",
             dependent_fields=None,
             language="en",
-            stemming=Stemming.Best
+            stemming=Stemming.Best,
         )
         self.assertEqual(field.name, "description")
         self.assertEqual(field.type, FieldType.Text)
-        self.assertEqual(field.features, [FieldFeature.LexicalSearch, FieldFeature.Filter])
+        self.assertEqual(
+            field.features, [FieldFeature.LexicalSearch, FieldFeature.Filter]
+        )
         self.assertEqual(field.lexical_field_name, "description_lexical")
         self.assertEqual(field.filter_field_name, "description_filter")
         self.assertIsNone(field.dependent_fields)
@@ -60,11 +73,13 @@ class TestField(unittest.TestCase):
             features=[],
             lexical_field_name=None,
             filter_field_name=None,
-            dependent_fields={"text_field": 0.7, "image_field": 0.3}
+            dependent_fields={"text_field": 0.7, "image_field": 0.3},
         )
         self.assertEqual(field.name, "multimodal_field")
         self.assertEqual(field.type, FieldType.MultimodalCombination)
-        self.assertEqual(field.dependent_fields, {"text_field": 0.7, "image_field": 0.3})
+        self.assertEqual(
+            field.dependent_fields, {"text_field": 0.7, "image_field": 0.3}
+        )
 
     def test_field_name_validation_invalid_pattern(self):
         """Test that field names must match the required pattern."""
@@ -72,7 +87,7 @@ class TestField(unittest.TestCase):
             ("invalid-name!", "contains invalid characters"),
             ("123invalid", "starts with number"),
             ("field with spaces", "contains spaces"),
-            ("field@symbol", "contains @ symbol")
+            ("field@symbol", "contains @ symbol"),
         ]
 
         for invalid_name, description in invalid_names:
@@ -82,7 +97,7 @@ class TestField(unittest.TestCase):
                         name=invalid_name,
                         type=FieldType.Text,
                         lexical_field_name="lexical",
-                        filter_field_name="filter"
+                        filter_field_name="filter",
                     )
                 self.assertIn("must match [a-zA-Z_][a-zA-Z0-9_]*", str(cm.exception))
 
@@ -93,7 +108,7 @@ class TestField(unittest.TestCase):
                 name="marqo__field",
                 type=FieldType.Text,
                 lexical_field_name="lexical",
-                filter_field_name="filter"
+                filter_field_name="filter",
             )
         self.assertIn("must not start with", str(cm.exception))
 
@@ -107,7 +122,7 @@ class TestField(unittest.TestCase):
                         name=name,
                         type=FieldType.Text,
                         lexical_field_name="lexical",
-                        filter_field_name="filter"
+                        filter_field_name="filter",
                     )
                 self.assertIn("must not be one of", str(cm.exception))
 
@@ -117,15 +132,44 @@ class TestField(unittest.TestCase):
         # Format: (field_type, field_name, feature, should_be_valid, required_field_names)
         compatibility_matrix = [
             # LexicalSearch feature compatibility
-            (FieldType.Text, "text_field", FieldFeature.LexicalSearch, True, {"lexical_field_name": "text_field_lexical"}),
-            (FieldType.ArrayText, "array_text_field", FieldFeature.LexicalSearch, True, {"lexical_field_name": "array_text_field_lexical"}),
-            (FieldType.CustomVector, "custom_vector_field", FieldFeature.LexicalSearch, True, {"lexical_field_name": "custom_vector_field_lexical"}),
+            (
+                FieldType.Text,
+                "text_field",
+                FieldFeature.LexicalSearch,
+                True,
+                {"lexical_field_name": "text_field_lexical"},
+            ),
+            (
+                FieldType.ArrayText,
+                "array_text_field",
+                FieldFeature.LexicalSearch,
+                True,
+                {"lexical_field_name": "array_text_field_lexical"},
+            ),
+            (
+                FieldType.CustomVector,
+                "custom_vector_field",
+                FieldFeature.LexicalSearch,
+                True,
+                {"lexical_field_name": "custom_vector_field_lexical"},
+            ),
             (FieldType.Bool, "bool_field", FieldFeature.LexicalSearch, False, {}),
             (FieldType.Int, "int_field", FieldFeature.LexicalSearch, False, {}),
             (FieldType.Float, "float_field", FieldFeature.LexicalSearch, False, {}),
-            (FieldType.ImagePointer, "image_field", FieldFeature.LexicalSearch, False, {}),
-            (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.LexicalSearch, False, {}),
-
+            (
+                FieldType.ImagePointer,
+                "image_field",
+                FieldFeature.LexicalSearch,
+                False,
+                {},
+            ),
+            (
+                FieldType.MultimodalCombination,
+                "multimodal_field",
+                FieldFeature.LexicalSearch,
+                False,
+                {},
+            ),
             # ScoreModifier feature compatibility
             (FieldType.Int, "int_field", FieldFeature.ScoreModifier, True, {}),
             (FieldType.Long, "long_field", FieldFeature.ScoreModifier, True, {}),
@@ -133,47 +177,204 @@ class TestField(unittest.TestCase):
             (FieldType.Double, "double_field", FieldFeature.ScoreModifier, True, {}),
             (FieldType.MapInt, "map_int_field", FieldFeature.ScoreModifier, True, {}),
             (FieldType.MapLong, "map_long_field", FieldFeature.ScoreModifier, True, {}),
-            (FieldType.MapFloat, "map_float_field", FieldFeature.ScoreModifier, True, {}),
-            (FieldType.MapDouble, "map_double_field", FieldFeature.ScoreModifier, True, {}),
+            (
+                FieldType.MapFloat,
+                "map_float_field",
+                FieldFeature.ScoreModifier,
+                True,
+                {},
+            ),
+            (
+                FieldType.MapDouble,
+                "map_double_field",
+                FieldFeature.ScoreModifier,
+                True,
+                {},
+            ),
             (FieldType.Text, "text_field", FieldFeature.ScoreModifier, False, {}),
             (FieldType.Bool, "bool_field", FieldFeature.ScoreModifier, False, {}),
-            (FieldType.ArrayInt, "array_int_field", FieldFeature.ScoreModifier, False, {}),
-            (FieldType.CustomVector, "custom_vector_field", FieldFeature.ScoreModifier, False, {}),
-            (FieldType.ImagePointer, "image_field", FieldFeature.ScoreModifier, False, {}),
-            (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.ScoreModifier, False, {}),
-
+            (
+                FieldType.ArrayInt,
+                "array_int_field",
+                FieldFeature.ScoreModifier,
+                False,
+                {},
+            ),
+            (
+                FieldType.CustomVector,
+                "custom_vector_field",
+                FieldFeature.ScoreModifier,
+                False,
+                {},
+            ),
+            (
+                FieldType.ImagePointer,
+                "image_field",
+                FieldFeature.ScoreModifier,
+                False,
+                {},
+            ),
+            (
+                FieldType.MultimodalCombination,
+                "multimodal_field",
+                FieldFeature.ScoreModifier,
+                False,
+                {},
+            ),
             # Filter feature compatibility
-            (FieldType.Text, "text_field", FieldFeature.Filter, True, {"filter_field_name": "text_field_filter"}),
-            (FieldType.Bool, "bool_field", FieldFeature.Filter, True, {"filter_field_name": "bool_field_filter"}),
-            (FieldType.Int, "int_field", FieldFeature.Filter, True, {"filter_field_name": "int_field_filter"}),
-            (FieldType.Long, "long_field", FieldFeature.Filter, True, {"filter_field_name": "long_field_filter"}),
-            (FieldType.Float, "float_field", FieldFeature.Filter, True, {"filter_field_name": "float_field_filter"}),
-            (FieldType.Double, "double_field", FieldFeature.Filter, True, {"filter_field_name": "double_field_filter"}),
-            (FieldType.ArrayText, "array_text_field", FieldFeature.Filter, True, {"filter_field_name": "array_text_field_filter"}),
-            (FieldType.ArrayInt, "array_int_field", FieldFeature.Filter, True, {"filter_field_name": "array_int_field_filter"}),
-            (FieldType.ArrayLong, "array_long_field", FieldFeature.Filter, True, {"filter_field_name": "array_long_field_filter"}),
-            (FieldType.ArrayFloat, "array_float_field", FieldFeature.Filter, True, {"filter_field_name": "array_float_field_filter"}),
-            (FieldType.ArrayDouble, "array_double_field", FieldFeature.Filter, True, {"filter_field_name": "array_double_field_filter"}),
-            (FieldType.MapInt, "map_int_field", FieldFeature.Filter, True, {"filter_field_name": "map_int_field_filter"}),
-            (FieldType.MapLong, "map_long_field", FieldFeature.Filter, True, {"filter_field_name": "map_long_field_filter"}),
-            (FieldType.MapFloat, "map_float_field", FieldFeature.Filter, True, {"filter_field_name": "map_float_field_filter"}),
-            (FieldType.MapDouble, "map_double_field", FieldFeature.Filter, True, {"filter_field_name": "map_double_field_filter"}),
-            (FieldType.CustomVector, "custom_vector_field", FieldFeature.Filter, True, {"filter_field_name": "custom_vector_field_filter"}),
-            (FieldType.VideoPointer, "video_field", FieldFeature.Filter, True, {"filter_field_name": "video_field_filter"}),
-            (FieldType.AudioPointer, "audio_field", FieldFeature.Filter, True, {"filter_field_name": "audio_field_filter"}),
+            (
+                FieldType.Text,
+                "text_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "text_field_filter"},
+            ),
+            (
+                FieldType.Bool,
+                "bool_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "bool_field_filter"},
+            ),
+            (
+                FieldType.Int,
+                "int_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "int_field_filter"},
+            ),
+            (
+                FieldType.Long,
+                "long_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "long_field_filter"},
+            ),
+            (
+                FieldType.Float,
+                "float_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "float_field_filter"},
+            ),
+            (
+                FieldType.Double,
+                "double_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "double_field_filter"},
+            ),
+            (
+                FieldType.ArrayText,
+                "array_text_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "array_text_field_filter"},
+            ),
+            (
+                FieldType.ArrayInt,
+                "array_int_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "array_int_field_filter"},
+            ),
+            (
+                FieldType.ArrayLong,
+                "array_long_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "array_long_field_filter"},
+            ),
+            (
+                FieldType.ArrayFloat,
+                "array_float_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "array_float_field_filter"},
+            ),
+            (
+                FieldType.ArrayDouble,
+                "array_double_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "array_double_field_filter"},
+            ),
+            (
+                FieldType.MapInt,
+                "map_int_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "map_int_field_filter"},
+            ),
+            (
+                FieldType.MapLong,
+                "map_long_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "map_long_field_filter"},
+            ),
+            (
+                FieldType.MapFloat,
+                "map_float_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "map_float_field_filter"},
+            ),
+            (
+                FieldType.MapDouble,
+                "map_double_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "map_double_field_filter"},
+            ),
+            (
+                FieldType.CustomVector,
+                "custom_vector_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "custom_vector_field_filter"},
+            ),
+            (
+                FieldType.VideoPointer,
+                "video_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "video_field_filter"},
+            ),
+            (
+                FieldType.AudioPointer,
+                "audio_field",
+                FieldFeature.Filter,
+                True,
+                {"filter_field_name": "audio_field_filter"},
+            ),
             (FieldType.ImagePointer, "image_field", FieldFeature.Filter, False, {}),
-            (FieldType.MultimodalCombination, "multimodal_field", FieldFeature.Filter, False, {}),
+            (
+                FieldType.MultimodalCombination,
+                "multimodal_field",
+                FieldFeature.Filter,
+                False,
+                {},
+            ),
         ]
 
-        for field_type, field_name, feature, should_be_valid, required_fields in compatibility_matrix:
-            with self.subTest(field_type=field_type, feature=feature, expected_valid=should_be_valid):
+        for (
+            field_type,
+            field_name,
+            feature,
+            should_be_valid,
+            required_fields,
+        ) in compatibility_matrix:
+            with self.subTest(
+                field_type=field_type, feature=feature, expected_valid=should_be_valid
+            ):
                 # Prepare field arguments
                 field_args = {
                     "name": field_name,
                     "type": field_type,
                     "features": [feature],
                     "lexical_field_name": required_fields.get("lexical_field_name"),
-                    "filter_field_name": required_fields.get("filter_field_name")
+                    "filter_field_name": required_fields.get("filter_field_name"),
                 }
 
                 # Add dependent_fields for MultimodalCombination
@@ -197,18 +398,18 @@ class TestField(unittest.TestCase):
             (
                 "language_without_lexical_search",
                 {"language": "en"},
-                "language can only be populated when"
+                "language can only be populated when",
             ),
             (
                 "stemming_without_lexical_search",
                 {"stemming": Stemming.Best},
-                "stemming can only be populated when"
+                "stemming can only be populated when",
             ),
             (
                 "both_without_lexical_search",
                 {"language": "en", "stemming": Stemming.Best},
-                "language can only be populated when"  # Language error comes first
-            )
+                "language can only be populated when",  # Language error comes first
+            ),
         ]
 
         for case_name, field_config, expected_error in test_cases:
@@ -221,10 +422,9 @@ class TestField(unittest.TestCase):
                         lexical_field_name=None,
                         filter_field_name=None,
                         language=field_config.get("language"),
-                        stemming=field_config.get("stemming")
+                        stemming=field_config.get("stemming"),
                     )
                 self.assertIn(expected_error, str(cm.exception))
-
 
     def test_dependent_fields_validation(self):
         """Test validation for dependent fields in MultimodalCombination type."""
@@ -236,7 +436,7 @@ class TestField(unittest.TestCase):
                 features=[],
                 lexical_field_name=None,
                 filter_field_name=None,
-                dependent_fields={"text": 0.6, "image": 0.4}
+                dependent_fields={"text": 0.6, "image": 0.4},
             )
             self.assertEqual(field.dependent_fields, {"text": 0.6, "image": 0.4})
 
@@ -247,22 +447,22 @@ class TestField(unittest.TestCase):
                 "type": FieldType.Text,
                 "dependent_fields": {"other": 1.0},
                 "expected_error": "dependent_fields must only be defined for fields of type",
-                "description": "non_multimodal_with_dependent_fields"
+                "description": "non_multimodal_with_dependent_fields",
             },
             {
                 "name": "multimodal_field",
                 "type": FieldType.MultimodalCombination,
                 "dependent_fields": None,
                 "expected_error": "dependent_fields must be defined",
-                "description": "multimodal_without_dependent_fields"
+                "description": "multimodal_without_dependent_fields",
             },
             {
                 "name": "multimodal_field",
                 "type": FieldType.MultimodalCombination,
                 "dependent_fields": {},
                 "expected_error": "dependent_fields must be defined",
-                "description": "multimodal_with_empty_dependent_fields"
-            }
+                "description": "multimodal_with_empty_dependent_fields",
+            },
         ]
 
         for case in invalid_cases:
@@ -274,10 +474,9 @@ class TestField(unittest.TestCase):
                         features=[],
                         lexical_field_name=None,
                         filter_field_name=None,
-                        dependent_fields=case["dependent_fields"]
+                        dependent_fields=case["dependent_fields"],
                     )
                 self.assertIn(case["expected_error"], str(cm.exception))
-
 
     def test_required_field_names_validation(self):
         """Test that required field names are present based on features."""
@@ -287,15 +486,15 @@ class TestField(unittest.TestCase):
                 "lexical_field_name": None,
                 "filter_field_name": None,
                 "expected_error": "lexical_field_name must be populated when",
-                "description": "LexicalSearch feature without lexical_field_name"
+                "description": "LexicalSearch feature without lexical_field_name",
             },
             {
                 "features": [FieldFeature.Filter],
                 "lexical_field_name": None,
                 "filter_field_name": None,
                 "expected_error": "filter_field_name must be populated when",
-                "description": "Filter feature without filter_field_name"
-            }
+                "description": "Filter feature without filter_field_name",
+            },
         ]
 
         for test_case in test_cases:
@@ -306,7 +505,7 @@ class TestField(unittest.TestCase):
                         type=FieldType.Text,
                         features=test_case["features"],
                         lexical_field_name=test_case["lexical_field_name"],
-                        filter_field_name=test_case["filter_field_name"]
+                        filter_field_name=test_case["filter_field_name"],
                     )
                 self.assertIn(test_case["expected_error"], str(cm.exception))
 
@@ -317,14 +516,14 @@ class TestField(unittest.TestCase):
             type=FieldType.Text,
             features=[],
             lexical_field_name=None,
-            filter_field_name=None
+            filter_field_name=None,
         )
 
         # Test that all field attributes are immutable
         immutable_attributes = [
             ("name", "new_name"),
             ("type", FieldType.Int),
-            ("features", [FieldFeature.LexicalSearch])
+            ("features", [FieldFeature.LexicalSearch]),
         ]
 
         for attribute, new_value in immutable_attributes:
@@ -344,7 +543,7 @@ class TestField(unittest.TestCase):
                 "filter_field_name": "text_field_filter",
                 "language": "en",
                 "stemming": Stemming.Best,
-                "description": "Text with LexicalSearch and Filter"
+                "description": "Text with LexicalSearch and Filter",
             },
             {
                 "name": "int_field",
@@ -354,7 +553,7 @@ class TestField(unittest.TestCase):
                 "filter_field_name": "int_field_filter",
                 "language": None,
                 "stemming": None,
-                "description": "Int with ScoreModifier and Filter"
+                "description": "Int with ScoreModifier and Filter",
             },
             {
                 "name": "custom_vector_field",
@@ -364,8 +563,8 @@ class TestField(unittest.TestCase):
                 "filter_field_name": "custom_vector_filter",
                 "language": None,
                 "stemming": Stemming.Multiple,
-                "description": "CustomVector with LexicalSearch and Filter"
-            }
+                "description": "CustomVector with LexicalSearch and Filter",
+            },
         ]
 
         for test_case in test_cases:
@@ -377,7 +576,7 @@ class TestField(unittest.TestCase):
                     stemming=test_case["stemming"],
                     lexical_field_name=test_case["lexical_field_name"],
                     filter_field_name=test_case["filter_field_name"],
-                    language=test_case["language"]
+                    language=test_case["language"],
                 )
                 self.assertEqual(len(field.features), len(test_case["features"]))
                 for feature in test_case["features"]:
@@ -392,7 +591,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="en",
-            stemming=Stemming.Best
+            stemming=Stemming.Best,
         )
 
         field2 = Field(
@@ -402,7 +601,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="en",
-            stemming=Stemming.Best
+            stemming=Stemming.Best,
         )
 
         field3 = Field(
@@ -412,7 +611,7 @@ class TestField(unittest.TestCase):
             lexical_field_name="test_lexical",
             filter_field_name=None,
             language="es",  # Different language
-            stemming=Stemming.Best
+            stemming=Stemming.Best,
         )
 
         self.assertEqual(field1, field2)
@@ -443,7 +642,7 @@ class TestCollapseField(unittest.TestCase):
     def test_collapse_field_invalid_name_protected_names(self):
         """Test that protected field names are rejected."""
         protected_names = ["_id", "_tensor_facets", "_highlights", "_score", "_found"]
-        
+
         for protected_name in protected_names:
             with self.subTest(protected_name=protected_name):
                 with self.assertRaises(ValidationError) as cm:
@@ -458,8 +657,14 @@ class TestCollapseField(unittest.TestCase):
 
     def test_collapse_field_invalid_name_invalid_pattern_special_chars(self):
         """Test that field names with invalid special characters are rejected."""
-        invalid_names = ["field-name", "field.name", "field space", "field@name", "field#name"]
-        
+        invalid_names = [
+            "field-name",
+            "field.name",
+            "field space",
+            "field@name",
+            "field#name",
+        ]
+
         for invalid_name in invalid_names:
             with self.subTest(invalid_name=invalid_name):
                 with self.assertRaises(ValidationError) as cm:
@@ -490,7 +695,7 @@ class TestCollapseField(unittest.TestCase):
         valid_names = [
             "product_id",
             "category",
-            "brand_name", 
+            "brand_name",
             "parent_product_id",
             "variant_group",
             "CamelCase",
@@ -500,9 +705,9 @@ class TestCollapseField(unittest.TestCase):
             "field_with_underscores",
             "_valid_underscore_start",
             "a",  # single letter
-            "field123ABC"
+            "field123ABC",
         ]
-        
+
         for name in valid_names:
             with self.subTest(field_name=name):
                 collapse_field = CollapseField(name=name, minGroups=1)
@@ -512,38 +717,44 @@ class TestCollapseField(unittest.TestCase):
 
 class TestSemiStructuredMarqoIndexCollapseFields(MarqoTestCase):
     """Unit tests for SemiStructuredMarqoIndex collapse fields functionality."""
-    
+
     def test_semi_structured_index_single_collapse_field_valid(self):
         """Test that SemiStructuredMarqoIndex accepts a single collapse field."""
         collapse_fields = [CollapseField(name="product_id", minGroups=100)]
 
-        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+        index = self.semi_structured_marqo_index(
+            name="test_index", collapse_fields=collapse_fields
+        )
         self.assertEqual(index.collapse_fields, collapse_fields)
-        self.assertTrue(index.is_collapse_field('product_id'))
-        self.assertFalse(index.is_collapse_field('some_other_field'))
+        self.assertTrue(index.is_collapse_field("product_id"))
+        self.assertFalse(index.is_collapse_field("some_other_field"))
 
     def test_semi_structured_index_multiple_collapse_fields_invalid(self):
         """Test that SemiStructuredMarqoIndex rejects multiple collapse fields."""
         collapse_fields = [
             CollapseField(name="product_id", minGroups=100),
-            CollapseField(name="brand_id", minGroups=50)
+            CollapseField(name="brand_id", minGroups=50),
         ]
 
         with self.assertRaises(ValidationError) as cm:
-            self.semi_structured_marqo_index(name='test_index', collapse_fields=collapse_fields)
+            self.semi_structured_marqo_index(
+                name="test_index", collapse_fields=collapse_fields
+            )
         self.assertIn("There must be exactly one collapse field", str(cm.exception))
 
     def test_semi_structured_index_empty_collapse_fields_invalid(self):
         """Test that SemiStructuredMarqoIndex rejects empty collapse fields list."""
         with self.assertRaises(ValidationError) as cm:
-            self.semi_structured_marqo_index(name='test_index', collapse_fields=[])
+            self.semi_structured_marqo_index(name="test_index", collapse_fields=[])
         self.assertIn("There must be exactly one collapse field", str(cm.exception))
 
     def test_semi_structured_index_no_collapse_fields_valid(self):
         """Test that SemiStructuredMarqoIndex accepts no collapse fields (None)."""
-        index = self.semi_structured_marqo_index(name='test_index', collapse_fields=None)
+        index = self.semi_structured_marqo_index(
+            name="test_index", collapse_fields=None
+        )
         self.assertIsNone(index.collapse_fields)
-        self.assertFalse(index.is_collapse_field('product_id'))
+        self.assertFalse(index.is_collapse_field("product_id"))
 
 
 class TestForwardCompatibility(unittest.TestCase):
@@ -560,7 +771,7 @@ class TestForwardCompatibility(unittest.TestCase):
             dependent_fields=None,
             language="en",
             stemming=Stemming.Best,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(field.name, "test_field")
@@ -576,15 +787,23 @@ class TestForwardCompatibility(unittest.TestCase):
         """Test that Model accepts extra fields gracefully."""
         model = Model(
             name="test_model",
-            properties={"name": "test_model", "dimensions": 512, "tokens": 128, "type": "sbert"},  # Use valid model type
+            properties={
+                "name": "test_model",
+                "dimensions": 512,
+                "tokens": 128,
+                "type": "sbert",
+            },  # Use valid model type
             custom=True,
             text_query_prefix="query:",
             text_chunk_prefix="chunk:",
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(model.name, "test_model")
-        self.assertEqual(model.properties, {"name": "test_model", "dimensions": 512, "tokens": 128, "type": "sbert"})
+        self.assertEqual(
+            model.properties,
+            {"name": "test_model", "dimensions": 512, "tokens": 128, "type": "sbert"},
+        )
         self.assertTrue(model.custom)
         self.assertEqual(model.text_query_prefix, "query:")
         self.assertEqual(model.text_chunk_prefix, "chunk:")
@@ -594,7 +813,7 @@ class TestForwardCompatibility(unittest.TestCase):
         collapse_field = CollapseField(
             name="collapse_test",
             minGroups=100,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(collapse_field.name, "collapse_test")
@@ -606,12 +825,14 @@ class TestForwardCompatibility(unittest.TestCase):
             name="tensor_field",
             chunk_field_name="marqo__chunk_tensor_field",
             embeddings_field_name="marqo__embeddings_tensor_field",
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(tensor_field.name, "tensor_field")
         self.assertEqual(tensor_field.chunk_field_name, "marqo__chunk_tensor_field")
-        self.assertEqual(tensor_field.embeddings_field_name, "marqo__embeddings_tensor_field")
+        self.assertEqual(
+            tensor_field.embeddings_field_name, "marqo__embeddings_tensor_field"
+        )
 
     def test_string_array_field_forward_compatibility(self):
         """Test that StringArrayField accepts extra fields gracefully."""
@@ -620,12 +841,14 @@ class TestForwardCompatibility(unittest.TestCase):
             type=FieldType.ArrayText,
             string_array_field_name="marqo__string_array_test",
             features=[FieldFeature.Filter],
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(string_array_field.name, "string_array_field")
         self.assertEqual(string_array_field.type, FieldType.ArrayText)
-        self.assertEqual(string_array_field.string_array_field_name, "marqo__string_array_test")
+        self.assertEqual(
+            string_array_field.string_array_field_name, "marqo__string_array_test"
+        )
         self.assertEqual(string_array_field.features, [FieldFeature.Filter])
 
     def test_hnsw_config_forward_compatibility(self):
@@ -633,7 +856,7 @@ class TestForwardCompatibility(unittest.TestCase):
         hnsw_config = HnswConfig(
             efConstruction=200,
             m=16,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(hnsw_config.ef_construction, 200)
@@ -645,7 +868,7 @@ class TestForwardCompatibility(unittest.TestCase):
             splitLength=100,
             splitOverlap=10,
             splitMethod=TextSplitMethod.Sentence,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(text_preprocessing.split_length, 100)
@@ -657,7 +880,7 @@ class TestForwardCompatibility(unittest.TestCase):
         video_preprocessing = VideoPreProcessing(
             splitLength=30,
             splitOverlap=5,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(video_preprocessing.split_length, 30)
@@ -668,7 +891,7 @@ class TestForwardCompatibility(unittest.TestCase):
         audio_preprocessing = AudioPreProcessing(
             splitLength=60,
             splitOverlap=10,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(audio_preprocessing.split_length, 60)
@@ -678,7 +901,7 @@ class TestForwardCompatibility(unittest.TestCase):
         """Test that ImagePreProcessing accepts extra fields gracefully."""
         image_preprocessing = ImagePreProcessing(
             patchMethod=PatchMethod.Simple,
-            future_field="extra_value"  # Extra field
+            future_field="extra_value",  # Extra field
         )
         # Assert all existing fields are populated correctly
         self.assertEqual(image_preprocessing.patch_method, PatchMethod.Simple)

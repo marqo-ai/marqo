@@ -1,10 +1,12 @@
-import marqo
 import os
+import time
+
 import torch
 from dotenv import load_dotenv
-import time
-from SpeechSearch.transcriber import AudioTranscriber
 from SpeechSearch.indexer import index_transcriptions
+from SpeechSearch.transcriber import AudioTranscriber
+
+import marqo
 
 load_dotenv()
 
@@ -17,7 +19,6 @@ def check_can_run() -> None:
 
 
 def main():
-
     marqo_device = "cpu"
 
     check_can_run()
@@ -54,7 +55,7 @@ def main():
     at = AudioTranscriber(os.environ["HF_TOKEN"], local_device)
 
     for idx, f in enumerate(os.listdir("audios")):
-        print(f"Processing file {idx+1} of {len(os.listdir('audios'))}...")
+        print(f"Processing file {idx + 1} of {len(os.listdir('audios'))}...")
 
         at_start = time.perf_counter()
         if ".wav" not in f:
@@ -65,7 +66,7 @@ def main():
         at_end = time.perf_counter()
 
         print(
-            f"Annotation and transcription of file {idx+1} took {at_end-at_start} seconds"
+            f"Annotation and transcription of file {idx + 1} took {at_end - at_start} seconds"
         )
 
         indx_start = time.perf_counter()
@@ -78,7 +79,7 @@ def main():
         )
         indx_end = time.perf_counter()
 
-        print(f"Indexing of file {idx+1} took {indx_end-indx_start} seconds")
+        print(f"Indexing of file {idx + 1} took {indx_end - indx_start} seconds")
 
     print("Done!")
 

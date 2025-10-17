@@ -8,7 +8,7 @@ from opentelemetry.sdk.metrics.export import (
     MetricExportResult,
     PeriodicExportingMetricReader,
 )
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
 from marqo import logging
 from marqo.tensor_search import utils
@@ -17,23 +17,30 @@ from marqo.tensor_search.enums import EnvVars
 
 class LoggingMetricExporter(ConsoleMetricExporter):
     """A MetricExporter that logs via the Python logging system instead of printing."""
+
     def __init__(self, logger_name: str = "metrics"):
         super().__init__()
         self.logger = logging.get_logger(logger_name)
 
-    def export(self, metrics_data, timeout_millis: float = 10_000, **kwargs) -> MetricExportResult:
+    def export(
+        self, metrics_data, timeout_millis: float = 10_000, **kwargs
+    ) -> MetricExportResult:
         self.logger.info(metrics_data.to_json(indent=None))
         return MetricExportResult.SUCCESS
 
 
 def bootstrap_otel(app: FastAPI, service_name: str) -> Callable[[], None]:
-    export_interval_seconds = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_METRICS_EXPORT_INTERVAL)
+    export_interval_seconds = utils.read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_METRICS_EXPORT_INTERVAL
+    )
     if export_interval_seconds == 0:
         # disable metrics export, and return no_op as shutdown hook
         return lambda: None
 
     exporter = LoggingMetricExporter()
-    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=export_interval_seconds * 1000)
+    reader = PeriodicExportingMetricReader(
+        exporter, export_interval_millis=export_interval_seconds * 1000
+    )
 
     resource = Resource({SERVICE_NAME: service_name})
     meter_provider = MeterProvider(resource=resource, metric_readers=[reader])

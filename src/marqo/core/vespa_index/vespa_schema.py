@@ -2,12 +2,15 @@ from abc import ABC, abstractmethod
 
 import semver
 
-from marqo.core.models.marqo_index_request import MarqoIndexRequest, StructuredMarqoIndexRequest, \
-    UnstructuredMarqoIndexRequest
-
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import (
+    MarqoIndexRequest,
+    StructuredMarqoIndexRequest,
+    UnstructuredMarqoIndexRequest,
+)
 
-MINIMUM_SEMI_STRUCTURED_INDEX_VERSION = semver.VersionInfo.parse('2.13.0')
+MINIMUM_SEMI_STRUCTURED_INDEX_VERSION = semver.VersionInfo.parse("2.13.0")
+
 
 class VespaSchema(ABC):
     """
@@ -15,24 +18,24 @@ class VespaSchema(ABC):
     """
 
     _INDEX_NAME_ENCODING_MAP = {
-        '_': '_00',
-        '-': '_01',
+        "_": "_00",
+        "-": "_01",
     }
 
     _DISTANCE_METRIC_MAP = {
-        DistanceMetric.Euclidean: 'euclidean',
-        DistanceMetric.Angular: 'angular',
-        DistanceMetric.DotProduct: 'dotproduct',
-        DistanceMetric.PrenormalizedAngular: 'prenormalized-angular',
-        DistanceMetric.Geodegrees: 'geodegrees',
-        DistanceMetric.Hamming: 'hamming'
+        DistanceMetric.Euclidean: "euclidean",
+        DistanceMetric.Angular: "angular",
+        DistanceMetric.DotProduct: "dotproduct",
+        DistanceMetric.PrenormalizedAngular: "prenormalized-angular",
+        DistanceMetric.Geodegrees: "geodegrees",
+        DistanceMetric.Hamming: "hamming",
     }
 
     def _get_distance_metric(self, marqo_distance_metric: DistanceMetric) -> str:
         try:
             return self._DISTANCE_METRIC_MAP[marqo_distance_metric]
         except KeyError:
-            raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
+            raise ValueError(f"Unknown Marqo distance metric: {marqo_distance_metric}")
 
     @abstractmethod
     def generate_schema(self) -> (str, MarqoIndex):
@@ -70,7 +73,7 @@ class VespaSchema(ABC):
             else:
                 encoded_name_chars.append(char)
 
-        encoded_name = ''.join(encoded_name_chars)
+        encoded_name = "".join(encoded_name_chars)
 
         if encoded_name == index_name:
             return index_name
@@ -95,14 +98,28 @@ def for_marqo_index_request(marqo_index_request: MarqoIndexRequest):
         The VespaSchema implementation for the given MarqoIndexRequest
     """
     if isinstance(marqo_index_request, StructuredMarqoIndexRequest):
-        from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
+        from marqo.core.structured_vespa_index.structured_vespa_schema import (
+            StructuredVespaSchema,
+        )
+
         return StructuredVespaSchema(marqo_index_request)
     elif isinstance(marqo_index_request, UnstructuredMarqoIndexRequest):
-        if semver.Version.parse(marqo_index_request.marqo_version) < MINIMUM_SEMI_STRUCTURED_INDEX_VERSION:
-            from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
+        if (
+            semver.Version.parse(marqo_index_request.marqo_version)
+            < MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
+        ):
+            from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import (
+                UnstructuredVespaSchema,
+            )
+
             return UnstructuredVespaSchema(marqo_index_request)
         else:
-            from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+            from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import (
+                SemiStructuredVespaSchema,
+            )
+
             return SemiStructuredVespaSchema(marqo_index_request)
     else:
-        raise ValueError(f"No known implementation for index type {type(marqo_index_request)}")
+        raise ValueError(
+            f"No known implementation for index type {type(marqo_index_request)}"
+        )

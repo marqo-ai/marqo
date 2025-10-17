@@ -1,6 +1,7 @@
 """
 Pytest configuration for unit tests.
 """
+
 import os
 
 # Set required environment variables before any imports

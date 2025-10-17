@@ -1,12 +1,13 @@
 from pathlib import Path
-from pydantic import Field, field_validator, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 from typing import Union
 
+from inference_orchestrator.core.enum import MarqoCacheType
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
-from inference_orchestrator.core.enum import MarqoCacheType
-from .enum import LogLevel, LogFormat
+from pydantic import Field, ValidationError, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
+
+from .enum import LogFormat, LogLevel
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
 

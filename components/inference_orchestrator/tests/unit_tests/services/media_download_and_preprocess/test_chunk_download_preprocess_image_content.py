@@ -1,14 +1,22 @@
 from unittest.mock import patch
 
-import PIL.Image
 import numpy as np
+import PIL.Image
 import torch
-
-from tests.integration_tests.test_case import TestImageUrls, InferenceTestCase
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from inference_orchestrator.services.triton_inference.content_preprocessing import download_and_preprocess_media
-from inference_orchestrator.schemas.api import ImagePreprocessingConfig, Modality, InferenceErrorModel
+from inference_orchestrator.schemas.api import (
+    ImagePreprocessingConfig,
+    InferenceErrorModel,
+    Modality,
+)
 from inference_orchestrator.services.errors import MediaDownloadError
+from inference_orchestrator.services.triton_inference.content_preprocessing import (
+    download_and_preprocess_media,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import (
+    AbstractPreprocessor,
+)
+
+from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 
 class CLIPPreprocessor(AbstractPreprocessor):
@@ -23,7 +31,9 @@ def preprocess_side_effect(inputs, *args, **kwargs):
     A side effect function for preprocess mock.
     Returns a list of tensors where each tensor depends on the length of the text.
     """
-    return [torch.ones(size=(1, 12)), ] * len(inputs)
+    return [
+        torch.ones(size=(1, 12)),
+    ] * len(inputs)
 
 
 def faulty_preprocess_side_effect(inputs, *args, **kwargs):
@@ -33,29 +43,37 @@ def faulty_preprocess_side_effect(inputs, *args, **kwargs):
 
 def mock_load_image_from_path(url, *args, **kwargs):
     if url in {e for e in TestImageUrls}:
-        return PIL.Image.fromarray(np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8))
+        return PIL.Image.fromarray(
+            np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        )
     else:
         raise PIL.UnidentifiedImageError("This image does not exist in the test data")
 
 
 class TestChunkDownloadPreprocessImage(InferenceTestCase):
-
     def setUp(self):
         self.preprocessing_config = ImagePreprocessingConfig(
             modality=Modality.IMAGE,
             download_timeout_ms=3000,
             download_thread_count=1,
-            download_header=None
+            download_header=None,
         )
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def test_download_and_preprocess_image_valid_url(self, mock_preprocess, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    @patch.object(CLIPPreprocessor, "preprocess", side_effect=preprocess_side_effect)
+    def test_download_and_preprocess_image_valid_url(
+        self, mock_preprocess, mock_download_image
+    ):
         content = [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value]
         preprocessor = CLIPPreprocessor()
-        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                                preprocessing_config=self.preprocessing_config)
+        results = download_and_preprocess_media(
+            content=content,
+            preprocessor=preprocessor,
+            preprocessing_config=self.preprocessing_config,
+        )
 
         self.assertEqual(2, len(results))
         self.assertEqual(1, len(results[0]))
@@ -71,43 +89,72 @@ class TestChunkDownloadPreprocessImage(InferenceTestCase):
         mock_preprocess.assert_called()
         mock_download_image.assert_called()
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    def testdownload_and_preprocess_image_invalid_url_returns_individual_error(self, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    def testdownload_and_preprocess_image_invalid_url_returns_individual_error(
+        self, mock_download_image
+    ):
         """Check behavior when a non-existent image URL is provided."""
         content = ["http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
-        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                                preprocessing_config=self.preprocessing_config,
-                                                return_individual_error=True)
+        results = download_and_preprocess_media(
+            content=content,
+            preprocessor=preprocessor,
+            preprocessing_config=self.preprocessing_config,
+            return_individual_error=True,
+        )
 
         self.assertEqual(1, len(results))
         self.assertTrue(isinstance(results[0], InferenceErrorModel))
-        self.assertIn("This image does not exist in the test data", results[0].error_message)
+        self.assertIn(
+            "This image does not exist in the test data", results[0].error_message
+        )
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    def testdownload_and_preprocess_image_invalid_url_raises_error_when_return_individual_error_is_false(self, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    def testdownload_and_preprocess_image_invalid_url_raises_error_when_return_individual_error_is_false(
+        self, mock_download_image
+    ):
         """Check behavior when a non-existent image URL is provided."""
         content = ["http://invalid-url.com/does-not-exist.jpg"]
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                          preprocessing_config=self.preprocessing_config, return_individual_error=False)
-        self.assertIn("This image does not exist in the test data", str(context.exception))
+            download_and_preprocess_media(
+                content=content,
+                preprocessor=preprocessor,
+                preprocessing_config=self.preprocessing_config,
+                return_individual_error=False,
+            )
+        self.assertIn(
+            "This image does not exist in the test data", str(context.exception)
+        )
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testdownload_and_preprocess_image_partial_failure(self, mock_preprocess, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    @patch.object(CLIPPreprocessor, "preprocess", side_effect=preprocess_side_effect)
+    def testdownload_and_preprocess_image_partial_failure(
+        self, mock_preprocess, mock_download_image
+    ):
         """One image succeeds, one fails, returned list reflects both outcomes."""
-        content = [TestImageUrls.IMAGE1.value, "http://invalid-url.com/does-not-exist.jpg"]
+        content = [
+            TestImageUrls.IMAGE1.value,
+            "http://invalid-url.com/does-not-exist.jpg",
+        ]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                                preprocessing_config=self.preprocessing_config,
-                                                return_individual_error=True)
+        results = download_and_preprocess_media(
+            content=content,
+            preprocessor=preprocessor,
+            preprocessing_config=self.preprocessing_config,
+            return_individual_error=True,
+        )
 
         self.assertEqual(len(results), 2)
 
@@ -120,58 +167,78 @@ class TestChunkDownloadPreprocessImage(InferenceTestCase):
 
         # Second image failure
         self.assertIsInstance(results[1], InferenceErrorModel)
-        self.assertIn("This image does not exist in the test data", results[1].error_message)
+        self.assertIn(
+            "This image does not exist in the test data", results[1].error_message
+        )
 
         mock_download_image.assert_called()
         self.assertEqual(2, mock_download_image.call_count)
         mock_preprocess.assert_called()
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testdownload_and_preprocess_image_all_failures(self, mock_preprocess, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    @patch.object(CLIPPreprocessor, "preprocess", side_effect=preprocess_side_effect)
+    def testdownload_and_preprocess_image_all_failures(
+        self, mock_preprocess, mock_download_image
+    ):
         """All images fail, returns list of MediaDownloadErrors."""
         content = [
             "http://invalid-url.com/does-not-exist1.jpg",
-            "http://invalid-url.com/does-not-exist2.jpg"
+            "http://invalid-url.com/does-not-exist2.jpg",
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                                preprocessing_config=self.preprocessing_config,
-                                                return_individual_error=True)
+        results = download_and_preprocess_media(
+            content=content,
+            preprocessor=preprocessor,
+            preprocessing_config=self.preprocessing_config,
+            return_individual_error=True,
+        )
 
         self.assertEqual(len(results), 2)
 
         for i, result in enumerate(results):
             self.assertIsInstance(result, InferenceErrorModel)
-            self.assertIn("This image does not exist in the test data", result.error_message)
+            self.assertIn(
+                "This image does not exist in the test data", result.error_message
+            )
 
         mock_download_image.assert_called()
         self.assertEqual(2, mock_download_image.call_count)
         mock_preprocess.assert_not_called()
 
-    @patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-           side_effect=mock_load_image_from_path)
-    @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
-    def testdownload_and_preprocess_image_first_fails_rest_succeed(self, mock_preprocess, mock_download_image):
+    @patch(
+        "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
+        side_effect=mock_load_image_from_path,
+    )
+    @patch.object(CLIPPreprocessor, "preprocess", side_effect=preprocess_side_effect)
+    def testdownload_and_preprocess_image_first_fails_rest_succeed(
+        self, mock_preprocess, mock_download_image
+    ):
         """First URL fails, others succeed."""
         content = [
             "http://invalid-url.com/fail-first.jpg",
             TestImageUrls.IMAGE1.value,
-            TestImageUrls.IMAGE2.value
+            TestImageUrls.IMAGE2.value,
         ]
         preprocessor = CLIPPreprocessor()
 
-        results = download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                                preprocessing_config=self.preprocessing_config,
-                                                return_individual_error=True)
+        results = download_and_preprocess_media(
+            content=content,
+            preprocessor=preprocessor,
+            preprocessing_config=self.preprocessing_config,
+            return_individual_error=True,
+        )
 
         self.assertEqual(len(results), 3)
 
         # First image: fail
         self.assertIsInstance(results[0], InferenceErrorModel)
-        self.assertIn("This image does not exist in the test data", results[0].error_message)
+        self.assertIn(
+            "This image does not exist in the test data", results[0].error_message
+        )
 
         # Second and third: success
         for i in [1, 2]:
@@ -187,22 +254,30 @@ class TestChunkDownloadPreprocessImage(InferenceTestCase):
 
     @patch(
         "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess.load_image_from_path",
-        side_effect=mock_load_image_from_path)
-    @patch.object(CLIPPreprocessor, 'preprocess', side_effect=preprocess_side_effect)
+        side_effect=mock_load_image_from_path,
+    )
+    @patch.object(CLIPPreprocessor, "preprocess", side_effect=preprocess_side_effect)
     def testdownload_and_preprocess_image_first_fails_raise_error_when_not_returning_individual_error(
-            self, mock_preprocess, mock_download_image):
+        self, mock_preprocess, mock_download_image
+    ):
         """First URL fails, skip the others."""
         content = [
             "http://invalid-url.com/fail-first.jpg",
             TestImageUrls.IMAGE1.value,
-            TestImageUrls.IMAGE2.value
+            TestImageUrls.IMAGE2.value,
         ]
         preprocessor = CLIPPreprocessor()
 
         with self.assertRaises(MediaDownloadError) as context:
-            download_and_preprocess_media(content=content, preprocessor=preprocessor,
-                                          preprocessing_config=self.preprocessing_config, return_individual_error=False)
-        self.assertIn("This image does not exist in the test data", str(context.exception))
+            download_and_preprocess_media(
+                content=content,
+                preprocessor=preprocessor,
+                preprocessing_config=self.preprocessing_config,
+                return_individual_error=False,
+            )
+        self.assertIn(
+            "This image does not exist in the test data", str(context.exception)
+        )
 
         mock_download_image.assert_called()
         self.assertEqual(1, mock_download_image.call_count)

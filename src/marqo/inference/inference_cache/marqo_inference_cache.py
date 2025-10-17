@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Optional, Union, TypeVar
+from typing import Optional, TypeVar, Union
 
 from marqo import logging
 from marqo.api.exceptions import EnvVarError
@@ -8,7 +8,10 @@ from marqo.inference.inference_cache.abstract_cache import MarqoAbstractCache
 from marqo.inference.inference_cache.enums import MarqoCacheType
 from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
 from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
-from marqo.inference.inference_cache.monitoring import OTELCacheStatsCollector, CacheStatsCollector
+from marqo.inference.inference_cache.monitoring import (
+    CacheStatsCollector,
+    OTELCacheStatsCollector,
+)
 
 T = TypeVar("T")
 logger = logging.get_logger(__name__)
@@ -26,14 +29,20 @@ class MarqoInferenceCache:
         MarqoCacheType.LFU: MarqoLFUCache,
     }
 
-    def __init__(self, cache_size: int, cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU):
+    def __init__(
+        self,
+        cache_size: int,
+        cache_type: Union[None, str, MarqoCacheType] = MarqoCacheType.LRU,
+    ):
         self._cache = self._build_cache(cache_size, cache_type)
         self._stats: CacheStatsCollector = OTELCacheStatsCollector(
             curr_size_fn=lambda: self._cache.currsize,
-            max_size_fn=lambda: self._cache.maxsize
+            max_size_fn=lambda: self._cache.maxsize,
         )
 
-    def _build_cache(self, cache_size: int, cache_type: MarqoCacheType) -> Optional[MarqoAbstractCache]:
+    def _build_cache(
+        self, cache_size: int, cache_type: MarqoCacheType
+    ) -> Optional[MarqoAbstractCache]:
         """Return a cache instance based on the cache type and size.
 
         Args:
@@ -47,13 +56,19 @@ class MarqoInferenceCache:
             EnvVarError: If the cache size or type is invalid.
         """
         if not isinstance(cache_size, int) or cache_size < 1:
-            raise EnvVarError(f"Invalid cache size: {cache_size}. Must be a positive integer.")
+            raise EnvVarError(
+                f"Invalid cache size: {cache_size}. Must be a positive integer."
+            )
 
         if cache_type not in self._CACHE_TYPES_MAPPING:
-            raise EnvVarError(f"Invalid cache type: {cache_type}. "
-                              f"Must be one of {self._CACHE_TYPES_MAPPING.keys()}.")
+            raise EnvVarError(
+                f"Invalid cache type: {cache_type}. "
+                f"Must be one of {self._CACHE_TYPES_MAPPING.keys()}."
+            )
         cache = self._CACHE_TYPES_MAPPING[cache_type](maxsize=cache_size)
-        logger.info(f'Built inference cache with type {cache_type} and size {cache_size}')
+        logger.info(
+            f"Built inference cache with type {cache_type} and size {cache_size}"
+        )
         return cache
 
     def get(self, model_cache_key: str, content: str, default=None) -> Optional[T]:
@@ -83,7 +98,9 @@ class MarqoInferenceCache:
 
     def _generate_key(self, model_cache_key: str, content: str) -> str:
         if not isinstance(model_cache_key, str):
-            raise TypeError(f"model_cache_key must be a string, not {type(model_cache_key)}")
+            raise TypeError(
+                f"model_cache_key must be a string, not {type(model_cache_key)}"
+            )
         if not isinstance(content, str):
             raise TypeError(f"content must be a string, not {type(content)}")
         return f"{model_cache_key}||{content}"

@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
 
+from inference_orchestrator.schemas.api import InferenceErrorModel, InferenceResult
 from numpy import ndarray
-
-from inference_orchestrator.schemas.api import InferenceResult, InferenceErrorModel
 
 
 class AbstractInferencePipeline(ABC):
-
     def __init__(self, model, inference_request):
         self.model = model
         self.inference_request = inference_request
@@ -23,7 +21,9 @@ class AbstractInferencePipeline(ABC):
         pass
 
     @staticmethod
-    def format_results(preprocessed_content_list: list, embeddings: list[ndarray]) -> InferenceResult:
+    def format_results(
+        preprocessed_content_list: list, embeddings: list[ndarray]
+    ) -> InferenceResult:
         """
         Format the results of the inference pipeline into a InferenceResult object.
         Args:
@@ -47,5 +47,7 @@ class AbstractInferencePipeline(ABC):
                 raise ValueError(f"Invalid chunk type: {type} for chunk: {chunk}")
             results.append(chunk_results)
         if len(results) != len(preprocessed_content_list):
-            raise ValueError("The formatted results length does not match the input content length")
+            raise ValueError(
+                "The formatted results length does not match the input content length"
+            )
         return InferenceResult(result=results)

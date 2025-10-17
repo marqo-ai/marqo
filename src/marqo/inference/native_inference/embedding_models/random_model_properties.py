@@ -1,4 +1,6 @@
-from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import (
+    MarqoBaseModelProperties,
+)
 
 
 class RandomModelProperties(MarqoBaseModelProperties):
@@ -12,5 +14,6 @@ class RandomModelProperties(MarqoBaseModelProperties):
         type: The type of the model. It should be 'random'.
         note: A note about the model. It is optional.
     """
+
     name: str
     type: str = "random"

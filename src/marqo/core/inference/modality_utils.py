@@ -1,19 +1,20 @@
 import io
 import os
-import base64
 from contextlib import contextmanager
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 from urllib.parse import urlparse
 
 import magic
 import requests
 import validators
 
-from marqo.core.inference.api import Modality, MediaDownloadError
+from marqo.core.inference.api import MediaDownloadError, Modality
 
 
 @contextmanager
-def fetch_content_sample(url: str, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
+def fetch_content_sample(
+    url: str, media_download_headers: Optional[dict] = None, sample_size=10240
+):  # 10 KB
     # It's ok to pass None to requests.get() for headers and it won't change the default headers
     """Fetch a sample of the content from the URL.
 
@@ -51,11 +52,11 @@ def _infer_modality_based_on_extension(extension: str) -> Optional[Modality]:
 
     extension = extension.lower()
 
-    if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+    if extension in ["jpg", "jpeg", "png", "gif", "webp"]:
         return Modality.IMAGE
-    elif extension in ['mp4', 'avi', 'mov']:
+    elif extension in ["mp4", "avi", "mov"]:
         return Modality.VIDEO
-    elif extension in ['mp3', 'wav', 'ogg']:
+    elif extension in ["mp3", "wav", "ogg"]:
         return Modality.AUDIO
     else:
         return None
@@ -71,11 +72,11 @@ def _infer_modality_based_on_mime_type(mime_object: str) -> Modality:
     Returns:
         Modality: The inferred modality (IMAGE, VIDEO, AUDIO, or TEXT if unknown)
     """
-    if mime_object.startswith('image/'):
+    if mime_object.startswith("image/"):
         return Modality.IMAGE
-    elif mime_object.startswith('video/'):
+    elif mime_object.startswith("video/"):
         return Modality.VIDEO
-    elif mime_object.startswith('audio/'):
+    elif mime_object.startswith("audio/"):
         return Modality.AUDIO
     else:
         return Modality.TEXT
@@ -84,18 +85,20 @@ def _infer_modality_based_on_mime_type(mime_object: str) -> Modality:
 def is_base64_image(content: str) -> bool:
     """
     Check if a string is a base64-encoded image.
-    
+
     Args:
         content: The string to check
-        
+
     Returns:
         bool: True if the content is a base64-encoded image, False otherwise
     """
-    return content.startswith('data:image/')
+    return content.startswith("data:image/")
 
 
 # TODO this method is copied from s2_inference.multimodal_modal_load class, improve it
-def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
+def infer_modality(
+    content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None
+) -> Modality:
     """
     Infer the modality of the content. Video, audio, image or text.
 
@@ -134,11 +137,17 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
                 modality: Modality = _infer_modality_based_on_mime_type(mime)
                 return modality
         except requests.exceptions.RequestException as e:
-            raise MediaDownloadError(f"Error downloading media file {content}: {e}") from e
+            raise MediaDownloadError(
+                f"Error downloading media file {content}: {e}"
+            ) from e
         except magic.MagicException as e:
-            raise MediaDownloadError(f"Error determining MIME type for {encoded_url}: {e}") from e
+            raise MediaDownloadError(
+                f"Error determining MIME type for {encoded_url}: {e}"
+            ) from e
         except IOError as e:
-            raise MediaDownloadError(f"IO error while processing {encoded_url}: {e}") from e
+            raise MediaDownloadError(
+                f"IO error while processing {encoded_url}: {e}"
+            ) from e
 
     elif isinstance(content, bytes):
         # Use python-magic for byte content
@@ -197,5 +206,5 @@ def get_url_file_extension(url: str) -> Optional[str]:
     _, ext = os.path.splitext(filename)
 
     if ext:
-        return ext.lstrip('.').lower()
+        return ext.lstrip(".").lower()
     return None

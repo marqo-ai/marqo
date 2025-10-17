@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from model_management.config import Config
 from model_management.core.settings import Settings
@@ -18,7 +18,9 @@ class TestConfig(TestCase):
 
             self.assertIsInstance(config.triton_client, TritonClient)
             self.assertIsInstance(config.model_manager, ModelManager)
-            self.assertEqual(settings.model_base_dir, config.model_manager.model_base_dir)
+            self.assertEqual(
+                settings.model_base_dir, config.model_manager.model_base_dir
+            )
             self.assertEqual(settings.triton_url, config.triton_client.url)
 
     def test_config_initialization_with_custom_settings(self):
@@ -51,7 +53,9 @@ class TestConfig(TestCase):
                 with patch("os.environ", {"TRITON_URL": url}):
                     settings = Settings(_env_file=None)
 
-                    with patch("model_management.config.TritonClient") as mock_triton_client:
+                    with patch(
+                        "model_management.config.TritonClient"
+                    ) as mock_triton_client:
                         config = Config(settings)
                         mock_triton_client.assert_called_once_with(url=url)
 
@@ -68,17 +72,21 @@ class TestConfig(TestCase):
                 with patch("os.environ", {"MODEL_BASE_DIR": path}):
                     settings = Settings(_env_file=None)
 
-                    with patch("model_management.config.TritonClient") as mock_triton_client, \
-                         patch("model_management.config.ModelManager") as mock_model_manager:
-
+                    with (
+                        patch(
+                            "model_management.config.TritonClient"
+                        ) as mock_triton_client,
+                        patch(
+                            "model_management.config.ModelManager"
+                        ) as mock_model_manager,
+                    ):
                         mock_triton_instance = MagicMock()
                         mock_triton_client.return_value = mock_triton_instance
 
                         config = Config(settings)
 
                         mock_model_manager.assert_called_once_with(
-                            model_base_dir=path,
-                            triton_client=mock_triton_instance
+                            model_base_dir=path, triton_client=mock_triton_instance
                         )
 
     def test_config_components_are_accessible(self):
@@ -101,8 +109,10 @@ class TestConfig(TestCase):
             "maxBatchSize": 8,
             "name": "test-model",
             "sources": ["s3://test/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+            ],
+            "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         }
 
         with patch("os.environ", {"MARQO_MODELS_TO_PRELOAD": json.dumps([model])}):

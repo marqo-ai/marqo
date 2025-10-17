@@ -14,8 +14,12 @@ import vespa.application as pyvespa
 from marqo.tensor_search.api import generate_config
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import concurrency
-from marqo.vespa.exceptions import (VespaError, VespaNotConvergedError,
-                                    VespaStatusError, VespaTimeoutError)
+from marqo.vespa.exceptions import (
+    VespaError,
+    VespaNotConvergedError,
+    VespaStatusError,
+    VespaTimeoutError,
+)
 from marqo.vespa.models import QueryResult, VespaDocument
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
@@ -28,11 +32,19 @@ class TestVespaClient(AsyncMarqoTestCase):
     TEST_CLUSTER = "content_default"
 
     def setUp(self):
-        self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                  "http://localhost:8080", "content_default")
+        self.client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
-        self.test_document_1 = VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})
-        self.test_document_2 = VespaDocument(id="doc2", fields={"title": "Title 2", "contents": "Content 2"})
+        self.test_document_1 = VespaDocument(
+            id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+        )
+        self.test_document_2 = VespaDocument(
+            id="doc2", fields={"title": "Title 2", "contents": "Content 2"}
+        )
         self.pyvespa_client.delete_all_docs(self.TEST_CLUSTER, self.TEST_SCHEMA)
 
     def _base_test_feed_batch_successful(self, func, batch):
@@ -43,7 +55,9 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(batch_response.errors, False)
 
         statuses = [response.status for response in batch_response.responses]
-        path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
+        path_ids = [
+            response.path_id.split("/")[-1] for response in batch_response.responses
+        ]
         ids = [response.id.split("::")[-1] for response in batch_response.responses]
         messages = [response.message for response in batch_response.responses]
 
@@ -54,7 +68,9 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     def test_feed_batch_successful(self):
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
@@ -67,7 +83,9 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     def test_feed_batch_invalidDoc_successful(self):
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"invalid_field": "Title 2"}),
         ]
 
@@ -76,8 +94,14 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(batch_response.errors, True)
 
         statuses = [response.status for response in batch_response.responses]
-        path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
-        ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == 200]
+        path_ids = [
+            response.path_id.split("/")[-1] for response in batch_response.responses
+        ]
+        ids = [
+            response.id.split("::")[-1]
+            for response in batch_response.responses
+            if response.status == 200
+        ]
         messages = [response.message for response in batch_response.responses]
 
         self.assertEqual(statuses, [200, 400])
@@ -87,10 +111,16 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertIsNotNone(messages[1])
 
     def test_feed_batch_invalidFeedUrl_fails(self):
-        feed_client = VespaClient("http://localhost:8080", "http://localhost:8000",
-                                  "http://localhost:8080", "content_default")
+        feed_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8000",
+            "http://localhost:8080",
+            "content_default",
+        )
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
@@ -101,13 +131,21 @@ class TestVespaClient(AsyncMarqoTestCase):
             self.assertIn("Network Error", r.message)
 
     @pytest.mark.asyncio
-    @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
+    @patch.object(
+        concurrency,
+        "_run_coroutine_in_thread",
+        wraps=concurrency._run_coroutine_in_thread,
+    )
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
         """Test that feed_batch works when an event loop is already running and runs in a new thread"""
 
         batch_response = self.client.feed_batch(
-            [VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})],
-            self.TEST_SCHEMA
+            [
+                VespaDocument(
+                    id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+                )
+            ],
+            self.TEST_SCHEMA,
         )
         self.assertEqual(len(batch_response.responses), 1)
 
@@ -119,11 +157,17 @@ class TestVespaClient(AsyncMarqoTestCase):
         def raise_exception(*args, **kwargs):
             raise Exception("Attempted to run in new thread!")
 
-        @patch.object(concurrency, "_run_coroutine_in_thread", side_effect=raise_exception)
+        @patch.object(
+            concurrency, "_run_coroutine_in_thread", side_effect=raise_exception
+        )
         def run(mock_executor):
             batch_response = self.client.feed_batch(
-                [VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})],
-                self.TEST_SCHEMA
+                [
+                    VespaDocument(
+                        id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+                    )
+                ],
+                self.TEST_SCHEMA,
             )
             self.assertEqual(len(batch_response.responses), 1)
 
@@ -131,7 +175,9 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     def test_feed_batch_sync_successful(self):
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
@@ -144,21 +190,27 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     def test_feed_batch_multithreaded_successful(self):
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(
+            self.client.feed_batch_multithreaded, documents
+        )
 
     def test_feed_batch_multithreaded_emptyBatch_successful(self):
         documents = []
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(
+            self.client.feed_batch_multithreaded, documents
+        )
 
     def test_delete_document_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
-            {"id": "doc2", "fields": {"title": "Title 2", "contents": "Content 2"}}
+            {"id": "doc2", "fields": {"title": "Title 2", "contents": "Content 2"}},
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
@@ -169,10 +221,12 @@ class TestVespaClient(AsyncMarqoTestCase):
 
         # Verify document deleted
         get_responses = self.pyvespa_client.get_batch(
-            batch=[{"id": "doc1"}, {"id": "doc2"}],
-            schema=self.TEST_SCHEMA
+            batch=[{"id": "doc1"}, {"id": "doc2"}], schema=self.TEST_SCHEMA
         )
-        status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
+        status = [
+            {resp.json["id"].split("::")[-1]: resp.status_code}
+            for resp in get_responses
+        ]
 
         self.assertEqual(status, [{"doc1": 404}, {"doc2": 200}])
 
@@ -190,10 +244,12 @@ class TestVespaClient(AsyncMarqoTestCase):
 
         # Verify document deleted
         get_responses = self.pyvespa_client.get_batch(
-            batch=[{"id": "docx"}, {"id": "doc1"}],
-            schema=self.TEST_SCHEMA
+            batch=[{"id": "docx"}, {"id": "doc1"}], schema=self.TEST_SCHEMA
         )
-        status = [{resp.json['id'].split('::')[-1]: resp.status_code} for resp in get_responses]
+        status = [
+            {resp.json["id"].split("::")[-1]: resp.status_code}
+            for resp in get_responses
+        ]
 
         self.assertEqual(status, [{"docx": 404}, {"doc1": 200}])
 
@@ -201,14 +257,14 @@ class TestVespaClient(AsyncMarqoTestCase):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
             {"id": "doc2", "fields": {"title": "Title 1", "contents": "Content 1.1"}},
-            {"id": "doc3", "fields": {"title": "Title 2"}}
+            {"id": "doc3", "fields": {"title": "Title 2"}},
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
         result = self.client.query(
             yql="select * from sources * where title contains 'Title 1';",
             ranking="bm25",
-            model_restrict=self.TEST_SCHEMA
+            model_restrict=self.TEST_SCHEMA,
         )
 
         self.assertEqual(len(result.root.children), 2)
@@ -222,21 +278,25 @@ class TestVespaClient(AsyncMarqoTestCase):
     def test_query_notFound_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
-            {"id": "doc2", "fields": {"title": "Title 2"}}
+            {"id": "doc2", "fields": {"title": "Title 2"}},
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
         result = self.client.query(
             yql="select * from sources * where title contains 'Title 3';",
             ranking="bm25",
-            model_restrict=self.TEST_SCHEMA
+            model_restrict=self.TEST_SCHEMA,
         )
 
         self.assertIsNone(result.root.children)
 
     def test_query_invalidQueryUrl_fails(self):
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
-                                   "http://localhost:8000", "content_default")
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8000",
+            "content_default",
+        )
 
         with self.assertRaises(VespaError):
             query_client.query(
@@ -247,17 +307,18 @@ class TestVespaClient(AsyncMarqoTestCase):
         """
         VespaTimeoutError error is raised when Vespa responds with a timeout error.
         """
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
 
         def modified_post(*args, **kwargs):
-            kwargs['json']['timeout'] = '1ms'
+            kwargs["json"]["timeout"] = "1ms"
             return httpx.post(*args, **kwargs)
 
-        with patch.object(
-                httpx.Client, "post",
-                wraps=modified_post
-        ):
+        with patch.object(httpx.Client, "post", wraps=modified_post):
             with self.assertRaisesStrict(VespaTimeoutError):
                 query_client.query(
                     yql="select * from sources * where title contains 'Title 1';"
@@ -268,30 +329,35 @@ class TestVespaClient(AsyncMarqoTestCase):
         VespaTimeoutError error is raised when VespaClient is created with a default timeout of 1ms.
         This will fail even if query 'timeout' isn't set, since the default timeout will be used.
         """
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default",
-                                   default_search_timeout_ms=1)
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+            default_search_timeout_ms=1,
+        )
 
         def pass_through_post(*args, **kwargs):
             return httpx.post(*args, **kwargs)
 
-        with patch.object(
-                httpx.Client, "post",
-                wraps=pass_through_post
-        ) as mock_post:
+        with patch.object(httpx.Client, "post", wraps=pass_through_post) as mock_post:
             with self.assertRaisesStrict(VespaTimeoutError):
                 query_client.query(
                     yql="select * from sources * where title contains 'Title 1';"
                 )
             # Ensure that post was called with correct timeout
-            self.assertEqual(mock_post.call_args.kwargs['json']['timeout'], '1ms')
+            self.assertEqual(mock_post.call_args.kwargs["json"]["timeout"], "1ms")
 
     def test_query_softDoom_fails(self):
         """
         VespaTimeoutError error is raised when Vespa responds with a soft doom error.
         """
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
 
         def modified_post(*args, **kwargs):
             resp = httpx.post(*args, **kwargs)
@@ -300,20 +366,17 @@ class TestVespaClient(AsyncMarqoTestCase):
             result.root.errors.append(
                 Error(
                     code=8,
-                    summary='Error in search reply.',
-                    message='Search request soft doomed during query setup and initialization.'
+                    summary="Error in search reply.",
+                    message="Search request soft doomed during query setup and initialization.",
                 )
             )
             return httpx.Response(
                 status_code=504,
                 content=result.json(by_alias=True).encode("utf-8"),
-                request=resp.request
+                request=resp.request,
             )
 
-        with patch.object(
-                httpx.Client, "post",
-                wraps=modified_post
-        ):
+        with patch.object(httpx.Client, "post", wraps=modified_post):
             with self.assertRaisesStrict(VespaTimeoutError):
                 query_client.query(
                     yql="select * from sources * where title contains 'Title 1';"
@@ -323,8 +386,12 @@ class TestVespaClient(AsyncMarqoTestCase):
         """
         VespaStatusError error is raised when Vespa responds with a non-handled error status code.
         """
-        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
 
         statuses = [400, 500, 504]
 
@@ -338,8 +405,9 @@ class TestVespaClient(AsyncMarqoTestCase):
         for status in statuses:
             with self.subTest(status):
                 with patch.object(
-                        httpx.Client, "post",
-                        wraps=functools.partial(modified_post, status=status)
+                    httpx.Client,
+                    "post",
+                    wraps=functools.partial(modified_post, status=status),
                 ):
                     with self.assertRaisesStrict(VespaStatusError):
                         query_client.query(
@@ -350,11 +418,18 @@ class TestVespaClient(AsyncMarqoTestCase):
         app = self.client.download_application()
 
         self.assertTrue(os.path.exists(app), "Application root does not exist")
-        self.assertTrue(os.path.isfile(os.path.join(app, "services.xml")),
-                        "services.xml does not exist or is not a file")
-        self.assertTrue(os.path.isdir(os.path.join(app, "schemas")), "schemas does not exist or is not a directory")
-        self.assertTrue(os.path.isfile(os.path.join(app, "schemas", "test_vespa_client.sd")),
-                        "test_vespa_client.sd does not exist or is not a file")
+        self.assertTrue(
+            os.path.isfile(os.path.join(app, "services.xml")),
+            "services.xml does not exist or is not a file",
+        )
+        self.assertTrue(
+            os.path.isdir(os.path.join(app, "schemas")),
+            "schemas does not exist or is not a directory",
+        )
+        self.assertTrue(
+            os.path.isfile(os.path.join(app, "schemas", "test_vespa_client.sd")),
+            "test_vespa_client.sd does not exist or is not a file",
+        )
 
     def test_download_application_createSessionError_fails(self):
         """
@@ -394,7 +469,9 @@ class TestVespaClient(AsyncMarqoTestCase):
             """
             Get the current Vespa application generation
             """
-            resp = httpx.get("http://localhost:19071/application/v2/tenant/default/application/default")
+            resp = httpx.get(
+                "http://localhost:19071/application/v2/tenant/default/application/default"
+            )
             return resp.json()["generation"]
 
         app = self.client.download_application()
@@ -406,9 +483,11 @@ class TestVespaClient(AsyncMarqoTestCase):
 
             generation_after = get_vespa_app_generation()
 
-            self.assertTrue(generation_after > generation_before)  # note generation can increase by more than 1
+            self.assertTrue(
+                generation_after > generation_before
+            )  # note generation can increase by more than 1
             mock_post.assert_called_once()
-            self.assertTrue('prepareandactivate' in mock_post.call_args[0][0])
+            self.assertTrue("prepareandactivate" in mock_post.call_args[0][0])
 
     def test_deploy_application_invalidAppPath_fails(self):
         with self.assertRaises(VespaError):
@@ -421,12 +500,16 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     def test_feed_batch_documents_DocumentTimeOut_response_format(self):
         documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        with patch("marqo.vespa.vespa_client.httpx.AsyncClient.post",
-                   side_effect = httpx.TimeoutException("Timeout")):
+        with patch(
+            "marqo.vespa.vespa_client.httpx.AsyncClient.post",
+            side_effect=httpx.TimeoutException("Timeout"),
+        ):
             batch_response = self.client.feed_batch(documents, self.TEST_SCHEMA)
 
         self.assertEqual(batch_response.errors, True)
@@ -436,7 +519,7 @@ class TestVespaClient(AsyncMarqoTestCase):
             self.assertIn("Network Error", r.message)
 
     def test_get_vespa_version(self):
-        expected_vespa_version = '8.513.17'
+        expected_vespa_version = "8.513.17"
         version = self.client.get_vespa_version()
         self.assertEqual(expected_vespa_version, version)
 
@@ -445,22 +528,42 @@ class TestVespaClient(AsyncMarqoTestCase):
             (200, 200, None),
             (404, 404, "Document does not exist in the index"),
             (412, 400, "Marqo vector store couldn't update the document"),
-            (429, 429, "Marqo vector store received too many requests. Please try again later"),
+            (
+                429,
+                429,
+                "Marqo vector store received too many requests. Please try again later",
+            ),
             (507, 400, "Marqo vector store is out of memory or disk space"),
-            (123, 500, "Marqo vector store returned an unexpected error with this document"),
-            (400, 500, "Marqo vector store returned an unexpected error with this document"),
+            (
+                123,
+                500,
+                "Marqo vector store returned an unexpected error with this document",
+            ),
+            (
+                400,
+                500,
+                "Marqo vector store returned an unexpected error with this document",
+            ),
             # generic 400 error without specific message
-            (400, 400, "The document contains invalid characters in the fields. Original error: could not parse field"),
+            (
+                400,
+                400,
+                "The document contains invalid characters in the fields. Original error: could not parse field",
+            ),
             # specific 400 error
         ]
         for status, expected_status, expected_message in test_cases:
             with self.subTest(status=status):
                 if status == 400 and "could not parse field" in expected_message:
-                    result_status, result_message = self.client.translate_vespa_document_response(
-                        status, "could not parse field")
+                    result_status, result_message = (
+                        self.client.translate_vespa_document_response(
+                            status, "could not parse field"
+                        )
+                    )
                 else:
-                    result_status, result_message = self.client.translate_vespa_document_response(
-                        status,None)
+                    result_status, result_message = (
+                        self.client.translate_vespa_document_response(status, None)
+                    )
                 self.assertEqual(result_status, expected_status)
                 if expected_message:
                     self.assertIn(expected_message, result_message)
@@ -473,117 +576,133 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     @patch.object(
         VespaClient,
-        'get_application_has_converged',
-        side_effect=httpx._exceptions.ReadTimeout("Read Timeout")
+        "get_application_has_converged",
+        side_effect=httpx._exceptions.ReadTimeout("Read Timeout"),
     )
-    def test_vespa_client_timeout_exception_handled(self, mock_get_application_has_converged):
+    def test_vespa_client_timeout_exception_handled(
+        self, mock_get_application_has_converged
+    ):
         """If a timeout exception is raised, the method should retry until the total wait time is reached"""
         side_effects = [
             httpx._exceptions.ReadTimeout("Read Timeout"),
-            httpcore._exceptions.ReadTimeout("Read Timeout")
+            httpcore._exceptions.ReadTimeout("Read Timeout"),
         ]
         for side_effect in side_effects:
             with self.subTest(side_effect=side_effect):
-                vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                           "http://localhost:8080", "content_default")
+                vespa_client = VespaClient(
+                    "http://localhost:19071",
+                    "http://localhost:8080",
+                    "http://localhost:8080",
+                    "content_default",
+                )
                 with self.assertRaises(VespaError) as e:
                     vespa_client.wait_for_application_convergence(0.1)
-                self.assertGreaterEqual(mock_get_application_has_converged.call_count, 5)
+                self.assertGreaterEqual(
+                    mock_get_application_has_converged.call_count, 5
+                )
                 self.assertIn("Vespa application did not converge", str(e.exception))
 
-    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
-    def test_application_convergence_timeout_fails(self, mock_get_application_has_converged):
+    @patch.object(VespaClient, "get_application_has_converged", return_value=False)
+    def test_application_convergence_timeout_fails(
+        self, mock_get_application_has_converged
+    ):
         """If the total wait time is reached, the method should raise a VespaError"""
-        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        vespa_client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
 
         with self.assertRaises(VespaError) as e:
             vespa_client.wait_for_application_convergence(timeout=0.1)
-        self.assertIn("Vespa application did not converge",str(e.exception))
+        self.assertIn("Vespa application did not converge", str(e.exception))
 
     def test_get_pool_size_initialization(self):
         """Test that get_pool_size is properly set and used as default concurrency"""
         get_pool_size = 15
         client = VespaClient(
-            "http://localhost:19071", 
+            "http://localhost:19071",
             "http://localhost:8080",
-            "http://localhost:8080", 
+            "http://localhost:8080",
             "content_default",
-            get_pool_size=get_pool_size
+            get_pool_size=get_pool_size,
         )
-        
+
         # Verify get_pool_size is set correctly
         self.assertEqual(client.get_pool_size, get_pool_size)
-        
+
         client.close()
 
-    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    @patch("marqo.vespa.vespa_client.httpx.AsyncClient")
     def test_get_batch_uses_correct_concurrency(self, mock_async_client_class):
         """Test that get_batch uses get_pool_size as default concurrency"""
         # Create a proper mock for the async client and response
         mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
-        
+
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
-            'id': 'test::doc1',
-            'fields': {'title': 'Test'}
+            "pathId": "/document/v1/test_vespa_client/test_vespa_client/docid/doc1",
+            "id": "test::doc1",
+            "fields": {"title": "Test"},
         }
-        
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Feed a document first to ensure the schema exists
         test_doc = VespaDocument(id="doc1", fields={"title": "Test Title"})
         self.client.feed_document(test_doc, self.TEST_SCHEMA)
-        
+
         # Call get_batch
-        self.client.get_batch(['doc1'], self.TEST_SCHEMA)
-        
+        self.client.get_batch(["doc1"], self.TEST_SCHEMA)
+
         # Verify AsyncClient was created
         mock_async_client_class.assert_called_once()
 
-    @patch('marqo.vespa.vespa_client.asyncio.Semaphore')
-    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
-    def test_get_batch_semaphore_uses_concurrency_parameter(self, mock_async_client_class, mock_semaphore_class):
+    @patch("marqo.vespa.vespa_client.asyncio.Semaphore")
+    @patch("marqo.vespa.vespa_client.httpx.AsyncClient")
+    def test_get_batch_semaphore_uses_concurrency_parameter(
+        self, mock_async_client_class, mock_semaphore_class
+    ):
         """Test that get_batch creates semaphore with concurrency parameter, using get_pool_size as default"""
         # Create a proper mock for the async client and response
         mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
-        
+
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
-            'id': 'test::doc1',
-            'fields': {'title': 'Test'}
+            "pathId": "/document/v1/test_vespa_client/test_vespa_client/docid/doc1",
+            "id": "test::doc1",
+            "fields": {"title": "Test"},
         }
-        
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Create client with specific get_pool_size
         get_pool_size = 20
         client = VespaClient(
             "http://localhost:19071",
-            "http://localhost:8080", 
+            "http://localhost:8080",
             "http://localhost:8080",
             "content_default",
-            get_pool_size=get_pool_size
+            get_pool_size=get_pool_size,
         )
-        
+
         # Test 1: Use default concurrency (should use get_pool_size)
-        client.get_batch(['doc1'], self.TEST_SCHEMA)
+        client.get_batch(["doc1"], self.TEST_SCHEMA)
         mock_semaphore_class.assert_called_with(get_pool_size)
-        
+
         # Test 2: Use explicit concurrency parameter
         custom_concurrency = 8
         mock_semaphore_class.reset_mock()
-        client.get_batch(['doc1'], self.TEST_SCHEMA, concurrency=custom_concurrency)
+        client.get_batch(["doc1"], self.TEST_SCHEMA, concurrency=custom_concurrency)
         mock_semaphore_class.assert_called_with(custom_concurrency)
-        
+
         client.close()
 
     def test_vespa_client_close_calls_http_client_close(self):
@@ -594,81 +713,101 @@ class TestVespaClient(AsyncMarqoTestCase):
             document_url="http://localhost:8080",
             query_url="http://localhost:8080",
             content_cluster_name="test_cluster",
-            get_pool_size=10
+            get_pool_size=10,
         )
-        
+
         # Mock the http_client.close method
-        with patch.object(client.http_client, 'close') as mock_close:
+        with patch.object(client.http_client, "close") as mock_close:
             # Call close method
             client.close()
-            
+
             # Verify that http_client.close was called
             mock_close.assert_called_once()
 
     def test_vespa_get_pool_size_env_var(self):
         """Test that VESPA_GET_POOL_SIZE environment variable properly sets get_pool_size"""
-        
+
         # Test 1: Default value (should be 10)
         with self.subTest("default_get_pool_size"):
             config = generate_config()
             vespa_client = config.vespa_client
-            
+
             # Verify default get_pool_size is used
             self.assertEqual(vespa_client.get_pool_size, 10)
             vespa_client.close()
-        
+
         # Test 2: Set environment variable to custom value
         with self.subTest("custom_get_pool_size"):
             with patch.dict(os.environ, {EnvVars.VESPA_GET_POOL_SIZE: "25"}):
                 # Import and call generate_config to create VespaClient with env var
-                
+
                 config = generate_config()
                 vespa_client = config.vespa_client
-                
+
                 # Verify the custom get_pool_size is used
                 self.assertEqual(vespa_client.get_pool_size, 25)
-                
+
                 vespa_client.close()
 
     def test_deploy_session(self):
         """Test that create_deployment_session calls the correct methods"""
-        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        vespa_client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
         # wait for vespa to get converged
         vespa_client.wait_for_application_convergence(timeout=10)
         generation_before_deployment = vespa_client.get_application_generation()
         deployment_session = vespa_client.create_deployment_session()
 
         prep = vespa_client.prepare(deployment_session[1], 10)
-        session_id = prep['session-id']
-        self.assertEqual(prep['message'], f"Session {session_id} for tenant 'default' prepared.")
+        session_id = prep["session-id"]
+        self.assertEqual(
+            prep["message"], f"Session {session_id} for tenant 'default' prepared."
+        )
 
-        activate = vespa_client.activate(prep['activate'], 10)
-        previous_expected_generation = activate['application']['previousActiveGeneration']
-        self.assertEqual(activate['message'], f"Session {session_id} for tenant 'default' activated.")
+        activate = vespa_client.activate(prep["activate"], 10)
+        previous_expected_generation = activate["application"][
+            "previousActiveGeneration"
+        ]
+        self.assertEqual(
+            activate["message"], f"Session {session_id} for tenant 'default' activated."
+        )
 
         self.assertEqual(previous_expected_generation, generation_before_deployment)
         base_expected_deploy_url = f"http://localhost:19071/application/v2/tenant/default/session/{session_id}/"
-        self.assertEqual(deployment_session[0], base_expected_deploy_url + 'content/')
-        self.assertEqual(deployment_session[1], base_expected_deploy_url + 'prepared')
+        self.assertEqual(deployment_session[0], base_expected_deploy_url + "content/")
+        self.assertEqual(deployment_session[1], base_expected_deploy_url + "prepared")
 
         vespa_client.wait_for_application_convergence(timeout=10)
         generation_after_deployment = vespa_client.get_application_generation()
         self.assertEqual(generation_after_deployment, int(session_id))
 
-    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
-    def test_check_for_application_convergence_not_converged(self, mock_get_application_has_converged):
+    @patch.object(VespaClient, "get_application_has_converged", return_value=False)
+    def test_check_for_application_convergence_not_converged(
+        self, mock_get_application_has_converged
+    ):
         """Test that check_for_application_convergence raises an error if the application has not converged"""
-        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        vespa_client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
         with self.assertRaises(VespaNotConvergedError) as e:
             vespa_client.check_for_application_convergence()
         self.assertIn("Vespa application has not converged", str(e.exception))
 
     def test_get_application_generation(self):
         """Test that get_application_generation returns the current application generation"""
-        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
-                                   "http://localhost:8080", "content_default")
+        vespa_client = VespaClient(
+            "http://localhost:19071",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
         application_generation = vespa_client.get_application_generation()
         self.assertEqual(type(application_generation), int)
 
@@ -698,20 +837,26 @@ class TestVespaClient(AsyncMarqoTestCase):
     def test_feed_documents(self):
         self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
         get_response = self.client.get_document(
-            id=self.test_document_1.id,
-            schema=self.TEST_SCHEMA
+            id=self.test_document_1.id, schema=self.TEST_SCHEMA
         )
         document = get_response.document
-        self.assertEqual(document.id, f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}')
+        self.assertEqual(
+            document.id,
+            f"id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}",
+        )
         self.assertEqual(document.fields, self.test_document_1.fields)
-        delete_response = self.client.delete_document(self.test_document_1.id, self.TEST_SCHEMA)
+        delete_response = self.client.delete_document(
+            self.test_document_1.id, self.TEST_SCHEMA
+        )
         self.assertEqual(
             delete_response.path_id,
-            f'/document/v1/{self.TEST_SCHEMA}/{self.TEST_SCHEMA}/docid/{self.test_document_1.id}'
+            f"/document/v1/{self.TEST_SCHEMA}/{self.TEST_SCHEMA}/docid/{self.test_document_1.id}",
         )
 
         get_all_docs = self.client.get_all_documents(self.TEST_SCHEMA)
-        self.assertEqual(get_all_docs.document_count, 0) # validate that all documents were deleted
+        self.assertEqual(
+            get_all_docs.document_count, 0
+        )  # validate that all documents were deleted
 
     def test_delete_all_documents(self):
         response = self.client.get_all_documents(self.TEST_SCHEMA)
@@ -733,22 +878,26 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Feed 2 documents
         self.client.feed_document(self.test_document_1, self.TEST_SCHEMA)
         self.client.feed_document(self.test_document_2, self.TEST_SCHEMA)
-        get_documents_response = self.client.get_all_documents(self.TEST_SCHEMA, stream=True)
+        get_documents_response = self.client.get_all_documents(
+            self.TEST_SCHEMA, stream=True
+        )
 
         # Check retrieved documents match
         self.assertEqual(get_documents_response.document_count, 2)
         self.assertEqual(
             get_documents_response.documents[0].id,
-            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}'
+            f"id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_1.id}",
         )
         self.assertEqual(
             get_documents_response.documents[1].id,
-            f'id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_2.id}'
+            f"id:{self.TEST_SCHEMA}:{self.TEST_SCHEMA}::{self.test_document_2.id}",
         )
 
     def test_batch_index_requests(self):
         feed_batch_docs = [
-            VespaDocument(id="batch_doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(
+                id="batch_doc1", fields={"title": "Title 1", "contents": "Content 1"}
+            ),
             VespaDocument(id="batch_doc2", fields={"title": "Title 2"}),
         ]
 
@@ -756,30 +905,26 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(batch_response.errors, False)
 
         get_batch_response = self.client.get_batch(
-            ids=["batch_doc1", "batch_doc2"],
-            schema=self.TEST_SCHEMA
+            ids=["batch_doc1", "batch_doc2"], schema=self.TEST_SCHEMA
         )
         self.assertEqual(get_batch_response.errors, False)
         self.assertEqual(len(get_batch_response.responses), 2)
 
         get_batch_no_ids_response = self.client.get_batch(
-            ids=[],
-            schema=self.TEST_SCHEMA
+            ids=[], schema=self.TEST_SCHEMA
         )
         self.assertEqual(get_batch_no_ids_response.errors, False)
         self.assertEqual(get_batch_no_ids_response.responses, [])
 
         delete_batch_response = self.client.delete_batch(
-            ids=["batch_doc1", "batch_doc2"],
-            schema=self.TEST_SCHEMA
+            ids=["batch_doc1", "batch_doc2"], schema=self.TEST_SCHEMA
         )
         self.assertEqual(delete_batch_response.errors, False)
         self.assertEqual(len(delete_batch_response.responses), 2)
 
         # Try getting documents after deletion
         get_batch_response = self.client.get_batch(
-            ids=["batch_doc1", "batch_doc2"],
-            schema=self.TEST_SCHEMA
+            ids=["batch_doc1", "batch_doc2"], schema=self.TEST_SCHEMA
         )
         self.assertEqual(get_batch_response.errors, True)
         self.assertEqual(len(get_batch_response.responses), 2)
@@ -787,47 +932,53 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(get_batch_response.responses[1].status, 404)
 
     @pytest.mark.asyncio
-    @patch("httpx.AsyncClient.put", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    @patch(
+        "httpx.AsyncClient.put",
+        return_value=httpx.Response(status_code=200, content="Invalid JSON"),
+    )
     async def test_update_document_json_decode_error(self, mock_put):
         """
         Test that _update_document_async properly raises VespaError on JSONDecodeError for a 200 response.
         """
 
-        document = VespaDocument(
-            id="doc1", fields={
-                "title": "Updated Title"
-            }
-            )
+        document = VespaDocument(id="doc1", fields={"title": "Updated Title"})
 
         with pytest.raises(VespaError, match="Unexpected response from Vespa"):
             await self.client._update_document_async(
-                asyncio.Semaphore(1), httpx.AsyncClient(), document, "test_schema", 60, "marqo__id"
-                )
+                asyncio.Semaphore(1),
+                httpx.AsyncClient(),
+                document,
+                "test_schema",
+                60,
+                "marqo__id",
+            )
 
         assert mock_put.call_count == 1
 
     @pytest.mark.asyncio
-    @patch("httpx.AsyncClient.post", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    @patch(
+        "httpx.AsyncClient.post",
+        return_value=httpx.Response(status_code=200, content="Invalid JSON"),
+    )
     async def test_feed_document_json_decode_error(self, mock_post):
         """
         Test that feed_document properly raises VespaError on JSONDecodeError for a 200 response.
         """
 
-        document = VespaDocument(
-            id="doc1", fields={
-                "title": "Updated Title"
-            }
-            )
+        document = VespaDocument(id="doc1", fields={"title": "Updated Title"})
 
         with pytest.raises(VespaError, match="Unexpected response from Vespa"):
             await self.client._feed_document_async(
                 asyncio.Semaphore(1), httpx.AsyncClient(), document, "test_schema", 60
-                )
+            )
 
         assert mock_post.call_count == 1
 
     @pytest.mark.asyncio
-    @patch("httpx.AsyncClient.delete", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
+    @patch(
+        "httpx.AsyncClient.delete",
+        return_value=httpx.Response(status_code=200, content="Invalid JSON"),
+    )
     async def test_delete_document_json_decode_error(self, mock_delete):
         """
         Test that delete_document properly raises VespaError on JSONDecodeError for a 200 response.
@@ -836,33 +987,42 @@ class TestVespaClient(AsyncMarqoTestCase):
         with pytest.raises(VespaError, match="Unexpected response: Invalid JSON"):
             await self.client._delete_document_async(
                 asyncio.Semaphore(1), httpx.AsyncClient(), "doc1", "test_schema", 60
-                )
+            )
 
         assert mock_delete.call_count == 1
 
     def test_httpx_client_should_not_timeout_before_vespa_timeout(self):
         """Test that httpx client will not time out before Vespa timeout"""
+
         def delayed_vespa_504(*args, **kwargs):
             time.sleep(7)  # emulate Vespa taking ~7s
             payload = {
                 "root": {
                     "relevance": 0.0,
-                    "errors": [{
-                        "code": 8,
-                        "summary": "Error in search reply.",
-                        "message": "Search request soft doomed during query setup and initialization."
-                    }]
+                    "errors": [
+                        {
+                            "code": 8,
+                            "summary": "Error in search reply.",
+                            "message": "Search request soft doomed during query setup and initialization.",
+                        }
+                    ],
                 }
             }
             req = httpx.Request("POST", "http://dummy/search/")
-            return httpx.Response(status_code=504, content=json.dumps(payload).encode(), request=req)
+            return httpx.Response(
+                status_code=504, content=json.dumps(payload).encode(), request=req
+            )
 
-        query_client = VespaClient("http://localhost:8080","http://localhost:8080",
-                                   "http://localhost:8080","content_default")
+        query_client = VespaClient(
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "http://localhost:8080",
+            "content_default",
+        )
 
         with patch.object(httpx.Client, "post", side_effect=delayed_vespa_504):
             with self.assertRaisesStrict(VespaTimeoutError):
                 query_client.query(
                     yql="select * from sources * where title contains 'Title 1';",
-                    timeout=7000 # 7 seconds Vespa timeout, 8 seconds httpx timeout
+                    timeout=7000,  # 7 seconds Vespa timeout, 8 seconds httpx timeout
                 )

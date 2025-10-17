@@ -5,9 +5,9 @@ import botocore
 from botocore.exceptions import NoCredentialsError
 
 from marqo.inference.model_download.download_model_from_s3 import (
+    check_s3_model_already_exists,
     get_presigned_s3_url,
     get_s3_model_absolute_cache_path,
-    check_s3_model_already_exists,
     get_s3_model_cache_filename,
 )
 from marqo.s2_inference.configs import ModelCache
@@ -18,11 +18,15 @@ from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 class TestModelAuthEdgeCases(unittest.TestCase):
     def setUp(self):
         self.s3_location = S3Location(Bucket="test-bucket", Key="test-key")
-        self.s3_auth = S3Auth(aws_access_key_id="test-access-key", aws_secret_access_key="test-secret-key")
+        self.s3_auth = S3Auth(
+            aws_access_key_id="test-access-key", aws_secret_access_key="test-secret-key"
+        )
 
     def test_get_presigned_s3_url_no_credentials_error(self):
         with patch("boto3.client") as boto3_client_mock:
-            boto3_client_mock.return_value.generate_presigned_url.side_effect = NoCredentialsError
+            boto3_client_mock.return_value.generate_presigned_url.side_effect = (
+                NoCredentialsError
+            )
             with self.assertRaises(ModelDownloadError):
                 get_presigned_s3_url(self.s3_location, self.s3_auth)
 
@@ -70,6 +74,8 @@ class TestModelAuthEdgeCases(unittest.TestCase):
                 check_s3_model_already_exists(self.s3_location)
 
     def test_get_s3_model_cache_filename_with_directory(self):
-        location_with_directory = S3Location(Bucket="test-bucket", Key="models/test-key")
+        location_with_directory = S3Location(
+            Bucket="test-bucket", Key="models/test-key"
+        )
         result = get_s3_model_cache_filename(location_with_directory)
         self.assertEqual(result, "test-key")

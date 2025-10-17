@@ -1,18 +1,14 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.14.1
-  hooks:
-    # Run the linter.
-    - id: ruff-check
-      types_or: [ python, pyi ]
-      args: [ --fix ]
-    # Run the formatter.
-    - id: ruff-format
-      types_or: [ python, pyi ]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+      - id: ruff-check
+        types_or: [python, pyi]
+        files: ^components/inference_orchestrator/(src|tests)/
+        args: [--fix]
+        exclude: '(^|/)notebooks/|(^|/)\.ipynb_checkpoints/|\.ipynb$'
 
-- repo: https://github.com/pycqa/isort
-  rev: 7.0.0
-  hooks:
-    - id: isort
-      name: isort (python)
+      - id: ruff-format
+        types_or: [python, pyi]
+        files: ^components/inference_orchestrator/(src|tests)/
+        exclude: '(^|/)\.ipynb_checkpoints/|\.ipynb$'

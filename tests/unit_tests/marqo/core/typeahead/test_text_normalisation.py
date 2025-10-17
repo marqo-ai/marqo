@@ -1,12 +1,13 @@
-import unittest
 import unicodedata
-from hypothesis import given, strategies as st
+import unittest
 
-from marqo.core.typeahead.text_normalization import normalize_text, generate_prefixes
+from hypothesis import given
+from hypothesis import strategies as st
+
+from marqo.core.typeahead.text_normalization import generate_prefixes, normalize_text
 
 
 class TestNormalizeText(unittest.TestCase):
-
     # ---------- Basic behavior ----------
     def test_empty_string_returns_empty(self):
         self.assertEqual(normalize_text(""), "")
@@ -28,8 +29,8 @@ class TestNormalizeText(unittest.TestCase):
             ("Café", "cafe"),
             ("mañana", "manana"),
             ("Māori", "maori"),
-            ("e\u0301lite", "elite"),   # decomposed "é"
-            ("İstanbul", "istanbul"),   # I + combining dot -> remove dot -> i
+            ("e\u0301lite", "elite"),  # decomposed "é"
+            ("İstanbul", "istanbul"),  # I + combining dot -> remove dot -> i
         ]
         for raw, expected in cases:
             with self.subTest(raw=raw):
@@ -96,19 +97,25 @@ class TestNormalizeText(unittest.TestCase):
 
 class TestGeneratePrefixes(unittest.TestCase):
     def test_generate_prefixes_for_single_term_query(self):
-        query = 'hello'
+        query = "hello"
         prefixes = generate_prefixes(query)
-        self.assertListEqual(['h', 'he', 'hel', 'hell', 'hello'], prefixes)
+        self.assertListEqual(["h", "he", "hel", "hell", "hello"], prefixes)
 
     def test_generate_prefixes_for_multi_term_query(self):
-        query = 'hello world'
+        query = "hello world"
         prefixes = generate_prefixes(query)
-        self.assertListEqual(['h', 'he', 'hel', 'hell', 'hello', 'w', 'wo', 'wor', 'worl', 'world'], prefixes)
+        self.assertListEqual(
+            ["h", "he", "hel", "hell", "hello", "w", "wo", "wor", "worl", "world"],
+            prefixes,
+        )
 
     def test_generate_prefixes_for_multi_term_query_with_multiple_spaces(self):
-        query = '   hello    world    '
+        query = "   hello    world    "
         prefixes = generate_prefixes(query)
-        self.assertListEqual(['h', 'he', 'hel', 'hell', 'hello', 'w', 'wo', 'wor', 'worl', 'world'], prefixes)
+        self.assertListEqual(
+            ["h", "he", "hel", "hell", "hello", "w", "wo", "wor", "worl", "world"],
+            prefixes,
+        )
 
 
 if __name__ == "__main__":

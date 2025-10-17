@@ -1,20 +1,18 @@
 from enum import StrEnum
 from typing import List, Optional, Union
 from unittest import TestCase
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
-from numpy import ndarray
-
 from inference_orchestrator.api.telemetry import RequestMetricsStore
 from inference_orchestrator.config import get_config
 from inference_orchestrator.schemas.api import (
+    EmbeddingModelConfig,
+    ImagePreprocessingConfig,
     InferenceRequest,
     InferenceResult,
-    EmbeddingModelConfig,
     Modality,
     TextPreprocessingConfig,
-    ImagePreprocessingConfig,
 )
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
     get_model_properties,
@@ -23,6 +21,7 @@ from inference_orchestrator.services.triton_inference.model_manager import model
 from inference_orchestrator.services.triton_inference.triton_inference import (
     TritonInference,
 )
+from numpy import ndarray
 
 
 class TestImageUrls(StrEnum):

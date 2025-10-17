@@ -1,6 +1,8 @@
 from typing import Callable
 
 from fastapi import FastAPI
+from inference_orchestrator.core.logging import get_logger
+from inference_orchestrator.core.settings import get_settings
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import (
@@ -8,22 +10,21 @@ from opentelemetry.sdk.metrics.export import (
     MetricExportResult,
     PeriodicExportingMetricReader,
 )
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-from inference_orchestrator.core.logging import get_logger
-from inference_orchestrator.core.settings import get_settings
-
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
 settings = get_settings()
 
 
-
 class LoggingMetricExporter(ConsoleMetricExporter):
     """A MetricExporter that logs via the Python logging system instead of printing."""
+
     def __init__(self, logger_name: str = "metrics"):
         super().__init__()
         self.logger = get_logger(logger_name)
 
-    def export(self, metrics_data, timeout_millis: float = 10_000, **kwargs) -> MetricExportResult:
+    def export(
+        self, metrics_data, timeout_millis: float = 10_000, **kwargs
+    ) -> MetricExportResult:
         self.logger.info(metrics_data.to_json(indent=None))
         return MetricExportResult.SUCCESS
 
@@ -35,7 +36,9 @@ def bootstrap_otel(app: FastAPI, service_name: str) -> Callable[[], None]:
         return lambda: None
 
     exporter = LoggingMetricExporter()
-    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=export_interval_seconds * 1000)
+    reader = PeriodicExportingMetricReader(
+        exporter, export_interval_millis=export_interval_seconds * 1000
+    )
 
     resource = Resource({SERVICE_NAME: service_name})
     meter_provider = MeterProvider(resource=resource, metric_readers=[reader])

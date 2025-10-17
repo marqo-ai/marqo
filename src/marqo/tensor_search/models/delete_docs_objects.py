@@ -4,11 +4,12 @@ endpoint.
 """
 
 import datetime
-from typing import NamedTuple, Literal, List
+from typing import List, Literal, NamedTuple
 
 
 class MqDeleteDocsResponse(NamedTuple):
     """An object that holds the data we send back to users"""
+
     index_name: str
     status_string: Literal["succeeded"]
     document_ids: List[str]
@@ -20,6 +21,7 @@ class MqDeleteDocsResponse(NamedTuple):
 
 class MqDeleteDocsRequest(NamedTuple):
     """An object that holds the data from users for a delete request"""
+
     index_name: str
     schema_name: str
     document_ids: List[str]

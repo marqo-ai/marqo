@@ -1,11 +1,9 @@
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, List, Tuple
-from typing import Optional, Dict, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from numpy import ndarray
-from pydantic import StrictStr, model_validator, ConfigDict, BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 
 from .base_model import AppImmutableBaseModel
 

@@ -1,17 +1,10 @@
 import unittest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 import msgpack
 import numpy as np
 from fastapi.testclient import TestClient
-from starlette import status
-from starlette.status import (
-    HTTP_200_OK,
-    HTTP_400_BAD_REQUEST,
-    HTTP_422_UNPROCESSABLE_ENTITY,
-    HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-)
-
+from inference_orchestrator.main import app
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
     Inference,
@@ -20,8 +13,14 @@ from inference_orchestrator.schemas.api import (
     Modality,
     TextPreprocessingConfig,
 )
-from inference_orchestrator.main import app
 from inference_orchestrator.services.errors import ServiceError
+from starlette import status
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
+    HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+    HTTP_422_UNPROCESSABLE_ENTITY,
+)
 
 
 class TestInferenceAPI(unittest.TestCase):

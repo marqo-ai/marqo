@@ -33,8 +33,7 @@ class AbstractDistributedLock(ABC):
     @property
     @abstractmethod
     def is_acquired(self) -> bool:
-        """Check if the lock is acquired.
-        """
+        """Check if the lock is acquired."""
         pass
 
     @abstractmethod

@@ -17,29 +17,26 @@ We may test multiple different env vars in the same test case. This is because
  each new test case is expensive, requiring a restart of Marqo. This prevents
  this test suite's runtime from growing too large.
 """
+
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Optional, List
+from typing import Callable, List, Optional
 
 from marqo import Client
-from tests import marqo_test
-from tests import utilities
+from tests import marqo_test, utilities
 
 
 class TestEnvVarChanges(marqo_test.MarqoTestCase):
+    """
+    All tests that rerun marqo with different env vars should go here
+    Teardown will handle resetting marqo back to base settings
+    """
 
-    """
-        All tests that rerun marqo with different env vars should go here
-        Teardown will handle resetting marqo back to base settings
-    """
-    
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         # Ensures that marqo goes back to default state after these tests
-        utilities.rerun_marqo_with_default_config(
-            calling_class=cls.__name__
-        )
+        utilities.rerun_marqo_with_default_config(calling_class=cls.__name__)
         print("Marqo has been rerun with default env vars!")
 
     def test_preload_models(self):
@@ -57,14 +54,19 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 "name": "ViT-B-32-quickgelu",
                 "dimensions": 512,
                 "type": "open_clip",
-                "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
-            }
+                "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
+            },
         }
 
-        print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
+        print(
+            f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}"
+        )
         utilities.rerun_marqo_with_env_vars(
-            env_vars = ['-e', f"MARQO_MODELS_TO_PRELOAD=[{json.dumps(open_clip_model_object)}]"],
-            calling_class=self.__class__.__name__
+            env_vars=[
+                "-e",
+                f"MARQO_MODELS_TO_PRELOAD=[{json.dumps(open_clip_model_object)}]",
+            ],
+            calling_class=self.__class__.__name__,
         )
 
         # check preloaded models (should be custom model)
@@ -75,7 +77,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
     def test_inference_cache(self):
         """
-            Ensures that inference cache works for search but not add_docs when enabled
+        Ensures that inference cache works for search but not add_docs when enabled
         """
 
         # Restart marqo with new max values
@@ -83,21 +85,32 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
             env_vars=[
-                "-e", f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
-                "-e", f"MARQO_INFERENCE_CACHE_SIZE=10",  # enable cache on inference side
-                "-e", f"MARQO_API_INFERENCE_CACHE_SIZE=10",  # enable inference cache on api side
+                "-e",
+                f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
+                "-e",
+                "MARQO_INFERENCE_CACHE_SIZE=10",  # enable cache on inference side
+                "-e",
+                "MARQO_API_INFERENCE_CACHE_SIZE=10",  # enable inference cache on api side
             ],
-            calling_class=self.__class__.__name__
+            calling_class=self.__class__.__name__,
         )
 
         # Create index with same number of replicas and EF
-        self.client.create_index(index_name=index_name, ann_parameters={
-            "spaceType": 'prenormalized-angular', "parameters": {"efConstruction": 5000, "m": 16}}
+        self.client.create_index(
+            index_name=index_name,
+            ann_parameters={
+                "spaceType": "prenormalized-angular",
+                "parameters": {"efConstruction": 5000, "m": 16},
+            },
         )
 
         # Assert correct EF const
-        assert self.client.index(index_name).get_settings() \
-                   ["annParameters"]["parameters"]["efConstruction"] == 5000
+        assert (
+            self.client.index(index_name).get_settings()["annParameters"]["parameters"][
+                "efConstruction"
+            ]
+            == 5000
+        )
 
         # Assert correct models
         res = self.client.index(index_name).get_loaded_models()
@@ -106,8 +119,10 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Test inference cache
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
-        min_inference_time_ms = 8      # inference usually takes at least 8ms
-        cache_reading_time_ms = 3      # if it hits cache, the pipeline should take less than 3ms
+        min_inference_time_ms = 8  # inference usually takes at least 8ms
+        cache_reading_time_ms = (
+            3  # if it hits cache, the pipeline should take less than 3ms
+        )
 
         # Test search query's embedding is cached when inference cache is enabled
         base64_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
@@ -117,23 +132,38 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 # Single query
                 # First search that misses cache should take longer
                 r = telemetry_client.index(index_name).search(q=query)
-                self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > min_inference_time_ms)
-                
+                self.assertTrue(
+                    r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"]
+                    > min_inference_time_ms
+                )
+
                 # Run a few more times to make sure we populate it on API side cache as well as inference side cache
-                self._run_in_threads(lambda client: client.index(index_name).search(q=query),
-                                     max_workers=5, count=50)
-                
+                self._run_in_threads(
+                    lambda client: client.index(index_name).search(q=query),
+                    max_workers=5,
+                    count=50,
+                )
+
                 # Following searches should hit cache, average latency should be low
                 inference_latency = self._run_in_threads(
                     lambda client: client.index(index_name).search(q=query),
-                    max_workers=1, count=10, telemetry_name="search.vector_inference_full_pipeline")
+                    max_workers=1,
+                    count=10,
+                    telemetry_name="search.vector_inference_full_pipeline",
+                )
 
                 if query == image_url:
                     # image url is not cached, so avg latency will usually be > min_inference_time_ms
-                    self.assertTrue(sum(inference_latency) / 10 > min_inference_time_ms, inference_latency)
+                    self.assertTrue(
+                        sum(inference_latency) / 10 > min_inference_time_ms,
+                        inference_latency,
+                    )
                 else:
                     # other queries are all cached, so avg latency should be < cache_reading_time_ms
-                    self.assertTrue(sum(inference_latency) / 10 < cache_reading_time_ms, inference_latency)
+                    self.assertTrue(
+                        sum(inference_latency) / 10 < cache_reading_time_ms,
+                        inference_latency,
+                    )
 
         # Test to ensure inference cache is not working for add_documents:
         with self.subTest("Add document"):
@@ -141,20 +171,36 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             # all the latency telemetry data points are larger than the min_inference_time_ms to verify cache is not
             # involved in this process
             inference_latency = self._run_in_threads(
-                lambda client: client.index(index_name).add_documents([{"test": "test"}], tensor_fields=["test"]),
-                max_workers=1, count=10, telemetry_name="add_documents.inference.all"
+                lambda client: client.index(index_name).add_documents(
+                    [{"test": "test"}], tensor_fields=["test"]
+                ),
+                max_workers=1,
+                count=10,
+                telemetry_name="add_documents.inference.all",
             )
-            self.assertTrue(all([latency > min_inference_time_ms for latency in inference_latency]), inference_latency)
+            self.assertTrue(
+                all([latency > min_inference_time_ms for latency in inference_latency]),
+                inference_latency,
+            )
 
-    def _run_in_threads(self, operation: Callable[[Client], dict], max_workers: int,
-                        count: int, telemetry_name: Optional[str] = None) -> List[float]:
+    def _run_in_threads(
+        self,
+        operation: Callable[[Client], dict],
+        max_workers: int,
+        count: int,
+        telemetry_name: Optional[str] = None,
+    ) -> List[float]:
         results = []
 
         # Using ThreadPoolExecutor to simulate concurrent access, we use a new client every time to avoid
         # connection pooling, so we can hit most api workers in split mode
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(operation, Client(**self.client_settings, return_telemetry=True))
-                       for _ in range(count)]
+            futures = [
+                executor.submit(
+                    operation, Client(**self.client_settings, return_telemetry=True)
+                )
+                for _ in range(count)
+            ]
 
             # Collect results or errors from the futures
             for future in as_completed(futures):
@@ -164,6 +210,6 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                     if telemetry_name:
                         results.append(res["telemetry"]["timesMs"][telemetry_name])
                 except Exception as e:
-                    self.fail(f'Exception raised when collecting results: {e}')
+                    self.fail(f"Exception raised when collecting results: {e}")
 
         return results

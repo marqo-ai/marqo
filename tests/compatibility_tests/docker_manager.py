@@ -6,7 +6,7 @@ import docker
 import requests
 import semver
 from botocore.exceptions import BotoCoreError, ClientError
-from docker.errors import NotFound, APIError, ContainerError, ImageNotFound
+from docker.errors import APIError, ContainerError, NotFound
 
 from tests.compatibility_tests.compatibility_test_logger import get_logger
 
@@ -31,7 +31,9 @@ class DockerManager:
         """
         return f"marqo_{version.replace('.', '_')}_volume"
 
-    def create_volume_for_marqo_version(self, version: str, volume_name: str = None) -> str:
+    def create_volume_for_marqo_version(
+        self, version: str, volume_name: str = None
+    ) -> str:
         """
         Create a Docker volume for the specified Marqo version.
 
@@ -88,16 +90,20 @@ class DockerManager:
             ecr_client = boto3.client("ecr", region_name=region)
             auth_data = ecr_client.get_authorization_token()["authorizationData"][0]
             token = auth_data["authorizationToken"]
-            decoded_token = base64.b64decode(token).decode('utf-8')
+            decoded_token = base64.b64decode(token).decode("utf-8")
 
             username, password = decoded_token.split(":")
             # Get the ECR login password
             self.logger.debug(f"Logging into ECR registry: {ecr_registry}")
-            resp = self.docker_client.login(username=username, password=password, registry=ecr_registry)
+            resp = self.docker_client.login(
+                username=username, password=password, registry=ecr_registry
+            )
 
             # Pull the Docker image from ECR
             self.logger.debug(f"Pulling image: {image_name} from ECR registry")
-            image = self.docker_client.images.pull(image_name, auth_config={'username': username, 'password': password})
+            image = self.docker_client.images.pull(
+                image_name, auth_config={"username": username, "password": password}
+            )
 
             # Optionally retag the image locally to marqo-ai/marqo
             hash_part = image_name.split(":")[1] if ":" in image_name else image_name
@@ -108,16 +114,22 @@ class DockerManager:
             return local_tag
 
         except (BotoCoreError, ClientError) as e:
-            self.logger.exception(f"Failed to retrieve ECR authorization token: {str(e)}")
+            self.logger.exception(
+                f"Failed to retrieve ECR authorization token: {str(e)}"
+            )
             raise RuntimeError("Failed to authenticate with ECR.") from e
         except docker.errors.APIError as e:
             self.logger.exception(f"Failed to pull or tag the image: {str(e)}")
             raise RuntimeError(
-                f"Failed to pull or tag the Docker image '{image_name}' due to a Docker API error.") from e
+                f"Failed to pull or tag the Docker image '{image_name}' due to a Docker API error."
+            ) from e
         except Exception as e:
-            self.logger.exception(f"An unexpected error occurred while pulling the Docker image: {image_name} from ECR")
+            self.logger.exception(
+                f"An unexpected error occurred while pulling the Docker image: {image_name} from ECR"
+            )
             raise RuntimeError(
-                f"Failed to pull Docker image '{image_name}' from ECR due to an unexpected error.") from e
+                f"Failed to pull Docker image '{image_name}' from ECR due to an unexpected error."
+            ) from e
 
     def pull_marqo_image(self, image_name: str, source: str):
         """
@@ -144,11 +156,16 @@ class DockerManager:
             elif source == "ECR":
                 return self.pull_remote_image_from_ecr(image_name)
             else:
-                raise ValueError(f"Invalid source specified: {source}. Must be 'docker' or 'ECR'.")
+                raise ValueError(
+                    f"Invalid source specified: {source}. Must be 'docker' or 'ECR'."
+                )
         except docker.errors.APIError as e:
-            self.logger.exception(f"Failed to pull image: {image_name} from source: {source}")
-            raise Exception(f"Failed to pull Docker image: {image_name} from source: {source}. Error: {str(e)}") from e
-
+            self.logger.exception(
+                f"Failed to pull image: {image_name} from source: {source}"
+            )
+            raise Exception(
+                f"Failed to pull Docker image: {image_name} from source: {source}. Error: {str(e)}"
+            ) from e
 
     def start_marqo_container(self, version: str, volume_name: str):
         """
@@ -161,7 +178,9 @@ class DockerManager:
         source = "docker"  # Always DockerHub for released images
         image_name = f"marqoai/marqo:{version}"
         container_name = f"marqo-{version}"
-        self.logger.info(f"Starting Marqo container with version: {version}, volume_name: {volume_name}, source: {source}")
+        self.logger.info(
+            f"Starting Marqo container with version: {version}, volume_name: {volume_name}, source: {source}"
+        )
 
         # Pull the image
         self.pull_marqo_image(image_name, source)
@@ -169,11 +188,15 @@ class DockerManager:
         # Stop and remove the container if it exists
         try:
             container = self.docker_client.containers.get(container_name)
-            self.logger.debug(f"Stopping and removing existing container: {container_name}")
+            self.logger.debug(
+                f"Stopping and removing existing container: {container_name}"
+            )
             container.stop()
             container.remove()
         except NotFound:
-            self.logger.warning(f"Container {container_name} does not exist. Skipping removal.")
+            self.logger.warning(
+                f"Container {container_name} does not exist. Skipping removal."
+            )
 
         # Create volume and configure mounting
         volume_name = self.create_volume_for_marqo_version(version, volume_name)
@@ -185,7 +208,9 @@ class DockerManager:
 
         # Start the container
         try:
-            self.logger.info(f"Starting container: {container_name} with image: {image_name}")
+            self.logger.info(
+                f"Starting container: {container_name} with image: {image_name}"
+            )
             container = self.docker_client.containers.run(
                 image=image_name,
                 name=container_name,
@@ -193,9 +218,9 @@ class DockerManager:
                 ports={"8882/tcp": 8882},
                 environment={
                     "MARQO_ENABLE_BATCH_APIS": "TRUE",
-                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6"
+                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6",
                 },
-                volumes={volume_name: {"bind": volume_mount_path, "mode": "rw"}}
+                volumes={volume_name: {"bind": volume_mount_path, "mode": "rw"}},
             )
             log_stream = container.logs(stream=True, follow=True)
             self.containers_to_cleanup.add(container_name)
@@ -221,7 +246,7 @@ class DockerManager:
                     break
                 time.sleep(0.5)
 
-            #Stop following logs after Marqo starts
+            # Stop following logs after Marqo starts
             self.logger.debug("Stopped following docker logs")
 
         except APIError as e:
@@ -229,7 +254,9 @@ class DockerManager:
                 f"Failed to start Docker container {container_name}, with version: {version}, and volume_name: {volume_name}"
             ) from e
 
-    def copy_state_from_container(self, from_version_volume: str, to_version_volume: str, image: str):
+    def copy_state_from_container(
+        self, from_version_volume: str, to_version_volume: str, image: str
+    ):
         """
         Copy the state from one Docker volume to another using a specified Docker image.
 
@@ -256,16 +283,22 @@ class DockerManager:
                 remove=True,  # Automatically remove the container after it exits
                 entrypoint="",  # Override the default entrypoint
                 volumes={
-                    from_version_volume: {'bind': '/opt/vespa_old', 'mode': 'rw'},
-                    to_version_volume: {'bind': '/opt/vespa/var', 'mode': 'rw'}
+                    from_version_volume: {"bind": "/opt/vespa_old", "mode": "rw"},
+                    to_version_volume: {"bind": "/opt/vespa/var", "mode": "rw"},
                 },
                 tty=True,  # Allocate a pseudo-TTY
             )
-            self.logger.info(f"Successfully copied state from {from_version_volume} to {to_version_volume}")
+            self.logger.info(
+                f"Successfully copied state from {from_version_volume} to {to_version_volume}"
+            )
 
         except (APIError, ContainerError) as e:
-            self.logger.error(f"Error during state copy from {from_version_volume} to {to_version_volume}: {e}")
-            raise RuntimeError(f"Failed to copy state from {from_version_volume} to {to_version_volume}.") from e
+            self.logger.error(
+                f"Error during state copy from {from_version_volume} to {to_version_volume}: {e}"
+            )
+            raise RuntimeError(
+                f"Failed to copy state from {from_version_volume} to {to_version_volume}."
+            ) from e
 
     def start_marqo_container_by_transferring_state(
         self,
@@ -273,7 +306,7 @@ class DockerManager:
         source_version: str,
         source_volume: str,
         target_version_image: str = None,
-        source: str = "docker"
+        source: str = "docker",
     ):
         """
         Start a Marqo container for the specified target_version, transferring state from the source_version container.
@@ -313,19 +346,35 @@ class DockerManager:
             container.remove(force=True)
             self.logger.debug(f"Removed existing container: {container_name}")
         except docker.errors.NotFound:
-            self.logger.warning(f"Container {container_name} does not exist, skipping removal.")
+            self.logger.warning(
+                f"Container {container_name} does not exist, skipping removal."
+            )
 
         # Prepare the volume mapping
         volumes = {}
-        if source_version_parsed >= self.marqo_transfer_state_version and target_version_parsed >= self.marqo_transfer_state_version:
-            volumes[source_volume] = {'bind': '/opt/vespa/var', 'mode': 'rw'}
-        elif source_version_parsed < self.marqo_transfer_state_version and target_version_parsed < self.marqo_transfer_state_version:
-            volumes[source_volume] = {'bind': '/opt/vespa', 'mode': 'rw'}
-        elif source_version_parsed < self.marqo_transfer_state_version <= target_version_parsed:
+        if (
+            source_version_parsed >= self.marqo_transfer_state_version
+            and target_version_parsed >= self.marqo_transfer_state_version
+        ):
+            volumes[source_volume] = {"bind": "/opt/vespa/var", "mode": "rw"}
+        elif (
+            source_version_parsed < self.marqo_transfer_state_version
+            and target_version_parsed < self.marqo_transfer_state_version
+        ):
+            volumes[source_volume] = {"bind": "/opt/vespa", "mode": "rw"}
+        elif (
+            source_version_parsed
+            < self.marqo_transfer_state_version
+            <= target_version_parsed
+        ):
             # Handle state transfer for versions < 2.9 to >= 2.9
-            target_version_volume = self.create_volume_for_marqo_version(str(target_version))
-            self.copy_state_from_container(source_volume, target_version_volume, image_name)
-            volumes[target_version_volume] = {'bind': '/opt/vespa/var', 'mode': 'rw'}
+            target_version_volume = self.create_volume_for_marqo_version(
+                str(target_version)
+            )
+            self.copy_state_from_container(
+                source_volume, target_version_volume, image_name
+            )
+            volumes[target_version_volume] = {"bind": "/opt/vespa/var", "mode": "rw"}
 
         # Start the container
         self.logger.info(f"Starting container {container_name} with volumes: {volumes}")
@@ -337,9 +386,9 @@ class DockerManager:
                 detach=True,
                 environment={
                     "MARQO_ENABLE_BATCH_APIS": "TRUE",
-                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6"
+                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6",
                 },
-                volumes=volumes
+                volumes=volumes,
             )
             self.containers_to_cleanup.add(container_name)
             self.logger.info(f"Container {container_name} started successfully.")
@@ -365,7 +414,7 @@ class DockerManager:
                     break
                 time.sleep(0.5)
 
-            #Stop following logs after Marqo starts
+            # Stop following logs after Marqo starts
             self.logger.debug("Stopped following docker logs")
 
         except docker.errors.APIError as e:
@@ -387,17 +436,20 @@ class DockerManager:
         container_name = f"marqo-{version}"
         self.logger.info(f"Stopping container with container name {container_name}")
 
-
         try:
             # Get the container by name
             container = self.docker_client.containers.get(container_name)
 
             # Stop the container
-            container.stop(timeout=60)  # Increase the timeout from default 10 seconds to 60 seconds
+            container.stop(
+                timeout=60
+            )  # Increase the timeout from default 10 seconds to 60 seconds
             self.logger.debug(f"Successfully stopped container {container_name}")
 
         except NotFound:
-            self.logger.warning(f"Warning: Container {container_name} not found. It may not be running.")
+            self.logger.warning(
+                f"Warning: Container {container_name} not found. It may not be running."
+            )
         except APIError as e:
             raise RuntimeError(f"Failed to stop container {container_name}") from e
 
@@ -419,9 +471,13 @@ class DockerManager:
                 self.logger.debug(f"Successfully removed container {container_name}")
                 self.containers_to_cleanup.remove(container_name)
             except NotFound:
-                self.logger.warning(f"Warning: Container {container_name} not found. It may already have been removed.")
+                self.logger.warning(
+                    f"Warning: Container {container_name} not found. It may already have been removed."
+                )
             except APIError as e:
-                self.logger.warning(f"Warning: Failed to remove container {container_name}: {e}")
+                self.logger.warning(
+                    f"Warning: Failed to remove container {container_name}: {e}"
+                )
 
         # Clear any remaining entries in the cleanup set
         self.containers_to_cleanup.clear()
@@ -444,15 +500,24 @@ class DockerManager:
                 self.logger.info(f"Successfully removed volume {volume_name}")
                 self.volumes_to_cleanup.remove(volume_name)
             except NotFound:
-                self.logger.warning(f"Warning: Volume {volume_name} not found. It may already have been removed.")
+                self.logger.warning(
+                    f"Warning: Volume {volume_name} not found. It may already have been removed."
+                )
             except APIError as e:
-                self.logger.warning(f"Warning: Failed to remove volume {volume_name}: {e}")
+                self.logger.warning(
+                    f"Warning: Failed to remove volume {volume_name}: {e}"
+                )
 
         # Clear any remaining entries in the cleanup set
         self.volumes_to_cleanup.clear()
 
-    def prepare_volume_for_rollback(self, target_version: str, source_volume: str, target_version_image_name: str = None,
-                                    source="docker"):
+    def prepare_volume_for_rollback(
+        self,
+        target_version: str,
+        source_volume: str,
+        target_version_image_name: str = None,
+        source="docker",
+    ):
         """
         Adjust the permissions of files or directories inside a Docker volume to be accessible
         by the specific user (vespa) and group (vespa) that the container expects to interact with.
@@ -464,14 +529,14 @@ class DockerManager:
             source (str): The source to pull the image from ('docker' for Docker Hub or 'ECR').
         """
         self.logger.info(
-            f"Preparing volume for rollback with target_version: {target_version}, source_volume: {source_volume}, target_version_image_name: {target_version_image_name}, source: {source}")
+            f"Preparing volume for rollback with target_version: {target_version}, source_volume: {source_volume}, target_version_image_name: {target_version_image_name}, source: {source}"
+        )
 
         # Determine the image to use
         if source == "docker":
             image_name = f"marqoai/marqo:{target_version}"
         else:
             image_name = target_version_image_name
-
 
         try:
             # Pull the image if not already available locally
@@ -480,19 +545,28 @@ class DockerManager:
             self.logger.debug(f"Image {image_name} pulled successfully.")
 
             # Run a container with the provided image and the required command
-            self.logger.info(f"Starting container to adjust permissions on volume {source_volume}...")
+            self.logger.info(
+                f"Starting container to adjust permissions on volume {source_volume}..."
+            )
             container = self.docker_client.containers.run(
                 image=image_name,
                 name=f"prepare-rollback-{target_version}",
-                command=["/bin/sh", "-c", "chown -R vespa:vespa /opt/vespa/var"],  # Using verified shell path
-                volumes={source_volume: {'bind': '/opt/vespa/var', 'mode': 'rw'}},
+                command=[
+                    "/bin/sh",
+                    "-c",
+                    "chown -R vespa:vespa /opt/vespa/var",
+                ],  # Using verified shell path
+                volumes={source_volume: {"bind": "/opt/vespa/var", "mode": "rw"}},
                 remove=True,
-                detach=False
+                detach=False,
             )
-            self.logger.info(f"Volume {source_volume} prepared successfully for rollback.")
+            self.logger.info(
+                f"Volume {source_volume} prepared successfully for rollback."
+            )
         except APIError as e:
             raise RuntimeError(
-                f"Failed to prepare volume {source_volume} for rollback using image {image_name}: {e}") from e
+                f"Failed to prepare volume {source_volume} for rollback using image {image_name}: {e}"
+            ) from e
 
     def _check_image_exists_on_dockerhub(self, image_name: str) -> bool:
         """Check if a Docker image exists on DockerHub."""
@@ -500,12 +574,13 @@ class DockerManager:
             namespace, repo_tag = image_name.split("/")
             repo, tag = repo_tag.split(":")
         except ValueError:
-            raise ValueError(f"Invalid image name format: {image_name}. Expected format: namespace/repo:tag")
+            raise ValueError(
+                f"Invalid image name format: {image_name}. Expected format: namespace/repo:tag"
+            )
 
         url = f"https://hub.docker.com/v2/repositories/{namespace}/{repo}/tags/{tag}"
         response = requests.get(url)
         return response.status_code == 200
-
 
     def pull_image_from_dockerhub(self, image_name: str):
         """
@@ -525,14 +600,20 @@ class DockerManager:
             image_name + "-cloud",
         ]
 
-        available_variants = [v for v in variants if self._check_image_exists_on_dockerhub(v)]
-            
+        available_variants = [
+            v for v in variants if self._check_image_exists_on_dockerhub(v)
+        ]
+
         if not available_variants:
-            raise RuntimeError(f"Image {image_name} and its variants = {variants} do not exist on DockerHub.")
+            raise RuntimeError(
+                f"Image {image_name} and its variants = {variants} do not exist on DockerHub."
+            )
 
         if len(available_variants) > 1:
-            self.logger.warning(f"Multiple variants exist on DockerHub: {available_variants}. We will use the first one "
-                                f"{available_variants[0]}.")
+            self.logger.warning(
+                f"Multiple variants exist on DockerHub: {available_variants}. We will use the first one "
+                f"{available_variants[0]}."
+            )
 
         target_image = available_variants[0]
         try:
@@ -542,5 +623,5 @@ class DockerManager:
             image = self.docker_client.images.get(target_image)
             # Retag to base image name
             image.tag(image_name.split(":")[0], image_name.split(":")[1])
-        except APIError as e:
+        except APIError:
             raise RuntimeError(f"Failed to pull image {target_image} from DockerHub.")

@@ -1,4 +1,5 @@
 """Functions used to fulfill the add_documents endpoint"""
+
 import logging
 import math
 import threading
@@ -6,24 +7,31 @@ from concurrent.futures import ThreadPoolExecutor
 
 import PIL
 
-from marqo.inference.media_download_and_preprocess.image_download import load_image_from_path
-from marqo.inference.media_download_and_preprocess.streaming_media_processor import StreamingMediaProcessor
+from marqo.inference.media_download_and_preprocess.image_download import (
+    load_image_from_path,
+)
+from marqo.inference.media_download_and_preprocess.streaming_media_processor import (
+    StreamingMediaProcessor,
+)
 from marqo.inference.type import *
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
 
 logger = logging.getLogger(__name__)
 
 
 def threaded_download_and_preprocess_content(
-        allocated_content: list[str],
-        preprocessor,
-        preprocessing_config: Union[ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig],
-        metric_obj: Optional[RequestMetrics] = None,
-        return_individual_error: bool = True,
+    allocated_content: list[str],
+    preprocessor,
+    preprocessing_config: Union[
+        ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig
+    ],
+    metric_obj: Optional[RequestMetrics] = None,
+    return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
-    """
+    (
+        """
     A thread calls this function to download media(images, audio, video) for its allocated contents.
     
     Args:
@@ -36,9 +44,11 @@ def threaded_download_and_preprocess_content(
             otherwise, they are raised.
     Returns:
         A list of preprocessed content.
-    """"""
+    """
+        """
 
     """
+    )
 
     modality = preprocessing_config.modality
 
@@ -48,7 +58,7 @@ def threaded_download_and_preprocess_content(
             preprocessor,
             preprocessing_config,
             metric_obj,
-            return_individual_error
+            return_individual_error,
         )
     elif modality in [Modality.AUDIO, Modality.VIDEO]:
         return _threaded_download_and_preprocess_audio_and_video(
@@ -56,18 +66,18 @@ def threaded_download_and_preprocess_content(
             preprocessor,
             preprocessing_config,
             metric_obj,
-            return_individual_error
+            return_individual_error,
         )
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
 
 def _threaded_download_and_preprocess_image(
-        allocated_content: list[str],
-        preprocessor,
-        preprocessing_config: ImagePreprocessingConfig,
-        metric_obj: Optional[RequestMetrics] = None,
-        return_individual_error: bool = True,
+    allocated_content: list[str],
+    preprocessor,
+    preprocessing_config: ImagePreprocessingConfig,
+    metric_obj: Optional[RequestMetrics] = None,
+    return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download images for its allocated contents.
 
@@ -81,14 +91,16 @@ def _threaded_download_and_preprocess_image(
 
     Ret
     """
-    _id = f'media_download.{preprocessing_config.modality}.{threading.get_ident()}'
+    _id = f"media_download.{preprocessing_config.modality}.{threading.get_ident()}"
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
             try:
                 image = load_image_from_path(
-                    url, preprocessing_config.download_header, timeout_ms=preprocessing_config.download_timeout_ms,
-                    metrics_obj=metric_obj
+                    url,
+                    preprocessing_config.download_header,
+                    timeout_ms=preprocessing_config.download_timeout_ms,
+                    metrics_obj=metric_obj,
                 )
             except PIL.UnidentifiedImageError as e:
                 metric_obj.increment_counter(f"{url}.UnidentifiedImageError")
@@ -99,11 +111,17 @@ def _threaded_download_and_preprocess_image(
                 continue
             if isinstance(image, Image):
                 try:
-                    preprocessed_image: List[Tensor] = preprocessor.preprocess([image], preprocessing_config.modality)
+                    preprocessed_image: List[Tensor] = preprocessor.preprocess(
+                        [image], preprocessing_config.modality
+                    )
                 except OSError as e:
                     if "image file is truncated" in str(e):
                         if return_individual_error:
-                            thread_results.append(InferenceErrorModel(error_message=f"Image file is truncated: {url}"))
+                            thread_results.append(
+                                InferenceErrorModel(
+                                    error_message=f"Image file is truncated: {url}"
+                                )
+                            )
                         else:
                             raise PreprocessingError(f"Image file is truncated: {url}")
                         continue
@@ -112,19 +130,25 @@ def _threaded_download_and_preprocess_image(
                 thread_results.append([(url, preprocessed_image[0])])
             else:
                 if return_individual_error:
-                    thread_results.append(InferenceErrorModel(error_message=f"Unexpected image type: {type(image)} "
-                                                                            f"for image: {url}"))
+                    thread_results.append(
+                        InferenceErrorModel(
+                            error_message=f"Unexpected image type: {type(image)} "
+                            f"for image: {url}"
+                        )
+                    )
                 else:
-                    raise ValueError(f"Unexpected image type: {type(image)} for image: {url}")
+                    raise ValueError(
+                        f"Unexpected image type: {type(image)} for image: {url}"
+                    )
     return thread_results
 
 
 def _threaded_download_and_preprocess_audio_and_video(
-        allocated_content: list[str],
-        preprocessor,
-        preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
-        metric_obj: Optional[RequestMetrics] = None,
-        return_individual_error: bool = True,
+    allocated_content: list[str],
+    preprocessor,
+    preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
+    metric_obj: Optional[RequestMetrics] = None,
+    return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
     """A thread calls this function to download audio and video for its allocated contents.
 
@@ -143,16 +167,16 @@ def _threaded_download_and_preprocess_audio_and_video(
         return_individual_error is False.
         RuntimeError: If the number of results does not match the number of allocated content.
     """
-    _id = f'media_download.{preprocessing_config.modality}.{threading.get_ident()}'
+    _id = f"media_download.{preprocessing_config.modality}.{threading.get_ident()}"
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
             try:
-                media_downloader= StreamingMediaProcessor(
-                    url = url,
-                    preprocessors = preprocessor,
-                    preprocessing_config = preprocessing_config,
-                    enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
+                media_downloader = StreamingMediaProcessor(
+                    url=url,
+                    preprocessors=preprocessor,
+                    preprocessing_config=preprocessing_config,
+                    enable_video_gpu_acceleration=_enable_video_gpu_acceleration(),
                 )
                 results: list[Tuple[str, Tensor]] = media_downloader.process_media()
                 thread_results.append(results)
@@ -176,39 +200,48 @@ def _enable_video_gpu_acceleration() -> bool:
 
     The environment variable MARQO_ENABLE_VIDEO_GPU_ACCELERATION is set on marqo start_on script.
     """
-    return utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
+    return (
+        utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION)
+        == "TRUE"
+    )
 
 
 def process_batch(
-        content: list[str],
-        preprocessor,
-        preprocessing_config: Union[ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig],
-        return_individual_error: bool = True
+    content: list[str],
+    preprocessor,
+    preprocessing_config: Union[
+        ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig
+    ],
+    return_individual_error: bool = True,
 ) -> list[PreprocessedContent]:
-
     results: list[PreprocessedContent] = []
 
     thread_count = preprocessing_config.download_thread_count
 
     content_per_thread = math.ceil(len(content) / thread_count)
     m = [RequestMetrics() for _ in range(thread_count)]
-    thread_allocated_docs = [content[i: i + content_per_thread] for i in range(0, len(content), content_per_thread)]
+    thread_allocated_docs = [
+        content[i : i + content_per_thread]
+        for i in range(0, len(content), content_per_thread)
+    ]
 
     # Using the map function to ensure the results are in the same order as the input
     with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-        results_nested = list(executor.map(
-            lambda args: threaded_download_and_preprocess_content(*args),
-            [
-                (
-                    allocation,
-                    preprocessor,
-                    preprocessing_config,
-                    m[i],
-                    return_individual_error
-                )
-                for i, allocation in enumerate(thread_allocated_docs)
-            ]
-        ))
+        results_nested = list(
+            executor.map(
+                lambda args: threaded_download_and_preprocess_content(*args),
+                [
+                    (
+                        allocation,
+                        preprocessor,
+                        preprocessing_config,
+                        m[i],
+                        return_individual_error,
+                    )
+                    for i, allocation in enumerate(thread_allocated_docs)
+                ],
+            )
+        )
 
     for partial_result in results_nested:
         results.extend(partial_result)
@@ -244,10 +277,10 @@ def reduce_thread_metrics(data):
     result = {}
     for key, value in data.items():
         if key.startswith("media_download."):
-            parts = key.split('.')
+            parts = key.split(".")
             if len(parts) < 4:
                 continue
-            new_key = '.'.join(parts[0:2] + parts[3:])
+            new_key = ".".join(parts[0:2] + parts[3:])
             if new_key in result:
                 if isinstance(result[new_key], list):
                     result[new_key].append(value)

@@ -25,7 +25,9 @@ def get_image_transform(config):
             transforms.ToTensor(),
             transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.CenterCrop(224),
-            transforms.Normalize(OPENAI_DATASET_MEAN, OPENAI_DATASET_STD)  # assume image
+            transforms.Normalize(
+                OPENAI_DATASET_MEAN, OPENAI_DATASET_STD
+            ),  # assume image
         ]
     )
     return transform
@@ -44,7 +46,7 @@ def load_and_transform_image(image_path, transform):
 
 class LanguageBindImageProcessor(ProcessorMixin):
     attributes = []
-    tokenizer_class = ("LanguageBindImageTokenizer")
+    tokenizer_class = "LanguageBindImageTokenizer"
 
     def __init__(self, config, tokenizer=None, **kwargs):
         super().__init__(**kwargs)
@@ -53,17 +55,29 @@ class LanguageBindImageProcessor(ProcessorMixin):
         self.image_processor = load_and_transform_image
         self.tokenizer = tokenizer
 
-    def __call__(self, images=None, text=None, context_length=77, return_tensors=None, **kwargs):
+    def __call__(
+        self, images=None, text=None, context_length=77, return_tensors=None, **kwargs
+    ):
         if text is None and images is None:
-            raise ValueError("You have to specify either text or images. Both cannot be none.")
+            raise ValueError(
+                "You have to specify either text or images. Both cannot be none."
+            )
 
         if text is not None:
-            encoding = self.tokenizer(text, max_length=context_length, padding='max_length',
-                                      truncation=True, return_tensors=return_tensors, **kwargs)
+            encoding = self.tokenizer(
+                text,
+                max_length=context_length,
+                padding="max_length",
+                truncation=True,
+                return_tensors=return_tensors,
+                **kwargs,
+            )
 
         if images is not None:
             images = make_list_of_images(images)
-            image_features = [self.image_processor(image, self.transform) for image in images]
+            image_features = [
+                self.image_processor(image, self.transform) for image in images
+            ]
             image_features = torch.stack(image_features)
 
         if text is not None and images is not None:
@@ -79,11 +93,15 @@ class LanguageBindImageProcessor(ProcessorMixin):
         This method forwards all its arguments to CLIPTokenizerFast's [`~PreTrainedTokenizer.batch_decode`]. Please
         refer to the docstring of this method for more information.
         """
-        return self.tokenizer.batch_decode(*args, skip_special_tokens=skip_special_tokens, **kwargs)
+        return self.tokenizer.batch_decode(
+            *args, skip_special_tokens=skip_special_tokens, **kwargs
+        )
 
     def decode(self, skip_special_tokens=True, *args, **kwargs):
         """
         This method forwards all its arguments to CLIPTokenizerFast's [`~PreTrainedTokenizer.decode`]. Please refer to
         the docstring of this method for more information.
         """
-        return self.tokenizer.decode(*args, skip_special_tokens=skip_special_tokens, **kwargs)
+        return self.tokenizer.decode(
+            *args, skip_special_tokens=skip_special_tokens, **kwargs
+        )

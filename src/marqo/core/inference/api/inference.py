@@ -1,43 +1,50 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from numpy import ndarray
-from pydantic.v1 import StrictStr, root_validator, Field
+from pydantic.v1 import Field, StrictStr, root_validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType
+
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class ModelConfig(ImmutableBaseModel):
-    model_name: StrictStr = Field(alias='modelName')
-    model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
-    model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
-    normalize_embeddings: bool = Field(default=True, alias='normalizeEmbeddings')
+    model_name: StrictStr = Field(alias="modelName")
+    model_properties: Optional[Dict[str, Any]] = Field(
+        default=None, alias="modelProperties"
+    )
+    model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
+    normalize_embeddings: bool = Field(default=True, alias="normalizeEmbeddings")
 
 
 class InferenceRequest(ImmutableBaseModel):
     modality: Modality
     contents: List[str] = Field(min_items=1)
     device: Optional[str] = Field(default=None)
-    model_config: ModelConfig = Field(alias='modelConfig')
-    preprocessing_config: PreprocessingConfigType = Field(alias='preprocessingConfig')
-    use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
+    model_config: ModelConfig = Field(alias="modelConfig")
+    preprocessing_config: PreprocessingConfigType = Field(alias="preprocessingConfig")
+    use_inference_cache: bool = Field(default=False, alias="useInferenceCache")
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
-    return_individual_error: bool = Field(default=True, alias='returnIndividualError')
+    return_individual_error: bool = Field(default=True, alias="returnIndividualError")
 
     @root_validator(pre=False)
     def check_preprocessing_config_matches_modality(cls, values):
-        modality: Modality = values.get('modality')
-        preprocessing_config: PreprocessingConfigType = values.get('preprocessing_config')
+        modality: Modality = values.get("modality")
+        preprocessing_config: PreprocessingConfigType = values.get(
+            "preprocessing_config"
+        )
 
         if not modality or not preprocessing_config:
             raise ValueError("Modality or preprocessing_config is missing")
 
         if modality.value != preprocessing_config.modality:
-            raise ValueError(f"preprocessing config of type {type(preprocessing_config)} "
-                             f"does not support modality: {modality}")
+            raise ValueError(
+                f"preprocessing config of type {type(preprocessing_config)} "
+                f"does not support modality: {modality}"
+            )
 
         return values
 
@@ -46,8 +53,9 @@ class InferenceErrorModel(ImmutableBaseModel):
     """
     A model class to store error information for each individual content
     """
+
     status_code: int = Field(default=400)
-    error_code: str = Field(default='inference_error')
+    error_code: str = Field(default="inference_error")
     error_message: str
 
 
@@ -59,7 +67,6 @@ class InferenceResult(ImmutableBaseModel):
 
 
 class Inference(ABC):
-
     @abstractmethod
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         """

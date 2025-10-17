@@ -4,7 +4,7 @@ from typing import Optional
 
 class CaseInsensitiveEnum(Enum):
     @classmethod
-    def _missing_(cls, value: str) -> Optional['CaseInsensitiveEnum']:
+    def _missing_(cls, value: str) -> Optional["CaseInsensitiveEnum"]:
         value = value.lower()
         for member in cls:
             if member.value.lower() == value:

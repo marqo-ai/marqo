@@ -3,8 +3,10 @@ from typing import List, Optional
 from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
-from marqo.core.models.marqo_add_documents_response import BatchResponseStats
-from marqo.core.models.marqo_add_documents_response import MarqoBaseDocumentsResponse
+from marqo.core.models.marqo_add_documents_response import (
+    BatchResponseStats,
+    MarqoBaseDocumentsResponse,
+)
 
 
 class MarqoUpdateDocumentsItem(MarqoBaseModel):
@@ -36,5 +38,5 @@ class MarqoUpdateDocumentsResponse(MarqoBaseDocumentsResponse):
                 else:
                     raise ValueError(f"Unexpected status code: {item.status}")
 
-        values['_batch_response_stats'] = batch_response_count
+        values["_batch_response_stats"] = batch_response_count
         return values

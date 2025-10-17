@@ -1,39 +1,25 @@
-import time
-import math
-import pprint
-from unittest import mock
-from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
-from marqo.api.exceptions import (
-    MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
-    InvalidFieldNameError, IllegalRequestedDocCount
-)
-from marqo.tensor_search import tensor_search, constants, index_meta_cache
-from marqo.tensor_search.throttling.redis_throttle import throttle
-
-import copy
+from marqo.api.exceptions import IndexNotFoundError
+from marqo.tensor_search import tensor_search
 from tests.integ_tests.marqo_test import MarqoTestCase
-import requests
-import random
+
 
 class TestThrottling(MarqoTestCase):
-
     def setUp(self) -> None:
         self.endpoint = self.authorized_url
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
+        except IndexNotFoundError:
             pass
 
     def tearDown(self) -> None:
         self.index_name_1 = "my-test-index-1"
         try:
             tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-        except IndexNotFoundError as s:
+        except IndexNotFoundError:
             pass
-    
-    
+
     # TODO: Fix this unit test and add more.
     """
     def test_throttle_decrement_on_error(self):

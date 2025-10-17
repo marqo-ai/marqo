@@ -1,15 +1,13 @@
 import uuid
 
-from marqo.client import Client
 from marqo.enums import InterpolationMethod
 from marqo.errors import MarqoWebError
-
 from tests.marqo_test import MarqoTestCase
 
 
 class TestRecommend(MarqoTestCase):
-    structured_index_name = "structured_index" + str(uuid.uuid4()).replace('-', '')
-    unstructured_index_name = "unstructured_index" + str(uuid.uuid4()).replace('-', '')
+    structured_index_name = "structured_index" + str(uuid.uuid4()).replace("-", "")
+    unstructured_index_name = "unstructured_index" + str(uuid.uuid4()).replace("-", "")
 
     @classmethod
     def setUpClass(cls):
@@ -21,10 +19,22 @@ class TestRecommend(MarqoTestCase):
                     "type": "structured",
                     "model": "hf/all-MiniLM-L6-v2",
                     "allFields": [
-                        {"name": "title", "type": "text", "features": ["filter", "lexical_search"]},
-                        {"name": "content", "type": "text", "features": ["filter", "lexical_search"]},
+                        {
+                            "name": "title",
+                            "type": "text",
+                            "features": ["filter", "lexical_search"],
+                        },
+                        {
+                            "name": "content",
+                            "type": "text",
+                            "features": ["filter", "lexical_search"],
+                        },
                         {"name": "tags", "type": "array<text>", "features": ["filter"]},
-                        {"name": "int_filter_field_1", "type": "int", "features": ["filter", "score_modifier"]}
+                        {
+                            "name": "int_filter_field_1",
+                            "type": "int",
+                            "features": ["filter", "score_modifier"],
+                        },
                     ],
                     "tensorFields": ["title", "content"],
                 },
@@ -32,7 +42,7 @@ class TestRecommend(MarqoTestCase):
                     "indexName": cls.unstructured_index_name,
                     "type": "unstructured",
                     "model": "hf/all-MiniLM-L6-v2",
-                }
+                },
             ]
         )
 
@@ -62,15 +72,17 @@ class TestRecommend(MarqoTestCase):
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["title"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
-                res = self.client.index(index_name).recommend(
-                    documents=['1', '2']
-                )
+                res = self.client.index(index_name).recommend(documents=["1", "2"])
 
                 ids = [doc["_id"] for doc in res["hits"]]
                 self.assertEqual(set(ids), {"3"})
@@ -85,29 +97,29 @@ class TestRecommend(MarqoTestCase):
                 "title": "Red orchid",
                 "content": "flower",
             },
-            {
-                "_id": "2",
-                "title": "Red rose",
-                "content": "flower"
-            },
+            {"_id": "2", "title": "Red rose", "content": "flower"},
             {
                 "_id": "3",
                 "title": "Europe",
                 "content": "continent",
-            }
+            },
         ]
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
+                tensor_fields = (
+                    ["title"] if index_name == self.unstructured_index_name else None
+                )
                 searchable_attributes = ["title"]
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
                 res = self.client.index(index_name).recommend(
-                    documents=['1', '2'],
+                    documents=["1", "2"],
                     tensor_fields=["title"],
                     interpolation_method=InterpolationMethod.SLERP,
                     exclude_input_documents=True,
@@ -117,17 +129,13 @@ class TestRecommend(MarqoTestCase):
                     approximate=True,
                     searchable_attributes=searchable_attributes,
                     show_highlights=True,
-                    filter_string='content:(continent)',
+                    filter_string="content:(continent)",
                     attributes_to_retrieve=["title"],
                     score_modifiers={
-                        "multiply_score_by":
-                            [
-                                {
-                                    "field_name": "int_filter_field_1",
-                                    "weight": 1
-                                }
-                            ]
-                    }
+                        "multiply_score_by": [
+                            {"field_name": "int_filter_field_1", "weight": 1}
+                        ]
+                    },
                 )
                 ids = [doc["_id"] for doc in res["hits"]]
                 self.assertEqual(set(ids), {"3"})
@@ -142,12 +150,7 @@ class TestRecommend(MarqoTestCase):
                 "title": "Red orchid",
                 "tags": ["flower", "orchid"],
             },
-            {
-                "_id": "2",
-                "title": "Red rose",
-                "tags": ["flower"],
-                "content": "test"
-            },
+            {"_id": "2", "title": "Red rose", "tags": ["flower"], "content": "test"},
             {
                 "_id": "3",
                 "title": "Europe",
@@ -157,15 +160,19 @@ class TestRecommend(MarqoTestCase):
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["content"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
                 with self.assertRaises(MarqoWebError) as e:
                     self.client.index(index_name).recommend(
-                        documents=['1', '2', '3'], tensor_fields=["content"]
+                        documents=["1", "2", "3"], tensor_fields=["content"]
                     )
                 self.assertIn("1, 3", str(e.exception))
 
@@ -177,12 +184,7 @@ class TestRecommend(MarqoTestCase):
                 "title": "Red orchid",
                 "tags": ["flower", "orchid"],
             },
-            {
-                "_id": "2",
-                "title": "Red rose",
-                "tags": ["flower"],
-                "content": "test"
-            },
+            {"_id": "2", "title": "Red rose", "tags": ["flower"], "content": "test"},
             {
                 "_id": "3",
                 "title": "Europe",
@@ -197,31 +199,72 @@ class TestRecommend(MarqoTestCase):
 
         with self.assertRaises(MarqoWebError) as e:
             self.client.index(index_name).recommend(
-                documents=['1', '2', '3'], tensor_fields=["void"]
+                documents=["1", "2", "3"], tensor_fields=["void"]
             )
         self.assertIn("Available tensor fields: title, content", str(e.exception))
 
     def test_recommender_rerankDepth(self):
         """Test that rerank_depth affects hit count and handles edge cases based on expected behavior."""
         docs = [
-            {"_id": "doc_0", "title": "Project Overview",
-             "content": "Summary of the project's goals and deliverables."},
-            {"_id": "doc_1", "title": "Team Roles", "content": "Descriptions of each team member's responsibilities."},
-            {"_id": "doc_2", "title": "Timeline", "content": "Key milestones and deadlines for the project."},
-            {"_id": "doc_3", "title": "Budget Estimate", "content": "Projected costs and resource allocation."},
-            {"_id": "doc_4", "title": "Tech Stack", "content": "Overview of technologies and tools being used."},
-            {"_id": "doc_5", "title": "Risk Assessment", "content": "Potential risks and mitigation strategies."},
-            {"_id": "doc_6", "title": "Client Feedback", "content": "Summary of feedback received from stakeholders."},
-            {"_id": "doc_7", "title": "Testing Plan", "content": "Details on testing strategies and coverage."},
-            {"_id": "doc_8", "title": "Deployment Guide",
-             "content": "Steps and procedures for deploying the application."},
-            {"_id": "doc_9", "title": "Post-Mortem",
-             "content": "Analysis of what went well and areas for improvement."},
+            {
+                "_id": "doc_0",
+                "title": "Project Overview",
+                "content": "Summary of the project's goals and deliverables.",
+            },
+            {
+                "_id": "doc_1",
+                "title": "Team Roles",
+                "content": "Descriptions of each team member's responsibilities.",
+            },
+            {
+                "_id": "doc_2",
+                "title": "Timeline",
+                "content": "Key milestones and deadlines for the project.",
+            },
+            {
+                "_id": "doc_3",
+                "title": "Budget Estimate",
+                "content": "Projected costs and resource allocation.",
+            },
+            {
+                "_id": "doc_4",
+                "title": "Tech Stack",
+                "content": "Overview of technologies and tools being used.",
+            },
+            {
+                "_id": "doc_5",
+                "title": "Risk Assessment",
+                "content": "Potential risks and mitigation strategies.",
+            },
+            {
+                "_id": "doc_6",
+                "title": "Client Feedback",
+                "content": "Summary of feedback received from stakeholders.",
+            },
+            {
+                "_id": "doc_7",
+                "title": "Testing Plan",
+                "content": "Details on testing strategies and coverage.",
+            },
+            {
+                "_id": "doc_8",
+                "title": "Deployment Guide",
+                "content": "Steps and procedures for deploying the application.",
+            },
+            {
+                "_id": "doc_9",
+                "title": "Post-Mortem",
+                "content": "Analysis of what went well and areas for improvement.",
+            },
         ]
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name=index_name):
-                tensor_fields = ["title", "content"] if index_name == self.unstructured_index_name else None
+                tensor_fields = (
+                    ["title", "content"]
+                    if index_name == self.unstructured_index_name
+                    else None
+                )
                 searchable_attributes = ["title"]
 
                 add_docs_results = self.client.index(index_name).add_documents(
@@ -261,8 +304,12 @@ class TestRecommend(MarqoTestCase):
                 # Case 5: ef_search < rerank_depth → ef_search limits rerank pool
                 with self.subTest(case="ef_search_limits_rerank_pool"):
                     res = self.client.index(index_name).recommend(
-                        documents=["doc_0", "doc_1"], limit=10, offset=0, rerank_depth=5, ef_search=3,
-                        searchable_attributes=['title']
+                        documents=["doc_0", "doc_1"],
+                        limit=10,
+                        offset=0,
+                        rerank_depth=5,
+                        ef_search=3,
+                        searchable_attributes=["title"],
                     )
                     self.assertLessEqual(len(res["hits"]), 3)
 
@@ -270,7 +317,10 @@ class TestRecommend(MarqoTestCase):
                 with self.subTest(case="invalid_negative_rerank_depth"):
                     with self.assertRaises(MarqoWebError):
                         self.client.index(index_name).recommend(
-                            documents=["doc_0", "doc_1"], limit=10, offset=0, rerank_depth=-1
+                            documents=["doc_0", "doc_1"],
+                            limit=10,
+                            offset=0,
+                            rerank_depth=-1,
                         )
 
     def test_recommend_allow_missing_documents_true(self):
@@ -282,7 +332,7 @@ class TestRecommend(MarqoTestCase):
                 "tags": ["flower", "orchid"],
             },
             {
-                "_id": "2", 
+                "_id": "2",
                 "title": "Red rose",
                 "tags": ["flower"],
             },
@@ -295,18 +345,21 @@ class TestRecommend(MarqoTestCase):
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["title"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["title"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
                 # Should succeed even with missing document "missing_doc"
                 res = self.client.index(index_name).recommend(
-                    documents=['1', '2', 'missing_doc'],
-                    allow_missing_documents=True
+                    documents=["1", "2", "missing_doc"], allow_missing_documents=True
                 )
-                
+
                 # Should return results based on available documents
                 ids = [doc["_id"] for doc in res["hits"]]
                 self.assertEqual(set(ids), {"3"})
@@ -319,12 +372,7 @@ class TestRecommend(MarqoTestCase):
                 "title": "Red orchid",
                 "tags": ["flower", "orchid"],
             },
-            {
-                "_id": "2",
-                "title": "Red rose", 
-                "tags": ["flower"],
-                "content": "test"
-            },
+            {"_id": "2", "title": "Red rose", "tags": ["flower"], "content": "test"},
             {
                 "_id": "3",
                 "title": "Europe",
@@ -336,17 +384,21 @@ class TestRecommend(MarqoTestCase):
             with self.subTest(index_name):
                 # For structured: use content field but only doc 2 has content (docs 1,3 lack embeddings)
                 # For unstructured: use content field but only doc 2 has content
-                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["content"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
                 # Should succeed even when documents 1 and 3 lack embeddings for content field
                 res = self.client.index(index_name).recommend(
-                    documents=['1', '2', '3'],
+                    documents=["1", "2", "3"],
                     tensor_fields=["content"],
-                    allow_missing_embeddings=True
+                    allow_missing_embeddings=True,
                 )
 
     def test_recommend_allow_missing_both_true(self):
@@ -357,14 +409,9 @@ class TestRecommend(MarqoTestCase):
                 "title": "Red orchid",
                 "tags": ["flower", "orchid"],
             },
+            {"_id": "2", "title": "Red rose", "tags": ["flower"], "content": "test"},
             {
-                "_id": "2",
-                "title": "Red rose",
-                "tags": ["flower"],
-                "content": "test"
-            },
-            {
-                "_id": "3", 
+                "_id": "3",
                 "title": "Europe",
                 "tags": ["continent"],
             },
@@ -372,18 +419,22 @@ class TestRecommend(MarqoTestCase):
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["content"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
 
                 # Should succeed with both missing documents and missing embeddings
                 res = self.client.index(index_name).recommend(
-                    documents=['1', '2', '3', 'missing_doc'],
+                    documents=["1", "2", "3", "missing_doc"],
                     tensor_fields=["content"],
                     allow_missing_documents=True,
-                    allow_missing_embeddings=True
+                    allow_missing_embeddings=True,
                 )
 
     def test_recommend_failed_to_collect_vectors_error(self):
@@ -402,13 +453,17 @@ class TestRecommend(MarqoTestCase):
             {
                 "_id": "3",
                 "content": "test",
-            }
+            },
         ]
 
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                tensor_fields = ["content"] if index_name == self.unstructured_index_name else None
-                add_docs_results = self.client.index(index_name).add_documents(docs, tensor_fields=tensor_fields)
+                tensor_fields = (
+                    ["content"] if index_name == self.unstructured_index_name else None
+                )
+                add_docs_results = self.client.index(index_name).add_documents(
+                    docs, tensor_fields=tensor_fields
+                )
 
                 if add_docs_results["errors"]:
                     raise Exception(f"Failed to add documents to index {index_name}")
@@ -416,8 +471,13 @@ class TestRecommend(MarqoTestCase):
                 # Should fail when all documents lack embeddings and allow_missing_embeddings=True
                 with self.assertRaises(MarqoWebError) as e:
                     self.client.index(index_name).recommend(
-                        documents=['1', '2'],
-                        tensor_fields=["content"],  # Documents don't have content embeddings
-                        allow_missing_embeddings=True
+                        documents=["1", "2"],
+                        tensor_fields=[
+                            "content"
+                        ],  # Documents don't have content embeddings
+                        allow_missing_embeddings=True,
                     )
-                self.assertIn("Marqo could not collect any valid vector from the documents.", str(e.exception))
+                self.assertIn(
+                    "Marqo could not collect any valid vector from the documents.",
+                    str(e.exception),
+                )

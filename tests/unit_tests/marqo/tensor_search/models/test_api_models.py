@@ -1,30 +1,40 @@
 import unittest
+
 from pydantic.v1 import ValidationError
 
 from marqo.api import exceptions as api_exceptions
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.inference.api import Modality
+from marqo.core.models.facets_parameters import (
+    FacetsParameters,
+    FieldFacetsConfiguration,
+)
+from marqo.core.models.hybrid_parameters import (
+    HybridParameters,
+    RankingMethod,
+    RetrievalMethod,
+)
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery, SearchCollapseField
+from marqo.tensor_search.models.api_models import (
+    CustomVectorQuery,
+    SearchCollapseField,
+    SearchQuery,
+)
 from marqo.tensor_search.models.search import (
-    SearchContext, 
-    SearchContextTensor, 
+    QueryContent,
+    SearchContext,
     SearchContextDocuments,
     SearchContextDocumentsParameters,
-    QueryContent
+    SearchContextTensor,
 )
-from marqo.core.inference.api import Modality
 
 
 class TestSearchQuery(unittest.TestCase):
-
     def test_search_query_with_all_parameters(self):
         """Test SearchQuery creation with all parameters set to valid values."""
         custom_vector_query = CustomVectorQuery(
             customVector=CustomVectorQuery.CustomVector(
-                content="test content",
-                vector=[0.1, 0.2, 0.3, 0.4]
+                content="test content", vector=[0.1, 0.2, 0.3, 0.4]
             )
         )
 
@@ -32,13 +42,11 @@ class TestSearchQuery(unittest.TestCase):
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
             alpha=0.7,
-            rrfK=100
+            rrfK=100,
         )
 
         facets = FacetsParameters(
-            fields={
-                "category": FieldFacetsConfiguration(type="string", maxResults=10)
-            }
+            fields={"category": FieldFacetsConfiguration(type="string", maxResults=10)}
         )
 
         context = SearchContext(
@@ -66,7 +74,7 @@ class TestSearchQuery(unittest.TestCase):
             hybridParameters=hybrid_parameters,
             facets=facets,
             trackTotalHits=True,
-            language="en"
+            language="en",
         )
 
         # Verify key attributes
@@ -80,10 +88,7 @@ class TestSearchQuery(unittest.TestCase):
     def test_search_query_required_parameters_only(self):
         """Test SearchQuery with only required parameters."""
         # For tensor search, either q or context is required
-        search_query = SearchQuery(
-            q="test query",
-            searchMethod=SearchMethod.TENSOR
-        )
+        search_query = SearchQuery(q="test query", searchMethod=SearchMethod.TENSOR)
 
         # Verify defaults
         self.assertEqual(search_query.searchMethod, SearchMethod.TENSOR)
@@ -95,8 +100,7 @@ class TestSearchQuery(unittest.TestCase):
     def test_hybrid_parameters_validation(self):
         """Test that hybrid parameters are only allowed for hybrid search."""
         hybrid_parameters = HybridParameters(
-            retrievalMethod=RetrievalMethod.Disjunction,
-            rankingMethod=RankingMethod.RRF
+            retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF
         )
 
         # Should fail for tensor search
@@ -104,9 +108,12 @@ class TestSearchQuery(unittest.TestCase):
             SearchQuery(
                 q="test",
                 searchMethod=SearchMethod.TENSOR,
-                hybridParameters=hybrid_parameters
+                hybridParameters=hybrid_parameters,
             )
-        self.assertIn("Hybrid parameters can only be provided for 'HYBRID' search", str(cm.exception))
+        self.assertIn(
+            "Hybrid parameters can only be provided for 'HYBRID' search",
+            str(cm.exception),
+        )
 
     def test_facets_validation(self):
         """Test that facets are only allowed for hybrid search."""
@@ -116,35 +123,31 @@ class TestSearchQuery(unittest.TestCase):
 
         # Should fail for tensor search
         with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.TENSOR,
-                facets=facets
-            )
-        self.assertIn("Facets can only be provided for 'HYBRID' search", str(cm.exception))
+            SearchQuery(q="test", searchMethod=SearchMethod.TENSOR, facets=facets)
+        self.assertIn(
+            "Facets can only be provided for 'HYBRID' search", str(cm.exception)
+        )
 
     def test_track_total_hits_validation(self):
         """Test that trackTotalHits is only allowed for hybrid search."""
         # Should fail for tensor search
         with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.TENSOR,
-                trackTotalHits=True
-            )
-        self.assertIn("trackTotalHits can only be provided for 'HYBRID' search", str(cm.exception))
+            SearchQuery(q="test", searchMethod=SearchMethod.TENSOR, trackTotalHits=True)
+        self.assertIn(
+            "trackTotalHits can only be provided for 'HYBRID' search", str(cm.exception)
+        )
 
     def test_approximate_threshold_validation(self):
         """Test approximate threshold validation."""
         # Should fail for lexical search
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.LEXICAL,
-                approximateThreshold=0.5
+                q="test", searchMethod=SearchMethod.LEXICAL, approximateThreshold=0.5
             )
-        self.assertIn("'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods",
-                      str(cm.exception))
+        self.assertIn(
+            "'approximateThreshold' is only valid for 'HYBRID' and 'TENSOR' search methods",
+            str(cm.exception),
+        )
 
         # Should fail when approximate=False
         with self.assertRaises(ValidationError) as cm:
@@ -152,18 +155,21 @@ class TestSearchQuery(unittest.TestCase):
                 q="test",
                 searchMethod=SearchMethod.TENSOR,
                 approximate=False,
-                approximateThreshold=0.5
+                approximateThreshold=0.5,
             )
-        self.assertIn("'approximateThreshold' cannot be set when 'approximate' is False", str(cm.exception))
+        self.assertIn(
+            "'approximateThreshold' cannot be set when 'approximate' is False",
+            str(cm.exception),
+        )
 
         # Should fail for invalid range
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.TENSOR,
-                approximateThreshold=1.5
+                q="test", searchMethod=SearchMethod.TENSOR, approximateThreshold=1.5
             )
-        self.assertIn("'approximateThreshold' must be between 0 and 1", str(cm.exception))
+        self.assertIn(
+            "'approximateThreshold' must be between 0 and 1", str(cm.exception)
+        )
 
     def test_query_and_context_validation(self):
         """Test validation of query and context requirements."""
@@ -175,26 +181,24 @@ class TestSearchQuery(unittest.TestCase):
         # Tensor search requires either query or context
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(searchMethod=SearchMethod.TENSOR)
-        self.assertIn("One of Query(q) or context is required for TENSOR search", str(cm.exception))
+        self.assertIn(
+            "One of Query(q) or context is required for TENSOR search",
+            str(cm.exception),
+        )
 
     def test_rerank_depth_validation(self):
         """Test rerank depth validation."""
         # Should fail for lexical search
         with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.LEXICAL,
-                rerankDepth=10
-            )
-        self.assertIn("'rerankDepth' is currently not supported for 'LEXICAL' search method", str(cm.exception))
+            SearchQuery(q="test", searchMethod=SearchMethod.LEXICAL, rerankDepth=10)
+        self.assertIn(
+            "'rerankDepth' is currently not supported for 'LEXICAL' search method",
+            str(cm.exception),
+        )
 
         # Should fail for negative values
         with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test",
-                searchMethod=SearchMethod.TENSOR,
-                rerankDepth=-1
-            )
+            SearchQuery(q="test", searchMethod=SearchMethod.TENSOR, rerankDepth=-1)
         self.assertIn("rerankDepth cannot be negative", str(cm.exception))
 
     def test_image_download_headers_validation(self):
@@ -204,14 +208,13 @@ class TestSearchQuery(unittest.TestCase):
             SearchQuery(
                 q="test",
                 image_download_headers={"header1": "value1"},
-                mediaDownloadHeaders={"header2": "value2"}
+                mediaDownloadHeaders={"header2": "value2"},
             )
         self.assertIn("Cannot set both imageDownloadHeaders", str(cm.exception))
 
         # Should work when imageDownloadHeaders is set and mediaDownloadHeaders is copied
         search_query = SearchQuery(
-            q="test",
-            image_download_headers={"header1": "value1"}
+            q="test", image_download_headers={"header1": "value1"}
         )
         self.assertEqual(search_query.mediaDownloadHeaders, {"header1": "value1"})
 
@@ -219,7 +222,7 @@ class TestSearchQuery(unittest.TestCase):
         """Test that invalid search method raises validation error"""
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(q="test", searchMethod="INVALID_METHOD")
-        
+
         error_details = str(cm.exception)
         self.assertIn("value is not a valid enumeration member", error_details)
 
@@ -228,7 +231,7 @@ class TestSearchQuery(unittest.TestCase):
         # Valid interpolation method
         query = SearchQuery(q="test", interpolationMethod=InterpolationMethod.SLERP)
         self.assertEqual(query.interpolationMethod, InterpolationMethod.SLERP)
-        
+
         # None should be valid
         query = SearchQuery(q="test", interpolationMethod=None)
         self.assertIsNone(query.interpolationMethod)
@@ -238,9 +241,11 @@ class TestSearchQuery(unittest.TestCase):
         # Valid case - query with tensor search
         query = SearchQuery(q="test", searchMethod=SearchMethod.TENSOR)
         self.assertEqual(query.searchMethod, SearchMethod.TENSOR)
-        
+
         # Valid case - no query but with context for tensor search
-        context = SearchContext(tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)])
+        context = SearchContext(
+            tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)]
+        )
         query = SearchQuery(q=None, searchMethod=SearchMethod.TENSOR, context=context)
         self.assertIsNone(query.q)
         self.assertIsNotNone(query.context)
@@ -249,7 +254,7 @@ class TestSearchQuery(unittest.TestCase):
         """Test that lexical search requires query"""
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(q=None, searchMethod=SearchMethod.LEXICAL)
-        
+
         error_details = str(cm.exception)
         self.assertIn("Query(q) is required for lexical search", error_details)
 
@@ -258,7 +263,7 @@ class TestSearchQuery(unittest.TestCase):
         # Valid positive integer
         query = SearchQuery(q="test", efSearch=100)
         self.assertEqual(query.efSearch, 100)
-        
+
         # None should be valid
         query = SearchQuery(q="test", efSearch=None)
         self.assertIsNone(query.efSearch)
@@ -268,10 +273,10 @@ class TestSearchQuery(unittest.TestCase):
         # Valid boolean values
         query = SearchQuery(q="test", approximate=True)
         self.assertTrue(query.approximate)
-        
+
         query = SearchQuery(q="test", approximate=False)
         self.assertFalse(query.approximate)
-        
+
         # None should be valid
         query = SearchQuery(q="test", approximate=None)
         self.assertIsNone(query.approximate)
@@ -281,7 +286,7 @@ class TestSearchQuery(unittest.TestCase):
         # Default should be True
         query = SearchQuery(q="test")
         self.assertTrue(query.showHighlights)
-        
+
         # Can be set to False
         query = SearchQuery(q="test", showHighlights=False)
         self.assertFalse(query.showHighlights)
@@ -291,11 +296,11 @@ class TestSearchQuery(unittest.TestCase):
         # Valid list of strings
         query = SearchQuery(q="test", searchableAttributes=["field1", "field2"])
         self.assertEqual(query.searchableAttributes, ["field1", "field2"])
-        
+
         # None should be valid
         query = SearchQuery(q="test", searchableAttributes=None)
         self.assertIsNone(query.searchableAttributes)
-        
+
         # Empty list should be valid
         query = SearchQuery(q="test", searchableAttributes=[])
         self.assertEqual(query.searchableAttributes, [])
@@ -305,16 +310,18 @@ class TestSearchQuery(unittest.TestCase):
         # Valid list of strings
         query = SearchQuery(q="test", attributesToRetrieve=["field1", "field2"])
         self.assertEqual(query.attributesToRetrieve, ["field1", "field2"])
-        
+
         # None should be valid
         query = SearchQuery(q="test", attributesToRetrieve=None)
         self.assertIsNone(query.attributesToRetrieve)
 
     def test_search_query_with_valid_tensor_context_only(self):
         """Test SearchQuery with only tensor context (no query)"""
-        
-        context = SearchContext(tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)])
-        
+
+        context = SearchContext(
+            tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)]
+        )
+
         # Should be valid for tensor search
         query = SearchQuery(q=None, searchMethod=SearchMethod.TENSOR, context=context)
         self.assertIsNone(query.q)
@@ -322,10 +329,10 @@ class TestSearchQuery(unittest.TestCase):
 
     def test_search_query_with_valid_documents_context_only(self):
         """Test SearchQuery with only documents context (no query)"""
-        
+
         context_docs = SearchContextDocuments(ids={"doc1": 1.0})
         context = SearchContext(documents=context_docs)
-        
+
         # Should be valid for tensor search
         query = SearchQuery(q=None, searchMethod=SearchMethod.TENSOR, context=context)
         self.assertIsNone(query.q)
@@ -333,20 +340,20 @@ class TestSearchQuery(unittest.TestCase):
 
     def test_search_query_default_search_method(self):
         """Test SearchQuery default search method"""
-        
+
         query = SearchQuery(q="test")
         self.assertEqual(query.searchMethod, SearchMethod.TENSOR)
 
     def test_search_query_limit_and_offset_defaults(self):
         """Test SearchQuery default limit and offset values"""
-        
+
         query = SearchQuery(q="test")
         self.assertEqual(query.limit, 10)
         self.assertEqual(query.offset, 0)
 
     def test_search_query_show_highlights_default(self):
         """Test SearchQuery default showHighlights value"""
-        
+
         query = SearchQuery(q="test")
         self.assertTrue(query.showHighlights)
 
@@ -358,20 +365,20 @@ class TestSearchQuery(unittest.TestCase):
                 "search_method": SearchMethod.TENSOR,
                 "language": "en",
                 "should_fail": True,
-                "expected_error": "language parameter is not supported for TENSOR search method"
+                "expected_error": "language parameter is not supported for TENSOR search method",
             },
             {
                 "search_method": SearchMethod.LEXICAL,
                 "language": "fr",
                 "should_fail": False,
-                "expected_error": None
+                "expected_error": None,
             },
             {
                 "search_method": SearchMethod.HYBRID,
                 "language": "es",
                 "should_fail": False,
-                "expected_error": None
-            }
+                "expected_error": None,
+            },
         ]
 
         for case in test_cases:
@@ -381,15 +388,18 @@ class TestSearchQuery(unittest.TestCase):
                         SearchQuery(
                             q="test query",
                             searchMethod=case["search_method"],
-                            language=case["language"]
+                            language=case["language"],
                         )
                     self.assertIn(case["expected_error"], str(cm.exception))
-                    self.assertIn("Language specification only applies to lexical and hybrid search", str(cm.exception))
+                    self.assertIn(
+                        "Language specification only applies to lexical and hybrid search",
+                        str(cm.exception),
+                    )
                 else:
                     search_query = SearchQuery(
                         q="test query",
                         searchMethod=case["search_method"],
-                        language=case["language"]
+                        language=case["language"],
                     )
                     self.assertEqual(search_query.language, case["language"])
                     self.assertEqual(search_query.searchMethod, case["search_method"])
@@ -397,66 +407,58 @@ class TestSearchQuery(unittest.TestCase):
     def test_context_documents_with_lexical_search_fails(self):
         """Test that context.documents is not supported for lexical search"""
         context = SearchContext(
-            documents=SearchContextDocuments(
-                ids={"doc1": 1.0, "doc2": 0.5}
-            )
+            documents=SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
         )
-        
+
         # Should fail for lexical search
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
-                q="test query",
-                searchMethod=SearchMethod.LEXICAL,
-                context=context
+                q="test query", searchMethod=SearchMethod.LEXICAL, context=context
             )
         self.assertIn("Context is not supported for lexical search", str(cm.exception))
 
     def test_context_documents_lexical_lexical_hybrid_search_fails(self):
         """Test that context.documents is not supported for lexical/lexical hybrid search"""
         context = SearchContext(
-            documents=SearchContextDocuments(
-                ids={"doc1": 1.0, "doc2": 0.5}
-            )
+            documents=SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
         )
-        
+
         hybrid_params = HybridParameters(
-            retrievalMethod=RetrievalMethod.Lexical,
-            rankingMethod=RankingMethod.Lexical
+            retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Lexical
         )
-        
+
         # Should fail for lexical/lexical hybrid search
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
                 q="test query",
                 searchMethod=SearchMethod.HYBRID,
                 hybridParameters=hybrid_params,
-                context=context
+                context=context,
             )
-        self.assertIn("Context is not supported for lexical/lexical hybrid search", str(cm.exception))
+        self.assertIn(
+            "Context is not supported for lexical/lexical hybrid search",
+            str(cm.exception),
+        )
 
 
 class TestCustomVectorQuery(unittest.TestCase):
-
     def test_custom_vector_query_creation(self):
         """Test CustomVectorQuery creation."""
         custom_query = CustomVectorQuery(
             customVector=CustomVectorQuery.CustomVector(
-                content="test content",
-                vector=[0.1, 0.2, 0.3]
+                content="test content", vector=[0.1, 0.2, 0.3]
             )
         )
-        
+
         self.assertEqual(custom_query.customVector.content, "test content")
         self.assertEqual(custom_query.customVector.vector, [0.1, 0.2, 0.3])
 
     def test_custom_vector_query_without_content(self):
         """Test CustomVectorQuery without content."""
         custom_query = CustomVectorQuery(
-            customVector=CustomVectorQuery.CustomVector(
-                vector=[0.1, 0.2, 0.3]
-            )
+            customVector=CustomVectorQuery.CustomVector(vector=[0.1, 0.2, 0.3])
         )
-        
+
         self.assertIsNone(custom_query.customVector.content)
         self.assertEqual(custom_query.customVector.vector, [0.1, 0.2, 0.3])
 
@@ -466,9 +468,11 @@ class TestSearchQueryContextMethods(unittest.TestCase):
 
     def test_get_context_tensor_with_context(self):
         """Test get_context_tensor when context with tensor is provided"""
-        context = SearchContext(tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)])
+        context = SearchContext(
+            tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)]
+        )
         query = SearchQuery(q="test", context=context)
-        
+
         result = query.get_context_tensor()
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 1)
@@ -478,29 +482,31 @@ class TestSearchQueryContextMethods(unittest.TestCase):
     def test_get_context_tensor_without_context(self):
         """Test get_context_tensor when no context is provided"""
         query = SearchQuery(q="test")
-        
+
         result = query.get_context_tensor()
         self.assertIsNone(result)
 
     def test_get_context_documents_with_context(self):
         """Test get_context_documents when context with documents is provided"""
         query = SearchQuery(q="test")
-        
+
         result = query.get_context_documents()
         self.assertIsNone(result)
 
     def test_get_context_documents_without_context(self):
         """Test get_context_documents when no context is provided"""
         query = SearchQuery(q="test")
-        
+
         result = query.get_context_documents()
         self.assertIsNone(result)
 
     def test_get_context_documents_with_context_no_documents(self):
         """Test get_context_documents when context exists but has no documents"""
-        context = SearchContext(tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)])
+        context = SearchContext(
+            tensor=[SearchContextTensor(vector=[1, 2, 3], weight=1.0)]
+        )
         query = SearchQuery(q="test", context=context)
-        
+
         result = query.get_context_documents()
         self.assertIsNone(result)
 
@@ -512,7 +518,9 @@ class TestSearchContextDocumentsParameters(unittest.TestCase):
         """Test that empty tensorFields list raises error"""
         with self.assertRaises(ValueError) as cm:
             SearchContextDocumentsParameters(tensorFields=[])
-        self.assertIn('tensorFields parameter must be non-empty list', str(cm.exception))
+        self.assertIn(
+            "tensorFields parameter must be non-empty list", str(cm.exception)
+        )
 
     def test_tensor_fields_validation_none(self):
         """Test that None tensorFields is valid"""
@@ -551,13 +559,13 @@ class TestSearchContextDocuments(unittest.TestCase):
         """Test that empty ids dict raises error"""
         with self.assertRaises(ValueError) as cm:
             SearchContextDocuments(ids={})
-        self.assertIn('must be present and a non-empty dict', str(cm.exception))
+        self.assertIn("must be present and a non-empty dict", str(cm.exception))
 
     def test_search_context_documents_with_none_ids_fails(self):
         """Test that None ids raises error"""
         with self.assertRaises(ValueError) as cm:
             SearchContextDocuments(ids=None)
-        self.assertIn('must be present and a non-empty dict', str(cm.exception))
+        self.assertIn("must be present and a non-empty dict", str(cm.exception))
 
     def test_search_context_documents_with_valid_ids_succeeds(self):
         """Test that valid ids dict succeeds"""
@@ -617,14 +625,14 @@ class TestSearchContext(unittest.TestCase):
         invalid_types = [
             ("not_a_list", "str"),
             (123, "int"),
-            ({"key": "value"}, "dict")
+            ({"key": "value"}, "dict"),
         ]
 
         for invalid_value, expected_type in invalid_types:
             with self.subTest(value=invalid_value, expected_type=expected_type):
                 with self.assertRaises(api_exceptions.InvalidArgError) as cm:
                     SearchContext(tensor=invalid_value)
-                self.assertIn('not a valid list', str(cm.exception))
+                self.assertIn("not a valid list", str(cm.exception))
 
     def test_tensor_valid_list(self):
         """Test that passing a valid list of SearchContextTensor works"""
@@ -646,13 +654,15 @@ class TestSearchContext(unittest.TestCase):
         # Test with 0 tensors (should fail)
         with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             SearchContext(tensor=[])
-        self.assertIn('has at least 1 items', str(cm.exception))
+        self.assertIn("has at least 1 items", str(cm.exception))
 
         # Test with 65 tensors (should fail)
-        large_tensor_list = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(65)]
+        large_tensor_list = [
+            SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(65)
+        ]
         with self.assertRaises(api_exceptions.InvalidArgError) as cm:
             SearchContext(tensor=large_tensor_list)
-        self.assertIn('has at most 64 items', str(cm.exception))
+        self.assertIn("has at most 64 items", str(cm.exception))
 
         # Test with 1 tensor (should pass)
         single_tensor = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0)]
@@ -660,7 +670,9 @@ class TestSearchContext(unittest.TestCase):
         self.assertEqual(len(context.tensor), 1)
 
         # Test with 64 tensors (should pass)
-        max_tensor_list = [SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(64)]
+        max_tensor_list = [
+            SearchContextTensor(vector=[0.1, 0.2], weight=1.0) for _ in range(64)
+        ]
         context = SearchContext(tensor=max_tensor_list)
         self.assertEqual(len(context.tensor), 64)
 
@@ -679,15 +691,17 @@ class TestQueryContent(unittest.TestCase):
     def test_query_content_modality_field_with_text(self):
         """Test QueryContent modality field access with text modality"""
         query_content = QueryContent(content="test content", modality=Modality.TEXT)
-        
+
         # Test that modality field is accessible and has correct value
         self.assertEqual(query_content.modality, Modality.TEXT)
         self.assertEqual(query_content.content, "test content")
 
     def test_query_content_modality_field_with_image(self):
         """Test QueryContent modality field access with image modality"""
-        query_content = QueryContent(content="http://example.com/image.jpg", modality=Modality.IMAGE)
-        
+        query_content = QueryContent(
+            content="http://example.com/image.jpg", modality=Modality.IMAGE
+        )
+
         self.assertEqual(query_content.modality, Modality.IMAGE)
         self.assertEqual(query_content.content, "http://example.com/image.jpg")
 
@@ -698,71 +712,77 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
     def test_collapse_fields_valid_format(self):
         """Test that collapse fields with valid format are accepted"""
         collapse_fields = [SearchCollapseField(name="product_id")]
-        
+
         search_query = SearchQuery(
             q="test query",
             searchMethod=SearchMethod.HYBRID,
-            collapseFields=collapse_fields
+            collapseFields=collapse_fields,
         )
-        
+
         self.assertEqual(len(search_query.collapse_fields), 1)
         self.assertEqual(search_query.collapse_fields[0].name, "product_id")
 
     def test_collapse_fields_only_for_hybrid_search(self):
         """Test that collapse fields are only allowed for hybrid search"""
         collapse_fields = [SearchCollapseField(name="product_id")]
-        
+
         with self.subTest("TENSOR search method"):
             with self.assertRaises(ValueError) as cm:
                 SearchQuery(
                     q="test query",
                     searchMethod=SearchMethod.TENSOR,
-                    collapseFields=collapse_fields
+                    collapseFields=collapse_fields,
                 )
-            self.assertIn("collapseFields can only be provided for 'HYBRID' search", str(cm.exception))
-        
+            self.assertIn(
+                "collapseFields can only be provided for 'HYBRID' search",
+                str(cm.exception),
+            )
+
         with self.subTest("LEXICAL search method"):
             with self.assertRaises(ValueError) as cm:
                 SearchQuery(
                     q="test query",
                     searchMethod=SearchMethod.LEXICAL,
-                    collapseFields=collapse_fields
+                    collapseFields=collapse_fields,
                 )
-            self.assertIn("collapseFields can only be provided for 'HYBRID' search", str(cm.exception))
+            self.assertIn(
+                "collapseFields can only be provided for 'HYBRID' search",
+                str(cm.exception),
+            )
 
     def test_collapse_fields_single_field_only(self):
         """Test that exactly one collapse field must be provided"""
         with self.subTest("Multiple collapse fields"):
             collapse_fields = [
                 SearchCollapseField(name="product_id"),
-                SearchCollapseField(name="category_id")
+                SearchCollapseField(name="category_id"),
             ]
-            
+
             with self.assertRaises(ValueError) as cm:
                 SearchQuery(
                     q="test query",
                     searchMethod=SearchMethod.HYBRID,
-                    collapseFields=collapse_fields
+                    collapseFields=collapse_fields,
                 )
-            self.assertIn("Exactly one collapse field must be provided", str(cm.exception))
-        
+            self.assertIn(
+                "Exactly one collapse field must be provided", str(cm.exception)
+            )
+
         with self.subTest("Empty collapse fields list"):
             with self.assertRaises(ValueError) as cm:
                 SearchQuery(
-                    q="test query",
-                    searchMethod=SearchMethod.HYBRID,
-                    collapseFields=[]
+                    q="test query", searchMethod=SearchMethod.HYBRID, collapseFields=[]
                 )
-            self.assertIn("Exactly one collapse field must be provided", str(cm.exception))
+            self.assertIn(
+                "Exactly one collapse field must be provided", str(cm.exception)
+            )
 
     def test_collapse_fields_none_is_valid(self):
         """Test that None collapse fields is valid"""
         search_query = SearchQuery(
-            q="test query",
-            searchMethod=SearchMethod.HYBRID,
-            collapseFields=None
+            q="test query", searchMethod=SearchMethod.HYBRID, collapseFields=None
         )
-        
+
         self.assertIsNone(search_query.collapse_fields)
 
     def test_search_collapse_field_requires_name(self):
@@ -771,5 +791,5 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
             SearchCollapseField()  # Missing required name field
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

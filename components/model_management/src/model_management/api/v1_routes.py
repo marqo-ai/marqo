@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, Query
-from fastapi import Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.routing import APIRoute
-
 from model_management.core.logging import get_logger
+
 from ..config import Config, get_config
-from ..schemas.api_models import LoadModelRequest, LoadModelResponse, UnloadModelResponse
+from ..schemas.api_models import (
+    LoadModelRequest,
+    LoadModelResponse,
+    UnloadModelResponse,
+)
 
 logger = get_logger(__name__)
 
@@ -43,13 +46,16 @@ def load_model(payload: LoadModelRequest, cfg: Config = Depends(get_config)):
     :return: 200 OK if the model was loaded successfully
     """
     cfg.model_manager.load_model(payload.triton_model_properties)
-    return LoadModelResponse(message=f"Model '{payload.triton_model_properties.name}' loaded successfully.")
+    return LoadModelResponse(
+        message=f"Model '{payload.triton_model_properties.name}' loaded successfully."
+    )
 
 
 @router.post("/models/{model_name}/unload", response_model=UnloadModelResponse)
 def unload_model(
-        model_name: str, remove_files: bool = Query(False, alias="remove-files"),
-        cfg: Config = Depends(get_config)
+    model_name: str,
+    remove_files: bool = Query(False, alias="remove-files"),
+    cfg: Config = Depends(get_config),
 ):
     """
     Unload a model from the Triton Inference Server.

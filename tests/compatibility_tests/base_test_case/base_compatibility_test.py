@@ -1,6 +1,6 @@
 import json
 import logging
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
@@ -17,8 +17,10 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        if not hasattr(cls, 'logger'):
-            cls.logger = get_logger(f"tests.compatibility_tests.{cls.__module__}.{cls.__name__}")
+        if not hasattr(cls, "logger"):
+            cls.logger = get_logger(
+                f"tests.compatibility_tests.{cls.__module__}.{cls.__name__}"
+            )
 
     @classmethod
     def get_results_file_path(cls):
@@ -39,7 +41,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     def save_results_to_file(cls, results):
         """Save results to a JSON file."""
         filepath = cls.get_results_file_path()
-        with filepath.open('w') as f:
+        with filepath.open("w") as f:
             json.dump(results, f, indent=4)
         cls.logger.debug(f"Results saved to {filepath}")
 
@@ -47,7 +49,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     def load_results_from_file(cls):
         """Load results from a JSON file."""
         filepath = cls.get_results_file_path()
-        with filepath.open('r') as f:
+        with filepath.open("r") as f:
             results = json.load(f)
         cls.logger.debug(f"Results loaded from {filepath}")
         return results
@@ -60,7 +62,9 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
             filepath.unlink()
             cls.logger.debug(f"Results file deleted: {filepath}")
         else:
-            cls.logger.debug(f"Not deleting, as the results file was never created in the first place.")
+            cls.logger.debug(
+                "Not deleting, as the results file was never created in the first place."
+            )
 
     @abstractmethod
     def prepare(self):
@@ -72,6 +76,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         """Set the logging level for this class's logger"""
         log_level = getattr(logging, level.upper(), None)
         if log_level is None:
-            raise ValueError(f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
+            raise ValueError(
+                f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}."
+            )
         cls.logger.setLevel(log_level)
         cls.logger.info(f"Logging level changed to {level.upper()}")

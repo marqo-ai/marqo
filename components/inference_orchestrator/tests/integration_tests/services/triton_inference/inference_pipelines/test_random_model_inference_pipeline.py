@@ -1,7 +1,4 @@
 import numpy as np
-
-from numpy import ndarray
-
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
     ImagePreprocessingConfig,
@@ -11,6 +8,7 @@ from inference_orchestrator.schemas.api import (
     TextPreprocessingConfig,
 )
 from integration_tests.test_case import InferenceTestCase, TestImageUrls
+from numpy import ndarray
 
 
 class TestRandomModelInferencePipeline(InferenceTestCase):

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from inference_orchestrator.api.telemetry import RequestMetrics
 from inference_orchestrator.schemas.api import (
@@ -9,9 +9,9 @@ from inference_orchestrator.schemas.api import (
 )
 from inference_orchestrator.services.errors import MediaDownloadError
 from inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess import (
-    threaded_download_and_preprocess_content,
-    reduce_thread_metrics,
     process_batch,
+    reduce_thread_metrics,
+    threaded_download_and_preprocess_content,
 )
 
 

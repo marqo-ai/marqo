@@ -1,19 +1,17 @@
-from marqo.connections import redis_driver, generate_redis_warning
-from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.tensor_search import utils
-from marqo.logging import get_logger
-from marqo.api.exceptions import TooManyRequestsError
+# for logging
+import time
+import uuid
 from functools import wraps
 from threading import Thread
-import uuid
 
-# for logging
-import datetime
-import time
-import os
-import logging
+from marqo.api.exceptions import TooManyRequestsError
+from marqo.connections import generate_redis_warning, redis_driver
+from marqo.logging import get_logger
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars, RequestType
 
 logger = get_logger(__name__)
+
 
 def throttle(request_type: str):
     """
@@ -25,12 +23,16 @@ def throttle(request_type: str):
     Implemented in a failsafe manner. If redis cannot be connected to or causes an error for any reason, this function is escaped and marqo operation will proceed as normal.
     Can be manually turned off with env var: $MARQO_ENABLE_THROTTLING='FALSE'
     """
-    def decorator(function):
-        
-        @wraps(function)        # needed to preserve function metadata, or else FastAPI throws a 422.
-        def wrapper(*args, **kwargs):
 
-            if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) != "TRUE":
+    def decorator(function):
+        @wraps(
+            function
+        )  # needed to preserve function metadata, or else FastAPI throws a 422.
+        def wrapper(*args, **kwargs):
+            if (
+                utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING)
+                != "TRUE"
+            ):
                 return function(*args, **kwargs)
 
             redis = redis_driver.get_db()  # redis instance
@@ -38,11 +40,17 @@ def throttle(request_type: str):
 
             # Define maximum thread counts
             throttling_max_threads = {
-                RequestType.INDEX: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_INDEX),
-                RequestType.SEARCH: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_SEARCH),
-                RequestType.PARTIAL_UPDATE: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE)
+                RequestType.INDEX: utils.read_env_vars_and_defaults(
+                    EnvVars.MARQO_MAX_CONCURRENT_INDEX
+                ),
+                RequestType.SEARCH: utils.read_env_vars_and_defaults(
+                    EnvVars.MARQO_MAX_CONCURRENT_SEARCH
+                ),
+                RequestType.PARTIAL_UPDATE: utils.read_env_vars_and_defaults(
+                    EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE
+                ),
             }
-            
+
             set_key = f"set:{request_type}"
             thread_name = f"thread:{uuid.uuid4()}"
 
@@ -52,26 +60,36 @@ def throttle(request_type: str):
                 try:
                     redis.zrem(key, name)
                 except Exception as e:
-                    logger.warning(generate_redis_warning(skipped_operation="throttling thread count decrement", exc=e))
+                    logger.warning(
+                        generate_redis_warning(
+                            skipped_operation="throttling thread count decrement", exc=e
+                        )
+                    )
                     redis_driver.set_faulty(True)
 
             # Check current thread count / increment using LUA script
             try:
                 check_result = redis.evalsha(
-                    lua_shas["check_and_increment"], 
-                    1,          
-                    set_key,                                 # sorted set key (by request type)
-                    thread_name,                             # name of member for the thread
-                    throttling_max_threads[request_type],    # thread_limit
-                    utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
+                    lua_shas["check_and_increment"],
+                    1,
+                    set_key,  # sorted set key (by request type)
+                    thread_name,  # name of member for the thread
+                    throttling_max_threads[request_type],  # thread_limit
+                    utils.read_env_vars_and_defaults(
+                        EnvVars.MARQO_THREAD_EXPIRY_TIME
+                    ),  # expire_time
                 )
             except Exception as e:
-                logger.warning(generate_redis_warning(skipped_operation="throttling thread count check", exc=e))
+                logger.warning(
+                    generate_redis_warning(
+                        skipped_operation="throttling thread count check", exc=e
+                    )
+                )
                 redis_driver.set_faulty(True)
                 return function(*args, **kwargs)
 
             t1 = time.time()
-            redis_time = (t1 - t0)*1000
+            redis_time = (t1 - t0) * 1000
 
             # Thread limit exceeded, throw 429
             if check_result != 0:
@@ -86,12 +104,15 @@ def throttle(request_type: str):
 
                 except Exception as e:
                     raise e
-                
+
                 # Delete thread key whether function succeeds or fails (async)
                 finally:
                     # Remove key from sorted set (async)
-                    remove_thread = Thread(target = remove_thread_from_set, args = (set_key, thread_name))
+                    remove_thread = Thread(
+                        target=remove_thread_from_set, args=(set_key, thread_name)
+                    )
                     remove_thread.start()
-                    
+
         return wrapper
+
     return decorator

@@ -1,5 +1,6 @@
-from marqo.base_model import StrictBaseModel
 from typing import List
+
+from marqo.base_model import StrictBaseModel
 
 
 class MarqoCudaInfo(StrictBaseModel):

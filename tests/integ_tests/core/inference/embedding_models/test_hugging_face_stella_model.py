@@ -1,6 +1,8 @@
 import unittest
 
-from marqo.inference.native_inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
+from marqo.inference.native_inference.embedding_models.hugging_face_stella_model import (
+    HuggingFaceStellaModel,
+)
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
@@ -11,10 +13,17 @@ class TestHuggingFaceStellaModel(unittest.TestCase):
         """
         for trust_remote_code in [None, False]:
             with self.subTest(trust_remote_code=trust_remote_code):
-                model_properties = {k: v for k, v in {'name': 'my_model', 'type': 'hf', 'dimensions': 512,
-                                                      'trustRemoteCode': trust_remote_code}.items() if
-                                    v is not None}
-                device = 'cpu'
+                model_properties = {
+                    k: v
+                    for k, v in {
+                        "name": "my_model",
+                        "type": "hf",
+                        "dimensions": 512,
+                        "trustRemoteCode": trust_remote_code,
+                    }.items()
+                    if v is not None
+                }
+                device = "cpu"
 
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     HuggingFaceStellaModel(model_properties, device)
@@ -22,8 +31,12 @@ class TestHuggingFaceStellaModel(unittest.TestCase):
                 self.assertIn("trustRemoteCode", str(context.exception))
 
         with self.subTest(trust_remote_code=True):
-            model_properties = {'name': 'my_model', 'type': 'hf', 'dimensions': 512,
-                                'trustRemoteCode': True}
-            device = 'cpu'
+            model_properties = {
+                "name": "my_model",
+                "type": "hf",
+                "dimensions": 512,
+                "trustRemoteCode": True,
+            }
+            device = "cpu"
 
             self.assertIsNotNone(HuggingFaceStellaModel(model_properties, device))

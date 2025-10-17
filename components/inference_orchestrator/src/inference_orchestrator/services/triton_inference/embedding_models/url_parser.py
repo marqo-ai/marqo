@@ -1,6 +1,7 @@
 import os
 from urllib.parse import urlparse
 
+
 def get_base_filename(path_or_url: str) -> str:
     """Extract the base filename from a local file path or a URL (ignoring query params)."""
     parsed = urlparse(path_or_url)
