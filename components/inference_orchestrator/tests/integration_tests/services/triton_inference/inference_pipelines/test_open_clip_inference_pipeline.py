@@ -1,11 +1,17 @@
 import numpy as np
 
-from inference_orchestrator.schemas.api import *
+from numpy import ndarray
+
+from inference_orchestrator.schemas.api import (
+    EmbeddingModelConfig,
+    InferenceRequest,
+    InferenceResult,
+    TextPreprocessingConfig,
+)
 from tests.integration_tests.test_case import InferenceTestCase
 
 
 class TestOpenCLIPInferencePipeline(InferenceTestCase):
-
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -23,14 +29,12 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
             modality="language",
             contents=["text", "very long long long long text"],
             device="cpu",
-            model_config_=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name=model_name,
                 model_properties=self.get_model_properties_from_registry(model_name),
-                normalize_embeddings=True
+                normalize_embeddings=True,
             ),
-            preprocessing_config=TextPreprocessingConfig(
-                should_chunk=False
-            )
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
 
         results = self.inference.vectorise(text_inference_request)
@@ -45,7 +49,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
         self.assertTrue(isinstance(results_1[0], tuple))
         self.assertTrue(isinstance(results_1[0][0], str))
         self.assertTrue(isinstance(results_1[0][1], np.ndarray))
-        self.assertEqual((768, ), results_1[0][1].shape)
+        self.assertEqual((768,), results_1[0][1].shape)
         self.assertEqual("text", results_1[0][0])
 
         results_2: list[tuple[str, ndarray]] = results.result[1]
@@ -54,8 +58,9 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
         self.assertTrue(isinstance(results_2[0], tuple))
         self.assertTrue(isinstance(results_2[0][0], str))
         self.assertTrue(isinstance(results_2[0][1], np.ndarray))
-        self.assertEqual((768, ), results_2[0][1].shape)
+        self.assertEqual((768,), results_2[0][1].shape)
         self.assertEqual("very long long long long text", results_2[0][0])
+
     #
     # def test_inference_two_valid_images(self):
     #     """Test that the pipeline returns the embeddings for the two valid images."""
@@ -66,7 +71,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
     #             TestImageUrls.IMAGE2.value
     #         ],
     #         device="cpu",
-    #         model_config=ModelConfig(
+    #         model_config=EmbeddingModelConfig(
     #             model_name="test",
     #             model_properties={
     #                 "type": "open_clip",
@@ -116,7 +121,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
     #             TestImageUrls.IMAGE2.value + "invalid"
     #         ],
     #         device="cpu",
-    #         model_config=ModelConfig(
+    #         model_config=EmbeddingModelConfig(
     #             model_name="test",
     #             model_properties={
     #                 "type": "open_clip",

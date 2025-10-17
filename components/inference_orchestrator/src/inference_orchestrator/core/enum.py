@@ -7,6 +7,12 @@ class LogLevel(StrEnum):
     WARNING = "WARNING"
     ERROR = "ERROR"
 
+
 class LogFormat(StrEnum):
     PLAIN = "PLAIN"
     JSON = "JSON"
+
+
+class MarqoCacheType(StrEnum):
+    LRU = "LRU"
+    LFU = "LFU"

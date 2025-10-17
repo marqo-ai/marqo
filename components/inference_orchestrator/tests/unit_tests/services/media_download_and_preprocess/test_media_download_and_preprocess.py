@@ -2,24 +2,26 @@ from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
 from inference_orchestrator.api.telemetry import RequestMetrics
-from inference_orchestrator.schemas.api import Modality, \
-    ImagePreprocessingConfig, InferenceErrorModel
-from inference_orchestrator.services.errors import *
+from inference_orchestrator.schemas.api import (
+    ImagePreprocessingConfig,
+    InferenceErrorModel,
+    Modality,
+)
+from inference_orchestrator.services.errors import MediaDownloadError
 from inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess import (
     threaded_download_and_preprocess_content,
     reduce_thread_metrics,
-    process_batch
+    process_batch,
 )
 
 
 class TestMediaDownloadAndPreprocess(TestCase):
-
     def setUp(self):
         self.sample_image_preprocessing_config = ImagePreprocessingConfig(
             modality=Modality.IMAGE,
             download_header={"Authorization": "Bearer fake_token"},
             download_timeout_ms=1000,
-            download_thread_count=2
+            download_thread_count=2,
         )
 
     def test_threaded_download_and_preprocess_invalid_modality(self):
@@ -32,7 +34,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 preprocessor=MagicMock(),
                 preprocessing_config=config,
                 metric_obj=None,
-                return_individual_error=True
+                return_individual_error=True,
             )
         self.assertIn("Unsupported modality", str(context.exception))
 
@@ -41,14 +43,17 @@ class TestMediaDownloadAndPreprocess(TestCase):
             "media_download.image.100.thread_time": 10,
             "media_download.image.100.url1": 20,
             "media_download.image.101.thread_time": 15,
-            "media_download.image.101.url1": 25
+            "media_download.image.101.url1": 25,
         }
 
         reduced = reduce_thread_metrics(raw_data)
 
         self.assertIn("media_download.image.thread_time", reduced)
         self.assertEqual([10, 15], reduced["media_download.image.thread_time"])
-        self.assertEqual([20, 25], reduced["media_download.image.url1"],)
+        self.assertEqual(
+            [20, 25],
+            reduced["media_download.image.url1"],
+        )
 
     def test_process_batch_raises_on_thread_error(self):
         content = ["url1", "url2"]
@@ -61,14 +66,16 @@ class TestMediaDownloadAndPreprocess(TestCase):
             return [[(url, "tensor")] for url in allocated_content]
 
         with patch(
-                "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
-                "threaded_download_and_preprocess_content", side_effect=mock_threaded_download_and_preprocess_content):
+            "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
+            "threaded_download_and_preprocess_content",
+            side_effect=mock_threaded_download_and_preprocess_content,
+        ):
             with self.assertRaises(MediaDownloadError) as context:
                 process_batch(
                     content=content,
                     preprocessor=MagicMock(),
                     preprocessing_config=self.sample_image_preprocessing_config,
-                    return_individual_error=False
+                    return_individual_error=False,
                 )
             self.assertIn("Simulated thread error", str(context.exception))
 
@@ -82,15 +89,23 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 return [InferenceErrorModel(error_message="Simulated error for url1")]
             return [[(url, "tensor")] for url in allocated_content]
 
-        with patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
-                "threaded_download_and_preprocess_content", side_effect=mock_threaded_download_and_preprocess_content), \
-             patch("inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
-                   "RequestMetricsStore.for_request", return_value=RequestMetrics()):
+        with (
+            patch(
+                "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
+                "threaded_download_and_preprocess_content",
+                side_effect=mock_threaded_download_and_preprocess_content,
+            ),
+            patch(
+                "inference_orchestrator.services.media_download_and_preprocess.media_download_and_preprocess."
+                "RequestMetricsStore.for_request",
+                return_value=RequestMetrics(),
+            ),
+        ):
             results = process_batch(
                 content=content,
                 preprocessor=MagicMock(),
                 preprocessing_config=self.sample_image_preprocessing_config,
-                return_individual_error=True
+                return_individual_error=True,
             )
 
             # Expect results for both URLs

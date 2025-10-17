@@ -1,7 +1,7 @@
 from numpy import dtype
 from enum import Enum
 from pydantic import Field, field_validator, PrivateAttr, model_validator
-from typing import Optional, List, Literal, Any
+from typing import Optional, List, Literal
 
 from ..base_model_properties import BaseModelProperties, TritonModelProperties
 from ..data_type_conversion import convert_to_triton_data_type, convert_to_numpy_dtype
@@ -21,31 +21,38 @@ class Precision(str, Enum):
 
 
 class OpenCLIPTritonModelProperties(TritonModelProperties):
-
-    @field_validator('input', mode='after')
+    @field_validator("input", mode="after")
     @classmethod
     def validate_input(cls, v: list):
         input_length = len(v)
         if input_length != 1:
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder must have exactly 1 input. "
-                             f"Received '{v}' with '{input_length}' inputs.")
+            raise ValueError(
+                f"For OpenCLIP models, triton_text_encoder must have exactly 1 input. "
+                f"Received '{v}' with '{input_length}' inputs."
+            )
 
         if v[0].name != "input":
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder input must be named 'input'. "
-                             f"Received '{v[0].name}' instead.")
+            raise ValueError(
+                f"For OpenCLIP models, triton_text_encoder input must be named 'input'. "
+                f"Received '{v[0].name}' instead."
+            )
         return v
 
-    @field_validator('output', mode='after')
+    @field_validator("output", mode="after")
     @classmethod
     def validate_output(cls, v: list):
         output_length = len(v)
         if output_length != 1:
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder must have exactly 1 output. "
-                             f"Received '{v}' with '{output_length}' inputs.")
+            raise ValueError(
+                f"For OpenCLIP models, triton_text_encoder must have exactly 1 output. "
+                f"Received '{v}' with '{output_length}' inputs."
+            )
 
         if v[0].name != "output":
-            raise ValueError(f"For OpenCLIP models, triton_text_encoder output must be named 'output'. "
-                             f"Received '{v[0].name}' instead.")
+            raise ValueError(
+                f"For OpenCLIP models, triton_text_encoder output must be named 'output'. "
+                f"Received '{v[0].name}' instead."
+            )
         return v
 
 
@@ -66,16 +73,23 @@ class OpenCLIPModelProperties(BaseModelProperties):
         size: The size of the image. It is optional. If provided, it will override the default size of the image.
         note: A note about the model. It is optional.
     """
+
     name: str
     tokenizer: Optional[str] = None
-    image_preprocessor: ImagePreprocessor = Field(default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor")
+    image_preprocessor: ImagePreprocessor = Field(
+        default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor"
+    )
     mean: Optional[List[float]] = None
     std: Optional[List[float]] = None
     size: Optional[int] = None
     note: Optional[str] = None
     type: Literal["open_clip"]
-    triton_text_encoder: TritonModelProperties = Field(..., alias="tritonTextEncoder")
-    triton_image_encoder: TritonModelProperties = Field(..., alias="tritonImageEncoder")
+    triton_text_encoder_properties: TritonModelProperties = Field(
+        ..., alias="tritonTextEncoderProperties"
+    )
+    triton_image_encoder_properties: TritonModelProperties = Field(
+        ..., alias="tritonImageEncoderProperties"
+    )
 
     _text_input_numpy_type: dtype = PrivateAttr()
     _text_input_triton_type: str = PrivateAttr()
@@ -88,20 +102,32 @@ class OpenCLIPModelProperties(BaseModelProperties):
         Cache the derived types for the model properties. This cache will be the hot path for encoding so
         we use a model validator to do this once at initialization time.
         """
-        self._text_input_numpy_type = convert_to_numpy_dtype(self.triton_text_encoder.input[0].data_type)
-        self._text_input_triton_type = convert_to_triton_data_type(self.triton_text_encoder.input[0].data_type)
-        self._image_input_numpy_type = convert_to_numpy_dtype(self.triton_image_encoder.input[0].data_type)
-        self._image_input_triton_type = convert_to_triton_data_type(self.triton_image_encoder.input[0].data_type)
+        self._text_input_numpy_type = convert_to_numpy_dtype(
+            self.triton_text_encoder_properties.input[0].data_type
+        )
+        self._text_input_triton_type = convert_to_triton_data_type(
+            self.triton_text_encoder_properties.input[0].data_type
+        )
+        self._image_input_numpy_type = convert_to_numpy_dtype(
+            self.triton_image_encoder_properties.input[0].data_type
+        )
+        self._image_input_triton_type = convert_to_triton_data_type(
+            self.triton_image_encoder_properties.input[0].data_type
+        )
         return self
 
     @property
-    def text_input_numpy_type(self) -> dtype: return self._text_input_numpy_type
+    def text_input_numpy_type(self) -> dtype:
+        return self._text_input_numpy_type
 
     @property
-    def text_input_triton_type(self) -> str:  return self._text_input_triton_type
+    def text_input_triton_type(self) -> str:
+        return self._text_input_triton_type
 
     @property
-    def image_input_numpy_type(self) -> dtype: return self._image_input_numpy_type
+    def image_input_numpy_type(self) -> dtype:
+        return self._image_input_numpy_type
 
     @property
-    def image_input_triton_type(self) -> str: return self._image_input_triton_type
+    def image_input_triton_type(self) -> str:
+        return self._image_input_triton_type

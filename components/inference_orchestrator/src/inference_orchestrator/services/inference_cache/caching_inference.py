@@ -3,8 +3,18 @@ import hashlib
 import numpy as np
 import orjson
 
-from inference_orchestrator.schemas.api import *
-from inference_orchestrator.services.inference_cache.marqo_inference_cache import (MarqoInferenceCache)
+from typing import List, Optional, Tuple
+
+from inference_orchestrator.schemas.api import (
+    Inference,
+    InferenceErrorModel,
+    InferenceRequest,
+    InferenceResult,
+    Modality,
+)
+from inference_orchestrator.services.inference_cache.marqo_inference_cache import (
+    MarqoInferenceCache,
+)
 
 
 def is_base64_image(content: str) -> bool:
@@ -14,13 +24,17 @@ def is_base64_image(content: str) -> bool:
 class CachingInference(Inference):
     def __init__(self, delegate: Inference, cache_size: int, cache_type: str):
         self.delegate = delegate
-        self.inference_cache = MarqoInferenceCache(cache_size=cache_size, cache_type=cache_type)
+        self.inference_cache = MarqoInferenceCache(
+            cache_size=cache_size, cache_type=cache_type
+        )
 
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
         if self.should_skip_cache(request):
             return self.delegate.vectorise(request)
 
-        model_cache_key = self.model_cache_key(request.model_config_.model_properties)
+        model_cache_key = self.model_cache_key(
+            request.embedding_model_config.model_properties
+        )
 
         cached_result: List[Tuple[int, str, np.ndarray]] = []
         contents_to_vectorise: List[str] = []
@@ -38,7 +52,11 @@ class CachingInference(Inference):
                 contents_to_vectorise.append(content)
 
         if not contents_to_vectorise:
-            return InferenceResult(result=[[(content, embedding)] for _, content, embedding in cached_result])
+            return InferenceResult(
+                result=[
+                    [(content, embedding)] for _, content, embedding in cached_result
+                ]
+            )
 
         new_request = request.copy(update={"contents": contents_to_vectorise})
         inference_result = self.delegate.vectorise(new_request)
@@ -46,13 +64,17 @@ class CachingInference(Inference):
         for r in inference_result.result:
             if not isinstance(r, InferenceErrorModel):
                 if len(r) > 1:
-                    raise RuntimeError(f"Inference cache does not support chunking but got {len(r)} chunks. "
-                                       f"Preprocessing config: "
-                                       f"{orjson.dumps(dict(new_request.preprocessing_config)).decode('utf-8')}")
+                    raise RuntimeError(
+                        f"Inference cache does not support chunking but got {len(r)} chunks. "
+                        f"Preprocessing config: "
+                        f"{orjson.dumps(dict(new_request.preprocessing_config)).decode('utf-8')}"
+                    )
                 content, embedding = r[0]
                 content_cache_key = self.content_cache_key(content, request.modality)
                 if content_cache_key:
-                    self.inference_cache.set(model_cache_key, content_cache_key, embedding)
+                    self.inference_cache.set(
+                        model_cache_key, content_cache_key, embedding
+                    )
 
         # Merge result
         if cached_result:
@@ -73,16 +95,16 @@ class CachingInference(Inference):
     def content_cache_key(self, content: str, modality: Modality) -> Optional[str]:
         """
         Generate appropriate cache key for content based on modality.
-        
+
         For TEXT modality: use content directly
-        For IMAGE modality: 
+        For IMAGE modality:
             - if base64 image: use blake3 hash with prefix
             - otherwise: use content directly (will be skipped in caching logic)
-        
+
         Args:
             content: The content string
             modality: The modality type
-            
+
         Returns:
             Cache key string, None if it should not be cached
         """
@@ -100,6 +122,10 @@ class CachingInference(Inference):
     def should_skip_cache(self, request):
         return (
             not request.use_inference_cache
-            or request.modality not in [Modality.TEXT, Modality.IMAGE]  # we support text and image modalities
+            or request.modality
+            not in [
+                Modality.TEXT,
+                Modality.IMAGE,
+            ]  # we support text and image modalities
             or request.preprocessing_config.should_chunk  # we do not support caching chunks
         )

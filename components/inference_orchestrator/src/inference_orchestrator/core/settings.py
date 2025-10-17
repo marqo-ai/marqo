@@ -5,6 +5,7 @@ from typing import Union
 
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
+from inference_orchestrator.core.enum import MarqoCacheType
 from .enum import LogLevel, LogFormat
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
@@ -19,8 +20,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    marqo_inference_cache_size: int = Field(0, alias="MARQO_INFERENCE_CACHE_SIZE")
-    marqo_inference_cache_type: str = Field("LRU", alias="MARQO_INFERENCE_CACHE_TYPE")
+    marqo_inference_cache_size: int = Field(0, alias="MARQO_INFERENCE_CACHE_SIZE", ge=0)
+    marqo_inference_cache_type: MarqoCacheType = Field(
+        MarqoCacheType.LRU, alias="MARQO_INFERENCE_CACHE_TYPE"
+    )
     marqo_triton_url: str = Field("http://localhost:8001", alias="MARQO_TRITON_URL")
     marqo_model_management_container_url: str = Field(
         "http://localhost:8883", alias="MARQO_MODEL_MANAGEMENT_CONTAINER_URL"

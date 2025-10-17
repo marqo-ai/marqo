@@ -1,14 +1,10 @@
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Literal
 
+from pydantic import Field, field_validator
+
+from inference_orchestrator.schemas.base_model import AppImmutableBaseModel
 from .url_parser import get_base_filename
-
-
-class ModelBaseModel(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
 
 
 class DataType(str, Enum):
@@ -22,7 +18,20 @@ class DataType(str, Enum):
     TYPE_BF16 = "TYPE_BF16"
 
 
-class ModelInput(ModelBaseModel):
+class BaseModelProperties(AppImmutableBaseModel):
+    """
+    The base class for all model properties classes.
+
+    Attributes:
+        dimensions: The dimensions of the model.
+        type: The type of the model
+    """
+
+    dimensions: int = Field(..., ge=1)
+    type: Literal["open_clip", "hf", "random"]
+
+
+class ModelInput(AppImmutableBaseModel):
     """
     ModelInput defines the input of the model.
 
@@ -31,12 +40,13 @@ class ModelInput(ModelBaseModel):
         dims (list[int]): The dimensions of the input tensor.
         data_type (DataType): The data type of the input tensor.
     """
+
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., alias='dataType')
+    data_type: DataType = Field(..., alias="dataType")
 
 
-class ModelOutput(ModelBaseModel):
+class ModelOutput(AppImmutableBaseModel):
     """
     ModelOutput defines the output of the model.
 
@@ -45,14 +55,17 @@ class ModelOutput(ModelBaseModel):
         dims (list[int]): The dimensions of the output tensor.
         data_type (DataType): The data type of the output tensor.
     """
+
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., alias='dataType')
+    data_type: DataType = Field(..., alias="dataType")
 
 
-class TritonModelProperties(ModelBaseModel):
+class TritonModelProperties(AppImmutableBaseModel):
     """
     TritonModelProperties defines the properties of a model to be served by Triton Inference Server.
+
+    For backward compatibility, the limit on each field can only be relaxed, not tightened.
 
     Attributes:
         name (str): The name of the model.
@@ -63,31 +76,25 @@ class TritonModelProperties(ModelBaseModel):
             supports a single output for embeddings models.
         input (list[ModelInput]): A list of input definitions for the model. Supports 1 to 3 inputs.
     """
-    name: str
-    max_batch_size: int = Field(8, alias='maxBatchSize', gt=0, le=128)
-    sources: list[str] = Field(..., alias='sources', min_length=1, max_length=5)
-    output: list[ModelOutput] = Field(..., alias='output', min_length=1, max_length=1)
-    input: list[ModelInput] = Field(..., alias='input', min_length=1, max_length=3)
 
-    @field_validator('sources', mode="after")
+    name: str
+    max_batch_size: int = Field(8, alias="maxBatchSize", gt=0, le=128)
+    sources: list[str] = Field(..., alias="sources", min_length=1, max_length=5)
+    output: list[ModelOutput] = Field(..., alias="output", min_length=1, max_length=1)
+    input: list[ModelInput] = Field(..., alias="input", min_length=1, max_length=3)
+
+    @field_validator("sources", mode="after")
     @classmethod
     def _validate_sources(cls, values: list[str]) -> list[str]:
         """All sources must point to a model.onnx file, or a model.onnx.data file."""
         for v in values:
             base_filename = get_base_filename(v)
-            if not (base_filename == "model.onnx" or base_filename.startswith("model.onnx.data")):
-                raise ValueError(f"All sources must point to a model.onnx file, or a model.onnx.data file. "
-                                 f"Received invalid source: {v}")
+            if not (
+                base_filename == "model.onnx"
+                or base_filename.startswith("model.onnx.data")
+            ):
+                raise ValueError(
+                    f"All sources must point to a model.onnx file, or a model.onnx.data file. "
+                    f"Received invalid source: {v}"
+                )
         return values
-
-
-class BaseModelProperties(BaseModel):
-    """
-    The base class for all model properties classes.
-
-    Attributes:
-        dimensions: The dimensions of the model.
-        type: The type of the model
-    """
-    dimensions: int = Field(..., ge=1)
-    type: Literal["open_clip", "hf", "random"]

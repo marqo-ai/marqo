@@ -5,13 +5,17 @@ from pathlib import Path
 import numpy as np
 from parameterized import parameterized_class
 
-from inference_orchestrator.schemas.api import *
-from inference_orchestrator.services.media_download_and_preprocess.image_download import load_image_from_path
-from inference_orchestrator.services.triton_inference.model_manager.model_manager import load_model
+from inference_orchestrator.schemas.api import Modality
+from inference_orchestrator.services.media_download_and_preprocess.image_download import (
+    load_image_from_path,
+)
+from inference_orchestrator.services.triton_inference.model_manager.model_manager import (
+    load_model,
+)
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 OPEN_CLIP_TEST_MODELS = [
-    #--- Marqo OpenCLIP models for testing
+    # --- Marqo OpenCLIP models for testing
     "Marqo/marqo-fashionCLIP",
     "Marqo/marqo-fashionSigLIP",
     "Marqo/marqo-ecommerce-embeddings-L",
@@ -19,16 +23,16 @@ OPEN_CLIP_TEST_MODELS = [
     # --- Other OpenCLIP models for testing
     "open_clip/ViT-B-32/laion2b_s34b_b79k",
     "laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k",
-
     "timm/ViT-L-16-SigLIP2-256",
     "open_clip/ViT-L-16-SigLIP-256/webli",
     "open_clip/ViT-B-16-SigLIP/webli",
-
     "open_clip/ViT-L-14/laion2b_s32b_b82k",
 ]
 
 
-@parameterized_class([{"model_name": model_name} for model_name in OPEN_CLIP_TEST_MODELS])
+@parameterized_class(
+    [{"model_name": model_name} for model_name in OPEN_CLIP_TEST_MODELS]
+)
 class TestOpenClipModelEncode(InferenceTestCase):
     """
     Tests for OpenCLIP models, which are heavily used in production.
@@ -52,7 +56,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
     - That the model outputs match the results from the pipeline encode methods.
     """
 
-    model_name: str # A class variable to store the model name that will be populated by the parameterized decorator
+    model_name: str  # A class variable to store the model name that will be populated by the parameterized decorator
     device = "cpu"
 
     @classmethod
@@ -66,15 +70,27 @@ class TestOpenClipModelEncode(InferenceTestCase):
         cls.eject_all_models()
         current_file = Path(__file__).resolve()
         target_dir = current_file.parent
-        text_json_file = target_dir / "embeddings_reference" / "open_clip_text_marqo_2_24_2_embeddings.json"
-        image_json_file = target_dir / "embeddings_reference" / "open_clip_image_marqo_2_24_2_embeddings.json"
+        text_json_file = (
+            target_dir
+            / "embeddings_reference"
+            / "open_clip_text_marqo_2_24_2_embeddings.json"
+        )
+        image_json_file = (
+            target_dir
+            / "embeddings_reference"
+            / "open_clip_image_marqo_2_24_2_embeddings.json"
+        )
         if not os.path.exists(text_json_file):
-            raise FileNotFoundError(f"File {text_json_file} not found, which is needed to compare embeddings.")
+            raise FileNotFoundError(
+                f"File {text_json_file} not found, which is needed to compare embeddings."
+            )
         if not os.path.exists(image_json_file):
-            raise FileNotFoundError(f"File {image_json_file} not found, which is needed to compare embeddings.")
-        with open(text_json_file, 'r') as f:
+            raise FileNotFoundError(
+                f"File {image_json_file} not found, which is needed to compare embeddings."
+            )
+        with open(text_json_file, "r") as f:
             cls.open_clip_text_embeddings_reference = json.load(f)
-        with open(image_json_file, 'r') as f:
+        with open(image_json_file, "r") as f:
             cls.open_clip_image_embeddings_reference = json.load(f)
 
     def setUp(self):
@@ -83,12 +99,14 @@ class TestOpenClipModelEncode(InferenceTestCase):
             self.model_name,
             model_properties=self.get_model_properties_from_registry(self.model_name),
             triton_client=self.config.triton_client,
-            model_management_client=self.config.model_management_client
+            model_management_client=self.config.model_management_client,
         )
         self.eps = 1e-6
 
     def test_embeddings_regression_text(self):
-        self.model_embeddings_reference = self.open_clip_text_embeddings_reference[self.model_name]
+        self.model_embeddings_reference = self.open_clip_text_embeddings_reference[
+            self.model_name
+        ]
 
         for text, embeddings in self.model_embeddings_reference.items():
             with self.subTest(f"Test text: {text}"):
@@ -97,16 +115,21 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     content=[text],
                     model_name=self.model_name,
                     modality=Modality.TEXT,
-                    normalize_embeddings=False
+                    normalize_embeddings=False,
                 )
 
                 embeddings_difference = self.calculate_embeddings_difference(
                     embeddings_reference, pipeline_embeddings[0]
                 )
-                self.assertTrue(embeddings_difference < 3e-3, f"The embedding difference is {embeddings_difference}.")
+                self.assertTrue(
+                    embeddings_difference < 3e-3,
+                    f"The embedding difference is {embeddings_difference}.",
+                )
 
     def test_embeddings_regression_image(self):
-        self.model_embeddings_reference = self.open_clip_image_embeddings_reference[self.model_name]
+        self.model_embeddings_reference = self.open_clip_image_embeddings_reference[
+            self.model_name
+        ]
 
         for image_url, embeddings in self.model_embeddings_reference.items():
             with self.subTest(f"Test image url: {image_url}"):
@@ -115,7 +138,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
                     content=[image_url],
                     model_name=self.model_name,
                     modality=Modality.IMAGE,
-                    normalize_embeddings=False
+                    normalize_embeddings=False,
                 )
 
                 embeddings_difference = self.calculate_embeddings_difference(
@@ -123,7 +146,7 @@ class TestOpenClipModelEncode(InferenceTestCase):
                 )
                 self.assertTrue(
                     embeddings_difference < 3e-3,
-                    f"The embedding difference is {embeddings_difference}."
+                    f"The embedding difference is {embeddings_difference}.",
                 )
 
     def test_open_clip_encode_text_normalized(self):
@@ -131,22 +154,34 @@ class TestOpenClipModelEncode(InferenceTestCase):
         A test to ensure that the open clip model generates the same embeddings as the pipeline for text inputs when
         normalize is set to True.
         """
-        texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
+        texts = [
+            "hello",
+            "big",
+            "asasasasaaaaaaaaaaaa",
+            "",
+            "a word. another one!?. #$#.",
+        ]
 
-        tokenized_text = self.model.get_preprocessor().preprocess(texts, modality=Modality.TEXT)
-        raw_embeddings = self.model.encode(tokenized_text, modality=Modality.TEXT, normalize=True)
+        tokenized_text = self.model.get_preprocessor().preprocess(
+            texts, modality=Modality.TEXT
+        )
+        raw_embeddings = self.model.encode(
+            tokenized_text, modality=Modality.TEXT, normalize=True
+        )
         pipeline_embeddings = self.encode_content_helper(
             content=texts,
             model_name=self.model_name,
             modality=Modality.TEXT,
-            normalize_embeddings=True
+            normalize_embeddings=True,
         )
 
         for i, raw_embedding in enumerate(raw_embeddings):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(
+                raw_embedding.shape[0], self.model.model_properties.dimensions
+            )
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
 
@@ -161,21 +196,30 @@ class TestOpenClipModelEncode(InferenceTestCase):
             TestImageUrls.IMAGE2.value,
         ]
 
-        images = [load_image_from_path(image, media_download_headers=dict()) for image in image_urls]
+        images = [
+            load_image_from_path(image, media_download_headers=dict())
+            for image in image_urls
+        ]
 
-        preprocessed_images = self.model.get_preprocessor().preprocess(images, modality=Modality.IMAGE)
-        raw_embeddings = self.model.encode(preprocessed_images, modality=Modality.IMAGE, normalize=True)
+        preprocessed_images = self.model.get_preprocessor().preprocess(
+            images, modality=Modality.IMAGE
+        )
+        raw_embeddings = self.model.encode(
+            preprocessed_images, modality=Modality.IMAGE, normalize=True
+        )
 
         pipeline_embeddings = self.encode_content_helper(
             content=image_urls,
             model_name=self.model_name,
             modality=Modality.IMAGE,
-            normalize_embeddings=True
+            normalize_embeddings=True,
         )
         for i, raw_embedding in enumerate(raw_embeddings):
             pipeline_embedding = pipeline_embeddings[i]
             self.assertEqual(raw_embedding.shape, pipeline_embedding.shape)
             self.assertTrue((raw_embedding - pipeline_embedding < self.eps).all())
-            self.assertEqual(raw_embedding.shape[0], self.model.model_properties.dimensions)
+            self.assertEqual(
+                raw_embedding.shape[0], self.model.model_properties.dimensions
+            )
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
