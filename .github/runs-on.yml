@@ -8,7 +8,7 @@ images:
     ami: "ami-0b8bc108d37bb85f3"
 
   marqo-gpu-image:
-    ami: "ami-0be479c8e2b8dcc93"
+    ami: "ami-05552d0fb705d800e"
 
   marqo-cpu-arm-image:
     ami: "ami-0a449659aae944a9d"
