@@ -59,3 +59,13 @@ explicit = true
 extend-exclude = [
   "*.ipynb",
 ]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # enable import sorting
+
+[tool.ruff.lint.isort]
+force-single-line = false
+combine-as-imports = true
+force-sort-within-sections = true
+known-first-party = ["inference_orchestrator"]
+lines-after-imports = 2

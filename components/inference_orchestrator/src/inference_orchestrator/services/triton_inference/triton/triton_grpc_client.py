@@ -1,6 +1,8 @@
+from tritonclient import grpc
+
 from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
-from tritonclient import grpc
+from inference_orchestrator.services.errors import TritonInferenceError
 
 
 logger = get_logger(__name__)
@@ -56,11 +58,17 @@ class TritonGRPCClient:
             infer_outputs: A list of infer output data
         Returns:
             The gRPC inference result containing the encoded data.
+        Raises:
+            TritonInferenceError: If there is an error during the inference process.
         """
-
-        return self.client.infer(
-            model_name=model_name,
-            inputs=infer_inputs,
-            outputs=infer_outputs,
-            compression_algorithm=self.grpc_compression_algorithm,
-        )
+        try:
+            return self.client.infer(
+                model_name=model_name,
+                inputs=infer_inputs,
+                outputs=infer_outputs,
+                compression_algorithm=self.grpc_compression_algorithm,
+            )
+        except grpc.InferenceServerException as e:
+            raise TritonInferenceError(
+                f"Error during inference with model {model_name}: {str(e)}"
+            ) from e

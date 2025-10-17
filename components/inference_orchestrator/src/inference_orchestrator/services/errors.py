@@ -59,6 +59,12 @@ class InvalidModelPropertiesError(ServiceError):
     pass
 
 
+class TritonInferenceError(ServiceError):
+    """Raised when there is an error during inference with Triton."""
+
+    pass
+
+
 class MediaDownloadError(ServiceError):
     """Raised when there is an error downloading media files."""
 
