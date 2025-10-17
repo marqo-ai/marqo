@@ -35,6 +35,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "isort>=7.0.0",
     "marqo>=3.18.0",
     "opentelemetry-test-utils>=0.58b0",
     "parameterized>=0.9.0",

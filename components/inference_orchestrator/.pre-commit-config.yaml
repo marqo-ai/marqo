@@ -10,3 +10,9 @@ repos:
     # Run the formatter.
     - id: ruff-format
       types_or: [ python, pyi ]
+
+- repo: https://github.com/pycqa/isort
+  rev: 7.0.0
+  hooks:
+    - id: isort
+      name: isort (python)
