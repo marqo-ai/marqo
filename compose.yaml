@@ -59,7 +59,7 @@ services:
     tty: true
     environment:
       HF_HUB_ENABLE_HF_TRANSFER: "1"
-      MARQO_ENABLE_BATCH_APIS: "true"
+      MARQO_ENABLE_BATCH_APIS: "TRUE"
       MARQO_ENABLE_OPS_API: "TRUE"
       MARQO_ENABLE_THROTTLING: "FALSE"
       MARQO_API_INFERENCE_CACHE_SIZE: "0"
