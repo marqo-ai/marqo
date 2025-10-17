@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional, Any
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.inference.api.modality import Modality
@@ -6,7 +6,6 @@ from marqo.core.inference.api.modality import Modality
 
 class Preprocessors(MarqoBaseModel):
     """The type of preprocessors is unknown, so we use Any."""
-
     image: Optional[Any] = None
     text: Optional[Any] = None
     video: Optional[Any] = None

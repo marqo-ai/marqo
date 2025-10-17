@@ -1,19 +1,20 @@
 import pandas as pd
-from dotenv import load_dotenv
-from langchain.chains import LLMChain
-from langchain.docstore.document import Document
-from langchain_openai import OpenAI
 from utilities import (
-    extract_text_from_highlights,
-    get_extra_data,
     marqo_prompt,
+    extract_text_from_highlights,
     marqo_template,
-    reformat_npcs,
+    get_extra_data,
+    reformat_npcs
 )
+from dotenv import load_dotenv
+from langchain_openai import OpenAI
+from langchain.docstore.document import Document
+from langchain.chains import LLMChain
 
 load_dotenv()
 
 if __name__ == "__main__":
+
     #############################################################
     #       0. Install Marqo
     #############################################################
@@ -63,14 +64,14 @@ if __name__ == "__main__":
             "hobbies": "Cooking, gardening, and reading",
             "favorite_food": "Seafood",
             "dislikes": "Cilantro",
-        },
+        }
     ]
 
     df = pd.DataFrame(reformat_npcs(NPCs))
     print(df.head())
 
     # make the data python dicts
-    documents = df.to_dict(orient="records")
+    documents = df.to_dict(orient='records')
 
     #############################################################
     #       2. Setup Marqo
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     import marqo
     from marqo import Client
 
-    marqo.set_log_level("WARN")
+    marqo.set_log_level('WARN')
 
     mq = Client()
 
@@ -95,27 +96,16 @@ if __name__ == "__main__":
         "textPreprocessing": {
             "splitLength": 5,
             "splitOverlap": 1,
-            "splitMethod": "sentence",
+            "splitMethod": "sentence"
         },
     }
 
     # create the index - if no settings are present then sensible defaults are used
     mq.create_index(index_name, settings_dict=index_settings)
-    res = mq.index(index_name).add_documents(
-        documents,
-        tensor_fields=[
-            "name",
-            "backstory",
-            "location",
-            "occupation",
-            "family_history",
-            "work_history",
-            "favorite_color",
-            "hobbies",
-            "favorite_food",
-            "dislikes",
-        ],
-    )
+    res = mq.index(index_name).add_documents(documents, tensor_fields=["name", "backstory", "location", "occupation",
+                                                                       "family_history", "work_history",
+                                                                       "favorite_color",
+                                                                       "hobbies", "favorite_food", "dislikes"])
 
     #############################################################
     #       3. Regular NPC superhero
@@ -125,13 +115,11 @@ if __name__ == "__main__":
     persona = "Evelyn Parker"
 
     # we pre-opulate them here to complete a conversation but it can easily be made interactive
-    human_questions = [
-        "hi, what is your name?",
-        "wow, what are some of your favorite things to do?",
-        "are you scared of anything?",
-        "where did you grow up?",
-        "what do you dislike?",
-    ]
+    human_questions = ["hi, what is your name?",
+                       "wow, what are some of your favorite things to do?",
+                       "are you scared of anything?",
+                       "where did you grow up?",
+                       "what do you dislike?"]
 
     history = []
     template = marqo_template()
@@ -148,28 +136,21 @@ if __name__ == "__main__":
         print(history[-1])
 
         # search for background related to the question
-        results = mq.index(index_name).search(
-            question, filter_string=f"name:({persona})", limit=20
-        )
+        results = mq.index(index_name).search(question, filter_string=f"name:({persona})", limit=20)
 
         # optionally crop the text to the highlighted region to fit within the context window
         highlights, texts = extract_text_from_highlights(results, token_limit=150)
 
         # add the truncated/cropped text to the data structure for langchain
-        summaries = [
-            Document(page_content=f"Source [{ind}]:" + t)
-            for ind, t in enumerate(texts[:n_history])
-        ]
+        summaries = [Document(page_content=f"Source [{ind}]:" + t) for ind, t in enumerate(texts[:n_history])]
 
         # get the conversation history
         chain_qa = LLMChain(llm=llm, prompt=prompt)
 
-        llm_results = chain_qa.invoke(
-            {"summaries": summaries, "conversation": "\n".join(history)},
-            return_only_outputs=False,
-        )
+        llm_results = chain_qa.invoke({"summaries": summaries, "conversation": "\n".join(history)},
+                                      return_only_outputs=False)
 
-        history.append(llm_results["text"])
+        history.append(llm_results['text'])
         print(history[-1])
 
     #############################################################
@@ -180,30 +161,17 @@ if __name__ == "__main__":
 
     # add some more info
     extra_docs = [{"text": text, "name": persona} for text in get_extra_data()]
-    res = mq.index(index_name).add_documents(
-        extra_docs,
-        tensor_fields=[
-            "name",
-            "backstory",
-            "location",
-            "occupation",
-            "family_history",
-            "work_history",
-            "favorite_color",
-            "hobbies",
-            "favorite_food",
-            "dislikes",
-        ],
-    )
+    res = mq.index(index_name).add_documents(extra_docs, tensor_fields=["name", "backstory", "location", "occupation",
+                                                                        "family_history", "work_history",
+                                                                        "favorite_color",
+                                                                        "hobbies", "favorite_food", "dislikes"])
 
     # we pre-opulate them here to complete a conversation but it can easily be made interactive
-    human_questions = [
-        "hi, what is your name?",
-        "wow, what are some of your favorite things to do?",
-        "are you scared of anything?",
-        "where did you grow up?",
-        "what do you dislike?",
-    ]
+    human_questions = ["hi, what is your name?",
+                       "wow, what are some of your favorite things to do?",
+                       "are you scared of anything?",
+                       "where did you grow up?",
+                       "what do you dislike?"]
 
     history = []
     template = marqo_template()
@@ -217,26 +185,18 @@ if __name__ == "__main__":
         print(history[-1])
 
         # search for background related to the question
-        results = mq.index(index_name).search(
-            question, filter_string=f"name:({persona})", limit=20
-        )
+        results = mq.index(index_name).search(question, filter_string=f"name:({persona})", limit=20)
 
         # optionally crop the text to the highlighted region to fit within the context window
         highlights, texts = extract_text_from_highlights(results, token_limit=150)
 
         # add the truncated/cropped text to the data structure for langchain
-        summaries = [
-            Document(page_content=f"Source [{ind}]:" + t)
-            for ind, t in enumerate(texts[-n_history:])
-        ]
+        summaries = [Document(page_content=f"Source [{ind}]:" + t) for ind, t in enumerate(texts[-n_history:])]
 
         # get the conversation history
         chain_qa = LLMChain(llm=llm, prompt=prompt)
 
-        llm_results = chain_qa(
-            {"summaries": summaries, "conversation": "\n".join(history)},
-            return_only_outputs=False,
-        )
+        llm_results = chain_qa({"summaries": summaries, "conversation": "\n".join(history)}, return_only_outputs=False)
 
-        history.append(llm_results["text"])
+        history.append(llm_results['text'])
         print(history[-1])

@@ -1,45 +1,37 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
-
 import datetime
 import random
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import List, Dict, Optional
+from urllib3.exceptions import ReadTimeoutError
 
 import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 from PIL.Image import Image
-from urllib3.exceptions import ReadTimeoutError
+from torchvision.transforms import Compose
 
 from marqo import marqo_docs
 from marqo.api.configs import EnvVars
-from marqo.api.exceptions import (
-    ConfigurationError,
-    InternalError,
-    ModelCacheManagementError,
-)
-from marqo.core.inference.modality_utils import *
-from marqo.logging import get_logger
+from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 from marqo.s2_inference import constants
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
-    InvalidModelPropertiesError,
-    ModelDownloadError,
-    ModelLoadError,
-    ModelNotInCacheError,
-    UnknownModelError,
-    VectoriseError,
-)
+    VectoriseError, InvalidModelPropertiesError, ModelLoadError,
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
+from marqo.logging import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
+from marqo.core.inference.modality_utils import *
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import generate_batches, read_env_vars_and_defaults
+from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
 
 logger = get_logger(__name__)
 
@@ -52,124 +44,69 @@ MODEL_PROPERTIES = load_model_properties()
 
 
 def vectorise(
-    model_name: str,
-    content: Union[str, List[str], List[Image], List[bytes]],
-    model_properties: dict = None,
-    device: str = None,
-    normalize_embeddings: bool = get_default_normalization(),
-    model_auth: ModelAuth = None,
-    enable_cache: bool = False,
-    modality: Modality = Modality.TEXT,
-    media_download_headers: Optional[Dict] = None,
-    **kwargs,
-) -> List[List[float]]:
+        model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
+        model_properties: dict = None,
+        device: str = None, normalize_embeddings: bool = get_default_normalization(),
+        model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
+        media_download_headers: Optional[Dict] = None, **kwargs) -> List[List[float]]:
     if not device:
-        raise InternalError(
-            message="vectorise (internal function) cannot be called without setting device!"
-        )
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
     validated_model_properties = validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(
-        model_name, device, validated_model_properties
-    )
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(
-        model_cache_key,
-        model_name,
-        validated_model_properties,
-        device,
-        normalize_embeddings,
-        model_auth=model_auth,
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_auth=model_auth
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-    return _vectorise_without_cache(
-        model_cache_key,
-        content,
-        normalize_embeddings,
-        modality,
-        media_download_headers,
-        **kwargs,
-    )
-
+    return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                                    **kwargs)
 
 def _vectorise_without_cache(
-    model_cache_key: str,
-    content: Union[str, List[str], List[Image], List[bytes]],
-    normalize_embeddings: bool,
-    modality: Modality,
-    media_download_headers,
-    **kwargs,
-) -> List[List[float]]:
-    return _encode_without_cache(
-        model_cache_key,
-        content,
-        normalize_embeddings,
-        modality,
-        media_download_headers,
-        **kwargs,
-    )
+        model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+        normalize_embeddings: bool, modality: Modality, media_download_headers,
+        **kwargs) -> List[List[float]]:
+    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers, **kwargs)
 
 
-def _encode_without_cache(
-    model_cache_key: str,
-    content: Union[str, List[str], List[Image], List[bytes]],
-    normalize_embeddings: bool,
-    modality: Modality,
-    media_download_headers: Optional[Dict] = None,
-    **kwargs,
-) -> List[List[float]]:
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+                          normalize_embeddings: bool, modality: Modality, media_download_headers: Optional[Dict]=None,
+                          **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
 
         if isinstance(content, str):
             vectorised = model.encode(
-                content,
-                normalize=normalize_embeddings,
-                modality=modality,
-                media_download_headers=media_download_headers,
-                **kwargs,
+                content, normalize=normalize_embeddings, modality=modality,
+                media_download_headers=media_download_headers, **kwargs
             )
         elif isinstance(content, Tensor):
-            vectorised = model.encode(
-                content, normalize=normalize_embeddings, modality=modality, **kwargs
-            )
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
 
             for batch in generate_batches(content, batch_size=batch_size):
                 if modality is None:
-                    modality = infer_modality(
-                        batch[0] if isinstance(batch[0], (str, bytes)) else batch
-                    )
+                    modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
 
                 # TODO maybe the infer parameter can be replaced by modality
-                infer = kwargs.pop(
-                    "infer", False if modality == Modality.TEXT else True
-                )
+                infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
                 encoded_batch = model.encode(
-                    batch,
-                    modality=modality,
-                    normalize=normalize_embeddings,
-                    media_download_headers=media_download_headers,
-                    infer=infer,
-                    **kwargs,
-                )
+                    batch, modality=modality, normalize=normalize_embeddings,
+                    media_download_headers=media_download_headers, infer = infer, **kwargs)
 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
 
             if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
-                raise RuntimeError(
-                    f"Vectorise created an empty list of batches! Content: {content}"
-                )
+                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
     except (UnidentifiedImageError, OSError) as e:
         if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
-            raise VectoriseError(
-                f"Could not process given image: {content}. Original Error message: {e}"
-            ) from e
+            raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
         else:
             raise e
 
@@ -183,19 +120,17 @@ def get_available_models() -> Dict:
 
 def is_preprocessor_preload(model_properties: dict = None) -> bool:
     """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
-    model_properties: Validated model properties. The model properties should have been validated in marqo_index
+        model_properties: Validated model properties. The model properties should have been validated in marqo_index
     """
     model_type = model_properties.get("type", None)
     return model_type in constants.PREPROCESS_PRELOAD_MODELS
 
 
-def load_multimodal_model_and_get_preprocessors(
-    model_name: str,
-    model_properties: Optional[dict] = None,
-    device: Optional[str] = None,
-    model_auth: Optional[ModelAuth] = None,
-    normalize_embeddings: bool = get_default_normalization(),
-) -> Tuple[Any, Preprocessors]:
+def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
+                                                device: Optional[str] = None,
+                                                model_auth: Optional[ModelAuth] = None,
+                                                normalize_embeddings: bool = get_default_normalization()) \
+        -> Tuple[Any, Preprocessors]:
     """Load the model and return preprocessors for different modalities.
 
     Args:
@@ -212,9 +147,7 @@ def load_multimodal_model_and_get_preprocessors(
         InternalError: If the device is not set.
     """
     if not device:
-        raise InternalError(
-            message="vectorise (internal function) cannot be called without setting device!"
-        )
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
     # if model_properties.get("type") in ['languagebind', 'imagebind']:
     #    model = load_multimodal_model(model_name, model_properties, device)
@@ -222,34 +155,26 @@ def load_multimodal_model_and_get_preprocessors(
     model_cache_key = _create_model_cache_key(model_name, device, model_properties)
 
     _update_available_models(
-        model_cache_key,
-        model_name,
-        model_properties,
-        device,
-        normalize_embeddings,
-        model_auth=model_auth,
+        model_cache_key, model_name, model_properties, device, normalize_embeddings,
+        model_auth=model_auth
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
-    if model_properties.get("type") in ["languagebind"]:
+    if model_properties.get("type") in ['languagebind']:
         preprocessors = model.get_preprocessors()
     elif model_properties.get("type") in [ModelType.OpenCLIP, ModelType.CLIP]:
         preprocessors = {"image": getattr(model, "preprocess", None)}
     else:
-        raise InternalError(
-            f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
-            f"add_document "
-        )
+        raise InternalError(f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
+                            f"add_document ")
     return model, Preprocessors(**preprocessors)
 
 
 def _get_max_vectorise_batch_size() -> int:
     """Gets MARQO_MAX_VECTORISE_BATCH_SIZE from the environment, validates it before returning it."""
 
-    max_batch_size_value = read_env_vars_and_defaults(
-        EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE
-    )
+    max_batch_size_value = read_env_vars_and_defaults(EnvVars.MARQO_MAX_VECTORISE_BATCH_SIZE)
     validation_error_msg = (
         "Could not properly read env var `MARQO_MAX_VECTORISE_BATCH_SIZE`. "
         "`MARQO_MAX_VECTORISE_BATCH_SIZE` must be an int greater than or equal to 1."
@@ -261,17 +186,13 @@ def _get_max_vectorise_batch_size() -> int:
         logger.error(value_error_msg)
         raise ConfigurationError(value_error_msg) from e
     if batch_size < 1:
-        batch_size_too_small_msg = (
-            f"`{validation_error_msg} Current value: `{max_batch_size_value}`."
-        )
+        batch_size_too_small_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`."
         logger.error(batch_size_too_small_msg)
         raise ConfigurationError(batch_size_too_small_msg)
     return batch_size
 
 
-def _create_model_cache_key(
-    model_name: str, device: str, model_properties: dict = None
-) -> str:
+def _create_model_cache_key(model_name: str, device: str, model_properties: dict = None) -> str:
     """creates a key to store the loaded model by in the cache
 
     Args:
@@ -287,31 +208,18 @@ def _create_model_cache_key(
     if model_properties is None:
         model_properties = dict()
 
-    model_cache_key = (
-        model_name
-        + "||"
-        + model_properties.get("name", "")
-        + "||"
-        + str(model_properties.get("dimensions", ""))
-        + "||"
-        + model_properties.get("type", "")
-        + "||"
-        + str(model_properties.get("tokens", ""))
-        + "||"
-        + device
-    )
+    model_cache_key = (model_name + "||" +
+                       model_properties.get('name', '') + "||" +
+                       str(model_properties.get('dimensions', '')) + "||" +
+                       model_properties.get('type', '') + "||" +
+                       str(model_properties.get('tokens', '')) + "||" +
+                       device)
 
     return model_cache_key
 
 
-def _update_available_models(
-    model_cache_key: str,
-    model_name: str,
-    validated_model_properties: dict,
-    device: str,
-    normalize_embeddings: bool,
-    model_auth: ModelAuth = None,
-) -> None:
+def _update_available_models(model_cache_key: str, model_name: str, validated_model_properties: dict,
+                             device: str, normalize_embeddings: bool, model_auth: ModelAuth = None) -> None:
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
@@ -321,36 +229,28 @@ def _update_available_models(
             raise ModelCacheManagementError(
                 "Request rejected, as this request attempted to update the model cache, while "
                 "another request was updating the model cache at the same time. "
-                "Please wait for 10 seconds and send the request again "
-            )
+                "Please wait for 10 seconds and send the request again ")
         with lock:
-            _validate_model_into_device(
-                model_name,
-                validated_model_properties,
-                device,
-                calling_func=_update_available_models.__name__,
-            )
+            _validate_model_into_device(model_name, validated_model_properties, device,
+                                        calling_func=_update_available_models.__name__)
             try:
                 most_recently_used_time = datetime.datetime.now()
                 _available_models[model_cache_key] = {
                     AvailableModelsKey.model: _load_model(
-                        model_name,
-                        validated_model_properties,
+                        model_name, validated_model_properties,
                         device=device,
                         calling_func=_update_available_models.__name__,
-                        model_auth=model_auth,
+                        model_auth=model_auth
                     ),
                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
-                    AvailableModelsKey.model_size: model_size,
+                    AvailableModelsKey.model_size: model_size
                 }
                 logger.info(
-                    f"loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}."
-                )
+                    f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
             except Exception as e:
                 logger.error(
                     f"Error loading model {model_name} on device {device} with normalization={normalize_embeddings}. \n"
-                    f"Error message is {str(e)}"
-                )
+                    f"Error message is {str(e)}")
 
                 if isinstance(e, ModelDownloadError):
                     raise e
@@ -358,24 +258,18 @@ def _update_available_models(
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "
                     f"please check that model_properties={validated_model_properties} is correct "
-                    f"and Marqo has access to the weights file."
-                ) from e
+                    f"and Marqo has access to the weights file.") from e
 
     else:
         most_recently_used_time = datetime.datetime.now()
-        logger.debug(
-            f"renewed {model_name} on device {device} with new most recently time={most_recently_used_time}."
-        )
+        logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')
         try:
-            _available_models[model_cache_key][
-                AvailableModelsKey.most_recently_used_time
-            ] = most_recently_used_time
+            _available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
         except KeyError as e:
             raise ModelNotInCacheError(
                 f"Marqo cannot renew model {model_name} on device {device} with normalization={normalize_embeddings}. "
                 f"Maybe another thread is updating the model cache at the same time."
-                f"Please wait for 10 seconds and send the request again.\n"
-            ) from e
+                f"Please wait for 10 seconds and send the request again.\n") from e
 
 
 def validate_model_properties(model_name: str, model_properties: dict) -> dict:
@@ -403,10 +297,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         if model_type in (None, ModelType.SBERT):
             required_keys = ["dimensions", "name"]
             # updates model dict with default values if optional keys are missing for sbert
-            optional_keys_values = [
-                ("type", ModelType.SBERT),
-                ("tokens", get_default_seq_length()),
-            ]
+            optional_keys_values = [("type", ModelType.SBERT), ("tokens", get_default_seq_length())]
             for key, value in optional_keys_values:
                 if key not in model_properties:
                     model_properties[key] = value
@@ -417,42 +308,29 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_type in (ModelType.NO_MODEL,):
             required_keys = ["dimensions"]
             if not model_name == "no_model":
-                raise InvalidModelPropertiesError(
-                    f"To use the 'no_model' feature, you must provide 'model = no_model' "
-                    f"and 'type = no_model', but received 'model = {model_name}' and "
-                    f"'type = {model_type}'."
-                )
-        elif model_type in (
-            ModelType.Test,
-            ModelType.Random,
-            ModelType.MultilingualClip,
-            ModelType.FP16_CLIP,
-            ModelType.SBERT_ONNX,
-            ModelType.CLIP_ONNX,
-            ModelType.LanguageBind,
-        ):
+                raise InvalidModelPropertiesError(f"To use the 'no_model' feature, you must provide 'model = no_model' "
+                                                  f"and 'type = no_model', but received 'model = {model_name}' and "
+                                                  f"'type = {model_type}'.")
+        elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX, ModelType.LanguageBind):
             pass
         else:
-            raise InvalidModelPropertiesError(
-                f"Invalid model type. Please check the model type in model_properties. "
-                f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
-                f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.HF_STELLA}', "
-                f"'{ModelType.NO_MODEL}', "
-                f"'{ModelType.Test}', '{ModelType.Random}', "
-                f"'{ModelType.MultilingualClip}', "
-                f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', "
-                f"'{ModelType.CLIP_ONNX}' "
-            )
+            raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
+                                              f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
+                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.HF_STELLA}', "
+                                              f"'{ModelType.NO_MODEL}', "
+                                              f"'{ModelType.Test}', '{ModelType.Random}', "
+                                              f"'{ModelType.MultilingualClip}', "
+                                              f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', "
+                                              f"'{ModelType.CLIP_ONNX}' ")
 
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(
-                    f"model_properties has missing key '{key}'. "
-                    f"please update your model properties with required key `{key}`. "
-                    f"{error_message_postfix} "
-                    f"check {marqo_docs.list_of_models()}, "
-                    f"{marqo_docs.bring_your_own_model()} for more info"
-                )
+                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. "
+                                                  f"please update your model properties with required key `{key}`. "
+                                                  f"{error_message_postfix} "
+                                                  f"check {marqo_docs.list_of_models()}, "
+                                                  f"{marqo_docs.bring_your_own_model()} for more info")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
@@ -467,17 +345,14 @@ def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
 
     Raises:
         InvalidModelPropertiesError: if the dimensions value is invalid
-    """
+        """
     if dimensions is None or not isinstance(dimensions, int) or dimensions < 1:
         raise InvalidModelPropertiesError(
-            f"Invalid model properties: 'dimensions' must be a positive integer, but received {dimensions}."
-        )
+            f"Invalid model properties: 'dimensions' must be a positive integer, but received {dimensions}.")
 
 
-def _validate_model_into_device(
-    model_name: str, model_properties: dict, device: str, calling_func: str = None
-) -> bool:
-    """
+def _validate_model_into_device(model_name: str, model_properties: dict, device: str, calling_func: str = None) -> bool:
+    '''
     Note: this function should only be called by `_update_available_models` for threading safeness.
 
     A function to detect if the device have enough memory to load the target model.
@@ -489,56 +364,37 @@ def _validate_model_into_device(
     Returns:
         True we have enough space for the model
         Raise an error and return False if we can't find enough space for the model.
-    """
+    '''
     if calling_func not in ["unit_test", "_update_available_models"]:
-        raise RuntimeError(
-            "This function should only be called by `update_available_models` or `unit_test` for "
-            "thread safeness."
-        )
+        raise RuntimeError("This function should only be called by `update_available_models` or `unit_test` for "
+                           "thread safeness.")
 
     model_size = get_model_size(model_name, model_properties)
-    if _check_memory_threshold_for_model(
-        device, model_size, calling_func=_validate_model_into_device.__name__
-    ):
+    if _check_memory_threshold_for_model(device, model_size, calling_func=_validate_model_into_device.__name__):
         return True
     else:
-        model_cache_key_for_device = [
-            key for key in list(_available_models) if key.endswith(device)
-        ]
-        sorted_key_for_device = sorted(
-            model_cache_key_for_device,
-            key=lambda x: _available_models[x][
-                AvailableModelsKey.most_recently_used_time
-            ],
-        )
+        model_cache_key_for_device = [key for key in list(_available_models) if key.endswith(device)]
+        sorted_key_for_device = sorted(model_cache_key_for_device,
+                                       key=lambda x: _available_models[x][
+                                           AvailableModelsKey.most_recently_used_time])
         for key in sorted_key_for_device:
             logger.info(
                 f"Eject model = `{key.split('||')[0]}` with size = `{_available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
-                f"to save space for model = `{model_name}`."
-            )
+                f"to save space for model = `{model_name}`.")
             del _available_models[key]
-            if _check_memory_threshold_for_model(
-                device, model_size, calling_func=_validate_model_into_device.__name__
-            ):
+            if _check_memory_threshold_for_model(device, model_size, calling_func=_validate_model_into_device.__name__):
                 return True
 
-        if (
-            _check_memory_threshold_for_model(
-                device, model_size, calling_func=_validate_model_into_device.__name__
-            )
-            is False
-        ):
+        if _check_memory_threshold_for_model(device, model_size,
+                                             calling_func=_validate_model_into_device.__name__) is False:
             raise ModelCacheManagementError(
                 f"Marqo CANNOT find enough space to load model = `{model_name}` in device = `{device}`.\n"
                 f"Marqo tried to eject all the models on this device = `{device}` but still can't find enough space. \n"
-                f"Please use a smaller model or increase the memory threshold."
-            )
+                f"Please use a smaller model or increase the memory threshold.")
 
 
-def _check_memory_threshold_for_model(
-    device: str, model_size: Union[float, int], calling_func: str = None
-) -> bool:
-    """
+def _check_memory_threshold_for_model(device: str, model_size: Union[float, int], calling_func: str = None) -> bool:
+    '''
     Note: this function should only be called by `_validate_model_into_device` for threading safeness.
     `_validate_model_into_device` is calle by `_update_available_models` which is already thread safe.
 
@@ -549,63 +405,43 @@ def _check_memory_threshold_for_model(
     Returns:
         True if we have enough space
         False if we don't have enough space
-    """
+    '''
     if calling_func not in ["unit_test", "_validate_model_into_device"]:
-        raise RuntimeError(
-            f"The function `{_check_memory_threshold_for_model.__name__}` should only be called by "
-            f"`unit_test` or `_validate_model_into_device` for threading safeness."
-        )
+        raise RuntimeError(f"The function `{_check_memory_threshold_for_model.__name__}` should only be called by "
+                           f"`unit_test` or `_validate_model_into_device` for threading safeness.")
 
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         torch.cuda.empty_cache()
-        used_memory = sum(
-            [
-                _available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE)
-                for key, values in _available_models.items()
-                if key.endswith(device)
-            ]
-        )
-        threshold = float(
-            read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY)
-        )
+        used_memory = sum([_available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                           _available_models.items() if key.endswith(device)])
+        threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
-        used_memory = sum(
-            [
-                _available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE)
-                for key, values in _available_models.items()
-                if key.endswith("cpu")
-            ]
-        )
-        threshold = float(
-            read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY)
-        )
+        used_memory = sum([_available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                           _available_models.items() if key.endswith("cpu")])
+        threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY))
     else:
         raise ModelCacheManagementError(
             f"Unable to check the device cache for device=`{device}`. The model loading will proceed"
-            f"without device cache check. This might break down Marqo if too many models are loaded."
-        )
+            f"without device cache check. This might break down Marqo if too many models are loaded.")
     if model_size > threshold:
         raise ModelCacheManagementError(
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshold = `{threshold}`. "
             f"Marqo CANNOT find enough space for the model. Please change the threshold by adjusting the environment variables.\n"
             f"Please modify the threshold by setting the environment variable `MARQO_MAX_CUDA_MODEL_MEMORY` or `MARQO_MAX_CPU_MODEL_MEMORY`."
-            f"You can find more detailed information at {marqo_docs.configuring_marqo()}."
-        )
+            f"You can find more detailed information at {marqo_docs.configuring_marqo()}.")
     return (used_memory + model_size) < threshold
 
 
 def get_model_size(model_name: str, model_properties: dict) -> (int, float):
-    """
+    '''
     Return the model size for given model
     Note that the priorities are size_in_properties -> model_name -> model_type -> default size
-    """
+    '''
     if "model_size" in model_properties:
         return model_properties["model_size"]
 
-    name_info = (
-        (model_name + model_properties.get("name", "")).lower().replace("/", "-")
-    )
+    name_info = (model_name + model_properties.get("name", "")).lower().replace("/", "-")
     for name, size in constants.MODEL_NAME_SIZE_MAPPING.items():
         if name in name_info:
             return size
@@ -615,13 +451,9 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 
 def _load_model(
-    model_name: str,
-    model_properties: dict,
-    device: str,
-    calling_func: str = None,
-    model_auth: Optional[ModelAuth] = None,
-    max_retries: int = 3,
-    retry_delay: int = 5,
+        model_name: str, model_properties: dict, device: str,
+        calling_func: str = None, model_auth: Optional[ModelAuth] = None,
+        max_retries: int = 3, retry_delay: int = 5
 ) -> Any:
     """Load a model with retry mechanism in case of transient failures.
 
@@ -640,28 +472,19 @@ def _load_model(
         ModelLoadError: If loading fails after all retries.
     """
     if calling_func not in ["unit_test", "_update_available_models"]:
-        raise RuntimeError(
-            f"The function `{_load_model.__name__}` should only be called by "
-            f"`unit_test` or `_update_available_models` for threading safety."
-        )
+        raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
+                           f"`unit_test` or `_update_available_models` for threading safety.")
 
     model_type = model_properties.get("type")
-    loader = _get_model_loader(model_properties.get("name", None), model_properties)
+    loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
     attempt = 0
     while attempt < max_retries:
         try:
-            print(
-                f"Attempt {attempt + 1}/{max_retries}: Loading model `{model_name}` on `{device}`..."
-            )
+            print(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
 
             # Load the model
-            if model_type in (
-                ModelType.OpenCLIP,
-                ModelType.HF_MODEL,
-                ModelType.HF_STELLA,
-                ModelType.LanguageBind,
-            ):
+            if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
                 model = loader(
                     device=device,
                     model_properties=model_properties,
@@ -669,26 +492,19 @@ def _load_model(
                 )
             else:
                 model = loader(
-                    model_properties.get("name", None),
+                    model_properties.get('name', None),
                     device=device,
-                    embedding_dim=model_properties["dimensions"],
+                    embedding_dim=model_properties['dimensions'],
                     model_properties=model_properties,
                     model_auth=model_auth,
-                    max_seq_length=model_properties.get(
-                        "tokens", get_default_seq_length()
-                    ),
+                    max_seq_length=model_properties.get('tokens', get_default_seq_length())
                 )
 
             model.load()  # Load the model
             print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
             return model  # ✅ Success, return the model
 
-        except (
-            ReadTimeoutError,
-            requests.exceptions.Timeout,
-            OSError,
-            RuntimeError,
-        ) as e:
+        except (ReadTimeoutError, requests.exceptions.Timeout, OSError, RuntimeError) as e:
             print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
             attempt += 1
 
@@ -702,10 +518,10 @@ def _load_model(
 
 
 def clear_loaded_models() -> None:
-    """clears the loaded model cache
+    """ clears the loaded model cache
 
-    Future_Change:
-        expose cache related functions to the client
+        Future_Change:
+            expose cache related functions to the client
     """
     _available_models.clear()
     if torch.cuda.is_available():
@@ -714,7 +530,7 @@ def clear_loaded_models() -> None:
 
 
 def get_model_properties_from_registry(model_name: str) -> dict:
-    """Returns a dict describing properties of a model.
+    """ Returns a dict describing properties of a model.
 
     These properties will be used by the tensor_search application to set up
     index parameters.
@@ -726,13 +542,11 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     Returns:
         dict: a dictionary describing properties of the model.
     """
-    if model_name not in MODEL_PROPERTIES["models"]:
-        raise UnknownModelError(
-            f"Could not find model properties in model registry for model={model_name}. "
-            f"Model is not supported by default."
-        )
+    if model_name not in MODEL_PROPERTIES['models']:
+        raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
+                                f"Model is not supported by default.")
 
-    model_properties = MODEL_PROPERTIES["models"][model_name]
+    model_properties = MODEL_PROPERTIES['models'][model_name]
 
     validate_model_properties(model_name, model_properties)
 
@@ -766,7 +580,8 @@ def _check_output_type(output: List[List[float]]) -> bool:
     return True
 
 
-def _float_tensor_to_list(output: FloatTensor) -> Union[List[List[float]], List[float]]:
+def _float_tensor_to_list(output: FloatTensor) -> Union[
+    List[List[float]], List[float]]:
     """
     Args:
         output (FloatTensor): _description_
@@ -797,18 +612,14 @@ def _convert_tensor_to_numpy(output: Union[FloatTensor, Tensor]) -> ndarray:
     A function that convert tensors to numpy arrays
     """
     if isinstance(output, (torch.Tensor, torch.FloatTensor)):
-        return output.to("cpu").detach().numpy()
+        return output.to('cpu').detach().numpy()
     elif isinstance(output, ndarray):
         return output
     else:
-        raise ValueError(
-            f"Marqo received an unexpected output type=`{type(output).__name__}`from encode function."
-        )
+        raise ValueError(f"Marqo received an unexpected output type=`{type(output).__name__}`from encode function.")
 
 
-def _convert_cached_embeddings_to_output(
-    cached_embeddings: List[float],
-) -> List[List[float]]:
+def _convert_cached_embeddings_to_output(cached_embeddings: List[float]) -> List[List[float]]:
     """
     A function that converts cached embeddings List[float] to the expected output List[List[float]]
 
@@ -818,21 +629,14 @@ def _convert_cached_embeddings_to_output(
         List[List[float]]: The converted embeddings in the expected output format
     """
     if not isinstance(cached_embeddings, list):
-        raise TypeError(
-            f"expected a list of floats but received {type(cached_embeddings)}"
-        )
+        raise TypeError(f"expected a list of floats but received {type(cached_embeddings)}")
     if not isinstance(cached_embeddings[0], float):
-        raise TypeError(
-            f"expected a list of floats but received {type(cached_embeddings[0])}"
-        )
-    return [
-        cached_embeddings,
-    ]
+        raise TypeError(f"expected a list of floats but received {type(cached_embeddings[0])}")
+    return [cached_embeddings, ]
 
 
-def _convert_vectorized_output(
-    output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False
-) -> List[List[float]]:
+def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[
+    List[float]]:
     """converts the model outputs to a list of lists of floats
     also checks the input dim, expects (samples x vector dim)
     if a single sample is present, will pad the first dim to make it (1 x vector_dim)
@@ -864,9 +668,7 @@ def _convert_vectorized_output(
         elif isinstance(output[0], ndarray):
             output = [_nd_array_to_list(_o) for _o in output]
         else:
-            raise TypeError(
-                f"unsupported nested list with elements of type {type(output[0])}"
-            )
+            raise TypeError(f"unsupported nested list with elements of type {type(output[0])}")
 
     else:
         raise TypeError(f"unsupported output type of {type(output)}")
@@ -877,13 +679,11 @@ def _convert_vectorized_output(
     if _check_output_type(output):
         return output
 
-    raise TypeError(
-        f"unable to convert input of type {type(output)} to a list of lists of floats"
-    )
+    raise TypeError(f"unable to convert input of type {type(output)} to a list of lists of floats")
 
 
 def _get_model_loader(model_name: str, model_properties: dict) -> Any:
-    """Returns a dict describing properties of a model.
+    """ Returns a dict describing properties of a model.
 
     These properties will be used by the tensor_search application to set up
     index parameters.
@@ -896,14 +696,12 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
         dict: a dictionary describing properties of the model.
     """
 
-    model_type = model_properties["type"]
+    model_type = model_properties['type']
 
-    if model_type not in MODEL_PROPERTIES["loaders"]:
-        raise KeyError(
-            f"model_name={model_name} for model_type={model_type} not in allowed model types"
-        )
+    if model_type not in MODEL_PROPERTIES['loaders']:
+        raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
 
-    return MODEL_PROPERTIES["loaders"][model_type]
+    return MODEL_PROPERTIES['loaders'][model_type]
 
 
 def eject_model(model_name: str, device: str):
@@ -922,23 +720,15 @@ def eject_model(model_name: str, device: str):
             continue
 
     if model_cache_key is None:
-        raise ModelNotInCacheError(
-            f"The model_name `{model_name}` device `{device}` is not cached or found"
-        )
+        raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
 
     if model_cache_key in _available_models:
         del _available_models[model_cache_key]
         if device.startswith("cuda"):
             torch.cuda.empty_cache()
-        return {
-            "result": "success",
-            "message": f"successfully eject model_name `{model_name}` from device `{device}`",
-        }
+        return {"result": "success", "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
     else:
-        raise ModelNotInCacheError(
-            f"The model_name `{model_name}` device `{device}` is not cached or found"
-        )
-
+        raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
 
 # def normalize(inputs):
 

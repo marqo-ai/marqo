@@ -34,7 +34,7 @@ class V2V1V2V0Rollback(Rollback):
             logger.info("Removing Marqo config")
             self._remove_marqo_version()
         except Exception as e:
-            raise Exception("Rollback v21v20 failed") from e
+            raise Exception('Rollback v21v20 failed') from e
 
         logger.info("Verifying rollback")
         self._verify_query_profile()
@@ -45,21 +45,20 @@ class V2V1V2V0Rollback(Rollback):
     def _delete_query_profile(self):
         app = self.vespa_client.download_application()
 
-        shutil.rmtree(os.path.join(app, "search"), ignore_errors=True)
+        shutil.rmtree(os.path.join(app, 'search'), ignore_errors=True)
 
         self.vespa_client.deploy_application(app)
         self.vespa_client.wait_for_application_convergence()
 
     def _remove_marqo_version(self):
         self.vespa_client.delete_document(
-            id=self.config_id, schema=self.settings_schema
+            id=self.config_id,
+            schema=self.settings_schema
         )
 
     def _verify_query_profile(self):
         app = self.vespa_client.download_application()
-        profile_path_exists = os.path.exists(
-            os.path.join(app, "search/query-profiles", "default.xml")
-        )
+        profile_path_exists = os.path.exists(os.path.join(app, 'search/query-profiles', 'default.xml'))
         if profile_path_exists:
             raise api_exceptions.InternalError(
                 "Query profile exists. Rollback has not been applied correctly"
@@ -67,7 +66,7 @@ class V2V1V2V0Rollback(Rollback):
 
     def _verify_marqo_version(self):
         configured_version = self.index_management.get_marqo_version()
-        if configured_version != "2.0":
+        if configured_version != '2.0':
             raise api_exceptions.InternalError(
                 f"Marqo version in config is {configured_version}, expected 2.0. "
                 f"Rollback has not been applied correctly"

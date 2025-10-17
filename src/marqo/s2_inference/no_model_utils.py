@@ -1,6 +1,6 @@
 from marqo.s2_inference.errors import VectoriseError
-from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.sbert_utils import Model
+from marqo.s2_inference.models.model_type import ModelType
 
 
 class NO_MODEL(Model):
@@ -11,8 +11,6 @@ class NO_MODEL(Model):
         pass
 
     def encode(self, *args, **kwargs) -> None:
-        raise VectoriseError(
-            f"Cannot vectorise anything with '{ModelType.NO_MODEL}'. "
-            f"This model is intended for adding documents and searching with custom vectors only. "
-            f"If vectorisation is needed, please use a different model "
-        )
+        raise VectoriseError(f"Cannot vectorise anything with '{ModelType.NO_MODEL}'. "
+                             f"This model is intended for adding documents and searching with custom vectors only. "
+                             f"If vectorisation is needed, please use a different model ")

@@ -1,28 +1,23 @@
-import unittest
-import urllib.parse
-
 import pydantic
 
-from marqo.api.exceptions import BadRequestError, InternalError, InvalidArgError
-from marqo.api.models.add_docs_objects import AddDocsBodyParams, ModelAuth
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search.models.private_models import S3Auth
-from marqo.tensor_search.web import api_utils
+from marqo.api.models.add_docs_objects import ModelAuth, AddDocsBodyParams
 from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
+from marqo.tensor_search.models.private_models import S3Auth
+import urllib.parse
+from marqo.tensor_search.web import api_utils
+from marqo.api.exceptions import InvalidArgError, InternalError, BadRequestError
 from tests.integ_tests.marqo_test import MarqoTestCase
+import unittest
 
 
 class TestApiUtils(MarqoTestCase):
+
     def test_translate_api_device_good(self):
-        for given, expected in [
-            ("cpu", "cpu"),
-            ("cuda", "cuda"),
-            ("CPU", "cpu"),
-            ("CUDA2", "cuda:2"),
-            ("cuda1234", "cuda:1234"),
-            ("cpu1", "cpu:1"),
-            (None, None),
-        ]:
+        for given, expected in [("cpu", "cpu"), ("cuda", "cuda"),
+                                ("CPU", "cpu"), ("CUDA2", "cuda:2"),
+                                ("cuda1234", "cuda:1234"), ("cpu1", "cpu:1"),
+                                (None, None)]:
             assert expected == api_utils.translate_api_device(given)
 
     def test_translate_api_device_bad(self):
@@ -38,24 +33,14 @@ class TestApiUtils(MarqoTestCase):
         for opensearch_url, authorized_url in [
             ("http://admin:admin@localhost:9200", "http://admin:admin@localhost:9200"),
             ("http://localhost:9200", "http://admin:admin@localhost:9200"),
-            (
-                "https://admin:admin@localhost:9200",
-                "https://admin:admin@localhost:9200",
-            ),
+            ("https://admin:admin@localhost:9200", "https://admin:admin@localhost:9200"),
             ("https://localhost:9200", "https://admin:admin@localhost:9200"),
+            ("http://king_user:mysecretpw@unusual.com/happy@chappy:9200",
+             "http://king_user:mysecretpw@unusual.com/happy@chappy:9200"),
+            ("http://unusual.com/happy@chappy:9200", "http://admin:admin@unusual.com/happy@chappy:9200"),
             (
-                "http://king_user:mysecretpw@unusual.com/happy@chappy:9200",
-                "http://king_user:mysecretpw@unusual.com/happy@chappy:9200",
-            ),
-            (
-                "http://unusual.com/happy@chappy:9200",
-                "http://admin:admin@unusual.com/happy@chappy:9200",
-            ),
-            (
-                "http://www.unusual.com/happy@@@@#chappy:9200",
-                "http://admin:admin@www.unusual.com/happy@@@@#chappy:9200",
-            ),
-            ("://", "://admin:admin@"),
+            "http://www.unusual.com/happy@@@@#chappy:9200", "http://admin:admin@www.unusual.com/happy@@@@#chappy:9200"),
+            ("://", "://admin:admin@")
         ]:
             c = api_utils.upconstruct_authorized_url(opensearch_url=opensearch_url)
             assert authorized_url == c
@@ -71,6 +56,7 @@ class TestApiUtils(MarqoTestCase):
 
 
 class TestDecodeQueryStringModelAuth(MarqoTestCase):
+
     def test_decode_query_string_model_auth_none(self):
         result = api_utils.decode_query_string_model_auth()
         self.assertIsNone(result)
@@ -80,41 +66,33 @@ class TestDecodeQueryStringModelAuth(MarqoTestCase):
         self.assertIsNone(result)
 
     def test_decode_query_string_model_auth_valid(self):
-        model_auth_obj = ModelAuth(
-            s3=S3Auth(
-                aws_access_key_id="some_acc_id", aws_secret_access_key="some_sece_key"
-            )
-        )
+        model_auth_obj = ModelAuth(s3=S3Auth(
+            aws_access_key_id='some_acc_id', aws_secret_access_key='some_sece_key'))
         model_auth_str = model_auth_obj.json()
         model_auth_url_encoded = urllib.parse.quote_plus(model_auth_str)
 
         result = api_utils.decode_query_string_model_auth(model_auth_url_encoded)
 
         self.assertIsInstance(result, ModelAuth)
-        self.assertEqual(result.s3.aws_access_key_id, "some_acc_id")
-        self.assertEqual(result.s3.aws_secret_access_key, "some_sece_key")
+        self.assertEqual(result.s3.aws_access_key_id, 'some_acc_id')
+        self.assertEqual(result.s3.aws_secret_access_key, 'some_sece_key')
         self.assertEqual(result.hf, None)
 
     def test_decode_query_string_model_auth_invalid(self):
         with self.assertRaises(pydantic.v1.ValidationError):
             api_utils.decode_query_string_model_auth("invalid_url_encoded_string")
 
-
 @unittest.skip
 class TestAddDocsParamsOrchestrator(unittest.TestCase):
     def test_add_docs_params_orchestrator(self):
         # Set up the arguments for the function
         index_name = "test-index"
-        body = AddDocsBodyParams(
-            documents=[{"test": "doc"}],
-            nonTensorFields=["field1"],
-            useExistingTensors=True,
-            imageDownloadHeaders={"header1": "value1"},
-            modelAuth=ModelAuth(
-                s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")
-            ),
-            mappings={"map1": "value1"},
-        )
+        body = AddDocsBodyParams(documents=[{"test": "doc"}],
+                                    nonTensorFields=["field1"],
+                                    useExistingTensors=True,
+                                    imageDownloadHeaders={"header1": "value1"},
+                                    modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
+                                    mappings={"map1": "value1"})
         device = "test-device"
 
         # Query parameters should be parsed as default values
@@ -125,16 +103,8 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         mappings = dict()
 
         # Call the function with the arguments
-        result = add_docs_params_orchestrator(
-            index_name,
-            body,
-            device,
-            non_tensor_fields,
-            mappings,
-            model_auth,
-            media_download_headers,
-            use_existing_tensors,
-        )
+        result = add_docs_params_orchestrator(index_name, body, device, non_tensor_fields, mappings,
+                                              model_auth, media_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -149,9 +119,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
     def test_add_docs_params_orchestrator_deprecated_query_parameters(self):
         # Set up the arguments for the function
         index_name = "test-index"
-        model_auth = ModelAuth(
-            s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")
-        )
+        model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
 
         body = [{"test": "doc"}]
 
@@ -164,17 +132,8 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         auto_refresh = True
 
         # Call the function with the arguments
-        result = add_docs_params_orchestrator(
-            index_name,
-            body,
-            device,
-            auto_refresh,
-            non_tensor_fields,
-            mappings,
-            model_auth,
-            media_download_headers,
-            use_existing_tensors,
-        )
+        result = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+                                              model_auth, media_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -191,9 +150,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         body = "invalid body type"  # Not an instance of AddDocsBodyParams or List[Dict]
 
         index_name = "test-index"
-        model_auth = ModelAuth(
-            s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")
-        )
+        model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
 
         device = "test-device"
         non_tensor_fields = ["field1"]
@@ -205,61 +162,33 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
 
         # Use pytest.raises to check for the error
         try:
-            _ = add_docs_params_orchestrator(
-                index_name,
-                body,
-                device,
-                auto_refresh,
-                non_tensor_fields,
-                mappings,
-                model_auth,
-                media_download_headers,
-                use_existing_tensors,
-            )
+           _ = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+                                            model_auth, media_download_headers, use_existing_tensors)
         except InternalError as e:
             self.assertIn("Unexpected request body type", str(e))
 
     def test_add_docs_params_orchestrator_deprecated_query_parameters_error(self):
         # Test the case where the function should raise an error due to deprecated query parameters
         index_name = "test-index"
-        model_auth = ModelAuth(
-            s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")
-        )
+        model_auth = ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test"))
         device = "test-device"
         auto_refresh = True
-        body = AddDocsBodyParams(
-            documents=[{"test": "doc"}],
-            nonTensorFields=["field1"],
-            useExistingTensors=True,
-            imageDownloadHeaders={"header1": "value1"},
-            modelAuth=ModelAuth(
-                s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")
-            ),
-            mappings={"map1": "value1"},
-        )
+        body = AddDocsBodyParams(documents=[{"test": "doc"}],
+                                    nonTensorFields=["field1"],
+                                    useExistingTensors=True,
+                                    imageDownloadHeaders={"header1": "value1"},
+                                    modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
+                                    mappings={"map1": "value1"})
 
-        params = {
-            "non_tensor_fields": ["what"],
-            "use_existing_tensors": True,
-            "media_download_headers": {"header2": "value2"},
-            "model_auth": model_auth,
-            "mappings": {"map2": "value2"},
-        }
+        params = {"non_tensor_fields": ["what"], "use_existing_tensors": True,
+                  "media_download_headers": {"header2": "value2"}, "model_auth": model_auth,
+                  "mappings": {"map2": "value2"}}
 
         for param, value in params.items():
             kwargs = {key: None for key in params.keys()}
             kwargs[param] = value
             try:
-                add_docs_params_orchestrator(
-                    index_name,
-                    body,
-                    device,
-                    auto_refresh=auto_refresh,
-                    query_parameters=kwargs,
-                    **kwargs,
-                )
+                add_docs_params_orchestrator(index_name, body, device, auto_refresh=auto_refresh,
+                                             query_parameters=kwargs, **kwargs)
             except BadRequestError as e:
-                self.assertIn(
-                    "Marqo is not accepting any of the following parameters in the query string",
-                    str(e),
-                )
+                self.assertIn("Marqo is not accepting any of the following parameters in the query string", str(e))

@@ -23,40 +23,34 @@ def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[
         return device
 
     if not isinstance(device, str):
-        raise InvalidArgError(
-            f"Device must be a str! Given "
-            f"device `{device}` of type {type(device).__name__} "
-        )
+        raise InvalidArgError(f"Device must be a str! Given "
+                              f"device `{device}` of type {type(device).__name__} ")
     lowered_device = device.lower()
     acceptable_devices = [d.value.lower() for d in enums.Device]
 
     match_attempt = [
-        (lowered_device.startswith(acceptable), lowered_device.replace(acceptable, ""))
-        for acceptable in acceptable_devices
-    ]
+        (lowered_device.startswith(acceptable),
+         lowered_device.replace(acceptable, ""))
+        for acceptable in acceptable_devices]
 
     try:
         prefix_match = [attempt[1] for attempt in match_attempt if attempt[0]][0]
-    except IndexError:
-        raise InvalidArgError(
-            f"Given device `{device}` doesn't start with a known device type. "
-            f"Acceptable device types: {acceptable_devices}"
-        )
+    except IndexError as k:
+        raise InvalidArgError(f"Given device `{device}` doesn't start with a known device type. "
+                              f"Acceptable device types: {acceptable_devices}")
     if not prefix_match:
         return device
     try:
         int(prefix_match)
     except ValueError:
-        raise InvalidArgError(
-            f"Given device `{device}` not recognised. "
-            f"Acceptable devices: {acceptable_devices}"
-        )
+        raise InvalidArgError(f"Given device `{device}` not recognised. "
+                              f"Acceptable devices: {acceptable_devices}")
     return device
 
 
 async def validate_device(device: typing.Optional[str] = None) -> typing.Optional[str]:
     """Translates the device string for internal use.
-
+    
     This function only performs basic string translation and does not validate
     if the device is available as inference runs in a separate service.
 
@@ -68,5 +62,5 @@ async def validate_device(device: typing.Optional[str] = None) -> typing.Optiona
     """
     if device is None:
         return None
-
+        
     return api_utils.translate_api_device(validate_api_device_string(device))

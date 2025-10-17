@@ -19,7 +19,7 @@ class TestStemming(MarqoTestCase):
         cls.client.create_index(
             index_name=cls.semi_structured_index_name,
             type="unstructured",
-            model="hf/e5-small-v2",
+            model="hf/e5-small-v2"
         )
         cls.indexes_to_delete.append(cls.semi_structured_index_name)
 
@@ -47,101 +47,59 @@ class TestStemming(MarqoTestCase):
             docs,
             tensor_fields=["title_stem1"],
             mappings={
-                "title_stem1": {
-                    "type": "text_field",
-                    "language": "de",
-                    "stemming": "none",
-                },
-                "title_stem2": {
-                    "type": "text_field",
-                    "language": "de",
-                    "stemming": "best",
-                },
-                "title_stem3": {
-                    "type": "text_field",
-                    "language": "de",
-                    "stemming": "shortest",
-                },
-                "title_stem4": {
-                    "type": "text_field",
-                    "language": "de",
-                    "stemming": "multiple",
-                },
+                "title_stem1": {"type": "text_field", "language": "de", "stemming": "none"},
+                "title_stem2": {"type": "text_field", "language": "de", "stemming": "best"},
+                "title_stem3": {"type": "text_field", "language": "de", "stemming": "shortest"},
+                "title_stem4": {"type": "text_field", "language": "de", "stemming": "multiple"},
             },
         )
 
-        self.assertFalse(res["errors"], "Should not have errors when adding documents")
+        self.assertFalse(res['errors'], "Should not have errors when adding documents")
 
     def test_stemming_search(self):
         """
         Test docs with different stemming configs return expected search results.
         """
         cases = [
-            ("nacionalmente", ["title_stem1"], ["1"], "Full word matches no stemming"),
             (
-                "nacionalmente",
-                ["title_stem2"],
-                ["2"],
-                "Full word matches best stemming",
+                "nacionalmente", ["title_stem1"], ["1"], "Full word matches no stemming"
             ),
             (
-                "nacionalmente",
-                ["title_stem3"],
-                ["3"],
-                "Full word matches shortest stemming",
+                "nacionalmente", ["title_stem2"], ["2"], "Full word matches best stemming"
             ),
             (
-                "nacionalmente",
-                ["title_stem4"],
-                ["4"],
-                "Full word matches multiple stemming",
+                "nacionalmente", ["title_stem3"], ["3"], "Full word matches shortest stemming"
             ),
             (
-                "nacionalmente",
-                ["title_stem1", "title_stem2"],
-                ["1", "2"],
-                "Full word matches with none and best fields",
+                "nacionalmente", ["title_stem4"], ["4"], "Full word matches multiple stemming"
+            ),
+
+            (
+                "nacionalmente", ["title_stem1", "title_stem2"], ["1", "2"], "Full word matches with none and "
+                                                                             "best fields"
             ),
             (
-                "nacionalment",
-                ["title_stem1"],
-                [],
-                "Stemmed word does not match none stemming",
+                "nacionalment", ["title_stem1"], [], "Stemmed word does not match none stemming"
             ),
             (
-                "nacionalment",
-                ["title_stem2"],
-                ["2"],
-                "Stemmed word matches best stemming",
+                "nacionalment", ["title_stem2"], ["2"], "Stemmed word matches best stemming"
             ),
             (
-                "nacionalment",
-                ["title_stem1", "title_stem2"],
-                ["2"],
-                "Stemmed word matches best stemming but not none",
+                "nacionalment", ["title_stem1", "title_stem2"], ["2"], "Stemmed word matches best stemming but not none"
             ),
             (
-                "nacionalment",
-                ["title_stem3"],
-                ["3"],
-                "Stemmed word matches shortest stemming",
+                "nacionalment", ["title_stem3"], ["3"], "Stemmed word matches shortest stemming"
             ),
+
             (
-                "nacionalment",
-                ["title_stem4"],
-                ["4"],
-                "Stemmed word matches multiple stemming",
+                "nacionalment", ["title_stem4"], ["4"], "Stemmed word matches multiple stemming"
             ),
         ]
 
         search_configs = [
             ("LEXICAL", {}, "lexical search"),
-            (
-                "HYBRID",
-                {"retrievalMethod": "lexical", "rankingMethod": "lexical"},
-                "hybrid lexical/lexical",
-            ),
-            ("HYBRID", {"alpha": 0}, "hybrid RRF with alpha=0"),
+            ("HYBRID", {"retrievalMethod": "lexical", "rankingMethod": "lexical"}, "hybrid lexical/lexical"),
+            ("HYBRID", {"alpha": 0}, "hybrid RRF with alpha=0")
         ]
 
         self.populate_index()
@@ -153,12 +111,10 @@ class TestStemming(MarqoTestCase):
                         q=query,
                         search_method=search_method,
                         language="de",
-                        hybrid_parameters=hybrid_params if hybrid_params else None,
+                        hybrid_parameters=hybrid_params if hybrid_params else None
                     )
 
-                    actual_ids = set(
-                        hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids
-                    )
+                    actual_ids = set(hit["_id"] for hit in res["hits"] if hit["_id"] in expected_ids)
                     self.assertEqual(set(expected_ids), actual_ids)
 
     def test_stemming_all_fields_search(self):
@@ -168,23 +124,17 @@ class TestStemming(MarqoTestCase):
         self.populate_index()
 
         res = self.client.index(self.semi_structured_index_name).search(
-            q="nacionalmente", search_method="LEXICAL", language="de"
+            q="nacionalmente",
+            search_method="LEXICAL",
+            language="de"
         )
 
-        self.assertGreater(
-            len(res["hits"]), 0, "Should find matches for 'nacionalmente' in all fields"
-        )
+        self.assertGreater(len(res["hits"]), 0, "Should find matches for 'nacionalmente' in all fields")
 
     def test_stemming_invalid_value_error(self):
         """Test that invalid stemming values produce proper API errors."""
         docs = [{"_id": "invalid_test", "field": "test content"}]
-        mappings = {
-            "field": {
-                "type": "text_field",
-                "language": "en",
-                "stemming": "invalid_algorithm",
-            }
-        }
+        mappings = {"field": {"type": "text_field", "language": "en", "stemming": "invalid_algorithm"}}
 
         # Should raise an error due to invalid stemming value
         with self.assertRaises(Exception) as cm:
@@ -199,73 +149,71 @@ class TestStemming(MarqoTestCase):
         """Test that changing stemming configuration produces API error."""
         # First add document with one stemming config
         docs1 = [{"_id": "change_test1", "title": "First document"}]
-        mappings1 = {
-            "title": {"type": "text_field", "language": "en", "stemming": "best"}
-        }
+        mappings1 = {"title": {"type": "text_field", "language": "en", "stemming": "best"}}
 
         response1 = self.client.index(self.semi_structured_index_name).add_documents(
             docs1, mappings=mappings1, tensor_fields=[]
         )
-        self.assertFalse(response1["errors"])
+        self.assertFalse(response1['errors'])
 
         # Try to add document with different stemming config for same field
         docs2 = [{"_id": "change_test2", "title": "Second document"}]
-        mappings2 = {
-            "title": {"type": "text_field", "language": "en", "stemming": "shortest"}
-        }
+        mappings2 = {"title": {"type": "text_field", "language": "en", "stemming": "shortest"}}
 
         response2 = self.client.index(self.semi_structured_index_name).add_documents(
             docs2, mappings=mappings2, tensor_fields=[]
         )
 
         # Should have errors
-        self.assertTrue(response2["errors"])
-        error_message = response2["items"][0]["message"]
+        self.assertTrue(response2['errors'])
+        error_message = response2['items'][0]['message']
         self.assertIn("different stemming configuration", error_message)
 
     def test_stemming_no_language(self):
         """Test that no stemming occurs when stemming is set to 'none' without language in field mapping."""
         docs = [
-            {"_id": "no_lang_1", "content": "running quickly"},
-            {"_id": "no_lang_2", "content": "runs fast"},
+            {
+                "_id": "no_lang_1",
+                "content": "running quickly"
+            },
+            {
+                "_id": "no_lang_2", 
+                "content": "runs fast"
+            }
         ]
 
         # Add documents with no stemming and no language in mapping
         res = self.client.index(self.semi_structured_index_name).add_documents(
             docs,
             tensor_fields=[],
-            mappings={"content": {"type": "text_field", "stemming": "none"}},
+            mappings={
+                "content": {"type": "text_field", "stemming": "none"}
+            }
         )
-
-        self.assertFalse(
-            res["errors"],
-            "Should not have errors when adding documents without language",
-        )
+        
+        self.assertFalse(res['errors'], "Should not have errors when adding documents without language")
 
         # Search for exact matches should work
         running_res = self.client.index(self.semi_structured_index_name).search(
             q="running",
             search_method="LEXICAL",
             language="en",
-            searchable_attributes=["content"],
+            searchable_attributes=["content"]
         )
-
+        
         runs_res = self.client.index(self.semi_structured_index_name).search(
             q="runs",
             search_method="LEXICAL",
             language="en",
-            searchable_attributes=["content"],
+            searchable_attributes=["content"]
         )
 
         # Verify exact matches work
         running_ids = {hit["_id"] for hit in running_res["hits"]}
         runs_ids = {hit["_id"] for hit in runs_res["hits"]}
-
-        self.assertEqual(
-            {"no_lang_1"}, running_ids, "Should find document with 'running'"
-        )
+        
+        self.assertEqual({"no_lang_1"}, running_ids, "Should find document with 'running'")
         self.assertEqual({"no_lang_2"}, runs_ids, "Should find document with 'runs'")
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

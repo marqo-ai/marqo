@@ -1,18 +1,15 @@
 from enum import Enum
-from typing import List, Optional
-
 from pydantic.v1 import Field, validator
+from typing import List, Optional
 
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.base_model import StrictBaseModel
-from marqo.core.unstructured_vespa_index.unstructured_validation import (
-    validate_field_name,
-)
+from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 
 
 class SortOrder(str, Enum):
     Asc = "asc"
-    Desc = "desc"
+    Desc= "desc"
 
 
 class SortMissingPolicy(str, Enum):
@@ -29,7 +26,6 @@ class SortByField(StrictBaseModel):
         order (SortOrder): The order of sorting, either asc(ascending) or desc(descending). Defaults to desc.
         missing (SortMissingPolicy): Defines how to handle missing values in the sort field. Defaults to last.
     """
-
     class Config(StrictBaseModel.Config):
         use_enum_values = True
 
@@ -37,7 +33,7 @@ class SortByField(StrictBaseModel):
     order: SortOrder = SortOrder.Desc
     missing: SortMissingPolicy = SortMissingPolicy.Last
 
-    @validator("field_name")
+    @validator('field_name')
     def _validate_field_name(cls, v):
         """Validate the field name is in a valid format."""
         try:
@@ -60,7 +56,6 @@ class SortByModel(StrictBaseModel):
         min_sort_candidates (Optional[int]): The minimum number of candidates to be retrieved.
             Check Vespa Custom Searcher for more details.
     """
-
     fields: List[SortByField] = Field(..., min_items=1, max_items=3)
     sort_depth: Optional[int] = Field(None, ge=1, alias="sortDepth")
     min_sort_candidates: Optional[int] = Field(None, ge=1, alias="minSortCandidates")

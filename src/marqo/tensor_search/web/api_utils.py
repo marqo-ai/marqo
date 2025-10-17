@@ -1,11 +1,11 @@
 import json
 import urllib.parse
-from typing import Dict, List, Optional, Union
+from typing import Union, List, Optional, Dict
 
 from marqo.api.exceptions import InvalidArgError
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import enums
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
@@ -33,10 +33,9 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
         (
             lowered_device.startswith(acceptable),
             lowered_device.replace(acceptable, ""),
-            acceptable,
+            acceptable
         )
-        for acceptable in acceptable_devices
-    ]
+        for acceptable in acceptable_devices]
 
     try:
         matched = [attempt for attempt in match_attempt if attempt[0]][0]
@@ -47,11 +46,9 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
         else:
             formatted = f"{prefix}:{suffix}"
             return formatted
-    except (IndexError, ValueError):
-        raise InvalidArgError(
-            f"Given device `{device}` isn't  a known device type. "
-            f"Acceptable device types: {acceptable_devices}"
-        )
+    except (IndexError, ValueError) as k:
+        raise InvalidArgError(f"Given device `{device}` isn't  a known device type. "
+                              f"Acceptable device types: {acceptable_devices}")
 
 
 def decode_media_download_headers(media_download_headers: Optional[str] = None) -> dict:
@@ -77,9 +74,7 @@ def decode_media_download_headers(media_download_headers: Optional[str] = None) 
             raise InvalidArgError(f"Error parsing media_download_headers. Message: {e}")
 
 
-def decode_query_string_model_auth(
-    model_auth: Optional[str] = None,
-) -> Optional[ModelAuth]:
+def decode_query_string_model_auth(model_auth: Optional[str] = None) -> Optional[ModelAuth]:
     """Decodes a url encoded ModelAuth string into a ModelAuth object
 
     Args:
@@ -102,14 +97,14 @@ def decode_query_string_model_auth(
 def decode_mappings(mappings: Optional[str] = None) -> dict:
     """Decodes mappings string into a Python dict
 
-    Args:
-        mappings: JSON-serialised, URL encoded mappings object
+       Args:
+           mappings: JSON-serialised, URL encoded mappings object
 
-    Returns:
-        mappings as a dict
+       Returns:
+           mappings as a dict
 
-    Raises:
-        InvalidArgError is there is trouble parsing the dictionary
+       Raises:
+           InvalidArgError is there is trouble parsing the dictionary
     """
     if not mappings:
         return dict()
@@ -122,9 +117,8 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
             raise InvalidArgError(f"Error parsing mappings. Message: {e}")
 
 
-def add_docs_params_orchestrator(
-    index_name: str, body: Union[AddDocsBodyParams, List[Dict]], device: str
-) -> AddDocsParams:
+def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
+                                 device: str) -> AddDocsParams:
     """An orchestrator for the add_documents API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
@@ -142,14 +136,9 @@ def add_docs_params_orchestrator(
     text_chunk_prefix = body.textChunkPrefix
 
     return AddDocsParams(
-        index_name=index_name,
-        docs=docs,
-        device=device,
-        tensor_fields=tensor_fields,
-        use_existing_tensors=use_existing_tensors,
-        media_download_headers=media_download_headers,
+        index_name=index_name, docs=docs,
+        device=device, tensor_fields=tensor_fields,
+        use_existing_tensors=use_existing_tensors, media_download_headers=media_download_headers,
         image_download_thread_count=image_download_thread_count,
-        mappings=mappings,
-        model_auth=model_auth,
-        text_chunk_prefix=text_chunk_prefix,
+        mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
     )

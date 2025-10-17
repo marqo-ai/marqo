@@ -1,12 +1,13 @@
 import uuid
 
 from marqo.client import Client
+
 from tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredGetSettings(MarqoTestCase):
-    default_index_name = "default_index" + str(uuid.uuid4()).replace("-", "")
-    custom_index_name = "custom_index" + str(uuid.uuid4()).replace("-", "")
+    default_index_name = "default_index" + str(uuid.uuid4()).replace('-', '')
+    custom_index_name = "custom_index" + str(uuid.uuid4()).replace('-', '')
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -32,26 +33,16 @@ class TestStructuredGetSettings(MarqoTestCase):
         'annParameters': {'spaceType': 'angular', 'parameters': {'efConstruction': 128, 'm': 16}}
         }
         """
-        self.client.create_index(
-            index_name=self.default_index_name,
-            type="structured",
-            all_fields=[{"name": "title", "type": "text"}],
-            tensor_fields=["title"],
-        )
+        self.client.create_index(index_name=self.default_index_name,
+                                 type="structured",
+                                 all_fields=[{"name": "title", "type": "text"}],
+                                 tensor_fields=["title"])
 
         ix = self.client.index(self.default_index_name)
         index_settings = ix.get_settings()
-        fields = {
-            "type",
-            "allFields",
-            "tensorFields",
-            "model",
-            "normalizeEmbeddings",
-            "textPreprocessing",
-            "imagePreprocessing",
-            "vectorNumericType",
-            "annParameters",
-        }
+        fields = {"type", "allFields", "tensorFields", "model",
+                  "normalizeEmbeddings", "textPreprocessing", "imagePreprocessing",
+                  "vectorNumericType", "annParameters"}
         self.assertTrue(fields.issubset(set(index_settings)))
 
     def test_custom_settings(self):
@@ -69,18 +60,16 @@ class TestStructuredGetSettings(MarqoTestCase):
         'annParameters': {'spaceType': 'angular', 'parameters': {'efConstruction': 128, 'm': 16}}
         }
         """
-        model_properties = {
-            "name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-            "dimensions": 384,
-            "tokens": 128,
-            "type": "hf",
-        }
+        model_properties = {'name': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
+                            'dimensions': 384,
+                            'tokens': 128,
+                            'type': 'hf'}
 
         index_settings = {
             "type": "structured",
-            "model": "test-model",
-            "modelProperties": model_properties,
-            "normalizeEmbeddings": True,
+            'model': 'test-model',
+            'modelProperties': model_properties,
+            'normalizeEmbeddings': True,
             "allFields": [
                 {"name": "title", "type": "text"},
                 {"name": "content", "type": "text"},
@@ -88,22 +77,11 @@ class TestStructuredGetSettings(MarqoTestCase):
             "tensorFields": ["title", "content"],
         }
 
-        res = self.client.create_index(
-            index_name=self.custom_index_name, settings_dict=index_settings
-        )
+        res = self.client.create_index(index_name=self.custom_index_name, settings_dict=index_settings)
 
         ix = self.client.index(self.custom_index_name)
         index_settings = ix.get_settings()
-        fields = {
-            "type",
-            "allFields",
-            "tensorFields",
-            "model",
-            "modelProperties",
-            "normalizeEmbeddings",
-            "textPreprocessing",
-            "imagePreprocessing",
-            "vectorNumericType",
-            "annParameters",
-        }
+        fields = {"type", "allFields", "tensorFields", "model", "modelProperties",
+                  "normalizeEmbeddings", "textPreprocessing", "imagePreprocessing",
+                  "vectorNumericType", "annParameters"}
         self.assertTrue(fields.issubset(set(index_settings)))

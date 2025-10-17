@@ -1,9 +1,8 @@
-from typing import Dict, List, Optional, Union
-
-from pydantic.v1 import Field, root_validator
+from typing import Dict, List, Union, Optional
 
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.models.api_models import BaseMarqoModel
+from pydantic.v1 import root_validator, Field
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
@@ -24,16 +23,14 @@ class RecommendQuery(BaseMarqoModel):
     scoreModifiers: Optional[ScoreModifierLists] = None
     rerankDepth: Optional[int] = None
     allow_missing_documents: bool = Field(default=False, alias="allowMissingDocuments")
-    allow_missing_embeddings: bool = Field(
-        default=False, alias="allowMissingEmbeddings"
-    )
+    allow_missing_embeddings: bool = Field(default=False, alias="allowMissingEmbeddings")
 
     @root_validator(pre=False)
     def validate_rerank_depth(cls, values):
-        """Validate that rerank_depth is only set for hybrid search - RRF."""
-        rerank_depth = values.get("rerankDepth")
+        """Validate that rerank_depth is only set for hybrid search - RRF. """
+        rerank_depth = values.get('rerankDepth')
 
         if rerank_depth and rerank_depth < 0:
-            raise ValueError("rerankDepth cannot be negative.")
+            raise ValueError(f"rerankDepth cannot be negative.")
 
         return values

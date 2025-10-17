@@ -1,4 +1,4 @@
-from typing import Any, Hashable
+from typing import Hashable, Any
 
 from cachetools import LRUCache
 from readerwriterlock import rwlock

@@ -31,52 +31,35 @@ async def raise_base_exception():
 async def route():
     return {"message": "Hello, World!"}
 
-
 client = TestClient(app)
 
 
 class TestMarqoCustomRoute(MarqoTestCase):
     def test_marqo_custom_route_logs_error(self):
-        with patch("marqo.api.route.logger.error") as mock_logger_error:
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
             with self.assertRaises(ValueError):
                 response = client.get("/test-route")
             mock_logger_error.assert_called_once()
-            self.assertIn(
-                "Test Error for MarqoCustomRoute", str(mock_logger_error.call_args)
-            )
+            self.assertIn("Test Error for MarqoCustomRoute", str(mock_logger_error.call_args))
 
     def test_marqo_custom_route_logs_api_exception(self):
-        expected_error = api_exceptions.MarqoWebError(
-            "Test API exceptions for MarqoCustomRoute"
-        )
-        with patch("marqo.api.route.logger.error") as mock_logger_error:
+        expected_error = api_exceptions.MarqoWebError("Test API exceptions for MarqoCustomRoute")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
             with self.assertRaises(api_exceptions.MarqoWebError):
                 response = client.get("/raise-api-exception")
-            mock_logger_error.assert_called_once_with(
-                str(expected_error), exc_info=True
-            )
-            self.assertIn(
-                "Test API exceptions for MarqoCustomRoute",
-                str(mock_logger_error.call_args),
-            )
+            mock_logger_error.assert_called_once_with(str(expected_error), exc_info=True)
+            self.assertIn("Test API exceptions for MarqoCustomRoute", str(mock_logger_error.call_args))
 
     def test_marqo_custom_route_base_exception(self):
-        expected_error = base_exceptions.MarqoError(
-            "Test Base exceptions for MarqoCustomRoute"
-        )
-        with patch("marqo.api.route.logger.error") as mock_logger_error:
+        expected_error = base_exceptions.MarqoError("Test Base exceptions for MarqoCustomRoute")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
             with self.assertRaises(base_exceptions.MarqoError):
                 response = client.get("/raise-base-exception")
-            mock_logger_error.assert_called_once_with(
-                str(expected_error), exc_info=True
-            )
-            self.assertIn(
-                "Test Base exceptions for MarqoCustomRoute",
-                str(mock_logger_error.call_args),
-            )
+            mock_logger_error.assert_called_once_with(str(expected_error), exc_info=True)
+            self.assertIn("Test Base exceptions for MarqoCustomRoute", str(mock_logger_error.call_args))
 
     def test_normal_route(self):
-        with patch("marqo.api.route.logger.error") as mock_logger_error:
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
             response = client.get("/normal-route")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"message": "Hello, World!"})

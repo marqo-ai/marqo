@@ -1,8 +1,9 @@
-from marqo import config, marqo_docs, version
+from marqo import config, version
+from marqo import marqo_docs
 from marqo.connections import redis_driver
-from marqo.logging import get_logger
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
+from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,12 +30,12 @@ class BootstrapVespa:
 
     def run(self):
         try:
-            logger.debug("Bootstrapping Vespa")
+            logger.debug('Bootstrapping Vespa')
             created = self.config.index_management.bootstrap_vespa()
             if created:
-                logger.debug("Vespa configured successfully")
+                logger.debug('Vespa configured successfully')
             else:
-                logger.debug("Vespa configuration already exists. Skipping bootstrap")
+                logger.debug('Vespa configuration already exists. Skipping bootstrap')
         except Exception as e:
             logger.error(
                 f"Failed to bootstrap vector store. If you are using an external vector store, "
@@ -51,17 +52,18 @@ class PopulateCache:
         self.config = config
 
     def run(self):
-        logger.debug("Starting index cache refresh thread")
+        logger.debug('Starting index cache refresh thread')
         index_meta_cache.start_refresh_thread(self.config)
 
 
 class InitializeRedis:
+
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
 
     def run(self):
-        logger.debug("Initializing Redis")
+        logger.debug('Initializing Redis')
         # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
         if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
             redis_driver.init_from_app(self.host, self.port)
@@ -73,6 +75,7 @@ class PrintVersion:
 
 
 class MarqoPhrase:
+
     def run(self):
         message = r"""
      _____                                                   _        __              _                                     
@@ -87,6 +90,7 @@ class MarqoPhrase:
 
 
 class MarqoWelcome:
+
     def run(self):
         message = r"""   
      __    __    ___  _        __   ___   ___ ___    ___      ______   ___       ___ ___   ____  ____   ___    ___   __ 

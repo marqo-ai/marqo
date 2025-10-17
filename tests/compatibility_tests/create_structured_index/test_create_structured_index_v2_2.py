@@ -2,18 +2,14 @@ import traceback
 
 import pytest
 
-from tests.compatibility_tests.base_test_case.base_compatibility_test import (
-    BaseCompatibilityTestCase,
-)
+from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-
-@pytest.mark.marqo_version("2.2.0")
+@pytest.mark.marqo_version('2.2.0')
 class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
     """
     New structured index data types: long, double, array<long> and array<double> for a higher precision and range of values Available for indexes created with Marqo 2.2+ (#722)
     Ref: https://github.com/marqo-ai/marqo/releases/tag/2.2.0
     """
-
     indexes_settings_to_test_on = [
         {
             "type": "structured",
@@ -28,11 +24,7 @@ class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
             "imagePreprocessing": {"patchMethod": None},
             "allFields": [
                 {"name": "text_field", "type": "text", "features": ["lexical_search"]},
-                {
-                    "name": "caption",
-                    "type": "text",
-                    "features": ["lexical_search", "filter"],
-                },
+                {"name": "caption", "type": "text", "features": ["lexical_search", "filter"]},
                 {"name": "tags", "type": "array<text>", "features": ["filter"]},
                 {"name": "image_field", "type": "image_pointer"},
                 {"name": "my_int", "type": "int", "features": ["score_modifier"]},
@@ -55,9 +47,8 @@ class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
             "annParameters": {
                 "spaceType": "prenormalized-angular",
                 "parameters": {"efConstruction": 512, "m": 16},
-            },
-        }
-    ]
+            }
+        }]
     indexes_to_test_on = ["test_create_index_api_structured_index_2_2_0"]
 
     @classmethod
@@ -74,13 +65,11 @@ class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
         self.logger.debug(f"Creating indexes {self.indexes_settings_to_test_on}")
         all_results = {}
         errors = []  # Collect any errors to report them at the end
-        for index_name, index_settings in zip(
-            self.indexes_to_test_on, self.indexes_settings_to_test_on
-        ):
+        for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             try:
-                self.client.create_index(index_name, settings_dict=index_settings)
+                self.client.create_index(index_name, settings_dict = index_settings)
                 all_results[index_name] = self.client.index(index_name).get_settings()
-            except Exception:
+            except Exception as e:
                 errors.append((index_name, traceback.format_exc()))
 
         if errors:
@@ -94,27 +83,22 @@ class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()
-        test_failures = []  # this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+        test_failures = [] # this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
 
         for index_name in self.indexes_to_test_on:
             try:
-                with self.subTest(index=index_name):
+                with self.subTest(index = index_name):
                     actual_settings = self.client.index(index_name).get_settings()
                     self.logger.debug(f"Printing actual_settings {actual_settings}")
-                    self.logger.debug(
-                        f"Printing expected_settings {expected_settings.get(index_name)}"
-                    )
-                    self.assertEqual(
-                        expected_settings.get(index_name),
-                        actual_settings,
-                        f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}",
-                    )
-            except Exception:
+                    self.logger.debug(f"Printing expected_settings {expected_settings.get(index_name)}")
+                    self.assertEqual(expected_settings.get(index_name), actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
+            except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:
-            failure_message = "\n".join(
-                [f"Failure in index {idx}, {error}" for idx, error in test_failures]
-            )
+            failure_message = "\n".join([
+                f"Failure in index {idx}, {error}"
+                for idx, error in test_failures
+            ])
             self.fail(f"Some subtests failed:\n{failure_message}")

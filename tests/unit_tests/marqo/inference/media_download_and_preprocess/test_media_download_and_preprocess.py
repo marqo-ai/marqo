@@ -1,38 +1,39 @@
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch, MagicMock
 
 from marqo.core.inference.api import *
 from marqo.inference.media_download_and_preprocess.media_download_and_preprocess import (
-    _enable_video_gpu_acceleration,
     _threaded_download_and_preprocess_audio_and_video,
-    process_batch,
-    reduce_thread_metrics,
     threaded_download_and_preprocess_content,
+    reduce_thread_metrics,
+    _enable_video_gpu_acceleration,
+    process_batch
 )
 from marqo.tensor_search.telemetry import RequestMetrics
 
 
 class TestMediaDownloadAndPreprocess(TestCase):
+
     def setUp(self):
         self.sample_image_preprocessing_config = ImagePreprocessingConfig(
             modality=Modality.IMAGE,
             download_header={"Authorization": "Bearer fake_token"},
             download_timeout_ms=1000,
-            download_thread_count=2,
+            download_thread_count=2
         )
 
         self.sample_audio_preprocessing_config = AudioPreprocessingConfig(
             modality=Modality.AUDIO,
             download_header={},
             download_timeout_ms=1000,
-            download_thread_count=1,
+            download_thread_count=1
         )
 
         self.sample_video_preprocessing_config = VideoPreprocessingConfig(
             modality=Modality.VIDEO,
             download_header={},
             download_timeout_ms=1000,
-            download_thread_count=1,
+            download_thread_count=1
         )
 
     def test_threaded_download_and_preprocess_invalid_modality(self):
@@ -45,7 +46,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 preprocessor=MagicMock(),
                 preprocessing_config=config,
                 metric_obj=None,
-                return_individual_error=True,
+                return_individual_error=True
             )
         self.assertIn("Unsupported modality", str(context.exception))
 
@@ -54,31 +55,24 @@ class TestMediaDownloadAndPreprocess(TestCase):
             "media_download.image.100.thread_time": 10,
             "media_download.image.100.url1": 20,
             "media_download.image.101.thread_time": 15,
-            "media_download.image.101.url1": 25,
+            "media_download.image.101.url1": 25
         }
 
         reduced = reduce_thread_metrics(raw_data)
 
         self.assertIn("media_download.image.thread_time", reduced)
         self.assertEqual([10, 15], reduced["media_download.image.thread_time"])
-        self.assertEqual(
-            [20, 25],
-            reduced["media_download.image.url1"],
-        )
+        self.assertEqual([20, 25], reduced["media_download.image.url1"],)
 
     def test_enable_video_gpu_acceleration_true(self):
-        with patch(
-            "marqo.tensor_search.utils.read_env_vars_and_defaults", return_value="TRUE"
-        ):
+        with patch("marqo.tensor_search.utils.read_env_vars_and_defaults", return_value="TRUE"):
             self.assertTrue(_enable_video_gpu_acceleration())
 
     def test_threaded_download_and_preprocess_audio_success(self):
         fake_preprocessor = MagicMock()
         fake_results = [("chunk1", "tensor1")]
 
-        with patch(
-            "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor"
-        ) as mock_processor:
+        with patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor") as mock_processor:
             instance = mock_processor.return_value
             instance.process_media.return_value = fake_results
 
@@ -87,7 +81,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 preprocessor=fake_preprocessor,
                 preprocessing_config=self.sample_audio_preprocessing_config,
                 metric_obj=RequestMetrics(),
-                return_individual_error=True,
+                return_individual_error=True
             )
 
             self.assertEqual(len(result), 1)
@@ -97,9 +91,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
         fake_preprocessor = MagicMock()
         fake_results = [("chunk1", "tensor1")]
 
-        with patch(
-            "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor"
-        ) as mock_processor:
+        with patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor") as mock_processor:
             instance = mock_processor.return_value
             instance.process_media.return_value = fake_results
 
@@ -108,7 +100,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 preprocessor=fake_preprocessor,
                 preprocessing_config=self.sample_video_preprocessing_config,
                 metric_obj=RequestMetrics(),
-                return_individual_error=True,
+                return_individual_error=True
             )
 
             self.assertEqual(len(result), 1)
@@ -117,9 +109,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
     def test_threaded_download_and_preprocess_audio_error(self):
         fake_preprocessor = MagicMock()
 
-        with patch(
-            "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor"
-        ) as mock_processor:
+        with patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.StreamingMediaProcessor") as mock_processor:
             instance = mock_processor.return_value
             instance.process_media.side_effect = InferenceError("Download failed")
 
@@ -128,7 +118,7 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 preprocessor=fake_preprocessor,
                 preprocessing_config=self.sample_audio_preprocessing_config,
                 metric_obj=RequestMetrics(),
-                return_individual_error=True,
+                return_individual_error=True
             )
 
             self.assertEqual(len(result), 1)
@@ -145,16 +135,13 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 raise MediaDownloadError("Simulated thread error")
             return [[(url, "tensor")] for url in allocated_content]
 
-        with patch(
-            "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.threaded_download_and_preprocess_content",
-            side_effect=mock_threaded_download_and_preprocess_content,
-        ):
+        with patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.threaded_download_and_preprocess_content", side_effect=mock_threaded_download_and_preprocess_content):
             with self.assertRaises(MediaDownloadError) as context:
                 process_batch(
                     content=content,
                     preprocessor=MagicMock(),
                     preprocessing_config=self.sample_image_preprocessing_config,
-                    return_individual_error=False,
+                    return_individual_error=False
                 )
             self.assertIn("Simulated thread error", str(context.exception))
 
@@ -168,21 +155,13 @@ class TestMediaDownloadAndPreprocess(TestCase):
                 return [InferenceErrorModel(error_message="Simulated error for url1")]
             return [[(url, "tensor")] for url in allocated_content]
 
-        with (
-            patch(
-                "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.threaded_download_and_preprocess_content",
-                side_effect=mock_threaded_download_and_preprocess_content,
-            ),
-            patch(
-                "marqo.inference.media_download_and_preprocess.media_download_and_preprocess.RequestMetricsStore.for_request",
-                return_value=RequestMetrics(),
-            ),
-        ):
+        with patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.threaded_download_and_preprocess_content", side_effect=mock_threaded_download_and_preprocess_content), \
+             patch("marqo.inference.media_download_and_preprocess.media_download_and_preprocess.RequestMetricsStore.for_request", return_value=RequestMetrics()):
             results = process_batch(
                 content=content,
                 preprocessor=MagicMock(),
                 preprocessing_config=self.sample_image_preprocessing_config,
-                return_individual_error=True,
+                return_individual_error=True
             )
 
             # Expect results for both URLs

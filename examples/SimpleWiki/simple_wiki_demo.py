@@ -2,35 +2,34 @@
 ### STEP 0. Import and define any helper functions
 #####################################################
 
-import copy
+from marqo import Client
 import json
 import math
-import pprint
-
 import numpy as np
-
-from marqo import Client
+import copy
+import pprint
 
 
 def read_json(filename: str) -> dict:
     # reads a json file
-    with open(filename, "r", encoding="utf-8") as f:
+    with open(filename, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data
 
 
 def clean_data(data: dict) -> dict:
     # removes the wikipedia from the title for better matching
-    data["title"] = data["title"].replace("- Wikipedia", "")
+    data['title'] = data['title'].replace('- Wikipedia', '')
     # Convert docDate to string
     data["docDate"] = str(data["docDate"])
     return data
 
 
-def split_big_docs(data, field="content", char_len=5e4):
+def split_big_docs(data, field='content', char_len=5e4):
     # there are some large documents which can cause issues for some users
     new_data = []
     for dat in data:
+
         content = dat[field]
         N = len(content)
 
@@ -40,7 +39,7 @@ def split_big_docs(data, field="content", char_len=5e4):
 
             for _content in new_content:
                 new_dat = copy.deepcopy(dat)
-                new_dat[field] = "".join(_content)
+                new_dat[field] = ''.join(_content)
                 new_data.append(new_dat)
         else:
             new_data.append(dat)
@@ -76,7 +75,7 @@ print(f"loaded data with {len(data)} entries")
 #####################################################
 
 # we use an index name. the index name needs to be lower case.
-index_name = "marqo-simplewiki-demo-all"
+index_name = 'marqo-simplewiki-demo-all'
 
 # setup the client
 client = Client()
@@ -91,10 +90,11 @@ except:
 # we create the index and can set the model we want to use
 # the onnx models are typically faster on both CPU and GPU
 # to use non-onnx just use the name 'all_datasets_v4_MiniLM-L6'
-client.create_index(index_name, model="onnx/all_datasets_v4_MiniLM-L6")
+client.create_index(index_name, model='onnx/all_datasets_v4_MiniLM-L6')
 
 responses = client.index(index_name).add_documents(
-    data, client_batch_size=50, tensor_fields=["title", "content"]
+    data, client_batch_size=50,
+    tensor_fields=["title", "content"]
 )
 
 # optionally take a look at the responses
@@ -109,41 +109,41 @@ responses = client.index(index_name).add_documents(
 # this will perform neural search across all indexed fields
 
 # lets create a query
-query = "what is air made of?"
+query = 'what is air made of?'
 
 results = client.index(index_name).search(query)
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # we also get highlighting which tells us why this article was returned
-pprint.pprint(results["hits"][0]["_highlights"])
+pprint.pprint(results['hits'][0]['_highlights'])
 
 # we can restrict the search to specific fields as well
 results = client.index(index_name).search(query)
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # we use lexical search instead of tensor search
-results = client.index(index_name).search(query, search_method="LEXICAL")
+results = client.index(index_name).search(query, search_method='LEXICAL')
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # lets create another query
-query = "what is a cube?"
+query = 'what is a cube?'
 
 results = client.index(index_name).search(query)
 
 # we can check the results - lets look at the top hit
-pprint.pprint(results["hits"][0])
+pprint.pprint(results['hits'][0])
 
 # we also get highlighting which tells us why this article was returned
-pprint.pprint(results["hits"][0]["_highlights"])
+pprint.pprint(results['hits'][0]['_highlights'])

@@ -1,5 +1,5 @@
-import base64
 import os
+import base64
 from io import BytesIO
 
 import certifi
@@ -9,6 +9,7 @@ import requests
 import torch
 import validators
 from PIL import Image, UnidentifiedImageError
+from requests.utils import requote_uri
 
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
@@ -22,11 +23,11 @@ from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 # TODO Merge this with the one in clip_utils in the future refactoring
 
-DEFAULT_HEADERS = {"User-Agent": "Marqobot/1.0"}
+DEFAULT_HEADERS = {'User-Agent': 'Marqobot/1.0'}
 
 
 def get_allowed_image_types():
-    return {".jpg", ".png", ".bmp", ".jpeg"}
+    return {'.jpg', '.png', '.bmp', '.jpeg'}
 
 
 def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
@@ -39,10 +40,9 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # we assume the batch is this way if a list
     # otherwise apply over each element
     if isinstance(inputs, list):
+
         if len(inputs) == 0:
-            raise UnidentifiedImageError(
-                "received empty list, expected at least one element."
-            )
+            raise UnidentifiedImageError("received empty list, expected at least one element.")
 
         thing = inputs[0]
     else:
@@ -64,8 +64,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         if os.path.isfile(thing):
             # we could also read the first part of the file and infer
             raise UnidentifiedImageError(
-                f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}"
-            )
+                f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}")
         else:
             # if it is not a local file and does not have an extension
             # check if url
@@ -78,14 +77,11 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     elif isinstance(thing, (ImageType, ndarray, Tensor)):
         return True
     else:
-        raise UnidentifiedImageError(
-            f"expected type Image or str for inputs but received type {type(thing)}"
-        )
+        raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
 
 
-def format_and_load_CLIP_images(
-    images: List[Union[str, ndarray, ImageType, Tensor]], media_download_headers: dict
-) -> Union[List[ImageType], List[Tensor]]:
+def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType, Tensor]],
+                                media_download_headers: dict) -> Union[List[ImageType], List[Tensor]]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
         for the clip model
 
@@ -121,9 +117,8 @@ def validate_url(url: str) -> bool:
         return False
 
 
-def format_and_load_CLIP_image(
-    image: Union[str, ndarray, ImageType, Tensor], media_download_headers: dict
-) -> Union[ImageType, Tensor]:
+def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
+                               media_download_headers: dict) -> Union[ImageType, Tensor]:
     """standardizes the input to be a PIL image
 
     Args:
@@ -142,16 +137,14 @@ def format_and_load_CLIP_image(
     if isinstance(image, str):
         img = load_image_from_path(image, media_download_headers)
     elif isinstance(image, np.ndarray):
-        img = Image.fromarray(image.astype("uint8"), "RGB")
+        img = Image.fromarray(image.astype('uint8'), 'RGB')
     elif isinstance(image, torch.Tensor):
         img = image
     elif isinstance(image, ImageType):
         img = image
     else:
-        raise UnidentifiedImageError(
-            f"input of type {type(image)} "
-            f"did not match allowed types of str, np.ndarray, ImageType, Tensor"
-        )
+        raise UnidentifiedImageError(f"input of type {type(image)} "
+                                     f"did not match allowed types of str, np.ndarray, ImageType, Tensor")
 
     return img
 
@@ -159,13 +152,13 @@ def format_and_load_CLIP_image(
 def _load_base64_image(content: str) -> ImageType:
     """
     Load a base64-encoded image string into a PIL Image.
-
+    
     Args:
         content: Base64-encoded image string (with or without data URL prefix)
-
+        
     Returns:
         ImageType: PIL Image object
-
+        
     Raises:
         UnidentifiedImageError: If the content cannot be decoded or loaded as an image
     """
@@ -184,12 +177,8 @@ def _load_base64_image(content: str) -> ImageType:
     return img
 
 
-def load_image_from_path(
-    image_path: str,
-    media_download_headers: dict,
-    timeout_ms=3000,
-    metrics_obj: Optional[RequestMetrics] = None,
-) -> ImageType:
+def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
+                         metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
@@ -213,9 +202,7 @@ def load_image_from_path(
         if metrics_obj is not None:
             metrics_obj.start(f"media_download.image.{image_path}")
         try:
-            img_io: BytesIO = download_image_from_url(
-                image_path, media_download_headers, timeout_ms
-            )
+            img_io: BytesIO = download_image_from_url(image_path, media_download_headers, timeout_ms)
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
@@ -238,18 +225,13 @@ def load_image_from_path(
             f"If you are running Marqo in a Docker container, you will need to use a Docker "
             f"volume so that your container can access host files. "
             f"For more information, please refer to: "
-            f"{marqo_docs.indexing_images()}"
-        )
+            f"{marqo_docs.indexing_images()}")
 
     return img
 
 
-def download_image_from_url(
-    image_path: str,
-    media_download_headers: dict,
-    timeout_ms: int = 3000,
-    modality: Optional[str] = None,
-) -> BytesIO:
+def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000,
+                            modality: Optional[str] = None) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
 
     For video/audio files, we check the file size during download rather than making a separate HEAD request upfront.
@@ -270,17 +252,13 @@ def download_image_from_url(
     """
 
     if not isinstance(timeout_ms, int):
-        raise InternalError(
-            f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}"
-        )
+        raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
 
     try:
         encoded_url = encode_url(image_path)
     except UnicodeEncodeError as e:
-        raise ImageDownloadError(
-            f"Marqo encountered an error when downloading the media url {image_path}. "
-            f"The url could not be encoded properly. Original error: {e}"
-        )
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
+                                 f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
     c = pycurl.Curl()
     c.setopt(pycurl.CAINFO, certifi.where())
@@ -297,9 +275,7 @@ def download_image_from_url(
 
     # callback to check file size for video and audio
     if modality in [Modality.VIDEO, Modality.AUDIO]:
-        max_size = read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE
-        )
+        max_size = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
 
         def progress(download_total, downloaded, upload_total, uploaded):
             if downloaded > max_size:
@@ -311,19 +287,15 @@ def download_image_from_url(
     try:
         c.perform()
         if c.getinfo(pycurl.RESPONSE_CODE) != 200:
-            raise ImageDownloadError(
-                f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}"
-            )
+            raise ImageDownloadError(f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}")
     except pycurl.error as e:
         error_message = str(e)
         if len(e.args) > 0:
             error_code = e.args[0]
             if error_code == pycurl.E_ABORTED_BY_CALLBACK:
                 error_message = f"Media file `{image_path}` exceeds the maximum allowed size for {modality}."
-        raise ImageDownloadError(
-            f"Marqo encountered an error when downloading the media url {image_path}. "
-            f"The original error is: {error_message}"
-        )
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
+                                 f"The original error is: {error_message}")
 
     finally:
         c.close()
@@ -353,12 +325,6 @@ def encode_url(url: str) -> str:
     return requests.utils.requote_uri(url)
 
 
-def download_media_from_url(
-    media_path: str,
-    media_download_headers: dict,
-    timeout_ms: int = 3000,
-    modality: Optional[str] = None,
-):
-    return download_image_from_url(
-        media_path, media_download_headers, timeout_ms, modality
-    )
+def download_media_from_url(media_path: str, media_download_headers: dict, timeout_ms: int = 3000,
+                            modality: Optional[str] = None):
+    return download_image_from_url(media_path, media_download_headers, timeout_ms, modality)

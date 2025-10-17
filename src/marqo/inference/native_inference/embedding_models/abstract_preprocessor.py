@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-
 from marqo.core.inference.api.modality import Modality
+from torch import Tensor
 
 
 class AbstractPreprocessor(ABC):

@@ -1,11 +1,9 @@
 from enum import Enum
-from typing import List, Optional
+from typing import Optional, List
 
 from pydantic.v1 import Field, root_validator
 
-from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import (
-    MarqoBaseModelProperties,
-)
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation
 
 
@@ -47,7 +45,6 @@ class OpenCLIPModelProperties(MarqoBaseModelProperties):
         note: A note about the model. It is optional.
         pretrained: The name of the pretrained model. It is optional.
     """
-
     name: str
     jit: bool = False
     precision: Precision = Precision.FP32
@@ -55,9 +52,7 @@ class OpenCLIPModelProperties(MarqoBaseModelProperties):
     localpath: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     tokenizer: Optional[str] = None
-    image_preprocessor: ImagePreprocessor = Field(
-        default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor"
-    )
+    image_preprocessor: ImagePreprocessor = Field(default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor")
     mean: Optional[List[float]] = None
     std: Optional[List[float]] = None
     size: Optional[int] = None
@@ -70,12 +65,8 @@ class OpenCLIPModelProperties(MarqoBaseModelProperties):
         localpath = values.get("localpath")
         model_location = values.get("model_location")
 
-        provided_fields = sum(
-            1 for field in [url, localpath, model_location] if field is not None
-        )
+        provided_fields = sum(1 for field in [url, localpath, model_location] if field is not None)
         if provided_fields > 1:
-            raise ValueError(
-                "Only one of 'url', 'localpath', or 'model_location' should be provided."
-            )
+            raise ValueError("Only one of 'url', 'localpath', or 'model_location' should be provided.")
 
         return values

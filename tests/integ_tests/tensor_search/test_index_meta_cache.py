@@ -1,37 +1,37 @@
 import copy
-import datetime
 import os
+import datetime
 import threading
 import time
 import unittest
-from unittest import mock
 
 import requests
-
-from marqo.api import configs, exceptions
-from marqo.api.exceptions import IndexNotFoundError
-from marqo.config import Config
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search import index_meta_cache, tensor_search, utils
-from marqo.tensor_search.enums import SearchMethod, TensorField
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search import index_meta_cache
+from marqo.config import Config
+from marqo.api.exceptions import IndexNotFoundError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import TensorField, SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
+from unittest import mock
+from marqo.api import exceptions, configs
 
 
 @unittest.skip
 class TestIndexMetaCache(MarqoTestCase):
+
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-1"
         self.index_name_2 = "my-test-index-2"
-        self.index_name_3 = "my-test-index-3"  # for tests where index must be created as part of the test
+        self.index_name_3 = "my-test-index-3" # for tests where index must be created as part of the test
         self.config = Config(self.authorized_url)
         self._delete_testing_indices()
         self._create_test_indices()
 
         # Any tests that call add_documents, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(
-            os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"}
-        )
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self):
@@ -41,7 +41,7 @@ class TestIndexMetaCache(MarqoTestCase):
         for ix in [self.index_name_1, self.index_name_2, self.index_name_3]:
             try:
                 tensor_search.delete_index(config=self.config, index_name=ix)
-            except IndexNotFoundError:
+            except IndexNotFoundError as s:
                 pass
 
     def _create_test_indices(self, indices=None):
@@ -73,95 +73,61 @@ class TestIndexMetaCache(MarqoTestCase):
             # reset the cache, too:
             index_meta_cache.empty_cache()
             # there needs to be an error because the index doesn't exist yet
-            tensor_search.search(
-                config=self.config, text="some text", index_name=self.index_name_3
-            )
-        except IndexNotFoundError:
+            tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
+        except IndexNotFoundError as s:
             pass
 
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_3
-        )
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
         # no error, because there is an index, and the cache is updated:
-        tensor_search.search(
-            config=self.config, text="some text", index_name=self.index_name_3
-        )
+        tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
         # emptying the cache:
         index_meta_cache.empty_cache()
         # no error is thrown because the index is search, and the cache is updated
-        tensor_search.search(
-            config=self.config, text="some text", index_name=self.index_name_3
-        )
+        tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
         assert self.index_name_3 in index_meta_cache.get_cache()
 
     def test_add_new_fields_preserves_index_cache(self):
         add_doc_res_1 = self.add_documents(
             config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"abc": "def"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
+            add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu")
         )
         add_doc_res_2 = self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"cool field": "yep yep", "haha": "heheh"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"cool field": "yep yep", "haha": "heheh"}],
+                auto_refresh=True, device="cpu"
+            )
         )
         index_info_t0 = index_meta_cache.get_cache()[self.index_name_1]
         # reset cache:
         index_meta_cache.empty_cache()
         add_doc_res_3 = self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"newer field": "ndewr content", "goblin": "paradise"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"newer field": "ndewr content",
+                                                                     "goblin": "paradise"}],
+                auto_refresh=True, device="cpu"
+            )
         )
 
         # None of these vector fields should exist
         for field in ["newer field", "goblin", "cool field", "abc", "haha"]:
-            assert (
-                utils.generate_vector_name(field)
-                not in index_meta_cache.get_cache()[self.index_name_1].properties[
-                    TensorField.chunks
-                ]["properties"]
-            )
-
+            assert utils.generate_vector_name(field) \
+                   not in index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]
+        
         # Only 1 vector field should exist
-        assert (
-            TensorField.marqo_knn_field
-            in index_meta_cache.get_cache()[self.index_name_1].properties[
-                TensorField.chunks
-            ]["properties"]
-        )
+        assert TensorField.marqo_knn_field \
+            in index_meta_cache.get_cache()[self.index_name_1].properties[TensorField.chunks]["properties"]
 
     def test_delete_removes_index_from_cache(self):
         """note the implicit index creation"""
         add_doc_res_1 = self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"abc": "def"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
+            )
         )
         add_doc_res_2 = self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_2,
-                docs=[{"abc": "def"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_2, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
+            )
         )
         assert self.index_name_1 in index_meta_cache.get_cache()
         tensor_search.delete_index(index_name=self.index_name_1, config=self.config)
@@ -170,78 +136,46 @@ class TestIndexMetaCache(MarqoTestCase):
 
     def test_create_index_updates_cache(self):
         index_meta_cache.empty_cache()
-        tensor_search.create_vector_index(
-            index_name=self.index_name_3, config=self.config
-        )
-        assert (
-            TensorField.field_name
-            in index_meta_cache.index_info_cache[self.index_name_3].properties[
-                TensorField.chunks
-            ]["properties"]
-        )
+        tensor_search.create_vector_index(index_name=self.index_name_3, config=self.config)
+        assert TensorField.field_name \
+               in index_meta_cache.index_info_cache[self.index_name_3].properties[TensorField.chunks]["properties"]
 
     def test_lexical_search_caching(self):
         d0 = {
-            "d-one": "marqo",
-            "_id": "abc1234",
+            "d-one": "marqo", "_id": "abc1234",
             "the big field": "very unlikely theory. marqo is pretty awesom, in the field",
         }
-        d1 = {
-            "some doc 1": "some 2 marqo",
-            "field abc": "robodog is not a cat",
-            "_id": "Jupyter_12",
-        }
+        d1 = {"some doc 1": "some 2 marqo", "field abc": "robodog is not a cat", "_id": "Jupyter_12"}
         d2 = {"exclude me": "marqo"}
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                auto_refresh=True,
-                docs=[d0, d1, d2],
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[d0, d1, d2], device="cpu")
         )
         # reset cache
         index_meta_cache.empty_cache()
-        index_object = index_meta_cache.get_index(
-            self.index_management, self.default_text_index
-        )
-        search_res = tensor_search._lexical_search(
-            config=self.config,
-            text="Marqo",
-            searchable_attributes=["some doc 1", "d-one"],
-            marqo_index=index_object,
-        )
-        assert len(search_res["hits"]) == 2
-        assert d1 in [self.strip_marqo_fields(res) for res in search_res["hits"]]
-        assert d0 in [self.strip_marqo_fields(res) for res in search_res["hits"]]
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
+        search_res =tensor_search._lexical_search(
+            config=self.config, text="Marqo", searchable_attributes=["some doc 1", "d-one"], marqo_index=index_object)
+        assert len(search_res['hits']) == 2
+        assert d1 in [self.strip_marqo_fields(res) for res in search_res['hits']]
+        assert d0 in [self.strip_marqo_fields(res) for res in search_res['hits']]
 
     def test_get_documents_caching(self):
         d0 = {
-            "d-one": "marqo",
-            "_id": "abc1234",
+            "d-one": "marqo", "_id": "abc1234",
             "the big field": "very unlikely theory. marqo is pretty awesom, in the field",
         }
-        d1 = {
-            "some doc 1": "some 2 marqo",
-            "field abc": "robodog is not a cat",
-            "_id": "Jupyter_12",
-        }
+        d1 = {"some doc 1": "some 2 marqo", "field abc": "robodog is not a cat", "_id": "Jupyter_12"}
         d2 = {"exclude me": "marqo"}
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                auto_refresh=True,
-                docs=[d0, d1, d2],
-                device="cpu",
-            ),
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True,
+                docs=[d0, d1, d2 ], device="cpu")
         )
         # reset cache
         index_meta_cache.empty_cache()
         search_res = tensor_search.get_document_by_id(
-            config=self.config, index_name=self.index_name_1, document_id="Jupyter_12"
-        )
+            config=self.config, index_name=self.index_name_1, document_id="Jupyter_12")
         assert d1 == search_res
 
     def test_empty_cache(self):
@@ -249,9 +183,7 @@ class TestIndexMetaCache(MarqoTestCase):
         index_meta_cache.empty_cache()
         assert len(index_meta_cache.get_cache()) == 0
 
-    def _simulate_externally_added_docs(
-        self, index_name, docs, check_only_in_external_cache: str = None
-    ):
+    def _simulate_externally_added_docs(self, index_name, docs, check_only_in_external_cache: str = None):
         """helper function to simulate another client adding docs
 
         Args:
@@ -261,147 +193,86 @@ class TestIndexMetaCache(MarqoTestCase):
                 'docs' but not previously indexed).
         """
         if check_only_in_external_cache is not None:
-            assert (
-                check_only_in_external_cache
-                not in index_meta_cache.get_cache()[index_name].properties[
-                    TensorField.chunks
-                ]["properties"]
-            )
-            assert (
-                check_only_in_external_cache
-                not in index_meta_cache.get_cache()[index_name].properties
-            )
+            assert check_only_in_external_cache not in \
+                   index_meta_cache.get_cache()[index_name].properties[TensorField.chunks]["properties"]
+            assert check_only_in_external_cache not in \
+                   index_meta_cache.get_cache()[index_name].properties
 
         # save the state of the cache:
         cache_t0 = copy.deepcopy(index_meta_cache.get_cache())
         # mock external party indexing something:
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=index_name, docs=docs, auto_refresh=True, device="cpu"
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=index_name,
+                docs=docs, auto_refresh=True, device="cpu"))
 
         if check_only_in_external_cache is not None:
             assert (
-                check_only_in_external_cache
-                in index_meta_cache.get_cache()[index_name].properties[
-                    TensorField.chunks
-                ]["properties"]
-            ) or (
-                check_only_in_external_cache
-                in index_meta_cache.get_cache()[index_name].properties
+                    check_only_in_external_cache
+                    in index_meta_cache.get_cache()[index_name].properties[TensorField.chunks]["properties"]
+                   ) or (
+                    check_only_in_external_cache
+                    in index_meta_cache.get_cache()[index_name].properties
             )
         # set cache to t0 state:
         index_meta_cache.index_info_cache = copy.deepcopy(cache_t0)
         # search refreshes index cache every 2 seconds
         time.sleep(2.1)
         if check_only_in_external_cache is not None:
-            assert (
-                check_only_in_external_cache
-                not in index_meta_cache.get_cache()[index_name].properties[
-                    TensorField.chunks
-                ]["properties"]
-            )
-            assert (
-                check_only_in_external_cache
-                not in index_meta_cache.get_cache()[index_name].properties
-            )
+            assert check_only_in_external_cache not in \
+                   index_meta_cache.get_cache()[index_name].properties[TensorField.chunks]["properties"]
+            assert check_only_in_external_cache not in \
+                   index_meta_cache.get_cache()[index_name].properties
 
     def test_search_lexical_externally_created_field(self):
-        """search (search_method=SearchMethod.lexical)
+        """ search (search_method=SearchMethod.lexical)
         after the first cache hit is empty, it should be updated.
         """
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
-            self.index_name_1,
-            [{"brand new field": "a line of text", "_id": "1234"}],
-            "brand new field",
-        )
+            self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
-            search_method=SearchMethod.LEXICAL,
-        )
+            index_name=self.index_name_1, config=self.config, text="a line of text",
+             search_method=SearchMethod.LEXICAL)
         assert len(result["hits"]) == 0
         # REFRESH INTERVAL IS 2 seconds
         time.sleep(4)
         result_2 = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
-            search_method=SearchMethod.LEXICAL,
-        )
+            index_name=self.index_name_1, config=self.config, text="a line of text",
+             search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_search_vectors_externally_created_field(self):
-        """search (search_method=SearchMethod.chunk_embeddings)"""
+        """ search (search_method=SearchMethod.chunk_embeddings)
+        """
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
-            self.index_name_1,
-            [{"brand new field": "a line of text", "_id": "1234"}],
-            "brand new field",
-        )
+            self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
-            search_method=SearchMethod.TENSOR,
-        )
+            index_name=self.index_name_1, config=self.config, text="a line of text",
+             search_method=SearchMethod.TENSOR)
         # With single KNN Field, correct result appears even when field is not in cache!
         assert "1234" in [h["_id"] for h in result["hits"]]
         assert len([h["_id"] for h in result["hits"]]) > 0
         result_2 = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
-            search_method=SearchMethod.TENSOR,
-        )
+            index_name=self.index_name_1, config=self.config, text="a line of text",
+             search_method=SearchMethod.TENSOR)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_search_vectors_externally_created_field_attributes(self):
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
-            self.index_name_1,
-            [{"brand new field": "a line of text", "_id": "1234"}],
-            "brand new field",
-        )
-        assert (
-            "brand new field"
-            not in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+            self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.TENSOR,
-        )
+             search_method=SearchMethod.TENSOR)
         # With single KNN Field, correct result appears even when field is not in cache!
         assert result["hits"][0]["_id"] == "1234"
 
@@ -409,89 +280,46 @@ class TestIndexMetaCache(MarqoTestCase):
         """lexical search doesn't need an up-to-date cache to work"""
         index_meta_cache.empty_cache()
         tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_3
-        )
+            config=self.config, index_name=self.index_name_3)
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         self._simulate_externally_added_docs(
-            self.index_name_3,
-            [{"brand new field": "a line of text", "_id": "1234"}],
-            "brand new field",
-        )
-        assert (
-            "brand new field"
-            not in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+            self.index_name_3, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_3,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_3, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.LEXICAL,
-        )
+             search_method=SearchMethod.LEXICAL)
         assert result["hits"][0]["_id"] == "1234"
         result_2 = tensor_search.search(
-            index_name=self.index_name_3,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_3, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.LEXICAL,
-        )
+             search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_vector_search_non_existent_field(self):
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
-        assert (
-            "brand new field"
-            not in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.TENSOR,
-        )
-        assert result["hits"] == []
+             search_method=SearchMethod.TENSOR)
+        assert result['hits'] == []
 
     def test_lexical_search_non_existent_field(self):
         """"""
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
-        assert (
-            "brand new field"
-            not in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         # no error:
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="sftstsbtdts",
+            index_name=self.index_name_1, config=self.config, text="sftstsbtdts",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.LEXICAL,
-        )
+             search_method=SearchMethod.LEXICAL)
 
     def test_cache_update_on_search(self):
         """
@@ -499,47 +327,26 @@ class TestIndexMetaCache(MarqoTestCase):
         With single KNN field, doc should be found even if field is not in cache
         """
         self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{"some field": "Plane 1"}],
-                auto_refresh=True,
-                device="cpu",
-            ),
-        )
+            config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
+                docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         time.sleep(2.5)
         self._simulate_externally_added_docs(
-            self.index_name_1,
-            [{"brand new field": "a line of text", "_id": "1234"}],
-            "brand new field",
-        )
-        assert (
-            "brand new field"
-            not in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+            self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
+        assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.TENSOR,
-        )
+             search_method=SearchMethod.TENSOR)
         assert result["hits"][0]["_id"] == "1234"
         time.sleep(0.5)
         if self.config.cluster_is_remote:
             # Allow extra time if using a remote cluster
             time.sleep(3)
         result_2 = tensor_search.search(
-            index_name=self.index_name_1,
-            config=self.config,
-            text="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
-            search_method=SearchMethod.TENSOR,
-        )
-        assert (
-            "brand new field"
-            in index_meta_cache.get_cache()[self.index_name_1].properties
-        )
+             search_method=SearchMethod.TENSOR)
+        assert "brand new field" in index_meta_cache.get_cache()[self.index_name_1].properties
         assert result_2["hits"][0]["_id"] == "1234"
 
     def test_populate_cache(self):
@@ -552,59 +359,44 @@ class TestIndexMetaCache(MarqoTestCase):
         index_meta_cache.empty_cache()
         assert self.index_name_1 not in index_meta_cache.get_cache()
         tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_3
-        )
-        ix_info = index_meta_cache.get_index_info(
-            config=self.config, index_name=self.index_name_3
-        )
+            config=self.config, index_name=self.index_name_3)
+        ix_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_3)
         assert ix_info.index_settings == configs.get_default_index_settings()
 
     def test_index_settings_after_cache_refresh(self):
         expected_index_settings = configs.get_default_index_settings()
         # Create index with some random model
-        expected_index_settings[IndexSettingsField.index_defaults][
-            IndexSettingsField.model
-        ] = "open_clip/RN50/openai"
+        expected_index_settings[IndexSettingsField.index_defaults][IndexSettingsField.model] = "open_clip/RN50/openai"
         index_meta_cache.empty_cache()
         assert self.index_name_3 not in index_meta_cache.get_cache()
         tensor_search.create_vector_index(
-            config=self.config,
-            index_name=self.index_name_3,
-            index_settings={
-                IndexSettingsField.index_defaults: {
-                    IndexSettingsField.model: "open_clip/RN50/openai"
-                }
-            },
+            config=self.config, index_name=self.index_name_3, index_settings={
+                IndexSettingsField.index_defaults: {IndexSettingsField.model: "open_clip/RN50/openai"}}
         )
-        ix_info = index_meta_cache.get_index_info(
-            config=self.config, index_name=self.index_name_3
-        )
+        ix_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_3)
         assert ix_info.index_settings == expected_index_settings
 
         index_meta_cache.empty_cache()
         assert self.index_name_3 not in index_meta_cache.get_cache()
 
         index_meta_cache.refresh_index(config=self.config, index_name=self.index_name_3)
-        ix_refreshed_info = index_meta_cache.get_index_info(
-            config=self.config, index_name=self.index_name_3
-        )
+        ix_refreshed_info = index_meta_cache.get_index_info(config=self.config, index_name=self.index_name_3)
         assert ix_refreshed_info.index_settings == expected_index_settings
 
     def test_index_refresh_on_interval_multi_threaded(self):
-        """This test involves spinning up 5 threads or so. these threads
-        try to refresh the cache every 0.1 seconds. Despite this, the
-        last_refresh_time ensures we only actually push out a mappings
-        request once per second.
-        Because checking the last_refresh_time isn't threadsafe, this
-        test may occasionally fail. Enabling log output, and allowing
-        more log output increases risk of test failure. However, most
-        the time it should pass.
+        """ This test involves spinning up 5 threads or so. these threads
+            try to refresh the cache every 0.1 seconds. Despite this, the
+            last_refresh_time ensures we only actually push out a mappings
+            request once per second.
+            Because checking the last_refresh_time isn't threadsafe, this
+            test may occasionally fail. Enabling log output, and allowing
+            more log output increases risk of test failure. However, most
+            the time it should pass.
 
         """
         mock_get = mock.MagicMock()
-
-        @mock.patch("marqo._httprequests.ALLOWED_OPERATIONS", {mock_get})
-        @mock.patch("requests.get", mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
         def run():
             N_seconds = 3
             REFRESH_INTERVAL_SECONDS = 1
@@ -615,40 +407,31 @@ class TestIndexMetaCache(MarqoTestCase):
 
             def threaded_while(thread_num, loop_record):
                 thread_loops = 0
-                while datetime.datetime.now() - start_time < datetime.timedelta(
-                    seconds=N_seconds
-                ):
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
                     cache_update_thread = threading.Thread(
                         target=index_meta_cache.refresh_index_info_on_interval,
-                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS),
-                    )
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
                     cache_update_thread.start()
                     time.sleep(sleep_time)
                     thread_loops += 1
                 loop_record[thread_num] = thread_loops
 
-            threads = [
-                threading.Thread(target=threaded_while, args=(i, total_loops))
-                for i in range(num_threads)
-            ]
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
             for th in threads:
                 th.start()
 
             for th in threads:
                 th.join()
-            estimated_loops = round((N_seconds / sleep_time) * num_threads)
-            assert sum(total_loops) in range(
-                estimated_loops - num_threads, estimated_loops + 1
-            )
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
 
             assert mock_get.call_count == N_seconds
             return True
-
         assert run()
 
     def test_index_refresh_on_interval_multi_threaded_no_index(self):
-        """If we encounter NonTensorIndexError/ IndexNotExists error
+        """ If we encounter NonTensorIndexError/ IndexNotExists error
         while refreshing the index info, it is considered a successful
         refresh and the refresh happens on the intervals as usual.
 
@@ -661,12 +444,11 @@ class TestIndexMetaCache(MarqoTestCase):
         mock_response.json = lambda: '{"a":"b"}'
 
         # mock_get.return_value = mock_response
-        @mock.patch("marqo._httprequests.ALLOWED_OPERATIONS", {mock_get})
-        @mock.patch("requests.get", mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
         def run(error):
             def use_error(*args, **kwargs):
-                raise error("")
-
+                raise error('')
             mock_get.side_effect = use_error
 
             N_seconds = 3
@@ -678,41 +460,32 @@ class TestIndexMetaCache(MarqoTestCase):
 
             def threaded_while(thread_num, loop_record):
                 thread_loops = 0
-                while datetime.datetime.now() - start_time < datetime.timedelta(
-                    seconds=N_seconds
-                ):
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
                     cache_update_thread = threading.Thread(
                         target=index_meta_cache.refresh_index_info_on_interval,
-                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS),
-                    )
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
                     cache_update_thread.start()
                     time.sleep(sleep_time)
                     thread_loops += 1
                 loop_record[thread_num] = thread_loops
 
-            threads = [
-                threading.Thread(target=threaded_while, args=(i, total_loops))
-                for i in range(num_threads)
-            ]
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
             for th in threads:
                 th.start()
 
             for th in threads:
                 th.join()
-            estimated_loops = round((N_seconds / sleep_time) * num_threads)
-            assert sum(total_loops) in range(
-                estimated_loops - num_threads, estimated_loops + 1
-            )
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
             assert mock_get.call_count == N_seconds
             return True
-
         assert run(error=exceptions.NonTensorIndexError)
         mock_get.reset_mock()
         assert run(error=exceptions.IndexNotFoundError)
 
     def test_index_refresh_on_interval_multi_threaded_errors(self):
-        """If we encounter any error besides
+        """ If we encounter any error besides
         NonTensorIndexError/ IndexNotExists we this is considered a
         failed refresh, which doesn't prevent other threads from
         trying to update it.
@@ -726,11 +499,11 @@ class TestIndexMetaCache(MarqoTestCase):
         mock_response.json = lambda: '{"a":"b"}'
 
         # mock_get.return_value = mock_response
-        @mock.patch("marqo._httprequests.ALLOWED_OPERATIONS", {mock_get})
-        @mock.patch("requests.get", mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('requests.get', mock_get)
         def run(error):
             def use_error(*args, **kwargs):
-                raise error("")
+                raise error('')
 
             mock_get.side_effect = use_error
 
@@ -743,37 +516,27 @@ class TestIndexMetaCache(MarqoTestCase):
 
             def threaded_while(thread_num, loop_record):
                 thread_loops = 0
-                while datetime.datetime.now() - start_time < datetime.timedelta(
-                    seconds=N_seconds
-                ):
+                while datetime.datetime.now() - start_time < datetime.timedelta(seconds=N_seconds):
                     cache_update_thread = threading.Thread(
                         target=index_meta_cache.refresh_index_info_on_interval,
-                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS),
-                    )
+                        args=(self.config, self.index_name_1, REFRESH_INTERVAL_SECONDS))
                     cache_update_thread.start()
                     time.sleep(sleep_time)
                     thread_loops += 1
                 loop_record[thread_num] = thread_loops
 
-            threads = [
-                threading.Thread(target=threaded_while, args=(i, total_loops))
-                for i in range(num_threads)
-            ]
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
             for th in threads:
                 th.start()
 
             for th in threads:
                 th.join()
             estimated_loops = round((N_seconds / sleep_time) * num_threads)
-            assert sum(total_loops) in range(
-                estimated_loops - num_threads, estimated_loops + 1
-            )
+            assert sum(total_loops) in range(estimated_loops - num_threads, estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
             # because we get these failures we set the last_refresh_time back to the original
             # allowing other threads to refresh index_info
-            assert mock_get.call_count in range(
-                estimated_loops - num_threads, estimated_loops + 1
-            )
+            assert mock_get.call_count in range(estimated_loops - num_threads, estimated_loops + 1)
             return True
 
         assert run(error=ValueError)
@@ -781,7 +544,7 @@ class TestIndexMetaCache(MarqoTestCase):
         assert run(error=requests.ConnectionError)
 
     def test_search_index_refresh_on_interval_multi_threaded(self):
-        """Same as test_index_refresh_on_interval_multi_threaded() ,
+        """ Same as test_index_refresh_on_interval_multi_threaded() ,
         but using the search endpoint.
 
         The same caveat applies: Because checking the last_refresh_time
@@ -798,20 +561,15 @@ class TestIndexMetaCache(MarqoTestCase):
         # the threads will see an empty cache and try to fill it
         try:
             self.add_documents(
-                config=self.config,
-                add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{"hi": "hello"}],
-                    auto_refresh=False,
-                    device="cpu",
-                ),
-            )
+                config=self.config, add_docs_params=AddDocsParams(
+                    index_name=self.index_name_1, docs=[{"hi": "hello"}],
+                    auto_refresh=False, device="cpu"))
         except IndexNotFoundError:
             pass
-
-        @mock.patch("marqo._httprequests.ALLOWED_OPERATIONS", {mock_get})
-        @mock.patch("marqo._httprequests.requests.get", mock_get)
+        @mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get})
+        @mock.patch('marqo._httprequests.requests.get', mock_get)
         def run():
+
             # requests.get('23456')
             N_seconds = 4
             # the following is hard coded in search()
@@ -826,39 +584,25 @@ class TestIndexMetaCache(MarqoTestCase):
                 while time.perf_counter_ns() - start_time < (N_seconds * 1e9):
                     cache_update_thread = threading.Thread(
                         target=tensor_search.search,
-                        kwargs={
-                            "config": self.config,
-                            "index_name": self.index_name_1,
-                            "text": "hello",
-                        },
-                    )
+                        kwargs={"config": self.config, "index_name": self.index_name_1, "text": "hello" })
                     cache_update_thread.start()
                     time.sleep(sleep_time)
                     thread_loops += 1
                 loop_record[thread_num] = thread_loops
-
-            threads = [
-                threading.Thread(target=threaded_while, args=(i, total_loops))
-                for i in range(num_threads)
-            ]
+            threads = [threading.Thread(target=threaded_while, args=(i, total_loops)) for i in range(num_threads)]
             for th in threads:
                 th.start()
             for th in threads:
                 th.join()
 
-            estimated_loops = round((N_seconds / sleep_time) * num_threads)
-            assert sum(total_loops) in range(
-                estimated_loops - (2 * num_threads), estimated_loops + 1
-            )
+            estimated_loops = round((N_seconds/sleep_time) * num_threads)
+            assert sum(total_loops) in range(estimated_loops - (2 * num_threads), estimated_loops + 1)
             time.sleep(0.5)  # let remaining thread complete, if needed
-            mappings_call_count = len(
-                [c for c in mock_get.mock_calls if "_mapping" in str(c)]
-            )
+            mappings_call_count = len([c for c in mock_get.mock_calls if '_mapping' in str(c)])
             # for the refresh interal hardcoded in search(), which is 2 seconds, we expect a total
             # of only 2 calls to the mappings endpoint, even though there are a lot more search requests
-            assert mappings_call_count == round(N_seconds / REFRESH_INTERVAL_SECONDS)
+            assert mappings_call_count == round(N_seconds/REFRESH_INTERVAL_SECONDS)
             return True
-
         assert run()
 
     def test_add_documents_to_unknown_index(self):
@@ -884,31 +628,21 @@ class TestIndexMetaCache(MarqoTestCase):
 
         @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
         def run():
-            tensor_search.create_vector_index(
-                config=self.config,
-                index_name=self.index_name_3,
-                index_settings={"index_defaults": {"model": "random"}},
-            )
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3,
+                                              index_settings={"index_defaults": {"model": "random"}})
             clear_cache_thread = threading.Thread(target=clear_cache)
             clear_cache_thread.start()
             self.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     **{
-                        "index_name": self.index_name_1,
-                        "auto_refresh": True,
-                        "device": "cpu",
+                        "index_name": self.index_name_1, "auto_refresh": True, "device":"cpu",
                         "docs": [
-                            {"Title": "Blah"},
-                            {"Title": "blah2"},
-                            {"Title": "Blah3"},
-                            {"Title": "Blah4"},
-                        ],
-                    }
-                ),
+                            {"Title": "Blah"}, {"Title": "blah2"},
+                            {"Title": "Blah3"}, {"Title": "Blah4"}]
+                })
             )
             return True
-
         assert run()
 
     def test_add_documents_to_non_existent_index(self):
@@ -933,11 +667,8 @@ class TestIndexMetaCache(MarqoTestCase):
 
         @mock.patch("marqo.tensor_search.validation.validate_doc", mock_validate_doc)
         def run():
-            tensor_search.create_vector_index(
-                config=self.config,
-                index_name=self.index_name_3,
-                index_settings={"index_defaults": {"model": "random"}},
-            )
+            tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3,
+                                              index_settings={"index_defaults": {"model": "random"}})
             clear_cache_thread = threading.Thread(target=delete_index)
             clear_cache_thread.start()
             try:
@@ -945,17 +676,11 @@ class TestIndexMetaCache(MarqoTestCase):
                     **{"config": self.config},
                     add_docs_params=AddDocsParams(
                         **{
-                            "index_name": self.index_name_3,
-                            "auto_refresh": True,
-                            "device": "cpu",
+                            "index_name": self.index_name_3, "auto_refresh": True,  "device":"cpu",
                             "docs": [
-                                {"Title": "Blah"},
-                                {"Title": "blah2"},
-                                {"Title": "Blah3"},
-                                {"Title": "Blah4"},
-                            ],
-                        }
-                    ),
+                                {"Title": "Blah"}, {"Title": "blah2"},
+                                {"Title": "Blah3"}, {"Title": "Blah4"}]
+                        })
                 )
                 raise AssertionError
             except exceptions.IndexNotFoundError:

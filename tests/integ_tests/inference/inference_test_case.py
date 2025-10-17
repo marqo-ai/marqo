@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import patch, Mock
 
 import numpy as np
 
@@ -11,13 +11,13 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 
 
 class InferenceTestCase(TestCase):
+
     @classmethod
     def configure_request_metrics(cls):
-        """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics."""
+        """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
+        """
         cls.mock_request = Mock()
-        cls.patcher = patch(
-            "marqo.tensor_search.telemetry.RequestMetricsStore._get_request"
-        )
+        cls.patcher = patch('marqo.tensor_search.telemetry.RequestMetricsStore._get_request')
         cls.mock_get_request = cls.patcher.start()
         cls.mock_get_request.return_value = cls.mock_request
         RequestMetricsStore.set_in_request(cls.mock_request)
@@ -26,30 +26,19 @@ class InferenceTestCase(TestCase):
     def setUpClass(cls) -> None:
         cls.configure_request_metrics()
 
-    def validate_norm(
-        self, embedding: ndarray, epsilon: float = 1e-6, normalize: bool = True
-    ):
+    def validate_norm(self, embedding: ndarray, epsilon: float = 1e-6, normalize: bool = True):
         if normalize:
-            return self.assertTrue(
-                abs(np.linalg.norm(embedding) - 1) < epsilon, np.linalg.norm(embedding)
-            )
+            return self.assertTrue(abs(np.linalg.norm(embedding) - 1) < epsilon, np.linalg.norm(embedding))
         else:
-            return self.assertTrue(
-                abs(np.linalg.norm(embedding) - 1) > epsilon, np.linalg.norm(embedding)
-            )
+            return self.assertTrue(abs(np.linalg.norm(embedding) - 1) > epsilon, np.linalg.norm(embedding))
 
     def get_model_properties_from_registry(self, model_name: str) -> dict:
         return MODEL_PROPERTIES["models"][model_name]
 
     def encode_content_helper(
-        self,
-        content: list[str],
-        model_name: str = "",
-        model_properties: Optional[dict] = None,
-        modality: Union[Modality, str] = Modality.TEXT,
-        device: Optional[str] = "cpu",
-        normalize_embeddings: bool = True,
-        media_download_headers: Optional[dict] = None,
+            self, content: list[str], model_name: str="", model_properties: Optional[dict] = None,
+            modality: Union[Modality, str] = Modality.TEXT, device: Optional[str] = "cpu",
+            normalize_embeddings: bool = True, media_download_headers: Optional[dict] = None
     ) -> List[ndarray]:
         """
         A helper function to encode the content of a document.
@@ -78,7 +67,8 @@ class InferenceTestCase(TestCase):
             preprocessing_config = TextPreprocessingConfig(should_chunk=False)
         elif modality == Modality.IMAGE:
             preprocessing_config = ImagePreprocessingConfig(
-                download_thread_count=1, download_header=media_download_headers
+                download_thread_count=1,
+                download_header=media_download_headers
             )
         else:
             raise ValueError(f"Unsupported modality: {modality}")
@@ -90,22 +80,18 @@ class InferenceTestCase(TestCase):
             model_config=ModelConfig(
                 model_name=model_name,
                 model_properties=model_properties,
-                normalize_embeddings=normalize_embeddings,
+                normalize_embeddings=normalize_embeddings
             ),
             use_inference_cache=False,
             return_individual_error=True,
-            preprocessing_config=preprocessing_config,
+            preprocessing_config=preprocessing_config
         )
 
-        results: InferenceResult = NativeInferenceLocal(DeviceManager()).vectorise(
-            inference_request
-        )
+        results: InferenceResult = NativeInferenceLocal(DeviceManager()).vectorise(inference_request)
         embeddings = [result[0][1] for result in results.result]
         return embeddings
 
-    def calculate_embeddings_difference(
-        self, embedding_1: ndarray, embedding_2: ndarray
-    ):
+    def calculate_embeddings_difference(self, embedding_1: ndarray, embedding_2: ndarray):
         """
         Calculate the difference between two embeddings.
 

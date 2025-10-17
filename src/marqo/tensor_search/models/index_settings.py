@@ -1,18 +1,14 @@
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, Any, Optional, List, Union
 
 from pydantic.v1 import root_validator
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
-from marqo import marqo_docs, version
+from marqo import version, marqo_docs
 from marqo.base_model import StrictBaseModel
-from marqo.core.models.marqo_index_request import (
-    FieldRequest,
-    MarqoIndexRequest,
-    StructuredMarqoIndexRequest,
-    UnstructuredMarqoIndexRequest,
-)
+from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
+    UnstructuredMarqoIndexRequest
 
 
 class AnnParameters(StrictBaseModel):
@@ -28,13 +24,15 @@ class IndexSettings(StrictBaseModel):
     treatUrlsAndPointersAsMedia: Optional[bool]
     filterStringMaxLength: Optional[int]
     collapseFields: Optional[List[core.CollapseField]] = None
-    model: str = "hf/e5-base-v2"
+    model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
     textQueryPrefix: Optional[str] = None
     textChunkPrefix: Optional[str] = None
     normalizeEmbeddings: bool = True
     textPreprocessing: core.TextPreProcessing = core.TextPreProcessing(
-        splitLength=2, splitOverlap=0, splitMethod=core.TextSplitMethod.Sentence
+        splitLength=2,
+        splitOverlap=0,
+        splitMethod=core.TextSplitMethod.Sentence
     )
     imagePreprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
         patchMethod=None
@@ -50,22 +48,21 @@ class IndexSettings(StrictBaseModel):
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
     annParameters: AnnParameters = AnnParameters(
         spaceType=core.DistanceMetric.PrenormalizedAngular,
-        parameters=core.HnswConfig(efConstruction=512, m=16),
+        parameters=core.HnswConfig(
+            efConstruction=512,
+            m=16
+        )
     )
-
+    
     @root_validator
     def validate_url_pointer_treatment(cls, values):
-        treat_as_images = values.get("treatUrlsAndPointersAsImages")
-        treat_as_media = values.get("treatUrlsAndPointersAsMedia")
+        treat_as_images = values.get('treatUrlsAndPointersAsImages')
+        treat_as_media = values.get('treatUrlsAndPointersAsMedia')
 
         if treat_as_images and not treat_as_media:
             # Deprecation warning
             import warnings
-
-            warnings.warn(
-                "'treatUrlsAndPointersAsImages' is deprecated. Use 'treatUrlsAndPointersAsMedia' instead.",
-                DeprecationWarning,
-            )
+            warnings.warn("'treatUrlsAndPointersAsImages' is deprecated. Use 'treatUrlsAndPointersAsMedia' instead.", DeprecationWarning)
 
         if treat_as_images == False and treat_as_media:
             raise api_exceptions.InvalidArgError(
@@ -74,21 +71,21 @@ class IndexSettings(StrictBaseModel):
 
         # If treatUrlsAndPointersAsMedia is True, ensure treatUrlsAndPointersAsImages is also True
         if treat_as_media:
-            values["treatUrlsAndPointersAsImages"] = True
+            values['treatUrlsAndPointersAsImages'] = True
 
         return values
 
     @root_validator
     def validate_collapse_fields(cls, values):
-        collapse_fields = values.get("collapseFields")
-        index_type = values.get("type")
-
+        collapse_fields = values.get('collapseFields')
+        index_type = values.get('type')
+        
         # collapseFields is only supported for SemiStructuredIndex
         if collapse_fields is not None and index_type == core.IndexType.Structured:
             raise api_exceptions.InvalidArgError(
                 "collapseFields is only supported for unstructured indexes"
             )
-
+        
         return values
 
     @root_validator(pre=True)
@@ -97,13 +94,11 @@ class IndexSettings(StrictBaseModel):
         def validate_keys(d: Union[dict, list]):
             if isinstance(d, dict):
                 for key in d.keys():
-                    if "_" in key:
-                        raise ValueError(
-                            f"Invalid field name '{key}'. "
-                            f"See Create Index API reference here {marqo_docs.create_index()}"
-                        )
+                    if '_' in key:
+                        raise ValueError(f"Invalid field name '{key}'. "
+                                         f"See Create Index API reference here {marqo_docs.create_index()}")
 
-                    if key not in ["dependentFields", "modelProperties"]:
+                    if key not in ['dependentFields', 'modelProperties']:
                         validate_keys(d[key])
             elif isinstance(d, list):
                 for item in d:
@@ -135,9 +130,8 @@ class IndexSettings(StrictBaseModel):
                         name=field.name,
                         type=field.type,
                         features=field.features,
-                        dependent_fields=field.dependent_fields,
-                    )
-                    for field in self.allFields
+                        dependent_fields=field.dependent_fields
+                    ) for field in self.allFields
                 ]
 
             return StructuredMarqoIndexRequest(
@@ -147,7 +141,7 @@ class IndexSettings(StrictBaseModel):
                     properties=self.modelProperties,
                     custom=self.modelProperties is not None,
                     text_query_prefix=self.textQueryPrefix,
-                    text_chunk_prefix=self.textChunkPrefix,
+                    text_chunk_prefix=self.textChunkPrefix
                 ),
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
@@ -180,7 +174,7 @@ class IndexSettings(StrictBaseModel):
                     self.treatUrlsAndPointersAsImages = True
                 else:
                     self.treatUrlsAndPointersAsImages = False
-
+            
             if self.treatUrlsAndPointersAsMedia is None:
                 # Default value for treat_urls_and_pointers_as_media is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
@@ -190,7 +184,7 @@ class IndexSettings(StrictBaseModel):
                 # Default value for filter_string_max_length is 20, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
                 self.filterStringMaxLength = 50
-
+    
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
                 model=core.Model(
@@ -198,7 +192,7 @@ class IndexSettings(StrictBaseModel):
                     properties=self.modelProperties,
                     custom=self.modelProperties is not None,
                     text_query_prefix=self.textQueryPrefix,
-                    text_chunk_prefix=self.textChunkPrefix,
+                    text_chunk_prefix=self.textChunkPrefix
                 ),
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
@@ -214,7 +208,7 @@ class IndexSettings(StrictBaseModel):
                 collapse_fields=self.collapseFields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
-                updated_at=time.time(),
+                updated_at=time.time()
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
@@ -225,12 +219,12 @@ class IndexSettings(StrictBaseModel):
             # This covers both UnstructuredMarqoIndex and SemiStructuredMarqoIndex
             # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
             # this information and the SemiStructured concept are internal implementation details only.
-
+            
             # Only include collapseFields for SemiStructuredMarqoIndex
             collapse_fields = None
             if isinstance(marqo_index, core.SemiStructuredMarqoIndex):
                 collapse_fields = marqo_index.collapse_fields
-
+            
             return cls(
                 type=core.IndexType.Unstructured,
                 treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
@@ -247,8 +241,8 @@ class IndexSettings(StrictBaseModel):
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
-                    parameters=marqo_index.hnsw_config,
-                ),
+                    parameters=marqo_index.hnsw_config
+                )
             )
         elif isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
@@ -258,9 +252,8 @@ class IndexSettings(StrictBaseModel):
                         name=field.name,
                         type=field.type,
                         features=field.features,
-                        dependent_fields=field.dependent_fields,
-                    )
-                    for field in marqo_index.fields
+                        dependent_fields=field.dependent_fields
+                    ) for field in marqo_index.fields
                 ],
                 tensorFields=[field.name for field in marqo_index.tensor_fields],
                 model=marqo_index.model.name,
@@ -273,26 +266,24 @@ class IndexSettings(StrictBaseModel):
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
-                    parameters=marqo_index.hnsw_config,
-                ),
+                    parameters=marqo_index.hnsw_config
+                )
             )
         else:
-            raise api_exceptions.InternalError(
-                f"Unknown index type: {type(marqo_index)}"
-            )
+            raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
 
     @classmethod
     def get_model_properties(cls, marqo_index):
         if marqo_index.model.properties is None:
             return None
 
-        if marqo_index.model.properties.get("isMarqtuneModel", False):
+        if marqo_index.model.properties.get('isMarqtuneModel', False):
             # Hide all properties except for isMarqtuneModel
-            marqo_index.model.properties.pop("name", None)
-            marqo_index.model.properties.pop("dimensions")
-            marqo_index.model.properties.pop("model_location")
-            marqo_index.model.properties.pop("type")
-            marqo_index.model.properties.pop("trustRemoteCode", None)
+            marqo_index.model.properties.pop('name', None)
+            marqo_index.model.properties.pop('dimensions')
+            marqo_index.model.properties.pop('model_location')
+            marqo_index.model.properties.pop('type')
+            marqo_index.model.properties.pop('trustRemoteCode', None)
         return marqo_index.model.properties
 
 

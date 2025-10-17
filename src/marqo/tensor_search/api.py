@@ -1,8 +1,7 @@
 """The API entrypoint for Tensor Search"""
-
 import json
 from contextlib import asynccontextmanager
-from typing import Any, List, Type, TypeVar
+from typing import List, Type, Any, TypeVar
 
 import pydantic
 import uvicorn
@@ -10,12 +9,13 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
+from pydantic import ValidationError
 from pydantic.v1 import parse_obj_as
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
-from marqo import config
+from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
-from marqo import marqo_docs, version
+from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.add_docs_objects import AddDocsBodyParams
@@ -29,32 +29,25 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
-from marqo.core.models.typeahead import TypeaheadIndexingRequest, TypeaheadRequest
+from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
-from marqo.core.monitoring.statsd_client import StatsDClient
-from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
-from marqo.inference.native_inference.remote.client.inference_client import (
-    NativeInferenceClient,
-)
-from marqo.inference.native_inference.remote.client.model_manager_client import (
-    ModelManagerClient,
-)
-from marqo.logging import LOGGING_CONFIG, get_logger
+from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
+from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
+from marqo.logging import get_logger, LOGGING_CONFIG
 from marqo.otel import bootstrap_otel
 from marqo.tensor_search import tensor_search, utils
-from marqo.tensor_search.enums import EnvVars, RequestType
+from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
-from marqo.tensor_search.models.index_settings import (
-    IndexSettings,
-    IndexSettingsWithName,
-)
+from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
+from marqo.core.monitoring.statsd_client import StatsDClient
+from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
-from marqo.tensor_search.web import api_utils, api_validation
-from marqo.upgrades.upgrade import RollbackRunner, UpgradeRunner
+from marqo.tensor_search.web import api_validation, api_utils
+from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -68,45 +61,24 @@ def generate_config() -> config.Config:
         query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
-        content_cluster_name=utils.read_env_vars_and_defaults(
-            EnvVars.VESPA_CONTENT_CLUSTER_NAME
-        ),
-        default_search_timeout_ms=utils.read_env_vars_and_defaults_ints(
-            EnvVars.VESPA_SEARCH_TIMEOUT_MS
-        ),
-        feed_pool_size=utils.read_env_vars_and_defaults_ints(
-            EnvVars.VESPA_FEED_POOL_SIZE
-        ),
-        get_pool_size=utils.read_env_vars_and_defaults_ints(
-            EnvVars.VESPA_GET_POOL_SIZE
-        ),
-        delete_pool_size=utils.read_env_vars_and_defaults_ints(
-            EnvVars.VESPA_DELETE_POOL_SIZE
-        ),
-        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(
-            EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE
-        ),
+        content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
+        default_search_timeout_ms=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_SEARCH_TIMEOUT_MS),
+        feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),
+        get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
+        delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
+        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
 
     # Zookeeper is only instantiated if the hosts are provided
-    zookeeper_client = (
-        ZookeeperClient(
-            zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(
-                EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT
-            ),
-            hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS),
-        )
-        if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
-        else None
-    )
+    zookeeper_client = ZookeeperClient(
+        zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
+        hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
+    ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == "COMBINED":
+    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
         # !!!Please note that these imports are deliberately put here since we only need them in COMBINED mode
         import marqo.inference.native_inference.remote.server.inference_config as inference_config
-        from marqo.inference.native_inference.remote.server.on_start_script import (
-            on_start as inference_on_start,
-        )
-
+        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
         native_inference_local_config = inference_config.Config()
         inference_on_start(native_inference_local_config)  # pre-warm the model
         inference = native_inference_local_config.local_inference
@@ -114,42 +86,26 @@ def generate_config() -> config.Config:
         return config.Config(vespa_client, inference, model_manager, zookeeper_client)
     else:
         inference = NativeInferenceClient(
-            base_url=utils.read_env_vars_and_defaults(
-                EnvVars.MARQO_REMOTE_INFERENCE_URL
-            ),
-            pool_size=utils.read_env_vars_and_defaults_ints(
-                EnvVars.MARQO_INFERENCE_POOL_SIZE
-            ),
-            timeout=utils.read_env_vars_and_defaults_ints(
-                EnvVars.MARQO_INFERENCE_TIMEOUT
-            ),
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+            pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+            timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
         )
         model_manager = ModelManagerClient(
-            base_url=utils.read_env_vars_and_defaults(
-                EnvVars.MARQO_REMOTE_INFERENCE_URL
-            ),
+            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
         )
 
         # initialise inference cache
-        inference_cache_size = utils.read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_API_INFERENCE_CACHE_SIZE
-        )
+        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
         if inference_cache_size > 0:  # enable inference cache
-            inference_cache_type = utils.read_env_vars_and_defaults(
-                EnvVars.MARQO_API_INFERENCE_CACHE_TYPE
-            )
+            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
             caching_inference = CachingInference(
                 delegate=inference,
                 cache_size=inference_cache_size,
-                cache_type=inference_cache_type,
+                cache_type=inference_cache_type
             )
-            return config.Config(
-                vespa_client, caching_inference, model_manager, zookeeper_client
-            )
+            return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
         else:
-            return config.Config(
-                vespa_client, inference, model_manager, zookeeper_client
-            )
+            return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -160,13 +116,12 @@ if __name__ in ["__main__", "api"]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    otel_shutdown_hook = bootstrap_otel(app, service_name="marqo-api")
+    otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-api')
 
     yield
 
     otel_shutdown_hook()
     get_config().stop_and_close_zookeeper_client()
-
 
 app = FastAPI(
     title="Marqo",
@@ -185,9 +140,7 @@ def get_config():
 
 
 @app.exception_handler(base_exceptions.MarqoError)
-def marqo_base_exception_handler(
-    request: Request, exc: base_exceptions.MarqoError
-) -> JSONResponse:
+def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError) -> JSONResponse:
     """
     Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
     The API Error will be passed to the `marqo_api_exception_handler` below.
@@ -198,117 +151,41 @@ def marqo_base_exception_handler(
     """
     api_exception_mappings = [
         # More specific errors should take precedence
+
         # Core exceptions
-        (
-            core_exceptions.InvalidFieldNameError,
-            api_exceptions.InvalidFieldNameError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.IndexExistsError,
-            api_exceptions.IndexAlreadyExistsError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.IndexNotFoundError,
-            api_exceptions.IndexNotFoundError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.VespaDocumentParsingError,
-            api_exceptions.BackendDataParsingError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.OperationConflictError,
-            api_exceptions.OperationConflictError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.BackendCommunicationError,
-            api_exceptions.BackendCommunicationError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.ZeroMagnitudeVectorError,
-            api_exceptions.BadRequestError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.BackendCommunicationError,
-            api_exceptions.BackendCommunicationError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.UnsupportedFeatureError,
-            api_exceptions.BadRequestError,
-            None,
-            None,
-        ),
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError, None, None),
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None, None),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None, None),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None, None),
+        (core_exceptions.OperationConflictError, api_exceptions.OperationConflictError, None, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
+        (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
+        (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
-        (
-            core_exceptions.ApplicationRollbackError,
-            api_exceptions.ApplicationRollbackError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.TooManyFieldsError,
-            api_exceptions.BadRequestError,
-            None,
-            None,
-        ),
-        (
-            core_exceptions.DeviceError,
-            api_exceptions.ServiceUnavailableError,
-            None,
-            None,
-        ),
+        (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
+        (core_exceptions.TooManyFieldsError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.DeviceError, api_exceptions.ServiceUnavailableError, None, None),
+
         # Vespa client exceptions
         (
             vespa_exceptions.VespaTimeoutError,
             api_exceptions.VectorStoreTimeoutError,
             "Vector store request timed out. Try your request again later.",
-            None,
+            None
         ),
+
         # Base exceptions
         (base_exceptions.InternalError, api_exceptions.InternalError, None, None),
-        (
-            base_exceptions.InvalidArgumentError,
-            api_exceptions.InvalidArgError,
-            None,
-            None,
-        ),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
+
         # Inference exceptions
         # TODO - Inference Server currently only raises InferenceError in the remote model, so these two catches
         # TODO - are not used in the remote mode. But they will be used in the combined mode.
-        (
-            inference_exceptions.MediaDownloadError,
-            api_exceptions.InvalidArgError,
-            None,
-            None,
-        ),
-        (
-            inference_exceptions.ModelError,
-            api_exceptions.BadRequestError,
-            None,
-            marqo_docs.list_of_models(),
-        ),
+        (inference_exceptions.MediaDownloadError, api_exceptions.InvalidArgError, None, None),
+        (inference_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
         # TODO - Distinguish recoverable vs unrecoverable errors for InferenceError
-        (
-            inference_exceptions.InferenceError,
-            api_exceptions.InvalidArgError,
-            None,
-            None,
-        ),
+        (inference_exceptions.InferenceError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
@@ -321,18 +198,14 @@ def marqo_base_exception_handler(
     # Completely unhandled exception (500)
     # This should abstract away internal error.
     if not converted_error:
-        converted_error = api_exceptions.MarqoWebError(
-            "Marqo encountered an unexpected internal error."
-        )
+        converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error.")
 
     return marqo_api_exception_handler(request, converted_error)
 
 
 @app.exception_handler(api_exceptions.MarqoWebError)
-def marqo_api_exception_handler(
-    request: Request, exc: api_exceptions.MarqoWebError
-) -> JSONResponse:
-    """Catch a MarqoWebError and return an appropriate HTTP response.
+def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebError) -> JSONResponse:
+    """ Catch a MarqoWebError and return an appropriate HTTP response.
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
     to handle WebErrors vs Regular errors"""
@@ -342,18 +215,18 @@ def marqo_api_exception_handler(
         "message": exc.message,
         "code": exc.code,
         "type": exc.error_type,
-        "link": exc.link,
+        "link": exc.link
     }
     if headers:
-        return JSONResponse(content=body, status_code=exc.status_code, headers=headers)
+        return JSONResponse(
+            content=body, status_code=exc.status_code, headers=headers
+        )
     else:
         return JSONResponse(content=body, status_code=exc.status_code)
 
 
 @app.exception_handler(RequestValidationError)
-async def api_validation_exception_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def api_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Catch FastAPI validation errors and return a 422 error with the error messages.
 
     Note: The Pydantic Validation error that happens at the API will be caught here and returned as a 422 error.
@@ -364,55 +237,48 @@ async def api_validation_exception_handler(
         "detail": jsonable_encoder(exc.errors()),
         "code": UnprocessableEntityError.code,
         "type": UnprocessableEntityError.error_type,
-        "link": UnprocessableEntityError.link,
+        "link": UnprocessableEntityError.link
     }
-    return JSONResponse(status_code=HTTP_422_UNPROCESSABLE_ENTITY, content=body)
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        content=body
+    )
 
 
 # For validation error raised from PydanticV1 model classes
 @app.exception_handler(pydantic.v1.ValidationError)
-async def validation_exception_handler(
-    request, exc: pydantic.v1.ValidationError
-) -> JSONResponse:
+async def validation_exception_handler(request, exc: pydantic.v1.ValidationError) -> JSONResponse:
     """Catch pydantic v1 validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
-    error_messages = [
-        {
-            "loc": error.get("loc", ""),
-            "msg": error.get("msg", ""),
-            "type": error.get("type", ""),
-        }
-        for error in exc.errors()
-    ]
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
 
     body = {
         "message": json.dumps(error_messages),
         "code": InvalidArgError.code,
         "type": InvalidArgError.error_type,
-        "link": InvalidArgError.link,
+        "link": InvalidArgError.link
     }
     return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
 
 # For validation error raised from PydanticV2 model classes
 @app.exception_handler(pydantic.ValidationError)
-async def validation_exception_handler(
-    request, exc: pydantic.ValidationError
-) -> JSONResponse:
+async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
-    error_messages = [
-        {
-            "loc": error.get("loc", ""),
-            "msg": error.get("msg", ""),
-            "type": error.get("type", ""),
-        }
-        for error in exc.errors()
-    ]
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
 
     body = {
         "message": json.dumps(error_messages),
         "code": InvalidArgError.code,
         "type": InvalidArgError.error_type,
-        "link": InvalidArgError.link,
+        "link": InvalidArgError.link
     }
     return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
@@ -422,7 +288,12 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
 
     headers = getattr(exc, "headers", None)
-    body = {"message": exc.message, "code": 500, "type": "internal_error", "link": ""}
+    body = {
+        "message": exc.message,
+        "code": 500,
+        "type": "internal_error",
+        "link": ""
+    }
     if headers:
         return JSONResponse(content=body, status_code=500, headers=headers)
     else:
@@ -434,7 +305,7 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
 # provide a v1 model type in the API method parameter. The workaround we use here take in the body as a dict and
 # manually converts it to an v1 model. It catches the v1.Validation error and converts it to FastAPI's
 # RequestValidationError to keep the behaviour consistent with the auto-injecting mechanism
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 def parse_request_object(obj_type: Type[T], obj: Any) -> T:
@@ -443,18 +314,14 @@ def parse_request_object(obj_type: Type[T], obj: Any) -> T:
     except pydantic.v1.ValidationError as e:
         raise RequestValidationError(errors=e.errors()) from e
 
-
 @app.get("/", summary="Basic information")
 def root():
-    return {"message": "Welcome to Marqo", "version": version.get_version()}
+    return {"message": "Welcome to Marqo",
+            "version": version.get_version()}
 
 
 @app.post("/indexes/{index_name}")
-def create_index(
-    index_name: str,
-    settings_dict: dict,
-    marqo_config: config.Config = Depends(get_config),
-):
+def create_index(index_name: str, settings_dict: dict, marqo_config: config.Config = Depends(get_config)):
     """
     Create index with settings. Please refer to the following documents for details about creating different types
     of index:
@@ -464,11 +331,13 @@ def create_index(
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettings can be injected after migrated to v2
     settings = parse_request_object(IndexSettings, settings_dict)
-    marqo_config.index_management.create_index(
-        settings.to_marqo_index_request(index_name)
-    )
+    marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     return JSONResponse(
-        content={"acknowledged": True, "index": index_name}, status_code=200
+        content={
+            "acknowledged": True,
+            "index": index_name
+        },
+        status_code=200
     )
 
 
@@ -479,7 +348,11 @@ def get_indexes(marqo_config: config.Config = Depends(get_config)):
     [List index API document](https://docs.marqo.ai/latest/reference/api/indexes/list-indexes/) for details.
     """
     indexes = marqo_config.index_management.get_all_indexes()
-    return {"results": [{"indexName": index.name} for index in indexes]}
+    return {
+        'results': [
+            {'indexName': index.name} for index in indexes
+        ]
+    }
 
 
 @app.get("/indexes/{index_name}/settings")
@@ -489,9 +362,7 @@ def get_settings(index_name: str, marqo_config: config.Config = Depends(get_conf
     [Index settings API document](https://docs.marqo.ai/latest/reference/api/settings/get-index-stats/) for details.
     """
     marqo_index = marqo_config.index_management.get_index(index_name)
-    return IndexSettings.from_marqo_index(marqo_index).dict(
-        exclude_none=True, by_alias=True
-    )
+    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True, by_alias=True)
 
 
 @app.delete("/indexes/{index_name}")
@@ -505,9 +376,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
 
 
 @app.get("/indexes/{index_name}/health")
-def check_index_health(
-    index_name: str, marqo_config: config.Config = Depends(get_config)
-):
+def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
     Provides information about the health of a Marqo index. Please refer to
     [Index health API document](https://docs.marqo.ai/latest/reference/api/health/health/) for details.
@@ -524,23 +393,19 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
     """
     stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
     return {
-        "numberOfDocuments": stats.number_of_documents,
-        "numberOfVectors": stats.number_of_vectors,
-        "backend": {
-            "memoryUsedPercentage": stats.backend.memory_used_percentage,
-            "storageUsedPercentage": stats.backend.storage_used_percentage,
-        },
+        'numberOfDocuments': stats.number_of_documents,
+        'numberOfVectors': stats.number_of_vectors,
+        'backend': {
+            'memoryUsedPercentage': stats.backend.memory_used_percentage,
+            'storageUsedPercentage': stats.backend.storage_used_percentage
+        }
     }
 
 
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
-def search(
-    index_name: str,
-    search_query_dict: dict,
-    device: str = Depends(api_validation.validate_device),
-    marqo_config: config.Config = Depends(get_config),
-):
+def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
+           marqo_config: config.Config = Depends(get_config)):
     """
     Search for documents matching a specific query in the given index. Please refer to
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
@@ -551,28 +416,20 @@ def search(
 
     query_logger = QueryLogger(search_query)
 
-    with RequestMetricsStore.for_request().time(
-        f"POST /indexes/{index_name}/search", query_logger.log_slow_query
-    ):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search", query_logger.log_slow_query):
         try:
             result = tensor_search.search(
-                config=marqo_config,
-                text=search_query.q,
-                index_name=index_name,
-                highlights=search_query.showHighlights,
+                config=marqo_config, text=search_query.q,
+                index_name=index_name, highlights=search_query.showHighlights,
                 searchable_attributes=search_query.searchableAttributes,
                 search_method=search_query.searchMethod,
-                result_count=search_query.limit,
-                offset=search_query.offset,
+                result_count=search_query.limit, offset=search_query.offset,
                 rerank_depth=search_query.rerankDepth,
-                ef_search=search_query.efSearch,
-                approximate=search_query.approximate,
+                ef_search=search_query.efSearch, approximate=search_query.approximate,
                 approximate_threshold=search_query.approximateThreshold,
                 reranker=search_query.reRanker,
-                filter=search_query.filter,
-                device=device,
-                attributes_to_retrieve=search_query.attributesToRetrieve,
-                boost=search_query.boost,
+                filter=search_query.filter, device=device,
+                attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
                 media_download_headers=search_query.mediaDownloadHeaders,
                 context=search_query.context,
                 score_modifiers=search_query.scoreModifiers,
@@ -582,12 +439,10 @@ def search(
                 facets=search_query.facets,
                 track_total_hits=search_query.trackTotalHits,
                 language=search_query.language,
-                relevance_cutoff=search_query.relevance_cutoff,
-                sort_by=search_query.sort_by,
+                relevance_cutoff= search_query.relevance_cutoff,
+                sort_by = search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,
-                collapse_field_name=search_query.collapse_fields[0].name
-                if search_query.collapse_fields
-                else None,
+                collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None
             )
             return ORJSONResponse(result)
         except Exception as e:
@@ -598,9 +453,8 @@ def search(
 
 @app.post("/indexes/{index_name}/recommend")
 @throttle(RequestType.SEARCH)
-def recommend(
-    query_dict: dict, index_name: str, marqo_config: config.Config = Depends(get_config)
-):
+def recommend(query_dict: dict, index_name: str,
+              marqo_config: config.Config = Depends(get_config)):
     """
     Recommend similar documents. Input a list of existing document IDs or dict of IDs and weights, and the response
     will be a list of "recommendations", which are documents similar to the input. These similar documents are
@@ -636,12 +490,8 @@ def recommend(
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.SEARCH)
-def embed(
-    embedding_request_dict: dict,
-    index_name: str,
-    device: str = Depends(api_validation.validate_device),
-    marqo_config: config.Config = Depends(get_config),
-):
+def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(api_validation.validate_device),
+          marqo_config: config.Config = Depends(get_config)):
     """
     Vectorise a piece of content (string or weighted dictionary) or list of content and return the corresponding
     embeddings. Please refer to [Embed API document](https://docs.marqo.ai/latest/reference/api/embed/embed/) for
@@ -654,22 +504,20 @@ def embed(
 
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
-            index_name=index_name,
-            device=device,
+            index_name=index_name, device=device,
             media_download_headers=embedding_request.mediaDownloadHeaders,
             model_auth=embedding_request.modelAuth,
-            content_type=embedding_request.content_type,
+            content_type=embedding_request.content_type
         )
 
 
 @app.post("/indexes/{index_name}/documents")
 @throttle(RequestType.INDEX)
 def add_or_replace_documents(
-    index_name: str,
-    body_dict: dict,
-    marqo_config: config.Config = Depends(get_config),
-    device: str = Depends(api_validation.validate_device),
-):
+        index_name: str,
+        body_dict: dict,
+        marqo_config: config.Config = Depends(get_config),
+        device: str = Depends(api_validation.validate_device)):
     """
     Add an array of documents or replace them if they already exist.
     Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
@@ -678,25 +526,20 @@ def add_or_replace_documents(
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  AddDocsBodyParams can be injected after migrated to v2
     body = parse_request_object(AddDocsBodyParams, body_dict)
-    add_docs_params = api_utils.add_docs_params_orchestrator(
-        index_name=index_name, body=body, device=device
-    )
+    add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
+                                                             device=device)
 
-    with RequestMetricsStore.for_request().time(
-        f"POST /indexes/{index_name}/documents"
-    ):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         res = marqo_config.document.add_documents(add_docs_params=add_docs_params)
-        return JSONResponse(
-            content=res.dict(exclude_none=True, by_alias=True),
-            headers=res.get_header_dict(),
-        )
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
-    index_name: str, body_dict: dict, marqo_config: config.Config = Depends(get_config)
-):
+        index_name: str,
+        body_dict: dict,
+        marqo_config: config.Config = Depends(get_config)):
     """
     Update an array of documents in a given index. Please refer to
     [Update document API](https://docs.marqo.ai/latest/reference/api/documents/update-documents/) for details.
@@ -706,63 +549,47 @@ def update_documents(
     body = parse_request_object(UpdateDocumentsBodyParams, body_dict)
 
     res = marqo_config.document.partial_update_documents_by_index_name(
-        index_name=index_name, partial_documents=body.documents
-    )
+        index_name=index_name, partial_documents=body.documents)
 
-    return JSONResponse(
-        content=res.dict(exclude_none=True, by_alias=True),
-        headers=res.get_header_dict(),
-    )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
-def get_document_by_id(
-    index_name: str,
-    document_id: str,
-    marqo_config: config.Config = Depends(get_config),
-    expose_facets: bool = False,
-):
+def get_document_by_id(index_name: str, document_id: str,
+                       marqo_config: config.Config = Depends(get_config),
+                       expose_facets: bool = False):
     """
     Gets a document using its ID. Please refer to
     [Get document API](https://docs.marqo.ai/latest/reference/api/documents/get-one-document/) for details.
     """
     return tensor_search.get_document_by_id(
-        config=marqo_config,
-        index_name=index_name,
-        document_id=document_id,
-        show_vectors=expose_facets,
+        config=marqo_config, index_name=index_name, document_id=document_id,
+        show_vectors=expose_facets
     )
 
 
 @app.get("/indexes/{index_name}/documents")
 def get_documents_by_ids_via_get(
-    index_name: str,
-    document_ids: List[str],
-    marqo_config: config.Config = Depends(get_config),
-    expose_facets: bool = False,
-):
+        index_name: str, document_ids: List[str],
+        marqo_config: config.Config = Depends(get_config),
+        expose_facets: bool = False):
     """
     Gets a selection of documents based on their IDs via a GET request. Please refer to
     [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
     """
     res = tensor_search.get_documents_by_ids(
-        config=marqo_config,
-        index_name=index_name,
-        document_ids=document_ids,
-        show_vectors=expose_facets,
+        config=marqo_config, index_name=index_name, document_ids=document_ids,
+        show_vectors=expose_facets
     )
-    return JSONResponse(
-        content=res.dict(exclude_none=True, by_alias=True),
-        headers=res.get_header_dict(),
-    )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/get-batch")
 def get_documents_by_ids_via_post(
-    index_name: str,
-    get_batch_documents_request_dict: dict,
-    marqo_config: config.Config = Depends(get_config),
-    expose_facets: bool = False,
+        index_name: str,
+        get_batch_documents_request_dict: dict,
+        marqo_config: config.Config = Depends(get_config),
+        expose_facets: bool = False
 ):
     """
     Gets a selection of documents based on their IDs via a POST request. Please refer to
@@ -770,28 +597,18 @@ def get_documents_by_ids_via_post(
     """
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  GetBatchDocumentsRequest can be injected after migrated to v2
-    get_batch_documents_request = parse_request_object(
-        GetBatchDocumentsRequest, get_batch_documents_request_dict
-    )
+    get_batch_documents_request = parse_request_object(GetBatchDocumentsRequest, get_batch_documents_request_dict)
 
     res = tensor_search.get_documents_by_ids(
-        config=marqo_config,
-        index_name=index_name,
-        document_ids=get_batch_documents_request.document_ids,
-        show_vectors=expose_facets,
+        config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
+        show_vectors=expose_facets
     )
-    return JSONResponse(
-        content=res.dict(exclude_none=True, by_alias=True),
-        headers=res.get_header_dict(),
-    )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")
-def delete_docs(
-    index_name: str,
-    documentIds: List[str],
-    marqo_config: config.Config = Depends(get_config),
-):
+def delete_docs(index_name: str, documentIds: List[str],
+                marqo_config: config.Config = Depends(get_config)):
     """
     Delete documents identified by an array of their IDs. Please refer to
     [Delete documents API](https://docs.marqo.ai/latest/reference/api/documents/delete-documents/) for details.
@@ -811,18 +628,12 @@ def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
 
 
 @app.delete("/models")
-def eject_model(
-    model_name: str,
-    model_device: str,
-    marqo_config: config.Config = Depends(get_config),
-):
+def eject_model(model_name: str, model_device: str, marqo_config: config.Config = Depends(get_config)):
     """
     Eject a model from a specific device. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
-    return marqo_config.model_manager.eject_model(
-        model_name=model_name, device=model_device
-    )
+    return marqo_config.model_manager.eject_model(model_name=model_name, device=model_device)
 
 
 @app.get("/device/cpu")
@@ -846,56 +657,41 @@ def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
 
 @app.post("/batch/indexes/delete", include_in_schema=False)
 @utils.enable_batch_apis()
-def batch_delete_indexes(
-    index_names: List[str], marqo_config: config.Config = Depends(get_config)
-):
+def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
     marqo_config.index_management.batch_delete_indexes_by_name(index_names=index_names)
-    return JSONResponse(
-        content={"acknowledged": True, "index_names": index_names}, status_code=200
-    )
+    return JSONResponse(content={"acknowledged": True,
+                                 "index_names": index_names}, status_code=200)
 
 
 @app.post("/batch/indexes/create", include_in_schema=False)
 @utils.enable_batch_apis()
-def batch_create_indexes(
-    index_settings_with_name_list: List[dict],
-    marqo_config: config.Config = Depends(get_config),
-):
+def batch_create_indexes(index_settings_with_name_list: List[dict],
+                         marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [
-        parse_request_object(IndexSettingsWithName, settings)
-        for settings in index_settings_with_name_list
-    ]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
 
-    marqo_index_requests = [
-        settings.to_marqo_index_request(settings.indexName)
-        for settings in index_settings
-    ]
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)
 
     return JSONResponse(
         content={
             "acknowledged": True,
-            "index_names": [settings.indexName for settings in index_settings],
+            "index_names": [settings.indexName for settings in index_settings]
         },
-        status_code=200,
+        status_code=200
     )
 
 
 @app.delete("/indexes/{index_name}/documents/delete-all", include_in_schema=False)
 @utils.enable_batch_apis()
-def delete_all_documents(
-    index_name: str, marqo_config: config.Config = Depends(get_config)
-):
+def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
     This API delete all the documents in the indexes specified in the index_names list."""
-    document_count: int = marqo_config.document.delete_all_docs_by_index_name(
-        index_name=index_name
-    )
+    document_count: int = marqo_config.document.delete_all_docs_by_index_name(index_name=index_name)
 
     return {"documentCount": document_count}
 
@@ -904,9 +700,7 @@ def delete_all_documents(
 @utils.enable_upgrade_api()
 def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
-    upgrade_runner = UpgradeRunner(
-        marqo_config.vespa_client, marqo_config.index_management
-    )
+    upgrade_runner = UpgradeRunner(marqo_config.vespa_client, marqo_config.index_management)
     upgrade_runner.upgrade()
 
 
@@ -919,35 +713,36 @@ def rollback_marqo(req_dict: dict, marqo_config: config.Config = Depends(get_con
     #  IndexSettingsWithName can be injected after migrated to v2
     req = parse_request_object(RollbackRequest, req_dict)
 
-    rollback_runner = RollbackRunner(
-        marqo_config.vespa_client, marqo_config.index_management
-    )
+    rollback_runner = RollbackRunner(marqo_config.vespa_client, marqo_config.index_management)
     rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 
 
 @app.post("/rollback-vespa", include_in_schema=False)
-def rollback_vespa_app_to_current_version(
-    marqo_config: config.Config = Depends(get_config),
-):
+def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.rollback_vespa()
-    return JSONResponse(content={"version": version.get_version()}, status_code=200)
+    return JSONResponse(
+        content={"version": version.get_version()},
+        status_code=200
+    )
 
 
-@app.post("/validate/index/{index_name}", include_in_schema=False)
+@app.post('/validate/index/{index_name}', include_in_schema=False)
 @utils.enable_ops_api()
 def schema_validation(index_name: str, settings_object: dict):
     IndexManagement.validate_index_settings(index_name, settings_object)
 
-    return JSONResponse(content={"validated": True, "index": index_name})
+    return JSONResponse(
+        content={
+            "validated": True,
+            "index": index_name
+        }
+    )
 
 
 # No throttling config here. Throttling will be deprecated and removed from Marqo soon.
 @app.post("/indexes/{index_name}/suggestions")
-def get_suggestions(
-    index_name: str,
-    suggestion_request: TypeaheadRequest,
-    marqo_config: config.Config = Depends(get_config),
-):
+def get_suggestions(index_name: str, suggestion_request: TypeaheadRequest,
+                    marqo_config: config.Config = Depends(get_config)):
     """
     Get query suggestions for typeahead functionality.
     """
@@ -957,14 +752,11 @@ def get_suggestions(
 
 
 @app.post("/indexes/{index_name}/suggestions/queries")
-def index_queries(
-    index_name: str,
-    typeahead_index_request: TypeaheadIndexingRequest,
-    marqo_config: config.Config = Depends(get_config),
-):
+def index_queries(index_name: str, typeahead_index_request: TypeaheadIndexingRequest,
+                  marqo_config: config.Config = Depends(get_config)):
     """
     Index queries for typeahead suggestions.
-
+    
     Args:
         index_name: Name of the index to add queries to
         typeahead_index_request: Request object to index the query suggestions
@@ -974,16 +766,12 @@ def index_queries(
     return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 
-@app.delete(
-    "/indexes/{index_name}/suggestions/queries/delete-all", include_in_schema=False
-)
+@app.delete("/indexes/{index_name}/suggestions/queries/delete-all", include_in_schema=False)
 @utils.enable_batch_apis()
-def delete_all_queries(
-    index_name: str, marqo_config: config.Config = Depends(get_config)
-):
+def delete_all_queries(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
     Delete all queries from the typeahead index.
-
+    
     Args:
         index_name: Name of the index to delete queries from
     """
@@ -994,14 +782,10 @@ def delete_all_queries(
 
 
 @app.delete("/indexes/{index_name}/suggestions/queries")
-def delete_queries(
-    index_name: str,
-    queries: List[str],
-    marqo_config: config.Config = Depends(get_config),
-):
+def delete_queries(index_name: str, queries: List[str], marqo_config: config.Config = Depends(get_config)):
     """
     Delete specific queries from the typeahead index.
-
+    
     Args:
         index_name: Name of the index to delete queries from
         queries: list containing queries to delete:
@@ -1013,12 +797,10 @@ def delete_queries(
 
 
 @app.get("/indexes/{index_name}/suggestions/stats")
-def get_typeahead_stats(
-    index_name: str, marqo_config: config.Config = Depends(get_config)
-):
+def get_typeahead_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
     Get statistics about the typeahead queries for an index.
-
+    
     Args:
         index_name: Name of the index to get stats for
     """
@@ -1028,24 +810,20 @@ def get_typeahead_stats(
 
 
 @app.get("/indexes/{index_name}/suggestions/queries")
-def get_queries(
-    index_name: str,
-    queries: List[str],
-    marqo_config: config.Config = Depends(get_config),
-):
+def get_queries(index_name: str, queries: List[str], marqo_config: config.Config = Depends(get_config)):
     """
     Get specific queries from the typeahead index by query strings.
-
+    
     Args:
         index_name: Name of the index to get queries from
         queries: List of query strings to retrieve
     """
     result = marqo_config.typeahead.get_queries(index_name, queries)
-
+    
     return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 
-@app.get("/memory", include_in_schema=False)
+@app.get('/memory', include_in_schema=False)
 @utils.enable_debug_apis()
 def memory():
     return memory_profiler.get_memory_profile()

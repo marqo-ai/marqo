@@ -1,13 +1,9 @@
-from unittest import TestCase
-
-from pydantic.v1 import ValidationError
-
 from marqo.tensor_search.models.api_models import SearchQuery
-from marqo.tensor_search.models.search import (
-    SearchContext,
-    SearchContextDocuments,
-    SearchContextTensor,
-)
+from marqo.tensor_search.models.search import (SearchContextTensor, SearchContextDocuments,
+                                               SearchContextDocumentsParameters, SearchContext)
+from unittest import TestCase
+from pydantic.v1 import ValidationError
+from marqo.api.exceptions import InvalidArgError
 
 
 class TestSearchQueryModel(TestCase):
@@ -20,7 +16,9 @@ class TestSearchQueryModel(TestCase):
         """Test that SearchQuery with only documents context succeeds"""
         search_query = SearchQuery(
             context=SearchContext(
-                documents=SearchContextDocuments(ids={"doc1": 1.0, "doc2": 0.5})
+                documents=SearchContextDocuments(
+                    ids={"doc1": 1.0, "doc2": 0.5}
+                )
             )
         )
         self.assertIsNotNone(search_query.context)
@@ -32,7 +30,9 @@ class TestSearchQueryModel(TestCase):
         """Test that SearchQuery with documents context using integer weights succeeds."""
         search_query = SearchQuery(
             context=SearchContext(
-                documents=SearchContextDocuments(ids={"doc1": 1, "doc2": 2})
+                documents=SearchContextDocuments(
+                    ids={"doc1": 1, "doc2": 2}
+                )
             )
         )
         self.assertIsNotNone(search_query.context)
@@ -45,7 +45,7 @@ class TestSearchQueryModel(TestCase):
             context=SearchContext(
                 tensor=[
                     SearchContextTensor(vector=[0.1, 0.2, 0.3], weight=1.0),
-                    SearchContextTensor(vector=[0.4, 0.5, 0.6], weight=0.5),
+                    SearchContextTensor(vector=[0.4, 0.5, 0.6], weight=0.5)
                 ]
             )
         )
@@ -57,13 +57,23 @@ class TestSearchQueryModel(TestCase):
     def test_search_context_documents_empty_ids_fails(self):
         """Test that SearchQuery with empty ids in documents context fails"""
         with self.assertRaises(ValidationError) as cm:
-            SearchQuery(context=SearchContext(documents=SearchContextDocuments(ids={})))
-        self.assertIn("must be present and a non-empty dict", str(cm.exception))
+            SearchQuery(
+                context=SearchContext(
+                    documents=SearchContextDocuments(
+                        ids={}
+                    )
+                )
+            )
+        self.assertIn('must be present and a non-empty dict', str(cm.exception))
 
     def test_search_context_documents_no_ids_fails(self):
         """Test that SearchQuery with no ids in documents context fails"""
         with self.assertRaises(ValidationError) as cm:
             SearchQuery(
-                context=SearchContext(documents=SearchContextDocuments(ids=None))
+                context=SearchContext(
+                    documents=SearchContextDocuments(
+                        ids=None
+                    )
+                )
             )
-        self.assertIn("must be present and a non-empty dict", str(cm.exception))
+        self.assertIn('must be present and a non-empty dict', str(cm.exception))

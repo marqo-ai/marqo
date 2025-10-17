@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List
+from typing import Dict, Any, List
 
 import semver
 
@@ -7,53 +7,32 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.inference.api import Inference, MediaDownloadError, Modality
+from marqo.core.inference.api import Modality, MediaDownloadError, Inference
 from marqo.core.inference.modality_utils import infer_modality
-from marqo.core.inference.tensor_fields_container import (
-    TensorField,
-    TensorFieldsContainer,
-)
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS
-from marqo.core.unstructured_vespa_index.unstructured_validation import (
-    validate_coupling_of_mappings_and_doc,
-    validate_field_name,
-    validate_mappings_object_format,
-    validate_tensor_fields,
-)
-from marqo.core.unstructured_vespa_index.unstructured_vespa_index import (
-    UnstructuredVespaIndex,
-)
-from marqo.core.vespa_index.add_documents_handler import (
-    AddDocumentsError,
-    AddDocumentsHandler,
-)
+from marqo.core.unstructured_vespa_index.unstructured_validation import validate_tensor_fields, validate_field_name, \
+    validate_mappings_object_format, validate_coupling_of_mappings_and_doc
+from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
-from marqo.tensor_search.validation import (
-    validate_custom_vector,
-    validate_map_numeric_field,
-)
+from marqo.tensor_search.validation import validate_custom_vector, \
+    validate_map_numeric_field
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
 from marqo.vespa.vespa_client import VespaClient
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
-    _MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS = semver.VersionInfo.parse(
-        "2.9.0"
-    )
+    _MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS = semver.VersionInfo.parse("2.9.0")
 
-    def __init__(
-        self,
-        marqo_index: UnstructuredMarqoIndex,
-        add_docs_params: AddDocsParams,
-        vespa_client: VespaClient,
-        inference: Inference,
-    ):
+    def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient,
+                 inference: Inference):
         self._validate_add_docs_params(add_docs_params)
         super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.marqo_index = marqo_index
@@ -68,39 +47,27 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         mappings = self.add_docs_params.mappings or dict()
         return TensorFieldsContainer(
             tensor_fields=self.add_docs_params.tensor_fields,
-            custom_vector_fields=[
-                field_name
-                for field_name, mapping in mappings.items()
-                if mapping.get("type", None) == FieldType.CustomVector
-            ],
-            multimodal_combo_fields={
-                field_name: mapping["weights"]
-                for field_name, mapping in mappings.items()
-                if mapping.get("type", None) == FieldType.MultimodalCombination
-            },
-            should_normalise_custom_vector=self.should_normalise_custom_vector,
+            custom_vector_fields=[field_name for field_name, mapping in mappings.items()
+                                  if mapping.get("type", None) == FieldType.CustomVector],
+            multimodal_combo_fields={field_name: mapping['weights'] for field_name, mapping in mappings.items()
+                                     if mapping.get("type", None) == FieldType.MultimodalCombination},
+            should_normalise_custom_vector=self.should_normalise_custom_vector
         )
 
     def _validate_doc(self, doc):
         super()._validate_doc(doc)
-        multimodal_sub_fields = list(
-            self.tensor_fields_container.get_multimodal_sub_fields()
-        )
+        multimodal_sub_fields = list(self.tensor_fields_container.get_multimodal_sub_fields())
         if self.add_docs_params.mappings and multimodal_sub_fields:
             try:
                 validate_coupling_of_mappings_and_doc(
                     doc, self.add_docs_params.mappings, multimodal_sub_fields
                 )
             except api_errors.InvalidArgError as err:
-                raise AddDocumentsError(
-                    err.message, error_code=err.code, status_code=err.status_code
-                ) from err
+                raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        content = self.tensor_fields_container.collect(
-            marqo_doc[MARQO_DOC_ID], field_name, field_content
-        )
+        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content)
         marqo_doc[field_name] = content
 
     def _infer_modality(self, tensor_field: TensorField) -> Modality:
@@ -126,25 +93,16 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         Raises:
             AddDocumentsError: If the modality of the media content cannot be inferred.
         """
-        if (
-            not self.marqo_index.treat_urls_and_pointers_as_images
-            and not self.marqo_index.treat_urls_and_pointers_as_media
-        ):
+        if (not self.marqo_index.treat_urls_and_pointers_as_images and
+                not self.marqo_index.treat_urls_and_pointers_as_media):
             return Modality.TEXT
 
         try:
-            modality = infer_modality(
-                tensor_field.field_content, self.add_docs_params.media_download_headers
-            )
+            modality = infer_modality(tensor_field.field_content, self.add_docs_params.media_download_headers)
         except MediaDownloadError as err:
-            raise AddDocumentsError(
-                f"Error processing {tensor_field.field_name}: {err.message}"
-            ) from err
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
 
-        if not self.marqo_index.treat_urls_and_pointers_as_media and modality in {
-            Modality.AUDIO,
-            Modality.VIDEO,
-        }:
+        if not self.marqo_index.treat_urls_and_pointers_as_media and modality in {Modality.AUDIO, Modality.VIDEO}:
             return Modality.TEXT
 
         return modality
@@ -178,15 +136,8 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                     # Please note that if one of the documents in the batch has a custom field which does not exist
                     # in the tensor field, the whole batch will fail and user will get a 400 pydantic.v1.ValidationError.
                     # We keep this behaviour unchanged to be compatible with the legacy unstructured index.
-                    validate_custom_vector(
-                        field_content,
-                        not is_tensor_field,
-                        self.marqo_index.model.get_dimension(),
-                    )
-                elif (
-                    self.marqo_index.parsed_marqo_version()
-                    < self._MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS
-                ):
+                    validate_custom_vector(field_content, not is_tensor_field, self.marqo_index.model.get_dimension())
+                elif self.marqo_index.parsed_marqo_version() < self._MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS:
                     # We do not support map of numeric fields prior to 2.9.0
                     raise AddDocumentsError(
                         f"The field {field_name} is a map field and only supported for indexes created with Marqo 2.9.0"
@@ -195,24 +146,20 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 else:
                     validate_map_numeric_field(field_content)
         except (api_errors.InvalidFieldNameError, api_errors.InvalidArgError) as err:
-            raise AddDocumentsError(
-                err.message, error_code=err.code, status_code=err.status_code
-            ) from err
+            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         doc_id = marqo_doc[MARQO_DOC_ID]
-        for (
-            field_name,
-            weights,
-        ) in self.tensor_fields_container.collect_multi_modal_fields(
-            doc_id, self.marqo_index.normalize_embeddings
-        ):
+        for field_name, weights in self.tensor_fields_container.collect_multi_modal_fields(
+                doc_id, self.marqo_index.normalize_embeddings):
+
             if MARQO_DOC_MULTIMODAL_PARAMS not in marqo_doc:
                 marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS] = dict()
 
-            marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(
-                {"weights": weights, "type": FieldType.MultimodalCombination}
-            )
+            marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps({
+                'weights': weights,
+                'type': FieldType.MultimodalCombination
+            })
 
     def _populate_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
@@ -221,31 +168,19 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         for vespa_doc in existing_vespa_docs:
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
             existing_multimodal_weights = {
-                field_name: mapping["weights"]
-                for field_name, mapping in existing_marqo_doc.get(
-                    MARQO_DOC_MULTIMODAL_PARAMS, dict()
-                ).items()
+                field_name: mapping['weights']
+                for field_name, mapping in existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict()).items()
             }
-            self.tensor_fields_container.populate_tensor_from_existing_doc(
-                existing_marqo_doc, existing_multimodal_weights
-            )
+            self.tensor_fields_container.populate_tensor_from_existing_doc(existing_marqo_doc,
+                                                                           existing_multimodal_weights)
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         all_chunks = []
         all_embeddings = []
-        doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(
-            doc[MARQO_DOC_ID]
-        )
+        doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
         for field_name, tensor_field_content in doc_tensor_fields.items():
-            all_chunks.extend(
-                [
-                    f"{field_name}::{chunk}"
-                    for chunk in tensor_field_content.tensor_field_chunks
-                ]
-            )
+            all_chunks.extend([f'{field_name}::{chunk}' for chunk in tensor_field_content.tensor_field_chunks])
             all_embeddings.extend(tensor_field_content.tensor_field_embeddings)
         doc[constants.MARQO_DOC_CHUNKS] = all_chunks
-        doc[constants.MARQO_DOC_EMBEDDINGS] = {
-            index: embedding for index, embedding in enumerate(all_embeddings)
-        }
+        doc[constants.MARQO_DOC_EMBEDDINGS] = {index: embedding for index, embedding in enumerate(all_embeddings)}
         return VespaDocument(**self.vespa_index.to_vespa_document(marqo_document=doc))

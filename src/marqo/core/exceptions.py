@@ -1,6 +1,9 @@
 from http import HTTPStatus
 
-from marqo.exceptions import InvalidArgumentError, MarqoError
+from marqo.exceptions import (
+    MarqoError,
+    InvalidArgumentError,
+)
 
 
 class InternalError(MarqoError):
@@ -12,7 +15,6 @@ class ApplicationNotInitializedError(MarqoError):
     This exception is raised when the Vespa application is not bootstrapped when receiving
     index operation requests.
     """
-
     pass
 
 
@@ -86,21 +88,18 @@ class FieldTypeMismatchError(InvalidArgumentError):
 
 class AddDocumentsError(Exception):
     status_code: int = int(HTTPStatus.BAD_REQUEST)
-    error_code: str = "invalid_argument"
+    error_code: str = 'invalid_argument'
     error_message: str
 
-    def __init__(
-        self,
-        error_message: str,
-        error_code: str = "invalid_argument",
-        status_code: int = int(HTTPStatus.BAD_REQUEST),
-    ) -> None:
+    def __init__(self, error_message: str,
+                 error_code: str = 'invalid_argument',
+                 status_code: int = int(HTTPStatus.BAD_REQUEST)) -> None:
         self.error_code = error_code
         self.error_message = error_message
         self.status_code = int(status_code)
 
     def __str__(self) -> str:
-        return f"{self.error_code}: {self.error_message}"
+        return f'{self.error_code}: {self.error_message}'
 
 
 class DuplicateDocumentError(AddDocumentsError):

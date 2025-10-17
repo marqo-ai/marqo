@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Dict, Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -7,22 +7,21 @@ class MarqoFields(BaseModel):
     """
     Fields that collect the metadata from the Custom Searcher.
     """
-
-    sort_candidates: Optional[int] = Field(None, alias="sortCandidates")
-    relevant_candidates: Optional[int] = Field(None, alias="relevantCandidates")
-    probe_candidates: Optional[int] = Field(None, alias="probeCandidates")
+    sort_candidates: Optional[int] = Field(None, alias='sortCandidates')
+    relevant_candidates: Optional[int] = Field(None, alias='relevantCandidates')
+    probe_candidates: Optional[int] = Field(None, alias='probeCandidates')
 
 
 # See https://docs.vespa.ai/en/reference/default-result-format.html
 class RootFields(BaseModel):
-    total_count: Optional[int] = Field(None, alias="totalCount")
-    marqo_fields: Optional[MarqoFields] = Field(None, alias="marqo__fields")
+    total_count: Optional[int] = Field(None, alias='totalCount')
+    marqo_fields: Optional[MarqoFields] = Field(None, alias='marqo__fields')
 
 
 class Degraded(BaseModel):
-    adaptive_timeout: Optional[bool] = Field(None, alias="adaptive-timeout")
-    match_phase: Optional[bool] = Field(None, alias="match-phase")
-    non_ideal_state: Optional[bool] = Field(None, alias="non-ideal-state")
+    adaptive_timeout: Optional[bool] = Field(None, alias='adaptive-timeout')
+    match_phase: Optional[bool] = Field(None, alias='match-phase')
+    non_ideal_state: Optional[bool] = Field(None, alias='non-ideal-state')
     timeout: Optional[bool] = None
 
 
@@ -33,7 +32,7 @@ class Coverage(BaseModel):
     full: bool
     nodes: int
     results: int
-    results_full: int = Field(alias="resultsFull")
+    results_full: int = Field(alias='resultsFull')
 
 
 class Error(BaseModel):
@@ -41,7 +40,7 @@ class Error(BaseModel):
     summary: Optional[str] = None
     source: Optional[str] = None
     message: Optional[str] = None
-    stack_trace: Optional[str] = Field(None, alias="stackTrace")
+    stack_trace: Optional[str] = Field(None, alias='stackTrace')
     transient: Optional[bool] = None
 
 
@@ -54,7 +53,7 @@ class AbstractChild(BaseModel):
     value: Optional[str] = None
     coverage: Optional[Coverage] = None
     errors: Optional[List[Error]] = None
-    children: Optional[List["Child"]] = None
+    children: Optional[List['Child']] = None
 
 
 class Child(AbstractChild):

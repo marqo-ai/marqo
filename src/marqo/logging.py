@@ -21,32 +21,22 @@ class LogFormat(str, Enum):
 
 
 # Please note that calling os.environ directly is required to avoid cyclic dependency
-raw_log_level = os.environ.get(
-    EnvVars.MARQO_LOG_LEVEL, default_env_vars()[EnvVars.MARQO_LOG_LEVEL]
-)
-raw_log_format = os.environ.get(
-    EnvVars.MARQO_LOG_FORMAT, default_env_vars()[EnvVars.MARQO_LOG_FORMAT]
-)
+raw_log_level = os.environ.get(EnvVars.MARQO_LOG_LEVEL, default_env_vars()[EnvVars.MARQO_LOG_LEVEL])
+raw_log_format = os.environ.get(EnvVars.MARQO_LOG_FORMAT, default_env_vars()[EnvVars.MARQO_LOG_FORMAT])
 
 try:
-    LOG_LEVEL = LogLevel(
-        raw_log_level.lower()
-    ).name  # need uppercase level name in the config
+    LOG_LEVEL = LogLevel(raw_log_level.lower()).name  # need uppercase level name in the config
 except ValueError:
-    raise EnvVarError(
-        f"The provided environment variable `{EnvVars.MARQO_LOG_LEVEL}` = `{raw_log_level}` is not "
-        f"supported. The environment variable `{EnvVars.MARQO_LOG_LEVEL}` should be one of "
-        f"{', '.join([l for l in LogLevel])}. Check {marqo_docs.configuring_marqo()} for more info."
-    )
+    raise EnvVarError(f"The provided environment variable `{EnvVars.MARQO_LOG_LEVEL}` = `{raw_log_level}` is not "
+                      f"supported. The environment variable `{EnvVars.MARQO_LOG_LEVEL}` should be one of "
+                      f"{', '.join([l for l in LogLevel])}. Check {marqo_docs.configuring_marqo()} for more info.")
 
 try:
     LOG_FORMAT = LogFormat(raw_log_format.lower()).value
 except ValueError:
-    raise EnvVarError(
-        f"The provided environment variable `{EnvVars.MARQO_LOG_FORMAT}` = `{raw_log_format}` is not "
-        f"supported. The environment variable `{EnvVars.MARQO_LOG_FORMAT}` should be one of "
-        f"{', '.join([f for f in LogFormat])}. Check {marqo_docs.configuring_marqo()} for more info."
-    )
+    raise EnvVarError(f"The provided environment variable `{EnvVars.MARQO_LOG_FORMAT}` = `{raw_log_format}` is not "
+                      f"supported. The environment variable `{EnvVars.MARQO_LOG_FORMAT}` should be one of "
+                      f"{', '.join([f for f in LogFormat])}. Check {marqo_docs.configuring_marqo()} for more info.")
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -78,8 +68,8 @@ LOGGING_CONFIG = {
                 '"client_addr": "%(client_addr)s", '
                 '"request_line": "%(request_line)s", '
                 '"status_code": "%(status_code)s"}'
-            ),
-        },
+            )
+        }
     },
     "handlers": {
         "default": {
@@ -90,10 +80,14 @@ LOGGING_CONFIG = {
             "formatter": f"access-{LOG_FORMAT}",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
-        },
+        }
     },
     "loggers": {
-        "uvicorn": {"handlers": ["default"], "level": LOG_LEVEL, "propagate": False},
+        "uvicorn": {
+            "handlers": ["default"],
+            "level": LOG_LEVEL,
+            "propagate": False
+        },
         "uvicorn.access": {
             "handlers": ["access"],
             "level": LOG_LEVEL,  # access log level also changes with root log level now
@@ -101,22 +95,16 @@ LOGGING_CONFIG = {
         },
         "httpx": {
             "handlers": ["default"],
-            "level": LOG_LEVEL
-            if LOG_LEVEL == "ERROR"
-            else "WARNING",  # mute verbose httpx info level log
+            "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",  # mute verbose httpx info level log
             "propagate": False,
         },
         "httpcore": {
             "handlers": ["default"],
-            "level": LOG_LEVEL
-            if LOG_LEVEL == "ERROR"
-            else "WARNING",  # mute verbose httpcore info level log
+            "level": LOG_LEVEL if LOG_LEVEL == "ERROR" else "WARNING",  # mute verbose httpcore info level log
             "propagate": False,
         },
         "marqo_query": {
-            "handlers": [
-                "default"
-            ],  # change this to a different handler if security is a concern
+            "handlers": ["default"],  # change this to a different handler if security is a concern
             "level": "WARNING",  # slow query at warning level, failed query at error level
             "propagate": False,
         },
@@ -124,7 +112,7 @@ LOGGING_CONFIG = {
             "handlers": ["default"],
             "level": "INFO",  # Always log out metrics in INFO level, ignoring the root log level.
             "propagate": False,
-        },
+        }
     },
     "root": {
         "handlers": ["default"],

@@ -28,6 +28,6 @@ class HealthResponse(StrictBaseModel):
             backend=BackendHealthResponse(
                 status=marqo_health_status.backend.status.value,
                 memoryIsAvailable=marqo_health_status.backend.memory_is_available,
-                storageIsAvailable=marqo_health_status.backend.storage_is_available,
-            ),
+                storageIsAvailable=marqo_health_status.backend.storage_is_available
+            )
         )

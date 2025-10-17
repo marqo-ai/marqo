@@ -1,7 +1,6 @@
 from enum import Enum
+from pydantic.v1 import root_validator, Field
 from typing import Union
-
-from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import StrictBaseModel
 
@@ -33,7 +32,6 @@ class RelevanceCutoffModel(StrictBaseModel):
             If the method is MeanStd, you must provide 'stdDevFactor' as a parameter.
             Check Vespa Custom Searcher for more details.
     """
-
     class Config(StrictBaseModel.Config):
         use_enum_values = True
 
@@ -46,26 +44,20 @@ class RelevanceCutoffModel(StrictBaseModel):
         """
         Validates that the parameters provided match the method selected for relevance cutoff.
         """
-        method = values.get("method")
-        parameters = values.get("parameters")
+        method = values.get('method')
+        parameters = values.get('parameters')
 
         if method == RelevanceCutoffMethod.RelativeMaxScore:
             if not isinstance(parameters, RelativeMaxScoreParameters):
-                raise ValueError(
-                    f"You must provide '{[f.alias for f in RelativeMaxScoreParameters.__fields__.values()]}'"
-                    f" as parameters for method '{method}'"
-                )
+                raise ValueError(f"You must provide '{[f.alias for f in RelativeMaxScoreParameters.__fields__.values()]}'"
+                                 f" as parameters for method '{method}'")
         elif method == RelevanceCutoffMethod.MeanStdDev:
             if not isinstance(parameters, MeanStdParameters):
-                raise ValueError(
-                    f"You must provide '{[f.alias for f in MeanStdParameters.__fields__.values()]}'"
-                    f" as parameters for {method}"
-                )
+                raise ValueError(f"You must provide '{[f.alias for f in MeanStdParameters.__fields__.values()]}'"
+                                 f" as parameters for {method}")
         elif method == RelevanceCutoffMethod.GapDetection:
             if parameters is not None:
-                raise ValueError(
-                    f"{method} does not require any parameters, but received {parameters}"
-                )
+                raise ValueError(f"{method} does not require any parameters, but received {parameters}")
         else:
             raise ValueError(f"Unknown relevance cutoff method: {method}")
         return values

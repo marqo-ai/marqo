@@ -3,7 +3,6 @@
 In the future this may be stored in redis or this logic be bundled with the
 index in the search DB via a plugin.
 """
-
 import threading
 import time
 from typing import Dict
@@ -30,9 +29,7 @@ cache_refresh_interval: int = 1  # seconds
 cache_refresh_log_interval: int = 60
 cache_refresh_last_logged_time: float = 0
 refresh_thread = None
-refresh_lock = (
-    threading.Lock()
-)  # to ensure only one thread is operating on refresh_thread
+refresh_lock = threading.Lock()  # to ensure only one thread is operating on refresh_thread
 
 
 def empty_cache():
@@ -44,9 +41,7 @@ def get_cache() -> Dict[str, MarqoIndex]:
     return index_info_cache
 
 
-def get_index(
-    index_management: IndexManagement, index_name: str, force_refresh=False
-) -> MarqoIndex:
+def get_index(index_management: IndexManagement, index_name: str, force_refresh=False) -> MarqoIndex:
     """
     Get an index.
 
@@ -90,7 +85,7 @@ def _refresh_index(index_management: IndexManagement, index_name: str) -> None:
 def _check_refresh_thread(index_management: IndexManagement):
     if refresh_lock.locked():
         # Another thread is running this function, skip as concurrent changes to the thread can error out
-        logger.debug("Refresh thread is locked. Skipping")
+        logger.debug('Refresh thread is locked. Skipping')
         return
 
     with refresh_lock:
@@ -98,11 +93,9 @@ def _check_refresh_thread(index_management: IndexManagement):
         if refresh_thread is None or not refresh_thread.is_alive():
             if refresh_thread is not None:
                 # If not None, then it has died
-                logger.warning(
-                    "Dead index cache refresh thread detected. Will start a new one"
-                )
+                logger.warning('Dead index cache refresh thread detected. Will start a new one')
 
-            logger.info("Starting index cache refresh thread")
+            logger.info('Starting index cache refresh thread')
 
             def refresh():
                 while True:
@@ -111,20 +104,15 @@ def _check_refresh_thread(index_management: IndexManagement):
 
                         populate_cache(index_management)
 
-                        if (
-                            time.time() - cache_refresh_last_logged_time
-                            > cache_refresh_log_interval
-                        ):
+                        if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
                             cache_refresh_last_logged_time = time.time()
-                            logger.info(
-                                f"Last index cache refresh at {cache_refresh_last_logged_time}"
-                            )
+                            logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
                     except VespaError as e:
                         if isinstance(e, VespaStatusError) and e.status_code == 400:
                             # This can happen when settings schema doesn't exist
                             logger.warning(
-                                "Failed to populate index cache due to 400 error from vector store. This can happen "
-                                f"if Marqo settings schema does not exist. Error: {e}"
+                                'Failed to populate index cache due to 400 error from vector store. This can happen '
+                                f'if Marqo settings schema does not exist. Error: {e}'
                             )
                         else:
                             logger.error(
@@ -133,9 +121,7 @@ def _check_refresh_thread(index_management: IndexManagement):
                                 f"{marqo_docs.configuring_marqo()} for more details. Error: {e}"
                             )
                     except Exception as e:
-                        logger.error(
-                            f"Unexpected error in index cache refresh thread: {e}"
-                        )
+                        logger.error(f'Unexpected error in index cache refresh thread: {e}')
 
                     time.sleep(cache_refresh_interval)
 

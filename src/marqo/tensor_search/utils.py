@@ -6,44 +6,42 @@ import json
 import os
 import pathlib
 from timeit import default_timer as timer
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    List, Optional, Union, Sequence, Dict, Tuple
+)
 
 import semver
 from fastapi import HTTPException
 
 from marqo import logging
-from marqo.api import configs, exceptions
-from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
+from marqo.api import exceptions, configs
 from marqo.core.exceptions import InternalError, UnsupportedFeatureError
 from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
+from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
+
 
 logger = logging.get_logger(__name__)
 
-
 def dicts_to_jsonl(dicts: List[dict]) -> str:
     """Turns a list of dicts into a JSONL string"""
-    return (
-        functools.reduce(lambda x, y: "{}\n{}".format(x, json.dumps(y)), dicts, "")
-        + "\n"
-    )
+    return functools.reduce(
+        lambda x, y: "{}\n{}".format(x, json.dumps(y)),
+        dicts, ""
+    ) + "\n"
 
 
-def truncate_dict_vectors(
-    doc: Union[dict, List], new_length: int = 5
-) -> Union[List, Dict]:
+def truncate_dict_vectors(doc: Union[dict, List], new_length: int = 5) -> Union[List, Dict]:
     """Creates a readable version of a dict by truncating identified vectors
     Looks for field names that contains the keyword "vector"
     """
     copied = copy.deepcopy(doc)
 
     if isinstance(doc, list):
-        return [
-            truncate_dict_vectors(d, new_length=new_length)
-            if isinstance(d, list) or isinstance(d, dict)
-            else copy.deepcopy(d)
-            for d in doc
-        ]
+        return [truncate_dict_vectors(d, new_length=new_length)
+                if isinstance(d, list) or isinstance(d, dict)
+                else copy.deepcopy(d)
+                for d in doc]
 
     for k, v in list(copied.items()):
         if "vector" in k.lower() and isinstance(v, Sequence):
@@ -154,13 +152,13 @@ def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
     if str_val is None:
         return None
 
-    validation_error_msg = f"Could not properly read env var `{var}`. `{var}` must be able to be parsed as an int."
+    validation_error_msg = (
+        f"Could not properly read env var `{var}`. `{var}` must be able to be parsed as an int."
+    )
     try:
         as_int = int(str_val)
     except (ValueError, TypeError) as e:
-        value_error_msg = (
-            f"`{validation_error_msg} Current value: `{str_val}`. Reason: {e}"
-        )
+        value_error_msg = f"`{validation_error_msg} Current value: `{str_val}`. Reason: {e}"
         logger.error(value_error_msg)
         raise exceptions.ConfigurationError(value_error_msg)
     return as_int
@@ -215,18 +213,13 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
         elif text[i] == "\\":
             escape = True
             # Stray backslashes should be ignored (not followed by special char, or is last char)
-            if not (
-                i == len(text) - 1
-                or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA
-            ):
+            if not (i == len(text) - 1 or text[i + 1] not in CHARACTERS_TO_BE_ESCAPED_IN_VESPA):
                 blob += text[i]
         elif text[i] == '"':
             # OPENING QUOTE
-            if opening_quote_idx is None:
+            if (opening_quote_idx is None):
                 opening_quote_idx = i
-                blob_opening_quote_idx = len(
-                    blob
-                )  # Opening quote index in blob is different from text
+                blob_opening_quote_idx = len(blob) # Opening quote index in blob is different from text
 
                 # Bad syntax opening quote: flag it, replace quote with whitespace
                 if not (i == 0 or text[i - 1] == " "):
@@ -238,27 +231,21 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
             # CLOSING QUOTE
             else:
                 # Good syntax closing: must have space on the right (or is last character) while opening exists.
-                if (
-                    i == len(text) - 1 or text[i + 1] == " "
-                ) and not current_quote_pair_is_faulty:
+                if (i == len(text) - 1 or text[i + 1] == " ") and not current_quote_pair_is_faulty:
                     # Add this quote to the blob
                     blob += text[i]
                     # Add everything in between the quotes as a required term
-                    new_required_term = text[opening_quote_idx + 1 : i]
-                    if new_required_term:  # Do not add empty strings as required terms
+                    new_required_term = text[opening_quote_idx + 1:i]
+                    if new_required_term:                           # Do not add empty strings as required terms
                         required_terms.append(new_required_term)
 
                     # Remove this required term from the blob
-                    blob = blob[: -(len(new_required_term) + 2)]
+                    blob = blob[:-(len(new_required_term) + 2)]
 
                 else:
                     # Bad syntax closing: treat this and opening quote as whitespace
-                    blob = (
-                        blob[:blob_opening_quote_idx]
-                        + " "
-                        + blob[blob_opening_quote_idx + 1 :]
-                        + " "
-                    )
+                    blob = blob[:blob_opening_quote_idx] + " " + \
+                                     blob[blob_opening_quote_idx + 1:] + " "
 
                 # Clean up flags
                 opening_quote_idx = None
@@ -269,7 +256,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
 
     # Unpaired quote will be turned to whitespace
     if opening_quote_idx is not None:
-        blob = blob[:blob_opening_quote_idx] + " " + blob[blob_opening_quote_idx + 1 :]
+        blob = blob[:blob_opening_quote_idx] + " " + blob[blob_opening_quote_idx + 1:]
 
     # Remove double/leading white spaces
     optional_terms = blob.split()
@@ -314,7 +301,7 @@ def _get_marqo_root() -> str:
 
 
 def add_timing(f, key: str = "processingTimeMs"):
-    """Function decorator to add function timing to response payload.
+    """ Function decorator to add function timing to response payload.
 
     Decorator for functions that adds the processing time to the return Dict (NOTE: must return value of function must
     be a dictionary). `key` param denotes what the processing time will be stored against.
@@ -337,10 +324,12 @@ def generate_batches(seq: Sequence, batch_size: int):
         raise ValueError("Batch size must be greater than 0")
 
     for i in range(0, len(seq), batch_size):
-        yield seq[i : i + batch_size]
+        yield seq[i:i + batch_size]
 
 
-def is_tensor_field(field: str, tensor_fields: List[str]) -> bool:
+def is_tensor_field(field: str,
+                    tensor_fields: List[str]
+                    ) -> bool:
     """Determine whether a field is a tensor field or not for add_documents calls."""
     if not tensor_fields:
         return False
@@ -371,14 +360,9 @@ def enable_batch_apis():
     def decorator_function(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if (
-                read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower()
-                != "true"
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_APIS to true to enable it.",
-                )
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_APIS to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
@@ -390,14 +374,9 @@ def enable_upgrade_api():
     def decorator_function(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if (
-                read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_UPGRADE_API).lower()
-                != "true"
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_UPGRADE_API to true to enable it.",
-                )
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_UPGRADE_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_UPGRADE_API to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
@@ -409,14 +388,9 @@ def enable_debug_apis():
     def decorator_function(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if (
-                read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower()
-                != "true"
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.",
-                )
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
@@ -428,14 +402,9 @@ def enable_ops_api():
     def decorator_function(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if (
-                read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_OPS_API).lower()
-                != "true"
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_OPS_API to true to enable it.",
-                )
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_OPS_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_OPS_API to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
@@ -443,15 +412,11 @@ def enable_ops_api():
     return decorator_function
 
 
-def check_feature_support(
-    min_marqo_version: semver.Version,
-    feature_name: str,
-    index_name_param: str = "index_name",
-):
+def check_feature_support(min_marqo_version: semver.Version, feature_name: str,
+                          index_name_param: str = "index_name"):
     def get_index(index_name: str):
         from marqo.tensor_search.api import get_config
         from marqo.tensor_search.index_meta_cache import get_index
-
         index_management = get_config().index_management
         return get_index(index_management, index_name)
 
@@ -464,9 +429,7 @@ def check_feature_support(
             bound_args.apply_defaults()
 
             if index_name_param not in bound_args.arguments:
-                raise InternalError(
-                    f"Missing {index_name_param} param in function {func.__name__}`"
-                )
+                raise InternalError(f'Missing {index_name_param} param in function {func.__name__}`')
 
             index_name = bound_args.arguments[index_name_param]
 

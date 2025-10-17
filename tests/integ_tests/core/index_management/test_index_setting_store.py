@@ -11,21 +11,22 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 
 @pytest.mark.unittest
 class TestIndexSettingStore(MarqoTestCase):
-    def _get_index(
-        self, index_name: str = "index1", version: Optional[int] = None
-    ) -> MarqoIndex:
+
+    def _get_index(self, index_name: str = 'index1', version: Optional[int] = None) -> MarqoIndex:
         return self.structured_marqo_index(
             name=index_name,
             schema_name="schema1",
-            model=Model(name="hf/e5-small"),
-            fields=[Field(name="title", type=FieldType.Text)],
+            model=Model(name='hf/e5-small'),
+            fields=[
+                Field(name='title', type=FieldType.Text)
+            ],
             tensor_fields=[],
-            marqo_version="2.12.0",
+            marqo_version='2.12.0',
             version=version,
         )
 
     def test_initialise_with_empty_object(self):
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
         self.assertEqual(len(store._index_settings), 0)
         self.assertEqual(len(store._index_settings_history), 0)
 
@@ -55,27 +56,23 @@ class TestIndexSettingStore(MarqoTestCase):
 
     def test_create_new_index_without_version_should_succeed(self):
         index = self._get_index()
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
         store.save_index_setting(index)
 
         self.assertEqual(len(store._index_settings), 1)
-        self.assertEqual(
-            store._index_settings[index.name], index.copy(update={"version": 1})
-        )
+        self.assertEqual(store._index_settings[index.name], index.copy(update={'version': 1}))
 
     def test_create_new_index_with_version_1_should_succeed(self):
         index = self._get_index(version=1)
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
         store.save_index_setting(index)
 
         self.assertEqual(len(store._index_settings), 1)
         self.assertEqual(store._index_settings[index.name], index)
 
-    def test_create_new_index_with_version_2_should_raise_operation_conflict_error(
-        self,
-    ):
+    def test_create_new_index_with_version_2_should_raise_operation_conflict_error(self):
         index = self._get_index(version=2)
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
         with self.assertRaises(OperationConflictError) as e:
             store.save_index_setting(index)
 
@@ -83,12 +80,10 @@ class TestIndexSettingStore(MarqoTestCase):
 
     def test_update_with_correct_version_should_succeed(self):
         index = self._get_index(version=1)
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
         store.save_index_setting(index)
 
-        updated_index = index.copy(
-            deep=True, update={"version": 2, "marqo_version": "2.13.0"}
-        )
+        updated_index = index.copy(deep=True, update={'version': 2, 'marqo_version': '2.13.0'})
         store.save_index_setting(updated_index)
 
         self.assertEqual(len(store._index_settings), 1)
@@ -101,7 +96,7 @@ class TestIndexSettingStore(MarqoTestCase):
     def test_update_with_wrong_version_should_raise_operation_conflict_error(self):
         index = self._get_index(version=1)
         index_json_string = json.dumps({index.name: json.loads(index.json())})
-        store = IndexSettingStore(index_json_string, "{}")
+        store = IndexSettingStore(index_json_string, '{}')
 
         # current version in the store is 1, but the target version is still 1
         updated_index = index
@@ -109,15 +104,12 @@ class TestIndexSettingStore(MarqoTestCase):
         with self.assertRaises(OperationConflictError) as e:
             store.save_index_setting(updated_index)
 
-        self.assertIn(
-            "Current version is 1, and cannot be upgraded to target version 1",
-            str(e.exception),
-        )
+        self.assertIn("Current version is 1, and cannot be upgraded to target version 1", str(e.exception))
 
     def test_delete_index_should_succeed(self):
         index = self._get_index(version=1)
         index_json_string = json.dumps({index.name: json.loads(index.json())})
-        store = IndexSettingStore(index_json_string, "{}")
+        store = IndexSettingStore(index_json_string, '{}')
 
         store.delete_index_setting(index.name)
 
@@ -130,9 +122,9 @@ class TestIndexSettingStore(MarqoTestCase):
     def test_delete_nonexistent_index(self):
         index = self._get_index(version=1)
         index_json_string = json.dumps({index.name: json.loads(index.json())})
-        store = IndexSettingStore(index_json_string, "{}")
+        store = IndexSettingStore(index_json_string, '{}')
 
-        store.delete_index_setting("random-index")
+        store.delete_index_setting('random-index')
 
         # assert nothing happened to the store
         self.assertEqual(len(store._index_settings), 1)
@@ -142,14 +134,12 @@ class TestIndexSettingStore(MarqoTestCase):
     def test_update_deleted_index_should_raise_operation_conflict_error(self):
         index = self._get_index(version=1)
         index_json_string = json.dumps({index.name: json.loads(index.json())})
-        store = IndexSettingStore(index_json_string, "{}")
+        store = IndexSettingStore(index_json_string, '{}')
 
         store.delete_index_setting(index.name)
 
         with self.assertRaises(OperationConflictError) as e:
-            updated_index = index.copy(
-                deep=True, update={"version": 2, "marqo_version": "2.13.0"}
-            )
+            updated_index = index.copy(deep=True, update={'version': 2, 'marqo_version': '2.13.0'})
             store.save_index_setting(updated_index)
 
         self.assertIn("The index does not exist or has been deleted", str(e.exception))
@@ -157,7 +147,7 @@ class TestIndexSettingStore(MarqoTestCase):
     def test_create_new_index_with_same_name_as_deleted_index_should_succeed(self):
         index = self._get_index(version=1)
         index_json_string = json.dumps({index.name: json.loads(index.json())})
-        store = IndexSettingStore(index_json_string, "{}")
+        store = IndexSettingStore(index_json_string, '{}')
 
         store.delete_index_setting(index.name)
         self.assertIn(index.name, store._index_settings_history)
@@ -170,11 +160,11 @@ class TestIndexSettingStore(MarqoTestCase):
 
     def test_history_version_limit(self):
         index = self._get_index()
-        store = IndexSettingStore("{}", "{}")
+        store = IndexSettingStore('{}', '{}')
 
         for v in range(1, 7):
             # version 1-6 is saved to store
-            updated_index = index.copy(deep=True, update={"version": v})
+            updated_index = index.copy(deep=True, update={'version': v})
             store.save_index_setting(updated_index)
 
         # latest version is 6
@@ -182,6 +172,4 @@ class TestIndexSettingStore(MarqoTestCase):
         # history should have a limit of 3 versions
         self.assertEqual(len(store._index_settings_history[index.name]), 3)
         # the history should be sorted by version number in descending order
-        self.assertEqual(
-            [h.version for h in store._index_settings_history[index.name]], [5, 4, 3]
-        )
+        self.assertEqual([h.version for h in store._index_settings_history[index.name]], [5, 4, 3])

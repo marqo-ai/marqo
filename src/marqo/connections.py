@@ -35,7 +35,7 @@ class RedisDriver:
         self.scripts = [
             {
                 "name": "check_and_increment",
-                "path": "throttling/check_and_increment.lua",
+                "path": "throttling/check_and_increment.lua"
             },
         ]
 
@@ -54,16 +54,10 @@ class RedisDriver:
             self.faulty = False
 
             t1 = time.time()
-            logger.info(
-                f"Took {((t1 - t0) * 1000):.3f}ms to connect to redis and load scripts."
-            )
+            logger.info(f"Took {((t1 - t0) * 1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warning(
-                generate_redis_warning(
-                    skipped_operation="loading throttling scripts", exc=e
-                )
-            )
+            logger.warning(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
             self.faulty = True
 
     def connect(self) -> redis.Redis:

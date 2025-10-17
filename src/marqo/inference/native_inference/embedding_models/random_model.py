@@ -1,20 +1,13 @@
-import hashlib
 from typing import Optional
 
 import numpy as np
 
 from marqo.core.inference.api.inference import ModelAuth
-from marqo.inference.native_inference.embedding_models.abstract_embedding_model import (
-    AbstractEmbeddingModel,
-)
-from marqo.inference.native_inference.embedding_models.abstract_preprocessor import (
-    AbstractPreprocessor,
-)
-from marqo.inference.native_inference.embedding_models.random_model_properties import (
-    RandomModelProperties,
-)
-from marqo.s2_inference.types import List, Modality, ndarray
-
+from marqo.inference.native_inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
+from marqo.inference.native_inference.embedding_models.random_model_properties import RandomModelProperties
+from marqo.s2_inference.types import List, ndarray, Modality
+import hashlib
 
 class RandomModelPreprocessor(AbstractPreprocessor):
     def __init__(self) -> None:
@@ -26,12 +19,8 @@ class RandomModelPreprocessor(AbstractPreprocessor):
 
 
 class RandomModel(AbstractEmbeddingModel):
-    def __init__(
-        self,
-        model_properties: dict,
-        device: str,
-        model_auth: Optional[ModelAuth] = None,
-    ) -> None:
+
+    def __init__(self, model_properties: dict, device: str, model_auth: Optional[ModelAuth] = None) -> None:
         super().__init__(model_properties, device, model_auth)
 
         self._model_properties = self._build_model_properties()
@@ -51,13 +40,11 @@ class RandomModel(AbstractEmbeddingModel):
 
     def _get_seed_from_string(self, content: str) -> int:
         """Creates a deterministic seed from the input string."""
-        hash_object = hashlib.md5(content.encode("utf-8"))
+        hash_object = hashlib.md5(content.encode('utf-8'))
         hash_digest = hash_object.hexdigest()
         return int(hash_digest[:8], 16)
 
-    def encode(
-        self, inputs: List[str], modality: Modality, normalize: bool = True
-    ) -> List[ndarray]:
+    def encode(self, inputs: List[str], modality: Modality, normalize: bool = True) -> List[ndarray]:
         """
         Generate embeddings for the given inputs.
 

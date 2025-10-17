@@ -6,6 +6,7 @@ class VespaError(MarqoError):
 
 
 class VespaStatusError(VespaError):
+
     @property
     def status_code(self) -> int:
         try:
@@ -24,7 +25,6 @@ class VespaTimeoutError(VespaStatusError):
     """
     Raised when Vespa responds with a timeout error.
     """
-
     pass
 
 
@@ -32,7 +32,6 @@ class VespaNotConvergedError(VespaStatusError):
     """
     Raised when Vespa responds with a not converged error.
     """
-
     pass
 
 
@@ -42,3 +41,6 @@ class InvalidVespaApplicationError(VespaError):
 
 class VespaActivationConflictError(VespaError):
     pass
+
+
+

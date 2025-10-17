@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Set, cast
+from typing import List, Dict, Set, Optional, Any, cast, Callable
 
 import numpy as np
 from pydantic.v1 import BaseModel
@@ -58,12 +58,8 @@ class TensorField(BaseModel):
             # in multimodal_subfield_embedding field
             return not self.multimodal_subfield_embedding
 
-    def populate_chunks_and_embeddings(
-        self,
-        chunks: List[str],
-        embeddings: List[List[float]],
-        for_top_level_field: bool = True,
-    ) -> None:
+    def populate_chunks_and_embeddings(self, chunks: List[str], embeddings: List[List[float]],
+                                       for_top_level_field: bool = True) -> None:
         """
         Populate chunks and embeddings to this tensor field. Chunks and embeddings can come from the following sources:
         - For custom vector field, field content is the single chunk, and single embedding is provided by user
@@ -78,24 +74,15 @@ class TensorField(BaseModel):
             embeddings (List[List[float]]): List of embeddings
             for_top_level_field (bool): if the embedding is for top level field or subfields
         """
-        if (
-            not chunks
-            or not embeddings
-            or not isinstance(chunks, list)
-            or not isinstance(chunks[0], str)
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-            or not isinstance(embeddings[0][0], (float, int))
-        ):  # custom vector can be integers
-            raise ValueError(
-                f"Invalid chunks and embeddings for doc: {self.doc_id}, field: {self.field_name}"
-            )
+        if (not chunks or not embeddings
+                or not isinstance(chunks, list) or not isinstance(chunks[0], str)
+                or not isinstance(embeddings, list) or not isinstance(embeddings[0], list)
+                or not isinstance(embeddings[0][0], (float, int))):  # custom vector can be integers
+            raise ValueError(f'Invalid chunks and embeddings for doc: {self.doc_id}, field: {self.field_name}')
 
         if len(chunks) != len(embeddings):
-            raise ValueError(
-                f"Chunk and embedding size does not match for doc: {self.doc_id}, field: {self.field_name}"
-                f": chunk size: {len(chunks)}, embedding size: {len(embeddings)}"
-            )
+            raise ValueError(f'Chunk and embedding size does not match for doc: {self.doc_id}, field: {self.field_name}'
+                             f': chunk size: {len(chunks)}, embedding size: {len(embeddings)}')
 
         if for_top_level_field or self.is_audio_or_video():
             self.chunks = chunks
@@ -113,9 +100,7 @@ class TensorField(BaseModel):
         else:
             # for image and text subfields only, it should not be chunked
             if len(chunks) != 1:
-                raise ValueError(
-                    f"{self.field_name} of doc: {self.doc_id} is a subfield and should not be chunked"
-                )
+                raise ValueError(f'{self.field_name} of doc: {self.doc_id} is a subfield and should not be chunked')
 
             self.multimodal_subfield_embedding = embeddings[0]
             self.is_resolved = True
@@ -123,36 +108,28 @@ class TensorField(BaseModel):
     @property
     def tensor_field_chunks(self) -> List[str]:
         if not self.is_top_level_tensor_field:
-            raise ValueError(
-                f"{self.field_name} of doc: {self.doc_id} is not a top level tensor field"
-            )
+            raise ValueError(f'{self.field_name} of doc: {self.doc_id} is not a top level tensor field')
 
         return self.chunks
 
     @property
     def tensor_field_embeddings(self) -> List[List[float]]:
         if not self.is_top_level_tensor_field:
-            raise ValueError(
-                f"{self.field_name} of doc: {self.doc_id} is not a top level tensor field"
-            )
+            raise ValueError(f'{self.field_name} of doc: {self.doc_id} is not a top level tensor field')
 
         return self.embeddings
 
     @property
     def subfield_chunk(self) -> Optional[str]:
         if not self.is_multimodal_subfield:
-            raise ValueError(
-                f"{self.field_name} of doc: {self.doc_id} is not a subfield"
-            )
+            raise ValueError(f'{self.field_name} of doc: {self.doc_id} is not a subfield')
         else:
             return self.field_content
 
     @property
     def subfield_embedding(self) -> Optional[List[float]]:
         if not self.is_multimodal_subfield:
-            raise ValueError(
-                f"{self.field_name} of doc: {self.doc_id} is not a subfield"
-            )
+            raise ValueError(f'{self.field_name} of doc: {self.doc_id} is not a subfield')
         elif self.is_audio_or_video():
             return np.mean(np.array(self.embeddings), axis=0).tolist()
         else:
@@ -173,11 +150,8 @@ class MultiModalTensorField(TensorField):
         if not self.subfields:
             return []
 
-        subfield_chunks = {
-            subfield: self.subfields[subfield].subfield_chunk
-            for subfield in self.weights.keys()
-            if subfield in self.subfields
-        }
+        subfield_chunks = {subfield: self.subfields[subfield].subfield_chunk for subfield in self.weights.keys()
+                           if subfield in self.subfields}
         return [json.dumps(subfield_chunks)]
 
     @property
@@ -190,8 +164,7 @@ class MultiModalTensorField(TensorField):
             return []
 
         combo_embeddings = [
-            np.array(self.subfields[subfield].subfield_embedding) * weight
-            for subfield, weight in self.weights.items()
+            np.array(self.subfields[subfield].subfield_embedding) * weight for subfield, weight in self.weights.items()
             if subfield in self.subfields
         ]
 
@@ -204,13 +177,9 @@ class MultiModalTensorField(TensorField):
 
 
 class TensorFieldsContainer:
-    def __init__(
-        self,
-        tensor_fields: List[str],
-        custom_vector_fields: List[str],
-        multimodal_combo_fields: dict,
-        should_normalise_custom_vector: bool,
-    ):
+
+    def __init__(self, tensor_fields: List[str], custom_vector_fields: List[str],
+                 multimodal_combo_fields: dict, should_normalise_custom_vector: bool):
         self._tensor_field_map: Dict[str, Dict[str, TensorField]] = defaultdict(dict)
         self._tensor_fields = set(tensor_fields)
         self._custom_tensor_fields: Set[str] = set(custom_vector_fields)
@@ -251,44 +220,26 @@ class TensorFieldsContainer:
         if not field.is_multimodal_subfield:
             return False
 
-        return any(
-            [
-                not self._tensor_field_map[field.doc_id][combo_field].is_resolved
-                for combo_field in self._multimodal_sub_field_reverse_map[
-                    field.field_name
-                ]
-                if field.doc_id in self._tensor_field_map
-                and combo_field in self._tensor_field_map[field.doc_id]
-            ]
-        )
+        return any([not self._tensor_field_map[field.doc_id][combo_field].is_resolved
+                    for combo_field in self._multimodal_sub_field_reverse_map[field.field_name]
+                    if field.doc_id in self._tensor_field_map
+                    and combo_field in self._tensor_field_map[field.doc_id]])
 
-    def select_unresolved_tensor_fields(
-        self, predicate: Optional[Callable[[TensorField], bool]] = None
-    ) -> List[TensorField]:
-        return [
-            tensor_field
-            for doc_id, fields in self._tensor_field_map.items()
-            for field_name, tensor_field in fields.items()
-            if not tensor_field.is_resolved
-            and tensor_field.field_type
-            not in {FieldType.CustomVector, FieldType.MultimodalCombination}
-            and (predicate is None or predicate(tensor_field))
-        ]
+    def select_unresolved_tensor_fields(self, predicate: Optional[Callable[[TensorField], bool]] = None) \
+            -> List[TensorField]:
+        return [tensor_field
+                for doc_id, fields in self._tensor_field_map.items()
+                for field_name, tensor_field in fields.items()
+                if not tensor_field.is_resolved
+                and tensor_field.field_type not in {FieldType.CustomVector, FieldType.MultimodalCombination}
+                and (predicate is None or predicate(tensor_field))]
 
     def get_tensor_field_content(self, doc_id: str) -> Dict[str, TensorField]:
-        return {
-            field_name: content
-            for field_name, content in self._tensor_field_map.get(
-                doc_id, dict()
-            ).items()
-            if content.is_top_level_tensor_field and content.tensor_field_chunks
-        }
+        return {field_name: content for field_name, content in self._tensor_field_map.get(doc_id, dict()).items()
+                if content.is_top_level_tensor_field and content.tensor_field_chunks}
 
-    def populate_tensor_from_existing_doc(
-        self,
-        existing_marqo_doc: Dict[str, Any],
-        existing_multimodal_weights: Dict[str, Dict[str, float]],
-    ) -> None:
+    def populate_tensor_from_existing_doc(self, existing_marqo_doc: Dict[str, Any],
+                                          existing_multimodal_weights: Dict[str, Dict[str, float]]) -> None:
         doc_id = existing_marqo_doc[MARQO_DOC_ID]
 
         if doc_id not in self._tensor_field_map:
@@ -317,14 +268,8 @@ class TensorFieldsContainer:
                     # mapping config is different, need to re-vectorise
                     continue
 
-                if any(
-                    [
-                        sub_field not in existing_marqo_doc
-                        or sub_field not in doc
-                        or existing_marqo_doc[sub_field] != doc[sub_field].field_content
-                        for sub_field in weights.keys()
-                    ]
-                ):
+                if any([sub_field not in existing_marqo_doc or sub_field not in doc or
+                        existing_marqo_doc[sub_field] != doc[sub_field].field_content for sub_field in weights.keys()]):
                     # If content of any subfields does not match
                     continue
 
@@ -338,28 +283,16 @@ class TensorFieldsContainer:
                     # Field content has changed, we need to re-vectorise
                     continue
 
-            if (
-                constants.MARQO_DOC_TENSORS not in existing_marqo_doc
-                or field_name not in existing_marqo_doc[constants.MARQO_DOC_TENSORS]
-            ):
+            if (constants.MARQO_DOC_TENSORS not in existing_marqo_doc or
+                    field_name not in existing_marqo_doc[constants.MARQO_DOC_TENSORS]):
                 # This field is not a tensor field in existing doc, we need to vectorise
                 continue
 
-            existing_tensor = existing_marqo_doc[constants.MARQO_DOC_TENSORS][
-                field_name
-            ]
-            tensor_content.populate_chunks_and_embeddings(
-                existing_tensor[constants.MARQO_DOC_CHUNKS],
-                existing_tensor[constants.MARQO_DOC_EMBEDDINGS],
-            )
+            existing_tensor = existing_marqo_doc[constants.MARQO_DOC_TENSORS][field_name]
+            tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
+                                                          existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
-    def collect(
-        self,
-        doc_id: str,
-        field_name: str,
-        field_content: Any,
-        field_type: Optional[FieldType] = None,
-    ) -> Any:
+    def collect(self, doc_id: str, field_name: str, field_content: Any, field_type: Optional[FieldType] = None) -> Any:
         """
         Collect tensor field content from the document if it is a tensor field.
 
@@ -371,10 +304,7 @@ class TensorFieldsContainer:
         Returns:
             The field content
         """
-        if (
-            field_name not in self._tensor_fields
-            and field_name not in self._multimodal_sub_field_reverse_map
-        ):
+        if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
             # not tensor fields, no need to collect
             return field_content
 
@@ -388,7 +318,7 @@ class TensorFieldsContainer:
 
         if not isinstance(field_content, str):
             raise AddDocumentsError(
-                f"Invalid type {type(field_content)} for tensor field {field_name}"
+                f'Invalid type {type(field_content)} for tensor field {field_name}'
             )
 
         field = TensorField(
@@ -397,22 +327,20 @@ class TensorFieldsContainer:
             field_content=field_content,
             field_type=field_type,
             is_top_level_tensor_field=field_name in self._tensor_fields,
-            is_multimodal_subfield=field_name in self._multimodal_sub_field_reverse_map,
+            is_multimodal_subfield=field_name in self._multimodal_sub_field_reverse_map
         )
         self._tensor_field_map[doc_id][field_name] = field
         return field_content
 
     def _collect_custom_vector_field(self, doc_id, field_name, field_content):
-        content = field_content["content"]
-        embedding = field_content["vector"]
+        content = field_content['content']
+        embedding = field_content['vector']
 
         if self._should_normalise_custom_vector:
             # normalise custom vector
             magnitude = np.linalg.norm(np.array(embedding), axis=-1, keepdims=True)
             if magnitude == 0:
-                raise AddDocumentsError(
-                    f"Field {field_name} has zero magnitude vector, cannot normalize."
-                )
+                raise AddDocumentsError(f"Field {field_name} has zero magnitude vector, cannot normalize.")
             embedding = (np.array(embedding) / magnitude).tolist()
 
         field = TensorField(
@@ -435,17 +363,13 @@ class TensorFieldsContainer:
                 doc_id=doc_id,
                 field_name=field_name,
                 weights=weights,
-                field_content="",
+                field_content='',
                 field_type=FieldType.MultimodalCombination,
-                subfields={
-                    subfield: self._tensor_field_map[doc_id][subfield]
-                    for subfield in weights.keys()
-                    if doc_id in self._tensor_field_map
-                    and subfield in self._tensor_field_map[doc_id]
-                },
+                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in weights.keys()
+                           if doc_id in self._tensor_field_map and subfield in self._tensor_field_map[doc_id]},
                 is_top_level_tensor_field=True,
                 is_multimodal_subfield=False,
-                normalize_embeddings=normalize_embeddings,
+                normalize_embeddings=normalize_embeddings
             )
             self._tensor_field_map[doc_id][field_name] = field
             yield field_name, weights

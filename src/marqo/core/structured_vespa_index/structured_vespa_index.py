@@ -1,25 +1,17 @@
 import marqo.core.search.search_filter as search_filter
-from marqo.core.exceptions import (
-    InvalidDataRangeError,
-    InvalidDataTypeError,
-    InvalidFieldNameError,
-    MarqoDocumentParsingError,
-    UnsupportedFeatureError,
-    VespaDocumentParsingError,
-)
+from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
+                                   InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_query import (
-    MarqoHybridQuery,
-    MarqoLexicalQuery,
-    MarqoTensorQuery,
-)
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod, RelativeMaxScoreParameters
+from marqo.tensor_search.models.sort_by_model import SortByModel
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -47,14 +39,14 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.MapInt: (dict, int),
         FieldType.MapFloat: (dict, float),
         FieldType.MapDouble: (dict, float),
-        FieldType.MapLong: (dict, int),
+        FieldType.MapLong: (dict, int)
     }
 
-    _VESPA_DOC_ID = "id"
-    _VESPA_DOC_FIELDS = "fields"
-    _VESPA_DOC_RELEVANCE = "relevance"
-    _VESPA_DOC_MATCH_FEATURES = "matchfeatures"
-    _VESPA_DOC_FIELDS_TO_IGNORE = {"sddocname"}
+    _VESPA_DOC_ID = 'id'
+    _VESPA_DOC_FIELDS = 'fields'
+    _VESPA_DOC_RELEVANCE = 'relevance'
+    _VESPA_DOC_MATCH_FEATURES = 'matchfeatures'
+    _VESPA_DOC_FIELDS_TO_IGNORE = {'sddocname'}
 
     _DEFAULT_MAX_LIMIT = 1000
     _DEFAULT_MAX_OFFSET = 10000
@@ -71,18 +63,12 @@ class StructuredVespaIndex(VespaIndex):
 
     _TOTAL_HITS_GROUP_CONST = "1.1"
 
-    _HYBRID_SEARCH_MINIMUM_VERSION = (
-        constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
-    )
+    _HYBRID_SEARCH_MINIMUM_VERSION = constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
 
     def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
 
-    def to_vespa_partial_document(
-        self,
-        marqo_document: Dict[str, Any],
-        existing_vespa_document: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any], existing_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers_2_8: Dict[str, float] = dict()
@@ -90,9 +76,7 @@ class StructuredVespaIndex(VespaIndex):
         score_modifiers_double_long: Dict[str, float] = {}
 
         if constants.MARQO_DOC_ID not in marqo_document:
-            raise MarqoDocumentParsingError(
-                f"'{constants.MARQO_DOC_ID}' is a required field but it does not exist"
-            )
+            raise MarqoDocumentParsingError(f"'{constants.MARQO_DOC_ID}' is a required field but it does not exist")
         else:
             vespa_id = marqo_document[constants.MARQO_DOC_ID]
             self._verify_id_field(vespa_id)
@@ -101,24 +85,16 @@ class StructuredVespaIndex(VespaIndex):
             if marqo_field == constants.MARQO_DOC_ID:
                 continue
             if marqo_field == constants.MARQO_DOC_TENSORS:
-                raise MarqoDocumentParsingError(
-                    f"You cannot modify '{marqo_field}' field. "
-                )
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' field. ")
 
-            tensor_fields_names = [
-                tensor_field.name for tensor_field in self._marqo_index.tensor_fields
-            ]
+            tensor_fields_names = [tensor_field.name for tensor_field in self._marqo_index.tensor_fields]
             if marqo_field in tensor_fields_names:
-                raise MarqoDocumentParsingError(
-                    f"You cannot modify '{marqo_field}' field as this is a tensor field"
-                )
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' field as this is a tensor field")
 
             dependent_fields_names = self._marqo_index.dependent_fields_names
             if marqo_field in dependent_fields_names:
-                raise MarqoDocumentParsingError(
-                    f"You cannot modify '{marqo_field}' "
-                    f"field as this is a dependent field of a multimodal combination field"
-                )
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' "
+                                                f"field as this is a dependent field of a multimodal combination field")
 
             marqo_value = marqo_document[marqo_field]
             self._verify_marqo_field_name(marqo_field)
@@ -126,25 +102,15 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
 
-            if (not isinstance(marqo_value, bool)) and isinstance(
-                marqo_value, (int, float)
-            ):
+            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
 
-            if (
-                isinstance(marqo_value, list)
-                and len(marqo_value) > 0
-                and type(marqo_value[0]) in (float, int)
-            ):
+            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
                     self._verify_numerical_field_value(v, index_field)
 
-            if isinstance(marqo_value, dict) and index_field.type in (
-                FieldType.MapFloat,
-                FieldType.MapInt,
-                FieldType.MapLong,
-                FieldType.MapDouble,
-            ):
+            if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
+                                                                      FieldType.MapLong, FieldType.MapDouble):
                 for k, v in marqo_value.items():
                     if type(v) in (float, int):
                         self._verify_numerical_field_value(v, index_field)
@@ -154,11 +120,17 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_value = int(marqo_value)
 
             if index_field.lexical_field_name:
-                vespa_fields[index_field.lexical_field_name] = {"assign": marqo_value}
+                vespa_fields[index_field.lexical_field_name] = {
+                    "assign": marqo_value
+                }
             if index_field.filter_field_name:
-                vespa_fields[index_field.filter_field_name] = {"assign": marqo_value}
+                vespa_fields[index_field.filter_field_name] = {
+                    "assign": marqo_value
+                }
             if not index_field.lexical_field_name and not index_field.filter_field_name:
-                vespa_fields[index_field.name] = {"assign": marqo_value}
+                vespa_fields[index_field.name] = {
+                    "assign": marqo_value
+                }
 
             if FieldFeature.ScoreModifier in index_field.features:
                 if self._marqo_index_version < self._VERSION_2_9_0:
@@ -171,23 +143,32 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f"{index_field.name}.{key}"] = value
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
                     target_dict[index_field.name] = marqo_value
 
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
-                "modify": {"operation": "replace", "cells": score_modifiers_double_long}
+                "modify": {
+                    "operation": "replace",
+                    "cells": score_modifiers_double_long
+                }
             }
 
         if len(score_modifiers_float) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = {
-                "modify": {"operation": "replace", "cells": score_modifiers_float}
+                "modify": {
+                    "operation": "replace",
+                    "cells": score_modifiers_float
+                }
             }
 
         if len(score_modifiers_2_8) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = {
-                "modify": {"operation": "replace", "cells": score_modifiers_2_8}
+                "modify": {
+                    "operation": "replace",
+                    "cells": score_modifiers_2_8
+                }
             }
 
         return {"id": vespa_id, "fields": vespa_fields}
@@ -215,25 +196,15 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
 
-            if (not isinstance(marqo_value, bool)) and isinstance(
-                marqo_value, (int, float)
-            ):
+            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
 
-            if (
-                isinstance(marqo_value, list)
-                and len(marqo_value) > 0
-                and type(marqo_value[0]) in (float, int)
-            ):
+            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
                     self._verify_numerical_field_value(v, index_field)
 
-            if isinstance(marqo_value, dict) and index_field.type in (
-                FieldType.MapFloat,
-                FieldType.MapInt,
-                FieldType.MapLong,
-                FieldType.MapDouble,
-            ):
+            if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
+                                                                      FieldType.MapLong, FieldType.MapDouble):
                 for k, v in marqo_value.items():
                     if type(v) in (float, int):
                         self._verify_numerical_field_value(v, index_field)
@@ -260,7 +231,7 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f"{index_field.name}.{key}"] = value
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
                     target_dict[index_field.name] = marqo_value
 
@@ -268,41 +239,34 @@ class StructuredVespaIndex(VespaIndex):
         vector_count = 0
         if constants.MARQO_DOC_TENSORS in marqo_document:
             for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
-                marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][
-                    marqo_tensor_field
-                ]
+                marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
 
                 self._verify_marqo_tensor_field_name(marqo_tensor_field)
                 self._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
 
                 # If chunking an image, chunks will be a list of tuples, hence the str(c)
-                chunks = [
-                    str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]
-                ]
+                chunks = [str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]]
                 embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
                 vector_count += len(embeddings)
 
-                index_tensor_field = self._marqo_index.tensor_field_map[
-                    marqo_tensor_field
-                ]
+                index_tensor_field = self._marqo_index.tensor_field_map[marqo_tensor_field]
 
                 vespa_fields[index_tensor_field.chunk_field_name] = chunks
-                vespa_fields[index_tensor_field.embeddings_field_name] = {
-                    f"{i}": embeddings[i] for i in range(len(embeddings))
-                }
+                vespa_fields[index_tensor_field.embeddings_field_name] = \
+                    {f'{i}': embeddings[i] for i in range(len(embeddings))}
 
         vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
 
         if len(score_modifiers_double_long) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = (
-                score_modifiers_double_long
-            )
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
         if len(score_modifiers_float) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = score_modifiers_float
         if len(score_modifiers_2_8) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = score_modifiers_2_8
 
-        vespa_doc = {self._VESPA_DOC_FIELDS: vespa_fields}
+        vespa_doc = {
+            self._VESPA_DOC_FIELDS: vespa_fields
+        }
 
         if vespa_id is not None:
             vespa_doc[self._VESPA_DOC_ID] = vespa_id
@@ -310,12 +274,11 @@ class StructuredVespaIndex(VespaIndex):
         return vespa_doc
 
     def to_marqo_document(
-        self, vespa_document: Dict[str, Any], return_highlights: bool = False
+            self, vespa_document: Dict[str, Any], return_highlights: bool = False
     ) -> Dict[str, Any]:
+
         if self._VESPA_DOC_FIELDS not in vespa_document:
-            raise VespaDocumentParsingError(
-                f"Vespa document is missing {self._VESPA_DOC_FIELDS} field"
-            )
+            raise VespaDocumentParsingError(f'Vespa document is missing {self._VESPA_DOC_FIELDS} field')
 
         fields = vespa_document[self._VESPA_DOC_FIELDS]
         marqo_document = dict()
@@ -328,7 +291,7 @@ class StructuredVespaIndex(VespaIndex):
                     if value not in {0, 1}:
                         raise VespaDocumentParsingError(
                             f"Vespa document has invalid value '{value}' for boolean field '{marqo_field.name}'. "
-                            f"Expected 0 or 1"
+                            f'Expected 0 or 1'
                         )
                     value = bool(value)
 
@@ -338,8 +301,8 @@ class StructuredVespaIndex(VespaIndex):
                     # They must have the same value
                     if marqo_document[marqo_name] != value:
                         raise VespaDocumentParsingError(
-                            f"Vespa document has different values for Marqo field {marqo_name}: "
-                            f"{marqo_document[marqo_name]} and {value}"
+                            f'Vespa document has different values for Marqo field {marqo_name}: '
+                            f'{marqo_document[marqo_name]} and {value}'
                         )
                 else:
                     marqo_document[marqo_name] = value
@@ -349,49 +312,38 @@ class StructuredVespaIndex(VespaIndex):
                 if constants.MARQO_DOC_TENSORS not in marqo_document:
                     marqo_document[constants.MARQO_DOC_TENSORS] = dict()
                 if tensor_field.name not in marqo_document[constants.MARQO_DOC_TENSORS]:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name] = (
-                        dict()
-                    )
+                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name] = dict()
 
                 if field == tensor_field.chunk_field_name:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
-                        constants.MARQO_DOC_CHUNKS
-                    ] = value
+                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][constants.MARQO_DOC_CHUNKS] = value
                 elif field == tensor_field.embeddings_field_name:
                     try:
                         marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
-                            constants.MARQO_DOC_EMBEDDINGS
-                        ] = list(value["blocks"].values())
+                            constants.MARQO_DOC_EMBEDDINGS] = list(value['blocks'].values())
                     except (KeyError, AttributeError, TypeError) as e:
                         raise VespaDocumentParsingError(
-                            f"Cannot parse embeddings field {field} with value {value}"
+                            f'Cannot parse embeddings field {field} with value {value}'
                         ) from e
 
                 else:
-                    raise VespaDocumentParsingError(
-                        f"Unexpected tensor subfield {field}"
-                    )
+                    raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
             elif field == common.FIELD_ID:
                 marqo_document[constants.MARQO_DOC_ID] = value
-            elif (
-                field == common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE
-            ):  # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
+            elif field == common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE:  # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
                 marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = value
             elif field == common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE:
                 marqo_document[constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {
-                common.FIELD_SCORE_MODIFIERS_2_8,
-                common.FIELD_SCORE_MODIFIERS_FLOAT,
-                common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
-                common.FIELD_VECTOR_COUNT,
-                self._VESPA_DOC_MATCH_FEATURES,
-            }:
+            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
+                                                              common.FIELD_SCORE_MODIFIERS_FLOAT,
+                                                              common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
+                                                              common.FIELD_VECTOR_COUNT,
+                                                              self._VESPA_DOC_MATCH_FEATURES}:
                 continue
             else:
                 raise VespaDocumentParsingError(
-                    f"Unknown field {field} for index {self._marqo_index.name} in Vespa document"
+                    f'Unknown field {field} for index {self._marqo_index.name} in Vespa document'
                 )
 
         # Highlights
@@ -407,13 +359,10 @@ class StructuredVespaIndex(VespaIndex):
         # and also for lexical search. This applies to both with and without attributes_to_retrieve
 
         # Structured indexes don't support language
-        if (
-            isinstance(marqo_query, MarqoLexicalQuery)
-            and marqo_query.language is not None
-        ):
+        if isinstance(marqo_query, MarqoLexicalQuery) and marqo_query.language is not None:
             raise UnsupportedFeatureError(
-                "Language is not supported for structured indexes"
-            )
+                f'Language is not supported for structured indexes'
+                )
 
         # Verify attributes to retrieve, if defined
         if marqo_query.attributes_to_retrieve is not None:
@@ -421,13 +370,11 @@ class StructuredVespaIndex(VespaIndex):
             for att in marqo_query.attributes_to_retrieve:
                 if att not in self._marqo_index.field_map:
                     raise InvalidFieldNameError(
-                        f"Index {self._marqo_index.name} has no field {att}. "
-                        f"Available fields are: {', '.join(self._marqo_index.field_map.keys())}"
+                        f'Index {self._marqo_index.name} has no field {att}. '
+                        f'Available fields are: {", ".join(self._marqo_index.field_map.keys())}'
                     )
                 if att in self._marqo_index.tensor_field_map:
-                    chunk_field_names.append(
-                        self._marqo_index.tensor_field_map[att].chunk_field_name
-                    )
+                    chunk_field_names.append(self._marqo_index.tensor_field_map[att].chunk_field_name)
 
             marqo_query.attributes_to_retrieve.append(common.FIELD_ID)
             marqo_query.attributes_to_retrieve.extend(chunk_field_names)
@@ -435,18 +382,15 @@ class StructuredVespaIndex(VespaIndex):
         # Verify score modifiers, if defined
         if marqo_query.score_modifiers is not None:
             for modifier in marqo_query.score_modifiers:
-                if "." in modifier.field:
-                    root_modifier_field, subfield = modifier.field.split(".", 1)
+                if '.' in modifier.field:
+                    root_modifier_field, subfield = modifier.field.split('.', 1)
                 else:
                     root_modifier_field = modifier.field
-                if (
-                    root_modifier_field
-                    not in self._marqo_index.score_modifier_fields_names
-                ):
+                if root_modifier_field not in self._marqo_index.score_modifier_fields_names:
                     raise InvalidFieldNameError(
-                        f"Index {self._marqo_index.name} has no score modifier field {modifier.field}. "
-                        f"Available score modifier fields are: "
-                        f"{', '.join(self._marqo_index.score_modifier_fields_names)}"
+                        f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
+                        f'Available score modifier fields are: '
+                        f'{", ".join(self._marqo_index.score_modifier_fields_names)}'
                     )
 
         # Hybrid must be checked first since it is a subclass of Tensor and Lexical
@@ -458,112 +402,100 @@ class StructuredVespaIndex(VespaIndex):
             return self._to_vespa_lexical_query(marqo_query)
 
         else:
-            raise InternalError(f"Unknown query type {type(marqo_query)}")
+            raise InternalError(f'Unknown query type {type(marqo_query)}')
 
     def get_vector_count_query(self):
         return {
-            "yql": f"select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} "
-            f"where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))",
-            "model_restrict": self._marqo_index.schema_name,
-            "timeout": 5000,
+            'yql': f'select {common.FIELD_VECTOR_COUNT} from {self._marqo_index.schema_name} '
+                   f'where true limit 0 | all(group(1) each(output(sum({common.FIELD_VECTOR_COUNT}))))',
+            'model_restrict': self._marqo_index.schema_name,
+            'timeout': 5000
         }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         fields_to_search = self._get_tensor_fields_to_search(marqo_query)
 
-        tensor_term = (
-            self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
-        )
+        tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
-            filter_term = f" AND {filter_term}"
+            filter_term = f' AND {filter_term}'
         else:
-            filter_term = ""
+            filter_term = ''
         select_attributes = self._get_select_attributes(marqo_query)
-        summary = (
-            common.SUMMARY_ALL_VECTOR
-            if marqo_query.expose_facets
-            else common.SUMMARY_ALL_NON_VECTOR
-        )
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
 
         if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
-            ranking = (
-                common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9
-                if score_modifiers
+            ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 if score_modifiers \
                 else common.RANK_PROFILE_EMBEDDING_SIMILARITY
-            )
         else:
             ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
-        query_inputs = {common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query}
-        query_inputs.update({f: 1 for f in fields_to_search})
+        query_inputs = {
+            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+        }
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
         if score_modifiers:
             query_inputs.update(score_modifiers)
 
         query = {
-            "yql": f"select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}",
-            "model_restrict": self._marqo_index.schema_name,
-            "hits": marqo_query.limit,
-            "offset": marqo_query.offset,
-            "query_features": query_inputs,
-            "presentation.summary": summary,
-            "ranking": ranking,
-            "ranking.matching.approximateThreshold": marqo_query.approximate_threshold,
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold
         }
         query = {k: v for k, v in query.items() if v is not None}
 
         if not marqo_query.approximate:
-            query["ranking.softtimeout.enable"] = False
-            query["timeout"] = 300 * 1000  # 5 minutes
+            query['ranking.softtimeout.enable'] = False
+            query['timeout'] = 300 * 1000  # 5 minutes
 
         return query
 
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
         fields_to_search = self._get_lexical_fields_to_search(marqo_query)
 
-        lexical_term = (
-            self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
-        )
+        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
-            search_term = f"({lexical_term}) AND ({filter_term})"
+            search_term = f'({lexical_term}) AND ({filter_term})'
         else:
-            search_term = f"({lexical_term})"
+            search_term = f'({lexical_term})'
 
         select_attributes = self._get_select_attributes(marqo_query)
-        summary = (
-            common.SUMMARY_ALL_VECTOR
-            if marqo_query.expose_facets
-            else common.SUMMARY_ALL_NON_VECTOR
-        )
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
 
         if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
-            ranking = (
-                common.RANK_PROFILE_BM25_MODIFIERS_2_9
-                if score_modifiers
+            ranking = common.RANK_PROFILE_BM25_MODIFIERS_2_9 if score_modifiers \
                 else common.RANK_PROFILE_BM25
-            )
         else:
             ranking = common.RANK_PROFILE_BM25
 
         query_inputs = {}
-        query_inputs.update({f: 1 for f in fields_to_search})
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
         if score_modifiers:
             query_inputs.update(score_modifiers)
 
         query = {
-            "yql": f"select {select_attributes} from {self._marqo_index.schema_name} where {search_term}",
-            "model_restrict": self._marqo_index.schema_name,
-            "hits": marqo_query.limit,
-            "offset": marqo_query.offset,
-            "query_features": query_inputs,
-            "presentation.summary": summary,
-            "ranking": ranking,
-            "language": marqo_query.language,
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {search_term}',
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking,
+            'language': marqo_query.language
         }
-
+        
         query = {k: v for k, v in query.items() if v is not None}
 
         return query
@@ -575,64 +507,48 @@ class StructuredVespaIndex(VespaIndex):
         )
         tensor_term = "False"
         if fields_to_search_tensor:
-            marqo_query.rerank_depth_tensor = (
-                marqo_query.hybrid_parameters.rerankDepthTensor
-            )
+            marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
             tensor_term = self._get_tensor_search_term(marqo_query)
 
         # Lexical term
         fields_to_search_lexical = self._get_lexical_fields_to_search(
             searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesLexical
         )
-        lexical_term = (
-            self._get_lexical_search_term(marqo_query)
-            if fields_to_search_lexical
-            else "False"
-        )
+        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
 
         # If retrieval and ranking methods are opposite (lexical/tensor), use the rank() operator
-        if (
-            marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
-            and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Tensor
-        ):
-            individual_tensor_terms = self._get_individual_field_tensor_search_terms(
-                marqo_query
-            )
-            lexical_term = f"rank({lexical_term}, {','.join(individual_tensor_terms)})"
+        if (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and
+                marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Tensor):
+            individual_tensor_terms = self._get_individual_field_tensor_search_terms(marqo_query)
+            lexical_term = f'rank({lexical_term}, {",".join(individual_tensor_terms)})'
 
-        elif (
-            marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor
-            and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
-        ):
-            tensor_term = f"rank({tensor_term}, {lexical_term})"
+        elif (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor and
+              marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical):
+            tensor_term = f'rank({tensor_term}, {lexical_term})'
 
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
-            filter_term = f" AND ({filter_term})"
+            filter_term = f' AND ({filter_term})'
         else:
-            filter_term = ""
+            filter_term = ''
         select_attributes = self._get_select_attributes(marqo_query)
-        summary = (
-            common.SUMMARY_ALL_VECTOR
-            if marqo_query.expose_facets
-            else common.SUMMARY_ALL_NON_VECTOR
-        )
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 
         # Assign parameters to query
-        query_inputs = {common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query}
+        query_inputs = {
+            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+        }
 
         # Separate fields to rank (lexical and tensor)
-        query_inputs.update(
-            {
-                common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
-                    f: 1 for f in fields_to_search_lexical
-                },
-                common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
-                    f: 1 for f in fields_to_search_tensor
-                },
+        query_inputs.update({
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
+                f: 1 for f in fields_to_search_lexical
+            },
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
+                f: 1 for f in fields_to_search_tensor
             }
-        )
+        })
 
         """
         # TODO: implement this if no longer using custom searcher for lexical/tensor and tensor/lexical
@@ -647,56 +563,51 @@ class StructuredVespaIndex(VespaIndex):
         # Extract score modifiers
         hybrid_score_modifiers = self._get_hybrid_score_modifiers(marqo_query)
         if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL]:
-            query_inputs.update(
-                hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL]
-            )
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL])
         if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]:
-            query_inputs.update(
-                hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]
-            )
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
-            query_inputs.update(
-                hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
-            )
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
-        tensor_yql = f"select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}"
-        lexical_yql = f"select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}"
+        tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
+        lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
 
         query = {
-            "searchChain": "marqo",
-            "yql": "PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.",
-            "ranking": common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            "ranking.rerankCount": marqo_query.limit + marqo_query.offset,
+            'searchChain': 'marqo',
+            'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
+            'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
+            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,
             # limits the number of results going to phase 2
-            "model_restrict": self._marqo_index.schema_name,
-            "hits": marqo_query.limit,
-            "offset": marqo_query.offset,
-            "ranking.matching.approximateThreshold": marqo_query.approximate_threshold,
-            "query_features": query_inputs,
-            "presentation.summary": summary,
-            "language": marqo_query.language,
+
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'language': marqo_query.language,
+
             # Custom searcher parameters
-            "marqo__yql.tensor": None
-            if (
-                marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
-                and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
-            )
-            else tensor_yql,
-            "marqo__yql.lexical": lexical_yql,
-            "marqo__ranking.lexical.lexical": common.RANK_PROFILE_BM25,
-            "marqo__ranking.tensor.tensor": common.RANK_PROFILE_EMBEDDING_SIMILARITY,
-            "marqo__ranking.lexical.tensor": common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
-            "marqo__ranking.tensor.lexical": common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
-            "marqo__hybrid.retrievalMethod": marqo_query.hybrid_parameters.retrievalMethod,
-            "marqo__hybrid.rankingMethod": marqo_query.hybrid_parameters.rankingMethod,
-            "marqo__hybrid.verbose": marqo_query.hybrid_parameters.verbose,
+            'marqo__yql.tensor': None if (
+                    marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
+                    and
+                    marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
+            ) else tensor_yql,
+            'marqo__yql.lexical': lexical_yql,
+
+            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
+            'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
+            'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
+            'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
+
+            'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
+            'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
+            'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
 
         query = {k: v for k, v in query.items() if v is not None}
 
-        if marqo_query.hybrid_parameters.rankingMethod in {
-            RankingMethod.RRF
-        }:  # TODO: Add NormalizeLinear
+        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
@@ -706,27 +617,21 @@ class StructuredVespaIndex(VespaIndex):
         return query
 
     def _get_tensor_fields_to_search(
-        self,
-        marqo_query: Optional[MarqoTensorQuery] = None,
-        searchable_attributes: Optional[List[str]] = None,
+            self,
+            marqo_query: Optional[MarqoTensorQuery] = None,
+            searchable_attributes: Optional[List[str]] = None
     ) -> List[str]:
         if marqo_query is not None and searchable_attributes is not None:
-            raise ValueError(
-                "Cannot provide both marqo_query and searchable_attributes"
-            )
+            raise ValueError('Cannot provide both marqo_query and searchable_attributes')
 
-        searchable_attributes = (
-            marqo_query.searchable_attributes
-            if marqo_query is not None
-            else searchable_attributes
-        )
+        searchable_attributes = marqo_query.searchable_attributes if marqo_query is not None else searchable_attributes
 
         if searchable_attributes is not None:
             for att in searchable_attributes:
                 if att not in self._marqo_index.tensor_field_map:
                     raise InvalidFieldNameError(
-                        f"Index {self._marqo_index.name} has no tensor field {att}. "
-                        f"Available tensor fields are: {', '.join(self._marqo_index.tensor_field_map.keys())}"
+                        f'Index {self._marqo_index.name} has no tensor field {att}. '
+                        f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
                     )
 
             fields_to_search = searchable_attributes
@@ -736,34 +641,26 @@ class StructuredVespaIndex(VespaIndex):
         if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             return fields_to_search
         else:
-            return [
-                self._marqo_index.tensor_field_map[f].embeddings_field_name
-                for f in fields_to_search
-            ]
+            return [self._marqo_index.tensor_field_map[f].embeddings_field_name
+                    for f in fields_to_search]
 
     def _get_lexical_fields_to_search(
-        self,
-        marqo_query: Optional[MarqoLexicalQuery] = None,
-        searchable_attributes: Optional[List[str]] = None,
+            self,
+            marqo_query: Optional[MarqoLexicalQuery] = None,
+            searchable_attributes: Optional[List[str]] = None
     ) -> List[str]:
         if marqo_query is not None and searchable_attributes is not None:
-            raise ValueError(
-                "Cannot provide both marqo_query and searchable_attributes"
-            )
+            raise ValueError('Cannot provide both marqo_query and searchable_attributes')
 
-        searchable_attributes = (
-            marqo_query.searchable_attributes
-            if marqo_query is not None
-            else searchable_attributes
-        )
+        searchable_attributes = marqo_query.searchable_attributes if marqo_query is not None else searchable_attributes
 
         if searchable_attributes is not None:
             for att in searchable_attributes:
                 if att not in self._marqo_index.lexically_searchable_fields_names:
                     raise InvalidFieldNameError(
-                        f"Index {self._marqo_index.name} has no lexically searchable field {att}. "
-                        f"Available lexically searchable fields are: "
-                        f"{', '.join(self._marqo_index.lexically_searchable_fields_names)}"
+                        f'Index {self._marqo_index.name} has no lexically searchable field {att}. '
+                        f'Available lexically searchable fields are: '
+                        f'{", ".join(self._marqo_index.lexically_searchable_fields_names)}'
                     )
 
             fields_to_search = searchable_attributes
@@ -773,37 +670,26 @@ class StructuredVespaIndex(VespaIndex):
         if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             return fields_to_search
         else:
-            return [
-                self._marqo_index.field_map[f].lexical_field_name
-                for f in fields_to_search
-            ]
+            return [self._marqo_index.field_map[f].lexical_field_name
+                    for f in fields_to_search]
 
-    def _get_individual_field_tensor_search_terms(
-        self, marqo_query: MarqoTensorQuery
-    ) -> List[str]:
+    def _get_individual_field_tensor_search_terms(self, marqo_query: MarqoTensorQuery) -> List[str]:
         """
         Returns list of strings representing the tensor search terms for each field in the query.
         """
         if isinstance(marqo_query, MarqoHybridQuery):
-            searchable_attributes = (
-                marqo_query.hybrid_parameters.searchableAttributesTensor
-            )
+            searchable_attributes = marqo_query.hybrid_parameters.searchableAttributesTensor
         else:
             searchable_attributes = marqo_query.searchable_attributes
 
         if searchable_attributes is not None:
-            fields_to_search = [
-                f
-                for f in searchable_attributes
-                if f in self._marqo_index.tensor_field_map
-            ]
+            fields_to_search = [f for f in searchable_attributes if f in self._marqo_index.tensor_field_map]
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
+
         if marqo_query.rerank_depth_tensor is not None:
-            rerank_depth = max(
-                marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset
-            )
+            rerank_depth = max(marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset)
         else:
             rerank_depth = marqo_query.limit + marqo_query.offset
 
@@ -813,7 +699,7 @@ class StructuredVespaIndex(VespaIndex):
             # efSearch must be min result_count + offset
             marqo_query.ef_search = max(
                 utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
-                marqo_query.limit + marqo_query.offset,
+                marqo_query.limit + marqo_query.offset
             )
         additional_hits = max(marqo_query.ef_search - rerank_depth, 0)
 
@@ -822,14 +708,14 @@ class StructuredVespaIndex(VespaIndex):
             tensor_field = self._marqo_index.tensor_field_map[field]
             embedding_field_name = tensor_field.embeddings_field_name
             terms.append(
-                f"("
-                f"{{"
-                f"targetHits:{rerank_depth}, "
-                f"approximate:{str(marqo_query.approximate)}, "
-                f"hnsw.exploreAdditionalHits:{additional_hits}"
-                f"}}"
-                f"nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING})"
-                f")"
+                f'('
+                f'{{'
+                f'targetHits:{rerank_depth}, '
+                f'approximate:{str(marqo_query.approximate)}, '
+                f'hnsw.exploreAdditionalHits:{additional_hits}'
+                f'}}'
+                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING})'
+                f')'
             )
         return terms
 
@@ -837,14 +723,12 @@ class StructuredVespaIndex(VespaIndex):
         terms = self._get_individual_field_tensor_search_terms(marqo_query)
 
         if terms:
-            return f"({' OR '.join(terms)})"
+            return f'({" OR ".join(terms)})'
         else:
-            return ""
+            return ''
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
-        def _convert_to_in_list_str(
-            value_list: list, marqo_field_name: str, marqo_field_type: FieldType
-        ) -> str:
+        def _convert_to_in_list_str(value_list: list, marqo_field_name: str, marqo_field_type: FieldType) -> str:
             """
             Change list into its string representation, replacing [] with ().
             This is different from `tuple()` because it does not add a comma for single element lists.
@@ -855,19 +739,10 @@ class StructuredVespaIndex(VespaIndex):
             Otherwise: error out.
             """
 
-            in_list = "("
+            in_list = '('
 
-            STR_FIELD_TYPES = [
-                FieldType.Text,
-                FieldType.ArrayText,
-                FieldType.CustomVector,
-            ]
-            INT_FIELD_TYPES = [
-                FieldType.Int,
-                FieldType.Long,
-                FieldType.ArrayInt,
-                FieldType.ArrayLong,
-            ]
+            STR_FIELD_TYPES = [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]
+            INT_FIELD_TYPES = [FieldType.Int, FieldType.Long, FieldType.ArrayInt, FieldType.ArrayLong]
             for i in range(len(value_list)):
                 # str type fields
                 if marqo_field_type in STR_FIELD_TYPES:
@@ -891,31 +766,31 @@ class StructuredVespaIndex(VespaIndex):
 
                 # Add comma if not the last element
                 if i < len(value_list) - 1:
-                    in_list += ", "
+                    in_list += ', '
 
-            in_list += ")"
+            in_list += ')'
             return in_list
 
         def tree_to_filter_string(node: search_filter.Node) -> str:
             if isinstance(node, search_filter.Operator):
                 if isinstance(node, search_filter.And):
-                    operator = "AND"
+                    operator = 'AND'
                 elif isinstance(node, search_filter.Or):
-                    operator = "OR"
+                    operator = 'OR'
                 else:
-                    raise InternalError(f"Unknown operator type {type(node)}")
+                    raise InternalError(f'Unknown operator type {type(node)}')
 
-                return f"({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})"
+                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
             elif isinstance(node, search_filter.Modifier):
                 if isinstance(node, search_filter.Not):
-                    return f"!({tree_to_filter_string(node.modified)})"
+                    return f'!({tree_to_filter_string(node.modified)})'
                 else:
-                    raise InternalError(f"Unknown modifier type {type(node)}")
+                    raise InternalError(f'Unknown modifier type {type(node)}')
             elif isinstance(node, search_filter.Term):
                 if node.field not in self._marqo_index.filterable_fields_names:
                     raise InvalidFieldNameError(
                         f"Index '{self._marqo_index.name}' has no filterable field '{node.field}'. "
-                        f"Available filterable fields are: '{', '.join(self._marqo_index.filterable_fields_names)}'"
+                        f'Available filterable fields are: \'{", ".join(self._marqo_index.filterable_fields_names)}\''
                     )
 
                 if node.field == constants.MARQO_DOC_ID:
@@ -933,51 +808,39 @@ class StructuredVespaIndex(VespaIndex):
                 if isinstance(node, search_filter.EqualityTerm):
                     node_value = node.value
                     if marqo_field_type == FieldType.Bool:
-                        if node_value.lower() == "true":
-                            node_value = "1"
-                        elif node_value.lower() == "false":
-                            node_value = "0"
+                        if node_value.lower() == 'true':
+                            node_value = '1'
+                        elif node_value.lower() == 'false':
+                            node_value = '0'
 
                     return f'{marqo_field_name} contains "{self.escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
-                    lower = (
-                        f"{marqo_field_name} >= {node.lower}"
-                        if node.lower is not None
-                        else None
-                    )
-                    upper = (
-                        f"{marqo_field_name} <= {node.upper}"
-                        if node.upper is not None
-                        else None
-                    )
+                    lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
                     if lower and upper:
-                        return f"({lower} AND {upper})"
+                        return f'({lower} AND {upper})'
                     elif lower:
                         return lower
                     elif upper:
                         return upper
                     else:
-                        raise InternalError("RangeTerm has no lower or upper bound")
+                        raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
-                    return (
-                        f"{marqo_field_name} in "
-                        f"{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}"
-                    )
+                    return (f'{marqo_field_name} in '
+                            f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
 
-            raise InternalError(f"Unknown node type {type(node)}")
+            raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
 
     def _get_select_attributes(self, marqo_query: MarqoQuery) -> str:
         if marqo_query.attributes_to_retrieve is not None:
-            return ", ".join(marqo_query.attributes_to_retrieve)
+            return ', '.join(marqo_query.attributes_to_retrieve)
         else:
-            return "*"
+            return '*'
 
-    def _get_lexical_search_term(
-        self, marqo_query: MarqoLexicalQuery, is_facets_term=False
-    ) -> str:
+    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery, is_facets_term=False) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
         else:
@@ -985,91 +848,67 @@ class StructuredVespaIndex(VespaIndex):
 
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
-            return "false"
+            return 'false'
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
-            return "true"
+            return 'true'
 
         # Optional tokens
         if marqo_query.or_phrases and score_modifiers or is_facets_term:
-            or_terms = " OR ".join(
-                [
-                    self._get_lexical_contains_term(phrase, marqo_query)
-                    for phrase in marqo_query.or_phrases
-                ]
-            )
+            or_terms = ' OR '.join([
+                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+            ])
         elif marqo_query.or_phrases and not score_modifiers:
-            or_terms = "weakAnd(%s)" % ", ".join(
-                [
-                    self._get_lexical_contains_term(phrase, marqo_query)
-                    for phrase in marqo_query.or_phrases
-                ]
-            )
+            or_terms = 'weakAnd(%s)' % ', '.join([
+                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+            ])
         else:
-            or_terms = ""
+            or_terms = ''
 
         # Required tokens
         if marqo_query.and_phrases:
-            and_terms = " AND ".join(
-                [
-                    self._get_lexical_contains_term(phrase, marqo_query)
-                    for phrase in marqo_query.and_phrases
-                ]
-            )
+            and_terms = ' AND '.join([
+                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.and_phrases
+            ])
             if or_terms:
-                or_terms = f"({or_terms})"
-                and_terms = f" AND ({and_terms})"
+                or_terms = f'({or_terms})'
+                and_terms = f' AND ({and_terms})'
         else:
-            and_terms = ""
+            and_terms = ''
 
-        return f"{or_terms}{and_terms}"
+        return f'{or_terms}{and_terms}'
 
-    def _get_lexical_contains_term(self, phrase: str, query: MarqoQuery) -> str:
+    def _get_lexical_contains_term(self, phrase:str, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):
             searchable_attributes = query.hybrid_parameters.searchableAttributesLexical
         else:
             searchable_attributes = query.searchable_attributes
 
         if searchable_attributes is not None:
-            return (
-                "("
-                + " OR ".join(
-                    [
-                        f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
-                        for field in searchable_attributes
-                    ]
-                )
-                + ")"
-            )
+            return "("+' OR '.join([
+                f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for field in searchable_attributes
+            ])+")"
         else:
             return f'default contains "{phrase}"'
 
     def _verify_marqo_field_name(self, field_name: str):
         field_map = self._marqo_index.field_map
         if field_name not in field_map:
-            raise InvalidFieldNameError(
-                f"Invalid field name {field_name} for index {self._marqo_index.name}. "
-                f"Valid field names are {', '.join(field_map.keys())}"
-            )
+            raise InvalidFieldNameError(f'Invalid field name {field_name} for index {self._marqo_index.name}. '
+                                        f'Valid field names are {", ".join(field_map.keys())}')
 
     def _verify_marqo_tensor_field_name(self, field_name: str):
         tensor_field_map = self._marqo_index.tensor_field_map
         if field_name not in tensor_field_map:
-            raise InvalidFieldNameError(
-                f"Invalid tensor field name {field_name} for index {self._marqo_index.name}. "
-                f"Valid tensor field names are {', '.join(tensor_field_map.keys())}"
-            )
+            raise InvalidFieldNameError(f'Invalid tensor field name {field_name} for index {self._marqo_index.name}. '
+                                        f'Valid tensor field names are {", ".join(tensor_field_map.keys())}')
 
     def _verify_marqo_tensor_field(self, field_name: str, field_value: Dict[str, Any]):
-        if not set(field_value.keys()) == {
-            constants.MARQO_DOC_CHUNKS,
-            constants.MARQO_DOC_EMBEDDINGS,
-        }:
+        if not set(field_value.keys()) == {constants.MARQO_DOC_CHUNKS, constants.MARQO_DOC_EMBEDDINGS}:
             # TODO should this be InvalidTensorFieldError?
-            raise InternalError(
-                f"Invalid tensor field {field_name}. "
-                f"Expected keys {constants.MARQO_DOC_CHUNKS}, {constants.MARQO_DOC_EMBEDDINGS} "
-                f"but found {', '.join(field_value.keys())}"
-            )
+            raise InternalError(f'Invalid tensor field {field_name}. '
+                                f'Expected keys {constants.MARQO_DOC_CHUNKS}, {constants.MARQO_DOC_EMBEDDINGS} '
+                                f'but found {", ".join(field_value.keys())}')
 
     def _verify_marqo_field_type(self, field_name: str, value: Any):
         marqo_type = self._marqo_index.field_map[field_name].type
@@ -1077,86 +916,56 @@ class StructuredVespaIndex(VespaIndex):
 
         if isinstance(python_type, tuple):
             # Logic branch for array types
-            if (not isinstance(value, python_type[0])) or (
-                isinstance(value, list)
-                and not all(isinstance(v, python_type[1]) for v in value)
-            ):
-                raise InvalidDataTypeError(
-                    f"Invalid value {value} for a list field {field_name} with Marqo type "
-                    f"{marqo_type.value}. All list elements must be the same valid type "
-                )
+            if ((not isinstance(value, python_type[0])) or
+                    (isinstance(value, list) and not all(isinstance(v, python_type[1]) for v in value))):
+                raise InvalidDataTypeError(f'Invalid value {value} for a list field {field_name} with Marqo type '
+                                           f'{marqo_type.value}. All list elements must be the same valid type ')
 
         elif (
-            isinstance(python_type, list)
-            and not any(isinstance(value, t) for t in python_type)
-        ) or (not isinstance(python_type, list) and not isinstance(value, python_type)):
-            raise InvalidDataTypeError(
-                f"Invalid value {value} for field {field_name} with Marqo type "
-                f"{marqo_type.value}. Expected a value of type {python_type}, but found "
-                f"{type(value)}"
-            )
-        else:
-            ValueError(
-                f"Invalid python type {python_type} for field {field_name} with Marqo type {marqo_type.value} "
-                f"during call to _verify_marqo_field_type"
-            )
-
-    def _verify_numerical_field_value(
-        self, value: Union[float, int], index_field: Field
-    ):
-        if index_field.type in (
-            FieldType.Float,
-            FieldType.ArrayFloat,
-            FieldType.MapFloat,
+                (isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type)) or
+                (not isinstance(python_type, list) and not isinstance(value, python_type))
         ):
+            raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
+                                       f'{marqo_type.value}. Expected a value of type {python_type}, but found '
+                                       f'{type(value)}')
+        else:
+            ValueError(f'Invalid python type {python_type} for field {field_name} with Marqo type {marqo_type.value} '
+                       f'during call to _verify_marqo_field_type')
+
+    def _verify_numerical_field_value(self, value: Union[float, int], index_field: Field):
+        if index_field.type in (FieldType.Float, FieldType.ArrayFloat, FieldType.MapFloat):
             self._verify_float_field_range(value)
         elif index_field.type in (FieldType.Int, FieldType.ArrayInt, FieldType.MapInt):
             self._verify_int_field_range(value)
-        elif index_field.type in (
-            FieldType.Long,
-            FieldType.ArrayLong,
-            FieldType.MapLong,
-        ):
+        elif index_field.type in (FieldType.Long, FieldType.ArrayLong, FieldType.MapLong):
             self._verify_long_field_range(value)
-        elif index_field.type in (
-            FieldType.Double,
-            FieldType.ArrayDouble,
-            FieldType.MapDouble,
-        ):
+        elif index_field.type in (FieldType.Double, FieldType.ArrayDouble, FieldType.MapDouble):
             pass
         else:
-            raise InternalError(
-                f"Invalid field type {index_field.type} for field {index_field.name} called by"
-                f"_verify_numerical_field_value. Expected one of {FieldType.Float}, {FieldType.Int}, "
-                f"{FieldType.Long}, {FieldType.Double}"
-            )
+            raise InternalError(f'Invalid field type {index_field.type} for field {index_field.name} called by'
+                                f'_verify_numerical_field_value. Expected one of {FieldType.Float}, {FieldType.Int}, '
+                                f'{FieldType.Long}, {FieldType.Double}')
 
     def _verify_float_field_range(self, value: float):
         if not (self._MIN_FLOAT <= value <= self._MAX_FLOAT):
-            raise InvalidDataRangeError(
-                f"Invalid value {value} for float field. Expected a value in the range "
-                f"[{self._MIN_FLOAT}, {self._MAX_FLOAT}], but found {value}. "
-                f"If you wish to store a value outside of this range, create a field with type "
-                f"'{FieldType.Double}' "
-            )
+            raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
+                                        f'[{self._MIN_FLOAT}, {self._MAX_FLOAT}], but found {value}. '
+                                        f'If you wish to store a value outside of this range, create a field with type '
+                                        f"'{FieldType.Double}' ")
 
     def _verify_int_field_range(self, value: int):
         if not (self._MIN_INT <= value <= self._MAX_INT):
-            raise InvalidDataRangeError(
-                f"Invalid value {value} for int field. Expected a value in the range "
-                f"[{self._MIN_INT}, {self._MAX_INT}], but found {value}. "
-                f"If you wish to store a value outside of this range, create a field with type "
-                f"'{FieldType.Long} or '{FieldType.Double}' "
-            )
+            raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
+                                        f"[{self._MIN_INT}, {self._MAX_INT}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
+                                        f"'{FieldType.Long} or '{FieldType.Double}' ")
 
     def _verify_long_field_range(self, value: int):
         if not (self._MIN_LONG <= value <= self._MAX_LONG):
-            raise InvalidDataRangeError(
-                f"Invalid value {value} for long field. Expected a value in the range "
-                f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
-                f"If you wish to store a value outside of this range, create a field with type "
-                f"'{FieldType.Double}' "
-            )
+            raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
+                                        f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
+                                        f"'{FieldType.Double}' ")
 
     def _verify_id_field(self, value: str):
         """Validates that the _id value is acceptable.
@@ -1167,14 +976,11 @@ class StructuredVespaIndex(VespaIndex):
         if not isinstance(value, str):
             raise MarqoDocumentParsingError(
                 "Document _id must be a string type! "
-                f"Received _id {value} of type `{type(value).__name__}`"
-            )
+                f"Received _id {value} of type `{type(value).__name__}`")
         if not value:
             raise MarqoDocumentParsingError("Document ID can't be empty")
 
-    def _extract_highlights(
-        self, vespa_document_fields: Dict[str, Any]
-    ) -> List[Dict[Any, str]]:
+    def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
         # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
         # will be max double
@@ -1183,17 +989,12 @@ class StructuredVespaIndex(VespaIndex):
         min_distance = None
         closest_tensor_field = None
         for tensor_field in self._marqo_index.tensor_fields:
-            closest_feature = f"closest({tensor_field.embeddings_field_name})"
-            if (
-                closest_feature in match_features
-                and len(match_features[closest_feature]["cells"]) > 0
-            ):
-                distance_feature = (
-                    f"distance(field,{tensor_field.embeddings_field_name})"
-                )
+            closest_feature = f'closest({tensor_field.embeddings_field_name})'
+            if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
+                distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
                 if distance_feature not in match_features:
                     raise VespaDocumentParsingError(
-                        f"Expected {distance_feature} in match features but it was not found"
+                        f'Expected {distance_feature} in match features but it was not found'
                     )
                 distance = match_features[distance_feature]
                 if min_distance is None or distance < min_distance:
@@ -1204,18 +1005,14 @@ class StructuredVespaIndex(VespaIndex):
             return []
 
         # Get chunk index
-        chunk_index_str = next(
-            iter(
-                match_features[
-                    f"closest({closest_tensor_field.embeddings_field_name})"
-                ]["cells"]
-            )
-        )
+        chunk_index_str = next(iter(
+            match_features[f'closest({closest_tensor_field.embeddings_field_name})']['cells']
+        ))
         try:
             chunk_index = int(chunk_index_str)
         except ValueError as e:
             raise VespaDocumentParsingError(
-                f"Expected integer as chunk index, but found {chunk_index_str}", cause=e
+                f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
             ) from e
 
         # Get chunk value
@@ -1226,18 +1023,16 @@ class StructuredVespaIndex(VespaIndex):
                 chunk = vespa_document_fields[chunk_field_name][chunk_index]
             else:
                 # Note: WARN level will create verbose logs in production as this is per result
-                logger.debug(
-                    f"Failed to extract highlights as Vespa document is missing chunk field "
-                    f"{chunk_field_name}. This can happen if attributes_to_retrieve does not include "
-                    f"all searchable tensor fields (searchable_attributes)"
-                )
+                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
+                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
+                             f'all searchable tensor fields (searchable_attributes)')
 
                 chunk = None
 
         except (KeyError, TypeError, IndexError) as e:
             raise VespaDocumentParsingError(
-                f"Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}",
-                cause=e,
+                f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
+                cause=e
             ) from e
 
         if chunk is not None:
@@ -1249,4 +1044,4 @@ class StructuredVespaIndex(VespaIndex):
         try:
             return self._MARQO_TO_PYTHON_TYPE_MAP[marqo_type]
         except KeyError:
-            raise InternalError(f"Unknown Marqo type: {marqo_type}")
+            raise InternalError(f'Unknown Marqo type: {marqo_type}')

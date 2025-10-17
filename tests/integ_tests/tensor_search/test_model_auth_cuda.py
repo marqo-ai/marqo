@@ -2,46 +2,35 @@
 
 multiprocessing should be tested manually -problem with mocking (deadlock esque)
 """
-
-import os
-import unittest
-from unittest import mock
-
-import pytest
-import torch
-
-from marqo.api.exceptions import IndexNotFoundError
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.inference.model_download.download_model_from_s3 import (
-    get_s3_model_absolute_cache_path,
-)
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.external_apis.s3 import S3Location
-from marqo.tensor_search.models.private_models import ModelAuth, S3Auth
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
+from marqo.api.exceptions import IndexNotFoundError
 from tests.integ_tests.marqo_test import MarqoTestCase
-from tests.integ_tests.tensor_search.test_model_auth import (
-    _delete_file,
-    _get_base_index_settings,
-)
+from marqo.inference.model_download.download_model_from_s3 import get_s3_model_absolute_cache_path
+from marqo.tensor_search.models.external_apis.s3 import S3Location
+from unittest import mock
+from tests.integ_tests.tensor_search.test_model_auth import _delete_file, _get_base_index_settings
+import unittest
+import os
+import torch
+import pytest
 
 
 @pytest.mark.largemodel
-@pytest.mark.skipif(
-    torch.cuda.is_available() is False,
-    reason="We skip the large model test if we don't have cuda support",
-)
+@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 @unittest.skip
 class TestModelAuthLoadedS3(MarqoTestCase):
-    """loads an s3 model loaded index, for tests"""
+    """loads an s3 model loaded index, for tests """
 
     model_abs_path = None
-    fake_access_key_id = "12345"
-    fake_secret_key = "this-is-a-secret"
+    fake_access_key_id = '12345'
+    fake_secret_key = 'this-is-a-secret'
     index_name_1 = "test-model-auth-index-1"
-    s3_object_key = "path/to/your/secret_model.pt"
-    s3_bucket = "your-bucket-name"
-    custom_model_name = "my_model"
-    device = "cuda"
+    s3_object_key = 'path/to/your/secret_model.pt'
+    s3_bucket = 'your-bucket-name'
+    custom_model_name = 'my_model'
+    device = 'cuda'
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -55,12 +44,14 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
         try:
             tensor_search.delete_index(config=cls.config, index_name=cls.index_name_1)
-        except IndexNotFoundError:
+        except IndexNotFoundError as s:
             pass
 
         cls.model_abs_path = get_s3_model_absolute_cache_path(
-            S3Location(Key=cls.s3_object_key, Bucket=cls.s3_bucket)
-        )
+            S3Location(
+                Key=cls.s3_object_key,
+                Bucket=cls.s3_bucket
+            ))
         _delete_file(cls.model_abs_path)
 
         model_properties = {
@@ -71,15 +62,13 @@ class TestModelAuthLoadedS3(MarqoTestCase):
                     "Bucket": cls.s3_bucket,
                     "Key": cls.s3_object_key,
                 },
-                "auth_required": True,
+                "auth_required": True
             },
             "type": "open_clip",
         }
         s3_settings = _get_base_index_settings()
-        s3_settings["index_defaults"]["model_properties"] = model_properties
-        tensor_search.create_vector_index(
-            config=cls.config, index_name=cls.index_name_1, index_settings=s3_settings
-        )
+        s3_settings['index_defaults']['model_properties'] = model_properties
+        tensor_search.create_vector_index(config=cls.config, index_name=cls.index_name_1, index_settings=s3_settings)
 
         public_model_url = "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
 
@@ -93,37 +82,27 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         # file should not yet exist:
         assert not os.path.isfile(cls.model_abs_path)
 
-        with unittest.mock.patch(
-            "boto3.client", return_value=mock_s3_client
-        ) as mock_boto3_client:
+        with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
             # Call the function that uses the generate_presigned_url method
-            res = self.add_documents(
-                config=cls.config,
-                add_docs_params=AddDocsParams(
-                    index_name=cls.index_name_1,
-                    docs=[{"a": "b"}],
-                    device=cls.device,
-                    model_auth=ModelAuth(
-                        s3=S3Auth(
-                            aws_access_key_id=cls.fake_access_key_id,
-                            aws_secret_access_key=cls.fake_secret_key,
-                        )
-                    ),
-                ),
-            )
-            assert not res["errors"]
+            res = self.add_documents(config=cls.config, add_docs_params=AddDocsParams(
+                index_name=cls.index_name_1, docs=[{'a': 'b'}],
+                device=cls.device,
+                model_auth=ModelAuth(
+                    s3=S3Auth(aws_access_key_id=cls.fake_access_key_id, aws_secret_access_key=cls.fake_secret_key))
+            ))
+            assert not res['errors']
 
         assert os.path.isfile(cls.model_abs_path)
 
         mock_s3_client.generate_presigned_url.assert_called_with(
-            "get_object",
-            Params={"Bucket": "your-bucket-name", "Key": cls.s3_object_key},
+            'get_object',
+            Params={'Bucket': 'your-bucket-name', 'Key': cls.s3_object_key}
         )
         mock_boto3_client.assert_called_once_with(
-            "s3",
+            's3',
             aws_access_key_id=cls.fake_access_key_id,
             aws_secret_access_key=cls.fake_secret_key,
-            aws_session_token=None,
+            aws_session_token=None
         )
 
     @classmethod
@@ -133,30 +112,19 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
-        res = self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                auto_refresh=True,
-                docs=[{"c": "d"}],
-                device=self.device,
-            ),
-        )
-        assert not res["errors"]
+        res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}], device=self.device
+        ))
+        assert not res['errors']
 
     def test_after_downloading_doesnt_redownload(self):
         """on this instance, at least"""
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
         mock_req = mock.MagicMock()
-        with mock.patch("urllib.request.urlopen", mock_req):
-            res = self.add_documents(
-                config=self.config,
-                add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    auto_refresh=True,
-                    docs=[{"c": "d"}],
-                    device=self.device,
-                ),
-            )
-            assert not res["errors"]
+        with mock.patch('urllib.request.urlopen', mock_req):
+            res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}],
+                device=self.device
+            ))
+            assert not res['errors']
             mock_req.assert_not_called()

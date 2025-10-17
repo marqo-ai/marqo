@@ -1,7 +1,2 @@
 from .marqo_index import MarqoIndex, UnstructuredMarqoIndex
-from .marqo_query import (
-    MarqoHybridQuery,
-    MarqoLexicalQuery,
-    MarqoQuery,
-    MarqoTensorQuery,
-)
+from .marqo_query import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery

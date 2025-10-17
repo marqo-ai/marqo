@@ -1,12 +1,13 @@
 import unittest
 
 from marqo.api.exceptions import IndexNotFoundError
-from marqo.tensor_search import index_meta_cache, tensor_search
+from marqo.tensor_search import tensor_search, index_meta_cache
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 @unittest.skip
 class TestDeleteIndex(MarqoTestCase):
+
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
         self.index_name_1 = "my-test-index-owwoowow2"
@@ -21,18 +22,14 @@ class TestDeleteIndex(MarqoTestCase):
         for ix_name in [self.index_name_1, self.index_name_2]:
             try:
                 tensor_search.delete_index(config=self.config, index_name=ix_name)
-            except IndexNotFoundError:
+            except IndexNotFoundError as s:
                 pass
 
     def test_delete_clears_cache(self):
         """deletes the index info from cache"""
         assert self.index_name_1 not in index_meta_cache.get_cache()
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_1
-        )
-        tensor_search.create_vector_index(
-            config=self.config, index_name=self.index_name_2
-        )
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
+        tensor_search.create_vector_index(config=self.config, index_name=self.index_name_2)
         assert self.index_name_1 in index_meta_cache.get_cache()
         assert self.index_name_2 in index_meta_cache.get_cache()
         # make sure only index 1 is deleted:

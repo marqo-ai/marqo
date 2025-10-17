@@ -1,11 +1,11 @@
 import re
 import time
-from pathlib import PurePosixPath
 from typing import Dict
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from pathlib import PurePosixPath
 
 from marqo.core.monitoring.statsd_client import StatsDClient
 
@@ -47,18 +47,12 @@ class StatsDMiddleware(BaseHTTPMiddleware):
         self.statsd.timing("request.duration_ms", duration_ms, tags=tags)
 
         # batch outcome counters
-        if _DOCS_RE.fullmatch(request.url.path) and request.method in {
-            "POST",
-            "PATCH",
-            "GET",
-        }:
-            lowered: Dict[str, str] = {
-                k.lower(): v for k, v in response.headers.items()
-            }
+        if _DOCS_RE.fullmatch(request.url.path) and request.method in {"POST", "PATCH", "GET"}:
+            lowered: Dict[str, str] = {k.lower(): v for k, v in response.headers.items()}
             for hdr, metric in (
-                ("x-count-success", "batch.success"),
-                ("x-count-failure", "batch.failure"),
-                ("x-count-error", "batch.error"),
+                    ("x-count-success", "batch.success"),
+                    ("x-count-failure", "batch.failure"),
+                    ("x-count-error", "batch.error"),
             ):
                 if hdr in lowered:
                     try:

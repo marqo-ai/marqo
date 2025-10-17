@@ -1,12 +1,10 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Optional, Union, List, Dict, Any
 
 from pydantic.v1 import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
-from marqo.core.models.marqo_add_documents_response import (
-    BatchResponseStats,
-    MarqoBaseDocumentsResponse,
-)
+from marqo.core.models.marqo_add_documents_response import BatchResponseStats
+from marqo.core.models.marqo_add_documents_response import MarqoBaseDocumentsResponse
 from marqo.tensor_search.enums import TensorField
 
 
@@ -16,7 +14,6 @@ class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
     Only invalid request errors are handled here.
     Valid request should return a dictionary containing the document.
     """
-
     # This id can be any type as it might be used to hold an invalid id response
     id: Any = Field(alias="_id", default=None)
     status: int
@@ -28,7 +25,6 @@ class MarqoGetDocumentsByIdsResponse(MarqoBaseDocumentsResponse):
     """
     A response from getting documents by their ids from Marqo.
     """
-
     errors: bool
     results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
 
@@ -54,5 +50,5 @@ class MarqoGetDocumentsByIdsResponse(MarqoBaseDocumentsResponse):
                 else:
                     raise ValueError(f"Unexpected item type: {type(item)}")
 
-        values["_batch_response_stats"] = batch_response_count
+        values['_batch_response_stats'] = batch_response_count
         return values

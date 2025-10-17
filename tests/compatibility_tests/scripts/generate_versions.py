@@ -1,9 +1,8 @@
 import json
-import subprocess
-import sys
 
 import semver
-
+import subprocess
+import sys
 
 def generate_versions(to_version: str, num_minor_versions_to_test: int = 3) -> list:
     """
@@ -36,7 +35,8 @@ def generate_versions(to_version: str, num_minor_versions_to_test: int = 3) -> l
         if minor < 0:
             break
         tags = subprocess.check_output(
-            ["git", "tag", "--list", f"{target_version.major}.{minor}.*"], text=True
+            ["git", "tag", "--list", f"{target_version.major}.{minor}.*"],
+            text=True
         ).splitlines()
 
         # Filter and find the latest patch version tag
@@ -46,9 +46,8 @@ def generate_versions(to_version: str, num_minor_versions_to_test: int = 3) -> l
         minor -= 1
     return versions
 
-
 if __name__ == "__main__":
     to_version = sys.argv[1]  # Get to version from the command line
-    num_versions = sys.argv[2]  # Get number of versions to generate
+    num_versions = sys.argv[2] # Get number of versions to generate
     versions = generate_versions(to_version, int(num_versions))
     print(json.dumps(versions))  # Output versions as Json

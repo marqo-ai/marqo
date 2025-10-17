@@ -1,31 +1,19 @@
-from typing import Any, Dict, Optional
+from typing import Dict, Any, Optional
 
 import pydantic.v1 as pydantic
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import AddDocumentsError, TooManyFieldsError
-from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.exceptions import TooManyFieldsError, AddDocumentsError
 from marqo.core.inference.api import Inference
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.marqo_index import (
-    Field,
-    FieldFeature,
-    FieldType,
-    SemiStructuredMarqoIndex,
-    StringArrayField,
-    TensorField,
-)
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import (
-    SemiStructuredVespaIndex,
-)
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import (
-    SemiStructuredVespaSchema,
-)
-from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import (
-    UnstructuredAddDocumentsHandler,
-)
+from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField, \
+    StringArrayField
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.add_documents_handler import logger
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -36,33 +24,18 @@ from marqo.vespa.vespa_client import VespaClient
 
 class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
     # TODO find a way to decouple from env vars when retrieving configurations
-    max_lexical_field_count: int = pydantic.Field(
-        default_factory=lambda: read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED
-        )
-    )
-    max_tensor_field_count: int = pydantic.Field(
-        default_factory=lambda: read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED
-        )
-    )
-    max_string_array_field_count: int = pydantic.Field(
-        default_factory=lambda: read_env_vars_and_defaults_ints(
-            EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED
-        )
-    )
+    max_lexical_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED))
+    max_tensor_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED))
+    max_string_array_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED))
 
 
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
-    def __init__(
-        self,
-        marqo_index: SemiStructuredMarqoIndex,
-        add_docs_params: AddDocsParams,
-        vespa_client: VespaClient,
-        index_management: IndexManagement,
-        inference: Inference,
-        field_count_config=SemiStructuredFieldCountConfig(),
-    ):
+    def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
+                 vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
+                 field_count_config=SemiStructuredFieldCountConfig()):
         super().__init__(marqo_index, add_docs_params, vespa_client, inference)
         self.index_management = index_management
         self.marqo_index = marqo_index
@@ -74,7 +47,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         """Override parent validation to add collapse field validation."""
         # Call parent validation first
         super()._validate_doc(doc)
-
+        
         # Add collapse field validation
         self._validate_collapse_field_presence(doc)
 
@@ -82,10 +55,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         """Validate that documents contain required collapse fields with correct type."""
         if not self.marqo_index.collapse_fields:
             return  # No collapse fields configured
-
-        collapse_field = self.marqo_index.collapse_fields[
-            0
-        ]  # Only one allowed per spec
+        
+        collapse_field = self.marqo_index.collapse_fields[0]  # Only one allowed per spec
         collapse_field_name = collapse_field.name
 
         # TODO confirm if all these validations are required
@@ -94,15 +65,15 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                 f"Document missing required field '{collapse_field_name}'. "
                 f"All documents must contain this field for grouping."
             )
-
+        
         collapse_value = doc[collapse_field_name]
-
+        
         if not isinstance(collapse_value, str):
             raise AddDocumentsError(
                 f"Field '{collapse_field_name}' must be of type string. "
                 f"Got {type(collapse_value).__name__}: {collapse_value}"
             )
-
+        
         if not collapse_value.strip():
             raise AddDocumentsError(
                 f"Field '{collapse_field_name}' cannot be empty. "
@@ -111,7 +82,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         """Handle a field in a Marqo document by processing it and updating the index schema if needed.
-
+        
         Args:
             marqo_doc: The Marqo document being processed
             field_name: Name of the field
@@ -131,21 +102,17 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             self._add_lexical_field_to_index(field_name, language, stemming)
 
         # Add string array field if content is list of strings and index version supports it
-        is_string_array = isinstance(field_content, list) and all(
-            isinstance(elem, str) for elem in field_content
+        is_string_array = (
+            isinstance(field_content, list) and
+            all(isinstance(elem, str) for elem in field_content)
         )
-        if (
-            is_string_array
-            and
-            # This is required so that we can update schema on the fly
-            self.marqo_index.index_supports_partial_updates
-        ):
+        if (is_string_array and
+                # This is required so that we can update schema on the fly
+                self.marqo_index.index_supports_partial_updates):
             self._add_string_array_field_to_index(field_name)
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
-        doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(
-            doc[MARQO_DOC_ID]
-        )
+        doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
         processed_tensor_fields = dict()
         for field_name, tensor_field_content in doc_tensor_fields.items():
             processed_tensor_fields[field_name] = {
@@ -167,10 +134,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             # TODO this is a temporary solution to fix the consistency issue for single instance Marqo (used extensively
             #   in api-tests and integration tests). Find a better way to solve consistency issue for Marqo clusters
             from marqo.tensor_search import index_meta_cache
-
-            index_meta_cache.get_index(
-                self.index_management, self.marqo_index.name, force_refresh=True
-            )
+            index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
     def _get_field_language(self, field_name):
         """Extract language specification for a field from mappings and validate."""
@@ -181,13 +145,13 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if not field_mapping:
             return None
 
-        if field_mapping.get("type") == "text_field":
-            language = field_mapping.get("language")
+        if field_mapping.get('type') == 'text_field':
+            language = field_mapping.get('language')
             if language is not None and not self.marqo_index.index_supports_language:
                 raise AddDocumentsError(
-                    f"Language is only supported for indexes created with Marqo version "
-                    f"{constants.MARQO_LANGUAGE_MINIMUM_VERSION} or later. This index was created with  "
-                    f"Marqo {self.marqo_index.marqo_version}."
+                    f'Language is only supported for indexes created with Marqo version '
+                    f'{constants.MARQO_LANGUAGE_MINIMUM_VERSION} or later. This index was created with  '
+                    f'Marqo {self.marqo_index.marqo_version}.'
                 )
             return language
 
@@ -202,13 +166,13 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if not field_mapping:
             return None
 
-        if field_mapping.get("type") == "text_field":
-            stemming = field_mapping.get("stemming")
+        if field_mapping.get('type') == 'text_field':
+            stemming = field_mapping.get('stemming')
             if stemming is not None and not self.marqo_index.index_supports_stemming:
                 raise AddDocumentsError(
-                    f"Stemming is only supported for indexes created with Marqo version "
-                    f"{constants.MARQO_STEMMING_MINIMUM_VERSION} or later. This index was created with  "
-                    f"Marqo {self.marqo_index.marqo_version}."
+                    f'Stemming is only supported for indexes created with Marqo version '
+                    f'{constants.MARQO_STEMMING_MINIMUM_VERSION} or later. This index was created with  '
+                    f'Marqo {self.marqo_index.marqo_version}.'
                 )
             return stemming
 
@@ -233,32 +197,24 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         max_lexical_field_count = self.field_count_config.max_lexical_field_count
         if len(self.marqo_index.lexical_fields) >= max_lexical_field_count:
-            raise TooManyFieldsError(
-                f"Index {self.marqo_index.name} has {len(self.marqo_index.lexical_fields)} "
-                f"lexical fields. Your request to add {field_name} as a lexical field is rejected "
-                f"since it exceeds the limit of {max_lexical_field_count}. Please set a larger "
-                f"limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable."
-            )
+            raise TooManyFieldsError(f'Index {self.marqo_index.name} has {len(self.marqo_index.lexical_fields)} '
+                                     f'lexical fields. Your request to add {field_name} as a lexical field is rejected '
+                                     f'since it exceeds the limit of {max_lexical_field_count}. Please set a larger '
+                                     f'limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing lexical fields to marqo index
-        debug_parts = [
-            f"Adding lexical field {field_name} to index {self.marqo_index.name}"
-        ]
+        debug_parts = [f'Adding lexical field {field_name} to index {self.marqo_index.name}']
         if language:
-            debug_parts.append(f"with language {language}")
+            debug_parts.append(f'with language {language}')
         if stemming:
-            debug_parts.append(f"with stemming {stemming}")
-        logger.debug(" ".join(debug_parts))
+            debug_parts.append(f'with stemming {stemming}')
+        logger.debug(' '.join(debug_parts))
 
         self.marqo_index.lexical_fields.append(
-            Field(
-                name=field_name,
-                type=FieldType.Text,
-                features=[FieldFeature.LexicalSearch],
-                lexical_field_name=f"{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}",
-                language=language,
-                stemming=stemming,
-            )
+            Field(name=field_name, type=FieldType.Text,
+                  features=[FieldFeature.LexicalSearch],
+                  lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}',
+                  language=language, stemming=stemming)
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True
@@ -267,28 +223,19 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if field_name in self.marqo_index.name_to_string_array_field_map:
             return
 
-        max_string_array_field_count = (
-            self.field_count_config.max_string_array_field_count
-        )
+        max_string_array_field_count = self.field_count_config.max_string_array_field_count
         if len(self.marqo_index.string_array_fields) >= max_string_array_field_count:
-            raise TooManyFieldsError(
-                f"Index {self.marqo_index.name} has {len(self.marqo_index.string_array_fields)} "
-                f"string array fields. Your request to add {field_name} as a string array field is "
-                f"rejected since it exceeds the limit of {max_string_array_field_count}. Please set "
-                f"a larger limit in MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED environment variable."
-            )
+            raise TooManyFieldsError(f'Index {self.marqo_index.name} has {len(self.marqo_index.string_array_fields)} '
+                                     f'string array fields. Your request to add {field_name} as a string array field is '
+                                     f'rejected since it exceeds the limit of {max_string_array_field_count}. Please set '
+                                     f'a larger limit in MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
-        logger.debug(
-            f"Adding string array field {field_name} to index {self.marqo_index.name}"
-        )
+        logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 
         self.marqo_index.string_array_fields.append(
             StringArrayField(
-                name=field_name,
-                type=FieldType.ArrayText,
-                features=[FieldFeature.Filter],
-                string_array_field_name=f"{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}",
-            )
+                name=field_name, type=FieldType.ArrayText, features=[FieldFeature.Filter],
+                string_array_field_name=f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}')
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True
@@ -299,25 +246,20 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         max_tensor_field_count = self.field_count_config.max_tensor_field_count
         if len(self.marqo_index.tensor_fields) >= max_tensor_field_count:
-            raise TooManyFieldsError(
-                f"Index {self.marqo_index.name} has {len(self.marqo_index.tensor_fields)} "
-                f"tensor fields. Your request to add {field_name} as a tensor field is rejected "
-                f"since it exceeds the limit of {max_tensor_field_count}. Please set a larger "
-                f"limit in MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable."
-            )
+            raise TooManyFieldsError(f'Index {self.marqo_index.name} has {len(self.marqo_index.tensor_fields)} '
+                                     f'tensor fields. Your request to add {field_name} as a tensor field is rejected '
+                                     f'since it exceeds the limit of {max_tensor_field_count}. Please set a larger '
+                                     f'limit in MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing tensor fields to marqo index
-        logger.debug(
-            f"Adding tensor field {field_name} to index {self.marqo_index.name}"
-        )
+        logger.debug(f'Adding tensor field {field_name} to index {self.marqo_index.name}')
 
         if field_name not in self.marqo_index.tensor_field_map:
-            self.marqo_index.tensor_fields.append(
-                TensorField(
-                    name=field_name,
-                    chunk_field_name=f"{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}{field_name}",
-                    embeddings_field_name=f"{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}{field_name}",
-                )
-            )
+            self.marqo_index.tensor_fields.append(TensorField(
+                name=field_name,
+                chunk_field_name=f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}{field_name}',
+                embeddings_field_name=f'{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}{field_name}',
+            ))
             self.marqo_index.clear_cache()
             self.should_update_index = True
+

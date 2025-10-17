@@ -13,6 +13,5 @@ class MarqoBaseModelProperties(ImmutableBaseModel, ABC):
         dimensions: The dimensions of the model.
         type: The type of the model
     """
-
     dimensions: int = Field(..., ge=1)
     type: str

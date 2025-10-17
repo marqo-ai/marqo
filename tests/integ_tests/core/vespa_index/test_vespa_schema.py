@@ -11,6 +11,7 @@ class VespaSchemaImplementation(VespaSchema):
 
 
 class TestVespaSchema(unittest.TestCase):
+
     def setUp(self):
         self.vespa_schema = VespaSchemaImplementation()
 
@@ -30,7 +31,7 @@ class TestVespaSchema(unittest.TestCase):
         self.assertEqual(self.vespa_schema._get_vespa_schema_name(index_name), expected)
 
     def test_empty_string(self):
-        self.assertEqual(self.vespa_schema._get_vespa_schema_name(""), "")
+        self.assertEqual(self.vespa_schema._get_vespa_schema_name(''), '')
 
     def test_long_string_with_special_characters(self):
         index_name = "_" * 1000  # Very long string of underscores
@@ -46,3 +47,5 @@ class TestVespaSchema(unittest.TestCase):
         index_name = "test_schema-name"
         expected = f"{constants.MARQO_RESERVED_PREFIX}test_00schema_01name"
         self.assertEqual(self.vespa_schema._get_vespa_schema_name(index_name), expected)
+
+

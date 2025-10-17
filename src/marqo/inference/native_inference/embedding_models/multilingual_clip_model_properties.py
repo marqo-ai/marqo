@@ -1,6 +1,4 @@
-from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import (
-    MarqoBaseModelProperties,
-)
+from marqo.inference.native_inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 
 
 class MultilingualCLIPModelProperties(MarqoBaseModelProperties):
@@ -17,7 +15,6 @@ class MultilingualCLIPModelProperties(MarqoBaseModelProperties):
         dimensions: The dimensions of the model.
 
     """
-
     name: str
     visual_model: str
     textual_model: str

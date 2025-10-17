@@ -1,21 +1,17 @@
-import pprint
-
-import pandas as pd
-
 import marqo
+import pprint
+import pandas as pd
+import subprocess
 
-mq = marqo.Client(url="http://localhost:8882")  # Connection to Marqo Docker Container
+mq = marqo.Client(url='http://localhost:8882')  # Connection to Marqo Docker Container
 
 local_dir = "./"
 
 
 def load_index(index_name: str, number_data: int) -> None:
     try:
-        shirt_data = (
-            pd.read_csv("clothing-dataset/images.csv")
-            .head(number_data)[["image", "label", "kids"]]
-            .to_dict("records")
-        )
+        shirt_data = pd.read_csv('clothing-dataset/images.csv').head(number_data)[['image', 'label', 'kids']].to_dict(
+            'records')
 
         # dataset came from this link: https://github.com/alexeygrigorev/clothing-dataset-small
         # the .csv file has the following headers:
@@ -26,21 +22,17 @@ def load_index(index_name: str, number_data: int) -> None:
         # 70045b01-b350-4918-be74-2f627290ad7a,95,Skirt,False
 
         for data in shirt_data:
-            path = (
-                "http://host.docker.internal:8222/clothing-dataset/images/"
-                + data["image"]
-                + ".jpg"
-            )
-            data["image"] = path
+            path = "http://host.docker.internal:8222/clothing-dataset/images/" + data['image'] + ".jpg"
+            data['image'] = path
 
         settings = {
             "treatUrlsAndPointersAsImages": True,  # allows us to find an image file and index it
-            "model": "open_clip/ViT-B-16/openai",
+            "model": "open_clip/ViT-B-16/openai"
         }
 
         mq.create_index(index_name, settings_dict=settings)
 
-        mq.index(index_name).add_documents(shirt_data, tensor_fields=["image", "label"])
+        mq.index(index_name).add_documents(shirt_data, tensor_fields=['image', 'label'])
 
         print("Index successfully created.")
 
@@ -52,7 +44,7 @@ def delete_index(index_name: str):
     try:
         mq.index(index_name).delete()
         print("Index successfully deleted.")
-    except Exception:
+    except Exception as e:
         print("Index does not exist.")
 
 
@@ -90,8 +82,7 @@ def get_index_stats(index_name: str) -> dict:
 def main():
     print("Welcome to Marqo Demo!")
     while True:
-        action = int(
-            input("""
+        action = int(input('''
 What would you like to do?
 1) Create an Index
 2) Delete an Index
@@ -100,8 +91,7 @@ What would you like to do?
 5) Delete a document from an Index
 6) Quit
 
-Action: """)
-        )
+Action: '''))
 
         if action == 1:
             index_name = input("Index name: ")
@@ -116,14 +106,14 @@ Action: """)
             index_name = input("Index name: ")
             search_type = input("Search Type (Text, Image): ")
 
-            if search_type == "Text":
+            if search_type == 'Text':
                 search_mode = str(input("Search Mode: (Lexical, Tensor)"))
                 query_text = str(input("Query Text: "))
 
                 results = search_index_text(index_name, query_text, search_mode.upper())
 
                 pprint.pprint(results)
-            elif search_type == "Image":
+            elif search_type == 'Image':
                 image_name = str(input("Image name (include MIME type .jpg or .png): "))
 
                 results = search_index_image(index_name, image_name)

@@ -1,21 +1,15 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional, List
 
 import jsonschema
 
-from marqo import marqo_docs
 from marqo.api import exceptions as errors
 from marqo.core.exceptions import InternalError
-from marqo.core.models.marqo_index import (
-    validate_field_name as common_validate_field_name,
-)
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.mappings_object import (
-    custom_vector_mappings_schema,
-    mappings_schema,
-    multimodal_combination_mappings_schema,
-    text_field_mappings_schema,
-)
+from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, \
+    custom_vector_mappings_schema, text_field_mappings_schema
+from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
+from marqo import marqo_docs
 
 _FILTER_STRING_BOOL_VALUES = ["true", "false"]
 _RESERVED_FIELD_SUBSTRING = "::"
@@ -41,7 +35,7 @@ def validate_mappings_object_format(mappings: Dict) -> None:
                 _validate_text_field_mappings_object(configuration)
             else:
                 raise InternalError(
-                    f"Unknown mappings object type `{configuration['type']}` for field `{field_name}`"
+                    f'Unknown mappings object type `{configuration["type"]}` for field `{field_name}`'
                 )
 
     except jsonschema.ValidationError as e:
@@ -49,7 +43,6 @@ def validate_mappings_object_format(mappings: Dict) -> None:
             f"Error validating mappings object. Reason: {str(e)}. "
             f"Read about the mappings object here: {marqo_docs.mappings()}"
         )
-
 
 def _validate_multimodal_combination_field_name(multimodal_field_name: str):
     validate_field_name(multimodal_field_name)
@@ -61,9 +54,7 @@ def _validate_multimodal_combination_field_name(multimodal_field_name: str):
 
 def _validate_multimodal_combination_configuration_format(configuration: Dict):
     try:
-        jsonschema.validate(
-            instance=configuration, schema=multimodal_combination_mappings_schema
-        )
+        jsonschema.validate(instance=configuration, schema=multimodal_combination_mappings_schema)
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
@@ -73,9 +64,7 @@ def _validate_multimodal_combination_configuration_format(configuration: Dict):
 
 def _validate_custom_vector_configuration_format(configuration: Dict):
     try:
-        jsonschema.validate(
-            instance=configuration, schema=custom_vector_mappings_schema
-        )
+        jsonschema.validate(instance=configuration, schema=custom_vector_mappings_schema)
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating custom vector mappings object. Reason: \n{str(e)}"
@@ -127,23 +116,15 @@ def validate_field_name(field_name: str) -> None:
         )
 
 
-def validate_coupling_of_mappings_and_doc(
-    doc: Dict, mappings: Dict, multimodal_sub_fields: List
-):
+def validate_coupling_of_mappings_and_doc(doc: Dict, mappings: Dict, multimodal_sub_fields: List):
     """Validate the coupling of mappings object and doc"""
     if not mappings:
         return
 
-    multimodal_fields = [
-        field_name
-        for field_name, configuration in mappings.items()
-        if configuration["type"] == enums.MappingsObjectType.multimodal_combination
-    ]
-    custom_vector_fields = [
-        field_name
-        for field_name, configuration in mappings.items()
-        if configuration["type"] == enums.MappingsObjectType.custom_vector
-    ]
+    multimodal_fields = [field_name for field_name, configuration in mappings.items()
+                         if configuration["type"] == enums.MappingsObjectType.multimodal_combination]
+    custom_vector_fields = [field_name for field_name, configuration in mappings.items()
+                            if configuration["type"] == enums.MappingsObjectType.custom_vector]
 
     if multimodal_fields:
         _validate_conflicts_fields(multimodal_fields, doc)
@@ -157,8 +138,7 @@ def _validate_multimodal_sub_fields_content(doc: Dict, multimodal_sub_fields: Li
             if not isinstance(sub_content, str):
                 raise errors.InvalidArgError(
                     f"Multimodal subfields must be strings representing text or image pointer, "
-                    f"received {sub_field}:{sub_content}, which is of type {type(sub_content).__name__}"
-                )
+                    f"received {sub_field}:{sub_content}, which is of type {type(sub_content).__name__}")
 
 
 def _validate_conflicts_fields(multimodal_fields: List[str], doc: Dict):
@@ -166,9 +146,7 @@ def _validate_conflicts_fields(multimodal_fields: List[str], doc: Dict):
     doc_fields = set(doc.keys())
     if mappings_fields.intersection(doc_fields):
         raise errors.InvalidArgError(
-            f"Document and mappings object have conflicting fields: {mappings_fields.intersection(doc_fields)}"
-        )
-
+            f"Document and mappings object have conflicting fields: {mappings_fields.intersection(doc_fields)}")
 
 def validate_tensor_fields(tensor_fields: Optional[List[str]]) -> None:
     """Validate the tensor fields
@@ -177,9 +155,7 @@ def validate_tensor_fields(tensor_fields: Optional[List[str]]) -> None:
     Raises InvalidArgError if the tensor fields are invalid, and this should terminate the add_document process
     """
     if tensor_fields is None:
-        raise errors.BadRequestError(
-            "tensor_fields must be explicitly provided as a list for unstructured index. "
-            "If you don't want to vectorise any field, please provide an empty list []."
-        )
+        raise errors.BadRequestError("tensor_fields must be explicitly provided as a list for unstructured index. "
+                                     "If you don't want to vectorise any field, please provide an empty list [].")
     if "_id" in tensor_fields:
         raise errors.BadRequestError(message="`_id` field cannot be a tensor field.")

@@ -1,6 +1,5 @@
-from pprint import pprint
-
 import marqo
+from pprint import pprint
 
 mq = marqo.Client("http://localhost:8882")
 
@@ -26,7 +25,7 @@ docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-ga
 ### STEP 3: Index Data
 ####################################################
 
-index_name = "image-search-guide"
+index_name = 'image-search-guide'
 
 try:
     mq.index(index_name).delete()
@@ -47,17 +46,14 @@ mq.create_index(index_name, settings_dict=settings)
 import subprocess
 
 local_dir = "./data/"
-pid = subprocess.Popen(
-    ["python3", "-m", "http.server", "8222", "--directory", local_dir],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.STDOUT,
-)
+pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.STDOUT)
 
 import glob
 import os
 
 # Find all the local images
-locators = glob.glob(local_dir + "*.jpg")
+locators = glob.glob(local_dir + '*.jpg')
 
 # Generate docker path for local images
 docker_path = "http://host.docker.internal:8222/"
@@ -78,14 +74,13 @@ output:
 ### STEP 5: Add Images to the Index
 ####################################################
 
-documents = [
-    {"image_docker": image, "_id": str(idx)} for idx, image in enumerate(image_docker)
-]
+documents = [{"image_docker": image, "_id": str(idx)} for idx, image in enumerate(image_docker)]
 
 print(documents)
 
 res = mq.index(index_name).add_documents(
-    documents, client_batch_size=1, tensor_fields=["image_docker"]
+    documents, client_batch_size=1,
+    tensor_fields=["image_docker"]
 )
 
 pprint(res)
@@ -94,17 +89,16 @@ pprint(res)
 ### STEP 6: Search using Marqo
 ####################################################
 
-search_results = mq.index(index_name).search(
-    "A rider on a horse jumping over the barrier"
-)
+search_results = mq.index(index_name).search("A rider on a horse jumping over the barrier")
 print(search_results)
 
 ####################################################
 ### STEP 7: Visualize the Output
 ####################################################
 
-from IPython.display import display
+import requests
 from PIL import Image
+from IPython.display import display
 
 fig_path = search_results["hits"][0]["image_docker"].replace(docker_path, local_dir)
 display(Image.open(fig_path))

@@ -1,8 +1,9 @@
 import uuid
-
-import requests
+import math
 
 from tests.marqo_test import MarqoTestCase
+from marqo.errors import MarqoWebError
+import requests
 
 
 class TestDictScoreModifiers(MarqoTestCase):
@@ -10,47 +11,39 @@ class TestDictScoreModifiers(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        cls.structured_index_name = "structured_" + str(uuid.uuid4()).replace("-", "")
-        cls.unstructured_index_name = "unstructured_" + str(uuid.uuid4()).replace(
-            "-", ""
-        )
+        cls.structured_index_name = "structured_" + str(uuid.uuid4()).replace('-', '')
+        cls.unstructured_index_name = "unstructured_" + str(uuid.uuid4()).replace('-', '')
 
-        cls.create_indexes(
-            [
-                {
-                    "indexName": cls.structured_index_name,
-                    "type": "structured",
-                    "vectorNumericType": "float",
-                    "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
-                    "normalizeEmbeddings": True,
-                    "textPreprocessing": {
-                        "splitLength": 2,
-                        "splitOverlap": 0,
-                        "splitMethod": "sentence",
-                    },
-                    "imagePreprocessing": {"patchMethod": None},
-                    "allFields": [
-                        {
-                            "name": "text_field",
-                            "type": "text",
-                            "features": ["lexical_search"],
-                        },
-                        {"name": "int_field", "type": "int", "features": ["filter"]},
-                        # test no whitespace
-                    ],
-                    "tensorFields": ["text_field"],
-                    "annParameters": {
-                        "spaceType": "prenormalized-angular",
-                        "parameters": {"efConstruction": 512, "m": 16},
-                    },
+        cls.create_indexes([
+            {
+                "indexName": cls.structured_index_name,
+                "type": "structured",
+                "vectorNumericType": "float",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
+                "normalizeEmbeddings": True,
+                "textPreprocessing": {
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence",
                 },
-                {
-                    "indexName": cls.unstructured_index_name,
-                    "type": "unstructured",
-                    "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
-                },
-            ]
-        )
+                "imagePreprocessing": {"patchMethod": None},
+                "allFields": [
+                    {"name": "text_field", "type": "text", "features": ["lexical_search"]},
+                    {"name": "int_field", "type": "int", "features": ["filter"]}
+                    # test no whitespace
+                ],
+                "tensorFields": ["text_field"],
+                "annParameters": {
+                    "spaceType": "prenormalized-angular",
+                    "parameters": {"efConstruction": 512, "m": 16},
+                }
+            },
+            {
+                "indexName": cls.unstructured_index_name,
+                "type": "unstructured",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k"
+            }
+        ])
 
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
@@ -59,17 +52,16 @@ class TestDictScoreModifiers(MarqoTestCase):
             {"text_field": "hello", "int_field": 1, "_id": "1"},
             {"text_field": "world", "int_field": 2, "_id": "2"},
             {"text_field": "hello world", "int_field": 3, "_id": "3"},
-            {"text_field": "hello world", "int_field": 3, "_id": 4},  # Error id
+            {"text_field": "hello world", "int_field": 3, "_id": 4}, # Error id
         ]
         for index_name in self.indexes_to_delete:
             with self.subTest(msg=str(index_name)):
-                tensor_fields = (
-                    ["text_field"] if index_name.startswith("unstructured") else None
-                )
-                body = {"documents": documents, "tensorFields": tensor_fields}
-                res = requests.post(
-                    f"{self._MARQO_URL}/indexes/{index_name}/documents", json=body
-                )
+                tensor_fields = ["text_field"] if index_name.startswith("unstructured") else None
+                body = {
+                    "documents": documents,
+                    "tensorFields": tensor_fields
+                }
+                res = requests.post(f"{self._MARQO_URL}/indexes/{index_name}/documents", json=body)
                 self.assertEqual(200, res.status_code)
                 headers = res.headers
                 self.assertEqual("3", headers["x-count-success"])
@@ -89,16 +81,14 @@ class TestDictScoreModifiers(MarqoTestCase):
         update_documents = [
             {"int_field": 11, "_id": "1"},
             {"int_field": 22, "_id": "2"},
-            {"int_field": "3", "_id": "3"},  # Error field type
-            {"int_field": 3, "_id": 4},  # Error id
+            {"int_field": "3", "_id": "3"}, # Error field type
+            {"int_field": 3, "_id": 4}, # Error id
         ]
         index_name = self.structured_index_name
         body = {
             "documents": update_documents,
         }
-        res = requests.patch(
-            f"{self._MARQO_URL}/indexes/{index_name}/documents", json=body
-        )
+        res = requests.patch(f"{self._MARQO_URL}/indexes/{index_name}/documents", json=body)
         self.assertEqual(200, res.status_code)
         headers = res.headers
         self.assertEqual("2", headers["x-count-success"])
@@ -110,22 +100,15 @@ class TestDictScoreModifiers(MarqoTestCase):
             {"text_field": "hello", "int_field": 1, "_id": "1"},
             {"text_field": "world", "int_field": 2, "_id": "2"},
             {"text_field": "hello world", "int_field": 3, "_id": "3"},
-            {"text_field": "hello world", "int_field": 4, "_id": "4"},
+            {"text_field": "hello world", "int_field": 4, "_id": "4"}
         ]
         for index_name in self.indexes_to_delete:
             with self.subTest(msg=str(index_name)):
-                tensor_fields = (
-                    ["text_field"] if index_name.startswith("unstructured") else None
-                )
+                tensor_fields = ["text_field"] if index_name.startswith("unstructured") else None
 
-                self.client.index(index_name).add_documents(
-                    documents, tensor_fields=tensor_fields
-                )
-                document_ids = ["1", "2", "3", "4", "5", "0"]  # 0 and 5 are failures
-                res = requests.get(
-                    f"{self._MARQO_URL}/indexes/{index_name}/documents",
-                    json=document_ids,
-                )
+                self.client.index(index_name).add_documents(documents, tensor_fields=tensor_fields)
+                document_ids = ["1", "2", "3", "4", "5", "0"] # 0 and 5 are failures
+                res = requests.get(f"{self._MARQO_URL}/indexes/{index_name}/documents", json=document_ids)
                 self.assertEqual(200, res.status_code)
                 headers = res.headers
                 self.assertEqual("4", headers["x-count-success"])

@@ -1,11 +1,10 @@
 from enum import Enum
-
 from marqo.base_model import StrictBaseModel
 
 
 class ScoreModifierType(Enum):
-    Multiply = "multiply"
-    Add = "add"
+    Multiply = 'multiply'
+    Add = 'add'
 
 
 class ScoreModifier(StrictBaseModel):

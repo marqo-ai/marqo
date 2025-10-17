@@ -1,8 +1,8 @@
 """Functions used to download and preprocess audio and video files"""
 
+import math
 import os
 import subprocess
-
 # for multimodal processing
 import tempfile
 
@@ -12,9 +12,7 @@ from torch import Tensor
 from marqo.core.exceptions import InternalError
 from marqo.core.inference.api import *
 from marqo.core.models.marqo_index import *
-from marqo.inference.native_inference.embedding_models.languagebind_model import (
-    LanguagebindPreprocessor,
-)
+from marqo.inference.native_inference.embedding_models.languagebind_model import LanguagebindPreprocessor
 
 
 class ChunkTimingGenerator:
@@ -35,16 +33,12 @@ class ChunkTimingGenerator:
         self._step = chunk_duration - overlap_duration
 
         if self._duration < 0:
-            raise ValueError(
-                f"Duration of the media file is negative: {self._duration}"
-            )
+            raise ValueError(f'Duration of the media file is negative: {self._duration}')
 
         if self._step <= 0:
             # This is already verified in the ChunkConfig validation. We check it again to avoid an infinite loop
-            raise ValueError(
-                f"Chunking error due to chunk size ({self._chunk_duration}) <= overlap "
-                f"({self._overlap_duration})"
-            )
+            raise ValueError(f'Chunking error due to chunk size ({self._chunk_duration}) <= overlap '
+                             f'({self._overlap_duration})')
 
         self._current_position = 0.0
 
@@ -70,16 +64,17 @@ class ChunkTimingGenerator:
 
 
 class StreamingMediaProcessor:
+
     VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 10
     AUDIO_CPU_TIMOUT_OUT_MULTIPLIER = 10
     VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
-        self,
-        url: str,
-        preprocessors: LanguagebindPreprocessor,
-        preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
-        enable_video_gpu_acceleration: bool = False,
+            self,
+            url: str,
+            preprocessors: LanguagebindPreprocessor,
+            preprocessing_config: Union[AudioPreprocessingConfig, VideoPreprocessingConfig],
+            enable_video_gpu_acceleration: bool = False
     ):
         """
         Instantiate the StreamingMediaProcessor class.
@@ -95,13 +90,9 @@ class StreamingMediaProcessor:
         """
         self.url = url
         self.modality = preprocessing_config.modality
-
-        self.media_download_header = self._convert_headers_to_cli_format(
-            preprocessing_config.download_header
-        )
-        self.total_size, self.duration, self.probed_modality = (
-            self._fetch_file_metadata()
-        )
+        
+        self.media_download_header = self._convert_headers_to_cli_format(preprocessing_config.download_header)
+        self.total_size, self.duration, self.probed_modality = self._fetch_file_metadata()
 
         if self.modality != self.probed_modality:
             raise MediaMismatchError(
@@ -122,14 +113,12 @@ class StreamingMediaProcessor:
         else:
             self.split_length = self.duration
             self.split_overlap = 0
-
+        
         self.preprocessors = preprocessors
-
+        
         self.enable_video_gpu_acceleration = enable_video_gpu_acceleration
 
-    def _convert_headers_to_cli_format(
-        self, raw_media_download_headers: Optional[Dict] = None
-    ) -> str:
+    def _convert_headers_to_cli_format(self, raw_media_download_headers: Optional[Dict] = None) -> str:
         """
         A helper function to convert the media download headers into a format that can be passed to ffmpeg in
         subprocess calls.
@@ -145,13 +134,9 @@ class StreamingMediaProcessor:
             return ""
         elif not isinstance(raw_media_download_headers, dict):
             raise InternalError("media_download_headers should be a dictionary")
-        return "\r\n".join(
-            [f"{key}: {value}" for key, value in raw_media_download_headers.items()]
-        )
+        return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
 
-    def _infer_modality_from_probe(
-        self, modality_list: list[str], format_name: Optional[str]
-    ) -> Optional[Modality]:
+    def _infer_modality_from_probe(self, modality_list: list[str], format_name: Optional[str]) -> Optional[Modality]:
         """
         Infer the modality from the probed media file. This is used to determine whether the media is audio or video.
         """
@@ -179,34 +164,30 @@ class StreamingMediaProcessor:
         """
         try:
             probe_options = {
-                "v": "error",
-                "show_entries": "stream=codec_type,format=size,duration,format_name",
-                "of": "json",
-                "probesize": "256K",  # Probe only the first 256KB
+                'v': 'error',
+                'show_entries': 'stream=codec_type,format=size,duration,format_name',
+                'of': 'json',
+                'probesize': '256K',  # Probe only the first 256KB
             }
 
             if self.media_download_header:
-                probe_options["headers"] = self.media_download_header
+                probe_options['headers'] = self.media_download_header
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
-            size = int(probe["format"].get("size", 0))
-            duration = float(probe["format"].get("duration", 0))
-            format_name = probe["format"].get("format_name", "")
-            modality_list = [
-                codec_type.get("codec_type", "") for codec_type in probe["streams"]
-            ]
+            size = int(probe['format'].get('size', 0))
+            duration = float(probe['format'].get('duration', 0))
+            format_name = probe['format'].get('format_name', "")
+            modality_list = [codec_type.get('codec_type', "") for codec_type in probe['streams']]
             modality = self._infer_modality_from_probe(modality_list, format_name)
 
             return size, duration, modality
 
         except ffmpeg.Error as e:
-            raise MediaDownloadError(
-                f"Error fetching metadata: {e.stderr.decode()}"
-            ) from e
+            raise MediaDownloadError(f"Error fetching metadata: {e.stderr.decode()}") from e
 
     def _get_output_file_path(self, temp_dir, chunk_start):
-        extension = "mp4" if self.modality == Modality.VIDEO else "wav"
+        extension = 'mp4' if self.modality == Modality.VIDEO else 'wav'
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
     def process_media(self) -> list[Tuple[str, Tensor]]:
@@ -222,9 +203,7 @@ class StreamingMediaProcessor:
         """
         processed_chunks: list[Tuple[str, Tensor]] = []
         with tempfile.TemporaryDirectory() as temp_dir:
-            for chunk_start, chunk_end in ChunkTimingGenerator(
-                self.duration, self.split_length, self.split_overlap
-            ):
+            for chunk_start, chunk_end in ChunkTimingGenerator(self.duration, self.split_length, self.split_overlap):
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
                 try:
@@ -243,15 +222,12 @@ class StreamingMediaProcessor:
                     else:
                         raise ValueError(f"Unsupported modality: {self.modality}")
                 except (subprocess.CalledProcessError, MediaDownloadError) as e:
-                    logger.error(
-                        f"Error processing chunk starting at {chunk_start}: {e}"
-                    )
+                    logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
 
                 # We expect no error in the preprocessing step
                 processed_chunk_tensor: Tensor = self.preprocessors.preprocess(
-                    [output_file], modality=self.modality
-                )[0]
+                    [output_file], modality=self.modality)[0]
 
                 processed_chunks.append(
                     (f"[{chunk_start:.1f}, {chunk_end:.1f}]", processed_chunk_tensor)
@@ -266,9 +242,7 @@ class StreamingMediaProcessor:
         if download_total > 0:
             progress = downloaded / download_total * 100
 
-    def fetch_video_chunk(
-        self, start_time: float, duration: float, output_file: str
-    ) -> str:
+    def fetch_video_chunk(self, start_time: float, duration: float, output_file: str) -> str:
         """
         Fetch a video chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
         downloaded video chunk.
@@ -284,57 +258,38 @@ class StreamingMediaProcessor:
             MediaDownloadError: If there is an error downloading the video chunk
         """
         ffmpeg_command = [
-            "ffmpeg",
-            "-y",  # Enable overwrite
-            "-v",
-            "error",  # Suppress warnings and other output
+            'ffmpeg',
+            '-y',  # Enable overwrite
+            '-v', 'error',  # Suppress warnings and other output
         ]
 
         if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(["-headers", self.media_download_header])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         if self.enable_video_gpu_acceleration:
-            ffmpeg_command.extend(
-                [
-                    "-ss",
-                    str(start_time),  # Start time
-                    "-t",
-                    str(duration),  # Duration
-                    "-hwaccel",
-                    "cuda",  # Use GPU acceleration
-                    "-hwaccel_output_format",
-                    "cuda",  # Use GPU acceleration
-                    "-i",
-                    self.url,  # Input file
-                    "-c:a",
-                    "copy",  # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
-                    "-c:v",
-                    "h264_nvenc",  # Use NVIDIA NVENC H.264 encoder
-                    "-b:v",
-                    "5M",  # Set the video bitrate to 5M
-                    output_file,
-                ]
-            )
+            ffmpeg_command.extend([
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-hwaccel', 'cuda',  # Use GPU acceleration
+                '-hwaccel_output_format', 'cuda',  # Use GPU acceleration
+                '-i', self.url,  # Input file
+                '-c:a', 'copy', # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
+                '-c:v', 'h264_nvenc', # Use NVIDIA NVENC H.264 encoder
+                '-b:v', '5M', # Set the video bitrate to 5M
+                output_file
+            ])
             timeout = duration * self.VIDEO_GPU_TIMOUT_OUT_MULTIPLIER
         else:
-            ffmpeg_command.extend(
-                [
-                    "-ss",
-                    str(start_time),  # Start time
-                    "-t",
-                    str(duration),  # Duration
-                    "-i",
-                    self.url,  # Input file
-                    "-vcodec",
-                    "libx264",
-                    "-acodec",
-                    "aac",
-                    "-f",
-                    "mp4",
-                    output_file,
-                ]
-            )
+            ffmpeg_command.extend([
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-i', self.url,  # Input file
+                '-vcodec', 'libx264',
+                '-acodec', 'aac',
+                '-f', 'mp4',
+                output_file
+            ])
             timeout = duration * self.VIDEO_CPU_TIMOUT_OUT_MULTIPLIER
 
         base_error_message = f"Error downloading the video chunk with url={self.url}, start_time={start_time},"
@@ -342,14 +297,12 @@ class StreamingMediaProcessor:
         try:
             self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
         except (MediaDownloadError, InternalError):
-            if os.path.exists(output_file):  # Remove the file if it was created
+            if os.path.exists(output_file): # Remove the file if it was created
                 os.remove(output_file)
             raise
         return output_file
 
-    def fetch_audio_chunk(
-        self, start_time: float, duration: float, output_file: str
-    ) -> str:
+    def fetch_audio_chunk(self, start_time: float, duration: float, output_file: str) -> str:
         """
         Fetch an audio chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
         downloaded audio chunk.
@@ -362,30 +315,23 @@ class StreamingMediaProcessor:
             The path to the downloaded audio chunk
         """
         ffmpeg_command = [
-            "ffmpeg",
-            "-y",  # Enable overwrite
-            "-v",
-            "error",  # Suppress warnings and other output
+            'ffmpeg',
+            '-y', # Enable overwrite
+            '-v', 'error',  # Suppress warnings and other output
         ]
         if self.media_download_header:
             # -headers must appear before -i
-            ffmpeg_command.extend(["-headers", self.media_download_header])
+            ffmpeg_command.extend(['-headers', self.media_download_header])
 
         ffmpeg_command.extend(
             [
-                "-i",
-                str(self.url),  # Input file
-                "-ss",
-                str(start_time),  # Start time
-                "-t",
-                str(duration),  # Duration
-                "-acodec",
-                "pcm_s16le",  # Audio codec
-                "-ar",
-                "44100",  # Audio sample rate
-                "-f",
-                "wav",  # Output format
-                output_file,  # Output file
+                '-i', str(self.url),  # Input file
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-acodec', 'pcm_s16le',  # Audio codec
+                '-ar', '44100',  # Audio sample rate
+                '-f', 'wav',  # Output format
+                output_file  # Output file
             ]
         )
         timeout = duration * self.AUDIO_CPU_TIMOUT_OUT_MULTIPLIER
@@ -394,13 +340,13 @@ class StreamingMediaProcessor:
         try:
             self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
         except (MediaDownloadError, InternalError):
-            if os.path.exists(output_file):  # Remove the file if it was created
+            if os.path.exists(output_file): # Remove the file if it was created
                 os.remove(output_file)
             raise
         return output_file
 
     def _run_ffmpeg_command(
-        self, ffmpeg_command: List[str], timeout: float, base_error_message: str
+            self, ffmpeg_command: List[str], timeout: float, base_error_message: str
     ) -> None:
         """Call ffmpeg with the given command and timeout.
 
@@ -415,20 +361,13 @@ class StreamingMediaProcessor:
         """
         try:
             _ = subprocess.run(
-                ffmpeg_command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True,
-                timeout=timeout,
+                ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+                text=True, timeout=timeout
             )
         except subprocess.CalledProcessError as e:
-            raise MediaDownloadError(
-                f"{base_error_message} Original error: {e.stderr}"
-            ) from e
+            raise MediaDownloadError(f"{base_error_message} Original error: {e.stderr}") from e
         except subprocess.TimeoutExpired as e:
-            raise MediaDownloadError(
-                f"{base_error_message} the download operation timed out after {timeout} seconds"
-            ) from e
+            raise MediaDownloadError(f"{base_error_message} the download operation timed out after {timeout} seconds") \
+                from e
         except (OSError, ValueError) as e:
             raise InternalError(f"Error running ffmpeg command: {e}") from e

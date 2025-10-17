@@ -1,6 +1,8 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import List, Dict
+from typing import Optional, Any, Sequence
 
-from pydantic.v1 import BaseModel, Field, root_validator
+from pydantic.v1 import BaseModel, root_validator
+from pydantic.v1 import Field
 
 from marqo.tensor_search.models.private_models import ModelAuth
 
@@ -33,14 +35,12 @@ class AddDocsBodyParams(BaseModel):
 
         imageDownloadHeaders is deprecated and will be removed in the future.
         """
-        image_download_headers = values.get("imageDownloadHeaders")
-        media_download_headers = values.get("mediaDownloadHeaders")
+        image_download_headers = values.get('imageDownloadHeaders')
+        media_download_headers = values.get('mediaDownloadHeaders')
         if image_download_headers and media_download_headers:
-            raise ValueError(
-                "Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
-                "'imageDownloadHeaders' is deprecated and will be removed in the future. "
-                "Use mediaDownloadHeaders instead."
-            )
+            raise ValueError("Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
+                             "'imageDownloadHeaders' is deprecated and will be removed in the future. "
+                             "Use mediaDownloadHeaders instead.")
         if image_download_headers:
-            values["mediaDownloadHeaders"] = image_download_headers
+            values['mediaDownloadHeaders'] = image_download_headers
         return values
