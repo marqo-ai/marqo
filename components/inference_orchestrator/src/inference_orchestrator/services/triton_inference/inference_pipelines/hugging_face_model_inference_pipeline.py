@@ -7,9 +7,6 @@ from inference_orchestrator.schemas.api import (
     Modality,
     TextPreprocessingConfig,
 )
-from inference_orchestrator.services.triton_inference.content_preprocessing import (
-    split_prefix_preprocess_text,
-)
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model import (
     HuggingFaceModel,
 )
@@ -17,7 +14,7 @@ from inference_orchestrator.services.triton_inference.inference_pipelines.abstra
     AbstractInferencePipeline,
 )
 from numpy import ndarray
-from setuptools.errors import InternalError
+from inference_orchestrator.services.errors import InternalServerError
 
 HuggingFacePreprocessedContent = Union[InferenceErrorModel, List[Tuple[str, str]]]
 
@@ -68,7 +65,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             List[OpenCLIPPreprocessedContent]: The preprocessed content.
         """
         if self.inference_request.modality == Modality.TEXT:
-            results = split_prefix_preprocess_text(
+            results = self.split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 self.inference_request.preprocessing_config,
@@ -78,7 +75,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             Modality.AUDIO,
             Modality.VIDEO,
         ]:
-            results = split_prefix_preprocess_text(
+            results = self.split_prefix_preprocess_text(
                 self.inference_request.contents,
                 self.model.get_preprocessor(),
                 TextPreprocessingConfig(),  # Use a default TextPreprocessingConfig
@@ -118,7 +115,7 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
             embeddings.extend(batch_embeddings)
 
         if len(embeddings) != len(content_to_encode):
-            raise InternalError(
+            raise InternalServerError(
                 "The number of embeddings does not match the number of contents"
             )
 

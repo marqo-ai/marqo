@@ -15,7 +15,7 @@ from .config import Config, get_config
 from .core.logging import get_logger
 from .on_start_script import on_start
 from .schemas.api import InferenceRequest
-from .services.errors import ServiceError
+from .services.errors import ServiceError, InternalServerError
 from .services.triton_inference.model_manager import model_manager
 
 logger = get_logger(__name__)
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Marqo Inference",
     lifespan=lifespan,
-    verison="0.1.0",  # TODO replace with dynamic versioning from package (e.g., import version from marqo
+    version="0.1.0",  # TODO replace with dynamic versioning from package (e.g., import version from marqo
 )
 app.add_middleware(TelemetryMiddleware)
 
@@ -109,6 +109,11 @@ def vectorise(
     # Generate embeddings
     try:
         result = config.inference.vectorise(inference_request)
+    except InternalServerError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference error: {e.message}",
+        ) from e
     except ServiceError as e:
         # TODO distinguish recoverable error from unrecoverable error, return different error code
         raise HTTPException(
