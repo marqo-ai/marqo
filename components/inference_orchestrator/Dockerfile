@@ -17,7 +17,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
 
 # Download NLTK data
-RUN uv run python -m nltk.downloader punkt
 RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
 
 # Copy sourced
