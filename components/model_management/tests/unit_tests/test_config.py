@@ -56,7 +56,7 @@ class TestConfig(TestCase):
                     with patch(
                         "model_management.config.TritonClient"
                     ) as mock_triton_client:
-                        config = Config(settings)
+                        _ = Config(settings)
                         mock_triton_client.assert_called_once_with(url=url)
 
     def test_config_model_manager_receives_correct_parameters(self):
@@ -83,7 +83,7 @@ class TestConfig(TestCase):
                         mock_triton_instance = MagicMock()
                         mock_triton_client.return_value = mock_triton_instance
 
-                        config = Config(settings)
+                        _ = Config(settings)
 
                         mock_model_manager.assert_called_once_with(
                             model_base_dir=path, triton_client=mock_triton_instance

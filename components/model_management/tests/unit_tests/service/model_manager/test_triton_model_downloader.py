@@ -92,7 +92,7 @@ class TestTritonModelDownloader(TestCase):
             config_pbtxt=None,
         )
 
-        version_dir = downloader._version_dir()
+        _ = downloader._version_dir()
 
         # Verify directory was created
         mock_mkdir.assert_called()
