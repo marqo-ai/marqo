@@ -67,7 +67,6 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
         image_inference_request = InferenceRequest(
             modality="image",
             contents=[TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value],
-            device="cpu",
             embeding_model_config=EmbeddingModelConfig(
                 model_name="open_clip/ViT-B-32/laion2b_s34b_b79k",
                 model_properties=self.get_model_properties_from_registry(
@@ -113,7 +112,6 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
                 TestImageUrls.IMAGE1.value,
                 TestImageUrls.IMAGE2.value + "invalid",
             ],
-            device="cpu",
             embedding_model_config=EmbeddingModelConfig(
                 model_name="open_clip/ViT-B-32/laion2b_s34b_b79k",
                 model_properties=self.get_model_properties_from_registry(
