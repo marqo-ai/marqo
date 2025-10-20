@@ -3,7 +3,7 @@ name = "inference-orchestrator"
 version = "0.1.0"
 description = "Inference orchestrator for Marqo"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "blake3>=1.0.6",
     "cachetools>=6.2.0",
@@ -36,10 +36,11 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "marqo>=3.18.0",
     "opentelemetry-test-utils>=0.58b0",
     "parameterized>=0.9.0",
+    "pre-commit>=4.3.0",
     "pytest>=8.4.2",
+    "pytest-subtests>=0.14.2",
 ]
 
 [tool.pytest.ini_options]
@@ -58,3 +59,11 @@ torchvision = [
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.ruff]
+extend-exclude = [
+  "*.ipynb",
+]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # enable import sorting

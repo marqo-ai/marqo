@@ -1,12 +1,9 @@
-from .core.settings import Settings
 from .config import Config
+from .core.settings import Settings
 
 
 def on_start(cfg: Config, settings: Settings):
-    to_run_on_start = (
-        PreLoadModels(cfg, settings),
-        WelcomeMessage()
-    )
+    to_run_on_start = (PreLoadModels(cfg, settings), WelcomeMessage())
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()

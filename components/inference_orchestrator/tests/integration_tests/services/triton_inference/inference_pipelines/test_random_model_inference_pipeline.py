@@ -1,6 +1,14 @@
 import numpy as np
+from numpy import ndarray
 
-from inference_orchestrator.schemas.api import *
+from inference_orchestrator.schemas.api import (
+    EmbeddingModelConfig,
+    ImagePreprocessingConfig,
+    InferenceRequest,
+    InferenceResult,
+    Modality,
+    TextPreprocessingConfig,
+)
 from integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 
@@ -11,7 +19,7 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
             modality="language",
             contents=["text", "very long long long long text"],
             device="cpu",
-            model_config_=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="random/small",
                 normalize_embeddings=True,
                 model_properties={
@@ -19,12 +27,10 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
                     "dimensions": 32,
                     "tokens": 128,
                     "type": "random",
-                    "notes": ""
-                }
+                    "notes": "",
+                },
             ),
-            preprocessing_config=TextPreprocessingConfig(
-                should_chunk=False
-            )
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
 
         results = self.inference.vectorise(text_inference_request)
@@ -55,27 +61,22 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         """Test that the pipeline returns the embeddings for the two valid images."""
         image_inference_request = InferenceRequest(
             modality="image",
-            contents=[
-                TestImageUrls.IMAGE1.value,
-                TestImageUrls.IMAGE2.value
-            ],
+            contents=[TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value],
             device="cpu",
-            model_config_=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="random/small",
                 model_properties={
                     "name": "random/small",
                     "dimensions": 32,
                     "tokens": 128,
                     "type": "random",
-                    "notes": ""
+                    "notes": "",
                 },
-                normalize_embeddings=True
+                normalize_embeddings=True,
             ),
             preprocessing_config=ImagePreprocessingConfig(
-                should_chunk=False,
-                download_timeout_ms=1000,
-                download_thread_count=1
-            )
+                should_chunk=False, download_timeout_ms=1000, download_thread_count=1
+            ),
         )
 
         results = self.inference.vectorise(image_inference_request)
@@ -108,7 +109,7 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
 
         # Common parameters
         device = "cpu"
-        model_config = ModelConfig(
+        model_config = EmbeddingModelConfig(
             model_name="random/small",
             normalize_embeddings=True,
             model_properties={
@@ -116,8 +117,8 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
                 "dimensions": 32,
                 "tokens": 128,
                 "type": "random",
-                "notes": ""
-            }
+                "notes": "",
+            },
         )
 
         # The text we want to check
@@ -128,8 +129,8 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
             modality=Modality.TEXT,
             contents=[target_text],
             device=device,
-            model_config_=model_config,
-            preprocessing_config=TextPreprocessingConfig(should_chunk=False)
+            embedding_model_config=model_config,
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
 
         # Second inference request: target_text in the middle of other inputs
@@ -137,8 +138,8 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
             modality=Modality.TEXT,
             contents=["another text", target_text, "yet another text"],
             device=device,
-            model_config_=model_config,
-            preprocessing_config=TextPreprocessingConfig(should_chunk=False)
+            embedding_model_config=model_config,
+            preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
 
         # Perform vectorisation

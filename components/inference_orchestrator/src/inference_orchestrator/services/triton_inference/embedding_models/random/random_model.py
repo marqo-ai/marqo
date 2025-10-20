@@ -5,11 +5,15 @@ import numpy as np
 from numpy import ndarray
 
 from inference_orchestrator.schemas.api import Modality
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_embedding_model import \
-    AbstractEmbeddingModel
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
-from inference_orchestrator.services.triton_inference.embedding_models.random.random_model_properties import \
-    RandomModelProperties
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_embedding_model import (
+    AbstractEmbeddingModel,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import (
+    AbstractPreprocessor,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.random.random_model_properties import (
+    RandomModelProperties,
+)
 
 
 class RandomModelPreprocessor(AbstractPreprocessor):
@@ -29,8 +33,12 @@ class RandomModel(AbstractEmbeddingModel):
     as model management or Triton clients.
     """
 
-    def __init__(self, model_properties: dict, *args, **kwargs) -> None:  # Drop unused args, kwargs
-        super().__init__(model_properties, model_management_client=None, triton_client=None)
+    def __init__(
+        self, model_properties: dict, *args, **kwargs
+    ) -> None:  # Drop unused args, kwargs
+        super().__init__(
+            model_properties, model_management_client=None, triton_client=None
+        )
 
         self._model_properties = self._build_model_properties()
         self.preprocessor = RandomModelPreprocessor()
@@ -55,7 +63,9 @@ class RandomModel(AbstractEmbeddingModel):
         h = blake3.blake3(content.encode("utf-8")).hexdigest()
         return int(h[:8], 16)  # 32-bit seed, like your MD5 version
 
-    def encode(self, inputs: List[str], modality: Modality, normalize: bool = True) -> List[ndarray]:
+    def encode(
+        self, inputs: List[str], modality: Modality, normalize: bool = True
+    ) -> List[ndarray]:
         """
         Generate embeddings for the given inputs.
 

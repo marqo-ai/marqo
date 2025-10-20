@@ -25,7 +25,10 @@ class TestGetBaseFilename(TestCase):
         test_cases = [
             ("https://example.com/model.onnx", "model.onnx"),
             ("https://cdn.example.com/models/v1/model.onnx", "model.onnx"),
-            ("https://storage.example.com/bucket/model.onnx.data_0", "model.onnx.data_0"),
+            (
+                "https://storage.example.com/bucket/model.onnx.data_0",
+                "model.onnx.data_0",
+            ),
         ]
 
         for url, expected in test_cases:

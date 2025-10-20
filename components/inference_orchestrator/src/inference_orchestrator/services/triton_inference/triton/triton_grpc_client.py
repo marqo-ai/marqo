@@ -1,18 +1,31 @@
-import numpy as np
 from tritonclient import grpc
 
 from inference_orchestrator.core.logging import get_logger
-from inference_orchestrator.services.triton_inference.triton.channel_args import ChannelArgs
+from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
+from inference_orchestrator.services.errors import TritonInferenceError
 
 logger = get_logger(__name__)
 
 
 class TritonGRPCClient:
-    def __init__(self, url: str, channel_args: ChannelArgs):
+    def __init__(self, url: str, triton_channel_args: TritonChannelArgs):
         parsed_url = self._parse_url(url)
-        logger.info(f"Instantiating Triton GRPC client with URL: {parsed_url} and channel args: {channel_args}")
-        self.client = grpc.InferenceServerClient(url=parsed_url, verbose=False, channel_args=channel_args.build_channel_args())
-        self.grpc_compression_algorithm = channel_args.grpc_compression_algorithm
+        logger.info(
+            f"Instantiating Triton GRPC client with URL: {parsed_url} and channel args: {triton_channel_args}"
+        )
+        self.client = grpc.InferenceServerClient(
+            url=parsed_url,
+            verbose=False,
+            channel_args=triton_channel_args.build_channel_args(),
+        )
+        self.grpc_compression_algorithm = triton_channel_args.grpc_compression_algorithm
+
+    def close(self):
+        """
+        Close the gRPC client connection.
+        """
+        logger.info("Closing the gRPC client connection")
+        self.client.close()
 
     def _parse_url(self, url):
         """
@@ -26,15 +39,15 @@ class TritonGRPCClient:
         """
         if not url:
             raise ValueError("The triton server URL cannot be empty.")
-        if "http://" in url:
-            url = url.replace("http://", "")
-        if "https://" in url:
-            url = url.replace("https://", "")
+        url = url.removeprefix("https://").removeprefix("http://")
         return url
 
     def encode(
-            self, model_name: str, infer_inputs: list[grpc.InferInput], infer_outputs: list[grpc.InferRequestedOutput]) \
-            -> grpc.InferResult:
+        self,
+        model_name: str,
+        infer_inputs: list[grpc.InferInput],
+        infer_outputs: list[grpc.InferRequestedOutput],
+    ) -> grpc.InferResult:
         """
         Encode the input data using the specified model.
 
@@ -44,24 +57,17 @@ class TritonGRPCClient:
             infer_outputs: A list of infer output data
         Returns:
             The gRPC inference result containing the encoded data.
+        Raises:
+            TritonInferenceError: If there is an error during the inference process.
         """
-
-        return self.client.infer(
-            model_name=model_name, inputs=infer_inputs, outputs=infer_outputs,
-            compression_algorithm=self.grpc_compression_algorithm
-        )
-
-        inputs = np.ascontiguousarray(inputs, dtype=input_type.dtype)
-
-        input_tensor = grpc.InferInput(name="input", shape=list(inputs.shape), datatype="INT32")
-        input_tensor.set_data_from_numpy(inputs)
-
-        output_tensor = grpc.InferRequestedOutput(name="output")
-        response = self.client.infer(
-            model_name=model_name, inputs=[input_tensor], outputs=[output_tensor],
-            compression_algorithm=self.grpc_compression_algorithm
-        )
-        output_data = response.as_numpy("output")
-        if output_data.shape[0] != inputs.shape[0]:
-            raise ValueError(f"Output data shape {output_data.shape} does not match input data shape {inputs.shape}")
-        return output_data
+        try:
+            return self.client.infer(
+                model_name=model_name,
+                inputs=infer_inputs,
+                outputs=infer_outputs,
+                compression_algorithm=self.grpc_compression_algorithm,
+            )
+        except grpc.InferenceServerException as e:
+            raise TritonInferenceError(
+                f"Error during inference with model {model_name}: {str(e)}"
+            ) from e

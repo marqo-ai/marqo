@@ -1,14 +1,16 @@
-from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch, call
 import threading
 import time
+from unittest import TestCase
+from unittest.mock import Mock, patch
 
+from inference_orchestrator.services.errors import (
+    InvalidModelPropertiesError,
+    ModelOperationInProgressError,
+)
 from inference_orchestrator.services.triton_inference.model_manager import model_manager
-from inference_orchestrator.services.errors import ModelOperationInProgressError, InvalidModelPropertiesError
 
 
 class TestModelManager(TestCase):
-
     def setUp(self):
         """Clear the model cache before each test"""
         model_manager.clear_loaded_models()
@@ -18,28 +20,27 @@ class TestModelManager(TestCase):
         model_manager.clear_loaded_models()
 
     def test_create_model_cache_key(self):
-        """Test that model cache keys are created correctly"""
+        """Test that model cache keys are created correctly.
+        The hash suffix is hardcoded to detect changes in the key generation algorithm"""
         test_cases = [
             (
                 "model1",
                 {"name": "test", "dimensions": 512, "type": "clip", "tokens": 77},
-                "model1||test||512||clip||77||"
+                "model1||c8e6",
             ),
             (
                 "model2",
                 {"name": "bert", "dimensions": 768, "type": "hf"},
-                "model2||bert||768||hf||||"
+                "model2||c663",
             ),
-            (
-                "model3",
-                {},
-                "model3||||||||||"
-            ),
+            ("model3", {}, "model3||6e46"),
         ]
 
         for model_name, model_properties, expected_key in test_cases:
             with self.subTest(model_name=model_name):
-                result = model_manager._create_model_cache_key(model_name, model_properties)
+                result = model_manager._create_model_cache_key(
+                    model_name, model_properties
+                )
                 self.assertEqual(expected_key, result)
 
     def test_validate_model_properties_dimension_valid(self):
@@ -117,23 +118,27 @@ class TestModelManager(TestCase):
         mock_model1 = Mock()
         mock_model2 = Mock()
 
-        model_manager._available_models["model1||test||512||clip||77||"] = mock_model1
-        model_manager._available_models["model2||bert||768||hf||||"] = mock_model2
+        model_manager._available_models["model1||test"] = mock_model1
+        model_manager._available_models["model2||bert"] = mock_model2
 
         result = model_manager.get_loaded_models(detailed=False)
 
         self.assertIn("models", result)
         self.assertEqual(2, len(result["models"]))
-        self.assertIn({"model_name": "model1"}, result["models"])
-        self.assertIn({"model_name": "model2"}, result["models"])
+        self.assertIn({"model_name": "model1||test"}, result["models"])
+        self.assertIn({"model_name": "model2||bert"}, result["models"])
 
     def test_get_loaded_models_detailed(self):
         """Test get_loaded_models returns model names with properties"""
         mock_model1 = Mock()
-        mock_model1.model_properties.model_dump_json.return_value = '{"name": "test", "dimensions": 512}'
+        mock_model1.model_properties.model_dump_json.return_value = (
+            '{"name": "test", "dimensions": 512}'
+        )
 
         mock_model2 = Mock()
-        mock_model2.model_properties.model_dump_json.return_value = '{"name": "bert", "dimensions": 768}'
+        mock_model2.model_properties.model_dump_json.return_value = (
+            '{"name": "bert", "dimensions": 768}'
+        )
 
         model_manager._available_models["model1||test||512||clip||77||"] = mock_model1
         model_manager._available_models["model2||bert||768||hf||||"] = mock_model2
@@ -144,10 +149,16 @@ class TestModelManager(TestCase):
         self.assertEqual(2, len(result["models"]))
 
         # Check that model_properties were called with by_alias=True
-        mock_model1.model_properties.model_dump_json.assert_called_once_with(by_alias=True)
-        mock_model2.model_properties.model_dump_json.assert_called_once_with(by_alias=True)
+        mock_model1.model_properties.model_dump_json.assert_called_once_with(
+            by_alias=True
+        )
+        mock_model2.model_properties.model_dump_json.assert_called_once_with(
+            by_alias=True
+        )
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader"
+    )
     def test_update_available_models_new_model(self, mock_get_model_loader):
         """Test that _update_available_models loads new models"""
         mock_triton_client = Mock()
@@ -156,17 +167,17 @@ class TestModelManager(TestCase):
         mock_loader = Mock(return_value=mock_model)
         mock_get_model_loader.return_value = mock_loader
 
-        model_name = "test-model"
-        model_properties = {"name": "test", "dimensions": 512, "type": "clip"}
+        model_properties = {"name": "test", "dimensions": 512, "type": "open_clip"}
         model_cache_key = "test-model||test||512||clip||||"
 
         # Ensure the model is not in the cache
         self.assertNotIn(model_cache_key, model_manager._available_models)
 
         model_manager._update_available_models(
-            model_cache_key, model_name, model_properties,
+            model_cache_key,
+            model_properties,
             triton_client=mock_triton_client,
-            model_management_client=mock_management_client
+            model_management_client=mock_management_client,
         )
 
         # Verify the model was loaded
@@ -175,33 +186,42 @@ class TestModelManager(TestCase):
         mock_loader.assert_called_once_with(
             model_properties=model_properties,
             model_management_client=mock_management_client,
-            triton_client=mock_triton_client
+            triton_client=mock_triton_client,
         )
         mock_model.load.assert_called_once()
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader"
+    )
     def test_update_available_models_existing_model(self, mock_get_model_loader):
         """Test that _update_available_models does not reload existing models"""
         mock_existing_model = Mock()
-        model_cache_key = "test-model||test||512||clip||||"
+        model_cache_key = "test-model||test"
 
         # Add the model to the cache
         model_manager._available_models[model_cache_key] = mock_existing_model
 
         model_manager._update_available_models(
-            model_cache_key, "test-model", {},
+            model_cache_key,
+            dict(),
             triton_client=Mock(),
-            model_management_client=Mock()
+            model_management_client=Mock(),
         )
 
         # Verify get_model_loader was not called (no new model loaded)
         mock_get_model_loader.assert_not_called()
 
         # Verify the existing model is still in the cache
-        self.assertIs(mock_existing_model, model_manager._available_models[model_cache_key])
+        self.assertIs(
+            mock_existing_model, model_manager._available_models[model_cache_key]
+        )
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader')
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager._update_available_models')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader"
+    )
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager._update_available_models"
+    )
     def test_load_model_success(self, mock_update, mock_get_loader):
         """Test load_model successfully loads and returns a model"""
         mock_triton_client = Mock()
@@ -209,8 +229,8 @@ class TestModelManager(TestCase):
         mock_model = Mock()
 
         model_name = "test-model"
-        model_properties = {"name": "test", "dimensions": 512, "type": "clip"}
-        model_cache_key = "test-model||test||512||clip||||"
+        model_properties = {"name": "test", "dimensions": 512, "type": "open_clip"}
+        model_cache_key = "test-model||f2c6"
 
         # Pre-populate the cache (simulating what _update_available_models does)
         model_manager._available_models[model_cache_key] = mock_model
@@ -219,31 +239,32 @@ class TestModelManager(TestCase):
             model_name,
             model_properties,
             triton_client=mock_triton_client,
-            model_management_client=mock_management_client
+            model_management_client=mock_management_client,
         )
 
         # Verify _update_available_models was called with correct parameters
         mock_update.assert_called_once_with(
             model_cache_key,
-            model_name,
             model_properties,
             triton_client=mock_triton_client,
-            model_management_client=mock_management_client
+            model_management_client=mock_management_client,
         )
 
         # Verify the correct model was returned
         self.assertIs(mock_model, result)
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader"
+    )
     def test_eject_model_success(self, mock_get_loader):
         """Test eject_model removes a model from the cache"""
         mock_model = Mock()
-        model_cache_key = "test-model||test||512||clip||||"
+        model_cache_key = "test-model||dfsc"
 
         # Add the model to the cache
         model_manager._available_models[model_cache_key] = mock_model
 
-        result = model_manager.eject_model("test-model")
+        result = model_manager.eject_model("test-model||dfsc")
 
         # Verify the model was unloaded
         mock_model.unload.assert_called_once()
@@ -253,7 +274,7 @@ class TestModelManager(TestCase):
 
         # Verify the success response
         self.assertEqual("success", result["result"])
-        self.assertIn("test-model", result["message"])
+        self.assertIn("test-model||dfsc", result["message"])
 
     def test_eject_model_not_found(self):
         """Test eject_model when model is not in cache"""
@@ -269,18 +290,18 @@ class TestModelManager(TestCase):
         mock_model2 = Mock()
 
         # Add two models with the same prefix
-        model_manager._available_models["test||v1||512||clip||||"] = mock_model1
-        model_manager._available_models["test||v2||768||hf||||"] = mock_model2
+        model_manager._available_models["test1||dfdc"] = mock_model1
+        model_manager._available_models["test2||sads"] = mock_model2
 
-        model_manager.eject_model("test")
+        model_manager.eject_model("test1||dfdc")
 
         # Only the first model should be ejected
         mock_model1.unload.assert_called_once()
         mock_model2.unload.assert_not_called()
 
         # Only the first model should be removed
-        self.assertNotIn("test||v1||512||clip||||", model_manager._available_models)
-        self.assertIn("test||v2||768||hf||||", model_manager._available_models)
+        self.assertNotIn("test1||dfdc", model_manager._available_models)
+        self.assertIn("test2||sads", model_manager._available_models)
 
     def test_model_op_guard_success(self):
         """Test _model_op_guard successfully acquires and releases lock"""
@@ -327,7 +348,9 @@ class TestModelManager(TestCase):
         self.assertTrue(acquired)
         test_lock.release()
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager._update_available_models')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager._update_available_models"
+    )
     def test_load_model_concurrent_operations_blocked(self, mock_update):
         """Test that concurrent load_model calls are blocked by the lock"""
         mock_triton_client = Mock()
@@ -351,7 +374,7 @@ class TestModelManager(TestCase):
                     {"name": "test", "dimensions": 512},
                     triton_client=mock_triton_client,
                     model_management_client=mock_management_client,
-                    timeout=0.01  # Short timeout to trigger lock contention
+                    timeout=0.01,  # Short timeout to trigger lock contention
                 )
                 results.append(result)
             except ModelOperationInProgressError as e:
@@ -373,7 +396,9 @@ class TestModelManager(TestCase):
         self.assertEqual(1, len(errors))
         self.assertIsInstance(errors[0], ModelOperationInProgressError)
 
-    @patch('inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader')
+    @patch(
+        "inference_orchestrator.services.triton_inference.model_manager.model_manager.get_model_loader"
+    )
     def test_load_model_calls_model_load(self, mock_get_loader):
         """Test that _load_model calls the model's load method"""
         mock_triton_client = Mock()
@@ -382,14 +407,12 @@ class TestModelManager(TestCase):
         mock_loader = Mock(return_value=mock_model)
         mock_get_loader.return_value = mock_loader
 
-        model_name = "test-model"
-        model_properties = {"name": "test", "type": "clip"}
+        model_properties = {"name": "test", "type": "open_clip"}
 
         result = model_manager._load_model(
-            model_name,
             model_properties,
             triton_client=mock_triton_client,
-            model_management_client=mock_management_client
+            model_management_client=mock_management_client,
         )
 
         # Verify model loader was called
@@ -397,7 +420,7 @@ class TestModelManager(TestCase):
         mock_loader.assert_called_once_with(
             model_properties=model_properties,
             model_management_client=mock_management_client,
-            triton_client=mock_triton_client
+            triton_client=mock_triton_client,
         )
 
         # Verify model.load() was called

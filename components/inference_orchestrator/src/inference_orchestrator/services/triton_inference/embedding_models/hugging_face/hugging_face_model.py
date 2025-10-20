@@ -1,20 +1,33 @@
+from typing import Callable, List
+
 import numpy as np
 from numpy import ndarray
 from pydantic import ValidationError
-from transformers import (AutoTokenizer)
+from transformers import AutoTokenizer
 from tritonclient.grpc import InferInput, InferRequestedOutput, InferResult
-from typing import List, Callable
 
 from inference_orchestrator.schemas.api import Modality
-from inference_orchestrator.services.errors import InternalServerError, InvalidModelPropertiesError
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_embedding_model import \
-    AbstractEmbeddingModel
-from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import \
-    AbstractPreprocessor
+from inference_orchestrator.services.errors import (
+    InternalServerError,
+    InvalidModelPropertiesError,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_embedding_model import (
+    AbstractEmbeddingModel,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import (
+    AbstractPreprocessor,
+)
 from inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model_properties import (
-    HuggingFaceModelProperties, PoolingMethod)
-from inference_orchestrator.services.triton_inference.model_manager.model_management_client import ModelManagementClient
-from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import TritonGRPCClient
+    HuggingFaceModelProperties,
+    PoolingMethod,
+)
+from inference_orchestrator.services.triton_inference.model_manager.model_management_client import (
+    ModelManagementClient,
+)
+from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import (
+    TritonGRPCClient,
+)
+
 from ..model_download_cache import ModelDownloadCache
 
 
@@ -33,27 +46,36 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     """The concrete class for all sentence transformers models loaded from Hugging Face."""
 
     def __init__(
-            self,
-            model_properties: dict,
-            model_management_client: ModelManagementClient,
-            triton_client: TritonGRPCClient,
+        self,
+        model_properties: dict,
+        model_management_client: ModelManagementClient,
+        triton_client: TritonGRPCClient,
     ):
-        super().__init__(model_properties=model_properties, model_management_client=model_management_client, triton_client=triton_client)
+        super().__init__(
+            model_properties=model_properties,
+            model_management_client=model_management_client,
+            triton_client=triton_client,
+        )
 
-        self.model_properties: HuggingFaceModelProperties = self._build_model_properties(model_properties)
+        self.model_properties: HuggingFaceModelProperties = (
+            self._build_model_properties(model_properties)
+        )
 
         self._tokenizer = None
         self._pooling_func = None
         self._preprocessor = HuggingFacePreprocessor()
         self._model = None
 
-    def _build_model_properties(self, model_properties: dict) -> HuggingFaceModelProperties:
+    def _build_model_properties(
+        self, model_properties: dict
+    ) -> HuggingFaceModelProperties:
         """Convert the user input model_properties to HuggingFaceModelProperties."""
         try:
             parsed_properties = HuggingFaceModelProperties(**model_properties)
         except ValidationError as e:
-            raise InvalidModelPropertiesError(f"Invalid model properties: {model_properties}. Original error {e}") \
-                from e
+            raise InvalidModelPropertiesError(
+                f"Invalid model properties: {model_properties}. Original error {e}"
+            ) from e
 
         return parsed_properties
 
@@ -71,8 +93,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         """
 
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_properties.name,
-            cache_dir=ModelDownloadCache.hf_cache_path
+            self.model_properties.name, cache_dir=ModelDownloadCache.hf_cache_path
         )
         self._pooling_func = self._load_pooling_method()
 
@@ -81,7 +102,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def _load_triton_model(self) -> bool:
         """Load the model into Triton Inference Server using the model management client."""
         self.model_management_client.load_model(
-            model_properties=self.model_properties.triton_text_encoder.model_dump(by_alias=True)
+            model_properties=self.model_properties.triton_text_encoder_properties.model_dump(
+                by_alias=True
+            )
         )
         return True
 
@@ -92,12 +115,15 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         elif self.model_properties.pooling_method == PoolingMethod.CLS:
             return self._cls_pool_func
         else:
-            raise InternalServerError(f"Invalid pooling method: {self.model_properties.pooling_method}")
+            raise InternalServerError(
+                f"Invalid pooling method: {self.model_properties.pooling_method}"
+            )
 
     def encode(self, inputs: List[str], modality, normalize=True) -> List[ndarray]:
-
         if not isinstance(inputs, list) or not isinstance(inputs[0], str):
-            raise InternalServerError(f"The input data should be a list of strings, but received: {inputs}")
+            raise InternalServerError(
+                f"The input data should be a list of strings, but received: {inputs}"
+            )
 
         # Tokenize the input texts
         encoded_input = self._tokenizer(
@@ -105,7 +131,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             padding=True,
             truncation=True,
             max_length=self.model_properties.tokens,
-            return_tensors='np'
+            return_tensors="np",
         )
 
         shape = encoded_input["input_ids"].shape
@@ -113,19 +139,25 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         input_ids = InferInput("input_ids", shape, "INT64")
         input_ids.set_data_from_numpy(encoded_input["input_ids"].astype(np.int64))
         attention_mask = InferInput("attention_mask", shape, "INT64")
-        attention_mask.set_data_from_numpy(encoded_input["attention_mask"].astype(np.int64))
+        attention_mask.set_data_from_numpy(
+            encoded_input["attention_mask"].astype(np.int64)
+        )
         token_type_ids = InferInput("token_type_ids", shape, "INT64")
-        token_type_ids.set_data_from_numpy(encoded_input["token_type_ids"].astype(np.int64))
+        token_type_ids.set_data_from_numpy(
+            encoded_input["token_type_ids"].astype(np.int64)
+        )
 
         outputs = [InferRequestedOutput(name="last_hidden_state")]
         response: InferResult = self.triton_client.encode(
-            model_name=self.model_properties.triton_text_encoder.name,
+            model_name=self.model_properties.triton_text_encoder_properties.name,
             infer_inputs=[input_ids, attention_mask, token_type_ids],
-            infer_outputs=outputs
+            infer_outputs=outputs,
         )
 
         last_hidden_state: ndarray = response.as_numpy("last_hidden_state").copy()
-        embeddings = self._pooling_func(last_hidden_state, encoded_input["attention_mask"])
+        embeddings = self._pooling_func(
+            last_hidden_state, encoded_input["attention_mask"]
+        )
 
         if normalize:
             embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -143,13 +175,15 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         return emb
 
     @staticmethod
-    def _cls_pool_func(model_output: ndarray, attention_mask):
-        """A pooling function that extracts the CLS token from the model."""
-        return model_output[0][:, 0]
+    def _cls_pool_func(model_output: np.ndarray, attention_mask):
+        """A pooling function that extracts the CLS token from the model output."""
+        return model_output[:, 0, :]
 
     def get_preprocessor(self):
         return self._preprocessor
 
     def unload(self, remove_files: bool = False):
-        for model in [self.model_properties.triton_text_encoder]:
-            self.model_management_client.unload_model(model.name, remove_files=remove_files)
+        for model in [self.model_properties.triton_text_encoder_properties]:
+            self.model_management_client.unload_model(
+                model.name, remove_files=remove_files
+            )

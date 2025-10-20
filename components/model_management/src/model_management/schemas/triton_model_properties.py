@@ -1,8 +1,8 @@
 from enum import StrEnum
 
+from model_management.schemas.app_models import AppBaseModel
 from pydantic import Field, field_validator
 
-from model_management.schemas.app_models import AppBaseModel
 from ..services.model_manager.url_parser import get_base_filename
 
 
@@ -26,9 +26,10 @@ class ModelInput(AppBaseModel):
         dims (list[int]): The dimensions of the input tensor.
         data_type (DataType): The data type of the input tensor.
     """
+
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., validation_alias='dataType')
+    data_type: DataType = Field(..., validation_alias="dataType")
 
 
 class ModelOutput(AppBaseModel):
@@ -40,9 +41,10 @@ class ModelOutput(AppBaseModel):
         dims (list[int]): The dimensions of the output tensor.
         data_type (DataType): The data type of the output tensor.
     """
+
     name: str
     dims: list[int]
-    data_type: DataType = Field(..., validation_alias='dataType')
+    data_type: DataType = Field(..., validation_alias="dataType")
 
 
 class TritonModelProperties(AppBaseModel):
@@ -58,19 +60,29 @@ class TritonModelProperties(AppBaseModel):
         output (list[ModelOutput]): A list of output definitions for the model. Currently only
             supports a single output for embeddings models.
     """
-    name: str
-    max_batch_size: int = Field(8, validation_alias='maxBatchSize', gt=0, le=128)
-    sources: list[str] = Field(..., validation_alias='sources', min_length=1, max_length=5)
-    input: list[ModelInput] = Field(..., validation_alias='input')
-    output: list[ModelOutput] = Field(..., validation_alias='output', min_length=1, max_length=1)
 
-    @field_validator('sources', mode="after")
+    name: str
+    max_batch_size: int = Field(8, validation_alias="maxBatchSize", gt=0, le=128)
+    sources: list[str] = Field(
+        ..., validation_alias="sources", min_length=1, max_length=5
+    )
+    input: list[ModelInput] = Field(..., validation_alias="input")
+    output: list[ModelOutput] = Field(
+        ..., validation_alias="output", min_length=1, max_length=1
+    )
+
+    @field_validator("sources", mode="after")
     @classmethod
     def _validate_sources(cls, values: list[str]) -> list[str]:
         """All sources must point to a model.onnx file, or a model.onnx.data file."""
         for v in values:
             base_filename = get_base_filename(v)
-            if not (base_filename == "model.onnx" or base_filename.startswith("model.onnx.data")):
-                raise ValueError(f"All sources must point to a model.onnx file, or a model.onnx.data file. "
-                                 f"Received invalid source: {v}")
+            if not (
+                base_filename == "model.onnx"
+                or base_filename.startswith("model.onnx.data")
+            ):
+                raise ValueError(
+                    f"All sources must point to a model.onnx file, or a model.onnx.data file. "
+                    f"Received invalid source: {v}"
+                )
         return values

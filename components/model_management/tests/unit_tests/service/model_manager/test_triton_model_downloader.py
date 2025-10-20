@@ -1,11 +1,12 @@
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import Mock, patch, MagicMock, mock_open
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import botocore.exceptions
-
-from model_management.services.model_manager.triton_model_downloader import TritonModelDownloader
 from model_management.services.errors import ModelDownloadFailedError
+from model_management.services.model_manager.triton_model_downloader import (
+    TritonModelDownloader,
+)
 
 
 class TestTritonModelDownloader(TestCase):
@@ -16,7 +17,7 @@ class TestTritonModelDownloader(TestCase):
         self.sources = ["s3://bucket/model.onnx"]
         self.base_dir = "/tmp/models"
         self.model_name = "test-model"
-        self.config_pbtxt = "name: \"test-model\"\nmax_batch_size: 8"
+        self.config_pbtxt = 'name: "test-model"\nmax_batch_size: 8'
 
     def test_triton_model_downloader_initialization(self):
         """Test TritonModelDownloader initialization."""
@@ -25,7 +26,7 @@ class TestTritonModelDownloader(TestCase):
             base_dir=self.base_dir,
             model_name=self.model_name,
             config_pbtxt=self.config_pbtxt,
-            overwrite=False
+            overwrite=False,
         )
 
         self.assertEqual(self.sources, downloader.sources)
@@ -40,7 +41,7 @@ class TestTritonModelDownloader(TestCase):
             sources=self.sources,
             base_dir=self.base_dir,
             model_name=self.model_name,
-            overwrite=True
+            overwrite=True,
         )
 
         self.assertTrue(downloader.overwrite)
@@ -48,22 +49,22 @@ class TestTritonModelDownloader(TestCase):
     def test_triton_model_downloader_initialization_without_config(self):
         """Test TritonModelDownloader initialization without config_pbtxt."""
         downloader = TritonModelDownloader(
-            sources=self.sources,
-            base_dir=self.base_dir,
-            model_name=self.model_name
+            sources=self.sources, base_dir=self.base_dir, model_name=self.model_name
         )
 
         self.assertIsNone(downloader.config_pbtxt)
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.write_text')
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.write_text"
+    )
     def test_version_dir_creates_directory_structure(self, mock_write_text, mock_mkdir):
         """Test _version_dir creates correct directory structure."""
         downloader = TritonModelDownloader(
             sources=self.sources,
             base_dir=self.base_dir,
             model_name=self.model_name,
-            config_pbtxt=self.config_pbtxt
+            config_pbtxt=self.config_pbtxt,
         )
 
         version_dir = downloader._version_dir()
@@ -78,18 +79,20 @@ class TestTritonModelDownloader(TestCase):
         self.assertIn("test-model", str(version_dir))
         self.assertIn("1", str(version_dir))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.write_text')
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.write_text"
+    )
     def test_version_dir_without_config_pbtxt(self, mock_write_text, mock_mkdir):
         """Test _version_dir without config_pbtxt."""
         downloader = TritonModelDownloader(
             sources=self.sources,
             base_dir=self.base_dir,
             model_name=self.model_name,
-            config_pbtxt=None
+            config_pbtxt=None,
         )
 
-        version_dir = downloader._version_dir()
+        _ = downloader._version_dir()
 
         # Verify directory was created
         mock_mkdir.assert_called()
@@ -97,8 +100,8 @@ class TestTritonModelDownloader(TestCase):
         # Verify config.pbtxt was NOT written
         mock_write_text.assert_not_called()
 
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('model_management.services.model_manager.triton_model_downloader.tqdm')
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("model_management.services.model_manager.triton_model_downloader.tqdm")
     def test_download_with_progress_success(self, mock_tqdm, mock_file):
         """Test _download_with_progress downloads file successfully."""
         mock_fs = Mock()
@@ -111,12 +114,12 @@ class TestTritonModelDownloader(TestCase):
         )
 
         downloader = TritonModelDownloader(
-            sources=self.sources,
-            base_dir=self.base_dir,
-            model_name=self.model_name
+            sources=self.sources, base_dir=self.base_dir, model_name=self.model_name
         )
 
-        downloader._download_with_progress(mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx"))
+        downloader._download_with_progress(
+            mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx")
+        )
 
         # Verify fs.info was called
         mock_fs.info.assert_called_once_with("s3://bucket/model.onnx")
@@ -130,13 +133,13 @@ class TestTritonModelDownloader(TestCase):
         mock_fs.info = Mock(side_effect=botocore.exceptions.NoCredentialsError())
 
         downloader = TritonModelDownloader(
-            sources=self.sources,
-            base_dir=self.base_dir,
-            model_name=self.model_name
+            sources=self.sources, base_dir=self.base_dir, model_name=self.model_name
         )
 
         with self.assertRaises(ModelDownloadFailedError) as context:
-            downloader._download_with_progress(mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx"))
+            downloader._download_with_progress(
+                mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx")
+            )
 
         self.assertIn("AWS credentials", str(context.exception))
 
@@ -146,22 +149,28 @@ class TestTritonModelDownloader(TestCase):
         mock_fs.info = Mock(side_effect=FileNotFoundError("File not found"))
 
         downloader = TritonModelDownloader(
-            sources=self.sources,
-            base_dir=self.base_dir,
-            model_name=self.model_name
+            sources=self.sources, base_dir=self.base_dir, model_name=self.model_name
         )
 
         with self.assertRaises(ModelDownloadFailedError) as context:
-            downloader._download_with_progress(mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx"))
+            downloader._download_with_progress(
+                mock_fs, "s3://bucket/model.onnx", Path("/tmp/model.onnx")
+            )
 
         self.assertIn("not found", str(context.exception))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.exists')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
-    @patch.object(TritonModelDownloader, '_download_with_progress')
-    @patch.object(TritonModelDownloader, '_version_dir')
-    def test_prepare_and_download_single_source(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.exists"
+    )
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs"
+    )
+    @patch.object(TritonModelDownloader, "_download_with_progress")
+    @patch.object(TritonModelDownloader, "_version_dir")
+    def test_prepare_and_download_single_source(
+        self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists
+    ):
         """Test prepare_and_download with single source."""
         mock_version_dir.return_value = Path("/tmp/models/test-model/1")
         mock_exists.return_value = False
@@ -171,7 +180,7 @@ class TestTritonModelDownloader(TestCase):
         downloader = TritonModelDownloader(
             sources=["s3://bucket/model.onnx"],
             base_dir=self.base_dir,
-            model_name=self.model_name
+            model_name=self.model_name,
         )
 
         out_paths = downloader.prepare_and_download()
@@ -183,12 +192,18 @@ class TestTritonModelDownloader(TestCase):
         self.assertEqual(1, len(out_paths))
         self.assertIn("model.onnx", str(out_paths[0]))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.exists')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
-    @patch.object(TritonModelDownloader, '_download_with_progress')
-    @patch.object(TritonModelDownloader, '_version_dir')
-    def test_prepare_and_download_multiple_sources(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.exists"
+    )
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs"
+    )
+    @patch.object(TritonModelDownloader, "_download_with_progress")
+    @patch.object(TritonModelDownloader, "_version_dir")
+    def test_prepare_and_download_multiple_sources(
+        self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists
+    ):
         """Test prepare_and_download with multiple sources."""
         mock_version_dir.return_value = Path("/tmp/models/test-model/1")
         mock_exists.return_value = False
@@ -198,7 +213,7 @@ class TestTritonModelDownloader(TestCase):
         downloader = TritonModelDownloader(
             sources=["s3://bucket/model.onnx", "s3://bucket/model.onnx.data"],
             base_dir=self.base_dir,
-            model_name=self.model_name
+            model_name=self.model_name,
         )
 
         out_paths = downloader.prepare_and_download()
@@ -209,10 +224,14 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths
         self.assertEqual(2, len(out_paths))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.exists')
-    @patch.object(TritonModelDownloader, '_download_with_progress')
-    @patch.object(TritonModelDownloader, '_version_dir')
-    def test_prepare_and_download_skips_existing_files(self, mock_version_dir, mock_download, mock_exists):
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.exists"
+    )
+    @patch.object(TritonModelDownloader, "_download_with_progress")
+    @patch.object(TritonModelDownloader, "_version_dir")
+    def test_prepare_and_download_skips_existing_files(
+        self, mock_version_dir, mock_download, mock_exists
+    ):
         """Test prepare_and_download skips existing files when overwrite=False."""
         mock_version_dir.return_value = Path("/tmp/models/test-model/1")
         mock_exists.return_value = True  # File already exists
@@ -221,7 +240,7 @@ class TestTritonModelDownloader(TestCase):
             sources=["s3://bucket/model.onnx"],
             base_dir=self.base_dir,
             model_name=self.model_name,
-            overwrite=False
+            overwrite=False,
         )
 
         out_paths = downloader.prepare_and_download()
@@ -232,12 +251,18 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths still returned
         self.assertEqual(1, len(out_paths))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.exists')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
-    @patch.object(TritonModelDownloader, '_download_with_progress')
-    @patch.object(TritonModelDownloader, '_version_dir')
-    def test_prepare_and_download_overwrites_existing_files(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.exists"
+    )
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs"
+    )
+    @patch.object(TritonModelDownloader, "_download_with_progress")
+    @patch.object(TritonModelDownloader, "_version_dir")
+    def test_prepare_and_download_overwrites_existing_files(
+        self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists
+    ):
         """Test prepare_and_download overwrites existing files when overwrite=True."""
         mock_version_dir.return_value = Path("/tmp/models/test-model/1")
         mock_exists.return_value = True  # File already exists
@@ -248,7 +273,7 @@ class TestTritonModelDownloader(TestCase):
             sources=["s3://bucket/model.onnx"],
             base_dir=self.base_dir,
             model_name=self.model_name,
-            overwrite=True
+            overwrite=True,
         )
 
         out_paths = downloader.prepare_and_download()
@@ -259,12 +284,18 @@ class TestTritonModelDownloader(TestCase):
         # Verify output paths returned
         self.assertEqual(1, len(out_paths))
 
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.exists')
-    @patch('model_management.services.model_manager.triton_model_downloader.Path.mkdir')
-    @patch('model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs')
-    @patch.object(TritonModelDownloader, '_download_with_progress')
-    @patch.object(TritonModelDownloader, '_version_dir')
-    def test_prepare_and_download_with_various_sources(self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists):
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.Path.exists"
+    )
+    @patch("model_management.services.model_manager.triton_model_downloader.Path.mkdir")
+    @patch(
+        "model_management.services.model_manager.triton_model_downloader.fsspec.core.url_to_fs"
+    )
+    @patch.object(TritonModelDownloader, "_download_with_progress")
+    @patch.object(TritonModelDownloader, "_version_dir")
+    def test_prepare_and_download_with_various_sources(
+        self, mock_version_dir, mock_download, mock_url_to_fs, mock_mkdir, mock_exists
+    ):
         """Test prepare_and_download with various source formats."""
         test_cases = [
             ["s3://bucket/model.onnx"],
@@ -282,9 +313,7 @@ class TestTritonModelDownloader(TestCase):
             with self.subTest(sources=sources):
                 mock_download.reset_mock()
                 downloader = TritonModelDownloader(
-                    sources=sources,
-                    base_dir=self.base_dir,
-                    model_name=self.model_name
+                    sources=sources, base_dir=self.base_dir, model_name=self.model_name
                 )
 
                 out_paths = downloader.prepare_and_download()

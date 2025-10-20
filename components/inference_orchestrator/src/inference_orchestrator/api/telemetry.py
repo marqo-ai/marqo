@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 class TimerError(Exception):
     """An error occured whn operating on a metric timer (e.g. stopping a stopped timer)"""
+
     pass
 
 
@@ -26,7 +27,7 @@ class Timer:
     def start(self) -> None:
         """Start a new timer"""
         if self.start_time is not None:
-            logger.warning(f"'.start()' called on already running timer.")
+            logger.warning("'.start()' called on already running timer.")
         else:
             self.start_time = time.perf_counter()
 
@@ -37,7 +38,7 @@ class Timer:
         """
         if self.start_time is None:
             raise TimerError(
-                f"'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'."
+                "'.stop()' called on unstarted timer. '.start()' must be called before '.stop()'."
             )
         else:
             elapsed_time = time.perf_counter() - self.start_time
@@ -57,8 +58,8 @@ class RequestMetrics:
             for k, timer in mm.timers.items():
                 m.timers[k] = timer
 
-            for k, time in mm.times.items():
-                m.add_time(k, time)
+            for k, time_ in mm.times.items():
+                m.add_time(k, time_)
         return m
 
     def __init__(self):
@@ -67,9 +68,6 @@ class RequestMetrics:
         # Note: We default to float, but on multiple times for the same key, it gets converted to a List.
         self.times: Dict[str, Union[float, List[float]]] = defaultdict(float)
         self.timers: Dict[str, Timer] = defaultdict(Timer)
-
-    def increment_counter(self, k: str):
-        self.counter[k] += 1
 
     @contextmanager
     def time(self, k: str, callback: Optional[Callable[[float], None]] = None):
@@ -110,14 +108,11 @@ class RequestMetrics:
         self.counter[k] += v
 
     def json(self):
-        return {
-            "counter": dict(self.counter),
-            "timesMs": dict(self.times)
-        }
+        return {"counter": dict(self.counter), "timesMs": dict(self.times)}
 
 
-class RequestMetricsStore():
-    current_request: ContextVar[Request] = ContextVar('current_request')
+class RequestMetricsStore:
+    current_request: ContextVar[Request] = ContextVar("current_request")
 
     METRIC_STORES: Dict[Request, RequestMetrics] = {}
 
@@ -137,7 +132,9 @@ class RequestMetricsStore():
         return cls.METRIC_STORES[r]
 
     @classmethod
-    def set_in_request(cls, r: Optional[Request] = None, metrics: Optional[RequestMetrics] = None) -> None:
+    def set_in_request(
+        cls, r: Optional[Request] = None, metrics: Optional[RequestMetrics] = None
+    ) -> None:
         """
         NOTE: this function should only be used in TelemetryMiddleware, and threading edge cases.
         """
@@ -161,8 +158,9 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
     DEFAULT_TELEMETRY_QUERY_PARAM = "telemetry"
 
     def __init__(self, app, **options):
-        self.telemetry_flag: Optional[str] = options.pop("telemetery_flag",
-                                                         TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM)
+        self.telemetry_flag: Optional[str] = options.pop(
+            "telemetery_flag", TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM
+        )
         super().__init__(app, **options)
 
     def telemetry_enabled_for_request(self, request: Request) -> bool:
@@ -207,10 +205,11 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                     f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
                 )
                 get_logger(__name__).info(
-                    f"Telemetry data={orjson.dumps(telemetry).decode()}")
+                    f"Telemetry data={orjson.dumps(telemetry).decode()}"
+                )
 
         finally:
-            logger.debug('Clearing metrics for request')
+            logger.debug("Clearing metrics for request")
             RequestMetricsStore.clear_metrics_for(request)
 
         body = orjson.dumps(data)
@@ -220,5 +219,5 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             content=body,
             status_code=response.status_code,
             headers=dict(response.headers),
-            media_type=response.media_type
+            media_type=response.media_type,
         )

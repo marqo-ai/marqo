@@ -35,7 +35,7 @@ LOGGING_CONFIG = {
                 '"client_addr": "%(client_addr)s", '
                 '"request_line": "%(request_line)s", '
                 '"status_code": "%(status_code)s"}'
-            )
+            ),
         },
     },
     "handlers": {
@@ -65,6 +65,11 @@ LOGGING_CONFIG = {
         "marqo_query": {
             "handlers": ["default"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        "metrics": {
+            "handlers": ["default"],
+            "level": "INFO",  # Always log out metrics in INFO level, ignoring the root log level.
             "propagate": False,
         },
     },

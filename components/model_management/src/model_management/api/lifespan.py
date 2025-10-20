@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from ..config import get_config
-from ..core.logging import instantiate_logger, get_logger
+from ..core.logging import get_logger, instantiate_logger
 from ..core.settings import get_settings
 from ..on_start import on_start
 

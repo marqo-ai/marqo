@@ -1,13 +1,15 @@
-import os
 import threading
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import Mock, patch
 
-from model_management.services.model_manager.model_manager import ModelManager, _model_op_guard
-from model_management.services.triton.triton_client import TritonClient
 from model_management.schemas.triton_model_properties import TritonModelProperties
 from model_management.services.errors import ModelOperationInProgressError
+from model_management.services.model_manager.model_manager import (
+    ModelManager,
+    _model_op_guard,
+)
+from model_management.services.triton.triton_client import TritonClient
 
 
 class TestModelOpGuard(TestCase):
@@ -35,7 +37,10 @@ class TestModelOpGuard(TestCase):
                 with _model_op_guard(lock, timeout=0.1):
                     pass
 
-            self.assertIn("Another model load/unload operation is in progress", str(context.exception))
+            self.assertIn(
+                "Another model load/unload operation is in progress",
+                str(context.exception),
+            )
         finally:
             lock.release()
 
@@ -62,8 +67,7 @@ class TestModelManager(TestCase):
         self.mock_triton_client = Mock(spec=TritonClient)
         self.model_base_dir = "/tmp/models"
         self.manager = ModelManager(
-            model_base_dir=self.model_base_dir,
-            triton_client=self.mock_triton_client
+            model_base_dir=self.model_base_dir, triton_client=self.mock_triton_client
         )
 
         self.valid_model_props = TritonModelProperties(
@@ -71,20 +75,21 @@ class TestModelManager(TestCase):
             max_batch_size=8,
             sources=["s3://bucket/model.onnx"],
             input=[{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         )
 
     def test_model_manager_initialization(self):
         """Test ModelManager initialization."""
         manager = ModelManager(
-            model_base_dir="/tmp/test",
-            triton_client=self.mock_triton_client
+            model_base_dir="/tmp/test", triton_client=self.mock_triton_client
         )
 
         self.assertEqual("/tmp/test", manager.model_base_dir)
         self.assertEqual(self.mock_triton_client, manager.triton_client)
 
-    @patch('model_management.services.model_manager.model_manager.TritonModelDownloader')
+    @patch(
+        "model_management.services.model_manager.model_manager.TritonModelDownloader"
+    )
     def test_load_model_success(self, mock_downloader_class):
         """Test successful model loading."""
         mock_downloader = Mock()
@@ -108,7 +113,9 @@ class TestModelManager(TestCase):
         # Verify triton client was called
         self.mock_triton_client.load_model.assert_called_once_with("test-model")
 
-    @patch('model_management.services.model_manager.model_manager.TritonModelDownloader')
+    @patch(
+        "model_management.services.model_manager.model_manager.TritonModelDownloader"
+    )
     def test_load_model_generates_config_pbtxt(self, mock_downloader_class):
         """Test that load_model generates config.pbtxt."""
         mock_downloader = Mock()
@@ -131,11 +138,13 @@ class TestModelManager(TestCase):
 
         self.mock_triton_client.unload_model.assert_called_once_with("test-model")
 
-    @patch('os.path.exists')
-    @patch('os.walk')
-    @patch('os.remove')
-    @patch('os.rmdir')
-    def test_unload_model_with_removing_files(self, mock_rmdir, mock_remove, mock_walk, mock_exists):
+    @patch("os.path.exists")
+    @patch("os.walk")
+    @patch("os.remove")
+    @patch("os.rmdir")
+    def test_unload_model_with_removing_files(
+        self, mock_rmdir, mock_remove, mock_walk, mock_exists
+    ):
         """Test unload_model with removing files."""
         mock_exists.return_value = True
         mock_walk.return_value = [
@@ -152,7 +161,7 @@ class TestModelManager(TestCase):
         self.assertGreater(mock_remove.call_count, 0)
         self.assertGreater(mock_rmdir.call_count, 0)
 
-    @patch('os.path.exists')
+    @patch("os.path.exists")
     def test_unload_model_when_directory_does_not_exist(self, mock_exists):
         """Test unload_model when model directory doesn't exist."""
         mock_exists.return_value = False
@@ -182,15 +191,21 @@ class TestModelManager(TestCase):
                 "name": "image-model",
                 "max_batch_size": 16,
                 "sources": ["s3://bucket/model.onnx"],
-                "input": [{"name": "image", "dims": [3, 384, 384], "dataType": "TYPE_FP16"}],
-                "output": [{"name": "embeddings", "dims": [512], "dataType": "TYPE_FP16"}],
+                "input": [
+                    {"name": "image", "dims": [3, 384, 384], "dataType": "TYPE_FP16"}
+                ],
+                "output": [
+                    {"name": "embeddings", "dims": [512], "dataType": "TYPE_FP16"}
+                ],
             },
             {
                 "name": "text-model",
                 "max_batch_size": 32,
                 "sources": ["s3://bucket/model.onnx"],
                 "input": [{"name": "tokens", "dims": [512], "dataType": "TYPE_INT32"}],
-                "output": [{"name": "embeddings", "dims": [768], "dataType": "TYPE_FP32"}],
+                "output": [
+                    {"name": "embeddings", "dims": [768], "dataType": "TYPE_FP32"}
+                ],
             },
         ]
 
@@ -211,7 +226,7 @@ class TestModelManager(TestCase):
                 {"name": "image", "dims": [3, 224, 224], "dataType": "TYPE_FP32"},
                 {"name": "text", "dims": [77], "dataType": "TYPE_INT64"},
             ],
-            output=[{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
         )
 
         config_pbtxt = ModelManager.generate_config_pbtxt_file(model_props)
@@ -221,7 +236,9 @@ class TestModelManager(TestCase):
         self.assertIn("TYPE_FP32", config_pbtxt)
         self.assertIn("TYPE_INT64", config_pbtxt)
 
-    @patch('model_management.services.model_manager.model_manager.TritonModelDownloader')
+    @patch(
+        "model_management.services.model_manager.model_manager.TritonModelDownloader"
+    )
     def test_load_model_with_different_model_properties(self, mock_downloader_class):
         """Test load_model with various model configurations."""
         test_models = [
@@ -230,14 +247,14 @@ class TestModelManager(TestCase):
                 max_batch_size=4,
                 sources=["s3://bucket/model-1/model.onnx"],
                 input=[{"name": "input", "dims": [1], "dataType": "TYPE_FP32"}],
-                output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}]
+                output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}],
             ),
             TritonModelProperties(
                 name="model-2",
                 max_batch_size=64,
                 sources=["http://example.com/model-2/model.onnx"],
                 input=[{"name": "data", "dims": [512], "dataType": "TYPE_INT32"}],
-                output=[{"name": "result", "dims": [256], "dataType": "TYPE_FP16"}]
+                output=[{"name": "result", "dims": [256], "dataType": "TYPE_FP16"}],
             ),
         ]
 
@@ -284,7 +301,7 @@ class TestGenerateConfigPbtxt(TestCase):
             max_batch_size=8,
             sources=["s3://bucket/model.onnx"],
             input=[{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         )
 
         generated_config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -302,7 +319,7 @@ class TestGenerateConfigPbtxt(TestCase):
                 {"name": "image", "dims": [3, 224, 224], "dataType": "TYPE_FP32"},
                 {"name": "text", "dims": [77], "dataType": "TYPE_INT64"},
             ],
-            output=[{"name": "embeddings", "dims": [512], "dataType": "TYPE_FP32"}]
+            output=[{"name": "embeddings", "dims": [512], "dataType": "TYPE_FP32"}],
         )
 
         generated_config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -317,7 +334,7 @@ class TestGenerateConfigPbtxt(TestCase):
             max_batch_size=32,
             sources=["s3://bucket/model.onnx"],
             input=[{"name": "tokens", "dims": [512], "dataType": "TYPE_INT32"}],
-            output=[{"name": "embeddings", "dims": [768], "dataType": "TYPE_FP16"}]
+            output=[{"name": "embeddings", "dims": [768], "dataType": "TYPE_FP16"}],
         )
 
         generated_config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -331,8 +348,12 @@ class TestGenerateConfigPbtxt(TestCase):
             name="large-batch-model",
             max_batch_size=128,
             sources=["s3://bucket/model.onnx"],
-            input=[{"name": "input_data", "dims": [1, 512, 768], "dataType": "TYPE_FP16"}],
-            output=[{"name": "output_data", "dims": [1, 512, 768], "dataType": "TYPE_FP16"}]
+            input=[
+                {"name": "input_data", "dims": [1, 512, 768], "dataType": "TYPE_FP16"}
+            ],
+            output=[
+                {"name": "output_data", "dims": [1, 512, 768], "dataType": "TYPE_FP16"}
+            ],
         )
 
         generated_config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -347,7 +368,7 @@ class TestGenerateConfigPbtxt(TestCase):
             max_batch_size=8,
             sources=["s3://bucket/model.onnx"],
             input=[{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
-            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         )
 
         config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -376,7 +397,7 @@ class TestGenerateConfigPbtxt(TestCase):
                     name="test-model",
                     sources=["s3://bucket/model.onnx"],
                     input=[{"name": "input", "dims": [1], "dataType": input_type}],
-                    output=[{"name": "output", "dims": [1], "dataType": output_type}]
+                    output=[{"name": "output", "dims": [1], "dataType": output_type}],
                 )
 
                 config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -399,7 +420,7 @@ class TestGenerateConfigPbtxt(TestCase):
                     name="test-model",
                     sources=["s3://bucket/model.onnx"],
                     input=[{"name": "input", "dims": dims, "dataType": "TYPE_FP32"}],
-                    output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}]
+                    output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}],
                 )
 
                 config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -415,7 +436,7 @@ class TestGenerateConfigPbtxt(TestCase):
                 {"name": "input2", "dims": [512], "dataType": "TYPE_INT32"},
                 {"name": "input3", "dims": [77], "dataType": "TYPE_INT64"},
             ],
-            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         )
 
         config = ModelManager.generate_config_pbtxt_file(model_props)
@@ -426,11 +447,13 @@ class TestGenerateConfigPbtxt(TestCase):
         self.assertIn('name: "input3"', config)
 
         # Verify proper formatting with commas between inputs
-        lines = config.split('\n')
-        input_section = '\n'.join(lines[lines.index('input ['):lines.index('output [')])
+        lines = config.split("\n")
+        input_section = "\n".join(
+            lines[lines.index("input [") : lines.index("output [")]
+        )
 
         # Count closing braces followed by commas (indicates proper separation)
-        self.assertEqual(2, input_section.count('},'))
+        self.assertEqual(2, input_section.count("},"))
 
     def test_generate_config_pbtxt_single_output_no_comma(self):
         """Test that single output doesn't have trailing comma."""
@@ -438,16 +461,16 @@ class TestGenerateConfigPbtxt(TestCase):
             name="test-model",
             sources=["s3://bucket/model.onnx"],
             input=[{"name": "input", "dims": [1], "dataType": "TYPE_FP32"}],
-            output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}]
+            output=[{"name": "output", "dims": [1], "dataType": "TYPE_FP32"}],
         )
 
         config = ModelManager.generate_config_pbtxt_file(model_props)
 
         # Find output section
-        lines = config.split('\n')
-        output_start = lines.index('output [')
-        output_section = '\n'.join(lines[output_start:])
+        lines = config.split("\n")
+        output_start = lines.index("output [")
+        output_section = "\n".join(lines[output_start:])
 
         # Single output should not have comma after closing brace
-        self.assertNotIn('},', output_section)
-        self.assertIn('}', output_section)
+        self.assertNotIn("},", output_section)
+        self.assertIn("}", output_section)

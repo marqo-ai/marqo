@@ -7,7 +7,7 @@ class AppBaseError(Exception):
     """
 
     def __init__(
-            self, message: Optional[str] = None, cause: Optional[Exception] = None
+        self, message: Optional[str] = None, cause: Optional[Exception] = None
     ):
         super().__init__(message)
         self.message = message

@@ -1,14 +1,13 @@
 import json
 from unittest import TestCase
 
-from pydantic import ValidationError
-
 from model_management.schemas.api_models import (
     LoadModelRequest,
     LoadModelResponse,
     UnloadModelResponse,
 )
 from model_management.schemas.triton_model_properties import TritonModelProperties
+from pydantic import ValidationError
 
 
 class TestLoadModelRequest(TestCase):
@@ -20,7 +19,9 @@ class TestLoadModelRequest(TestCase):
             "name": "test-model",
             "maxBatchSize": 8,
             "sources": ["s3://bucket/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+            ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         }
 
@@ -38,10 +39,14 @@ class TestLoadModelRequest(TestCase):
         self.assertIsInstance(request1.triton_model_properties, TritonModelProperties)
 
         # Using field name 'triton_model_properties'
-        request2 = LoadModelRequest(triton_model_properties=self.valid_triton_properties)
+        request2 = LoadModelRequest(
+            triton_model_properties=self.valid_triton_properties
+        )
         self.assertIsInstance(request2.triton_model_properties, TritonModelProperties)
 
-        self.assertEqual(request1.triton_model_properties.name, request2.triton_model_properties.name)
+        self.assertEqual(
+            request1.triton_model_properties.name, request2.triton_model_properties.name
+        )
 
     def test_load_model_request_missing_required_field(self):
         """Test that LoadModelRequest raises ValidationError when tritonModelProperties is missing."""
@@ -69,7 +74,9 @@ class TestLoadModelRequest(TestCase):
 
         # Deserialize from dict
         request2 = LoadModelRequest(**request_dict)
-        self.assertEqual(request1.triton_model_properties.name, request2.triton_model_properties.name)
+        self.assertEqual(
+            request1.triton_model_properties.name, request2.triton_model_properties.name
+        )
 
 
 class TestLoadModelResponse(TestCase):

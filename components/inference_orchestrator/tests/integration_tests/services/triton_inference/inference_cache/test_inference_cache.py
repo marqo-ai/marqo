@@ -1,8 +1,7 @@
 import hashlib
 import random
-import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tests.integration_tests.test_case import InferenceTestCase
+from typing import Any
 
 import numpy as np
 from opentelemetry import metrics
@@ -12,24 +11,53 @@ from opentelemetry.sdk.metrics._internal.point import MetricsData
 from opentelemetry.test.globals_test import reset_metrics_globals
 from orjson import orjson
 
-from inference_orchestrator.schemas.api import *
-from inference_orchestrator.services.inference_cache.caching_inference import CachingInference
-from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import get_model_properties
+from inference_orchestrator.schemas.api import (
+    EmbeddingModelConfig,
+    ImagePreprocessingConfig,
+    Inference,
+    InferenceErrorModel,
+    InferenceRequest,
+    InferenceResult,
+    Modality,
+    TextPreprocessingConfig,
+)
+from inference_orchestrator.services.inference_cache.caching_inference import (
+    CachingInference,
+)
+from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
+    get_model_properties,
+)
+from tests.integration_tests.test_case import InferenceTestCase
 
 
 class RandomInferenceStub(Inference):
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
-        dimension = request.model_config_.model_properties["dimensions"]
-        model_key = hashlib.md5(orjson.dumps(request.model_config_.model_properties)).hexdigest()
+        dimension = request.embedding_model_config.model_properties["dimensions"]
+        model_key = hashlib.md5(
+            orjson.dumps(request.embedding_model_config.model_properties)
+        ).hexdigest()
 
         def random_ndarray(content: str):
-            seed = int(hashlib.sha256(f'{model_key}||{content}'.encode("utf-8")).hexdigest(), 16) % 2 ** 32
+            seed = (
+                int(
+                    hashlib.sha256(
+                        f"{model_key}||{content}".encode("utf-8")
+                    ).hexdigest(),
+                    16,
+                )
+                % 2**32
+            )
             arr = np.random.default_rng(seed).random((dimension,), dtype=np.float32)
             return arr / np.linalg.norm(arr)
 
         return InferenceResult(
-            result=[InferenceErrorModel(error_message=content) if content.startswith("error:") else
-                    [(content, random_ndarray(content))] for content in request.contents])
+            result=[
+                InferenceErrorModel(error_message=content)
+                if content.startswith("error:")
+                else [(content, random_ndarray(content))]
+                for content in request.contents
+            ]
+        )
 
 
 class TestInferenceCache(InferenceTestCase):
@@ -51,12 +79,11 @@ class TestInferenceCache(InferenceTestCase):
         self.base_request = InferenceRequest(
             modality=Modality.TEXT,
             contents=["a"],
-            model_config_=ModelConfig(
-                model_name=self.model_name,
-                model_properties=self.model_properties
+            embedding_model_config=EmbeddingModelConfig(
+                model_name=self.model_name, model_properties=self.model_properties
             ),
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
-            use_inference_cache=True
+            use_inference_cache=True,
         )
 
     def test_caching_inference_should_return_same_result_as_its_delegate(self):
@@ -64,18 +91,30 @@ class TestInferenceCache(InferenceTestCase):
             with self.subTest(cache_type=cache_type):
                 caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
-                req = self.base_request.copy(update={"contents": ["a", "b", "error:c"]})
+                req = self.base_request.model_copy(
+                    update={"contents": ["a", "b", "error:c"]}
+                )
 
                 result_from_local_inference = self.inference_local.vectorise(req)
                 result_from_caching_inference = caching_inference.vectorise(req)
 
-                model_key = caching_inference.model_cache_key(req.model_config_.model_properties)
+                model_key = caching_inference.model_cache_key(
+                    req.embedding_model_config.model_properties
+                )
 
-                self.assertEqual(len(result_from_local_inference.result), len(result_from_caching_inference.result))
+                self.assertEqual(
+                    len(result_from_local_inference.result),
+                    len(result_from_caching_inference.result),
+                )
                 for i in range(len(result_from_local_inference.result)):
                     # assert return the same inference error
-                    if isinstance(result_from_local_inference.result[i], InferenceErrorModel):
-                        self.assertEqual(result_from_local_inference.result[i], result_from_caching_inference.result[i])
+                    if isinstance(
+                        result_from_local_inference.result[i], InferenceErrorModel
+                    ):
+                        self.assertEqual(
+                            result_from_local_inference.result[i],
+                            result_from_caching_inference.result[i],
+                        )
                         continue
 
                     # assert return the same embeddings
@@ -85,16 +124,22 @@ class TestInferenceCache(InferenceTestCase):
                     self.assertTrue(np.array_equal(embedding1, embedding2))
 
                     # assert that the embeddings are cached
-                    cached_embedding = caching_inference.inference_cache.get(model_key, content1)
+                    cached_embedding = caching_inference.inference_cache.get(
+                        model_key, content1
+                    )
                     self.assertTrue(np.array_equal(embedding1, cached_embedding))
 
     def test_caching_inference_should_not_exceed_max_cache_size(self):
         with self.subTest(cache_type="LRU"):
             caching_inference = CachingInference(self.inference_local, 2, "LRU")
 
-            result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
+            result = caching_inference.vectorise(
+                self.base_request.model_copy(update={"contents": ["1", "2", "3"]})
+            )
 
-            model_key = caching_inference.model_cache_key(self.base_request.model_config_.model_properties)
+            model_key = caching_inference.model_cache_key(
+                self.base_request.embedding_model_config.model_properties
+            )
             self.assertEqual(len(result.result), 3)
             self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
             self.assertIsNone(caching_inference.inference_cache.get(model_key, "1"))
@@ -104,11 +149,19 @@ class TestInferenceCache(InferenceTestCase):
         with self.subTest(cache_type="LFU"):
             caching_inference = CachingInference(self.inference_local, 2, "LFU")
 
-            caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2"]}))
-            caching_inference.vectorise(self.base_request.copy(update={"contents": ["1"]}))
-            result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
+            caching_inference.vectorise(
+                self.base_request.model_copy(update={"contents": ["1", "2"]})
+            )
+            caching_inference.vectorise(
+                self.base_request.model_copy(update={"contents": ["1"]})
+            )
+            result = caching_inference.vectorise(
+                self.base_request.model_copy(update={"contents": ["1", "2", "3"]})
+            )
 
-            model_key = caching_inference.model_cache_key(self.base_request.model_config_.model_properties)
+            model_key = caching_inference.model_cache_key(
+                self.base_request.embedding_model_config.model_properties
+            )
             self.assertEqual(len(result.result), 3)
             self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
             self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "1"))
@@ -122,21 +175,35 @@ class TestInferenceCache(InferenceTestCase):
                 caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
                 caching_inference.vectorise(self.base_request)
-                model_key1 = caching_inference.model_cache_key(self.base_request.model_config_.model_properties)
+                model_key1 = caching_inference.model_cache_key(
+                    self.base_request.embedding_model_config.model_properties
+                )
 
-                req_with_new_model = self.base_request.model_copy(update={"model_config_": ModelConfig(
-                    model_name="hf/e5-small-v2",
-                    model_properties=get_model_properties("hf/e5-small-v2")
-                )})
+                req_with_new_model = self.base_request.model_copy(
+                    update={
+                        "embedding_model_config": EmbeddingModelConfig(
+                            model_name="hf/e5-small-v2",
+                            model_properties=get_model_properties("hf/e5-small-v2"),
+                        )
+                    }
+                )
                 caching_inference.vectorise(req_with_new_model)
-                model_key2 = caching_inference.model_cache_key(req_with_new_model.model_config_.model_properties)
+                model_key2 = caching_inference.model_cache_key(
+                    req_with_new_model.embedding_model_config.model_properties
+                )
 
-                cached_embedding_model_1 = caching_inference.inference_cache.get(model_key1, "a")
-                cached_embedding_model_2 = caching_inference.inference_cache.get(model_key2, "a")
+                cached_embedding_model_1 = caching_inference.inference_cache.get(
+                    model_key1, "a"
+                )
+                cached_embedding_model_2 = caching_inference.inference_cache.get(
+                    model_key2, "a"
+                )
 
                 self.assertIsNotNone(cached_embedding_model_1)
                 self.assertIsNotNone(cached_embedding_model_2)
-                self.assertNotEqual(cached_embedding_model_1[0], cached_embedding_model_2[0])
+                self.assertNotEqual(
+                    cached_embedding_model_1[0], cached_embedding_model_2[0]
+                )
 
     def test_inference_cache_is_thread_safe(self):
         """Test if the cache is thread-safe by simulating concurrent reads and writes."""
@@ -154,20 +221,27 @@ class TestInferenceCache(InferenceTestCase):
                 text = random.choice(frequent_texts)
             else:
                 text = random.choice(texts)
-            req = self.base_request.copy(update={"contents": [text]})
+            req = self.base_request.model_copy(update={"contents": [text]})
             res = caching_inference.vectorise(req)
             res_skipping_cache = self.inference_local.vectorise(req)
             # test if the cached embedding is the same as the original
-            self.assertTrue(np.array_equal(res.result[0][0][1], res_skipping_cache.result[0][0][1]))
+            self.assertTrue(
+                np.array_equal(res.result[0][0][1], res_skipping_cache.result[0][0][1])
+            )
 
-        for cache_type in ['LRU', 'LFU']:
+        for cache_type in ["LRU", "LFU"]:
             with self.subTest(cache_type=cache_type):
-                caching_inference = CachingInference(self.inference_local, CACHE_SIZE, cache_type)
+                caching_inference = CachingInference(
+                    self.inference_local, CACHE_SIZE, cache_type
+                )
                 errors = []
 
                 # Using ThreadPoolExecutor to simulate concurrent access to the cache
                 with ThreadPoolExecutor(max_workers=8) as executor:
-                    futures = [executor.submit(read_write_cache, caching_inference) for _ in range(ITERATIONS)]
+                    futures = [
+                        executor.submit(read_write_cache, caching_inference)
+                        for _ in range(ITERATIONS)
+                    ]
 
                     # Collect results or errors from the futures
                     for future in as_completed(futures):
@@ -177,7 +251,9 @@ class TestInferenceCache(InferenceTestCase):
                             errors.append(e)
 
                 # Assert no errors were encountered
-                self.assertEqual(len(errors), 0, f"Thread safety issues encountered: {errors}")
+                self.assertEqual(
+                    len(errors), 0, f"Thread safety issues encountered: {errors}"
+                )
 
     def test_caching_inference_should_capture_key_metrics(self):
         for cache_type in ["LRU", "LFU"]:
@@ -189,17 +265,31 @@ class TestInferenceCache(InferenceTestCase):
 
                 caching_inference = CachingInference(self.inference_local, 12, "LRU")
 
-                req1 = self.base_request.copy(update={"contents": ["1", "2", "3"]})  # misses: 3
+                req1 = self.base_request.model_copy(
+                    update={"contents": ["1", "2", "3"]}
+                )  # misses: 3
                 caching_inference.vectorise(req1)
 
-                self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 3)
-                self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 3)
+                self._assert_metric_value(
+                    reader.get_metrics_data(), "cache_miss_total", 3
+                )
+                self._assert_metric_value(
+                    reader.get_metrics_data(), "cache_size_curr", 3
+                )
 
-                req2 = self.base_request.copy(update={"contents": ["1", "2", "4", "error:5"]})  # hits 2, misses: 2
+                req2 = self.base_request.model_copy(
+                    update={"contents": ["1", "2", "4", "error:5"]}
+                )  # hits 2, misses: 2
                 caching_inference.vectorise(req2)
-                self._assert_metric_value(reader.get_metrics_data(), 'cache_miss_total', 5)
-                self._assert_metric_value(reader.get_metrics_data(), 'cache_hit_total', 2)
-                self._assert_metric_value(reader.get_metrics_data(), 'cache_size_curr', 4)  # error result not cached
+                self._assert_metric_value(
+                    reader.get_metrics_data(), "cache_miss_total", 5
+                )
+                self._assert_metric_value(
+                    reader.get_metrics_data(), "cache_hit_total", 2
+                )
+                self._assert_metric_value(
+                    reader.get_metrics_data(), "cache_size_curr", 4
+                )  # error result not cached
 
                 provider.shutdown()
 
@@ -215,16 +305,16 @@ class TestInferenceCache(InferenceTestCase):
         mixed_request = InferenceRequest(
             modality=Modality.IMAGE,
             contents=[base64_png, url_image, base64_jpeg],
-            model_config_=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="test/clip-model",
                 model_properties={
                     "name": "test-clip-model",
                     "dimensions": 512,
-                    "type": "clip"
-                }
+                    "type": "clip",
+                },
             ),
             preprocessing_config=ImagePreprocessingConfig(should_chunk=False),
-            use_inference_cache=True
+            use_inference_cache=True,
         )
 
         # First call - base64 images should be cached, URL processed normally
@@ -232,7 +322,10 @@ class TestInferenceCache(InferenceTestCase):
 
         # Verify cache contains blake3 keys for both base64 images
         import blake3
-        model_key = caching_inference.model_cache_key(mixed_request.model_config_.model_properties)
+
+        model_key = caching_inference.model_cache_key(
+            mixed_request.embedding_model_config.model_properties
+        )
 
         hash1 = blake3.blake3(base64_png.encode()).hexdigest()
         hash2 = blake3.blake3(base64_jpeg.encode()).hexdigest()
@@ -246,7 +339,9 @@ class TestInferenceCache(InferenceTestCase):
         self.assertIsNotNone(cached_embedding2, "Second base64 image should be cached")
 
         # Verify URL image is NOT cached
-        url_cached_embedding = caching_inference.inference_cache.get(model_key, url_image)
+        url_cached_embedding = caching_inference.inference_cache.get(
+            model_key, url_image
+        )
         self.assertIsNone(url_cached_embedding, "URL image should not be cached")
 
         # Verify cache size (only 2 base64 images cached)
@@ -279,8 +374,10 @@ class TestInferenceCache(InferenceTestCase):
         self.assertEqual(url_content2, url_image)  # Original URL unchanged
         self.assertTrue(np.array_equal(url_embedding1, url_embedding2))
 
-    def _assert_metric_value(self, metric_data: MetricsData, name: str, expected_value: Any):
+    def _assert_metric_value(
+        self, metric_data: MetricsData, name: str, expected_value: Any
+    ):
         cache_metrics = metric_data.resource_metrics[0].scope_metrics[0].metrics
         metric = next((metric for metric in cache_metrics if metric.name == name), None)
-        self.assertIsNotNone(metric, f'metric {name} not found')
+        self.assertIsNotNone(metric, f"metric {name} not found")
         self.assertEqual(expected_value, metric.data.data_points[0].value)

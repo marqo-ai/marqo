@@ -1,13 +1,12 @@
 from unittest import TestCase
 
-from pydantic import ValidationError
-
 from model_management.schemas.triton_model_properties import (
     DataType,
     ModelInput,
     ModelOutput,
     TritonModelProperties,
 )
+from pydantic import ValidationError
 
 
 class TestDataType(TestCase):
@@ -69,7 +68,9 @@ class TestModelInput(TestCase):
                 model_input = ModelInput(**input_data)
                 self.assertEqual(input_data["name"], model_input.name)
                 self.assertEqual(input_data["dims"], model_input.dims)
-                self.assertEqual(DataType(input_data["dataType"]), model_input.data_type)
+                self.assertEqual(
+                    DataType(input_data["dataType"]), model_input.data_type
+                )
 
     def test_model_input_validation_alias(self):
         """Test that ModelInput accepts both dataType and data_type."""
@@ -154,7 +155,9 @@ class TestModelOutput(TestCase):
                 model_output = ModelOutput(**output_data)
                 self.assertEqual(output_data["name"], model_output.name)
                 self.assertEqual(output_data["dims"], model_output.dims)
-                self.assertEqual(DataType(output_data["dataType"]), model_output.data_type)
+                self.assertEqual(
+                    DataType(output_data["dataType"]), model_output.data_type
+                )
 
     def test_model_output_validation_alias(self):
         """Test that ModelOutput accepts both dataType and data_type."""
@@ -189,7 +192,9 @@ class TestTritonModelProperties(TestCase):
             "name": "test-model",
             "maxBatchSize": 8,
             "sources": ["s3://bucket/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}],
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+            ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         }
 
@@ -225,7 +230,9 @@ class TestTritonModelProperties(TestCase):
             "name": "test-model",
             "max_batch_size": 16,
             "sources": ["s3://bucket/model.onnx"],
-            "input": [{"name": "input", "dims": [3, 224, 224], "data_type": "TYPE_FP32"}],
+            "input": [
+                {"name": "input", "dims": [3, 224, 224], "data_type": "TYPE_FP32"}
+            ],
             "output": [{"name": "output", "dims": [768], "data_type": "TYPE_FP32"}],
         }
         model2 = TritonModelProperties(**data)
@@ -260,9 +267,23 @@ class TestTritonModelProperties(TestCase):
         test_cases = [
             ([], False, "empty sources list should fail"),
             (["s3://bucket/model.onnx"], True, "single source"),
-            (["s3://bucket/model.onnx", "s3://bucket/model.onnx.data"], True, "two sources"),
-            (["s3://bucket/model.onnx"] + [f"s3://bucket/model.onnx.data_{i}" for i in range(4)], True, "five sources"),
-            (["s3://bucket/model.onnx"] + [f"s3://bucket/model.onnx.data_{i}" for i in range(5)], False, "six sources should fail"),
+            (
+                ["s3://bucket/model.onnx", "s3://bucket/model.onnx.data"],
+                True,
+                "two sources",
+            ),
+            (
+                ["s3://bucket/model.onnx"]
+                + [f"s3://bucket/model.onnx.data_{i}" for i in range(4)],
+                True,
+                "five sources",
+            ),
+            (
+                ["s3://bucket/model.onnx"]
+                + [f"s3://bucket/model.onnx.data_{i}" for i in range(5)],
+                False,
+                "six sources should fail",
+            ),
         ]
 
         for sources, should_pass, msg in test_cases:
@@ -308,7 +329,11 @@ class TestTritonModelProperties(TestCase):
         """Test that output list must have exactly 1 element (min_length=1, max_length=1)."""
         test_cases = [
             ([], False, "empty output list should fail"),
-            ([{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}], True, "single output"),
+            (
+                [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
+                True,
+                "single output",
+            ),
             (
                 [
                     {"name": "output1", "dims": [768], "dataType": "TYPE_FP32"},
