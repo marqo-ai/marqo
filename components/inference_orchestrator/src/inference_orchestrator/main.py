@@ -113,7 +113,7 @@ def vectorise(
     except InternalServerError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Inference error: {e.message}",
+            detail=f"An unexpected error occurred during vectorisation. {e.message}. Please try again later ",
         ) from e
     except ServiceError as e:
         # TODO distinguish recoverable error from unrecoverable error, return different error code
