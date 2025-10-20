@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import blake3
 import numpy as np
 
-from marqo.core.inference.api import Inference, InferenceRequest, ModelConfig, TextPreprocessingConfig, TextChunkConfig, \
+from marqo.core.inference.api import Inference, InferenceRequest, EmbeddingModelConfig, TextPreprocessingConfig, TextChunkConfig, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig, Modality
 from marqo.core.inference.inference_cache.caching_inference import CachingInference
 
@@ -47,7 +47,7 @@ class TestCachingInferenceShouldSkip(TestCase):
         # Build a minimal InferenceRequest template
         self.base_request = InferenceRequest(
             contents=['a'],
-            model_config=Mock(spec=ModelConfig),
+            embedding_model_config=Mock(spec=EmbeddingModelConfig),
             use_inference_cache=True,
             device=None,
             modality=Modality.TEXT,
@@ -90,7 +90,7 @@ class TestCachingInferenceVectorise(TestCase):
         # Base request template
         self.base_request = InferenceRequest(
             contents=['a', 'b'],
-            model_config=Mock(spec=ModelConfig),
+            embedding_model_config=Mock(spec=EmbeddingModelConfig),
             use_inference_cache=True,
             device=None,
             modality=Modality.TEXT,
@@ -207,7 +207,7 @@ class TestCachingInferenceBase64Images(TestCase):
         # Base64 image request template
         self.base_request = InferenceRequest(
             contents=[self.base64_png],
-            model_config=Mock(spec=ModelConfig),
+            embedding_model_config=Mock(spec=EmbeddingModelConfig),
             use_inference_cache=True,
             device=None,
             modality=Modality.IMAGE,

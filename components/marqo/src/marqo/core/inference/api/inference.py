@@ -10,7 +10,7 @@ from marqo.core.inference.api import Modality, PreprocessingConfigType
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
-class ModelConfig(ImmutableBaseModel):
+class EmbeddingModelConfig(ImmutableBaseModel):
     model_name: StrictStr = Field(alias='modelName')
     model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
     model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
@@ -21,7 +21,7 @@ class InferenceRequest(ImmutableBaseModel):
     modality: Modality
     contents: List[str] = Field(min_items=1)
     device: Optional[str] = Field(default=None)
-    model_config: ModelConfig = Field(alias='modelConfig')
+    embedding_model_config: EmbeddingModelConfig = Field(alias='embeddingModelConfig')
     preprocessing_config: PreprocessingConfigType = Field(alias='preprocessingConfig')
     use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch

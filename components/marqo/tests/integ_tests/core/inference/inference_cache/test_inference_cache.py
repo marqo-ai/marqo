@@ -12,7 +12,7 @@ from opentelemetry.sdk.metrics._internal.point import MetricsData
 from opentelemetry.test.globals_test import reset_metrics_globals
 from orjson import orjson
 
-from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, TextPreprocessingConfig, Inference, \
+from marqo.core.inference.api import InferenceRequest, Modality, EmbeddingModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig
 from marqo.core.inference.inference_cache.caching_inference import CachingInference
 from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties
@@ -20,8 +20,8 @@ from marqo.core.inference.embedding_models.marqo_model_regiestry import get_mode
 
 class RandomInferenceStub(Inference):
     def vectorise(self, request: InferenceRequest) -> InferenceResult:
-        dimension = request.model_config.model_properties["dimensions"]
-        model_key = hashlib.md5(orjson.dumps(request.model_config.model_properties)).hexdigest()
+        dimension = request.embedding_model_config.model_properties["dimensions"]
+        model_key = hashlib.md5(orjson.dumps(request.embedding_model_config.model_properties)).hexdigest()
 
         def random_ndarray(content: str):
             seed = int(hashlib.sha256(f'{model_key}||{content}'.encode("utf-8")).hexdigest(), 16) % 2 ** 32
@@ -40,7 +40,7 @@ class TestInferenceCache(unittest.TestCase):
         self.base_request = InferenceRequest(
             modality=Modality.TEXT,
             contents=["a"],
-            model_config=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="hf/all-MiniLM-L6-v2",
                 model_properties=get_model_properties("hf/all-MiniLM-L6-v2")
             ),
@@ -58,7 +58,7 @@ class TestInferenceCache(unittest.TestCase):
                 result_from_local_inference = self.inference_local.vectorise(req)
                 result_from_caching_inference = caching_inference.vectorise(req)
 
-                model_key = caching_inference.model_cache_key(req.model_config.model_properties)
+                model_key = caching_inference.model_cache_key(req.embedding_model_config.model_properties)
 
                 self.assertEqual(len(result_from_local_inference.result), len(result_from_caching_inference.result))
                 for i in range(len(result_from_local_inference.result)):
@@ -83,7 +83,7 @@ class TestInferenceCache(unittest.TestCase):
 
             result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
 
-            model_key = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+            model_key = caching_inference.model_cache_key(self.base_request.embedding_model_config.model_properties)
             self.assertEqual(len(result.result), 3)
             self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
             self.assertIsNone(caching_inference.inference_cache.get(model_key, "1"))
@@ -97,7 +97,7 @@ class TestInferenceCache(unittest.TestCase):
             caching_inference.vectorise(self.base_request.copy(update={"contents": ["1"]}))
             result = caching_inference.vectorise(self.base_request.copy(update={"contents": ["1", "2", "3"]}))
 
-            model_key = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+            model_key = caching_inference.model_cache_key(self.base_request.embedding_model_config.model_properties)
             self.assertEqual(len(result.result), 3)
             self.assertEqual(caching_inference.inference_cache._cache.currsize, 2)
             self.assertIsNotNone(caching_inference.inference_cache.get(model_key, "1"))
@@ -111,14 +111,14 @@ class TestInferenceCache(unittest.TestCase):
                 caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
                 caching_inference.vectorise(self.base_request)
-                model_key1 = caching_inference.model_cache_key(self.base_request.model_config.model_properties)
+                model_key1 = caching_inference.model_cache_key(self.base_request.embedding_model_config.model_properties)
 
-                req_with_new_model = self.base_request.copy(update={"model_config": ModelConfig(
+                req_with_new_model = self.base_request.copy(update={"embedding_model_config": EmbeddingModelConfig(
                     model_name="hf/e5-small-v2",
                     model_properties=get_model_properties("hf/e5-small-v2")
                 )})
                 caching_inference.vectorise(req_with_new_model)
-                model_key2 = caching_inference.model_cache_key(req_with_new_model.model_config.model_properties)
+                model_key2 = caching_inference.model_cache_key(req_with_new_model.embedding_model_config.model_properties)
 
                 cached_embedding_model_1 = caching_inference.inference_cache.get(model_key1, "a")
                 cached_embedding_model_2 = caching_inference.inference_cache.get(model_key2, "a")
@@ -204,7 +204,7 @@ class TestInferenceCache(unittest.TestCase):
         mixed_request = InferenceRequest(
             modality=Modality.IMAGE,
             contents=[base64_png, url_image, base64_jpeg],
-            model_config=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="test/clip-model",
                 model_properties={
                     "name": "test-clip-model",
@@ -221,7 +221,7 @@ class TestInferenceCache(unittest.TestCase):
 
         # Verify cache contains blake3 keys for both base64 images
         import blake3
-        model_key = caching_inference.model_cache_key(mixed_request.model_config.model_properties)
+        model_key = caching_inference.model_cache_key(mixed_request.embedding_model_config.model_properties)
 
         hash1 = blake3.blake3(base64_png.encode()).hexdigest()
         hash2 = blake3.blake3(base64_jpeg.encode()).hexdigest()

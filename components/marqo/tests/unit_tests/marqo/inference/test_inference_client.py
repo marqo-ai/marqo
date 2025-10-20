@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from marqo.core.inference.api import InferenceRequest, InferenceResult, InferenceError, Modality, ModelConfig, \
+from marqo.core.inference.api import InferenceRequest, InferenceResult, InferenceError, Modality, EmbeddingModelConfig, \
     TextPreprocessingConfig
 from marqo.core.inference.inference_client.inference_client import InferenceClient
 import httpx
@@ -23,7 +23,7 @@ class TestNativeInferenceClient(unittest.TestCase):
         self.inference_request = InferenceRequest(
             contents=["test content"],
             modality=Modality.TEXT,
-            model_config=ModelConfig(model_name='random'),
+            embedding_model_config=EmbeddingModelConfig(model_name='random'),
             preprocessing_config=TextPreprocessingConfig()
         )
 

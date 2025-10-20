@@ -77,7 +77,7 @@ class InferenceTestCase(TestCase):
             modality=modality,
             contents=content,
             device=device,
-            model_config=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name=model_name,
                 model_properties=model_properties,
                 normalize_embeddings=normalize_embeddings

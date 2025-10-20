@@ -8,7 +8,7 @@ from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError
 from marqo.core.inference.api import Modality, InferenceRequest, TextPreprocessingConfig, \
     TextChunkConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, ChunkConfig, \
-    Inference, ModelConfig, InferenceErrorModel
+    Inference, EmbeddingModelConfig, InferenceErrorModel
 from marqo.core.inference.modality_utils import is_base64_image
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, TensorField
 from marqo.core.models import MarqoIndex
@@ -343,7 +343,7 @@ class AddDocumentsHandler(ABC):
         request = InferenceRequest(
             modality=modality,
             contents=[field.field_content for field in tensor_fields],
-            model_config=ModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name=self.marqo_index.model.name,
                 model_properties=self.marqo_index.model.get_properties(),
                 model_auth=self.add_docs_params.model_auth,

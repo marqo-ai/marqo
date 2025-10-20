@@ -44,7 +44,7 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
-    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
+    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, EmbeddingModelConfig, \
     ModelError, InferenceErrorModel
 from marqo.core.inference.modality_utils import infer_modality, is_base64_image
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -838,7 +838,7 @@ def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHa
             inference_request = InferenceRequest(
                 modality=v.modality,
                 contents=v.content,
-                model_config=ModelConfig(
+                embedding_model_config=EmbeddingModelConfig(
                     model_name=v.model_name,
                     model_properties=v.model_properties,
                     model_auth=v.model_auth,
