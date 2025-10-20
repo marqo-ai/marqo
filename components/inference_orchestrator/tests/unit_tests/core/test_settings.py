@@ -31,7 +31,7 @@ class TestSettings(TestCase):
         """Test that Settings can be initialized with custom values from environment variables"""
         env_vars = {
             "MARQO_INFERENCE_CACHE_SIZE": "100",
-            "MARQO_INFERENCE_CACHE_TYPE": "FIFO",
+            "MARQO_INFERENCE_CACHE_TYPE": "LFU",
             "MARQO_TRITON_URL": "http://custom:8001",
             "MARQO_MODEL_MANAGEMENT_CONTAINER_URL": "http://custom:8883",
             "MARQO_MODELS_TO_PRELOAD": '["model1", "model2"]',
@@ -44,7 +44,7 @@ class TestSettings(TestCase):
             settings = Settings(_env_file=None)
 
             self.assertEqual(100, settings.marqo_inference_cache_size)
-            self.assertEqual("FIFO", settings.marqo_inference_cache_type)
+            self.assertEqual("LFU", settings.marqo_inference_cache_type)
             self.assertEqual("http://custom:8001", settings.marqo_triton_url)
             self.assertEqual(
                 "http://custom:8883", settings.marqo_model_management_container_url
@@ -61,8 +61,8 @@ class TestSettings(TestCase):
             (
                 "MARQO_INFERENCE_CACHE_TYPE",
                 "marqo_inference_cache_type",
-                "FIFO",
-                "FIFO",
+                "LFU",
+                "LFU",
             ),
             (
                 "MARQO_TRITON_URL",
@@ -231,6 +231,91 @@ class TestSettings(TestCase):
 
         self.assertIn("greater than or equal to 0", str(context.exception).lower())
 
+    def test_cache_size_validation(self):
+        """Test that cache size validates non-negative integer values"""
+        valid_cases = [
+            ("zero", "0", 0),
+            ("positive", "100", 100),
+            ("large positive", "10000", 10000),
+        ]
+
+        for msg, env_value, expected_value in valid_cases:
+            with self.subTest(msg=msg, value=expected_value):
+                with patch.dict(
+                    os.environ, {"MARQO_INFERENCE_CACHE_SIZE": env_value}, clear=True
+                ):
+                    settings = Settings(_env_file=None)
+                    self.assertEqual(
+                        expected_value, settings.marqo_inference_cache_size
+                    )
+
+    def test_cache_size_negative_value(self):
+        """Test that cache size rejects negative values"""
+        with self.assertRaises(ValidationError) as context:
+            with patch.dict(
+                os.environ, {"MARQO_INFERENCE_CACHE_SIZE": "-1"}, clear=True
+            ):
+                Settings(_env_file=None)
+
+        self.assertIn("greater than or equal to 0", str(context.exception).lower())
+
+    def test_cache_size_invalid_type(self):
+        """Test that cache size rejects non-integer values"""
+        invalid_cases = [
+            ("float", "1.5"),
+            ("string", "invalid"),
+        ]
+
+        for msg, env_value in invalid_cases:
+            with self.subTest(msg=msg, value=env_value):
+                with self.assertRaises(ValidationError):
+                    with patch.dict(
+                        os.environ,
+                        {"MARQO_INFERENCE_CACHE_SIZE": env_value},
+                        clear=True,
+                    ):
+                        Settings(_env_file=None)
+
+    def test_cache_type_validation(self):
+        """Test that cache type validates correct enum values"""
+        valid_cases = [
+            ("LRU", "LRU"),
+            ("LFU", "LFU"),
+            ("lru lowercase", "lru"),
+            ("lfu lowercase", "lfu"),
+        ]
+
+        for msg, env_value in valid_cases:
+            with self.subTest(msg=msg, value=env_value):
+                with patch.dict(
+                    os.environ, {"MARQO_INFERENCE_CACHE_TYPE": env_value}, clear=True
+                ):
+                    settings = Settings(_env_file=None)
+                    # The enum value should be uppercase
+                    self.assertIn(
+                        settings.marqo_inference_cache_type.value.upper(),
+                        ["LRU", "LFU"],
+                    )
+
+    def test_cache_type_invalid_value(self):
+        """Test that cache type rejects invalid enum values"""
+        invalid_cases = [
+            ("FIFO", "FIFO"),
+            ("INVALID", "INVALID"),
+            ("random string", "random"),
+            ("number", "123"),
+        ]
+
+        for msg, env_value in invalid_cases:
+            with self.subTest(msg=msg, value=env_value):
+                with self.assertRaises(ValidationError):
+                    with patch.dict(
+                        os.environ,
+                        {"MARQO_INFERENCE_CACHE_TYPE": env_value},
+                        clear=True,
+                    ):
+                        Settings(_env_file=None)
+
     def test_channel_args_default(self):
         """Test that channel_args uses default TritonChannelArgs"""
         with patch.dict(os.environ, {}, clear=True):
@@ -263,7 +348,7 @@ class TestSettings(TestCase):
             # Test that various fields cannot be modified
             test_cases = [
                 ("marqo_inference_cache_size", 100),
-                ("marqo_inference_cache_type", "FIFO"),
+                ("marqo_inference_cache_type", "LFU"),
                 ("marqo_triton_url", "http://modified:8001"),
                 ("marqo_log_level", LogLevel.DEBUG),
                 ("marqo_log_format", LogFormat.JSON),

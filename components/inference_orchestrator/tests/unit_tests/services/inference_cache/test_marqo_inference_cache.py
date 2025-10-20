@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 from inference_orchestrator.core.enum import MarqoCacheType
-from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.services.inference_cache.marqo_inference_cache import (
     MarqoInferenceCache,
 )
@@ -39,24 +38,6 @@ class TestMarqoInferenceCache(unittest.TestCase):
                     )
                 )
                 self.assertEqual(0, cache._cache.currsize)
-
-    def test_cache_initializationCacheType_fail(self):
-        """Test if the cache raises an error for an invalid cache type."""
-        test_cases = [
-            {"cache_size": 10, "cache_type": "INVALID"},  # Invalid cache type
-            {"cache_size": 10, "cache_type": 1},  # Invalid cache type
-            {"cache_size": 1.4, "cache_type": "LFU"},  # Invalid cache size
-            {"cache_size": -1, "cache_type": "LRU"},  # Invalid cache size
-            {"cache_size": 0, "cache_type": "LRU"},  # Invalid cache size
-            {"cache_size": "str", "cache_type": "LRU"},  # Invalid cache size
-        ]
-        for test_case in test_cases:
-            with self.subTest(test_case):
-                with self.assertRaises(EnvironmentVariableParsingError):
-                    MarqoInferenceCache(
-                        cache_size=test_case["cache_size"],
-                        cache_type=test_case["cache_type"],
-                    )
 
     # Test generate keys
     def test_generate_valid_key(self):

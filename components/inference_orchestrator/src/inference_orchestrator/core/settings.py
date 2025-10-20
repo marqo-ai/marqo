@@ -84,6 +84,15 @@ class Settings(BaseSettings):
             return v.upper()
         return v
 
+    @field_validator("marqo_inference_cache_type", mode="before")
+    @classmethod
+    def _validate_and_set_cache_type(cls, v):
+        if v is None:
+            return "LRU"
+        if isinstance(v, str):
+            return v.upper()
+        return v
+
 
 try:
     _settings = Settings()
