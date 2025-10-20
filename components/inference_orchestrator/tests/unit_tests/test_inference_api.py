@@ -59,7 +59,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/msgpack",
                 "Accept": "application/msgpack",
             },
-            data=packed_data,
+            content=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -88,7 +88,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/msgpack",
                 "Accept": "application/msgpack",
             },
-            data=invalid_data,
+            content=invalid_data,
         )
 
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
@@ -107,7 +107,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/msgpack",
                 "Accept": "application/msgpack",
             },
-            data=packed_data,
+            content=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_CONTENT)
@@ -144,7 +144,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/msgpack",
                 "Accept": "application/msgpack",
             },
-            data=packed_data,
+            content=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
@@ -174,7 +174,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/msgpack",
                 "Accept": "application/msgpack",
             },
-            data=packed_data,
+            content=packed_data,
         )
 
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -199,7 +199,7 @@ class TestInferenceAPI(unittest.TestCase):
                 "Content-Type": "application/protobuf",
                 "Accept": "application/msgpack",
             },
-            data=packed_data,
+            content=packed_data,
         )
 
         self.assertEqual(response.status_code, HTTP_415_UNSUPPORTED_MEDIA_TYPE)
