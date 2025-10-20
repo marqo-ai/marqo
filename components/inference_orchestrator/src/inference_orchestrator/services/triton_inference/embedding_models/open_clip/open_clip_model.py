@@ -321,12 +321,13 @@ class OpenCLIPModel(AbstractEmbeddingModel):
             infer_outputs=[output_tensor],
         )
 
-        # Do a copy to ensure it is writable
         embeddings = response.as_numpy(
             self.model_properties.triton_text_encoder_properties.output[0].name
-        ).copy()
+        )
 
         if normalize:
+            # Normalization is in-place, so ensure it's writable
+            embeddings = embeddings.copy()
             embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
         if embeddings.shape != (len(text), self.model_properties.dimensions):

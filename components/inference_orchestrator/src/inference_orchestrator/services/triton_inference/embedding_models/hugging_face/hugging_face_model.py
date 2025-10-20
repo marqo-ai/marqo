@@ -175,9 +175,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         return emb
 
     @staticmethod
-    def _cls_pool_func(model_output: ndarray, attention_mask):
-        """A pooling function that extracts the CLS token from the model."""
-        return model_output[0][:, 0]
+    def _cls_pool_func(model_output: np.ndarray, attention_mask):
+        """A pooling function that extracts the CLS token from the model output."""
+        return model_output[:, 0, :]
 
     def get_preprocessor(self):
         return self._preprocessor
