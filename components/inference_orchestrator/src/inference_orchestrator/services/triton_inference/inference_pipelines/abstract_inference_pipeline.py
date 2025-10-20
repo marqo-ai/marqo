@@ -51,7 +51,9 @@ class AbstractInferencePipeline(ABC):
                     chunk_results.append((original_text, embeddings[embedding_index]))
                     embedding_index += 1
             else:
-                raise ValueError(f"Invalid chunk type: {type} for chunk: {chunk}")
+                raise ValueError(
+                    f"Invalid chunk type: {type(chunk)} for chunk: {chunk}"
+                )
             results.append(chunk_results)
         if len(results) != len(preprocessed_content_list):
             raise ValueError(

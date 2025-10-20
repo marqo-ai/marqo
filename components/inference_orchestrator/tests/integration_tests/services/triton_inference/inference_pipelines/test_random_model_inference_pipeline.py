@@ -18,7 +18,6 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         text_inference_request = InferenceRequest(
             modality="language",
             contents=["text", "very long long long long text"],
-            device="cpu",
             embedding_model_config=EmbeddingModelConfig(
                 model_name="random/small",
                 normalize_embeddings=True,
@@ -62,7 +61,6 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         image_inference_request = InferenceRequest(
             modality="image",
             contents=[TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value],
-            device="cpu",
             embedding_model_config=EmbeddingModelConfig(
                 model_name="random/small",
                 model_properties={
@@ -108,7 +106,6 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         whether it is in a list with other content or on its own."""
 
         # Common parameters
-        device = "cpu"
         model_config = EmbeddingModelConfig(
             model_name="random/small",
             normalize_embeddings=True,
@@ -128,7 +125,6 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         single_inference_request = InferenceRequest(
             modality=Modality.TEXT,
             contents=[target_text],
-            device=device,
             embedding_model_config=model_config,
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
@@ -137,7 +133,6 @@ class TestRandomModelInferencePipeline(InferenceTestCase):
         multi_inference_request = InferenceRequest(
             modality=Modality.TEXT,
             contents=["another text", target_text, "yet another text"],
-            device=device,
             embedding_model_config=model_config,
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
