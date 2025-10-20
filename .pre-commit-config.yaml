@@ -4,11 +4,11 @@ repos:
     hooks:
       - id: ruff-check
         types_or: [python, pyi]
-        files: ^components/model_management/(src|tests)/
+        files: ^components/(inference_orchestrator|model_management)/(src|tests)/
         args: [--fix]
         exclude: '(^|/)notebooks/|(^|/)\.ipynb_checkpoints/|\.ipynb$'
 
       - id: ruff-format
         types_or: [python, pyi]
-        files: ^components/model_management/(src|tests)/
+        files: ^components/(inference_orchestrator|model_management)/(src|tests)/
         exclude: '(^|/)\.ipynb_checkpoints/|\.ipynb$'
