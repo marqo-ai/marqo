@@ -29,7 +29,7 @@ class TestHFModelEncode(InferenceTestCase):
         super().setUpClass()
         cls.eject_all_models()
         current_file = Path(__file__).resolve()
-        target_dir = current_file.parent
+        target_dir = current_file.parent.parent
         json_file = (
             target_dir / "embeddings_reference" / "hf_marqo_2_24_2_embeddings.json"
         )
