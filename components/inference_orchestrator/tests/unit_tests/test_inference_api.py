@@ -9,7 +9,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
     HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_422_UNPROCESSABLE_CONTENT,
 )
 
 from inference_orchestrator.main import app
@@ -110,7 +110,7 @@ class TestInferenceAPI(unittest.TestCase):
             data=packed_data,
         )
 
-        self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_CONTENT)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
         self.assertEqual(
