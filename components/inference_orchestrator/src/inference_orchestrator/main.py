@@ -104,7 +104,7 @@ def vectorise(
         ) from e
     except ValidationError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.errors()
         ) from e
 
     # Generate embeddings
