@@ -3,7 +3,7 @@ name = "inference-orchestrator"
 version = "0.1.0"
 description = "Inference orchestrator for Marqo"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "blake3>=1.0.6",
     "cachetools>=6.2.0",
