@@ -66,7 +66,6 @@ class TestCachingInferenceShouldSkip(TestCase):
             contents=["a"],
             embedding_model_config=mock_model_config,
             use_inference_cache=True,
-            device=None,
             modality=Modality.TEXT,
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
@@ -117,7 +116,6 @@ class TestCachingInferenceVectorise(TestCase):
             contents=["a", "b"],
             embedding_model_config=mock_model_config,
             use_inference_cache=True,
-            device=None,
             modality=Modality.TEXT,
             preprocessing_config=TextPreprocessingConfig(should_chunk=False),
         )
