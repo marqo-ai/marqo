@@ -7,6 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Tuple, Union
 
 import PIL
+from PIL.Image import Image
+from torch import Tensor
+
 from inference_orchestrator.api.telemetry import RequestMetrics, RequestMetricsStore
 from inference_orchestrator.schemas.api import (
     AudioPreprocessingConfig,
@@ -22,8 +25,6 @@ from inference_orchestrator.services.errors import (
 from inference_orchestrator.services.media_download_and_preprocess.image_download import (
     load_image_from_path,
 )
-from PIL.Image import Image
-from torch import Tensor
 
 logger = logging.getLogger(__name__)
 

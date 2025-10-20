@@ -3,6 +3,7 @@ from unittest.mock import patch
 import numpy as np
 import PIL.Image
 import torch
+
 from inference_orchestrator.schemas.api import (
     ImagePreprocessingConfig,
     InferenceErrorModel,
@@ -15,7 +16,6 @@ from inference_orchestrator.services.triton_inference.content_preprocessing impo
 from inference_orchestrator.services.triton_inference.embedding_models.abstract_preprocessor import (
     AbstractPreprocessor,
 )
-
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 

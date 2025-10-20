@@ -3,11 +3,12 @@ import unittest
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
+from PIL import Image, UnidentifiedImageError
+
 from inference_orchestrator.services.media_download_and_preprocess.image_download import (
     format_and_load_CLIP_image,
     load_image_from_path,
 )
-from PIL import Image, UnidentifiedImageError
 
 
 class TestBase64ImageSupport(unittest.TestCase):

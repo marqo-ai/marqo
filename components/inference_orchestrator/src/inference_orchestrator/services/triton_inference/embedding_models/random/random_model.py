@@ -2,6 +2,8 @@ from typing import List
 
 import blake3
 import numpy as np
+from numpy import ndarray
+
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.triton_inference.embedding_models.abstract_embedding_model import (
     AbstractEmbeddingModel,
@@ -12,7 +14,6 @@ from inference_orchestrator.services.triton_inference.embedding_models.abstract_
 from inference_orchestrator.services.triton_inference.embedding_models.random.random_model_properties import (
     RandomModelProperties,
 )
-from numpy import ndarray
 
 
 class RandomModelPreprocessor(AbstractPreprocessor):

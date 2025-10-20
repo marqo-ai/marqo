@@ -3,12 +3,12 @@ import os
 from pathlib import Path
 
 import numpy as np
+from parameterized import parameterized_class
+
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.triton_inference.model_manager.model_manager import (
     load_model,
 )
-from parameterized import parameterized_class
-
 from tests.integration_tests.test_case import InferenceTestCase
 
 HF_TEST_MODELS = ["hf/e5-base-v2", "hf/e5-small-v2", "hf/all-MiniLM-L6-v2"]

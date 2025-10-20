@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+from numpy import ndarray
+
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.triton_inference.model_manager.model_management_client import (
     ModelManagementClient,
@@ -8,7 +10,6 @@ from inference_orchestrator.services.triton_inference.model_manager.model_manage
 from inference_orchestrator.services.triton_inference.triton.triton_grpc_client import (
     TritonGRPCClient,
 )
-from numpy import ndarray
 
 
 class AbstractEmbeddingModel(ABC):

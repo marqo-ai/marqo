@@ -1,14 +1,15 @@
 import unittest
 from typing import Any, Dict
 
-from inference_orchestrator.services.inference_cache.monitoring import (
-    OTELCacheStatsCollector,
-)
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
 from opentelemetry.sdk.metrics._internal.point import Metric
 from opentelemetry.test.globals_test import reset_metrics_globals
+
+from inference_orchestrator.services.inference_cache.monitoring import (
+    OTELCacheStatsCollector,
+)
 
 
 class TestOTELCacheStatsCollector(unittest.TestCase):

@@ -1,8 +1,9 @@
 from enum import Enum
 from typing import Literal
 
-from inference_orchestrator.schemas.base_model import AppImmutableBaseModel
 from pydantic import Field, field_validator
+
+from inference_orchestrator.schemas.base_model import AppImmutableBaseModel
 
 from .url_parser import get_base_filename
 

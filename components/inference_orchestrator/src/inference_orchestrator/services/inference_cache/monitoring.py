@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Iterable
 
-from inference_orchestrator.api.otel import metrics
 from opentelemetry.metrics import CallbackOptions, Observation
+
+from inference_orchestrator.api.otel import metrics
 
 
 class CacheStatsCollector(ABC):

@@ -9,6 +9,10 @@ import pycurl
 import requests
 import torch
 import validators
+from numpy import ndarray
+from PIL import Image, UnidentifiedImageError
+from torch import Tensor
+
 from inference_orchestrator import marqo_docs
 from inference_orchestrator.api.telemetry import RequestMetrics
 from inference_orchestrator.core.settings import get_settings
@@ -16,9 +20,6 @@ from inference_orchestrator.services.errors import (
     ImageDownloadError,
     InternalServerError,
 )
-from numpy import ndarray
-from PIL import Image, UnidentifiedImageError
-from torch import Tensor
 
 # TODO Merge this with the one in clip_utils in the future refactoring
 

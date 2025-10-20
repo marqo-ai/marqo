@@ -4,7 +4,6 @@ from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 from inference_orchestrator.services.errors import TritonInferenceError
 
-
 logger = get_logger(__name__)
 
 

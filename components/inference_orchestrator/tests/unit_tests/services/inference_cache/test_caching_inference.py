@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 import blake3
 import numpy as np
+
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
     ImagePreprocessingConfig,

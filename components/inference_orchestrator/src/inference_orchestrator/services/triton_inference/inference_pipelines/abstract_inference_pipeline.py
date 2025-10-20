@@ -8,7 +8,6 @@ from inference_orchestrator.schemas.api import (
     InferenceResult,
 )
 
-
 PreprocessedContent = list[tuple[str, Union[str, any]]]
 
 

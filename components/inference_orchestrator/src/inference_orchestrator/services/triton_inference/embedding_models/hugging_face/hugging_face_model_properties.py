@@ -1,8 +1,9 @@
 from enum import Enum
 from typing import Literal, Optional
 
-from inference_orchestrator.core.logging import get_logger
 from pydantic import Field, field_validator
+
+from inference_orchestrator.core.logging import get_logger
 
 from ..base_model_properties import BaseModelProperties, TritonModelProperties
 

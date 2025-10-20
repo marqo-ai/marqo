@@ -1,8 +1,6 @@
 from typing import Callable
 
 from fastapi import FastAPI
-from inference_orchestrator.core.logging import get_logger
-from inference_orchestrator.core.settings import get_settings
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import (
@@ -11,6 +9,9 @@ from opentelemetry.sdk.metrics.export import (
     PeriodicExportingMetricReader,
 )
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+from inference_orchestrator.core.logging import get_logger
+from inference_orchestrator.core.settings import get_settings
 
 settings = get_settings()
 

@@ -4,6 +4,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import numpy as np
+from opentelemetry import metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
+from opentelemetry.sdk.metrics._internal.point import MetricsData
+from opentelemetry.test.globals_test import reset_metrics_globals
+from orjson import orjson
+
 from inference_orchestrator.schemas.api import (
     EmbeddingModelConfig,
     ImagePreprocessingConfig,
@@ -20,13 +27,6 @@ from inference_orchestrator.services.inference_cache.caching_inference import (
 from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
     get_model_properties,
 )
-from opentelemetry import metrics
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics._internal.export import InMemoryMetricReader
-from opentelemetry.sdk.metrics._internal.point import MetricsData
-from opentelemetry.test.globals_test import reset_metrics_globals
-from orjson import orjson
-
 from tests.integration_tests.test_case import InferenceTestCase
 
 
@@ -91,7 +91,9 @@ class TestInferenceCache(InferenceTestCase):
             with self.subTest(cache_type=cache_type):
                 caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
-                req = self.base_request.model_copy(update={"contents": ["a", "b", "error:c"]})
+                req = self.base_request.model_copy(
+                    update={"contents": ["a", "b", "error:c"]}
+                )
 
                 result_from_local_inference = self.inference_local.vectorise(req)
                 result_from_caching_inference = caching_inference.vectorise(req)

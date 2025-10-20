@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 
 import numpy as np
+from parameterized import parameterized_class
+
 from inference_orchestrator.schemas.api import Modality
 from inference_orchestrator.services.media_download_and_preprocess.image_download import (
     load_image_from_path,
@@ -10,8 +12,6 @@ from inference_orchestrator.services.media_download_and_preprocess.image_downloa
 from inference_orchestrator.services.triton_inference.model_manager.model_manager import (
     load_model,
 )
-from parameterized import parameterized_class
-
 from tests.integration_tests.test_case import InferenceTestCase, TestImageUrls
 
 OPEN_CLIP_TEST_MODELS = [

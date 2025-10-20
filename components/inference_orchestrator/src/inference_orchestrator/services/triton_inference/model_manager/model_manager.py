@@ -2,13 +2,15 @@ import threading
 from contextlib import contextmanager
 from typing import Any, Dict, Optional, Union
 
+import orjson
+from blake3 import blake3
+from tritonclient.grpc import InferenceServerClient as TritonGRPCClient
+
 from inference_orchestrator.core.logging import get_logger
 from inference_orchestrator.services.errors import (
     InvalidModelPropertiesError,
     ModelOperationInProgressError,
 )
-from blake3 import blake3
-import orjson
 from inference_orchestrator.services.triton_inference.embedding_models import (
     HuggingFaceModel,
     OpenCLIPModel,
@@ -20,7 +22,6 @@ from inference_orchestrator.services.triton_inference.embedding_models.model_pro
 from inference_orchestrator.services.triton_inference.model_manager.model_management_client import (
     ModelManagementClient,
 )
-from tritonclient.grpc import InferenceServerClient as TritonGRPCClient
 
 logger = get_logger(__name__)
 _available_models: Dict[str, Union[OpenCLIPModel, HuggingFaceModel]] = dict()
