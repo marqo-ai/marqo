@@ -153,6 +153,6 @@ class InferenceTestCase(TestCase):
     def eject_all_models():
         """Eject all models from Triton to ensure a clean state for tests that need to load models."""
         for model_name in [
-            model["model_name"] for model in model_manager.get_loaded_models()["models"]
+            model["modelName"] for model in model_manager.get_loaded_models()["models"]
         ]:
             model_manager.eject_model(model_name)
