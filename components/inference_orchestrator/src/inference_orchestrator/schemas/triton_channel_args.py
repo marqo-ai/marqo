@@ -9,7 +9,6 @@ class GRPCCompressionAlgorithm(StrEnum):
     DEFLATE = "deflate"
 
 
-
 class TritonChannelArgs(AppBaseModel):
     """
     A class to hold the arguments for a channel in Triton Inference Server.
