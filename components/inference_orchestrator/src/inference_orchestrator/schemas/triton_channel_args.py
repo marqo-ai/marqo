@@ -1,6 +1,13 @@
-from typing import Literal, Optional
+from enum import StrEnum
+from typing import Optional
 
 from inference_orchestrator.schemas.base_model import AppBaseModel
+
+
+class GRPCCompressionAlgorithm(StrEnum):
+    GZIP = "gzip"
+    DEFLATE = "deflate"
+
 
 
 class TritonChannelArgs(AppBaseModel):
@@ -47,7 +54,7 @@ class TritonChannelArgs(AppBaseModel):
     grpc_initial_reconnect_backoff_ms: int = 500
     grpc_max_reconnect_backoff_ms: int = 10_000
     grpc_enable_retries: int = 1
-    grpc_compression_algorithm: Optional[Literal["gzip", "deflate"]] = None
+    grpc_compression_algorithm: Optional[GRPCCompressionAlgorithm] = None
 
     def build_channel_args(self) -> list[tuple[str, int]]:
         """

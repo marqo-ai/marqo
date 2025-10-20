@@ -61,7 +61,7 @@ class Settings(BaseSettings):
                     or "modelProperties" not in preload_model_in_v
                 ):
                     raise ValueError(
-                        f"Your custom model {preload_model_in_v} is missing 'model' key."
+                        f"Your custom model {preload_model_in_v} is missing 'model' key or 'modelProperties' key. "
                         f"To add a custom model, it must be a dict with keys 'model' and 'modelProperties' "
                     )
         return v

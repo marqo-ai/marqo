@@ -58,7 +58,7 @@ class CachingInference(Inference):
                 ]
             )
 
-        new_request = request.copy(update={"contents": contents_to_vectorise})
+        new_request = request.model_copy(update={"contents": contents_to_vectorise})
         inference_result = self.delegate.vectorise(new_request)
 
         for r in inference_result.result:
