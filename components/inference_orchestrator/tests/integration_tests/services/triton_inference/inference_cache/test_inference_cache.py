@@ -91,7 +91,7 @@ class TestInferenceCache(InferenceTestCase):
             with self.subTest(cache_type=cache_type):
                 caching_inference = CachingInference(self.inference_local, 10, "LRU")
 
-                req = self.base_request.copy(update={"contents": ["a", "b", "error:c"]})
+                req = self.base_request.model_copy(update={"contents": ["a", "b", "error:c"]})
 
                 result_from_local_inference = self.inference_local.vectorise(req)
                 result_from_caching_inference = caching_inference.vectorise(req)
@@ -132,7 +132,7 @@ class TestInferenceCache(InferenceTestCase):
             caching_inference = CachingInference(self.inference_local, 2, "LRU")
 
             result = caching_inference.vectorise(
-                self.base_request.copy(update={"contents": ["1", "2", "3"]})
+                self.base_request.model_copy(update={"contents": ["1", "2", "3"]})
             )
 
             model_key = caching_inference.model_cache_key(
@@ -148,13 +148,13 @@ class TestInferenceCache(InferenceTestCase):
             caching_inference = CachingInference(self.inference_local, 2, "LFU")
 
             caching_inference.vectorise(
-                self.base_request.copy(update={"contents": ["1", "2"]})
+                self.base_request.model_copy(update={"contents": ["1", "2"]})
             )
             caching_inference.vectorise(
-                self.base_request.copy(update={"contents": ["1"]})
+                self.base_request.model_copy(update={"contents": ["1"]})
             )
             result = caching_inference.vectorise(
-                self.base_request.copy(update={"contents": ["1", "2", "3"]})
+                self.base_request.model_copy(update={"contents": ["1", "2", "3"]})
             )
 
             model_key = caching_inference.model_cache_key(
@@ -219,7 +219,7 @@ class TestInferenceCache(InferenceTestCase):
                 text = random.choice(frequent_texts)
             else:
                 text = random.choice(texts)
-            req = self.base_request.copy(update={"contents": [text]})
+            req = self.base_request.model_copy(update={"contents": [text]})
             res = caching_inference.vectorise(req)
             res_skipping_cache = self.inference_local.vectorise(req)
             # test if the cached embedding is the same as the original
@@ -263,7 +263,7 @@ class TestInferenceCache(InferenceTestCase):
 
                 caching_inference = CachingInference(self.inference_local, 12, "LRU")
 
-                req1 = self.base_request.copy(
+                req1 = self.base_request.model_copy(
                     update={"contents": ["1", "2", "3"]}
                 )  # misses: 3
                 caching_inference.vectorise(req1)
@@ -275,7 +275,7 @@ class TestInferenceCache(InferenceTestCase):
                     reader.get_metrics_data(), "cache_size_curr", 3
                 )
 
-                req2 = self.base_request.copy(
+                req2 = self.base_request.model_copy(
                     update={"contents": ["1", "2", "4", "error:5"]}
                 )  # hits 2, misses: 2
                 caching_inference.vectorise(req2)

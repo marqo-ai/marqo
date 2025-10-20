@@ -5,7 +5,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:Marqo/marqo-fashionCLIP",
         "dimensions": 512,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-fashionCLIP-image-encoder",
             "sources": [
@@ -16,7 +16,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-fashionCLIP-text-encoder",
             "sources": [
@@ -30,7 +30,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:Marqo/marqo-fashionSigLIP",
         "dimensions": 768,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-image-encoder",
             "sources": [
@@ -42,7 +42,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-text-encoder",
             "sources": [
@@ -56,7 +56,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:Marqo/marqo-ecommerce-embeddings-L",
         "dimensions": 1024,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-ecommerce-embeddings-L-image-encoder",
             "sources": [
@@ -67,7 +67,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "marqo-ecommerce-embeddings-L-text-encoder",
             "sources": [
@@ -81,7 +81,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:Marqo/marqo-ecommerce-embeddings-B",
         "dimensions": 768,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "marqo-ecommerce-embeddings-B-image-encoder",
             "sources": [
@@ -92,7 +92,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "marqo-ecommerce-embeddings-B-text-encoder",
             "sources": [
@@ -106,7 +106,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:timm/ViT-L-16-SigLIP2-256",
         "dimensions": 1024,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-16-SigLIP2-256-image-encoder",
             "sources": [
@@ -117,7 +117,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-16-SigLIP2-256-text-encoder",
             "sources": [
@@ -132,7 +132,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:timm/ViT-L-16-SigLIP-256",
         "dimensions": 1024,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-16-SigLIP-256-image-encoder",
             "sources": [
@@ -143,7 +143,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-16-SigLIP-256-text-encoder",
             "sources": [
@@ -157,7 +157,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
         "dimensions": 768,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-L-14-laion2B-s32B-b82K-image-encoder",
             "sources": [
@@ -168,7 +168,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-L-14-laion2B-s32B-b82K-text-encoder",
             "sources": [
@@ -182,7 +182,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
         "dimensions": 512,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-image-encoder",
             "sources": [
@@ -193,7 +193,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-text-encoder",
             "sources": [
@@ -207,7 +207,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:timm/ViT-B-16-SigLIP",
         "dimensions": 768,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "timm-ViT-B-16-SigLIP-image-encoder",
             "sources": [
@@ -218,7 +218,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "timm-ViT-B-16-SigLIP-text-encoder",
             "sources": [
@@ -232,7 +232,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "hf-hub:timm/vit_large_patch14_clip_224.laion400m_e32",
         "dimensions": 768,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-14-laion400m_e32b_b82k-image-encoder",
             "sources": [
@@ -243,7 +243,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-14-laion400m_e32b_b82k-text-encoder",
             "sources": [
@@ -257,7 +257,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k",
         "dimensions": 512,
         "type": "open_clip",
-        "tritonImageEncoder": {
+        "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k-image-encoder",
             "sources": [
@@ -268,7 +268,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             ],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
         },
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k-text-encoder",
             "sources": [
@@ -283,7 +283,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 768,
         "type": "hf",
         "poolingMethod": "mean",
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
             "name": "e5-base-v2-text-encoder",
             "sources": ["s3://marqo-opensource-models/infloat-e5-base-v2/model.onnx"],
@@ -306,7 +306,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 384,
         "type": "hf",
         "poolingMethod": "mean",
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
             "name": "e5-small-v2-text-encoder",
             "sources": ["s3://marqo-opensource-models/infloat-e5-small-v2/model.onnx"],
@@ -329,7 +329,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 384,
         "type": "hf",
         "poolingMethod": "mean",
-        "tritonTextEncoder": {
+        "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "all-MiniLM-L6-v2-text-encoder",
             "sources": [
