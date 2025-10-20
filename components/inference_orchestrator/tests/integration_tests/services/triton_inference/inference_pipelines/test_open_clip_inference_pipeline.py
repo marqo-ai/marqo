@@ -67,7 +67,7 @@ class TestOpenCLIPInferencePipeline(InferenceTestCase):
         image_inference_request = InferenceRequest(
             modality="image",
             contents=[TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value],
-            embeding_model_config=EmbeddingModelConfig(
+            embedding_model_config=EmbeddingModelConfig(
                 model_name="open_clip/ViT-B-32/laion2b_s34b_b79k",
                 model_properties=self.get_model_properties_from_registry(
                     "open_clip/ViT-B-32/laion2b_s34b_b79k"
