@@ -55,7 +55,7 @@ class ModelManagerClient(ModelManager):
             Exception: For any other exceptions.
         """
         try:
-            response = self.client.delete(f"/models?{model_name}")
+            response = self.client.delete(f"/models?model_name={model_name}")
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as http_err:
