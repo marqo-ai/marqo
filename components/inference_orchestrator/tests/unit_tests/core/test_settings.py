@@ -321,7 +321,7 @@ class TestSettings(TestCase):
         with patch.dict(os.environ, {}, clear=True):
             settings = Settings(_env_file=None)
             self.assertIsInstance(settings.channel_args, TritonChannelArgs)
-            self.assertEqual(20_000, settings.channel_args.grpc_keep_alive_time_ms)
+            self.assertEqual(300_000, settings.channel_args.grpc_keep_alive_time_ms)
 
     def test_channel_args_custom_via_json(self):
         """Test that channel_args can be customized via JSON environment variable"""

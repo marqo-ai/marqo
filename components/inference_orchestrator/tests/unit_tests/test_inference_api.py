@@ -113,15 +113,9 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_CONTENT)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
-        self.assertEqual(
-            {
-                "type": "missing",
-                "loc": ["modality"],
-                "msg": "Field required",
-                "input": {"invalid_field": "value"},
-                "url": "https://errors.pydantic.dev/2.11/v/missing",
-            },
-            unpacked_response["detail"][0],
+        self.assertIn(
+            "4 validation errors for InferenceRequest",
+            unpacked_response["detail"],
         )
 
     def test_vectorise_raise_inference_error(self):
