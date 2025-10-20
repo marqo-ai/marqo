@@ -109,7 +109,9 @@ class HuggingFaceModelInferencePipeline(AbstractInferencePipeline):
 
         embeddings: List[ndarray] = []
 
-        max_batch_size = self.model.model_properties.triton_text_encoder.max_batch_size
+        max_batch_size = (
+            self.model.model_properties.triton_text_encoder_properties.max_batch_size
+        )
         for i in range(0, len(content_to_encode), max_batch_size):
             batch: List[str] = content_to_encode[i : i + max_batch_size]
             batch_embeddings: List[ndarray] = self.model.encode(

@@ -90,9 +90,9 @@ class OpenCLIPModelInferencePipeline(AbstractInferencePipeline):
         embeddings: List[ndarray] = []
 
         max_batch_size = (
-            self.model.model_properties.triton_text_encoder.max_batch_size
+            self.model.model_properties.triton_text_encoder_properties.max_batch_size
             if self.inference_request.modality == Modality.TEXT
-            else self.model.model_properties.triton_image_encoder.max_batch_size
+            else self.model.model_properties.triton_image_encoder_properties.max_batch_size
         )
 
         for i in range(0, len(content_to_encode), max_batch_size):
