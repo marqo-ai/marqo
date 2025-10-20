@@ -1,7 +1,7 @@
 import time
 from typing import Dict, Union
 
-from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_regiestry import (
+from inference_orchestrator.services.triton_inference.embedding_models.marqo_model_registry import (
     get_model_properties,
 )
 from inference_orchestrator.version import get_version
