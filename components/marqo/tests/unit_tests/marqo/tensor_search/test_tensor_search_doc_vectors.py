@@ -117,8 +117,8 @@ class TestGetEmbeddingFieldNames(unittest.TestCase):
 
 class TestGetDocVectorsPerTensorFieldByIds(unittest.TestCase):
     """Test cases for get_doc_vectors_per_tensor_field_by_ids function"""
-    
-    def setup_method(self, method):
+
+    def setUp(self):
         """Set up common test fixtures"""
         self.mock_config = Mock(spec=Config)
         self.mock_vespa_client = Mock()

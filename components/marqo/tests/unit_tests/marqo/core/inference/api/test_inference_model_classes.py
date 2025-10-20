@@ -94,7 +94,7 @@ class TestModelConfig(unittest.TestCase):
 class TestInferenceRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model_config = EmbeddingModelConfig(model_name="test_model")
+        self.embedding_model_config = EmbeddingModelConfig(model_name="test_model")
 
     def test_empty_contents(self):
         """Test that empty contents list raises a ValidationError."""
@@ -102,7 +102,7 @@ class TestInferenceRequest(unittest.TestCase):
             InferenceRequest(
                 modality=Modality.TEXT,
                 contents=[],
-                embedding_model_config=self.model_config,
+                embedding_model_config=self.embedding_model_config,
                 preprocessing_config=TextPreprocessingConfig()
             )
         self.assertIn('ensure this value has at least 1 items', str(context.exception))
@@ -113,7 +113,7 @@ class TestInferenceRequest(unittest.TestCase):
             InferenceRequest(
                 modality=Modality.VIDEO,
                 contents="This should be a list",
-                embedding_model_config=self.model_config,
+                embedding_model_config=self.embedding_model_config,
                 preprocessing_config=TextPreprocessingConfig()
             )
         self.assertIn('value is not a valid list', str(context.exception))
@@ -124,7 +124,7 @@ class TestInferenceRequest(unittest.TestCase):
             InferenceRequest(
                 modality="INVALID_MODALITY",
                 contents=["Sample text"],
-                embedding_model_config=self.model_config,
+                embedding_model_config=self.embedding_model_config,
                 preprocessing_config=TextPreprocessingConfig()
             )
         self.assertIn('value is not a valid enumeration member', str(context.exception))
@@ -141,7 +141,7 @@ class TestInferenceRequest(unittest.TestCase):
                 request = InferenceRequest(
                     modality=modality,
                     contents=["some content"],
-                    embedding_model_config=self.model_config,
+                    embedding_model_config=self.embedding_model_config,
                     preprocessing_config=preprocessing_config
                 )
                 self.assertEqual(request.modality, modality)
@@ -152,7 +152,7 @@ class TestInferenceRequest(unittest.TestCase):
             InferenceRequest(
                 modality=None,
                 contents=["some content"],
-                embedding_model_config=self.model_config,
+                embedding_model_config=self.embedding_model_config,
                 preprocessing_config=TextPreprocessingConfig()
             )
         self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
@@ -162,7 +162,7 @@ class TestInferenceRequest(unittest.TestCase):
             InferenceRequest(
                 modality=Modality.TEXT,
                 contents=["some content"],
-                embedding_model_config=self.model_config,
+                embedding_model_config=self.embedding_model_config,
                 preprocessing_config=None
             )
         self.assertIn('Modality or preprocessing_config is missing', str(context.exception))
@@ -191,7 +191,7 @@ class TestInferenceRequest(unittest.TestCase):
                     InferenceRequest(
                         modality=modality,
                         contents=["some content"],
-                        embedding_model_config=self.model_config,
+                        embedding_model_config=self.embedding_model_config,
                         preprocessing_config=preprocessing_config
                     )
                 self.assertIn('does not support modality:', str(context.exception))
@@ -201,7 +201,7 @@ class TestInferenceRequest(unittest.TestCase):
         request = InferenceRequest(
             modality=Modality.IMAGE,
             contents=["image1.png", "image2.png"],
-            embedding_model_config=self.model_config,
+            embedding_model_config=self.embedding_model_config,
             preprocessing_config=ImagePreprocessingConfig()
         )
         self.assertIsNone(request.device)
@@ -215,7 +215,7 @@ class TestInferenceRequest(unittest.TestCase):
             contents=["audio1.mp3"],
             device="cuda",
             use_inference_cache=True,
-            embedding_model_config=self.model_config,
+            embedding_model_config=self.embedding_model_config,
             preprocessing_config=AudioPreprocessingConfig(),
             return_individual_error=False,
         )
@@ -228,20 +228,20 @@ class TestInferenceRequest(unittest.TestCase):
         data = {
             "modality": "language",
             "contents": ["Sample text"],
-            "modelConfig": self.model_config,
+            "embeddingModelConfig": self.embedding_model_config,
             "preprocessingConfig": TextPreprocessingConfig(),
             "useInferenceCache": True
         }
         request = InferenceRequest(**data)
         self.assertEqual(request.modality, Modality.TEXT)
         self.assertTrue(request.use_inference_cache)
-        self.assertEqual(request.embedding_model_config, self.model_config)
+        self.assertEqual(request.embedding_model_config, self.embedding_model_config)
 
     def test_immutability(self):
         request = InferenceRequest(
             modality=Modality.IMAGE,
             contents=["image1.png", "image2.png"],
-            embedding_model_config=self.model_config,
+            embedding_model_config=self.embedding_model_config,
             preprocessing_config=ImagePreprocessingConfig()
         )
 
