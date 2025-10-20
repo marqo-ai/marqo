@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+      - id: ruff-check
+        types_or: [python, pyi]
+        files: ^components/(inference_orchestrator|model_management)/(src|tests)/
+        args: [--fix]
+        exclude: '(^|/)notebooks/|(^|/)\.ipynb_checkpoints/|\.ipynb$'
+
+      - id: ruff-format
+        types_or: [python, pyi]
+        files: ^components/(inference_orchestrator|model_management)/(src|tests)/
+        exclude: '(^|/)\.ipynb_checkpoints/|\.ipynb$'

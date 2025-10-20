@@ -1,26 +1,34 @@
 import json
 from typing import Any, Dict, List
 
+import model_management.errors.http_errors as http_errors
+import model_management.services.errors as service_errors
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
-import model_management.errors.http_errors as http_errors
-import model_management.services.errors as service_errors
 from ..contracts.problem import Problem
 from ..errors.base import AppError
 
 
-def _map_service_errors_to_http_errors(service_exception: service_errors.ServiceError) -> AppError:
+def _map_service_errors_to_http_errors(
+    service_exception: service_errors.ServiceError,
+) -> AppError:
     """
     Map service-layer errors to appropriate HTTP errors.
     """
     service_to_http_error_map = [
-        ((service_errors.ModelDownloadFailedError, ), http_errors.InvalidArgumentError),
-        ((service_errors.ModelOperationInProgressError, ), http_errors.OperationConflictError),
-        ((service_errors.TritonCommunicationError, ), http_errors.DependencyBadGatewayError),
-        ((service_errors.InternalServerError, ), http_errors.InternalServerError),
+        ((service_errors.ModelDownloadFailedError,), http_errors.InvalidArgumentError),
+        (
+            (service_errors.ModelOperationInProgressError,),
+            http_errors.OperationConflictError,
+        ),
+        (
+            (service_errors.TritonCommunicationError,),
+            http_errors.DependencyBadGatewayError,
+        ),
+        ((service_errors.InternalServerError,), http_errors.InternalServerError),
     ]
 
     for service_error_classes, http_error_class in service_to_http_error_map:
@@ -59,10 +67,14 @@ def _problem_response(request: Request, exc: AppError) -> Response:
         request_id=getattr(request.state, "request_id", None),
         extras=getattr(exc, "extras", None),
     ).model_dump()
-    return JSONResponse(body, status_code=exc.http_status, media_type="application/problem+json")
+    return JSONResponse(
+        body, status_code=exc.http_status, media_type="application/problem+json"
+    )
 
 
-async def _validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
+async def _validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> Response:
     """
     Normalise the FastAPI/Pydantic validation errors into a tidy, client-friendly payload.
 
@@ -70,11 +82,14 @@ async def _validation_error_handler(request: Request, exc: RequestValidationErro
     :param exc: the raised RequestValidationError or ValidationError
     :return: A JSONResponse with Problem+JSON content type and 400 status code.
     """
-    error_messages = [{
-        'loc': error.get('loc', ''),
-        'msg': error.get('msg', ''),
-        'type': error.get('type', '')
-    } for error in exc.errors()]
+    error_messages = [
+        {
+            "loc": error.get("loc", ""),
+            "msg": error.get("msg", ""),
+            "type": error.get("type", ""),
+        }
+        for error in exc.errors()
+    ]
 
     return _problem_response(
         request,
@@ -84,7 +99,9 @@ async def _validation_error_handler(request: Request, exc: RequestValidationErro
     )
 
 
-async def _service_error_handler(request: Request, exc: service_errors.ServiceError) -> Response:
+async def _service_error_handler(
+    request: Request, exc: service_errors.ServiceError
+) -> Response:
     """
     Catch transport-agnostic service/domain errors and map them to HTTP-aware AppErrors.
     """
@@ -98,7 +115,9 @@ async def _app_error_handler(request: Request, exc: AppError) -> Response:
 
 
 async def _catch_all_handler(request: Request, exc: Exception) -> Response:
-    return _problem_response(request, http_errors.InternalServerError("An unexpected error occurred."))
+    return _problem_response(
+        request, http_errors.InternalServerError("An unexpected error occurred.")
+    )
 
 
 def _normalize_validation_errors(exc: RequestValidationError) -> Dict[str, Any]:
@@ -111,7 +130,11 @@ def _normalize_validation_errors(exc: RequestValidationError) -> Dict[str, Any]:
     for e in raw:
         loc = e.get("loc", [])
         # strip top-level sources like 'body'|'query'|'path' for a cleaner field path
-        stripped = [str(p) for p in loc if p not in ("body", "query", "path", "header", "cookie")]
+        stripped = [
+            str(p)
+            for p in loc
+            if p not in ("body", "query", "path", "header", "cookie")
+        ]
         field_path = ".".join(stripped)
 
         message = e.get("msg") or e.get("message") or "Invalid value"

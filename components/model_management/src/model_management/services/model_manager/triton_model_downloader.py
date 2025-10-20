@@ -29,12 +29,12 @@ class TritonModelDownloader:
     """
 
     def __init__(
-            self,
-            sources: list[str],
-            base_dir: str,
-            model_name: str,
-            config_pbtxt: str | None = None,
-            overwrite: bool = False,
+        self,
+        sources: list[str],
+        base_dir: str,
+        model_name: str,
+        config_pbtxt: str | None = None,
+        overwrite: bool = False,
     ):
         self.sources = sources
         self.base_dir = Path(base_dir)
@@ -49,7 +49,9 @@ class TritonModelDownloader:
             (root / "config.pbtxt").write_text(self.config_pbtxt)
         return root / "1"
 
-    def _download_with_progress(self, fs, path: str, dest: Path, chunk_size: int = 1024 * 1024):
+    def _download_with_progress(
+        self, fs, path: str, dest: Path, chunk_size: int = 1024 * 1024
+    ):
         """Download a file with a tqdm progress bar.
 
         :raise: ModelDownloadFailedError: If download fails due to missing credentials or file not found.
@@ -61,18 +63,25 @@ class TritonModelDownloader:
                 "Marqo cannot find your AWS credentials to download the model from S3. "
                 "Please ensure your AWS credentials are configured correctly. You can mount "
                 "your AWS credentials file into the container /root/.aws/credentials. Alternatively, "
-                "you can provide the model files via a publicly accessible URL ") from e
+                "you can provide the model files via a publicly accessible URL "
+            ) from e
         except FileNotFoundError as e:
-            raise ModelDownloadFailedError(f"The specified model file was not found: {path}. Please check "
-                                     f"the provided source and ensure the container has access to it ") from e
+            raise ModelDownloadFailedError(
+                f"The specified model file was not found: {path}. Please check "
+                f"the provided source and ensure the container has access to it "
+            ) from e
         size = info.get("size", None)
-        with fs.open(path, "rb") as fsrc, open(dest, "wb") as fdst, tqdm(
+        with (
+            fs.open(path, "rb") as fsrc,
+            open(dest, "wb") as fdst,
+            tqdm(
                 total=size,
                 unit="B",
                 unit_scale=True,
                 unit_divisor=1024,
                 desc=dest.name,
-        ) as bar:
+            ) as bar,
+        ):
             for chunk in iter(lambda: fsrc.read(chunk_size), b""):
                 fdst.write(chunk)
                 bar.update(len(chunk))

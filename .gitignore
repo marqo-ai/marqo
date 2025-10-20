@@ -162,6 +162,6 @@ scripts/vespa_local/multinode/docker-compose.yml
 scripts/vespa_local/multinode/services.xml
 scripts/vespa_local/multinode/hosts.xml
 
-# Docker compose files and environment files as
-# they may contain sensitive informatio
-**/.env
+# Exluce .env files in subdirectories as they are mainly used for local testing.
+# However, we include the root .env file as it is used to set environment variables for docker runs.
+*/.env

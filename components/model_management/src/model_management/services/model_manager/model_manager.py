@@ -1,22 +1,23 @@
 import os
 import threading
+from contextlib import contextmanager
 
 from jinja2 import Environment, PackageLoader
-
 from model_management.core.logging import get_logger
 from model_management.schemas.triton_model_properties import TritonModelProperties
-from model_management.services.model_manager.triton_model_downloader import TritonModelDownloader
+from model_management.services.model_manager.triton_model_downloader import (
+    TritonModelDownloader,
+)
 from model_management.services.triton.triton_client import TritonClient
+
 from ..errors import ModelOperationInProgressError
-from contextlib import contextmanager
 
 logger = get_logger(__name__)
 
 env = Environment(
-    loader=PackageLoader('model_management.services.model_manager',
-                         'templates')
+    loader=PackageLoader("model_management.services.model_manager", "templates")
 )
-template = env.get_template('config_pbtxt_template.jinja2')
+template = env.get_template("config_pbtxt_template.jinja2")
 
 _MODEL_IO_LOCK = threading.Lock()
 
@@ -52,7 +53,7 @@ class ModelManager:
                 base_dir=self.model_base_dir,
                 model_name=triton_model_properties.name,
                 config_pbtxt=self.generate_config_pbtxt_file(triton_model_properties),
-                overwrite=False
+                overwrite=False,
             ).prepare_and_download()
 
             self.triton_client.load_model(triton_model_properties.name)
@@ -76,7 +77,9 @@ class ModelManager:
             logger.info(f"Model unloaded: {model_name}")
 
     @staticmethod
-    def generate_config_pbtxt_file(triton_model_properties: TritonModelProperties) -> str:
+    def generate_config_pbtxt_file(
+        triton_model_properties: TritonModelProperties,
+    ) -> str:
         # Implement the logic to generate a config.pbtxt file for Triton Inference Server
         context = {
             "name": triton_model_properties.name,
