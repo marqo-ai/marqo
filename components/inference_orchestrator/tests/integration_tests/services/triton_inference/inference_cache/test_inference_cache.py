@@ -89,7 +89,9 @@ class TestInferenceCache(InferenceTestCase):
     def test_caching_inference_should_return_same_result_as_its_delegate(self):
         for cache_type in ["LRU", "LFU"]:
             with self.subTest(cache_type=cache_type):
-                caching_inference = CachingInference(self.inference_local, 10, "LRU")
+                caching_inference = CachingInference(
+                    self.inference_local, 10, cache_type
+                )
 
                 req = self.base_request.model_copy(
                     update={"contents": ["a", "b", "error:c"]}
@@ -131,7 +133,9 @@ class TestInferenceCache(InferenceTestCase):
 
     def test_caching_inference_should_not_exceed_max_cache_size(self):
         with self.subTest(cache_type="LRU"):
-            caching_inference = CachingInference(self.inference_local, 2, "LRU")
+            caching_inference = CachingInference(
+                self.inference_local, 2, cache_type="LRU"
+            )
 
             result = caching_inference.vectorise(
                 self.base_request.model_copy(update={"contents": ["1", "2", "3"]})
@@ -172,7 +176,9 @@ class TestInferenceCache(InferenceTestCase):
     def test_caching_inference_should_support_multiple_models(self):
         for cache_type in ["LRU", "LFU"]:
             with self.subTest(cache_type=cache_type):
-                caching_inference = CachingInference(self.inference_local, 10, "LRU")
+                caching_inference = CachingInference(
+                    self.inference_local, 10, cache_type
+                )
 
                 caching_inference.vectorise(self.base_request)
                 model_key1 = caching_inference.model_cache_key(
@@ -263,7 +269,9 @@ class TestInferenceCache(InferenceTestCase):
                 provider = MeterProvider(metric_readers=[reader])
                 metrics.set_meter_provider(provider)
 
-                caching_inference = CachingInference(self.inference_local, 12, "LRU")
+                caching_inference = CachingInference(
+                    self.inference_local, 12, cache_type
+                )
 
                 req1 = self.base_request.model_copy(
                     update={"contents": ["1", "2", "3"]}

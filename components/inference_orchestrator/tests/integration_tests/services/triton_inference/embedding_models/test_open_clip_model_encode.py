@@ -57,7 +57,6 @@ class TestOpenClipModelEncode(InferenceTestCase):
     """
 
     model_name: str  # A class variable to store the model name that will be populated by the parameterized decorator
-    device = "cpu"
 
     @classmethod
     def tearDownClass(cls):
