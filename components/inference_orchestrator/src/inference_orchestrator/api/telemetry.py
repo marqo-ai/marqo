@@ -159,7 +159,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, **options):
         self.telemetry_flag: Optional[str] = options.pop(
-            "telemetery_flag", TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM
+            "telemetry_flag", TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM
         )
         super().__init__(app, **options)
 
