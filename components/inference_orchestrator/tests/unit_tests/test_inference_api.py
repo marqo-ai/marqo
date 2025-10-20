@@ -113,7 +113,7 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTP_422_UNPROCESSABLE_ENTITY)
         unpacked_response = msgpack.unpackb(response.content, raw=False)
         self.assertIn("detail", unpacked_response)
-        self.assertEquals(
+        self.assertEqual(
             {
                 "type": "missing",
                 "loc": ["modality"],
