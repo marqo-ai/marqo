@@ -5,6 +5,7 @@ import pytest
 from marqo.errors import MarqoWebError
 
 from tests.marqo_test import MarqoTestCase
+import requests
 
 
 class TestModlCacheManagement(MarqoTestCase):
@@ -64,5 +65,8 @@ class TestModlCacheManagement(MarqoTestCase):
             with self.subTest(index_name):
                 # Do a search to ensure the model is cached
                 r = self.client.index(index_name).search("q")
-                res = self.client.index(index_name).eject_model("hf/all-MiniLM-L6-v2")
-                self.assertIn("successfully eject", str(res))
+
+                loaded_models = self.client.index(index_name).get_loaded_models()
+                for model in loaded_models:
+                    res = requests.delete(f"{self._MARQO_URL}/models?model_name={model['modelName']}")
+                    self.assertIn("successfully eject", str(res))
