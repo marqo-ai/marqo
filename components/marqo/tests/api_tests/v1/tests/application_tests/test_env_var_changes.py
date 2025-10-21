@@ -27,12 +27,11 @@ from tests import utilities
 
 
 class TestEnvVarChanges(marqo_test.MarqoTestCase):
-
     """
         All tests that rerun marqo with different env vars should go here
         Teardown will handle resetting marqo back to base settings
     """
-    
+
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
@@ -54,16 +53,35 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         open_clip_model_object = {
             "model": "open-clip-1",
             "modelProperties": {
-                "name": "ViT-B-32-quickgelu",
+                "name": "hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
                 "dimensions": 512,
                 "type": "open_clip",
-                "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt"
-            }
+                "tritonImageEncoderProperties": {
+                    "maxBatchSize": 8,
+                    "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-image-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/image-encoder/model.onnx"
+                    ],
+                    "input": [
+                        {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
+                    ],
+                    "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
+                },
+                "tritonTextEncoderProperties": {
+                    "maxBatchSize": 16,
+                    "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-text-encoder",
+                    "sources": [
+                        "s3://marqo-opensource-models/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/text-encoder/model.onnx",
+                    ],
+                    "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
+                    "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
+                },
+            },
         }
 
         print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
         utilities.rerun_marqo_with_env_vars(
-            env_vars = ['-e', f"MARQO_MODELS_TO_PRELOAD=[{json.dumps(open_clip_model_object)}]"],
+            env_vars=['-e', f"MARQO_MODELS_TO_PRELOAD=[{json.dumps(open_clip_model_object)}]"],
             calling_class=self.__class__.__name__
         )
 
@@ -71,7 +89,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         custom_models = ["open-clip-1"]
         self.client.create_index("test_index_for_preloaded_models")
         res = self.client.index("test_index_for_preload_models").get_loaded_models()
-        assert set([item["model_name"] for item in res["models"]]) == set(custom_models)
+        assert set([item["modelName"] for item in res["models"]]) == set(custom_models)
 
     def test_inference_cache(self):
         """
@@ -93,7 +111,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Create index with same number of replicas and EF
         self.client.create_index(index_name=index_name, ann_parameters={
             "spaceType": 'prenormalized-angular', "parameters": {"efConstruction": 5000, "m": 16}}
-        )
+                                 )
 
         # Assert correct EF const
         assert self.client.index(index_name).get_settings() \
@@ -106,8 +124,8 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # Test inference cache
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
 
-        min_inference_time_ms = 8      # inference usually takes at least 8ms
-        cache_reading_time_ms = 3      # if it hits cache, the pipeline should take less than 3ms
+        min_inference_time_ms = 8  # inference usually takes at least 8ms
+        cache_reading_time_ms = 3  # if it hits cache, the pipeline should take less than 3ms
 
         # Test search query's embedding is cached when inference cache is enabled
         base64_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
@@ -117,12 +135,13 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
                 # Single query
                 # First search that misses cache should take longer
                 r = telemetry_client.index(index_name).search(q=query)
-                self.assertTrue(r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > min_inference_time_ms)
-                
+                self.assertTrue(
+                    r["telemetry"]["timesMs"]["search.vector_inference_full_pipeline"] > min_inference_time_ms)
+
                 # Run a few more times to make sure we populate it on API side cache as well as inference side cache
                 self._run_in_threads(lambda client: client.index(index_name).search(q=query),
                                      max_workers=5, count=50)
-                
+
                 # Following searches should hit cache, average latency should be low
                 inference_latency = self._run_in_threads(
                     lambda client: client.index(index_name).search(q=query),
