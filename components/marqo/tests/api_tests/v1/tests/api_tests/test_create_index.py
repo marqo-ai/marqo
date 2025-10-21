@@ -12,6 +12,8 @@ class TestCreateIndex(MarqoTestCase):
     def setUp(self) -> None:
         """As this test class is testing index creation,
         we need to create/delete index before/after each test"""
+        print("------------------- Starting a test ------------------")
+        print(self.indexes_to_delete)
         super().setUp()
         self.index_name = "test_index"
 
