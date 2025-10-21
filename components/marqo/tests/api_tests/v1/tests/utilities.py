@@ -84,7 +84,7 @@ def rerun_marqo_with_env_vars(env_vars: dict[str, str], calling_class: str = "",
         updated_compose_data = compose_content.copy()
 
         targe_service_file = updated_compose_data['services'][target_service]
-        for key, value in env_vars:
+        for key, value in env_vars.items():
             if not 'environment' in targe_service_file:
                 targe_service_file['environment'] = {}
             targe_service_file['environment'][key] = value
