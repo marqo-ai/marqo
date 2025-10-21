@@ -35,6 +35,21 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         Teardown will handle resetting marqo back to base settings
     """
 
+    def _wait_for_container_to_be_ready(self, url: str, timeout: int = 30, container_name: str = "marqo") -> None:
+        start_time = time.time()
+        while True:
+            try:
+                response = requests.get(url)
+                if response.status_code == 200:
+                    print("Container is ready!")
+                    return
+            except requests.exceptions.RequestException:
+                pass
+
+            if time.time() - start_time > timeout:
+                raise TimeoutError(f"Container {container_name} did not become ready within {timeout} seconds.")
+            time.sleep(5)
+
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
@@ -95,13 +110,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         custom_models = ["open-clip-1"]
         self.client.create_index(index_name=index_name)
         # Wait for model loading to be ready
-        for _ in range(5):
-            try:
-                res = requests.get("http://localhost:8884/healthz").json()
-                if res["status"] == "ok":
-                    break
-            except Exception:
-                time.sleep(5)
+        self._wait_for_container_to_be_ready("http://localhost:8884/healthz", container_name="mioc")
         res = self.client.index(index_name).get_loaded_models()
         self.assertTrue(
             res["models"][0]["modelName"].startswith("open-clip-1"),
@@ -125,6 +134,8 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             target_service="mioc",
         )
 
+        self._wait_for_container_to_be_ready("http://localhost:8884/healthz", container_name="mioc")
+
         utilities.rerun_marqo_with_env_vars(
             env_vars={
                 "MARQO_API_INFERENCE_CACHE_SIZE": "10",  # enable inference cache on api side
@@ -132,6 +143,8 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             calling_class=self.__class__.__name__,
             target_service="api",
         )
+        self._wait_for_container_to_be_ready("http://localhost:8882/health", container_name="api")
+
 
         # Create index with same number of replicas and EF
         self.client.create_index(index_name=index_name, ann_parameters={
