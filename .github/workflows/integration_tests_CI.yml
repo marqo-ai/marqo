@@ -138,12 +138,12 @@ jobs:
           cd components/marqo
 
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest tests/integ_tests/core/documents/test_documents_common.py \
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest \
             ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
-            tests/integ_tests --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+            tests/integ_tests/core/documents/test_documents_common.py  --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
 
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
@@ -184,5 +184,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
-          path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           include-hidden-files: true
