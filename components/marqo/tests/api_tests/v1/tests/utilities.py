@@ -77,7 +77,7 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
         for env in env_vars:
             if env == '-e':
                 continue
-            fp.write(f"env\n")
+            fp.write(f"{env}\n")
         fp.flush()
         temp_path = pathlib.Path(fp.name).absolute()
         run_process = subprocess.Popen(
