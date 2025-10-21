@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: unit-tests-${{ github.ref }}
+  group: unit-tests-inference-orchestrator-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
