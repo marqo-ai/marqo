@@ -84,66 +84,60 @@ jobs:
         id: unit_diff_coverage
         continue-on-error: true
         run: |
+          cd components/marqo
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export PYTHONPATH="."
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
-
-            cd components/marqo
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ../..
-
-            diff-cover unit_coverage_data/coverage.xml --html-report unit_coverage_data/diff_cov.html \
-              --markdown-report unit_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots components/marqo
+            
+            diff-cover ../../unit_coverage_data/coverage.xml --html-report ../../unit_coverage_data/diff_cov.html \
+              --markdown-report ../../unit_coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=80
           else
             echo "Skipping diff-cover on push events"
-            echo "Skipped diff-cover on push event" > unit_coverage_data/diff_cov.md
-            touch unit_coverage_data/diff_cov.html
+            echo "Skipped diff-cover on push event" > ../../unit_coverage_data/diff_cov.md
+            touch ../../unit_coverage_data/diff_cov.html
           fi
 
       - name: Check diff integ test coverage (80% threshold)
         id: integ_diff_coverage
         continue-on-error: true
         run: |
+          cd components/marqo
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export PYTHONPATH="."
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
-
-            cd components/marqo
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ../..
 
-            diff-cover integ_coverage_data/coverage.xml --html-report integ_coverage_data/diff_cov.html \
-              --markdown-report integ_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots components/marqo
+            diff-cover ../../integ_coverate_data/coverage.xml --html-report ../../integ_coverate_data/diff_cov.html \
+              --markdown-report ../../integ_coverate_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on push events"
-            echo "Skipped diff-cover on push event" > integ_coverage_data/diff_cov.md
-            touch integ_coverage_data/diff_cov.html
+            echo "Skipped diff-cover on push event" > ../../integ_coverate_data/diff_cov.md
+            touch ../../integ_coverate_data/diff_cov.html
           fi
 
       - name: Check diff combined test coverage (95% threshold)
         id: combined_diff_coverage
         continue-on-error: true
         run: |
+          cd marqo/components
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export PYTHONPATH="."
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
-
-            cd components/marqo
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ../..
 
-            diff-cover coverage_data/coverage.xml --html-report coverage_data/diff_cov.html \
-              --markdown-report coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95 --src-roots components/marqo
+            diff-cover ../../coverage_data/coverage.xml --html-report ../../coverage_data/diff_cov.html \
+              --markdown-report ../../coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on push events"
-            echo "Skipped diff-cover on push event" > coverage_data/diff_cov.md
-            touch coverage_data/diff_cov.html
+            echo "Skipped diff-cover on push event" > ../../coverage_data/diff_cov.md
+            touch ../../coverage_data/diff_cov.html
           fi
 
       - name: Check overall integration test coverage (78% threshold)
