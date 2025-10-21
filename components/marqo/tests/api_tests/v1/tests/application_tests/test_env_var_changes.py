@@ -81,7 +81,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
         utilities.rerun_marqo_with_env_vars(
-            env_vars=['-e', f"MARQO_MODELS_TO_PRELOAD=[{json.dumps(open_clip_model_object)}]"],
+            env_vars={"MARQO_MODELS_TO_PRELOAD": "[{json.dumps(open_clip_model_object)}]"},
             calling_class=self.__class__.__name__,
             target_service="mioc"
         )
@@ -101,18 +101,18 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         new_models = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
         index_name = "test_multiple_env_vars"
         utilities.rerun_marqo_with_env_vars(
-            env_vars=[
-                "-e", f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
-                "-e", f"MARQO_INFERENCE_CACHE_SIZE=10",  # enable cache on inference side
-            ],
+            env_vars={
+                "MARQO_MODELS_TO_PRELOAD": json.dumps(new_models),
+                "MARQO_INFERENCE_CACHE_SIZE": "10",  # enable cache on inference side
+            },
             calling_class=self.__class__.__name__,
             target_service="mioc",
         )
 
         utilities.rerun_marqo_with_env_vars(
-            env_vars=[
-                "-e", f"MARQO_API_INFERENCE_CACHE_SIZE=10",  # enable inference cache on api side
-            ],
+            env_vars={
+                "MARQO_API_INFERENCE_CACHE_SIZE": "10",  # enable inference cache on api side
+            },
             calling_class=self.__class__.__name__,
             target_service="api",
         )

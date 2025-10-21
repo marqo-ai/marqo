@@ -12,7 +12,8 @@ dependencies = [
     "pytest>=8.4.2",
     "python-dotenv>=1.1.1",
     "pyyaml>=6.0.3",
-    "pydantic>=2.12.3"
+    "pydantic>=2.12.3",
+    "notebook>=7.4.7",
 ]
 
 [tool.pytest.ini_options]

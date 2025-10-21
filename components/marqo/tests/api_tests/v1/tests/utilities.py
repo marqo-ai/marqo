@@ -4,6 +4,7 @@ import time
 import typing
 import pathlib
 import tempfile
+import yaml
 
 root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
 compose_file = os.path.join(root_project_dir, "compose.yaml")
@@ -58,7 +59,7 @@ def classwide_decorate(decorator, allowed_configurations):
     return decorate
 
 
-def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", target_service: str = "api"):
+def rerun_marqo_with_env_vars(env_vars: dict[str, str], calling_class: str = "", target_service: str = "api"):
     """
         Given a list of env vars / flags, stop and rerun Marqo using the start script appropriate
         for the current test config
@@ -76,20 +77,27 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
         )
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".env") as fp:
-        for env in env_vars:
-            if env == '-e':
-                continue
-            fp.write(f"{env}\n")
+
+        with open(compose_file, 'r') as compose_fp:
+            compose_content = yaml.safe_load(compose_fp)
+
+        updated_compose_data = compose_content.copy()
+
+        targe_service_file = updated_compose_data['services'][target_service]
+        for key, value in env_vars:
+            if not 'environment' in targe_service_file:
+                targe_service_file['environment'] = {}
+            targe_service_file['environment'][key] = value
+
+        yaml.dump(updated_compose_data, fp)
         fp.flush()
         temp_path = pathlib.Path(fp.name).absolute()
-        print(temp_path)
+
         run_process = subprocess.Popen(
             [
                 "docker",  # command: run
                 "compose",
                 "-f",
-                str(compose_file),
-                "--env-file",
                 temp_path,
                 "up",
                 "-d",
