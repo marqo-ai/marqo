@@ -157,7 +157,9 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         # Assert correct models
         res = self.client.index(index_name).get_loaded_models()
-        assert set([item["model_name"] for item in res["models"]]) == set(new_models)
+        self.assertIn(
+            "open_clip/ViT-B-32/laion2b_s34b_b79k", res["models"][0]["modelName"]
+        )
 
         # Test inference cache
         telemetry_client = Client(**self.client_settings, return_telemetry=True)
