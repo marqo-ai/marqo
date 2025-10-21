@@ -4,7 +4,6 @@ import time
 import typing
 import pathlib
 
-
 root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
 compose_file = os.path.join(root_project_dir, "compose.yaml")
 
@@ -20,6 +19,7 @@ def disallow_environments(disallowed_configurations: typing.List[str]):
         "TESTING_CONFIGURATION" matches a configuration in
         disallowed_configurations, then the test will be skipped
     """
+
     def decorator(function):
         def wrapper(*args, **kwargs):
             if os.environ["TESTING_CONFIGURATION"] in disallowed_configurations:
@@ -27,7 +27,9 @@ def disallow_environments(disallowed_configurations: typing.List[str]):
             else:
                 result = function(*args, **kwargs)
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -39,7 +41,9 @@ def allow_environments(allowed_configurations: typing.List[str]):
             else:
                 result = function(*args, **kwargs)
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -49,6 +53,7 @@ def classwide_decorate(decorator, allowed_configurations):
             if method.startswith("test"):
                 setattr(cls, method, (decorator(allowed_configurations))(getattr(cls, method)))
         return cls
+
     return decorate
 
 
@@ -75,11 +80,9 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
             "-f",
             str(compose_file),
             "-d"] +
+        env_vars + # Env vars in list form
         [
-            env_vars
-        ] +
-        [
-            "api"
+            "api",
         ],  # service name in compose file of Marqo API
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -113,11 +116,11 @@ def attach_docker_logs(container_name: str, log_collection: typing.List, start_t
             must be in the format: "%Y-%m-%dT%H:%M:%S"
     """
 
-    commands =  ["docker", "logs", container_name]
+    commands = ["docker", "logs", container_name]
 
     if start_time != None:
         commands.append(f"--since={start_time}")
-    
+
     completed_process = subprocess.run(
         commands,
         stdout=subprocess.PIPE,
@@ -165,8 +168,8 @@ def retrieve_docker_logs(
 
 
 def control_marqo_os(
-    container_name: str = "marqo-os",
-    command: str = "start",
+        container_name: str = "marqo-os",
+        command: str = "start",
 ):
     """Stops a Marqo OS container. If Setup is DIND, This executes a command on the marqo container.
 
