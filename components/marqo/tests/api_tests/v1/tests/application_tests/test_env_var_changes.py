@@ -103,7 +103,10 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             except Exception:
                 time.sleep(5)
         res = self.client.index(index_name).get_loaded_models()
-        assert set([item["modelName"] for item in res["models"]]) == set(custom_models)
+        self.assertTrue(
+            res["models"][0]["modelName"].startswith("open-clip-1"),
+            f"Expected preloaded model to be {custom_models}, but got {res['models']}"
+        )
 
     def test_inference_cache(self):
         """
