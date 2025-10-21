@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --dev
-          python -m nltk.downloader punkt_tab
+          uv run python -m nltk.downloader punkt_tab
 
       - name: Run unit tests
         id: run_unit_tests
