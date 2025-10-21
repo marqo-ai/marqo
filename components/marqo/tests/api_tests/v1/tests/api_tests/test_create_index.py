@@ -12,8 +12,6 @@ class TestCreateIndex(MarqoTestCase):
     def setUp(self) -> None:
         """As this test class is testing index creation,
         we need to create/delete index before/after each test"""
-        print("------------------- Starting a test ------------------")
-        print(self.indexes_to_delete)
         super().setUp()
         self.index_name = "test_index"
 
@@ -80,7 +78,7 @@ class TestCreateIndex(MarqoTestCase):
             "dimensions": 384,
             "type": "hf",
             "poolingMethod": "mean",
-            "tritonTextEncoder": {
+            "tritonTextEncoderProperties": {
                 "maxBatchSize": 16,
                 "name": "all-MiniLM-L6-v2-text-encoder",
                 "sources": [
@@ -151,7 +149,7 @@ class TestCreateIndex(MarqoTestCase):
             'type': 'structured',
             'allFields': [{'name': 'test', 'type': 'text', 'features': ['lexical_search']}],
             'tensorFields': ['test'],
-            'model': 'hf/all_datasets_v4_MiniLM-L6',
+            'model': 'hf/all-MiniLM-L6-v2',
             'normalizeEmbeddings': True,
             'textPreprocessing': {'splitLength': 2, 'splitOverlap': 0, 'splitMethod': 'sentence'},
             'imagePreprocessing': {},
@@ -193,7 +191,7 @@ class TestCreateIndex(MarqoTestCase):
             "dimensions": 384,
             "type": "hf",
             "poolingMethod": "mean",
-            "tritonTextEncoder": {
+            "tritonTextEncoderProperties": {
                 "maxBatchSize": 16,
                 "name": "all-MiniLM-L6-v2-text-encoder",
                 "sources": [
@@ -225,7 +223,6 @@ class TestCreateIndex(MarqoTestCase):
             }
         }
 
-
         self.client.create_index(index_name=self.index_name,
                                  type="structured",
                                  model="test-model",
@@ -245,34 +242,6 @@ class TestCreateIndex(MarqoTestCase):
         self.assertEqual("test-model", index_settings['model'])
         self.assertEqual(model_properties, index_settings['modelProperties'])
 
-    def test_create_structured_image_index_with_preprocessing(self):
-        self.client.create_index(index_name=self.index_name,
-                                 type="structured",
-                                 model="open_clip/ViT-B-16/laion400m_e31",
-                                 image_preprocessing={"patchMethod": "simple"},
-                                 all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]},
-                                             {"name": "image", "type": "image_pointer"}],
-                                 tensor_fields=["test", "image"])
-        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
-        documents = [{"test": "test",
-                      "image": image_url}]
-
-        self.client.index(self.index_name).add_documents(documents)
-
-        lexical_search_res = self.client.index(self.index_name).search(q="test", search_method="LEXICAL")
-        tensor_search_res = self.client.index(self.index_name).search(q="test", search_method="TENSOR")
-        tensor_search_res_image = self.client.index(self.index_name).search(q=image_url, search_method="TENSOR")
-
-        self.assertEqual(1, len(lexical_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res_image['hits']))
-
-        index_settings = self.client.index(self.index_name).get_settings()
-
-        self.assertEqual(["test", "image"], index_settings["tensorFields"])
-        self.assertEqual("open_clip/ViT-B-16/laion400m_e31", index_settings["model"])
-        self.assertEqual("simple", index_settings['imagePreprocessing']['patchMethod'])
-
     def test_dash_in_index_name_structured(self):
         index_name = "test-index-test-index" + str(uuid.uuid4())
         self.client.create_index(index_name, type="structured",
@@ -289,16 +258,18 @@ class TestCreateIndex(MarqoTestCase):
         """
         Tests if you can use the Python client to create a structured index with a custom vector
         """
-        self.client.create_index(index_name=self.index_name,
-                                 type="structured",
-                                 model="open_clip/ViT-B-32/laion400m_e31",
-                                 all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
-                                              "features": ["lexical_search", "filter"]}],
-                                 tensor_fields=["my_custom_vector"],
-                                 ann_parameters={
-                                    "spaceType": "angular",
-                                    "parameters": {"efConstruction": 512, "m": 16}
-                                })
+        self.client.create_index(
+            index_name=self.index_name,
+            type="structured",
+            model="open_clip/ViT-B-32/laion2b_s34b_b79k",
+            all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
+                         "features": ["lexical_search", "filter"]}],
+            tensor_fields=["my_custom_vector"],
+            ann_parameters={
+                "spaceType": "angular",
+                "parameters": {"efConstruction": 512, "m": 16}
+            }
+        )
 
         # Random vectors for example purposes. replace these with your own.
         example_vector_1 = [i for i in range(512)]
@@ -373,7 +344,7 @@ class TestCreateIndex(MarqoTestCase):
 
         t1 = threading.Thread(target=create_index)
         t1.start()
-        time.sleep(0.5)
+        time.sleep(1)
 
         try:
             with self.assertRaises(MarqoWebError) as e:

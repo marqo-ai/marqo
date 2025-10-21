@@ -12,8 +12,15 @@ dependencies = [
     "pytest>=8.4.2",
     "python-dotenv>=1.1.1",
     "pyyaml>=6.0.3",
+    "pydantic>=2.12.3"
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "v1"]
+pythonpath = [".", "v1", "tests"]
+
+[dependency-groups]
+dev = [
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1",
+]
