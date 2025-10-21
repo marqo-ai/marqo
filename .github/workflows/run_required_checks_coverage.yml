@@ -126,7 +126,7 @@ jobs:
         id: combined_diff_coverage
         continue-on-error: true
         run: |
-          cd marqo/components
+          cd components/marqo
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export PYTHONPATH="."
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
