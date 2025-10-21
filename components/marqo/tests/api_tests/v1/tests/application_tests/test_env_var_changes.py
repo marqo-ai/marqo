@@ -82,7 +82,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             },
         }
 
-        index_name = "test_index_for_preload_models" + uuid.uuid4()[:4]
+        index_name = "test_index_for_preload_models" + str(uuid.uuid4())[:4]
 
         print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
         utilities.rerun_marqo_with_env_vars(
