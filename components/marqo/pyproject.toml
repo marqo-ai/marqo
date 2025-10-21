@@ -48,3 +48,29 @@ dev = [
 testpaths = ["tests"]
 addopts = "-ra"
 pythonpath = ["src",  "."]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/marqo/src/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

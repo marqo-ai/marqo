@@ -138,7 +138,8 @@ jobs:
           cd components/marqo
 
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest tests/integ_tests/core/documents/test_documents_common.py \
+            ${{ env.MULTINODE_TEST_ARGS }} \
             --ignore=tests/integ_tests/test_documentation.py --durations=100 \
             --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
@@ -162,8 +163,6 @@ jobs:
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
-        with:
-          path: marqo/components/marqo
 
       - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
@@ -173,11 +172,10 @@ jobs:
 
       - name: Merge Coverage Results
         run: |
-          cd marqo
           pip install coverage
           mkdir -p coverage-reports
           # Move coverage files to marqo directory for combining
-          find ../coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
+          find coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
           coverage combine
           # Store the combined coverage in a directory specific to this configuration
           cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas

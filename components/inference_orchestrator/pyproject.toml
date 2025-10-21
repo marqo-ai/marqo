@@ -71,6 +71,13 @@ omit = [
     "*/test_*.py",
     "*/__pycache__/*",
 ]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/inference_orchestrator/src/",
+]
 
 [tool.coverage.report]
 exclude_lines = [
