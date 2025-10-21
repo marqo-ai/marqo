@@ -73,7 +73,7 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
             "compose",
             "run",
             "-f",
-            compose_file,
+            str(compose_file),
             "-d"] +
         [
             env_vars
