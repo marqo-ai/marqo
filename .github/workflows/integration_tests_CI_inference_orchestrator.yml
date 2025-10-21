@@ -37,7 +37,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd components/marqo
           uv sync --dev
           uv run python -c "import nltk; nltk.download('punkt_tab')"
 

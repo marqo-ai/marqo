@@ -35,6 +35,7 @@ jobs:
           pip install uv
 
       - name: Install dependencies
+        run: |
           uv sync --dev
           python -m nltk.downloader punkt_tab
 
