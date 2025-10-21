@@ -10,7 +10,7 @@ compose_file = os.path.join(root_project_dir, "compose.yaml")
 
 
 def disallow_environments(disallowed_configurations: typing.List[str]):
-    """This construct wraps a test to ensure that it does not run for disallowed 
+    """This construct wraps a test to ensure that it does not run for disallowed
     testing environments.
 
     It figures by examining the "TESTING_CONFIGURATION" environment variable.
@@ -90,15 +90,12 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
                 temp_path,
                 "up",
                 "-d",
-                "force-recreate"
-            ] +
-            env_vars + # Env vars in list form
-            [
-                target_service,
-            ],  # service name in compose file of Marqo API
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True
+                "force-recreate",
+                target_service
+            ],
+        stdout = subprocess.PIPE,
+        stderr = subprocess.STDOUT,
+        universal_newlines = True
         )
         # Wait for the process to complete
         run_process.wait()
