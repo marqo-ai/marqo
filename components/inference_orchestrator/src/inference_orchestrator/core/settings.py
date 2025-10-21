@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Union
 
@@ -11,6 +12,15 @@ from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 from .enum import LogFormat, LogLevel
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
+
+
+def _default_cache_dir() -> str:
+    """
+    Returns the default cache directory path for storing models.
+    This path is set to ~/.cache/marqo/models in the user's home directory.
+    """
+    base = Path(os.path.expanduser("~/.cache/marqo/models"))
+    return str(base)
 
 
 class Settings(BaseSettings):
@@ -42,7 +52,7 @@ class Settings(BaseSettings):
         default_factory=TritonChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS"
     )
     marqo_model_cache_path: str = Field(
-        default=f"{PROJECT_ROOT}", alias="MARQO_MODEL_CACHE_PATH"
+        default=_default_cache_dir(), alias="MARQO_MODEL_CACHE_PATH"
     )
 
     @field_validator("marqo_models_to_preload", mode="after")
