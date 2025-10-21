@@ -3,7 +3,7 @@ name: Inference orchestrator Unit Tests
 
 on:
   workflow_call:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 concurrency:
   group: unit-tests-${{ github.ref }}
