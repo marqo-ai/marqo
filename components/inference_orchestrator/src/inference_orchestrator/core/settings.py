@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         default_factory=TritonChannelArgs, alias="MARQO_TRITON_CHANNEL_ARGS"
     )
     marqo_model_cache_path: str = Field(
-        default=f"{PROJECT_ROOT}/.cache", alias="MARQO_MODEL_CACHE_PATH"
+        default=f"{PROJECT_ROOT}", alias="MARQO_MODEL_CACHE_PATH"
     )
 
     @field_validator("marqo_models_to_preload", mode="after")
