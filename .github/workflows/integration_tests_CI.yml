@@ -138,7 +138,7 @@ jobs:
           cd components/marqo
 
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest ${{ env.MULTINODE_TEST_ARGS }} \
           --ignore=tests/integ_tests/test_documentation.py --durations=100 \
           --cov=src --cov-branch --cov-context=test \
           --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
