@@ -58,7 +58,7 @@ jobs:
         with:
           name: inference-orchestrator-integ-tests-report
           path: |
-            .coverage
-            pytest_result_summary.md
-            pytest_output.txt
+            components/inference_orchestrator/.coverage
+            components/inference_orchestrator/pytest_result_summary.md
+            components/inference_orchestrator/pytest_output.txt
           include-hidden-files: true

@@ -16,12 +16,12 @@ jobs:
   Test-Marqo:
     name: Run unit tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Check out marqo repo
         uses: actions/checkout@v3
         with:
-          path: marqo
+          path: components/marqo
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -35,13 +35,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd marqo/components/marqo
           uv sync --dev
 
       - name: Run unit tests
         id: run_unit_tests
         run: |
-          cd marqo/components/marqo
           set -o pipefail
           uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
@@ -52,7 +50,7 @@ jobs:
         with:
           name: marqo-unit-tests-report
           path: |
-            marqo/.coverage
-            marqo/pytest_result_summary.md
-            marqo/pytest_output.txt
+            components/marqo/.coverage
+            components/marqo/pytest_result_summary.md
+            components/marqo/pytest_output.txt
           include-hidden-files: true
