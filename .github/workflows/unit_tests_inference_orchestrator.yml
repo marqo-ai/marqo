@@ -3,7 +3,7 @@ name: Inference orchestrator Unit Tests
 
 on:
   workflow_call:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 concurrency:
   group: unit-tests-${{ github.ref }}
@@ -16,12 +16,13 @@ jobs:
   Test-Marqo:
     name: Run unit tests
     runs-on: ubuntu-latest
+    defaults:
+        run:
+            working-directory: components/inference_orchestrator
 
     steps:
       - name: Check out marqo repo
         uses: actions/checkout@v3
-        with:
-          path: components/inference_orchestrator
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -34,15 +35,13 @@ jobs:
           pip install uv
 
       - name: Install dependencies
-        run: |
-          cd marqo/components/marqo
           uv sync --dev
           python -m nltk.downloader punkt_tab
 
       - name: Run unit tests
         id: run_unit_tests
         run: |
-          cd marqo/components/marqo
+
           set -o pipefail
           uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
