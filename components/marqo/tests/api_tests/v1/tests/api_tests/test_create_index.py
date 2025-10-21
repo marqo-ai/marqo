@@ -344,7 +344,7 @@ class TestCreateIndex(MarqoTestCase):
 
         t1 = threading.Thread(target=create_index)
         t1.start()
-        time.sleep(1)
+        time.sleep(0.5)
 
         try:
             with self.assertRaises(MarqoWebError) as e:
