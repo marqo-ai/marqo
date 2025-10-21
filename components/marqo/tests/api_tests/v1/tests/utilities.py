@@ -57,7 +57,7 @@ def classwide_decorate(decorator, allowed_configurations):
     return decorate
 
 
-def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
+def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", target_service: str = "api"):
     """
         Given a list of env vars / flags, stop and rerun Marqo using the start script appropriate
         for the current test config
@@ -82,7 +82,7 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
             "-d"] +
         env_vars + # Env vars in list form
         [
-            "api",
+            target_service,
         ],  # service name in compose file of Marqo API
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
