@@ -106,7 +106,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      LOG_LEVEL: "INFO"
+      MARQO_LOG_LEVEL: "INFO"
       MARQO_TRITON_URL: http://triton:8001
       MARQO_MODEL_MANAGEMENT_CONTAINER_URL: http://mmc:8883
     ports:
