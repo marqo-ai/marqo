@@ -116,7 +116,7 @@ def rerun_marqo_with_env_vars(env_vars: dict[str, str], calling_class: str = "",
 def rerun_marqo_with_default_config(calling_class: str = ""):
     # Do not send any env vars
     # This should act like running the start script at the beginning
-    rerun_marqo_with_env_vars(env_vars=[], calling_class=calling_class)
+    rerun_marqo_with_env_vars(env_vars={}, calling_class=calling_class)
 
 
 docker_log_failure_message = "Failed to fetch docker logs for Marqo"
