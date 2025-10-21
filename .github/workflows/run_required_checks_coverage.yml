@@ -23,12 +23,6 @@ jobs:
           name: marqo-integ-tests-merged-report-1shards-0replicas
           path: integration-tests-coverage
 
-      - name: Download large model tests coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: marqo-largemodel-tests-report
-          path: largemodel-tests-coverage
-
       - name: Download unit tests coverage
         uses: actions/download-artifact@v4
         with:
@@ -40,8 +34,6 @@ jobs:
           echo "Listing all downloaded artifacts:"
           echo "Integration tests coverage:"
           ls -la integration-tests-coverage/
-          echo "Large model tests coverage:"
-          ls -la largemodel-tests-coverage/
           echo "Unit tests coverage:"
           ls -la unit-tests-coverage/
 
@@ -59,12 +51,10 @@ jobs:
           
           # Move all coverage files to a single directory
           cp integration-tests-coverage/.coverage.1shards-0replicas coverage_data/integration.coverage
-          cp largemodel-tests-coverage/.coverage coverage_data/largemodel.coverage
           cp unit-tests-coverage/.coverage coverage_data/unit.coverage
           
           # Copy to separate directories for individual analysis
           cp integration-tests-coverage/.coverage.1shards-0replicas integ_coverage_data/integration.coverage
-          cp largemodel-tests-coverage/.coverage integ_coverage_data/largemodel.coverage
           cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage
 
           # List all files for debug          
@@ -75,7 +65,7 @@ jobs:
           
           # Combine coverage data if available          
           echo "Combining coverage files..."
-          coverage combine ../coverage_data/integration.coverage ../coverage_data/largemodel.coverage ../coverage_data/unit.coverage
+          coverage combine ../coverage_data/integration.coverage ../coverage_data/unit.coverage
           coverage xml -o ../coverage_data/coverage.xml
           coverage html --directory=../coverage_data/htmlcov
           coverage report -m > ../coverage_data/coverage.txt
@@ -86,8 +76,8 @@ jobs:
           coverage html --directory=../unit_coverage_data/htmlcov
           coverage report -m > ../unit_coverage_data/coverage.txt
           
-          # Generate integration test coverage data (including largemodel)
-          coverage combine ../integ_coverage_data/integration.coverage ../integ_coverage_data/largemodel.coverage
+          # Generate integration test coverage data
+          coverage combine ../integ_coverage_data/integration.coverage
           coverage xml -o ../integ_coverage_data/coverage.xml
           coverage html --directory=../integ_coverage_data/htmlcov
           coverage report -m > ../integ_coverage_data/coverage.txt
@@ -214,7 +204,7 @@ jobs:
             echo "The following artifacts are of interest:"
             echo ""
             echo "- \`combined-test-coverage\`, \`integration-test-coverage\`, \`unit-test-coverage\`: Coverage and diff coverage reports."
-            echo "- \`marqo-integ-tests-report-*\`, \`marqo-largemodel-tests-report-*\`, \`marqo-unit-tests-report\`: pytest output and reports."
+            echo "- \`marqo-integ-tests-report-*\`, \`marqo-unit-tests-report\`: pytest output and reports."
           } >> $GITHUB_STEP_SUMMARY
           echo "# Unit coverage summary" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
