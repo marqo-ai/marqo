@@ -6,7 +6,7 @@ import pathlib
 import tempfile
 import yaml
 
-root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
+root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent.parent.parent
 compose_file = os.path.join(root_project_dir, "compose.yaml")
 
 
