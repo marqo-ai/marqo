@@ -69,6 +69,7 @@ services:
       MARQO_MAX_CUDA_MODEL_MEMORY: "10"
       MARQO_MODE: "API"
       MARQO_MODELS_TO_PRELOAD: "[]"
+      MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT: "0"
       MARQO_REMOTE_INFERENCE_URL: "http://mioc:8884"
       VESPA_CONFIG_URL: "http://host.docker.internal:19071"
       VESPA_DOCUMENT_URL: "http://host.docker.internal:8080"
