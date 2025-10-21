@@ -3,6 +3,7 @@ import subprocess
 import time
 import typing
 import pathlib
+import tempfile
 
 root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
 compose_file = os.path.join(root_project_dir, "compose.yaml")
@@ -71,40 +72,37 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
     if calling_class not in ["TestEnvVarChanges", "TestBackendRetries"]:
         raise RuntimeError(
             f"Rerun Marqo function should only be called by `TestEnvVarChanges` to ensure other API tests are not affected. Given calling class is {calling_class}")
-    run_process = subprocess.Popen(
-        [
-            "docker",  # command: run
-            "compose",
-            "-f",
-            str(compose_file),
-            "stop",
-            target_service,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True
-    )
 
-
-    run_process = subprocess.Popen(
-        [
-            "docker",  # command: run
-            "compose",
-            "-f",
-            str(compose_file),
-            "run",
-            "-d"] +
-        env_vars + # Env vars in list form
-        [
-            target_service,
-        ],  # service name in compose file of Marqo API
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True
-    )
-    # Wait for the process to complete
-    run_process.wait()
-    return True
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".env") as fp:
+        for env in env_vars:
+            if env == '-e':
+                continue
+            fp.write(f"env\n")
+        fp.flush()
+        temp_path = pathlib.Path(fp.name).absolute()
+        run_process = subprocess.Popen(
+            [
+                "docker",  # command: run
+                "compose",
+                "-f",
+                str(compose_file),
+                "--env-file",
+                temp_path,
+                "up",
+                "-d",
+                "force-recreate"
+            ] +
+            env_vars + # Env vars in list form
+            [
+                target_service,
+            ],  # service name in compose file of Marqo API
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True
+        )
+        # Wait for the process to complete
+        run_process.wait()
+        return True
 
 
 def rerun_marqo_with_default_config(calling_class: str = ""):
