@@ -71,14 +71,28 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
     if calling_class not in ["TestEnvVarChanges", "TestBackendRetries"]:
         raise RuntimeError(
             f"Rerun Marqo function should only be called by `TestEnvVarChanges` to ensure other API tests are not affected. Given calling class is {calling_class}")
+    run_process = subprocess.Popen(
+        [
+            "docker",  # command: run
+            "compose",
+            "-f",
+            str(compose_file),
+            "stop",
+            target_service,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True
+    )
+
 
     run_process = subprocess.Popen(
         [
             "docker",  # command: run
             "compose",
-            "run",
             "-f",
             str(compose_file),
+            "run",
             "-d"] +
         env_vars + # Env vars in list form
         [
