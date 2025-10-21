@@ -81,7 +81,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
         utilities.rerun_marqo_with_env_vars(
-            env_vars={"MARQO_MODELS_TO_PRELOAD": "[{json.dumps(open_clip_model_object)}]"},
+            env_vars={"MARQO_MODELS_TO_PRELOAD": json.dumps([open_clip_model_object])},
             calling_class=self.__class__.__name__,
             target_service="mioc"
         )
