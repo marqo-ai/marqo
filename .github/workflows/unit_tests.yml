@@ -16,12 +16,13 @@ jobs:
   Test-Marqo:
     name: Run unit tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/marqo
 
     steps:
       - name: Check out marqo repo
         uses: actions/checkout@v3
-        with:
-          path: components/marqo
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
