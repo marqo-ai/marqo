@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
         # By default, this will change the working directory to the root of the repository.
 
       - name: Download integration tests coverage
@@ -111,13 +113,13 @@ jobs:
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
 
-            diff-cover ../../integ_coverate_data/coverage.xml --html-report ../../integ_coverate_data/diff_cov.html \
-              --markdown-report ../../integ_coverate_data/diff_cov.md \
+            diff-cover ../../integ_coverage_data/coverage.xml --html-report ../../integ_coverage_data/diff_cov.html \
+              --markdown-report ../../integ_coverage_data/diff_cov.md \
               --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on push events"
-            echo "Skipped diff-cover on push event" > ../../integ_coverate_data/diff_cov.md
-            touch ../../integ_coverate_data/diff_cov.html
+            echo "Skipped diff-cover on push event" > ../../integ_coverage_data/diff_cov.md
+            touch ../../integ_coverage_data/diff_cov.html
           fi
 
       - name: Check diff combined test coverage (95% threshold)
