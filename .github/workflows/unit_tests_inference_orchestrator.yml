@@ -48,12 +48,12 @@ jobs:
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/unit_tests/ | tee pytest_output.txt
 
-#      - name: Upload test report
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: marqo-unit-tests-report
-#          path: |
-#            marqo/.coverage
-#            marqo/pytest_result_summary.md
-#            marqo/pytest_output.txt
-#          include-hidden-files: true
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: inference-orchestrator-unit-tests-report
+          path: |
+            .coverage
+            pytest_result_summary.md
+            pytest_output.txt
+          include-hidden-files: true

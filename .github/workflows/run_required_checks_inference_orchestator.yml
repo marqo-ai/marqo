@@ -77,7 +77,8 @@ jobs:
       - Run-integration-tests
       - Run-unit-tests
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
-    uses: ./.github/workflows/run_required_checks_coverage.yml
+    uses: ./.github/workflows/run_required_checks_coverage_inference_orchestrator.yml
+    secrets: inherit
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
   Report-required-test-status:
