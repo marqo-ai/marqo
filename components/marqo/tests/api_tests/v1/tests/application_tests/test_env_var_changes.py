@@ -18,9 +18,12 @@ We may test multiple different env vars in the same test case. This is because
  this test suite's runtime from growing too large.
 """
 import json
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional, List
+import time
 
+import requests
 from marqo import Client
 from tests import marqo_test
 from tests import utilities
@@ -79,6 +82,8 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             },
         }
 
+        index_name = "test_index_for_preload_models" + uuid.uuid4()[:4]
+
         print(f"Attempting to rerun marqo with custom model {open_clip_model_object['model']}")
         utilities.rerun_marqo_with_env_vars(
             env_vars={"MARQO_MODELS_TO_PRELOAD": json.dumps([open_clip_model_object])},
@@ -89,7 +94,13 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         # check preloaded models (should be custom model)
         custom_models = ["open-clip-1"]
         self.client.create_index("test_index_for_preloaded_models")
-        res = self.client.index("test_index_for_preload_models").get_loaded_models()
+        # Wait for model loading to be ready
+        for _ in range(5):
+            res = requests.get("http://localhost:8884/healthz").json()
+            if res["status"] == "ok":
+                break
+            time.sleep(5)
+        res = self.client.index(index_name).get_loaded_models()
         assert set([item["modelName"] for item in res["models"]]) == set(custom_models)
 
     def test_inference_cache(self):
