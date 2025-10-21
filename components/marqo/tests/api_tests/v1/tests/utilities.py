@@ -2,6 +2,11 @@ import os
 import subprocess
 import time
 import typing
+import pathlib
+
+
+root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
+compose_file = os.path.join(root_project_dir, "compose.yaml")
 
 
 def disallow_environments(disallowed_configurations: typing.List[str]):
@@ -62,42 +67,24 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
         raise RuntimeError(
             f"Rerun Marqo function should only be called by `TestEnvVarChanges` to ensure other API tests are not affected. Given calling class is {calling_class}")
 
-    # Stop Marqo
-    print("Attempting to stop marqo.")
-    subprocess.run(["docker", "stop", "marqo"], check=True, capture_output=True)
-    print("Marqo stopped.")
-
-    # Rerun the appropriate start script
-    test_config = os.environ["TESTING_CONFIGURATION"]
-
-    if test_config == "CPU_LOCAL_MARQO":
-        start_script_name = "start_local_marqo.sh"
-    elif test_config == "CPU_DOCKER_MARQO":
-        start_script_name = "start_docker_marqo.sh"
-    elif test_config == "CUDA_DOCKER_MARQO":
-        start_script_name = "start_cuda_docker_marqo.sh"
-    else:
-        raise RuntimeError(f"Invalid testing configuration: {test_config}. "
-                           f"Must be one of ('CPU_LOCAL_MARQO', 'CPU_DOCKER_MARQO', "
-                           f"'CUDA_DOCKER_MARQO') to run the application tests."
-                           f"If you are using a 'CUSTOM', please only run the tests under 'tests/api_tests'")
-    full_script_path = f"{os.environ['MARQO_API_TESTS_ROOT']}/scripts/{start_script_name}"
-
     run_process = subprocess.Popen(
         [
-            "bash",  # command: run
-            full_script_path,  # script to run
-            os.environ['MARQO_IMAGE_NAME'],  # arg $1 in script
-        ] + env_vars,  # args $2 onwards
+            "docker",  # command: run
+            "compose",
+            "run",
+            "-f",
+            compose_file,
+            "-d"] +
+        [
+            env_vars
+        ] +
+        [
+            "api"
+        ],  # service name in compose file of Marqo API
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         universal_newlines=True
     )
-
-    # Read and print the output line by line (in real time)
-    for line in run_process.stdout:
-        print(line, end='')
-
     # Wait for the process to complete
     run_process.wait()
     return True
