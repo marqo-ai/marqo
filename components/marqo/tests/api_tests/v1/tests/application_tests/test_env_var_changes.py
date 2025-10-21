@@ -35,7 +35,7 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
         Teardown will handle resetting marqo back to base settings
     """
 
-    def _wait_for_container_to_be_ready(self, url: str, timeout: int = 30, container_name: str = "marqo") -> None:
+    def _wait_for_container_to_be_ready(self, url: str, timeout: int = 60, container_name: str = "marqo") -> None:
         start_time = time.time()
         while True:
             try:
