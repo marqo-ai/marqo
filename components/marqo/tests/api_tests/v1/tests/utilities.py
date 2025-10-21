@@ -90,7 +90,7 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
                 temp_path,
                 "up",
                 "-d",
-                "force-recreate",
+                "--force-recreate",
                 target_service
             ],
         stdout = subprocess.PIPE,
