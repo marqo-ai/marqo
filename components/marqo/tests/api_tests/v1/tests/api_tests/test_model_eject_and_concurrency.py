@@ -53,7 +53,7 @@ class TestConcurrencyRequestsBlock(MarqoTestCase):
             res = self.client.index(index_name).search("what is best to wear on the moon?", device=self.device)
             q.put(AssertionError)
         except MarqoWebError as e:
-            if "Request rejected, as this request attempted to update the model cache," in str(e):
+            if "Another model load/unload operation is in progress. Please try again later " in str(e):
                 q.put("racing search get blocked with correct error")
             else:
                 q.put(e)

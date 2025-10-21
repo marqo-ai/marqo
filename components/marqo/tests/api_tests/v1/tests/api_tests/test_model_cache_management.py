@@ -59,5 +59,5 @@ class TestModlCacheManagement(MarqoTestCase):
 
                 loaded_models = self.client.index(index_name).get_loaded_models()["models"]
                 for model in loaded_models:
-                    res = requests.delete(f"{self._MARQO_URL}/models?model_name={model['modelName']}")
-                    self.assertIn("successfully eject", str(res))
+                    res = requests.delete(f"{self._MARQO_URL}/models?model_name={model['modelName']}").json()
+                    self.assertIn("ejected successfully", str(res))
