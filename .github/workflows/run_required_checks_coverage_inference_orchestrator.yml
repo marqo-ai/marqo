@@ -13,7 +13,7 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          path: marqo
+          path: components/inference_orchestrator
           fetch-depth: 0
 
       - name: Download integration tests coverage
@@ -60,26 +60,26 @@ jobs:
           ls -la
 
           # Use the same working directory as pytest in original workflows
-          cd marqo/components/inference_orchestrator
+          cd components/inference_orchestrator
 
           # Combine coverage data if available
           echo "Combining coverage files..."
-          coverage combine ../../../coverage_data/integration.coverage ../../../coverage_data/unit.coverage
-          coverage xml -o ../../../coverage_data/coverage.xml
-          coverage html --directory=../../../coverage_data/htmlcov
-          coverage report -m > ../../../coverage_data/coverage.txt
+          coverage combine ../../coverage_data/integration.coverage ../../coverage_data/unit.coverage
+          coverage xml -o ../../coverage_data/coverage.xml
+          coverage html --directory=../../coverage_data/htmlcov
+          coverage report -m > ../../coverage_data/coverage.txt
 
           # Generate unit test coverage data
-          coverage combine ../../../unit_coverage_data/unit.coverage
-          coverage xml -o ../../../unit_coverage_data/coverage.xml
-          coverage html --directory=../../../unit_coverage_data/htmlcov
-          coverage report -m > ../../../unit_coverage_data/coverage.txt
+          coverage combine ../../unit_coverage_data/unit.coverage
+          coverage xml -o ../../unit_coverage_data/coverage.xml
+          coverage html --directory=../../unit_coverage_data/htmlcov
+          coverage report -m > ../../unit_coverage_data/coverage.txt
 
           # Generate integration test coverage data
-          coverage combine ../../../integ_coverage_data/integration.coverage
-          coverage xml -o ../../../integ_coverage_data/coverage.xml
-          coverage html --directory=../../../integ_coverage_data/htmlcov
-          coverage report -m > ../../../integ_coverage_data/coverage.txt
+          coverage combine ../../integ_coverage_data/integration.coverage
+          coverage xml -o ../../integ_coverage_data/coverage.xml
+          coverage html --directory=../../integ_coverage_data/htmlcov
+          coverage report -m > ../../integ_coverage_data/coverage.txt
 
       - name: Check diff unit test coverage (80% threshold)
         id: unit_diff_coverage
@@ -90,13 +90,13 @@ jobs:
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
 
-            cd marqo
+            cd components/inference_orchestrator
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ..
+            cd ../..
 
             diff-cover unit_coverage_data/coverage.xml --html-report unit_coverage_data/diff_cov.html \
               --markdown-report unit_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots marqo/components/inference_orchestrator
+              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots components/inference_orchestrator
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > unit_coverage_data/diff_cov.md
@@ -112,13 +112,13 @@ jobs:
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
 
-            cd marqo
+            cd components/inference_orchestrator
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ..
+            cd ../..
 
             diff-cover integ_coverage_data/coverage.xml --html-report integ_coverage_data/diff_cov.html \
               --markdown-report integ_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots marqo/components/inference_orchestrator
+              --compare-branch $BASE_BRANCH --fail-under=80 --src-roots components/inference_orchestrator
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > integ_coverage_data/diff_cov.md
@@ -134,13 +134,13 @@ jobs:
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
 
-            cd marqo
+            cd components/inference_orchestrator
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            cd ..
+            cd ../..
 
             diff-cover coverage_data/coverage.xml --html-report coverage_data/diff_cov.html \
               --markdown-report coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95 --src-roots marqo/components/inference_orchestrator
+              --compare-branch $BASE_BRANCH --fail-under=95 --src-roots components/inference_orchestrator
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > coverage_data/diff_cov.md
