@@ -104,9 +104,17 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
             env_vars=[
                 "-e", f"MARQO_MODELS_TO_PRELOAD={json.dumps(new_models)}",
                 "-e", f"MARQO_INFERENCE_CACHE_SIZE=10",  # enable cache on inference side
+            ],
+            calling_class=self.__class__.__name__,
+            target_service="mioc",
+        )
+
+        utilities.rerun_marqo_with_env_vars(
+            env_vars=[
                 "-e", f"MARQO_API_INFERENCE_CACHE_SIZE=10",  # enable inference cache on api side
             ],
-            calling_class=self.__class__.__name__
+            calling_class=self.__class__.__name__,
+            target_service="api",
         )
 
         # Create index with same number of replicas and EF
