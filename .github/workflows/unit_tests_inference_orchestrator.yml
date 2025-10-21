@@ -1,4 +1,59 @@
-name: unit_tests_inference_orchestrator.yml
+name: Inference orchestrator Unit Tests
+# runs unit tests on standard machine
+
 on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  Test-Marqo:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: components/inference_orchestrator
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          cd marqo/components/marqo
+          uv sync --dev
+          python -m nltk.downloader punkt_tab
+
+      - name: Run unit tests
+        id: run_unit_tests
+        run: |
+          cd marqo/components/marqo
+          set -o pipefail
+          uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/unit_tests/ | tee pytest_output.txt
+
+#      - name: Upload test report
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: marqo-unit-tests-report
+#          path: |
+#            marqo/.coverage
+#            marqo/pytest_result_summary.md
+#            marqo/pytest_output.txt
+#          include-hidden-files: true

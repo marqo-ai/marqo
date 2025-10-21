@@ -63,9 +63,6 @@ jobs:
     needs: Determine-changes
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
     uses: ./.github/workflows/integration_tests_CI_inference_orchestrator.yml
-    with:
-      number_of_shards: 1
-      number_of_replicas: 0
     secrets: inherit
 
   Run-unit-tests:
