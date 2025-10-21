@@ -71,7 +71,9 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
 
     if calling_class not in ["TestEnvVarChanges", "TestBackendRetries"]:
         raise RuntimeError(
-            f"Rerun Marqo function should only be called by `TestEnvVarChanges` to ensure other API tests are not affected. Given calling class is {calling_class}")
+            f"Rerun Marqo function should only be called by `TestEnvVarChanges` "
+            f"to ensure other API tests are not affected. Given calling class is {calling_class}"
+        )
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".env") as fp:
         for env in env_vars:
@@ -80,6 +82,7 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = "", targ
             fp.write(f"{env}\n")
         fp.flush()
         temp_path = pathlib.Path(fp.name).absolute()
+        print(temp_path)
         run_process = subprocess.Popen(
             [
                 "docker",  # command: run
