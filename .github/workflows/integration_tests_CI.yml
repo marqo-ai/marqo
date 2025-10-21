@@ -138,13 +138,11 @@ jobs:
           cd components/marqo
 
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest \
-            ${{ env.MULTINODE_TEST_ARGS }} \
-            --ignore=tests/integ_tests/test_documentation.py --durations=100 \
-            --cov=src --cov-branch --cov-context=test \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
-            tests/integ_tests/core/documents/test_documents_common.py  --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
-
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          --ignore=tests/integ_tests/test_documentation.py --durations=100 \
+          --cov=src --cov-branch --cov-context=test \
+          --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
+          tests/integ_tests/core/ --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
@@ -161,9 +159,6 @@ jobs:
       - Test-Marqo
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout marqo repo
-        uses: actions/checkout@v3
-
       - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
         with:
