@@ -93,13 +93,15 @@ class TestEnvVarChanges(marqo_test.MarqoTestCase):
 
         # check preloaded models (should be custom model)
         custom_models = ["open-clip-1"]
-        self.client.create_index("test_index_for_preloaded_models")
+        self.client.create_index(index_name=index_name)
         # Wait for model loading to be ready
         for _ in range(5):
-            res = requests.get("http://localhost:8884/healthz").json()
-            if res["status"] == "ok":
-                break
-            time.sleep(5)
+            try:
+                res = requests.get("http://localhost:8884/healthz").json()
+                if res["status"] == "ok":
+                    break
+            except Exception:
+                time.sleep(5)
         res = self.client.index(index_name).get_loaded_models()
         assert set([item["modelName"] for item in res["models"]]) == set(custom_models)
 
