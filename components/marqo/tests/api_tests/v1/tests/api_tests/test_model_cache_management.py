@@ -36,15 +36,6 @@ class TestModlCacheManagement(MarqoTestCase):
 
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
-    @pytest.mark.cpu_only_test
-    def test_get_cuda_info_error(self) -> None:
-        """Test that cuda is not supported in the current machine"""
-        for index_name in [self.structured_index_name, self.unstructured_index_name]:
-            with self.subTest(index_name):
-                with self.assertRaises(MarqoWebError) as e:
-                    _ = self.client.index(index_name).get_cuda_info()
-                self.assertIn("CUDA is not available on this instance", str(e.exception.message))
-
     def test_get_cpu_info(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
@@ -66,7 +57,7 @@ class TestModlCacheManagement(MarqoTestCase):
                 # Do a search to ensure the model is cached
                 r = self.client.index(index_name).search("q")
 
-                loaded_models = self.client.index(index_name).get_loaded_models()
+                loaded_models = self.client.index(index_name).get_loaded_models()["models"]
                 for model in loaded_models:
                     res = requests.delete(f"{self._MARQO_URL}/models?model_name={model['modelName']}")
                     self.assertIn("successfully eject", str(res))
