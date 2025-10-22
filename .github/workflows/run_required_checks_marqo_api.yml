@@ -1,4 +1,5 @@
-name: Run Required Checks
+name: Run Required Checks Marqo API
+
 on:
   pull_request:
     branches:
