@@ -1,5 +1,5 @@
-name: cpu_local_marqo_API_tests
-# runs API Tests on CPU-only instance with Vespa and Marqo running in two separate docker containers
+name: ARM64 CPU API Tests
+# runs API Tests on ARM64 machine with Vespa and Marqo in the same docker container
 
 on:
   workflow_call:
@@ -26,31 +26,21 @@ on:
       - releases/*
     paths-ignore:
       - '**.md'
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: read
   id-token: write
 
-concurrency:
- group: cpu-local-api-tests-${{ github.ref }}
- cancel-in-progress: true
-
 jobs:
   Test-Marqo:
-    name: Run CPU Local Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    name: Run ARM64 Docker Marqo API Tests
+    runs-on: "runs-on=${{ github.run_id }}/family=r7g.large/ami=${{ vars.MARQO_CPU_ARM64_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
         working-directory: components/marqo/tests/api_tests/v1
     steps:
       - name: Checkout Marqo repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
@@ -94,5 +84,5 @@ jobs:
           echo "Marqo is up"
 
       - name: Run API Tests - CPU
-        run: |          
+        run: |
           uv run pytest tests/

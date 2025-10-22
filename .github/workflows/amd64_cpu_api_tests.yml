@@ -1,5 +1,5 @@
-name: cuda_docker_marqo_API_tests_split
-# runs API Tests on cuda-enabled instance with Vespa and Marqo running in the same container
+name: AMD64 CPU API Tests
+# runs API Tests on CPU-only instance with Vespa and Marqo running in two separate docker containers
 
 on:
   workflow_call:
@@ -33,18 +33,18 @@ on:
     paths-ignore:
       - '**.md'
 
-concurrency:
-  group: cuda_docker_marqo_split-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   id-token: write
 
+concurrency:
+ group: cpu-local-api-tests-${{ github.ref }}
+ cancel-in-progress: true
+
 jobs:
   Test-Marqo:
-    name: Run CUDA Docker Marqo API Tests
-    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
+    name: Run CPU Local Marqo API Tests
+    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
         working-directory: components/marqo/tests/api_tests/v1
@@ -80,7 +80,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           docker compose build --quiet
-          docker compose --profile gpu up -d --quiet-pull 
+          docker compose up -d --quiet-pull
+          
           end=$((SECONDS + 15*60))
           until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
             if (( SECONDS >= end )); then
@@ -89,10 +90,9 @@ jobs:
             fi
             sleep 1
           done
+          
           echo "Marqo is up"
 
-      - name: Run API Tests - CUDA
+      - name: Run API Tests - CPU
         run: |          
-          export TESTING_CONFIGURATION=CUDA_DOCKER_MARQO
           uv run pytest tests/
-
