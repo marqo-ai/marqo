@@ -43,4 +43,4 @@ class TritonInference(Inference):
         elif isinstance(model, RandomModel):
             return RandomModelInferencePipeline(model, request).run_pipeline()
         else:
-            raise InternalServerError("Model not supported.")
+            raise InternalServerError("Model not supported.")  # pragma: no cover
