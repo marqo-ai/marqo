@@ -91,16 +91,9 @@ jobs:
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
             
-            diff-cover ../../unit_coverage_data/coverage.xml \
-              --html-report ../../unit_coverage_data/diff_cov.html \
+            diff-cover ../../unit_coverage_data/coverage.xml --html-report ../../unit_coverage_data/diff_cov.html \
               --markdown-report ../../unit_coverage_data/diff_cov.md \
-              --json-report ../../unit_coverage_data/diff_cov.json \
               --compare-branch $BASE_BRANCH --fail-under=80
-            
-            DIFF_COV=$(jq -r '.total_percent_covered' ../../unit_coverage_data/diff_cov.json)
-            echo "percentage=$DIFF_COV" >> "$GITHUB_OUTPUT"
-            echo "Diff coverage is $DIFF_COV%"
-            
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > ../../unit_coverage_data/diff_cov.md
@@ -118,16 +111,9 @@ jobs:
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
 
-            diff-cover ../../integ_coverage_data/coverage.xml \
-              --html-report ../../integ_coverage_data/diff_cov.html \
+            diff-cover ../../integ_coverage_data/coverage.xml --html-report ../../integ_coverage_data/diff_cov.html \
               --markdown-report ../../integ_coverage_data/diff_cov.md \
-              --json-report ../../integ_coverage_data/diff_cov.json \
               --compare-branch $BASE_BRANCH --fail-under=95
-            
-            DIFF_COV=$(jq -r '.total_percent_covered' ../../integ_coverage_data/diff_cov.json)
-            echo "percentage=$DIFF_COV" >> "$GITHUB_OUTPUT"
-            echo "Diff coverage is $DIFF_COV%"
-            
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > ../../integ_coverage_data/diff_cov.md
@@ -145,15 +131,9 @@ jobs:
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
 
-            diff-cover ../../coverage_data/coverage.xml \
-              --html-report ../../coverage_data/diff_cov.html \
+            diff-cover ../../coverage_data/coverage.xml --html-report ../../coverage_data/diff_cov.html \
               --markdown-report ../../coverage_data/diff_cov.md \
-              --json-report ../../coverage_data/diff_cov.json \
-              --compare-branch "$BASE_BRANCH" --fail-under=95
-            
-            DIFF_COV=$(jq -r '.total_percent_covered' ../../coverage_data/diff_cov.json)
-            echo "pencentage=$DIFF_COV" >> "$GITHUB_OUTPUT"
-            echo "Diff coverage is $DIFF_COV%"
+              --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on push events"
             echo "Skipped diff-cover on push event" > ../../coverage_data/diff_cov.md
