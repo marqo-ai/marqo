@@ -1,43 +1,12 @@
-import filecmp
-import json
-import os
-import tarfile
-import tempfile
-import textwrap
-import threading
-import time
-import xml.etree.ElementTree as ET
-from datetime import datetime
-from pathlib import Path
-from typing import cast
-from unittest import mock
-from unittest.mock import patch
-import uuid
-
-import httpx
-import pytest
-
-from marqo import version
-from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError, InternalError, \
-    ApplicationRollbackError, OperationConflictError
-from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.index_management.vespa_application_package import (MarqoConfig, VespaApplicationPackage,
-                                                                   ApplicationPackageDeploymentSessionStore)
+from marqo.core.inference.api.exceptions import InferenceError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
-from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties
-from marqo.vespa.exceptions import VespaActivationConflictError
-from marqo.vespa.models import VespaDocument
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.core.inference.api.exceptions import InferenceError
 
 
-class TestIndexManagement(MarqoTestCase):
+class TestIndexSettingsUpdate(MarqoTestCase):
     """
     """
     @classmethod
@@ -161,7 +130,7 @@ class TestIndexManagement(MarqoTestCase):
         updated_index = self.index_management.get_index(self.unstructured_image_index)
         self.assertEqual(correct_model_properties, updated_index.model.properties)
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.unstructured_image_index).number_of_documents)
-        self.assertEqual(2, self.monitoring.get_index_stats_by_name(self.unstructured_text_index).number_of_vectors)
+        self.assertEqual(2, self.monitoring.get_index_stats_by_name(self.unstructured_image_index).number_of_vectors)
 
     def test_updated_model_properties_for_unstructured_text_index(self):
         """
@@ -230,7 +199,7 @@ class TestIndexManagement(MarqoTestCase):
         updated_index = self.index_management.get_index(self.structured_image_index)
         self.assertEqual(correct_model_properties, updated_index.model.properties)
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_image_index).number_of_documents)
-        self.assertEqual(2, self.monitoring.get_index_stats_by_name(self.structured_text_index).number_of_vectors)
+        self.assertEqual(2, self.monitoring.get_index_stats_by_name(self.structured_image_index).number_of_vectors)
         
     def test_updated_model_properties_for_structured_text_index(self):
         """
