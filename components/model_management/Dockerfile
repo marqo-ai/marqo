@@ -16,8 +16,10 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies from lockfile
 RUN uv sync --no-dev
 
-# Copy source
+# Copy sourced
 COPY src ./src
+# COPY version file from the root of the monorepo
+COPY ../../../version ./src/version
 
 # Set Python path
 ENV PYTHONPATH=/app/src

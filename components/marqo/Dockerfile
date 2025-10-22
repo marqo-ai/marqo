@@ -40,6 +40,7 @@ RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
 
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
+COPY ../../../version app/src/version
 
 # Set Python path
 ENV PYTHONPATH=/app/src

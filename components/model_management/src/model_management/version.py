@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+import os
 
 root_version_file_path = os.path.join(
     Path(__file__).resolve().parents[4], "version"
