@@ -21,8 +21,6 @@ RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
 
 # Copy sourced
 COPY src ./src
-# COPY version file from the root of the monorepo
-COPY ../../../version ./src/version
 
 # Set Python path
 ENV PYTHONPATH=/app/src
