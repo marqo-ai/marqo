@@ -9,7 +9,7 @@ from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, OperationConflictError, \
-    ZookeeperLockNotAcquiredError, InternalError, UnsupportedFeatureError
+    ZookeeperLockNotAcquiredError, InternalError, InvalidModelPropertiesError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
     ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
@@ -241,11 +241,8 @@ class IndexManagement:
         existing_index = self.get_index(index_name)
         updated_index = existing_index.copy()
         if "modelProperties" in settings_dict:
+            self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
             updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
-            if updated_index.model.get_dimension() != existing_index.model.get_dimension():
-                raise UnsupportedFeatureError(
-                    "Updating modelProperties resulting in dimension change is not supported "
-                )
 
         with self._vespa_deployment_lock():
             logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
@@ -414,6 +411,40 @@ class IndexManagement:
             raise ApplicationNotInitializedError()
 
         return application
+
+    @staticmethod
+    def validate_updated_model_properties(current_model_properties: dict, updated_model_properties: dict) -> None:
+        """
+        Validate the updated model properties to ensure compatibility with the current model properties.
+
+        Args:
+            current_model_properties: current model properties, as a dict
+            updated_model_properties: updated model properties, as a dict
+
+        Returns:
+            None
+
+        Raises:
+            InvalidModelPropertiesError: If the updated model properties is not compatible with the current model properties.
+        """
+        must_unchanged_keys = ["dimensions", "type"]
+
+        for key in must_unchanged_keys:
+            if current_model_properties.get(key) != updated_model_properties.get(key):
+                raise InvalidModelPropertiesError(
+                    f"Updating model properties resulting in change of '{key}' is not allowed. "
+                    f"Current '{key}': {current_model_properties.get(key)}, "
+                    f"updated '{key}': {updated_model_properties.get(key)} "
+                )
+
+        current_keys = set(current_model_properties.keys())
+        updated_keys = set(updated_model_properties.keys())
+
+        if current_keys.issubset(updated_keys):
+            raise InvalidModelPropertiesError(
+                f"The updated model properties must contain all keys in the current model properties for compatibility. "
+                f"Current model properties keys: {current_keys}, updated model properties keys: {updated_keys} "
+            )
 
     @contextmanager
     def _vespa_deployment_lock(self):

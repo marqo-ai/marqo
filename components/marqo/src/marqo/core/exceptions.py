@@ -121,3 +121,7 @@ class CudaDeviceNotAvailableError(DeviceError):
 
 class CudaOutOfMemoryError(DeviceError):
     pass
+
+
+class InvalidModelPropertiesError(MarqoError):
+    pass
