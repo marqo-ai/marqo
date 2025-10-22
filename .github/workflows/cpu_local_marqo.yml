@@ -81,9 +81,16 @@ jobs:
         run: |
           docker compose build --quiet
           docker compose up -d --quiet-pull
+          
+          end=$((SECONDS + 15*60))
           until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
-            sleep 0.1
+            if (( SECONDS >= end )); then
+              echo "❌ Timed out waiting for Marqo after 15 minutes."
+              exit 1
+            fi
+            sleep 1
           done
+          
           echo "Marqo is up"
 
       - name: Run API Tests - CPU
