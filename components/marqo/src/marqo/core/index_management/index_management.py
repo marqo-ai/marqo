@@ -239,11 +239,10 @@ class IndexManagement:
                                 f"Provided settings: {list(settings_dict.keys())}")
 
         existing_index = self.get_index(index_name)
-        updated_index = existing_index.copy()
+        updated_index = existing_index.copy(deep=True)
         if "modelProperties" in settings_dict:
             self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
             updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
-
         with self._vespa_deployment_lock():
             logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
             self._get_vespa_application().update_index_setting(updated_index)
@@ -440,7 +439,7 @@ class IndexManagement:
         current_keys = set(current_model_properties.keys())
         updated_keys = set(updated_model_properties.keys())
 
-        if current_keys.issubset(updated_keys):
+        if not current_keys.issubset(updated_keys):
             raise InvalidModelPropertiesError(
                 f"The updated model properties must contain all keys in the current model properties for compatibility. "
                 f"Current model properties keys: {current_keys}, updated model properties keys: {updated_keys} "
