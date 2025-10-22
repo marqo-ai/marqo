@@ -478,7 +478,12 @@ class TestMainAPIModelsEndpoints(InferenceTestCase):
 
 
 class TestMainAPIErrorHandling(InferenceTestCase):
-    """Test error handling in the API."""
+    """Test error handling in the API.
+
+    These tests specifically cover error handling in the vectorise endpoint,
+    focusing on lines 100-114 of main.py which handle msgpack parsing and
+    validation errors.
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -486,8 +491,210 @@ class TestMainAPIErrorHandling(InferenceTestCase):
         cls.client = TestClient(app)
         cls.eject_all_models()
 
+    def test_vectorise_with_malformed_msgpack_returns_400(self):
+        """Test that malformed msgpack data returns 400 with ExtraData error.
+
+        This tests line 102-106 in main.py for msgpack.ExtraData exception.
+        """
+        # Create valid msgpack data, then append extra bytes to make it malformed
+        valid_data = msgpack.packb({"test": "data"}, use_bin_type=True)
+        malformed_data = valid_data + b"\x00\x01\x02"  # Extra bytes after valid msgpack
+
+        response = self.client.post(
+            "/vectorise",
+            content=malformed_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(400, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+        self.assertIn("Invalid MessagePack format", error_data["detail"])
+
+    def test_vectorise_with_corrupted_msgpack_returns_400(self):
+        """Test that corrupted msgpack data returns 400 with UnpackException.
+
+        This tests line 102-106 in main.py for msgpack.UnpackException.
+        """
+        # Create completely invalid msgpack data
+        corrupted_data = b"\xff\xfe\xfd\xfc\xfb"  # Invalid msgpack bytes
+
+        response = self.client.post(
+            "/vectorise",
+            content=corrupted_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(400, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+        self.assertIn("Invalid MessagePack format", error_data["detail"])
+
+    def test_vectorise_with_incomplete_msgpack_returns_500(self):
+        """Test that incomplete msgpack data returns 500.
+
+        This tests line 111-114 in main.py - incomplete msgpack triggers
+        ValueError which is caught by the generic Exception handler.
+        """
+        # Create truncated msgpack data (incomplete)
+        incomplete_data = b"\x81"  # Start of a map but truncated
+
+        response = self.client.post(
+            "/vectorise",
+            content=incomplete_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(500, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+
+    def test_vectorise_with_missing_required_field_returns_422(self):
+        """Test that missing required fields returns 422 ValidationError.
+
+        This tests line 107-110 in main.py for Pydantic ValidationError.
+        """
+        # Missing required 'contents' field
+        invalid_request = {
+            "modality": "language",
+            "embeddingModelConfig": {
+                "modelName": "test-model",
+                "normalizeEmbeddings": True,
+            },
+            "preprocessingConfig": {"modality": "language"},
+        }
+
+        request_data = msgpack.packb(invalid_request, use_bin_type=True)
+
+        response = self.client.post(
+            "/vectorise",
+            content=request_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(422, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+        # ValidationError detail should mention missing field
+        self.assertIn("Field required", error_data["detail"])
+
+    def test_vectorise_with_wrong_field_type_returns_422(self):
+        """Test that wrong field types return 422 ValidationError.
+
+        This tests line 107-110 in main.py for Pydantic ValidationError.
+        """
+        # 'contents' should be a list, not a string
+        invalid_request = {
+            "modality": "language",
+            "contents": "should be a list not string",
+            "embeddingModelConfig": {
+                "modelName": "test-model",
+                "normalizeEmbeddings": True,
+            },
+            "preprocessingConfig": {"modality": "language"},
+        }
+
+        request_data = msgpack.packb(invalid_request, use_bin_type=True)
+
+        response = self.client.post(
+            "/vectorise",
+            content=request_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(422, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+
+    def test_vectorise_with_invalid_modality_returns_422(self):
+        """Test that invalid modality enum value returns 422 ValidationError.
+
+        This tests line 107-110 in main.py for Pydantic ValidationError.
+        """
+        invalid_request = {
+            "modality": "invalid_modality",  # Not a valid Modality enum
+            "contents": ["test"],
+            "embeddingModelConfig": {
+                "modelName": "test-model",
+                "normalizeEmbeddings": True,
+            },
+            "preprocessingConfig": {"modality": "language"},
+        }
+
+        request_data = msgpack.packb(invalid_request, use_bin_type=True)
+
+        response = self.client.post(
+            "/vectorise",
+            content=request_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(422, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+
+    def test_vectorise_with_invalid_embedding_config_returns_422(self):
+        """Test that invalid embeddingModelConfig returns 422 ValidationError.
+
+        This tests line 107-110 in main.py for Pydantic ValidationError.
+        """
+        # Missing required 'modelName' in embeddingModelConfig
+        invalid_request = {
+            "modality": "language",
+            "contents": ["test"],
+            "embeddingModelConfig": {
+                "normalizeEmbeddings": True,
+                # Missing modelName
+            },
+            "preprocessingConfig": {"modality": "language"},
+        }
+
+        request_data = msgpack.packb(invalid_request, use_bin_type=True)
+
+        response = self.client.post(
+            "/vectorise",
+            content=request_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(422, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+        self.assertIn("Field required", error_data["detail"])
+
+    def test_vectorise_with_invalid_preprocessing_config_returns_422(self):
+        """Test that invalid preprocessingConfig returns 422 ValidationError.
+
+        This tests line 107-110 in main.py for Pydantic ValidationError.
+        """
+        # Missing required 'modality' in preprocessingConfig
+        invalid_request = {
+            "modality": "language",
+            "contents": ["test"],
+            "embeddingModelConfig": {
+                "modelName": "test-model",
+                "normalizeEmbeddings": True,
+            },
+            "preprocessingConfig": {},  # Missing modality
+        }
+
+        request_data = msgpack.packb(invalid_request, use_bin_type=True)
+
+        response = self.client.post(
+            "/vectorise",
+            content=request_data,
+            headers={"Content-Type": "application/msgpack"},
+        )
+
+        self.assertEqual(422, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+
     def test_vectorise_with_invalid_model_properties_returns_400(self):
-        """Test that invalid model properties return 400 error."""
+        """Test that invalid model properties return 400 error.
+
+        This tests line 124-129 in main.py for ServiceError exception.
+        """
         # Create request with invalid model properties
         invalid_model_properties = {
             "type": "invalid_type",
@@ -515,3 +722,6 @@ class TestMainAPIErrorHandling(InferenceTestCase):
 
         # Should return 400 for invalid model properties (bad request)
         self.assertEqual(400, response.status_code)
+        error_data = response.json()
+        self.assertIn("detail", error_data)
+        self.assertIn("An error occurred during vectorisation", error_data["detail"])
