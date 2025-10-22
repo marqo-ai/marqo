@@ -280,7 +280,9 @@ _MODEL_REGISTRY: dict[str, dict] = {
     "hf/e5-base-v2": {
         "name": "intfloat/e5-base-v2",
         "dimensions": 768,
+        "tokens": 512,
         "type": "hf",
+        "notes": "",
         "poolingMethod": "mean",
         "text_query_prefix": "query: ",
         "text_chunk_prefix": "passage: ",
@@ -305,6 +307,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
     "hf/e5-small-v2": {
         "name": "intfloat/e5-small-v2",
         "dimensions": 384,
+        "tokens": 512,
+        "notes": "",
         "type": "hf",
         "text_query_prefix": "query: ",
         "text_chunk_prefix": "passage: ",
@@ -330,8 +334,10 @@ _MODEL_REGISTRY: dict[str, dict] = {
     "hf/all-MiniLM-L6-v2": {
         "name": "sentence-transformers/all-MiniLM-L6-v2",
         "dimensions": 384,
+        "tokens": 256,
         "type": "hf",
         "poolingMethod": "mean",
+        "notes": "",
         "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
             "name": "all-MiniLM-L6-v2-text-encoder",
