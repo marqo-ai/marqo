@@ -614,8 +614,8 @@ def delete_docs(index_name: str, documentIds: List[str],
 @app.get("/models")
 def get_loaded_models(detailed: bool=False, marqo_config: config.Config = Depends(get_config)):
     """
-    Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
-    [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
+    Returns information about all the loaded models with model_properties(detailed set to true), or not.
+    Please refer to [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
     """
     return marqo_config.model_manager.get_loaded_models(detailed)
 
@@ -623,7 +623,7 @@ def get_loaded_models(detailed: bool=False, marqo_config: config.Config = Depend
 @app.delete("/models")
 def eject_model(model_name: str, marqo_config: config.Config = Depends(get_config)):
     """
-    Eject a model from a specific device. Please refer to
+    Eject a model from Marqo. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
     return marqo_config.model_manager.eject_model(model_name=model_name)
@@ -636,16 +636,6 @@ def get_cpu_info():
     [Get CPU info API document](https://docs.marqo.ai/latest/reference/api/device/get-cpu-information/) for details.
     """
     return tensor_search.get_cpu_info()
-
-
-# TODO move this to Inference
-@app.get("/device/cuda")
-def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
-    """
-    Gives information about your cuda usage. Please refer to
-    [Get CUDA info API document](https://docs.marqo.ai/latest/reference/api/device/get-cuda-information/) for details.
-    """
-    return marqo_config.monitoring.get_cuda_info()
 
 
 @app.post("/batch/indexes/delete", include_in_schema=False)
