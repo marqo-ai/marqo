@@ -1,7 +1,7 @@
 [project]
 name = "model-management"
-version = "0.1.0"
-description = "Add your description here"
+version = ["dynamic"]
+description = "The model management component of Marqo"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.116.2",
