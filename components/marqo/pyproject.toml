@@ -1,6 +1,6 @@
 [project]
 name = "marqo-api"
-dynamic = ["version"]
+version = "0.0.1"
 description = "The core API component of Marqo"
 readme = "README.md"
 requires-python = ">=3.11, <3.12"
@@ -74,6 +74,3 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
-
-[tool.setuptools.dynamic]
-version = { attr = "marqo.version.__version__" }

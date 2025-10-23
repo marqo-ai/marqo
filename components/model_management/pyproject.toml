@@ -1,6 +1,6 @@
 [project]
-name = "model-management"
-dynamic = ["version"]
+name = "marqo-model-management"
+version = "0.0.1"
 description = "The model management component of Marqo"
 requires-python = ">=3.11,<3.12"
 dependencies = [
@@ -56,6 +56,3 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
-
-[tool.setuptools.dynamic]
-version = { attr = "model_management.version.__version__" }

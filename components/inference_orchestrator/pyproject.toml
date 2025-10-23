@@ -1,6 +1,6 @@
 [project]
-name = "inference-orchestrator"
-dynamic = ["version"]
+name = "marqo-inference-orchestrator"
+version = "0.0.1"
 description = "Inference orchestrator for Marqo"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -97,6 +97,3 @@ extend-exclude = [
 
 [tool.ruff.lint]
 extend-select = ["I"]  # enable import sorting
-
-[tool.setuptools.dynamic]
-version = { attr = "inference_orchestrator.version.__version__" }
