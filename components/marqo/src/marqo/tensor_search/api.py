@@ -612,12 +612,12 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 
 @app.get("/models")
-def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
+def get_loaded_models(detailed: bool=False, marqo_config: config.Config = Depends(get_config)):
     """
     Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
     [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
     """
-    return marqo_config.model_manager.get_loaded_models()
+    return marqo_config.model_manager.get_loaded_models(detailed)
 
 
 @app.delete("/models")

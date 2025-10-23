@@ -82,15 +82,23 @@ class Inference(ABC):
 
 class ModelManager(ABC):
     @abstractmethod
-    def get_loaded_models(self) -> dict:
+    def get_loaded_models(self, detailed: bool=False) -> dict:
         """
         Retrieve information about models loaded in all devices
 
-        Returns: All loaded models, in following format:
-            {"models": [
-                {"model_name": "model1", "model_device": "cpu"},
-                {"model_name": "model2", "model_device": "cuda"},
-            ]}
+        Args:
+            detailed (bool): whether to return detailed information about each model
+
+        Returns: A dictionary containing model names as keys and their details as values.
+        e.g,
+            {
+                "models": [{"modelName": "model1||1234", "modelProperties": {...}, ...]
+            } if detailed is True,
+
+            {
+                "models": [{"modelName": "model1||1234", "modelProperties": "<omitted>", ...]
+            } if detailed is False
+
         """
         pass
 

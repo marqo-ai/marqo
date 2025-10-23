@@ -17,9 +17,10 @@ class ModelManagerClient(ModelManager):
         self.base_url = base_url.rstrip("/")
         self.client = httpx.Client(base_url=base_url, timeout=timeout)
 
-    def get_loaded_models(self) -> dict:
+    def get_loaded_models(self, detailed: bool=False) -> dict:
         """
-        Retrieves the loaded models from the remote inference service.
+        Retrieves the loaded models from the remote inference service. The request is sent to the
+        inference_orchestrator service which manages the models.
 
         Returns:
             dict: A dictionary of loaded models.
@@ -29,7 +30,7 @@ class ModelManagerClient(ModelManager):
             Exception: For any other exceptions.
         """
         try:
-            response = self.client.get("/models")
+            response = self.client.get(f"/models?detailed={str(detailed).lower()}")
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as http_err:
