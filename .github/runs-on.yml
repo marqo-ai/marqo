@@ -11,7 +11,7 @@ images:
     ami: "ami-05552d0fb705d800e"
 
   marqo-cpu-arm-image:
-    ami: "ami-0a449659aae944a9d"
+    ami: "ami-055eacc4029e4a094"
 
 runners:
   marqo-cpu-runner:
