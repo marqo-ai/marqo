@@ -58,4 +58,4 @@ exclude_lines = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "version.__version__" }
+version = { attr = "model_management.version.__version__" }

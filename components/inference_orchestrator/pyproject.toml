@@ -99,4 +99,4 @@ extend-exclude = [
 extend-select = ["I"]  # enable import sorting
 
 [tool.setuptools.dynamic]
-version = { attr = "version.__version__" }
+version = { attr = "inference_orchestrator.version.__version__" }

@@ -76,4 +76,4 @@ exclude_lines = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "version.__version__" }
+version = { attr = "marqo.version.__version__" }
