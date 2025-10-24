@@ -667,7 +667,7 @@ class TestSearchStructured(MarqoTestCase):
             (None, doc.keys()),  # not provided
             (list(doc.keys()), doc.keys()),  # all fields are selected
         )
-            + tuple([([field], {field}) for field in doc.keys()])  # one field
+            + tuple([([field], {field}) for field in list(doc.keys())])  # one field
             + tuple((random_fields, set(random_fields)) for random_fields in
                     [random.sample(list(doc.keys()), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
 

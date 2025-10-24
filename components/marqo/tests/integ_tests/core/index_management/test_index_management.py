@@ -28,7 +28,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties
+from marqo.core.inference.embedding_models.marqo_model_registry import get_model_properties
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
 from tests.integ_tests.marqo_test import MarqoTestCase

@@ -11,6 +11,8 @@ COPY vespa/src /app/vespa/src
 # Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
 RUN mvn clean package -T 1C
 
+ARG TARGETPLATFORM
+ARG COMMITHASH
 
 FROM python:3.11-slim AS base
 

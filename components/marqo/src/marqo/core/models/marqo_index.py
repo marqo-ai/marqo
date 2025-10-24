@@ -1,22 +1,21 @@
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional, Dict, Any, Set, Union
-import semver
+from typing import List, Optional, Dict, Any, Set
 
 import pydantic.v1 as pydantic
+import semver
 from pydantic.v1 import PrivateAttr, root_validator
 from pydantic.v1 import ValidationError, validator
 from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic.v1.utils import ROOT_KEY
 
-from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel, MarqoBaseModel
+import marqo.core.inference.api.exceptions as inference_exceptions
+from marqo.base_model import ImmutableBaseModel, MarqoBaseModel
 from marqo.core import constants
+from marqo.core.inference.embedding_models.marqo_model_registry import get_model_properties, validate_model_properties
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
-
-import marqo.core.inference.api.exceptions as inference_exceptions
-from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties, validate_model_properties
 
 logger = get_logger(__name__)
 
@@ -182,7 +181,7 @@ class Model(MarqoBaseModel):
         custom = values.get('custom')
         if properties and custom:
             try:
-                validate_model_properties(model_name)
+                validate_model_properties(properties)
             except ValueError as e:
                 raise ValueError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'

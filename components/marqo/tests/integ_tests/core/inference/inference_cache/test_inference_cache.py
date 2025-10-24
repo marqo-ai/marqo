@@ -15,7 +15,7 @@ from orjson import orjson
 from marqo.core.inference.api import InferenceRequest, Modality, EmbeddingModelConfig, TextPreprocessingConfig, Inference, \
     InferenceResult, InferenceErrorModel, ImagePreprocessingConfig
 from marqo.core.inference.inference_cache.caching_inference import CachingInference
-from marqo.core.inference.embedding_models.marqo_model_regiestry import get_model_properties
+from marqo.core.inference.embedding_models.marqo_model_registry import get_model_properties
 
 
 class RandomInferenceStub(Inference):
