@@ -252,7 +252,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
         # Set up the test API client with the correct env vars set
         with mock.patch.dict(os.environ, {
             "VESPA_SEARCH_TIMEOUT_MS": "1",
-            "MARQO_MODE": "API"
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
             # VespaClient will be created with default timeout of 1ms
@@ -286,7 +285,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_API_INFERENCE_CACHE_SIZE": "10",
             "MARQO_API_INFERENCE_CACHE_TYPE": "LFU",
-            "MARQO_MODE": "API",
             "MARQO_ENABLE_THROTTLING": "FALSE"
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
@@ -334,12 +332,6 @@ class TestApiErrors(MarqoTestCase):
 
         cls.unstructured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
-
-    def setUp(self):
-        with mock.patch.dict(os.environ, {"MARQO_MODE": "COMBINED"}):
-            # reload the api module to recreated config in combined mode
-            importlib.reload(sys.modules['marqo.tensor_search.api'])
-            self.client = TestClient(api.app)
 
     def test_index_not_found_error(self):
         index_name = self.random_index_name()

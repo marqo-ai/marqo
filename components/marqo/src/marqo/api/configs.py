@@ -7,8 +7,6 @@ def default_env_vars() -> dict:
     default env vars if they aren't defined in the environment.
     """
     return {
-        EnvVars.MARQO_MODE: "COMBINED",  # one of COMBINED, API, INFERENCE
-
         # Common config applicable for all modes
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_LOG_FORMAT: "plain",
@@ -52,8 +50,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE",
         EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: 10_000,
 
-        # Throttling
-        EnvVars.MARQO_ENABLE_THROTTLING: "TRUE",
         EnvVars.MARQO_MAX_CONCURRENT_INDEX: 8,
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
         EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE: 100,

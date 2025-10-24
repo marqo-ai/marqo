@@ -17,9 +17,6 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 class TestAPIQueryLoggingIntegration(MarqoTestCase):
     """Integration tests for the query logging feature in the API"""
 
-    default_env_vars = {
-        EnvVars.MARQO_ENABLE_THROTTLING: 'FALSE'  # disable throttling
-    }
 
     @classmethod
     def setUpClass(cls):
