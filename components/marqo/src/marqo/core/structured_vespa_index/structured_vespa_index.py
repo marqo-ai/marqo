@@ -1,3 +1,5 @@
+from typing import Union
+
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
@@ -10,8 +12,6 @@ from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod, RelativeMaxScoreParameters
-from marqo.tensor_search.models.sort_by_model import SortByModel
 
 
 class StructuredVespaIndex(VespaIndex):
