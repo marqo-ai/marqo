@@ -17,7 +17,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
 
 # Download NLTK data
-RUN uv run python -m nltk.downloader punkt
 RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
 
 # Copy sourced
@@ -26,6 +25,7 @@ COPY src ./src
 # Set Python path
 ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
+RUN echo $COMMITHASH > build_info.txt
 
 ENV MARQO_HOST=0.0.0.0
 ENV MARQO_TIMEOUT_KEEP_ALIVE=75

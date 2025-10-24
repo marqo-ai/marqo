@@ -222,3 +222,58 @@ class TestOpenClipModelEncode(InferenceTestCase):
             )
             self.validate_norm(raw_embedding, epsilon=self.eps, normalize=True)
             self.validate_norm(pipeline_embedding, epsilon=self.eps, normalize=True)
+
+    def test_batch_results_are_different_text(self):
+        """
+        There could be a bug where the model returns the same embedding for all inputs in a batch. This is a bug
+        in the onnx conversion of some models. This test ensures that the embeddings for different inputs in a batch
+        are different.
+        """
+
+        inputs = ["hello world", "big world", "small world", "another world"]
+        embeddings = self.encode_content_helper(
+            content=inputs,
+            model_name=self.model_name,
+            modality=Modality.TEXT,
+            normalize_embeddings=True,
+        )
+
+        for i in range(len(embeddings)):
+            for j in range(i + 1, len(embeddings)):
+                with self.subTest(
+                    f"Comparing embeddings for inputs {inputs[i]} and {inputs[j]}"
+                ):
+                    self.assertFalse(
+                        np.allclose(embeddings[i], embeddings[j]),
+                        f"Embeddings for inputs {inputs[i]} and {inputs[j]} are the same, which is a bug.",
+                    )
+
+    def test_batch_results_are_different_image(self):
+        """
+        There could be a bug where the model returns the same embedding for all inputs in a batch. This is a bug
+        in the onnx conversion of some models. This test ensures that the embeddings for different inputs in a batch
+        are different.
+        """
+
+        inputs = [
+            TestImageUrls.IMAGE0.value,
+            TestImageUrls.IMAGE1.value,
+            TestImageUrls.IMAGE2.value,
+            TestImageUrls.IMAGE3.value,
+        ]
+        embeddings = self.encode_content_helper(
+            content=inputs,
+            model_name=self.model_name,
+            modality=Modality.IMAGE,
+            normalize_embeddings=True,
+        )
+
+        for i in range(len(embeddings)):
+            for j in range(i + 1, len(embeddings)):
+                with self.subTest(
+                    f"Comparing embeddings for inputs {inputs[i]} and {inputs[j]}"
+                ):
+                    self.assertFalse(
+                        np.allclose(embeddings[i], embeddings[j]),
+                        f"Embeddings for inputs {inputs[i]} and {inputs[j]} are the same, which is a bug.",
+                    )

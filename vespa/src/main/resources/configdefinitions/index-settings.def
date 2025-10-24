@@ -1,4 +1,0 @@
-package=ai.marqo.index
-
-indexSettingsFile path
-indexSettingsHistoryFile path

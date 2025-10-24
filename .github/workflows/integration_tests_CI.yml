@@ -81,7 +81,8 @@ jobs:
       fail-fast: false
       matrix:
         part: [ 0, 1, 2 ] # Zero-based index for JSON list access
-    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/spot=false"
     
     timeout-minutes: 60
     env:
@@ -90,62 +91,37 @@ jobs:
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
-        with:
-          path: marqo
 
-      - name: Set up Python 3.9
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.11"
           cache: "pip"
 
-      - name: Checkout marqo-base for requirements
-        uses: actions/checkout@v3
-        with:
-          repository: marqo-ai/marqo-base
-          path: marqo-base
+      - name: Install uv
+        run: |
+          pip install uv
 
       - name: Install dependencies
         run: |
-          pip install -r marqo/requirements.dev.txt
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # Override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt
-
-      - name: Download nltk data
+          cd components/marqo
+          uv sync --dev
+          uv run python -c "import nltk; nltk.download('punkt_tab')"
+          
+      - name: Spin up the inference environment
         run: |
-            python -m nltk.downloader punkt_tab
+          docker compose -f compose-inference.yaml build --quiet
+          docker compose -f compose-inference.yaml up -d --quiet-pull
 
       - name: Build Vespa
         run: |
-          sudo systemctl stop unattended-upgrades
-          sudo apt-get remove -y unattended-upgrades
-
-          # Function to wait for the dpkg lock to be released
-          function wait_for_dpkg_lock() {
-            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-              echo "Waiting for the dpkg lock to be released..."
-              sleep 5
-            done
-          }
-
-          # Wait for the dpkg lock before updating and installing
-          wait_for_dpkg_lock
-
-          echo "Updating package list"
-          sudo apt-get update -y
-
-          # Build Vespa components
-          echo "Installing jdk 17"
-          sudo apt-get install openjdk-17-jdk -y
-          echo "Installing maven"
-          sudo apt-get install maven -y
-          echo "Building Vespa components"
-          cd marqo/vespa
-          mvn clean package
+          cd components/marqo/vespa
+          mvn clean -q package
 
       - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
+        run: |
+          cd components/marqo
+          uv run python ./scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
 
       - name: Run Integration Tests
         run: |
@@ -159,24 +135,22 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
-          cd marqo
+          cd components/marqo
 
-          export PYTHONPATH="./src:."
           set -o pipefail
-          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas pytest ${{ env.MULTINODE_TEST_ARGS }} \
-            --ignore=tests/integ_tests/test_documentation.py --durations=100 \
-            --cov=src --cov-branch --cov-context=test \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
-            tests/integ_tests --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
-
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          --ignore=tests/integ_tests/test_documentation.py --durations=100 \
+          --cov=src --cov-branch --cov-context=test \
+          --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
+          tests/integ_tests/ --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
           name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
           path: |
-            marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
-            marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
-            marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+            components/marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            components/marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            components/marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
           include-hidden-files: true
 
   Merge-Coverage:
@@ -185,11 +159,6 @@ jobs:
       - Test-Marqo
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout marqo repo
-        uses: actions/checkout@v3
-        with:
-          path: marqo
-
       - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4
         with:
@@ -198,11 +167,10 @@ jobs:
 
       - name: Merge Coverage Results
         run: |
-          cd marqo
           pip install coverage
           mkdir -p coverage-reports
           # Move coverage files to marqo directory for combining
-          find ../coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
+          find coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
           coverage combine
           # Store the combined coverage in a directory specific to this configuration
           cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
@@ -211,5 +179,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
-          path: marqo/coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
           include-hidden-files: true

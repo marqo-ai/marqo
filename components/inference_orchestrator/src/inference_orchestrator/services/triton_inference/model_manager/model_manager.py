@@ -172,14 +172,16 @@ def get_loaded_models(detailed: bool = False) -> Dict:
         if detailed:
             result["models"].append(
                 {
-                    "model_name": model_name,
-                    "model_properties": model.model_properties.model_dump_json(
+                    "modelName": model_name,
+                    "modelProperties": model.model_properties.model_dump_json(
                         by_alias=True
                     ),
                 }
             )
         else:
-            result["models"].append({"model_name": model_name})
+            result["models"].append(
+                {"modelName": model_name, "modelProperties": "<omitted>"}
+            )
     return result
 
 

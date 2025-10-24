@@ -1,0 +1,57 @@
+name: Run unit tests
+# runs unit tests on standard machine
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  Test-Marqo:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/marqo
+
+    steps:
+      - name: Check out marqo repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Run unit tests
+        id: run_unit_tests
+        run: |
+          set -o pipefail
+          uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/unit_tests/ | tee pytest_output.txt
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-unit-tests-report
+          path: |
+            components/marqo/.coverage
+            components/marqo/pytest_result_summary.md
+            components/marqo/pytest_output.txt
+          include-hidden-files: true

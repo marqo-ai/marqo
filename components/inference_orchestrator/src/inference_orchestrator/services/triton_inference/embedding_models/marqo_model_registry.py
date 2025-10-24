@@ -1,3 +1,11 @@
+"""
+This file should be exactly the same as the
+equivalent file in the Marqo repo:
+components/marqo/src/marqo/core/inference/embedding_models/marqo_model_registry.py.
+
+TODO - Have a single source of truth for this file that can be imported in both repos.
+"""
+
 from inference_orchestrator.services.errors import UnsupportedModelError
 
 _MODEL_REGISTRY: dict[str, dict] = {
@@ -282,6 +290,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "dimensions": 768,
         "type": "hf",
         "poolingMethod": "mean",
+        "text_query_prefix": "query: ",
+        "text_chunk_prefix": "passage: ",
         "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
             "name": "e5-base-v2-text-encoder",
@@ -304,6 +314,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "name": "intfloat/e5-small-v2",
         "dimensions": 384,
         "type": "hf",
+        "text_query_prefix": "query: ",
+        "text_chunk_prefix": "passage: ",
         "poolingMethod": "mean",
         "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
@@ -347,6 +359,34 @@ _MODEL_REGISTRY: dict[str, dict] = {
                 }
             ],
         },
+    },
+    "random": {
+        "name": "random",
+        "dimensions": 384,
+        "tokens": 128,
+        "type": "random",
+        "notes": "",
+    },
+    "random/large": {
+        "name": "random/large",
+        "dimensions": 768,
+        "tokens": 128,
+        "type": "random",
+        "notes": "",
+    },
+    "random/small": {
+        "name": "random/small",
+        "dimensions": 32,
+        "tokens": 128,
+        "type": "random",
+        "notes": "",
+    },
+    "random/medium": {
+        "name": "random/medium",
+        "dimensions": 128,
+        "tokens": 128,
+        "type": "random",
+        "notes": "",
     },
 }
 

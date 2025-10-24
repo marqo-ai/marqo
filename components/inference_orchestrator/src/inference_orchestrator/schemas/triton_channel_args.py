@@ -42,10 +42,10 @@ class TritonChannelArgs(AppBaseModel):
         build_channel_args: Builds the channel arguments for Triton Inference Server.
     """
 
-    grpc_keep_alive_time_ms: int = 20_000
-    grpc_keep_alive_timeout_ms: int = 5_000
-    grpc_keep_alive_permit_without_calls: int = 1
-    grpc_http2_max_pings_without_data: int = 0
+    grpc_keep_alive_time_ms: int = 300_000
+    grpc_keep_alive_timeout_ms: int = 20_000
+    grpc_keep_alive_permit_without_calls: int = 0
+    grpc_http2_max_pings_without_data: int = 2
     grpc_http2_min_time_between_pings_ms: int = 10_000
     grpc_http2_min_ping_interval_without_data_ms: int = 10_000
     grpc_max_receive_message_length: int = 128 * 1024 * 1024

@@ -125,8 +125,14 @@ class TestModelManager(TestCase):
 
         self.assertIn("models", result)
         self.assertEqual(2, len(result["models"]))
-        self.assertIn({"model_name": "model1||test"}, result["models"])
-        self.assertIn({"model_name": "model2||bert"}, result["models"])
+        self.assertIn(
+            {"modelName": "model1||test", "modelProperties": "<omitted>"},
+            result["models"],
+        )
+        self.assertIn(
+            {"modelName": "model2||bert", "modelProperties": "<omitted>"},
+            result["models"],
+        )
 
     def test_get_loaded_models_detailed(self):
         """Test get_loaded_models returns model names with properties"""

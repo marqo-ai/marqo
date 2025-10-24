@@ -1,0 +1,64 @@
+name: Integration Tests Inference Orchestrator
+run-name: Integration tests Inference Orchestrator
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: integration-tests-inference-orchestrator-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Test-Marqo-Inference-Orchestrator:
+    name: Run Marqo Inference Orchestrator Integration Tests
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
+    defaults :
+      run:
+        working-directory: components/inference_orchestrator
+    timeout-minutes: 60
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+          uv run python -c "import nltk; nltk.download('punkt_tab')"
+
+      - name: Spin up the inference environment
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker compose -f compose-model-management.yaml build --quiet
+          docker compose -f compose-model-management.yaml --profile gpu up -d --quiet-pull
+
+      - name: Run Integration Tests
+        run: |
+          set -o pipefail
+          uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/integration_tests/ | tee pytest_output.txt
+
+      - name: Upload Test Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: inference-orchestrator-integ-tests-report
+          path: |
+            components/inference_orchestrator/.coverage
+            components/inference_orchestrator/pytest_result_summary.md
+            components/inference_orchestrator/pytest_output.txt
+          include-hidden-files: true

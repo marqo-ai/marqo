@@ -17,6 +17,7 @@ from .on_start_script import on_start
 from .schemas.api import InferenceRequest
 from .services.errors import InternalServerError, ServiceError
 from .services.triton_inference.model_manager import model_manager
+from .version import get_version
 
 logger = get_logger(__name__)
 
@@ -40,8 +41,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Marqo Inference",
     lifespan=lifespan,
-    version="0.1.0",  # TODO replace with dynamic versioning from package (e.g., import version from marqo
+    version=get_version(),
 )
+
 app.add_middleware(TelemetryMiddleware)
 
 
@@ -104,8 +106,12 @@ def vectorise(
         ) from e
     except ValidationError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.errors()
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)
         ) from e
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     # Generate embeddings
     try:
