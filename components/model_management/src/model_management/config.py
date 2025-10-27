@@ -10,9 +10,10 @@ class Config:
     """
 
     def __init__(self, settings: Settings):
-        self.triton_client = TritonClient(url=settings.triton_url)
+        self.triton_client = TritonClient(url=settings.marqo_triton_rest_url)
         self.model_manager = ModelManager(
-            model_base_dir=settings.model_base_dir, triton_client=self.triton_client
+            marqo_model_cache_path=settings.marqo_model_cache_path,
+            triton_client=self.triton_client,
         )
 
 

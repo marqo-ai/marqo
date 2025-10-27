@@ -5,8 +5,8 @@ from model_management.core.settings import Settings
 
 
 def instantiate_logger(s: Settings) -> None:
-    LOG_FORMAT = s.log_format.value  # e.g. "PLAIN" in upper case
-    LOG_LEVEL = s.log_level.value  # e.g. "INFO" in upper case
+    LOG_FORMAT = s.marqo_log_format.value  # e.g. "PLAIN" in upper case
+    LOG_LEVEL = s.marqo_log_level.value  # e.g. "INFO" in upper case
 
     LOGGING_CONFIG = {
         "version": 1,

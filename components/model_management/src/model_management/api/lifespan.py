@@ -17,7 +17,11 @@ async def lifespan(app: FastAPI):
     # 2. instantiate logger
     instantiate_logger(s)
     logger = get_logger(__name__)
-    logger.info("Logger configured with format=%s level=%s", s.log_format, s.log_level)
+    logger.info(
+        "Logger configured with format=%s level=%s",
+        s.marqo_log_format,
+        s.marqo_log_level,
+    )
 
     # 3. Initialize configuration
     cfg = get_config()

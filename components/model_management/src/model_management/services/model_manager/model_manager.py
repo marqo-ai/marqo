@@ -41,8 +41,8 @@ def _model_op_guard(lock: threading.Lock, timeout: float = 2.0):
 
 
 class ModelManager:
-    def __init__(self, model_base_dir: str, triton_client: TritonClient):
-        self.model_base_dir = model_base_dir
+    def __init__(self, marqo_model_cache_path: str, triton_client: TritonClient):
+        self.marqo_model_cache_path = marqo_model_cache_path
         self.triton_client = triton_client
 
     def load_model(self, triton_model_properties: TritonModelProperties) -> None:
@@ -50,7 +50,7 @@ class ModelManager:
             logger.info(f"Loading model: {triton_model_properties.model_dump_json()}")
             TritonModelDownloader(
                 sources=triton_model_properties.sources,
-                base_dir=self.model_base_dir,
+                base_dir=self.marqo_model_cache_path,
                 model_name=triton_model_properties.name,
                 config_pbtxt=self.generate_config_pbtxt_file(triton_model_properties),
                 overwrite=False,
@@ -65,7 +65,7 @@ class ModelManager:
             self.triton_client.unload_model(model_name)
 
             if remove_files:
-                model_dir = os.path.join(self.model_base_dir, model_name)
+                model_dir = os.path.join(self.marqo_model_cache_path, model_name)
                 if os.path.exists(model_dir):
                     for root, dirs, files in os.walk(model_dir, topdown=False):
                         for name in files:

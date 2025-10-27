@@ -19,15 +19,16 @@ class TestConfig(TestCase):
             self.assertIsInstance(config.triton_client, TritonClient)
             self.assertIsInstance(config.model_manager, ModelManager)
             self.assertEqual(
-                settings.model_base_dir, config.model_manager.model_base_dir
+                settings.marqo_model_cache_path,
+                config.model_manager.marqo_model_cache_path,
             )
-            self.assertEqual(settings.triton_url, config.triton_client.url)
+            self.assertEqual(settings.marqo_triton_rest_url, config.triton_client.url)
 
     def test_config_initialization_with_custom_settings(self):
         """Test that Config initializes correctly with custom Settings."""
         custom_env = {
-            "TRITON_URL": "http://custom-triton:9000",
-            "MODEL_BASE_DIR": "/custom/models",
+            "MARQO_TRITON_REST_URL": "http://custom-triton:9000",
+            "MARQO_MODEL_CACHE_PATH": "/custom/models",
         }
 
         with patch("os.environ", custom_env):
@@ -36,7 +37,9 @@ class TestConfig(TestCase):
 
             self.assertIsInstance(config.triton_client, TritonClient)
             self.assertIsInstance(config.model_manager, ModelManager)
-            self.assertEqual("/custom/models", config.model_manager.model_base_dir)
+            self.assertEqual(
+                "/custom/models", config.model_manager.marqo_model_cache_path
+            )
             self.assertEqual("http://custom-triton:9000", config.triton_client.url)
             self.assertIs(config.model_manager.triton_client, config.triton_client)
 
@@ -50,7 +53,7 @@ class TestConfig(TestCase):
 
         for url, msg in test_cases:
             with self.subTest(msg=msg):
-                with patch("os.environ", {"TRITON_URL": url}):
+                with patch("os.environ", {"MARQO_TRITON_REST_URL": url}):
                     settings = Settings(_env_file=None)
 
                     with patch(
@@ -69,7 +72,7 @@ class TestConfig(TestCase):
 
         for path, msg in test_cases:
             with self.subTest(msg=msg):
-                with patch("os.environ", {"MODEL_BASE_DIR": path}):
+                with patch("os.environ", {"MARQO_MODEL_CACHE_PATH": path}):
                     settings = Settings(_env_file=None)
 
                     with (
@@ -86,7 +89,8 @@ class TestConfig(TestCase):
                         _ = Config(settings)
 
                         mock_model_manager.assert_called_once_with(
-                            model_base_dir=path, triton_client=mock_triton_instance
+                            marqo_model_cache_path=path,
+                            triton_client=mock_triton_instance,
                         )
 
     def test_config_components_are_accessible(self):
