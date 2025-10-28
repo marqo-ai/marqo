@@ -89,14 +89,14 @@ class ModelManager(ABC):
         Args:
             detailed (bool): whether to return detailed information about each model
 
-        Returns: A dictionary containing model names as keys and their details as values.
+        Returns: A dictionary containing the list of loaded models, in following format,
         e.g,
             {
                 "models": [{"modelName": "model1||1234", "modelProperties": {...}, ...]
             } if detailed is True,
 
             {
-                "models": [{"modelName": "model1||1234", "modelProperties": "<omitted>", ...]
+                "models": [{"modelName": "model1||1234"}, {"modelName": "model2||5678"}, ...]
             } if detailed is False
 
         """
