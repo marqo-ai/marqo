@@ -32,8 +32,8 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../../../.env"), verbose=True) # Root of the monorepo
 
-VESPA_VERSION = os.getenv('VESPA_VERSION')
-VESPA_DISK_USAGE_LIMIT = float(os.getenv('VESPA_DISK_USAGE_LIMIT'))
+VESPA_VERSION = os.getenv('VESPA_VERSION', '8.513.17')
+VESPA_DISK_USAGE_LIMIT = float(os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75))
 VESPA_CONFIG_URL="http://localhost:19071"
 VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"

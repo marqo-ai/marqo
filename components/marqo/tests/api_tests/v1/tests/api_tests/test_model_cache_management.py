@@ -36,6 +36,11 @@ class TestModlCacheManagement(MarqoTestCase):
 
         cls.indexes_to_delete = [cls.structured_index_name, cls.unstructured_index_name]
 
+    def setUp(self):
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            # Do a search to load the model into cache
+            self.client.index(index_name).search("test")
+
     def test_get_cpu_info(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
@@ -47,8 +52,32 @@ class TestModlCacheManagement(MarqoTestCase):
     def test_get_loaded_models_format(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                r = self.client.index(index_name).get_loaded_models()
-                self.assertIn("models", r)
+                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models?detailed=true").json()
+                self.assertIn("models", loaded_models)
+                models = loaded_models["models"]
+                for model in models:
+                    self.assertIn("modelName", model)
+                    self.assertIn("modelProperties", model)
+
+    def test_get_loaded_models_format_detailed_false(self) -> None:
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models?detailed=false").json()
+                self.assertIn("models", loaded_models)
+                models = loaded_models["models"]
+                for model in models:
+                    self.assertIn("modelName", model)
+                    self.assertNotIn("modelProperties", model)
+
+    def test_get_loaded_models_format_detailed_default(self) -> None:
+        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+            with self.subTest(index_name):
+                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models").json()
+                self.assertIn("models", loaded_models)
+                models = loaded_models["models"]
+                for model in models:
+                    self.assertIn("modelName", model)
+                    self.assertNotIn("modelProperties", model)
 
     def test_eject_model(self) -> None:
         # test eject a model that is cached

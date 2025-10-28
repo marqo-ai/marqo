@@ -221,7 +221,6 @@ class IndexManagement:
     def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
         """
         Update index settings by settings dict. No schema update. Currently only modelProperties can be updated.
-        Do not increment the version of the index in this method.
 
         When calling this method, you must consider the scenario distributed Marqo instances. Some Marqo instances
         could still be running the old version so the updated modelProperties must be compatible with the old version.
@@ -233,19 +232,22 @@ class IndexManagement:
             IndexNotFoundError: If an index does not exist
             UnsupportedFeatureError: If the updated modelProperties results in dimension change
         """
-        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):
+        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS): #pragma: no cover
             # Should not happen since we validate the settings in the API layer
             raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
                                 f"Provided settings: {list(settings_dict.keys())}")
 
-        existing_index = self.get_index(index_name)
-        updated_index = existing_index.copy(deep=True)
-        if "modelProperties" in settings_dict:
-            self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
-            updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
         with self._vespa_deployment_lock():
-            logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
-            self._get_vespa_application().update_index_setting(updated_index)
+            existing_index = self.get_index(index_name)
+            updated_version = existing_index.version + 1 if existing_index.version is not None else 1
+            updated_index = existing_index.copy(deep=True, update={'version': updated_version})
+
+            if "modelProperties" in settings_dict:
+                self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
+                updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
+
+                logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
+                self._get_vespa_application().update_index_setting(updated_index)
 
     def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
         """

@@ -126,11 +126,11 @@ class TestModelManager(TestCase):
         self.assertIn("models", result)
         self.assertEqual(2, len(result["models"]))
         self.assertIn(
-            {"modelName": "model1||test", "modelProperties": "<omitted>"},
+            {"modelName": "model1||test"},
             result["models"],
         )
         self.assertIn(
-            {"modelName": "model2||bert", "modelProperties": "<omitted>"},
+            {"modelName": "model2||bert"},
             result["models"],
         )
 

@@ -33,6 +33,7 @@ dev = [
     "docker>=7.1.0",
     "dotenv>=0.9.9",
     "hypothesis>=6.140.3",
+    "notebook>=7.4.7",
     "opentelemetry-test-utils>=0.58b0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",

@@ -179,9 +179,7 @@ def get_loaded_models(detailed: bool = False) -> Dict:
                 }
             )
         else:
-            result["models"].append(
-                {"modelName": model_name, "modelProperties": "<omitted>"}
-            )
+            result["models"].append({"modelName": model_name})
     return result
 
 

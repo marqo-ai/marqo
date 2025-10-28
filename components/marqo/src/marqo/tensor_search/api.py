@@ -536,6 +536,7 @@ def update_documents(
 
 
 @app.patch("/indexes/{index_name}/index-settings")
+@utils.enable_ops_api()
 def update_index_settings(index_name: str, body: UpdateIndexSettingsBodyParams,
                           marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
