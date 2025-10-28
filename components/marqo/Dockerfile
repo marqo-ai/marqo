@@ -13,7 +13,7 @@ RUN mvn clean package -T 1C
 
 ARG COMMITHASH
 
-FROM python:3.11-slim AS base
+FROM python:3.9-slim AS base
 
 WORKDIR /app
 
