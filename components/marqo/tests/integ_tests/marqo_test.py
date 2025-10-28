@@ -108,8 +108,8 @@ class MarqoTestCase(unittest.TestCase):
                                                deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
-                                   inference=InferenceClient(base_url="http://3.227.153.164:8884"),
-                                   model_manager=ModelManagerClient(base_url="http://3.227.153.164:8884"),
+                                   inference=InferenceClient(base_url="http://localhost:8884"),
+                                   model_manager=ModelManagerClient(base_url="http://localhost:8884"),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
