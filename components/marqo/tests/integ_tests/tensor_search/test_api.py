@@ -332,6 +332,9 @@ class TestApiErrors(MarqoTestCase):
         cls.unstructured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
 
+    def setUp(self):
+        self.client = TestClient(api.app)
+
     def test_index_not_found_error(self):
         index_name = self.random_index_name()
 
