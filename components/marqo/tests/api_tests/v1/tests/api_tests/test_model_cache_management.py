@@ -52,7 +52,7 @@ class TestModlCacheManagement(MarqoTestCase):
     def test_get_loaded_models_format(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models/detailed=true").json()
+                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models?detailed=true").json()
                 self.assertIn("models", loaded_models)
                 models = loaded_models["models"]
                 for model in models:
@@ -62,7 +62,7 @@ class TestModlCacheManagement(MarqoTestCase):
     def test_get_loaded_models_format_detailed_false(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
             with self.subTest(index_name):
-                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models/detailed=false").json()
+                loaded_models :list[dict] = requests.get(f"{self._MARQO_URL}/models?detailed=false").json()
                 self.assertIn("models", loaded_models)
                 models = loaded_models["models"]
                 for model in models:
