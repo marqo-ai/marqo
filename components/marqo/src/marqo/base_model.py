@@ -26,7 +26,7 @@ class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):
 
 """
 The configuration propagation behaviour can be found here:
-https://docs.pydantic.dev/latest/concepts/config/#configuration-propagation
+https://docs.pydantic.dev/latest/concepts/config/#change-behaviour-globally
 
 TLDR, If you wish to change the behaviour of Pydantic globally,
 you can create your own custom parent class with a custom configuration, as the configuration is inherited.
