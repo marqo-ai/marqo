@@ -285,7 +285,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
         with mock.patch.dict(os.environ, {
             "MARQO_API_INFERENCE_CACHE_SIZE": "10",
             "MARQO_API_INFERENCE_CACHE_TYPE": "LFU",
-            "MARQO_ENABLE_THROTTLING": "FALSE"
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 

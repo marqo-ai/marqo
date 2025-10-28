@@ -1,4 +1,4 @@
-name: Run Required Checks Model Management
+name: Run Required Checks Inference Orchestrator
 on:
   pull_request:
     branches:
@@ -31,7 +31,7 @@ jobs:
         run: |
           cd marqo
           set -x
-
+          
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
@@ -62,13 +62,13 @@ jobs:
   Run-integration-tests:
     needs: Determine-changes
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
-    uses: ./.github/workflows/integration_tests_CI_model_management.yml
+    uses: ./.github/workflows/coverage_tests/integration_tests_CI_inference_orchestrator.yml
     secrets: inherit
 
   Run-unit-tests:
     needs: Determine-changes
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
-    uses: ./.github/workflows/unit_tests_model_management.yml
+    uses: ./.github/workflows/coverage_tests/unit_tests_inference_orchestrator.yml
     secrets: inherit
 
   Run-coverage-checks:
@@ -77,7 +77,7 @@ jobs:
       - Run-integration-tests
       - Run-unit-tests
     if: needs.Determine-changes.outputs.non_documentation_changes_found == 'true'
-    uses: ./.github/workflows/run_required_checks_coverage_model_management.yml
+    uses: ./.github/workflows/coverage_tests/run_required_checks_coverage_inference_orchestrator.yml
     secrets: inherit
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge

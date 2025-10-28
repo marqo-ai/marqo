@@ -1,6 +1,5 @@
 FROM python:3.11-slim AS base
 
-ARG TARGETPLATFORM
 ARG COMMITHASH
 
 WORKDIR /app

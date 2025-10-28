@@ -24,17 +24,30 @@ class ImmutableStrictBaseModel(StrictBaseModel, ImmutableBaseModel):
         pass
 
 
+"""
+The configuration propagation behaviour can be found here:
+https://docs.pydantic.dev/latest/concepts/config/#configuration-propagation
+
+TLDR, If you wish to change the behaviour of Pydantic globally,
+you can create your own custom parent class with a custom configuration, as the configuration is inherited.
+If you provide configuration to the subclasses, it will be merged with the parent configuration.
+
+NOTE: If your model inherits from multiple bases, Pydantic currently doesn't follow the MRO! Avoid this for
+unexpected behaviour.
+"""
+
+
 class MarqoBaseModelV2(pydantic.BaseModel):
     model_config = ConfigDict(validate_by_name=True, validate_assignment=True)
 
 
 class StrictBaseModelV2(MarqoBaseModelV2):
-    model_config = ConfigDict(**MarqoBaseModelV2.model_config, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
 
 class ImmutableBaseModelV2(MarqoBaseModelV2):
-    model_config = ConfigDict(**MarqoBaseModelV2.model_config, frozen=True)
+    model_config = ConfigDict(frozen=True)
 
 
-class ImmutableStrictBaseModelV2(StrictBaseModelV2, ImmutableBaseModelV2):
-    model_config = ConfigDict(**{**StrictBaseModelV2.model_config, **ImmutableBaseModelV2.model_config})
+class ImmutableStrictBaseModelV2(ImmutableBaseModelV2):
+    model_config = ConfigDict(extra="forbid")
