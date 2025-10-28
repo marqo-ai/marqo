@@ -403,6 +403,14 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=updated_at,
         )
 
+    @classmethod
+    def clear_all_loaded_models(cls):
+        loaded_models = cls.config.model_manager.get_loaded_models(detailed=False)
+        for model in loaded_models.get("models", []):
+            model_name = model.get("modelName")
+            if model_name:
+                cls.config.model_manager.eject_model(model_name=model_name)
+
     class _AssertRaisesContext:
         def __init__(self, expected_exception):
             self.expected_exception = expected_exception
