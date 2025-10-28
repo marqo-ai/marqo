@@ -38,6 +38,15 @@ class MarqoCustomRoute(APIRoute):
 router = APIRouter(prefix="/v1", tags=["v1"], route_class=MarqoCustomRoute)
 
 
+@router.get("/healthz", include_in_schema=False)
+def liveness_check():
+    """
+    The liveness check endpoint for the model management service.
+    :return: 200 OK if the service is alive
+    """
+    return {"status": "ok"}
+
+
 @router.post("/models/load", response_model=LoadModelResponse)
 def load_model(payload: LoadModelRequest, cfg: Config = Depends(get_config)):
     """
