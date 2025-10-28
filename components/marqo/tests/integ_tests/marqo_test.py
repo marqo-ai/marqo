@@ -108,8 +108,8 @@ class MarqoTestCase(unittest.TestCase):
                                                deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
-                                   inference=InferenceClient(base_url="http://localhost:8884"),
-                                   model_manager=ModelManagerClient(base_url="http://localhost:8884"),
+                                   inference=InferenceClient(base_url="http://3.227.153.164:8884"),
+                                   model_manager=ModelManagerClient(base_url="http://3.227.153.164:8884"),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
@@ -402,6 +402,14 @@ class MarqoTestCase(unittest.TestCase):
             created_at=created_at,
             updated_at=updated_at,
         )
+
+    @classmethod
+    def clear_all_loaded_models(cls):
+        loaded_models = cls.config.model_manager.get_loaded_models(detailed=False)
+        for model in loaded_models.get("models", []):
+            model_name = model.get("modelName")
+            if model_name:
+                cls.config.model_manager.eject_model(model_name=model_name)
 
     class _AssertRaisesContext:
         def __init__(self, expected_exception):
