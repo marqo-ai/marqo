@@ -57,7 +57,7 @@ class TestModlCacheManagement(MarqoTestCase):
                 models = loaded_models["models"]
                 for model in models:
                     self.assertIn("modelName", model)
-                    self.assertNIn("modelProperties", model)
+                    self.assertIn("modelProperties", model)
 
     def test_get_loaded_models_format_detailed_false(self) -> None:
         for index_name in [self.structured_index_name, self.unstructured_index_name]:
