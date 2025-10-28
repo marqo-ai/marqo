@@ -104,9 +104,18 @@ class TestUpdateIndexSettings(MarqoTestCase):
             updated_index_settings_dict = updated_index_settings.dict()
             # Model properties should be updated
             self.assertEqual(updated_model_properties, updated_index_settings_dict["model"]["properties"])
+            # version should be updated
+            original_version = original_index_settings_dict.get("version")
+            updated_version = updated_index_settings_dict.get("version")
+            if original_version is None:
+                self.assertEqual(1, updated_version)
+            else:
+                self.assertEqual(original_version + 1, updated_version)
             # Everything else should remain the same
             original_index_settings_dict["model"].pop("properties")
             updated_index_settings_dict["model"].pop("properties")
+            original_index_settings_dict.pop("version")
+            updated_index_settings_dict.pop("version")
             self.assertEqual(original_index_settings_dict, updated_index_settings_dict)
 
     def test_update_semistructured_marqo_index_non_custom_model_properties(self):
@@ -146,10 +155,19 @@ class TestUpdateIndexSettings(MarqoTestCase):
             # Model properties should be updated and custom should be set to True
             self.assertEqual(updated_model_properties, updated_index_settings_dict["model"]["properties"])
             self.assertEqual(True, updated_index_settings_dict["model"]["custom"])
+            # version should be updated
+            original_version = original_index_settings_dict.get("version")
+            updated_version = updated_index_settings_dict.get("version")
+            if original_version is None:
+                self.assertEqual(1, updated_version)
+            else:
+                self.assertEqual(original_version + 1, updated_version)
             # Everything else should remain the same
             original_index_settings_dict["model"].pop("custom")
             updated_index_settings_dict["model"].pop("properties")
             updated_index_settings_dict["model"].pop("custom")
+            updated_index_settings_dict.pop("version")
+            original_index_settings_dict.pop("version")
             self.assertEqual(original_index_settings_dict, updated_index_settings_dict)
 
     def test_update_structured_marqo_index_custom_model_properties(self):
@@ -187,9 +205,19 @@ class TestUpdateIndexSettings(MarqoTestCase):
             updated_index_settings_dict = updated_index_settings.dict()
             # Model properties should be updated
             self.assertEqual(updated_model_properties, updated_index_settings_dict["model"]["properties"])
+
+            # version should be updated
+            original_version = original_index_settings_dict.get("version")
+            updated_version = updated_index_settings_dict.get("version")
+            if original_version is None:
+                self.assertEqual(1, updated_version)
+            else:
+                self.assertEqual(original_version + 1, updated_version)
             # Everything else should remain the same
             original_index_settings_dict["model"].pop("properties")
             updated_index_settings_dict["model"].pop("properties")
+            original_index_settings_dict.pop("version")
+            updated_index_settings_dict.pop("version")
             self.assertEqual(original_index_settings_dict, updated_index_settings_dict)
 
     def test_update_structured_marqo_index_non_custom_model_properties(self):
@@ -229,10 +257,19 @@ class TestUpdateIndexSettings(MarqoTestCase):
             # Model properties should be updated and custom should be set to True
             self.assertEqual(updated_model_properties, updated_index_settings_dict["model"]["properties"])
             self.assertEqual(True, updated_index_settings_dict["model"]["custom"])
+            # version should be updated
+            original_version = original_index_settings_dict.get("version")
+            updated_version = updated_index_settings_dict.get("version")
+            if original_version is None:
+                self.assertEqual(1, updated_version)
+            else:
+                self.assertEqual(original_version + 1, updated_version)
             # Everything else should remain the same
             original_index_settings_dict["model"].pop("custom")
             updated_index_settings_dict["model"].pop("properties")
             updated_index_settings_dict["model"].pop("custom")
+            updated_index_settings_dict.pop("version")
+            original_index_settings_dict.pop("version")
             self.assertEqual(original_index_settings_dict, updated_index_settings_dict)
 
     def test_update_index_settings_non_existent_index(self):
