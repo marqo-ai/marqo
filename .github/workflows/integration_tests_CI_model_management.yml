@@ -42,7 +42,8 @@ jobs:
       - name: Run Triton For integration Tests
         run: |
           cd ../.. # Back to repo root
-          docker-compose -f compose-inference.local.yaml up -d triton
+          mkdir ~/.cache/marqo/models -p # Ensure model cache directory exists for triton to mount
+          docker compose -f compose-triton.yaml up -d
 
       - name: Run Integration Tests
         run: |
