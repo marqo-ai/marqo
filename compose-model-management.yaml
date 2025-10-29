@@ -61,7 +61,7 @@ services:
     environment:
       MARQO_LOG_LEVEL: "INFO"
       MARQO_MODELS_TO_PRELOAD: "[]"
-      MARQO+TRITON_REST_URL: http://triton:8000
+      MARQO_TRITON_REST_URL: http://triton:8000
       MARQO_MODEL_CACHE_PATH: /models
     volumes:
       - modelrepo:/models

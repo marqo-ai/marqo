@@ -90,6 +90,8 @@ class TestLifespan(unittest.TestCase):
         self.assertIn("level", call_args[0])
         self.assertEqual(self.mock_settings.marqo_log_format, call_args[1])
         self.assertEqual(self.mock_settings.marqo_log_level, call_args[2])
+        self.assertEqual(self.mock_settings.log_format, call_args[1])
+        self.assertEqual(self.mock_settings.log_level, call_args[2])
 
     @patch("model_management.api.lifespan.on_start")
     @patch("model_management.api.lifespan.get_config")
