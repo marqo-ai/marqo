@@ -43,6 +43,7 @@ jobs:
         run: |
           cd ../.. # Back to repo root
           mkdir ~/.cache/marqo/models -p # Ensure model cache directory exists for triton to mount
+          export MARQO_MODEL_CACHE_PATH=~/.cache/marqo/models
           docker compose -f compose-triton.yaml up -d
 
       - name: Run Integration Tests

@@ -14,7 +14,7 @@ services:
         "--model-control-mode=explicit"
       ]
     volumes:
-      - ${MARQO_MODEL_CACHE_PATH:-~/.cache/marqo/models}:/models
+      - ${MARQO_MODEL_CACHE_PATH:-$HOME/.cache/marqo/models}:/models
     ports:
       - "8000:8000"                # HTTP
       - "8001:8001"                # gRPC
@@ -39,7 +39,7 @@ services:
         "--model-control-mode=explicit"
       ]
     volumes:
-      - ${MARQO_MODEL_CACHE_PATH:~/.cache/marqo/models}:/models
+      - ${MARQO_MODEL_CACHE_PATH:-$HOME/.cache/marqo/models}:/models
     ports:
       - "8000:8000"                # HTTP
       - "8001:8001"                # gRPC
