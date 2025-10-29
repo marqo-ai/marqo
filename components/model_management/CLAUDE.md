@@ -87,7 +87,7 @@ Environment variables (see `env.example`):
 - All configuration should be environment-variable driven
 - Use structured logging with request IDs
 - Models are downloaded to `MODEL_BASE_DIR` and organized by model name
-- Always import everything at the top of the file, avoid inline imports unless necessary to prevent circular dependencies
+- **Always import everything at the top of the file**, avoid inline imports unless necessary to prevent circular dependencies. This applies to both source code and test files
 
 ### Detailed Test Development Guidelines
 - Each source package should have a corresponding test package

@@ -1,11 +1,15 @@
 """Integration tests for request ID middleware."""
 
+import concurrent.futures
 from unittest import TestCase
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
+from model_management.api.exception_handlers import register_exception_handlers
 from model_management.api.request_id import REQ_ID_HEADER, RequestIdMiddleware
+from model_management.errors.http_errors import InvalidArgumentError
+from model_management.main import app
 
 
 class TestRequestIdMiddleware(TestCase):
@@ -89,8 +93,6 @@ class TestRequestIdMiddleware(TestCase):
         in request.state and can be included in error response bodies.
         """
         # This test verifies that the middleware doesn't interfere with error handling
-        from model_management.api.exception_handlers import register_exception_handlers
-
         test_app = FastAPI()
 
         @test_app.get("/test/error")
@@ -110,9 +112,6 @@ class TestRequestIdMiddleware(TestCase):
 
     def test_middleware_does_not_break_error_handling(self):
         """Test that middleware doesn't break error handling flow."""
-        from model_management.api.exception_handlers import register_exception_handlers
-        from model_management.errors.http_errors import InvalidArgumentError
-
         test_app = FastAPI()
 
         @test_app.get("/test/error")
@@ -237,8 +236,6 @@ class TestRequestIdMiddleware(TestCase):
 
     def test_middleware_with_multiple_concurrent_requests(self):
         """Test that middleware correctly handles multiple concurrent requests."""
-        import concurrent.futures
-
         num_requests = 20
         request_ids = []
 
@@ -270,8 +267,6 @@ class TestRequestIdMiddlewareWithMainApp(TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test client with the main application."""
-        from model_management.main import app
-
         cls.client = TestClient(app)
 
     def test_request_id_in_healthz_endpoint(self):

@@ -2,7 +2,7 @@
 
 from unittest import TestCase
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from model_management.api.exception_handlers import register_exception_handlers
@@ -14,12 +14,14 @@ from model_management.errors.http_errors import (
     NotFoundError,
     OperationConflictError,
 )
+from model_management.main import app
+from model_management.services.errors import InternalServerError as ServiceInternalError
 from model_management.services.errors import (
     ModelDownloadFailedError,
     ModelOperationInProgressError,
+    ServiceError,
     TritonCommunicationError,
 )
-from model_management.services.errors import InternalServerError as ServiceInternalError
 
 
 class TestExceptionHandlers(TestCase):
@@ -33,8 +35,6 @@ class TestExceptionHandlers(TestCase):
         # Add test routes that raise various exceptions
         @self.app.get("/test/validation-error")
         def raise_validation_error():
-            from fastapi import HTTPException
-
             raise HTTPException(status_code=400, detail="Validation failed")
 
         @self.app.get("/test/invalid-argument")
@@ -337,7 +337,6 @@ class TestExceptionHandlers(TestCase):
     def test_service_error_without_mapping_defaults_to_internal_server_error(self):
         """Test that unmapped service errors default to InternalServerError."""
         # Create a custom service error that isn't explicitly mapped
-        from model_management.services.errors import ServiceError
 
         @self.app.get("/test/custom-service-error")
         def raise_custom_service_error():
@@ -357,8 +356,6 @@ class TestExceptionHandlerIntegrationWithMainApp(TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test client with the main application."""
-        from model_management.main import app
-
         cls.client = TestClient(app)
 
     def test_invalid_json_payload_returns_400(self):

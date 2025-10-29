@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -107,8 +108,6 @@ class TestConfig(TestCase):
 
     def test_config_with_models_to_preload(self):
         """Test that Config initializes correctly when Settings has models_to_preload."""
-        import json
-
         model = {
             "maxBatchSize": 8,
             "name": "test-model",
