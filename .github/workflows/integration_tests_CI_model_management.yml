@@ -39,9 +39,15 @@ jobs:
         run: |
           uv sync --dev
 
+      - name: Run Triton For integration Tests
+        run: |
+          cd ../.. # Back to repo root
+          docker-compose -f compose-inference.local.yaml up -d triton
+
       - name: Run Integration Tests
         run: |
           set -o pipefail
+                  
           uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integration_tests/ | tee pytest_output.txt
