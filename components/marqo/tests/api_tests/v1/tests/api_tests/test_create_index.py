@@ -54,7 +54,7 @@ class TestCreateIndex(MarqoTestCase):
 
     def test_create_unstructured_image_index(self):
         self.client.create_index(index_name=self.index_name, type="unstructured",
-                                 treat_urls_and_pointers_as_images=True, model="open_clip/ViT-B-32/laion400m_e32")
+                                 treat_urls_and_pointers_as_images=True, model="open_clip/ViT-B-32/laion2b_s34b_b79k")
         image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
         documents = [{"test": "test",
                       "image": image_url}]
@@ -70,16 +70,50 @@ class TestCreateIndex(MarqoTestCase):
 
         index_settings = self.client.index(self.index_name).get_settings()
         self.assertEqual(True, index_settings['treatUrlsAndPointersAsImages'])
-        self.assertEqual("open_clip/ViT-B-32/laion400m_e32", index_settings['model'])
+        self.assertEqual("open_clip/ViT-B-32/laion2b_s34b_b79k", index_settings['model'])
 
     def test_create_unstructured_text_index_custom_model(self):
+        model_properties = {
+            "name": "sentence-transformers/all-MiniLM-L6-v2",
+            "dimensions": 384,
+            "type": "hf",
+            "poolingMethod": "mean",
+            "tritonTextEncoderProperties": {
+                "maxBatchSize": 16,
+                "name": "all-MiniLM-L6-v2-text-encoder",
+                "sources": [
+                    "s3://marqo-opensource-models/sentence-transformers-all-minilm-l6-v2/model.onnx"],
+                "input": [
+                    {
+                        "name": "input_ids",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    },
+                    {
+                        "name": "attention_mask",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    },
+                    {
+                        "name": "token_type_ids",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    }
+                ],
+                "output": [
+                    {
+                        "name": "last_hidden_state",
+                        "dims": [-1, 384],
+                        "dataType": "TYPE_FP32"
+                    }
+                ]
+            }
+        }
+
         self.client.create_index(index_name=self.index_name, type="unstructured",
                                  treat_urls_and_pointers_as_images=False,
                                  model="test-model",
-                                 model_properties={"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                                                   "dimensions": 384,
-                                                   "tokens": 128,
-                                                   "type": "hf"}
+                                 model_properties=model_properties,
                                  )
         documents = [{"test": "test"}]
         self.client.index(self.index_name).add_documents(documents, tensor_fields=["test"])
@@ -93,170 +127,11 @@ class TestCreateIndex(MarqoTestCase):
         index_settings = self.client.index(self.index_name).get_settings()
         self.assertEqual(False, index_settings['treatUrlsAndPointersAsImages'])
         self.assertEqual("test-model", index_settings['model'])
-        self.assertEqual({"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                          "dimensions": 384,
-                          "tokens": 128,
-                          "type": "hf"}, index_settings['modelProperties'])
-
-    def test_created_unstructured_image_index_with_preprocessing(self):
-        self.client.create_index(index_name=self.index_name, type="unstructured",
-                                 treat_urls_and_pointers_as_images=True,
-                                 model="open_clip/ViT-B-16/laion400m_e31",
-                                 image_preprocessing={"patchMethod": "simple"})
-        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
-        documents = [{"test": "test",
-                      "image": image_url}]
-        self.client.index(self.index_name).add_documents(documents, tensor_fields=["test", "image"])
-
-        lexical_search_res = self.client.index(self.index_name).search(q="test", search_method="LEXICAL")
-        tensor_search_res = self.client.index(self.index_name).search(q="test", search_method="TENSOR")
-        tensor_search_res_image = self.client.index(self.index_name).search(q=image_url, search_method="TENSOR")
-
-        self.assertEqual(1, len(lexical_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res_image['hits']))
-
-        index_settings = self.client.index(self.index_name).get_settings()
-        self.assertEqual(True, index_settings['treatUrlsAndPointersAsImages'])
-        self.assertEqual("open_clip/ViT-B-16/laion400m_e31", index_settings['model'])
-        self.assertEqual("simple", index_settings['imagePreprocessing']['patchMethod'])
-
-    def test_create_invalid_unstructured_languagebind_index(self):
-        with self.assertRaises(MarqoWebError) as e:
-            res = self.client.create_index(
-                index_name=self.index_name,
-                type="unstructured",
-                model="LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-                video_preprocessing={
-                    "splitLength": 10,
-                    "splitOverlap": 3
-                },
-                treat_urls_and_pointers_as_media=True,
-                treat_urls_and_pointers_as_images=False
-            )
-
-    def test_create_unstructured_index_with_languagebind(self):
-        self.client.create_index(
-            index_name=self.index_name,
-            type="unstructured",
-            model="LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-            video_preprocessing={
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            audio_preprocessing={
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            treat_urls_and_pointers_as_media=True,
-            treat_urls_and_pointers_as_images=True
-        )
-
-        index_settings = self.client.index(self.index_name).get_settings()
-
-        expected_settings = {
-            "type": "unstructured",
-            "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-            "normalizeEmbeddings": True,
-            "textPreprocessing": {
-                "splitLength": 2,
-                "splitMethod": "sentence",
-                "splitOverlap": 0
-            },
-            "imagePreprocessing": {},
-            "videoPreprocessing": {
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            'filterStringMaxLength': 50,
-            "audioPreprocessing": {
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            "treatUrlsAndPointersAsMedia": True,
-            "treatUrlsAndPointersAsImages": True,
-            "vectorNumericType": "float",
-            "annParameters": {
-                "spaceType": "prenormalized-angular",
-                "parameters": {
-                    "efConstruction": 512,
-                    "m": 16
-                }
-            }
-        }
-
-        self.assertEqual(expected_settings, index_settings)
-
-    def test_create_structured_index_with_languagebind(self):
-        self.client.create_index(
-            index_name=self.index_name,
-            type="structured",
-            model="LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-            all_fields=[
-                {"name": "text_field_1", "type": "text"},
-                {"name": "text_field_2", "type": "text"},
-                {"name": "video_field_1", "type": "video_pointer"},
-                {"name": "video_field_2", "type": "video_pointer"},
-                {"name": "audio_field", "type": "audio_pointer"},
-                {"name": "image_field", "type": "image_pointer"}
-            ],
-            tensor_fields=["text_field_1", "text_field_2",
-                        "video_field_1", "video_field_2", "audio_field", "image_field"],
-            audio_preprocessing={
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            video_preprocessing={
-                "splitLength": 10,
-                "splitOverlap": 3
-            }
-        )
-
-        index_settings = self.client.index(self.index_name).get_settings()
-
-        expected_settings = {
-            "type": "structured",
-            "vectorNumericType": "float",
-            "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-            "normalizeEmbeddings": True,
-            "textPreprocessing": {
-                "splitLength": 2,
-                "splitMethod": "sentence",
-                "splitOverlap": 0
-            },
-            "imagePreprocessing": {},
-            "audioPreprocessing": {
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            "videoPreprocessing": {
-                "splitLength": 10,
-                "splitOverlap": 3
-            },
-            "annParameters": {
-                "spaceType": "prenormalized-angular",
-                "parameters": {
-                    "efConstruction": 512,
-                    "m": 16
-                }
-            },
-            "tensorFields": ["text_field_1", "text_field_2",
-                             "video_field_1", "video_field_2", "audio_field", "image_field"],
-            "allFields": [
-                {"features": [], "name": "text_field_1", "type": "text"},
-                {"features": [], "name": "text_field_2", "type": "text"},
-                {"features": [], "name": "video_field_1", "type": "video_pointer"},
-                {"features": [], "name": "video_field_2", "type": "video_pointer"},
-                {"features": [], "name": "audio_field", "type": "audio_pointer"},
-                {"features": [], "name": "image_field", "type": "image_pointer"},
-            ]
-        }
-
-        self.assertEqual(expected_settings, index_settings)
+        self.assertEqual(model_properties, index_settings['modelProperties'])
 
     def test_create_simple_structured_index(self):
         self.client.create_index(index_name=self.index_name, type="structured",
-                                 model="hf/all_datasets_v4_MiniLM-L6",
+                                 model="hf/all-MiniLM-L6-v2",
                                  all_fields=[{"name": "test", "type": "text",
                                               "features": ["lexical_search"]}],
                                  tensor_fields=["test"])
@@ -274,7 +149,7 @@ class TestCreateIndex(MarqoTestCase):
             'type': 'structured',
             'allFields': [{'name': 'test', 'type': 'text', 'features': ['lexical_search']}],
             'tensorFields': ['test'],
-            'model': 'hf/all_datasets_v4_MiniLM-L6',
+            'model': 'hf/all-MiniLM-L6-v2',
             'normalizeEmbeddings': True,
             'textPreprocessing': {'splitLength': 2, 'splitOverlap': 0, 'splitMethod': 'sentence'},
             'imagePreprocessing': {},
@@ -287,7 +162,7 @@ class TestCreateIndex(MarqoTestCase):
     def test_create_structured_image_index(self):
         self.client.create_index(index_name=self.index_name,
                                  type="structured",
-                                 model="open_clip/ViT-B-32/laion400m_e32",
+                                 model="open_clip/ViT-B-32/laion2b_s34b_b79k",
                                  all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]},
                                              {"name": "image", "type": "image_pointer"}],
                                  tensor_fields=["test", "image"])
@@ -308,16 +183,50 @@ class TestCreateIndex(MarqoTestCase):
         index_settings = self.client.index(self.index_name).get_settings()
 
         self.assertEqual(["test", "image"], index_settings["tensorFields"])
-        self.assertEqual("open_clip/ViT-B-32/laion400m_e32", index_settings["model"])
+        self.assertEqual("open_clip/ViT-B-32/laion2b_s34b_b79k", index_settings["model"])
 
     def test_create_structured_index_with_custom_model(self):
+        model_properties = {
+            "name": "sentence-transformers/all-MiniLM-L6-v2",
+            "dimensions": 384,
+            "type": "hf",
+            "poolingMethod": "mean",
+            "tritonTextEncoderProperties": {
+                "maxBatchSize": 16,
+                "name": "all-MiniLM-L6-v2-text-encoder",
+                "sources": [
+                    "s3://marqo-opensource-models/sentence-transformers-all-minilm-l6-v2/model.onnx"],
+                "input": [
+                    {
+                        "name": "input_ids",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    },
+                    {
+                        "name": "attention_mask",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    },
+                    {
+                        "name": "token_type_ids",
+                        "dims": [-1],
+                        "dataType": "TYPE_INT64"
+                    }
+                ],
+                "output": [
+                    {
+                        "name": "last_hidden_state",
+                        "dims": [-1, 384],
+                        "dataType": "TYPE_FP32"
+                    }
+                ]
+            }
+        }
+
         self.client.create_index(index_name=self.index_name,
                                  type="structured",
                                  model="test-model",
-                                 model_properties={"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                                                   "dimensions": 384,
-                                                   "tokens": 128,
-                                                   "type": "hf"},
+                                 model_properties=model_properties,
                                  all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]}],
                                  tensor_fields=["test"])
         documents = [{"test": "test"}]
@@ -331,38 +240,7 @@ class TestCreateIndex(MarqoTestCase):
 
         index_settings = self.client.index(self.index_name).get_settings()
         self.assertEqual("test-model", index_settings['model'])
-        self.assertEqual({"name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-                          "dimensions": 384,
-                          "tokens": 128,
-                          "type": "hf"}, index_settings['modelProperties'])
-
-    def test_create_structured_image_index_with_preprocessing(self):
-        self.client.create_index(index_name=self.index_name,
-                                 type="structured",
-                                 model="open_clip/ViT-B-16/laion400m_e31",
-                                 image_preprocessing={"patchMethod": "simple"},
-                                 all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]},
-                                             {"name": "image", "type": "image_pointer"}],
-                                 tensor_fields=["test", "image"])
-        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
-        documents = [{"test": "test",
-                      "image": image_url}]
-
-        self.client.index(self.index_name).add_documents(documents)
-
-        lexical_search_res = self.client.index(self.index_name).search(q="test", search_method="LEXICAL")
-        tensor_search_res = self.client.index(self.index_name).search(q="test", search_method="TENSOR")
-        tensor_search_res_image = self.client.index(self.index_name).search(q=image_url, search_method="TENSOR")
-
-        self.assertEqual(1, len(lexical_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res['hits']))
-        self.assertEqual(1, len(tensor_search_res_image['hits']))
-
-        index_settings = self.client.index(self.index_name).get_settings()
-
-        self.assertEqual(["test", "image"], index_settings["tensorFields"])
-        self.assertEqual("open_clip/ViT-B-16/laion400m_e31", index_settings["model"])
-        self.assertEqual("simple", index_settings['imagePreprocessing']['patchMethod'])
+        self.assertEqual(model_properties, index_settings['modelProperties'])
 
     def test_dash_in_index_name_structured(self):
         index_name = "test-index-test-index" + str(uuid.uuid4())
@@ -380,16 +258,18 @@ class TestCreateIndex(MarqoTestCase):
         """
         Tests if you can use the Python client to create a structured index with a custom vector
         """
-        self.client.create_index(index_name=self.index_name,
-                                 type="structured",
-                                 model="open_clip/ViT-B-32/laion400m_e31",
-                                 all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
-                                              "features": ["lexical_search", "filter"]}],
-                                 tensor_fields=["my_custom_vector"],
-                                 ann_parameters={
-                                    "spaceType": "angular",
-                                    "parameters": {"efConstruction": 512, "m": 16}
-                                })
+        self.client.create_index(
+            index_name=self.index_name,
+            type="structured",
+            model="open_clip/ViT-B-32/laion2b_s34b_b79k",
+            all_fields=[{"name": "my_custom_vector", "type": "custom_vector",
+                         "features": ["lexical_search", "filter"]}],
+            tensor_fields=["my_custom_vector"],
+            ann_parameters={
+                "spaceType": "angular",
+                "parameters": {"efConstruction": 512, "m": 16}
+            }
+        )
 
         # Random vectors for example purposes. replace these with your own.
         example_vector_1 = [i for i in range(512)]

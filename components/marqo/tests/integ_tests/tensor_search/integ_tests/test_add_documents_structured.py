@@ -125,25 +125,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
             ],
             tensor_fields=['image_field', 'image_field_2'],
-            model=Model(name='open_clip/ViT-B-16/openai')
-        )
-        index_request_img_chunking = cls.structured_marqo_index_request(
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text),
-                FieldRequest(
-                    name='desc',
-                    type=FieldType.Text,
-                    features=[FieldFeature.LexicalSearch]
-                ),
-                FieldRequest(
-                    name='image_field',
-                    type=FieldType.ImagePointer,
-                )
-            ],
-            tensor_fields=['image_field'],
-            model=Model(name='open_clip/ViT-B-16/openai'),
-            normalize_embeddings=True,
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn)
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k')
         )
         index_request_img_random = cls.structured_marqo_index_request(
             fields=[
@@ -166,14 +148,12 @@ class TestAddDocumentsStructured(MarqoTestCase):
             index_request_1,
             index_request_2,
             index_request_img_no_chunking,
-            index_request_img_chunking,
             index_request_img_random
         ])
 
         cls.index_name_1 = index_request_1.name
         cls.index_name_2 = index_request_2.name
         cls.index_name_img_no_chunking = index_request_img_no_chunking.name
-        cls.index_name_img_chunking = index_request_img_chunking.name
         cls.index_name_img_random = index_request_img_random.name
 
     def setUp(self) -> None:

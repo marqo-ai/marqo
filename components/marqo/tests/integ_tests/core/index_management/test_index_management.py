@@ -28,7 +28,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.core.inference.embedding_models.marqo_model_registry import get_model_properties
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
 from tests.integ_tests.marqo_test import MarqoTestCase
@@ -456,7 +456,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_and_delete_index_should_succeed(self):
         # merge batch create and delete happy path to save some testing time
-        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'))
         schema, index = vespa_schema_factory(request).generate_schema()
         typeahead_schema, index = TypeaheadVespaSchema(index).generate_schema()
         self.index_management.bootstrap_vespa()
@@ -471,7 +471,7 @@ class TestIndexManagement(MarqoTestCase):
         self._assert_index_is_not_present(app, index.name, index.schema_name, index.typeahead_schema_name)
 
     def test_update_index_should_succeed(self):
-        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'))
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
@@ -487,7 +487,7 @@ class TestIndexManagement(MarqoTestCase):
         self._assert_index_is_present(app, semi_structured_marqo_index, new_schema, expected_version=2)
 
     def test_update_index_should_fail_under_race_condition(self):
-        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'))
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
@@ -509,7 +509,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_update_index_should_fail_if_index_does_not_exist(self):
         self.index_management.bootstrap_vespa()
 
-        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'))
         _, index = vespa_schema_factory(request).generate_schema()
 
         with self.assertRaisesStrict(IndexNotFoundError):
@@ -520,7 +520,7 @@ class TestIndexManagement(MarqoTestCase):
 
         for request in [
             # legacy unstructured index cannot be updated
-            self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'), marqo_version='2.12.0'),
+            self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'), marqo_version='2.12.0'),
             # structured index cannot be updated
             self.structured_marqo_index_request(
                 fields=[FieldRequest(name='title', type=FieldType.Text)],
@@ -538,7 +538,7 @@ class TestIndexManagement(MarqoTestCase):
                 self.assertIn('can not be update', str(err.exception))
 
     def test_update_index_should_skip_if_nothing_to_update(self):
-        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small-v2'))
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
@@ -749,7 +749,7 @@ class TestIndexManagement(MarqoTestCase):
         self.assertEqual(saved_index.version, expected_version)
 
         # asser that the prefixes are set correctly
-        model_properties = get_model_properties_from_registry(saved_index.model.name)
+        model_properties = get_model_properties(saved_index.model.name)
         if 'text_chunk_prefix' in model_properties:
             self.assertEqual(saved_index.model.text_chunk_prefix, model_properties['text_chunk_prefix'])
         if 'text_query_prefix' in model_properties:

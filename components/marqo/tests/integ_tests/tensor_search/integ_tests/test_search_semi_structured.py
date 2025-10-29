@@ -1,28 +1,27 @@
 import copy
+import math
 import os
 import random
 import unittest
 import uuid
 from unittest import mock
 
-import math
 import requests
 
 import marqo.core.exceptions as core_exceptions
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from marqo.vespa.exceptions import VespaStatusError
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 
 class TestSearchSemiStructured(MarqoTestCase):
@@ -33,20 +32,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
         default_text_index_encoded_name = cls.unstructured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', '')
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 
@@ -55,21 +48,17 @@ class TestSearchSemiStructured(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-
         cls.indexes = cls.create_indexes([
             default_text_index,
             default_text_index_encoded_name,
             default_image_index,
-            image_index_with_chunking,
             image_index_with_random_model,
         ])
 
         cls.default_text_index = cls.indexes[0]
         cls.default_text_index_encoded_name = cls.indexes[1]
         cls.default_image_index = cls.indexes[2]
-        cls.image_index_with_chunking = cls.indexes[3]
-        cls.image_index_with_random_model = cls.indexes[4]
-
+        cls.image_index_with_random_model = cls.indexes[3]
 
     def setUp(self) -> None:
         super().setUp()
@@ -85,7 +74,7 @@ class TestSearchSemiStructured(MarqoTestCase):
     # TODO - Test approximate parameter
     # TODO - Test graceful degradation detection with approximate=False
     # TODO - Test timeout parameter
-    
+
     def test_each_doc_returned_once(self):
         """Each doc should be returned once, even if it matches multiple times"""
         tests = [
@@ -94,50 +83,26 @@ class TestSearchSemiStructured(MarqoTestCase):
         ]
         for index, desc in tests:
             with self.subTest(desc):
-                add_docs_res = self.add_documents(config=self.config,
-                                   add_docs_params=AddDocsParams(
-                                                index_name=index.name,
-                                                docs=[
-                                                    {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
-                                                     "_id": "5678", "finally": "some field efgh "},
-                                                    {"abc": "shouldn't really match ", "other_field": "Nope.....",
-                                                     "_id": "1234", "finally": "Random text here efgh "},
-                                                ],
-                                                tensor_fields=["abc", "other_field", "finally"],
-                                            )
-                                   )
+                add_docs_res = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"abc": "Exact match hehehe efgh ",
+                             "other_field": "baaadd efgh ",
+                             "_id": "5678", "finally": "some field efgh "},
+                            {"abc": "shouldn't really match ", "other_field": "Nope.....",
+                             "_id": "1234", "finally": "Random text here efgh "},
+                        ],
+                        tensor_fields=["abc", "other_field", "finally"],
+                    )
+                )
 
                 search_res = tensor_search.search(
                     config=self.config, index_name=index.name,
                     text=" efgh ", result_count=10, device="cpu", search_method=SearchMethod.TENSOR
                 )
                 assert len(search_res['hits']) == 2
-
-    #
-    # def test_search_with_searchable_attributes_max_attributes_is_none(self):
-    #     # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
-    #     add_docs_caller(
-    #         config=self.config, index_name=self.default_text_index.name, docs=[
-    #             {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #             {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #         ], )
-    #     tensor_search.search(
-    #         config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
-    #         searchable_attributes=["other field"]
-    #     )
-    #
-    # @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
-    # def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
-    #     with self.assertRaises(InvalidArgError):
-    #         add_docs_caller(
-    #             config=self.config, index_name=self.default_text_index.name, docs=[
-    #                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #             ], )
-    #         tensor_search.search(
-    #             config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe"
-    #         )
-    #
 
     @staticmethod
     def strip_marqo_fields(doc, strip_id=False):
@@ -180,10 +145,10 @@ class TestSearchSemiStructured(MarqoTestCase):
                 index_name=self.default_text_index.name,
                 docs=[
                     {"_id": "12345",
-                     "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
-                    {"_id": "abc12334", "Title": "Grandma Jo's family recipe. ",
-                     "Steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
-                tensor_fields=["Desc", "Title", "Steps"],
+                     "desc": "The Guardian is newspaper, read in the UK and other places around the world"},
+                    {"_id": "abc12334", "title": "Grandma Jo's family recipe. ",
+                     "steps": "1. Cook meat. 2: Dice Onions. 3: Serve."}],
+                tensor_fields=["desc", "title", "steps"],
             )
         )
 
@@ -648,28 +613,6 @@ class TestSearchSemiStructured(MarqoTestCase):
                         result_count=3, filter=filter_string, verbose=0
                     )
 
-    @unittest.skip(reason='temporarily skip due to inference interface changes')
-    def test_set_device(self):
-        """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
-
-        mock_vectorise = mock.MagicMock()
-
-        # Get vector dimension of the default BERT model
-        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry("hf/all_datasets_v4_MiniLM-L6")["dimensions"]
-        mock_vectorise.return_value = [[0, ] * DEFAULT_MODEL_DIMENSION]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.search(
-                config=self.config, index_name=self.default_text_index.name, text="some text",
-                search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
-            return True
-
-        assert run()
-        assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:123"
-
     def test_search_other_types_subsearch(self):
         self.add_documents(
             config=self.config,
@@ -848,7 +791,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index.name,
                 docs=[doc],
-                tensor_fields=["short_string_field" , "custom_vector_field", "multimodal_combo_field"],
+                tensor_fields=["short_string_field", "custom_vector_field", "multimodal_combo_field"],
                 mappings={
                     "custom_vector_field": {"type": "custom_vector"},
                     "multimodal_combo_field": {
@@ -933,9 +876,9 @@ class TestSearchSemiStructured(MarqoTestCase):
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     index_name=self.default_text_index.name,
-                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
+                    docs=[{"title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
                           for _ in range(batch_size)],
-                    tensor_fields=["Title"]
+                    tensor_fields=["title"]
                 )
             )
         self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index.name).
@@ -1336,7 +1279,7 @@ class TestSearchSemiStructured(MarqoTestCase):
 
     def test_search_with_content_double_colon(self):
         docs = [
-            {"_id": "1", "text_field": "::my_text"} # This should work properly
+            {"_id": "1", "text_field": "::my_text"}  # This should work properly
         ]
         self.add_documents(
             config=self.config,
@@ -1358,30 +1301,30 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_search_returned_documents(self):
         """A test to ensure that the returned are not missing/adding any unexpected fields"""
         full_fields_document = ({
-            "_id": "full_fields",
-            "text_field": "some text",
-            "int_field": 1,
-            "float_field": 2.0,
-            "bool_field": True,
-            "list_field": ["a", "b","c"],
-            "string_bool_field": "True",
-            "string_int_field": "1",
-            "string_float_field": "1.2",
-            "string_list_field": "['a', 'b', 'c']"
-        }, "full-fields document")
+                                    "_id": "full_fields",
+                                    "text_field": "some text",
+                                    "int_field": 1,
+                                    "float_field": 2.0,
+                                    "bool_field": True,
+                                    "list_field": ["a", "b", "c"],
+                                    "string_bool_field": "True",
+                                    "string_int_field": "1",
+                                    "string_float_field": "1.2",
+                                    "string_list_field": "['a', 'b', 'c']"
+                                }, "full-fields document")
 
         partial_fields_document = ({
-            "_id": "partial_field",
-            "text_field": "some text",
-            "float_field": 1.0,
-            "bool_field": True,
-            "list_field": ["a", "b", "c"],
-        }, "partial-fields document")
+                                       "_id": "partial_field",
+                                       "text_field": "some text",
+                                       "float_field": 1.0,
+                                       "bool_field": True,
+                                       "list_field": ["a", "b", "c"],
+                                   }, "partial-fields document")
 
         no_field_documents = ({
-            "_id": "no_field",
-            "text_field": "some text"
-        }, "no-field document")
+                                  "_id": "no_field",
+                                  "text_field": "some text"
+                              }, "no-field document")
 
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
@@ -1428,7 +1371,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index.name,
                                                search_method=SearchMethod.LEXICAL)
-                    
+
     def test_special_characters_in_map_score_modifiers(self):
         special_characters = SPECIAL_CHARACTERS
 
@@ -1456,7 +1399,8 @@ class TestSearchSemiStructured(MarqoTestCase):
                 )
 
                 score_modifiers = ScoreModifierLists(**{
-                    "add_to_score": [{"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
+                    "add_to_score": [
+                        {"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
                 })
 
                 res = tensor_search.search(
@@ -1531,7 +1475,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 }
             }
         ]
-        
+
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
@@ -1540,7 +1484,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 tensor_fields=["title"]
             )
         )
-        
+
         test_cases = [
             ("metadata.score:[0 TO 1]", ["doc1", "doc2", "doc3"]),
             ("metadata.score:[0.0 TO 1.0]", ["doc1", "doc2", "doc3"]),
@@ -1549,7 +1493,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             ("metadata.rank:[15.0 TO 20]", ["doc2", "doc3"]),
             ("metadata.rank:[0 TO 9]", []),
         ]
-        
+
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for filter_string, expected in test_cases:
                 with self.subTest(f"search_method={search_method}, filter={filter_string}"):
@@ -1563,7 +1507,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                     actual_ids = set([hit["_id"] for hit in search_res["hits"]])
                     self.assertEqual(len(search_res["hits"]), len(expected),
                                      f"Failed count check for filter '{filter_string}'.")
-                    self.assertEqual(actual_ids, set(expected), 
+                    self.assertEqual(actual_ids, set(expected),
                                      f"Failed ID match for filter '{filter_string}'")
 
     def test_search_incomplete_response_processed_correctly(self):
@@ -1587,7 +1531,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             )
         )
         with mock.patch.object(self.config.vespa_client, "query") as mock_query:
-        # mock the VespaClient.query method to return real response and modify the response
+            # mock the VespaClient.query method to return real response and modify the response
             def wrapper(*args, **kwargs):
                 # Call the real method
                 response = real_query(*args, **kwargs)
@@ -1603,7 +1547,8 @@ class TestSearchSemiStructured(MarqoTestCase):
                 return response
 
             mock_query.side_effect = wrapper
-            result = tensor_search.search(config=self.config, text="sample text", index_name=self.default_text_index.name, search_method=SearchMethod.LEXICAL)
+            result = tensor_search.search(config=self.config, text="sample text",
+                                          index_name=self.default_text_index.name, search_method=SearchMethod.LEXICAL)
             self.assertNotIn("int_field_1", result["hits"][0])
             self.assertIn("int_field_2", result["hits"][0])
 

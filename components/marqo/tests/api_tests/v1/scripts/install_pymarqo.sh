@@ -12,4 +12,4 @@ else
     MQ_PY_MARQO_BRANCH="git+https://github.com/marqo-ai/py-marqo.git@$PY_MARQO_BRANCH"
 fi
 
-pip install "$MQ_PY_MARQO_BRANCH"
+uv pip install "$MQ_PY_MARQO_BRANCH"

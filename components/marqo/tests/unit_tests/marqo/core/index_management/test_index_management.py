@@ -24,7 +24,7 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
         """Helper method to create a SemiStructuredMarqoIndex for testing."""
         return self.semi_structured_marqo_index(
             name=name,
-            model=Model(name='hf/e5-small'),
+            model=Model(name='hf/e5-small-v2'),
             version=1
         )
 
@@ -33,7 +33,7 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
         return self.structured_marqo_index(
             name=name,
             schema_name=f"marqo__{name}",
-            model=Model(name='hf/e5-small'),
+            model=Model(name='hf/e5-small-v2'),
             fields=[],  # StructuredMarqoIndex requires fields list
             tensor_fields=[]  # StructuredMarqoIndex requires tensor_fields list
         )
@@ -166,7 +166,7 @@ class TestIndexManagementUpdateIndex(MarqoTestCase):
         # Setup request
         request = self.unstructured_marqo_index_request(
             name="test_index",
-            model=Model(name='hf/e5-small')
+            model=Model(name='hf/e5-small-v2')
         )
 
         # Setup mock returns

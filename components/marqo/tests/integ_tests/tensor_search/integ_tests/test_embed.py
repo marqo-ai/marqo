@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-import torch
 
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -47,7 +46,7 @@ class TestEmbed(MarqoTestCase):
 
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
@@ -79,7 +78,7 @@ class TestEmbed(MarqoTestCase):
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -264,38 +263,6 @@ class TestEmbed(MarqoTestCase):
                 for i, expected_value in enumerate(expected_vector):
                     self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
                                         msg=f"Mismatch at index {i} for {index.type}")
-
-    @pytest.mark.largemodel
-    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
-    def test_embed_languagebind(self):
-        content = [
-            #TestImageUrls.HIPPO_REALISTIC.value, # image
-            "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4" # video
-        ]
-        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
-            with self.subTest(index=index.type):
-                embed_res = embed(
-                                marqo_config=self.config,
-                                index_name=index.name,
-                                embedding_request=EmbedRequest(
-                                    content=content
-                                ),
-                                device=None
-                            )
-                #print(embed_res)
-                #print(embed_res['embeddings'][0][:7])
-                expected = [
-                    0.0298048947006464, 0.05226955562829971, -0.0038126774597913027,
-                    0.061151087284088135, -0.013925471343100071, 0.060153547674417496, -0.0031225811690092087
-                ]
-                actual = embed_res['embeddings'][0][:7]
-                
-                for a, e in zip(actual, expected):
-                    self.assertAlmostEqual(a, e, delta=1.5)
-                
-                #print(f"Actual: {actual}")
-                #print(f"Expected: {expected}")
-
 
     def test_embed_equivalent_to_add_docs(self):
         """
@@ -515,52 +482,6 @@ class TestEmbed(MarqoTestCase):
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], [image_url])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
-
-    def test_embed_with_media_download_headers_and_model_auth(self):
-        """
-        Ensure that vectorise is called with the correct media_download_headers and model_auth
-        when using the embed endpoint.
-        """
-        for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
-            with self.subTest(index=index.type):
-                image_url = TestImageUrls.IMAGE1.value
-                vectorise = s2_inference.vectorise
-                def pass_through_vectorise(*arg, **kwargs):
-                    """Vectorise will behave as usual, but we will be able to see the call list
-                    via mock
-                    Set image download headers and model auth to None so there's no error out.
-                    """
-                    kwargs["media_download_headers"] = None
-                    kwargs["model_auth"] = None
-                    return vectorise(*arg, **kwargs)
-
-                mock_vectorise = unittest.mock.MagicMock()
-                mock_vectorise.side_effect = pass_through_vectorise
-                @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-                def run():
-                    embed_res = embed(
-                        marqo_config=self.config, index_name=index.name,
-                        embedding_request=EmbedRequest(
-                            content=[image_url],
-                            mediaDownloadHeaders={"Authorization": "my secret key"},
-                            modelAuth=ModelAuth(s3=S3Auth(
-                                aws_access_key_id='12345',
-                                aws_secret_access_key='this-is-a-secret'))
-                        ),
-                        device="cpu"
-                    )
-                    return True
-
-                self.assertTrue(run())
-
-                call_args = mock_vectorise.call_args_list
-                self.assertEqual(len(call_args), 1)
-
-                vectorise_kwargs = call_args[0].kwargs
-                self.assertEqual(vectorise_kwargs["media_download_headers"], {"Authorization": "my secret key"})
-                self.assertEqual(vectorise_kwargs["model_auth"], ModelAuth(s3=S3Auth(
-                                aws_access_key_id='12345',
-                                aws_secret_access_key='this-is-a-secret')))
 
     def test_embed_equivalent_to_search_weighted_dict(self):
         """

@@ -34,7 +34,7 @@ class SearchTest(unittest.TestCase):
         RequestMetricsStore.set_in_request(cls.mock_request)
 
         # Create a model
-        cls.model = Model(name="hf/all_datasets_v4_MiniLM-L6")
+        cls.model = Model(name="hf/all-MiniLM-L6-v2")
 
         # Structured index with multimodal fields
         cls.structured_index = StructuredMarqoIndex(

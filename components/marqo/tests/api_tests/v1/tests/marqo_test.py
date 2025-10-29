@@ -92,16 +92,13 @@ class MarqoTestCase(unittest.TestCase):
         # A function that can be called to remove loaded models in Marqo.
         # Use it whenever you think there is a risk of OOM problem.
         # E.g., add it into the `tearDown` function to remove models between test cases.
-
-        client = Client(**cls.client_settings)
-        index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
-        for index_name in index_names_list:
-            loaded_models = client.index(index_name).get_loaded_models().get("models", [])
-            for model in loaded_models:
-                try:
-                    client.index(index_name).eject_model(model_name=model["model_name"], model_device=model["model_device"])
-                except MarqoWebError:
-                    pass
+        loaded_models :list[dict] = requests.get(f"{cls._MARQO_URL}/models").json()["models"]
+        for model in loaded_models:
+            model_name = model["modelName"]
+            try:
+                _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model_name}")
+            except requests.exceptions.HTTPError as e:
+                pass
 
 
 class TestImageUrls(str, Enum):

@@ -11,7 +11,7 @@ class TestBase64ImageSearch(MarqoTestCase):
 
     structured_index_name = MarqoTestCase.random_index_name('structured_base64_index')
     unstructured_index_name = MarqoTestCase.random_index_name('unstructured_base64_index')
-    image_model = 'open_clip/ViT-B-32/laion400m_e31'
+    image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
 
     @classmethod
     def setUpClass(cls) -> None:

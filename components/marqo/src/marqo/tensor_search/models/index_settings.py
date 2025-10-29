@@ -278,12 +278,7 @@ class IndexSettings(StrictBaseModel):
             return None
 
         if marqo_index.model.properties.get('isMarqtuneModel', False):
-            # Hide all properties except for isMarqtuneModel
-            marqo_index.model.properties.pop('name', None)
-            marqo_index.model.properties.pop('dimensions')
-            marqo_index.model.properties.pop('model_location')
-            marqo_index.model.properties.pop('type')
-            marqo_index.model.properties.pop('trustRemoteCode', None)
+            return {"isMarqtuneModel": True}
         return marqo_index.model.properties
 
 

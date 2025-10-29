@@ -30,7 +30,7 @@ class TestUnstructuredGetStats(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "unstructured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "treatUrlsAndPointersAsImages": True,
             }
         ])

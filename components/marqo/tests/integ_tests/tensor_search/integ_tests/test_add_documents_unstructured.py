@@ -36,14 +36,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
-            treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
-        )
-
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             marqo_version='2.12.0'
         )
@@ -58,14 +51,12 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
             default_text_index,
             default_text_index_encoded_name,
             default_image_index,
-            image_index_with_chunking,
             image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
         cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
-        cls.image_index_with_chunking = image_index_with_chunking.name
         cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:

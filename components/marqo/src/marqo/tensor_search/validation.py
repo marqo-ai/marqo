@@ -1,5 +1,5 @@
 import json
-from typing import Type, Sequence
+from typing import Type, Sequence, Union
 
 import jsonschema
 
@@ -16,8 +16,7 @@ from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
-    custom_vector_mappings_schema, text_field_mappings_schema,
-)
+    custom_vector_mappings_schema, )
 from marqo.tensor_search.models.search import SearchContext
 
 

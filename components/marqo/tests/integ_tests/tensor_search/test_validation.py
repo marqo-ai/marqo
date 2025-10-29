@@ -292,7 +292,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         return {
             "index_defaults": {
                 "treat_urls_and_pointers_as_images": False,
-                "model": "hf/all_datasets_v4_MiniLM-L6",
+                "model": "hf/all-MiniLM-L6-v2",
                 "normalize_embeddings": True,
                 "text_preprocessing": {
                     "split_length": 2,

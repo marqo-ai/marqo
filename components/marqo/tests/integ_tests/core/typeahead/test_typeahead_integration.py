@@ -19,7 +19,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         
         # Create a semi-structured index with typeahead
         cls.test_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
         # simulate an index created prior to 2.23.0
         cls.old_version_index_request = cls.unstructured_marqo_index_request(

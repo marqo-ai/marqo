@@ -12,7 +12,6 @@ from tests.marqo_test import MarqoTestCase
 class TestStructuredAddDocuments(MarqoTestCase):
     text_index_name = "add_doc_api_test_structured_index" + str(uuid.uuid4()).replace('-', '')
     image_index_name = "add_doc_api_test_structured_image_index" + str(uuid.uuid4()).replace('-', '')
-    structured_languagebind_index_name = "add_doc_api_test_structured_languagebind_index" + str(uuid.uuid4()).replace('-', '')
     text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true" + str(uuid.uuid4()).replace('-', '')
 
     @classmethod
@@ -45,42 +44,12 @@ class TestStructuredAddDocuments(MarqoTestCase):
             {
                 "indexName": cls.image_index_name,
                 "type": "structured",
-                "model": "open_clip/ViT-B-32/openai",
+                "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "image_content", "type": "image_pointer"},
                 ],
                 "tensorFields": ["title", "image_content"],
-            },
-            {
-                "indexName": cls.structured_languagebind_index_name,
-                "type": "structured",
-                "model": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
-                "allFields": [
-                    {"name": "text_field_1", "type": "text"},
-                    {"name": "text_field_2", "type": "text"},
-                    {"name": "text_field_3", "type": "text"},
-                    {"name": "video_field_1", "type": "video_pointer"},
-                    {"name": "video_field_2", "type": "video_pointer"},
-                    {"name": "video_field_3", "type": "video_pointer"},
-                    {"name": "audio_field_1", "type": "audio_pointer"},
-                    {"name": "audio_field_2", "type": "audio_pointer"},
-                    {"name": "image_field_1", "type": "image_pointer"},
-                    {"name": "image_field_2", "type": "image_pointer"},
-                    {
-                        "name": "multimodal_field", 
-                        "type": "multimodal_combination",
-                        "dependentFields": {
-                            "text_field_1": 0.1,
-                            "text_field_2": 0.1,
-                            "image_field_1": 0.5,
-                            "video_field_1": 0.1,
-                            "video_field_2": 0.1,
-                            "audio_field_1": 0.1
-                        }
-                    },
-                ],
-                "tensorFields": ["multimodal_field", "text_field_3", "video_field_3", "audio_field_2", "image_field_2"]
             },
             {
                 "indexName": cls.text_index_with_normalize_embeddings_true,
@@ -106,7 +75,7 @@ class TestStructuredAddDocuments(MarqoTestCase):
         ]
         )
 
-        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.structured_languagebind_index_name, cls.text_index_with_normalize_embeddings_true]
+        cls.indexes_to_delete = [cls.text_index_name, cls.image_index_name, cls.text_index_with_normalize_embeddings_true]
 
     def tearDown(self):
         if self.indexes_to_delete:
@@ -372,148 +341,6 @@ class TestStructuredAddDocuments(MarqoTestCase):
         assert doc_res["custom_vector_field_1"] == "custom vector text"
         assert doc_res['_tensor_facets'][0]["custom_vector_field_1"] == "custom vector text"
         assert doc_res['_tensor_facets'][0]['_embedding'] == [1.0 for _ in range(DEFAULT_DIMENSIONS)]
-
-    @pytest.mark.cuda_test
-    def test_add_multimodal_single_documents(self):
-        documents = [
-            {
-                "video_field_3": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-                "_id": "1"
-            },
-            {
-                "audio_field_2": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-                "_id": "2"
-            },
-            {
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                "_id": "3"
-            },
-            {
-                "text_field_3": "hello there padawan. Today you will begin your training to be a Jedi",
-                "_id": "4"
-            },
-        ]
-        
-        res = self.client.index(self.structured_languagebind_index_name).add_documents(documents)
-        for item in res['items']:
-            self.assertEqual(200, item['status'])
-
-        get_res = self.client.index(self.structured_languagebind_index_name).get_documents(
-            document_ids=["1", "2", "3", "4"],
-            expose_facets=True
-        )
-        for doc in get_res['results']:
-            tensor_facets = doc['_tensor_facets']
-            self.assertIn('_embedding', tensor_facets[0])
-            self.assertEqual(len(tensor_facets[0]['_embedding']), 768)
-
-    @pytest.mark.cuda_test
-    def test_add_documents_with_invalid_media_fields(self):
-        documents = [
-            {
-                "video_field_3": "This is text, not a video URL",
-                "_id": "1"
-            },
-            {
-                "audio_field_2": "This is text, not an audio URL",
-                "_id": "2"
-            },
-            {
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                "_id": "3"
-            },
-            {
-                "text_field_3": "This is a valid text field",
-                "_id": "4"
-            },
-        ]
-        
-        res = self.client.index(self.structured_languagebind_index_name).add_documents(documents)
-
-        # Check that the batch operation didn't fail
-        self.assertTrue(res['errors'])
-        
-        # Check individual document statuses
-        self.assertEqual(400, res['items'][0]['status'])  # Invalid video field
-        self.assertEqual(400, res['items'][1]['status'])  # Invalid audio field
-        self.assertEqual(200, res['items'][2]['status'])  # Valid image field
-        self.assertEqual(200, res['items'][3]['status'])  # Valid text field
-        
-        # Verify that valid documents were added
-        get_res = self.client.index(self.structured_languagebind_index_name).get_documents(
-            document_ids=["3", "4"],
-            expose_facets=True
-        )
-        
-        self.assertEqual(2, len(get_res['results']))
-        
-        for doc in get_res['results']:
-            tensor_facets = doc['_tensor_facets']
-            self.assertIn('_embedding', tensor_facets[0])
-            self.assertEqual(len(tensor_facets[0]['_embedding']), 768)
-        
-        # Verify that invalid documents were not added
-        with self.assertRaises(MarqoWebError):
-            self.client.index(self.structured_languagebind_index_name).get_document(document_id="1")
-        
-        with self.assertRaises(MarqoWebError):
-            self.client.index(self.structured_languagebind_index_name).get_document(document_id="2")
-
-    @pytest.mark.cuda_test
-    def test_add_documents_with_mismatched_media_fields(self):
-        documents = [
-            {
-                "video_field_3": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-                "_id": "1"
-            },
-            {
-                "audio_field_2": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-                "_id": "2"
-            },
-            {
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                "_id": "3"
-            },
-            {
-                "text_field_3": "This is a valid text field",
-                "_id": "4"
-            },
-        ]
-        
-        res = self.client.index(self.structured_languagebind_index_name).add_documents(documents)
-
-        # Check that the batch operation had errors
-        self.assertTrue(res['errors'])
-        
-        # Check individual document statuses and error messages
-        self.assertEqual(400, res['items'][0]['status'])  # Audio in video field
-        self.assertIn("Error processing", res['items'][0]['error'])
-        
-        self.assertEqual(400, res['items'][1]['status'])  # Video in audio field
-        self.assertIn("Error processing", res['items'][1]['error'])
-        
-        self.assertEqual(200, res['items'][2]['status'])  # Valid image field
-        self.assertEqual(200, res['items'][3]['status'])  # Valid text field
-        
-        # Verify that valid documents were added
-        get_res = self.client.index(self.structured_languagebind_index_name).get_documents(
-            document_ids=["3", "4"],
-            expose_facets=True
-        )
-        
-        self.assertEqual(2, len(get_res['results']))
-        
-        for doc in get_res['results']:
-            tensor_facets = doc['_tensor_facets']
-            self.assertIn('_embedding', tensor_facets[0])
-            self.assertEqual(len(tensor_facets[0]['_embedding']), 768)
-        
-        # Verify that invalid documents were not added
-        with self.assertRaises(MarqoWebError):
-            self.client.index(self.structured_languagebind_index_name).get_document(document_id="1")
-        
-        with self.assertRaises(MarqoWebError):
-            self.client.index(self.structured_languagebind_index_name).get_document(document_id="2")
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
 

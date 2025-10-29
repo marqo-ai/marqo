@@ -30,9 +30,8 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
         text_index_6 = cls.unstructured_marqo_index_request()
 
-        image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
-            image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
+        test_image_index = cls.unstructured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 
@@ -43,7 +42,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
             text_index_4,
             text_index_5,
             text_index_6,
-            image_index_with_chunking,
+            test_image_index,
         ])
 
         cls.text_index_1 = text_index_1.name
@@ -52,7 +51,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         cls.text_index_4 = text_index_4.name
         cls.text_index_5 = text_index_5.name
         cls.text_index_6 = text_index_6.name
-        cls.image_index_with_chunking = image_index_with_chunking.name
+        cls.image_index = test_image_index.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -105,15 +104,6 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         doc1 = self._add_and_get_doc(self.text_index_1, "123", ["desc"])
         self.assertEqual(1, len(doc1['_tensor_facets']))
         self.assertIn('desc', doc1['_tensor_facets'][0])
-
-    def test_add_documents_should_use_existing_tensors_from_the_same_doc(self):
-        doc1 = self._add_and_get_doc(self.text_index_1, "123", ["title"])
-
-        with mock.patch('marqo.s2_inference.s2_inference.vectorise') as mock_vectorise:
-            doc2 = self._add_and_get_doc(self.text_index_1, "123", ["title"],
-                                         use_existing_tensors=True)
-            self.assertFalse(mock_vectorise.called)
-            self.assertEqual(doc1['_tensor_facets'], doc2['_tensor_facets'])
 
     def test_add_documents_should_add_string_fields_as_lexical_fields(self):
         self._add_and_get_doc(self.text_index_2, "123", [])
@@ -172,7 +162,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
     def test_add_documents_should_add_image_field_as_lexical_fields(self):
         self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.image_index_with_chunking,
+                index_name=self.image_index,
                 docs=[{
                     "title": "content 1",
                     "image_field": TestImageUrls.HIPPO_REALISTIC.value
@@ -183,14 +173,14 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
         res = tensor_search.search(
             text="hippo", search_method=SearchMethod.LEXICAL,
-            config=self.config, index_name=self.image_index_with_chunking,
+            config=self.config, index_name=self.image_index,
             searchable_attributes=['image_field']
         )
 
         self.assertEqual(1, len(res['hits']))
 
         updated_index = cast(SemiStructuredMarqoIndex,
-                             self.config.index_management.get_index(self.image_index_with_chunking))
+                             self.config.index_management.get_index(self.image_index))
         self.assertIn('image_field', updated_index.field_map.keys())
         self.assertIn('marqo__lexical_image_field', updated_index.lexical_field_map.keys())
 

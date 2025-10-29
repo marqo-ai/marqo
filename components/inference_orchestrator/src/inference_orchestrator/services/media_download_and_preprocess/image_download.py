@@ -1,17 +1,13 @@
 import base64
 import os
 from io import BytesIO
-from typing import List, Optional, Union
+from typing import Optional
 
 import certifi
-import numpy as np
 import pycurl
 import requests
-import torch
 import validators
-from numpy import ndarray
 from PIL import Image, UnidentifiedImageError
-from torch import Tensor
 
 from inference_orchestrator import marqo_docs
 from inference_orchestrator.api.telemetry import RequestMetrics
@@ -52,134 +48,7 @@ def is_base64_image(s: str) -> bool:
     return False
 
 
-def _is_image(inputs: Union[str, List[Union[str, Image, ndarray]]]) -> bool:
-    # some logic to determine if something is an image or not
-    # assume the batch is the same type
-    # maybe we use something like this https://github.com/ahupp/python-magic
-
-    _allowed = get_allowed_image_types()
-
-    # we assume the batch is this way if a list
-    # otherwise apply over each element
-    if isinstance(inputs, list):
-        if len(inputs) == 0:
-            raise UnidentifiedImageError(
-                "received empty list, expected at least one element."
-            )
-
-        thing = inputs[0]
-    else:
-        thing = inputs
-
-    # if it is a string, determine if it is a local file or url
-    if isinstance(thing, str):
-        # Check if it's a base64-encoded image first
-        if is_base64_image(thing):
-            return True
-
-        name, extension = os.path.splitext(thing.lower())
-
-        # if it has the correct extension, asssume yes
-        if extension in _allowed:
-            return True
-
-        # if it is a local file without extension, then raise an error
-        if os.path.isfile(thing):
-            # we could also read the first part of the file and infer
-            raise UnidentifiedImageError(
-                f"local file [{thing}] extension {extension} does not match allowed file types of {_allowed}"
-            )
-        else:
-            # if it is not a local file and does not have an extension
-            # check if url
-            if validators.url(thing):
-                return True
-            else:
-                return False
-
-    # if it is an array, then it is an image
-    elif isinstance(thing, (Image, ndarray, Tensor)):
-        return True
-    else:
-        raise UnidentifiedImageError(
-            f"expected type Image or str for inputs but received type {type(thing)}"
-        )
-
-
-def format_and_load_CLIP_images(
-    images: List[Union[str, ndarray, Image, Tensor]], media_download_headers: dict
-) -> Union[List[Image], List[Tensor]]:
-    """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
-        for the clip model
-
-    Args:
-        images (List[Union[str, np.ndarray, ImageType]]): list of file locations or arrays (can be mixed)
-
-    Raises:
-        TypeError: _description_
-
-    Returns:
-        List[ImageType]: list of PIL images
-    """
-    if not isinstance(images, list):
-        raise TypeError(f"expected list but received {type(images)}")
-
-    results = []
-    for image in images:
-        results.append(format_and_load_CLIP_image(image, media_download_headers))
-
-    return results
-
-
-def validate_url(url: str) -> bool:
-    """Validate a URL to ensure it is a valid URL. Returns True if the URL is valid or the encoded URL is valid.
-    Args:
-        url (str): URL to validate.
-    Returns:
-        bool: True if the URL is valid, False otherwise.
-    """
-    if isinstance(url, str):
-        return validators.url(url) or validators.url(encode_url(url))
-    else:
-        return False
-
-
-def format_and_load_CLIP_image(
-    image: Union[str, ndarray, Image, Tensor], media_download_headers: dict
-) -> Union[Image, Tensor]:
-    """standardizes the input to be a PIL image
-
-    Args:
-        image (Union[str, np.ndarray, ImageType, Tensor]): can be a local file, url, array or a tensor
-
-    Raises:
-        ValueError: _description_
-        TypeError: _description_
-
-    Returns:
-        standardized the image:
-            ImageType: PIL image if input is a string, an array or a PIL image
-            Tensor: torch tensor if input is a torch tensor
-    """
-    # check for the input type
-    if isinstance(image, str):
-        img = load_image_from_path(image, media_download_headers)
-    elif isinstance(image, np.ndarray):
-        img = Image.fromarray(image.astype("uint8"), "RGB")
-    elif isinstance(image, torch.Tensor):
-        img = image
-    elif isinstance(image, Image):
-        img = image
-    else:
-        raise UnidentifiedImageError(
-            f"input of type {type(image)} "
-            f"did not match allowed types of str, np.ndarray, ImageType, Tensor"
-        )
-
-    return img
-
-
-def _load_base64_image(content: str) -> Image:
+def _load_base64_image(content: str) -> Image.Image:
     """
     Load a base64-encoded image string into a PIL Image.
 
@@ -212,7 +81,7 @@ def load_image_from_path(
     media_download_headers: dict,
     timeout_ms=3000,
     metrics_obj: Optional[RequestMetrics] = None,
-) -> Image:
+) -> Image.Image:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:

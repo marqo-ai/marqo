@@ -1,6 +1,6 @@
 [project]
-name = "inference-orchestrator"
-version = "0.1.0"
+name = "marqo-inference-orchestrator"
+version = "0.0.1"
 description = "Inference orchestrator for Marqo"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -26,10 +26,10 @@ dependencies = [
     "python-json-logger>=3.3.0",
     "readerwriterlock>=1.0.9",
     "semver>=3.0.4",
-    "torch>=2.8.0",
-    "torchvision>=0.23.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
     "transformers>=4.56.2",
-    "tritonclient[grpc,http]>=2.60.0",
+    "tritonclient[grpc,http]==2.60.0",
     "uvicorn>=0.37.0",
     "validators>=0.35.0",
 ]
@@ -40,6 +40,10 @@ dev = [
     "parameterized>=0.9.0",
     "pre-commit>=4.3.0",
     "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-md-report>=0.7.0",
+    "pytest-retry>=1.7.0",
     "pytest-subtests>=0.14.2",
 ]
 
@@ -59,6 +63,32 @@ torchvision = [
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/inference_orchestrator/src/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
 
 [tool.ruff]
 extend-exclude = [

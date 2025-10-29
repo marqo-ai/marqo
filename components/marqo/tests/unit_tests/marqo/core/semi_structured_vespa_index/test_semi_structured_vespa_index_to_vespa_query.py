@@ -92,7 +92,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
         return SemiStructuredMarqoIndex(
             name=name,
             schema_name=name,
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model=Model(name='hf/all-MiniLM-L6-v2'),
             normalize_embeddings=True,
             distance_metric=DistanceMetric.Angular,
             vector_numeric_type='float',

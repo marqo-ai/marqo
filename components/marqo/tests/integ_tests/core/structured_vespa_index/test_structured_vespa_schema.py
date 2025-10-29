@@ -14,7 +14,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -49,7 +49,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         self.maxDiff = None
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -83,7 +83,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -116,7 +116,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -141,7 +141,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -167,7 +167,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         """
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
-            model=Model(name='ViT-B/32'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
@@ -194,7 +194,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
             with self.subTest(f"Structured index with distance metric: {distance_metric.value}"):
                 marqo_index_request = self.structured_marqo_index_request(
                     name=index_name,
-                    model=Model(name='ViT-B/32'),
+                    model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
                     distance_metric=distance_metric,    # Manually set distance metric to each one.
                     vector_numeric_type=VectorNumericType.Float,
                     hnsw_config=HnswConfig(ef_construction=100, m=16),

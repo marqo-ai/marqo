@@ -1,14 +1,12 @@
-import copy
 import json
 import os
 import unittest
 from unittest import mock
 
 import httpx
-import numpy as np
-from fastapi.responses import ORJSONResponse
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_FASHION_DOCUMENTS
+import pytest
 
+import marqo.api.exceptions as api_exception
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -17,14 +15,10 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments
-import marqo.api.exceptions as api_exception
-from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
-import pytest
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
-import unittest
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -40,13 +34,8 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         semi_structured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
-        )
-
-        semi_structured_index_with_no_model = cls.unstructured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            normalize_embeddings=False
         )
 
         semi_structured_text_index_2_14 = cls.unstructured_marqo_index_request(
@@ -61,14 +50,8 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),  # Used to be ViT-B/32 in old structured tests
             treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
-        )
-
-        unstructured_index_with_no_model = cls.unstructured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            normalize_embeddings=False,
             marqo_version='2.12.0'
         )
 
@@ -78,7 +61,7 @@ class TestHybridSearch(MarqoTestCase):
 
         # STRUCTURED indexes
         structured_default_image_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -117,17 +100,6 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3", "text_tensor_only"]
         )
 
-        structured_index_with_no_model = cls.structured_marqo_index_request(
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
-            fields=[
-                FieldRequest(name='text_field_1', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-                FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
-                FieldRequest(name="custom_field_1", type=FieldType.CustomVector)
-            ],
-            tensor_fields=["text_field_1", "image_field_1", "custom_field_1"],
-            normalize_embeddings=False
-        )
-
         structured_index_empty = cls.structured_marqo_index_request(
             model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[],
@@ -159,39 +131,35 @@ class TestHybridSearch(MarqoTestCase):
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
-            unstructured_index_with_no_model,
             unstructured_index_2_10,
+
             structured_default_image_index,
             structured_text_index_score_modifiers,
-            structured_index_with_no_model,
             structured_index_empty,
             structured_index_2_9,
             structured_text_index_2_14,
             structured_index_one_tensor_field,
+
             semi_structured_default_text_index,
             semi_structured_default_image_index,
-            semi_structured_index_with_no_model,
             semi_structured_text_index_2_14
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         cls.unstructured_default_image_index = cls.indexes[1]
-        cls.unstructured_index_with_no_model = cls.indexes[2]
-        cls.unstructured_index_2_10 = cls.indexes[3]
+        cls.unstructured_index_2_10 = cls.indexes[2]
 
-        cls.structured_default_image_index = cls.indexes[4]
-        cls.structured_text_index_score_modifiers = cls.indexes[5]
-        cls.structured_index_with_no_model = cls.indexes[6]
-        cls.structured_index_empty = cls.indexes[7]
-        cls.structured_index_2_9 = cls.indexes[8]
-        cls.structured_text_index_2_14 = cls.indexes[9]
-        cls.structured_index_one_tensor_field = cls.indexes[10]
+        cls.structured_default_image_index = cls.indexes[3]
+        cls.structured_text_index_score_modifiers = cls.indexes[4]
+        cls.structured_index_empty = cls.indexes[5]
+        cls.structured_index_2_9 = cls.indexes[6]
+        cls.structured_text_index_2_14 = cls.indexes[7]
+        cls.structured_index_one_tensor_field = cls.indexes[8]
 
-        cls.semi_structured_default_text_index = cls.indexes[11]
-        cls.semi_structured_default_image_index = cls.indexes[12]
-        cls.semi_structured_index_with_no_model = cls.indexes[13]
-        cls.semi_structured_text_index_2_14 = cls.indexes[14]
+        cls.semi_structured_default_text_index = cls.indexes[9]
+        cls.semi_structured_default_image_index = cls.indexes[10]
+        cls.semi_structured_text_index_2_14 = cls.indexes[11]
 
     def setUp(self) -> None:
         super().setUp()
@@ -344,295 +312,6 @@ class TestHybridSearch(MarqoTestCase):
                 # TODO: with and without score modifiers
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
-
-    def test_hybrid_search_structured_with_custom_vector_query(self):
-        """
-        Tests that using a custom vector query sends the correct arguments to vespa
-        Structured. Uses searchable attributes.
-        """
-        sample_vector = [0.5 for _ in range(16)]
-
-        original_query = self.config.vespa_client.query
-        def pass_through_query(*arg, **kwargs):
-            return original_query(*arg, **kwargs)
-
-        mock_vespa_client_query = unittest.mock.MagicMock()
-        mock_vespa_client_query.side_effect = pass_through_query
-
-        with self.subTest("Custom vector query, with content, no context"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content= "sample",
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        searchableAttributesLexical=["text_field_1"],
-                        searchableAttributesTensor=["text_field_1"]
-                    ),
-                    result_count=3
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            # Lexical yql has content text, but Tensor uses the sample vector
-            self.assertIn("marqo__lexical_text_field_1 contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             sample_vector)
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
-
-        with self.subTest("Custom vector query, with context, with content"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content= "sample",
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        searchableAttributesLexical=["text_field_1"],
-                        searchableAttributesTensor=["text_field_1"]
-                    ),
-                    context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
-                                                                      "weight": 1}], })
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            # Lexical yql has content text, but Tensor uses the sample vector with context
-            self.assertIn("marqo__lexical_text_field_1 contains \"sample\"",
-                          vespa_query_kwargs["marqo__yql.lexical"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             [i*1.5 for i in sample_vector])    # Should average the query & context vectors
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
-
-        with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content=None,
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="tensor",
-                        rankingMethod="tensor",
-                        searchableAttributesTensor=["text_field_1"]
-                    ),
-                    result_count=3
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             sample_vector)
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
-
-    def test_hybrid_search_semi_structured_with_custom_vector_query(self):
-        """
-        Tests that using a custom vector query sends the correct arguments to vespa
-        Unstructured. Does not use searchable attributes.
-        """
-        sample_vector = [0.5 for _ in range(16)]
-
-        original_query = self.config.vespa_client.query
-        def pass_through_query(*arg, **kwargs):
-            return original_query(*arg, **kwargs)
-
-        mock_vespa_client_query = unittest.mock.MagicMock()
-        mock_vespa_client_query.side_effect = pass_through_query
-
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.semi_structured_index_with_no_model.name,
-                docs=[{"_id": "doc1", "custom_field_1":
-                    {
-                        "content": "test custom field content_1",
-                        "vector": np.random.rand(16).tolist()
-                    }}],
-                tensor_fields=["custom_field_1"],
-                mappings={"custom_field_1": {"type": "custom_vector"}}
-            ),
-        )
-
-        with self.subTest("Custom vector query, with content, no context"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.semi_structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content= "sample",
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="disjunction",
-                        rankingMethod="rrf",
-                    ),
-                    result_count=3
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            # Lexical yql has content text, but Tensor uses the sample vector
-            self.assertIn("default contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             sample_vector)
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
-
-        with self.subTest("Custom vector query, with context, with content"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.semi_structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content= "sample",
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="disjunction",
-                        rankingMethod="rrf",
-                    ),
-                    context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
-                                                                      "weight": 1}], })
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            # Lexical yql has content text, but Tensor uses the sample vector with context
-            self.assertIn("default contains \"sample\"",
-                          vespa_query_kwargs["marqo__yql.lexical"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             [i*1.5 for i in sample_vector])    # Should average the query & context vectors
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
-
-        with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
-            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-            def run():
-                res = tensor_search.search(
-                    config=self.config,
-                    index_name=self.semi_structured_index_with_no_model.name,
-                    text=CustomVectorQuery(
-                        customVector=CustomVectorQuery.CustomVector(
-                            content=None,
-                            vector=sample_vector
-                        )
-                    ),
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod="tensor",
-                        rankingMethod="tensor"
-                    ),
-                    result_count=3
-                )
-                return res
-
-            res = run()
-
-            call_args = mock_vespa_client_query.call_args_list
-
-            vespa_query_kwargs = call_args[-1][1]
-            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
-                          vespa_query_kwargs["marqo__yql.tensor"])
-            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                             sample_vector)
-            self.assertIn("hits", res)
-
-            # Result should be JSON serializable
-            try:
-                ORJSONResponse(res)
-            except TypeError as e:
-                self.fail(f"Result is not JSON serializable: {e}")
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
@@ -2354,180 +2033,6 @@ class TestHybridSearch(MarqoTestCase):
                 )
             self.assertIn("either has no tensor fields or no lexically searchable fields", str(cm.exception))
 
-    def test_hybrid_search_none_query_wrong_retrieval_or_ranking_fails(self):
-        """
-        Test that hybrid search with a None query and wrong retrieval or ranking method fails.
-        """
-        test_cases = [
-            (RetrievalMethod.Tensor, RankingMethod.Lexical),
-            (RetrievalMethod.Lexical, RankingMethod.Tensor),
-            (RetrievalMethod.Lexical, RankingMethod.Lexical)
-        ]
-
-        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
-            with self.subTest(index=index.name):
-                for retrieval_method, ranking_method in test_cases:
-                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
-                        with self.assertRaises(InvalidArgumentError) as e:
-                            tensor_search.search(
-                                config=self.config,
-                                index_name=index.name,
-                                text=None,
-                                search_method="HYBRID",
-                                hybrid_parameters=HybridParameters(
-                                    retrievalMethod=retrieval_method,
-                                    rankingMethod=ranking_method,
-                                    verbose=True
-                                )
-                            )
-                        self.assertIn("retrievalMethod and rankingMethod are both 'tensor'", str(e.exception))
-
-    def test_hybrid_search_none_query_wrong_retrieval_or_ranking_fails_for_disjunction(self):
-        """
-        Test that hybrid search with a None query will raise error for disjunction and rrf.
-        """
-        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
-            with self.subTest(index=index.name):
-                with self.assertRaises(InvalidArgumentError) as e:
-                    tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=None,
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod=RetrievalMethod.Disjunction,
-                            rankingMethod=RankingMethod.RRF,
-                            verbose=True
-                        )
-                    )
-                self.assertIn("Either 'hybridParameters.queryLexical' or just 'q'", str(e.exception))
-
-    def test_hybrid_search_none_query_tensor_without_text_raises_error(self):
-        """
-        Test that hybrid search with none query tensor and no context will raise an error.
-        """
-        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
-            with self.subTest(index=index.name):
-                with self.assertRaises(api_exception.InvalidArgError) as e:
-                    tensor_search.search(
-                        config=self.config,
-                        text=None,
-                        index_name=index.name,
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            queryLexical="test",
-                            queryTensor=None,
-                            retrievalMethod=RetrievalMethod.Disjunction,
-                            rankingMethod=RankingMethod.RRF,
-                            verbose=True
-                        )
-                    )
-                self.assertIn(
-                    "Marqo could not collect any vectors from the search query but the retrieval or ranking method",
-                              str(e.exception)
-                )
-
-    def test_hybrid_search_none_query_with_context_vectors_passes(self):
-        """Test to ensure that context vectors work with no_model by setting query as None and providing context
-        vectors in search method. Uses hybrid search.
-        """
-
-        custom_vector = [0.655 for _ in range(16)]
-
-        docs = [
-            {
-                "_id": "1",
-                "custom_field_1":
-                    {
-                        "content": "test custom field content_1",
-                        "vector": np.random.rand(16).tolist()
-                    }
-            },
-            {
-                "_id": "2",
-                "custom_field_1":
-                    {
-                        "content": "test custom field content_2",
-                        "vector": custom_vector
-                    }
-            }
-        ]
-
-        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
-            with (self.subTest(index_name=index.name)):
-                add_docs_params = AddDocsParams(index_name=index.name,
-                                                docs=docs,
-                                                tensor_fields=["custom_field_1"] \
-                                                    if isinstance(index, UnstructuredMarqoIndex) else None,
-                                                mappings={"custom_field_1": {"type": "custom_vector"}} \
-                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
-                _ = self.add_documents(config=self.config,
-                                       add_docs_params=add_docs_params)
-
-                r = tensor_search.search(config=self.config, index_name=index.name, text=None,
-                                         search_method="hybrid",
-                                         hybrid_parameters=HybridParameters(retrievalMethod=RetrievalMethod.Tensor,
-                                                                            rankingMethod=RankingMethod.Tensor,
-                                                                            verbose=True),
-                                         context=SearchContext(**{"tensor": [{"vector": custom_vector,
-                                                                              "weight": 1}], }))
-                self.assertEqual(2, len(r["hits"]))
-                self.assertEqual("2", r["hits"][0]["_id"])
-                self.assertAlmostEqual(1, r["hits"][0]["_score"], places=1)
-
-                self.assertEqual("1", r["hits"][1]["_id"])
-                self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
-
-    def test_hybrid_search_query_tensor_none_with_context_vectors_passes(self):
-        """Test to ensure that context vectors work with queryTensor=None, and a different queryLexical.
-        """
-        custom_vector = [0.655 for _ in range(16)]
-
-        docs = [
-            {
-                "_id": "1",
-                "custom_field_1":
-                    {
-                        "content": "test custom field content_1",
-                        "vector": np.random.rand(16).tolist()
-                    }
-            },
-            {
-                "_id": "2",
-                "custom_field_1":
-                    {
-                        "content": "test custom field content_2",
-                        "vector": custom_vector
-                    }
-            }
-        ]
-
-        for index in [self.structured_index_with_no_model, self.semi_structured_index_with_no_model]:
-            with (self.subTest(index_name=index.name)):
-                add_docs_params = AddDocsParams(index_name=index.name,
-                                                docs=docs,
-                                                tensor_fields=["custom_field_1"] \
-                                                    if isinstance(index, UnstructuredMarqoIndex) else None,
-                                                mappings={"custom_field_1": {"type": "custom_vector"}} \
-                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
-                _ = self.add_documents(config=self.config,
-                                       add_docs_params=add_docs_params)
-
-                r = tensor_search.search(
-                    config=self.config, index_name=index.name, text=None,
-                    search_method="hybrid",
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod=RetrievalMethod.Disjunction,
-                        rankingMethod=RankingMethod.RRF,
-                        queryTensor=None,
-                        queryLexical="test",
-                        verbose=True
-                    ),
-                    context=SearchContext(**{"tensor": [{"vector": custom_vector,
-                                                         "weight": 1}], })
-                )
-                self.assertEqual(2, len(r["hits"]))
-
     def test_hybrid_search_query_tensor_none_with_context_docs_passes(self):
         """Test to ensure that context documents work with queryTensor=None, and a different queryLexical.
         """
@@ -2744,9 +2249,14 @@ class TestHybridSearch(MarqoTestCase):
                     request=httpx.Request("POST", "http://localhost:8080/test-url/")
                 )
 
-                with unittest.mock.patch("httpx.Client.post") as mock_query:
-                    mock_query.return_value = mock_vespa_result
+                _original_post = httpx.Client.post
 
+                def selective_post(self, url, *args, **kwargs):
+                    if "search" in url:
+                        return mock_vespa_result
+                    return _original_post(self, url, *args, **kwargs)
+
+                with mock.patch("marqo.vespa.vespa_client.httpx.Client.post", autospec=True, side_effect=selective_post):
                     for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
                         with self.subTest(index=type(index)):
                             with self.assertRaises(vespa_exceptions.VespaStatusError) as e:

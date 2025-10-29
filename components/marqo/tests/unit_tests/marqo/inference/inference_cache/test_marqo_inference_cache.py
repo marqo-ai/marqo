@@ -5,13 +5,13 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 from marqo.api.exceptions import EnvVarError
-from marqo.inference.inference_cache.enums import MarqoCacheType
-from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
+from marqo.core.inference.inference_cache.enums import MarqoCacheType
+from marqo.core.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 
 
 class TestMarqoInferenceCache(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch('marqo.inference.inference_cache.marqo_inference_cache.OTELCacheStatsCollector')
+        patcher = mock.patch('marqo.core.inference.inference_cache.marqo_inference_cache.OTELCacheStatsCollector')
         self.mock_collector_class = patcher.start()
         self.addCleanup(patcher.stop)
         self.mock_collector = self.mock_collector_class.return_value

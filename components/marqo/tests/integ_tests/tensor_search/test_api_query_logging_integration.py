@@ -17,25 +17,21 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 class TestAPIQueryLoggingIntegration(MarqoTestCase):
     """Integration tests for the query logging feature in the API"""
 
-    default_env_vars = {
-        EnvVars.MARQO_ENABLE_THROTTLING: 'FALSE'  # disable throttling
-    }
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
 
         unstructured_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
         legacy_unstructured_index_v212_request = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             marqo_version='2.12.0'
         )
 
         structured_index_request = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter])],
@@ -73,6 +69,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
     def _setup_log_capture(self):
         """Set up log capture for testing"""
+
         class LogCapture(logging.Handler):
             def __init__(self, messages_list):
                 super().__init__()
@@ -95,7 +92,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
-    } | default_env_vars)
+    })
     def test_slow_query_logging(self):
         """Integration test for slow query logging with details enabled"""
 
@@ -121,7 +118,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
                     # Verify slow query was logged with details
                     warning_logs = [msg for msg in self.log_messages if "Slow search query detected" in msg]
-                    self.assertTrue(len(warning_logs) > 0, f"Expected slow query log, but got logs: {self.log_messages}")
+                    self.assertTrue(len(warning_logs) > 0,
+                                    f"Expected slow query log, but got logs: {self.log_messages}")
 
                     warning_log = warning_logs[0]
                     self.assertIn(f"Query: {search_query}", warning_log)
@@ -130,7 +128,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
         EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
-    } | default_env_vars)
+    })
     def test_slow_query_logging_all_fields_sanitised_excluding_secret_fields(self):
         """Integration test for slow query logging with all fields for a hybrid query on semistructured index"""
 
@@ -304,7 +302,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Very low threshold for testing
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE",
         EnvVars.MARQO_LOG_QUERY_MAX_LENGTH: "20"
-    } | default_env_vars)
+    })
     def test_slow_query_logging_sanitised_custom_vector_fields(self):
         """Integration test for slow query logging with all fields for a hybrid query on semistructured index"""
 
@@ -352,7 +350,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1000",  # High threshold
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
-    } | default_env_vars)
+    })
     def test_fast_query_no_logging(self):
         """Integration test to verify fast queries are not logged"""
         # reload the module to apply the env var change
@@ -382,7 +380,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",  # Low threshold
         EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE"
-    } | default_env_vars)
+    })
     def test_slow_query_no_logging_when_disabled(self):
         """Integration test to verify fast queries are not logged"""
         # reload the module to apply the env var change
@@ -412,7 +410,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "500",
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
-    } | default_env_vars)
+    })
     def test_search_error_logging(self):
         """Integration test for search error logging"""
         # reload the module to apply the env var change
@@ -445,7 +443,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "500",
         EnvVars.MARQO_LOG_QUERY_DETAILS: "FALSE"
-    } | default_env_vars)
+    })
     def test_search_error_no_logging_when_disabled(self):
         """Integration test for search error logging"""
         # reload the module to apply the env var change
@@ -474,7 +472,7 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
     @patch.dict(os.environ, {
         EnvVars.MARQO_SLOW_QUERY_THRESHOLD_MS: "1",
         EnvVars.MARQO_LOG_QUERY_DETAILS: "TRUE"
-    } | default_env_vars)
+    })
     def test_search_error_logging_overrides_slow_query_logging(self):
         """Integration test for search error logging"""
         # reload the module to apply the env var change
@@ -510,4 +508,5 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
 
 if __name__ == '__main__':
     import unittest
+
     unittest.main()

@@ -22,13 +22,13 @@ class TestBase64ImageSearch(MarqoTestCase):
 
         # Create unstructured index for base64 tests
         cls.unstructured_base64_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True
         )
 
         # Create structured index for base64 tests
         cls.structured_base64_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="title", type=FieldType.Text,
                              features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
@@ -39,7 +39,7 @@ class TestBase64ImageSearch(MarqoTestCase):
 
         # Create unstructured index with marqo_version 2.12 for base64 tests
         cls.unstructured_base64_v212_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             marqo_version='2.12.0'
         )
@@ -136,6 +136,8 @@ class TestBase64ImageSearch(MarqoTestCase):
                             result_count=10,
                             hybrid_parameters=hybrid_parameters
                         )
+
+                        print(search_result)
 
                         # Verify results
                         self.assertIn('hits', search_result)

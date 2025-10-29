@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType

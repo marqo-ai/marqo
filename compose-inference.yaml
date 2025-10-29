@@ -23,7 +23,7 @@ services:
       - "8002:8002"                # Metrics
     networks:
       mmc-net:
-        aliases: [triton-cpu]
+        aliases: [triton]
     profiles: [gpu]
     restart: unless-stopped
     deploy:
@@ -34,7 +34,7 @@ services:
               count: 1
               capabilities: [ gpu ]
 
-  triton-cpu:
+  triton:
     image: nvcr.io/nvidia/tritonserver:25.08-py3
     command:
       [
@@ -65,6 +65,7 @@ services:
       MODEL_BASE_DIR: /models
     volumes:
       - modelrepo:/models
+      - ~/.aws/credentials:/root/.aws/credentials:ro  # If using AWS S3 for model storage
     ports:
       - "8883:8883"
     networks: [mmc-net]

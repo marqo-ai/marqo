@@ -13,12 +13,15 @@ jobs:
   Test-Documentation:
     name: Run Documentation Tests
     runs-on: ubuntu-latest
+    defaults:
+        run:
+            working-directory: components/marqo
+
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          path: marqo
 
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
@@ -35,10 +38,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          pip install -r marqo/requirements.dev.txt
+          uv sync --dev
 
       - name: Run Documentation Tests
         run: |
-          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src:./marqo"
-          pytest marqo/tests/integ_tests/test_documentation.py
+          uv run tests/integ_tests/test_documentation.py

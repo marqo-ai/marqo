@@ -35,35 +35,35 @@ from collections import defaultdict
 from timeit import default_timer as timer
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
 
-import numpy as np
 import psutil
 
-import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, ModelConfig, \
+from marqo.core.inference.api import Modality, TextPreprocessingConfig, ImagePreprocessingConfig, \
+    AudioPreprocessingConfig, VideoPreprocessingConfig, InferenceError, Inference, InferenceRequest, EmbeddingModelConfig, \
     ModelError, InferenceErrorModel
 from marqo.core.inference.modality_utils import infer_modality, is_base64_image
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
-from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.core.utils.vector_interpolation import from_interpolation_method
-from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
+from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
+from marqo.core.structured_vespa_index import common as structured_common
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
+from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.utils.vector_interpolation import from_interpolation_method
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_schema import MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
 from marqo.exceptions import InternalError
 from marqo.logging import get_logger
-from marqo.s2_inference import errors as s2_inference_errors
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference.reranking import rerank
 from marqo.tensor_search import delete_docs
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation
@@ -76,18 +76,17 @@ from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreMo
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
     SearchContextTensor, QueryContentCollector, QueryContent
+from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import QueryResult
-from marqo.core.models.marqo_index import IndexType
-from marqo.core.structured_vespa_index import common as structured_common
-from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core.vespa_index.vespa_schema import MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
-from marqo.tensor_search.models.sort_by_model import SortByModel
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+import marqo.core.inference.api.exceptions as inference_exceptions
+
+
 
 logger = get_logger(__name__)
 
@@ -320,22 +319,6 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
             )
 
     return tensor_facets
-
-
-def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker: Union[str, Dict], device: str,
-                 num_highlights: int):
-    if query.searchableAttributes is None:
-        raise api_exceptions.InvalidArgError(
-            f"searchable_attributes cannot be None when re-ranking. Specify which fields to search and rerank over.")
-    try:
-        start_rerank_time = timer()
-        rerank.rerank_search_results(search_result=result, query=query.q,
-                                     model_name=reranker, device=device,
-                                     searchable_attributes=query.searchableAttributes, num_highlights=num_highlights)
-        logger.debug(
-            f"search ({query.searchMethod.lower()}) reranking using {reranker}: took {(timer() - start_rerank_time):.3f}s to rerank results.")
-    except Exception as e:
-        raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
@@ -855,7 +838,7 @@ def vectorise_jobs(inference: Inference, jobs: List[VectorisedJobs]) -> Dict[JHa
             inference_request = InferenceRequest(
                 modality=v.modality,
                 contents=v.content,
-                model_config=ModelConfig(
+                embedding_model_config=EmbeddingModelConfig(
                     model_name=v.model_name,
                     model_properties=v.model_properties,
                     model_auth=v.model_auth,
@@ -1112,7 +1095,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     try:
         prefixed_queries = add_prefix_to_queries(queries)
-    except s2_inference_errors.MediaDownloadError as e:
+    except inference_exceptions.MediaDownloadError as e:
         raise api_exceptions.InvalidArgError(message=str(e)) from e
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
@@ -1288,32 +1271,14 @@ def delete_index(config: Config, index_name):
         del get_cache()[index_name]
 
 
-def get_loaded_models() -> dict:
-    available_models = s2_inference.get_available_models()
-    message = {"models": []}
-
-    for ix in available_models:
-        if isinstance(ix, str):
-            message["models"].append({"model_name": ix.split("||")[0], "model_device": ix.split("||")[-1]})
-    return message
-
-
-def eject_model(model_name: str, device: str) -> dict:
-    try:
-        result = s2_inference.eject_model(model_name, device)
-    except s2_inference_errors.ModelNotInCacheError as e:
-        raise api_exceptions.ModelNotInCacheError(message=str(e))
-    return result
-
-
 # TODO [Refactoring device logic] move to device manager
 def get_cpu_info() -> dict:
     return {
         "cpu_usage_percent": f"{psutil.cpu_percent(1)} %",  # The number 1 is a time interval for CPU usage calculation.
         "memory_used_percent": f"{psutil.virtual_memory()[2]} %",
-        # The number 2 is just a index number to get the expected results
+        # The number 2 is just an index number to get the expected results
         "memory_used_gb": f"{round(psutil.virtual_memory()[3] / 1000000000, 1)}",
-        # The number 3 is just a index number to get the expected results
+        # The number 3 is just an index number to get the expected results
     }
 
 

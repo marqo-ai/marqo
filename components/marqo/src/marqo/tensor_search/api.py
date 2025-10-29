@@ -9,32 +9,28 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, ORJSONResponse
-from pydantic import ValidationError
 from pydantic.v1 import parse_obj_as
-from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+from starlette.status import HTTP_422_UNPROCESSABLE_CONTENT
 
 from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
-from marqo.api.models.embed_request import EmbedRequest
-from marqo.api.models.get_batch_documents_request import GetBatchDocumentsRequest
-from marqo.api.models.health_response import HealthResponse
-from marqo.api.models.recommend_query import RecommendQuery
-from marqo.api.models.rollback_request import RollbackRequest
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models import UpdateIndexSettingsBodyParams, HealthResponse, RecommendQuery, GetBatchDocumentsRequest, \
+    EmbedRequest, AddDocsBodyParams, RollbackRequest, UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_client.inference_client import InferenceClient
+from marqo.core.inference.model_manager_client.model_manager_client import ModelManagerClient
 from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
+from marqo.core.monitoring.statsd_client import StatsDClient
+from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
 from marqo.core.search.query_logger import QueryLogger
-from marqo.inference.inference_cache.caching_inference import CachingInference
-from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
-from marqo.inference.native_inference.remote.client.model_manager_client import ModelManagerClient
 from marqo.logging import get_logger, LOGGING_CONFIG
 from marqo.otel import bootstrap_otel
 from marqo.tensor_search import tensor_search, utils
@@ -43,9 +39,6 @@ from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
-from marqo.core.monitoring.statsd_client import StatsDClient
-from marqo.core.monitoring.statsd_middleware import StatsDMiddleware
-from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
@@ -75,37 +68,28 @@ def generate_config() -> config.Config:
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
-    if utils.read_env_vars_and_defaults(EnvVars.MARQO_MODE) == 'COMBINED':
-        # !!!Please note that these imports are deliberately put here since we only need them in COMBINED mode
-        import marqo.inference.native_inference.remote.server.inference_config as inference_config
-        from marqo.inference.native_inference.remote.server.on_start_script import on_start as inference_on_start
-        native_inference_local_config = inference_config.Config()
-        inference_on_start(native_inference_local_config)  # pre-warm the model
-        inference = native_inference_local_config.local_inference
-        model_manager = native_inference_local_config.model_manager
-        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
-    else:
-        inference = NativeInferenceClient(
-            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
-            pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
-            timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
-        )
-        model_manager = ModelManagerClient(
-            base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
-        )
+    inference = InferenceClient(
+        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_POOL_SIZE),
+        timeout=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_TIMEOUT),
+    )
 
-        # initialise inference cache
-        inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
-        if inference_cache_size > 0:  # enable inference cache
-            inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
-            caching_inference = CachingInference(
-                delegate=inference,
-                cache_size=inference_cache_size,
-                cache_type=inference_cache_type
-            )
-            return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
-        else:
-            return config.Config(vespa_client, inference, model_manager, zookeeper_client)
+    model_manager = ModelManagerClient(
+        base_url=utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL),
+    )
+
+    # initialise inference cache
+    inference_cache_size = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_INFERENCE_CACHE_SIZE)
+    if inference_cache_size > 0:  # enable inference cache
+        inference_cache_type = utils.read_env_vars_and_defaults(EnvVars.MARQO_API_INFERENCE_CACHE_TYPE)
+        caching_inference = CachingInference(
+            delegate=inference,
+            cache_size=inference_cache_size,
+            cache_type=inference_cache_type
+        )
+        return config.Config(vespa_client, caching_inference, model_manager, zookeeper_client)
+    else:
+        return config.Config(vespa_client, inference, model_manager, zookeeper_client)
 
 
 _config = generate_config()
@@ -122,6 +106,7 @@ async def lifespan(app: FastAPI):
 
     otel_shutdown_hook()
     get_config().stop_and_close_zookeeper_client()
+
 
 app = FastAPI(
     title="Marqo",
@@ -240,7 +225,7 @@ async def api_validation_exception_handler(request: Request, exc: RequestValidat
         "link": UnprocessableEntityError.link
     }
     return JSONResponse(
-        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=HTTP_422_UNPROCESSABLE_CONTENT,
         content=body
     )
 
@@ -313,6 +298,7 @@ def parse_request_object(obj_type: Type[T], obj: Any) -> T:
         return parse_obj_as(obj_type, obj)
     except pydantic.v1.ValidationError as e:
         raise RequestValidationError(errors=e.errors()) from e
+
 
 @app.get("/", summary="Basic information")
 def root():
@@ -403,7 +389,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 
 
 @app.post("/indexes/{index_name}/search")
-@throttle(RequestType.SEARCH)
 def search(index_name: str, search_query_dict: dict, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     """
@@ -439,8 +424,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 facets=search_query.facets,
                 track_total_hits=search_query.trackTotalHits,
                 language=search_query.language,
-                relevance_cutoff= search_query.relevance_cutoff,
-                sort_by = search_query.sort_by,
+                relevance_cutoff=search_query.relevance_cutoff,
+                sort_by=search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,
                 collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None
             )
@@ -452,7 +437,6 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
 
 
 @app.post("/indexes/{index_name}/recommend")
-@throttle(RequestType.SEARCH)
 def recommend(query_dict: dict, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
     """
@@ -489,7 +473,6 @@ def recommend(query_dict: dict, index_name: str,
 
 
 @app.post("/indexes/{index_name}/embed")
-@throttle(RequestType.SEARCH)
 def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
     """
@@ -512,7 +495,6 @@ def embed(embedding_request_dict: dict, index_name: str, device: str = Depends(a
 
 
 @app.post("/indexes/{index_name}/documents")
-@throttle(RequestType.INDEX)
 def add_or_replace_documents(
         index_name: str,
         body_dict: dict,
@@ -535,7 +517,6 @@ def add_or_replace_documents(
 
 
 @app.patch("/indexes/{index_name}/documents")
-@throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
         index_name: str,
         body_dict: dict,
@@ -552,6 +533,19 @@ def update_documents(
         index_name=index_name, partial_documents=body.documents)
 
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+
+
+@app.patch("/indexes/{index_name}/index-settings")
+@utils.enable_ops_api()
+def update_index_settings(index_name: str, body: UpdateIndexSettingsBodyParams,
+                          marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    res = marqo_config.index_management.update_index_settings_by_settings_dict(
+        index_name=index_name,
+        settings_dict=body.model_dump(by_alias=True)
+    )
+
+    return JSONResponse(content={"message": "Index settings update is successful."})
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
@@ -619,21 +613,21 @@ def delete_docs(index_name: str, documentIds: List[str],
 
 
 @app.get("/models")
-def get_loaded_models(marqo_config: config.Config = Depends(get_config)):
+def get_loaded_models(detailed: bool=False, marqo_config: config.Config = Depends(get_config)):
     """
-    Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
-    [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
+    Returns information about all the loaded models with model_properties(detailed set to true), or not.
+    Please refer to [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
     """
-    return marqo_config.model_manager.get_loaded_models()
+    return marqo_config.model_manager.get_loaded_models(detailed)
 
 
 @app.delete("/models")
-def eject_model(model_name: str, model_device: str, marqo_config: config.Config = Depends(get_config)):
+def eject_model(model_name: str, marqo_config: config.Config = Depends(get_config)):
     """
-    Eject a model from a specific device. Please refer to
+    Eject a model from Marqo. Please refer to
     [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
     """
-    return marqo_config.model_manager.eject_model(model_name=model_name, device=model_device)
+    return marqo_config.model_manager.eject_model(model_name=model_name)
 
 
 @app.get("/device/cpu")
@@ -643,16 +637,6 @@ def get_cpu_info():
     [Get CPU info API document](https://docs.marqo.ai/latest/reference/api/device/get-cpu-information/) for details.
     """
     return tensor_search.get_cpu_info()
-
-
-# TODO move this to Inference
-@app.get("/device/cuda")
-def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
-    """
-    Gives information about your cuda usage. Please refer to
-    [Get CUDA info API document](https://docs.marqo.ai/latest/reference/api/device/get-cuda-information/) for details.
-    """
-    return marqo_config.monitoring.get_cuda_info()
 
 
 @app.post("/batch/indexes/delete", include_in_schema=False)
@@ -671,7 +655,8 @@ def batch_create_indexes(index_settings_with_name_list: List[dict],
     """An internal API used for testing processes. Not to be used by users."""
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  IndexSettingsWithName can be injected after migrated to v2
-    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in index_settings_with_name_list]
+    index_settings = [parse_request_object(IndexSettingsWithName, settings) for settings in
+                      index_settings_with_name_list]
 
     marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for settings in index_settings]
 
@@ -819,7 +804,7 @@ def get_queries(index_name: str, queries: List[str], marqo_config: config.Config
         queries: List of query strings to retrieve
     """
     result = marqo_config.typeahead.get_queries(index_name, queries)
-    
+
     return ORJSONResponse(content=result.model_dump(by_alias=True))
 
 

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 from numpy import ndarray
-from pydantic.v1 import StrictStr, root_validator, Field
+from pydantic.v1 import StrictStr, root_validator, Field, validator
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.api import Modality, PreprocessingConfigType
@@ -10,7 +10,7 @@ from marqo.core.inference.api import Modality, PreprocessingConfigType
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
-class ModelConfig(ImmutableBaseModel):
+class EmbeddingModelConfig(ImmutableBaseModel):
     model_name: StrictStr = Field(alias='modelName')
     model_properties: Optional[Dict[str, Any]] = Field(default=None, alias='modelProperties')
     model_auth: Optional[ModelAuth] = Field(default=None, alias='modelAuth')
@@ -21,7 +21,7 @@ class InferenceRequest(ImmutableBaseModel):
     modality: Modality
     contents: List[str] = Field(min_items=1)
     device: Optional[str] = Field(default=None)
-    model_config: ModelConfig = Field(alias='modelConfig')
+    embedding_model_config: EmbeddingModelConfig = Field(alias='embeddingModelConfig')
     preprocessing_config: PreprocessingConfigType = Field(alias='preprocessingConfig')
     use_inference_cache: bool = Field(default=False, alias='useInferenceCache')
     # whether we should return error for individual content, when set to false, any error should fail the whole batch
@@ -82,30 +82,37 @@ class Inference(ABC):
 
 class ModelManager(ABC):
     @abstractmethod
-    def get_loaded_models(self) -> dict:
+    def get_loaded_models(self, detailed: bool=False) -> dict:
         """
         Retrieve information about models loaded in all devices
 
-        Returns: All loaded models, in following format:
-            {"models": [
-                {"model_name": "model1", "model_device": "cpu"},
-                {"model_name": "model2", "model_device": "cuda"},
-            ]}
+        Args:
+            detailed (bool): whether to return detailed information about each model
+
+        Returns: A dictionary containing the list of loaded models, in following format,
+        e.g,
+            {
+                "models": [{"modelName": "model1||1234", "modelProperties": {...}, ...]
+            } if detailed is True,
+
+            {
+                "models": [{"modelName": "model1||1234"}, {"modelName": "model2||5678"}, ...]
+            } if detailed is False
+
         """
         pass
 
     @abstractmethod
-    def eject_model(self, model_name: str, device: str) -> dict:
+    def eject_model(self, model_name: str) -> dict:
         """
         Eject a model from the model cache
 
         Args:
             model_name (str): the name of the model
-            device (str): the device the model is loaded to
 
         Returns: The result of the rejection, in following format:
           {"result": "success",
-           "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
+           "message": f"successfully eject model_name `{model_name}` "}
 
         Raises:
             ModelError: If model is not found or not in the model cache

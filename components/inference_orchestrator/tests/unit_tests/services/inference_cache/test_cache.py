@@ -98,6 +98,36 @@ class TestCache(unittest.TestCase):
                     f"{cache_type} Currsize property incorrect after adding items.",
                 )
 
+    def test_cache_getitem_operator(self):
+        """Test the __getitem__ operator for both cache types."""
+        for cache_type, cache in self.caches.items():
+            with self.subTest(cache_type=cache_type):
+                cache.set("key1", "value1")
+                # Use the [] operator to access item
+                result = cache["key1"]
+                self.assertEqual("value1", result, f"{cache_type} __getitem__ failed.")
+
+    def test_cache_getitem_operator_missing_key_raises_error(self):
+        """Test that __getitem__ raises KeyError for missing keys."""
+        for cache_type, cache in self.caches.items():
+            with self.subTest(cache_type=cache_type):
+                with self.assertRaises(KeyError):
+                    _ = cache["nonexistent_key"]
+
+    def test_cache_popitem(self):
+        """Test the popitem method for both cache types."""
+        for cache_type, cache in self.caches.items():
+            with self.subTest(cache_type=cache_type):
+                cache.set("key1", "value1")
+                cache.set("key2", "value2")
+                self.assertEqual(2, len(cache))
+
+                # Remove one item using popitem
+                cache.popitem()
+                self.assertEqual(
+                    1, len(cache), f"{cache_type} popitem did not remove an item."
+                )
+
     def test_cache_clear(self):
         """Test the clear method for both cache types."""
         for cache_type, cache in self.caches.items():

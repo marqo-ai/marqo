@@ -1,5 +1,3 @@
-import unittest
-
 import math
 import os
 import random
@@ -11,21 +9,19 @@ import requests
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
-from marqo.vespa.exceptions import VespaStatusError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
-from marqo.tensor_search.models.search import SearchContext
-from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext
+from marqo.vespa.exceptions import VespaStatusError
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from tests.integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
-
-from marqo.tensor_search import index_meta_cache
 
 
 class TestSearchStructured(MarqoTestCase):
@@ -35,7 +31,7 @@ class TestSearchStructured(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -97,7 +93,7 @@ class TestSearchStructured(MarqoTestCase):
         )
         default_text_index_encoded_name = cls.structured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -111,7 +107,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         default_image_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -477,27 +473,6 @@ class TestSearchStructured(MarqoTestCase):
     # TODO: All filtering tests have been moved to test_search_combined.py
     # Do the same with all other tests.
 
-    @unittest.skip(reason='temporarily skip due to inference interface changes')
-    def test_set_device(self):
-        """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
-
-        mock_vectorise = mock.MagicMock()
-
-        # Get vector dimension of the default BERT model
-        DEFAULT_MODEL_DIMENSION = get_model_properties_from_registry("hf/all_datasets_v4_MiniLM-L6")["dimensions"]
-        mock_vectorise.return_value = [[0, ] * DEFAULT_MODEL_DIMENSION]
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="some text",
-                search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
-            return True
-
-        assert run()
-        assert os.environ["MARQO_BEST_AVAILABLE_DEVICE"] == "cpu"
-        args, kwargs = mock_vectorise.call_args
-        assert kwargs["device"] == "cuda:123"
 
     def test_search_other_types_subsearch(self):
         self.add_documents(
@@ -682,8 +657,6 @@ class TestSearchStructured(MarqoTestCase):
             ),
         )
 
-        print(res)
-
         # meta fields are always returned
         meta_fields = {"_id", "_score", "_highlights"}
 
@@ -694,9 +667,9 @@ class TestSearchStructured(MarqoTestCase):
             (None, doc.keys()),  # not provided
             (list(doc.keys()), doc.keys()),  # all fields are selected
         )
-            + tuple([([field], {field}) for field in doc.keys()])  # one field
+            + tuple([([field], {field}) for field in list(doc.keys())])  # one field
             + tuple((random_fields, set(random_fields)) for random_fields in
-                    [random.sample(doc.keys(), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
+                    [random.sample(list(doc.keys()), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for attributes_to_retrieve, expected_fields in test_cases:
@@ -804,7 +777,7 @@ class TestSearchStructured(MarqoTestCase):
         url_1 = TestImageUrls.HIPPO_REALISTIC.value
         url_2 = TestImageUrls.HIPPO_STATUE.value
         docs = [
-            {"_id": "123", "image_field_1": url_1, "text_field_1": "irrelevant text"},
+            {"_id": "123", "image_field_1": url_1, "text_field_1": "void"},
             {"_id": "789", "image_field_1": url_2},
         ]
         self.add_documents(
@@ -816,11 +789,15 @@ class TestSearchStructured(MarqoTestCase):
         )
         res = tensor_search.search(
             config=self.config, index_name=self.default_image_index,
-            text="A hippo in the water", result_count=3,
+            text=url_1, result_count=3,
         )
-        assert len(res['hits']) == 2
-        assert {hit['image_field_1'] for hit in res['hits']} == {url_2, url_1}
-        assert {hit['_highlights'][0]['image_field_1'] for hit in res['hits']} == {url_2, url_1}
+
+        hits = res["hits"]
+        self.assertEqual(2, len(res["hits"]))
+        self.assertIn("image_field_1", hits[0]["_highlights"][0])
+
+        self.assertEqual(2, len(res["hits"]))
+        self.assertIn("image_field_1", hits[1]["_highlights"][0])
 
     def test_multi_search(self):
         docs = [

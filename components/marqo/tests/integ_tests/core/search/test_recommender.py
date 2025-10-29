@@ -30,7 +30,7 @@ class TestRecommender(MarqoTestCase):
         # This is required for some tests
 
         unstructured_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model=Model(name='hf/all-MiniLM-L6-v2'),
             text_preprocessing=TextPreProcessing(
                 split_length=1000,
                 split_overlap=0,
@@ -39,7 +39,7 @@ class TestRecommender(MarqoTestCase):
         )
 
         unstructured_text_index_nonnormalized = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'), normalize_embeddings=False,
+            model=Model(name='hf/all-MiniLM-L6-v2'), normalize_embeddings=False,
             text_preprocessing=TextPreProcessing(
                 split_length=1000,
                 split_overlap=0,
@@ -48,7 +48,7 @@ class TestRecommender(MarqoTestCase):
         )
 
         structured_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
+            model=Model(name="hf/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="title", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch]),

@@ -21,7 +21,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.inference.inference_cache.caching_inference import CachingInference
+from marqo.core.inference.inference_cache.caching_inference import CachingInference
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.vespa import exceptions as vespa_exceptions
@@ -252,7 +252,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
         # Set up the test API client with the correct env vars set
         with mock.patch.dict(os.environ, {
             "VESPA_SEARCH_TIMEOUT_MS": "1",
-            "MARQO_MODE": "COMBINED"
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
             # VespaClient will be created with default timeout of 1ms
@@ -284,10 +283,8 @@ class TestApiCustomEnvVars(MarqoTestCase):
 
     def test_inference_cache_caches_query_string(self):
         with mock.patch.dict(os.environ, {
-            "MARQO_INFERENCE_CACHE_SIZE": "10",
-            "MARQO_INFERENCE_CACHE_TYPE": "LFU",
-            "MARQO_MODE": "COMBINED",
-            "MARQO_ENABLE_THROTTLING": "FALSE"
+            "MARQO_API_INFERENCE_CACHE_SIZE": "10",
+            "MARQO_API_INFERENCE_CACHE_TYPE": "LFU",
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
 
@@ -336,10 +333,9 @@ class TestApiErrors(MarqoTestCase):
         cls.structured_index = cls.indexes[1]
 
     def setUp(self):
-        with mock.patch.dict(os.environ, {"MARQO_MODE": "COMBINED"}):
-            # reload the api module to recreated config in combined mode
-            importlib.reload(sys.modules['marqo.tensor_search.api'])
-            self.client = TestClient(api.app)
+        # Reload the api module to ensure env vars are re-read
+        importlib.reload(sys.modules['marqo.tensor_search.api'])
+        self.client = TestClient(api.app)
 
     def test_index_not_found_error(self):
         index_name = self.random_index_name()
@@ -747,3 +743,115 @@ class TestApiErrors(MarqoTestCase):
             assert "some message" in response.json()["message"]
 
     # TODO: Test how marqo handles generic exceptions, including Exception, RunTimeError, ValueError, etc.
+
+
+class TestUpdateIndexSettingsEndpoints(MarqoTestCase):
+    def setUp(self):
+        self.client = TestClient(api.app)
+
+    def test_update_index_settings_enabled(self):
+        """Test that update_index_settings endpoint works when ops API is enabled"""
+        with mock.patch(
+                "marqo.core.index_management.index_management.IndexManagement."
+                "update_index_settings_by_settings_dict") as mock_update, \
+                patch.dict('os.environ',  {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+
+            mock_update.return_value = None
+
+            response = self.client.patch(
+                f"/indexes/index-1/index-settings",
+                json={}
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["message"], "Index settings update is successful.")
+            mock_update.assert_called_once()
+
+    def test_update_index_settings_disabled(self):
+        """Test that update_index_settings endpoint works when ops API is enabled"""
+        with mock.patch(
+                "marqo.core.index_management.index_management.IndexManagement."
+                "update_index_settings_by_settings_dict") as mock_update, \
+                patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'False'}):
+            mock_update.return_value = None
+
+            response = self.client.patch(
+                f"/indexes/index-1/index-settings",
+                json={}
+            )
+
+            self.assertEqual(response.status_code, 403)
+            mock_update.assert_not_called()
+
+
+class TestModelApiEndpoints(MarqoTestCase):
+    """Tests for model API endpoints"""
+
+    def setUp(self):
+        self.client = TestClient(api.app)
+
+    def test_get_loaded_models_detailed(self):
+        """Test get_loaded_models with detailed=True parameter"""
+        with mock.patch('marqo.core.inference.model_manager_client.model_manager_client.ModelManagerClient.'
+                         'get_loaded_models') as mock_get_model:
+
+            mock_get_model.return_value = {
+                "models": [
+                    {
+                        "modelName": "test-model",
+                        "modelProperties": {"dimensions": 768}
+                    }
+                ]
+            }
+
+            response = self.client.get("/models?detailed=true")
+
+            self.assertEqual(response.status_code, 200)
+            mock_get_model.assert_called_once_with(True)
+
+    def test_get_loaded_models_detailed_false(self):
+        """Test get_loaded_models with detailed=false parameter"""
+        with mock.patch('marqo.core.inference.model_manager_client.model_manager_client.ModelManagerClient.'
+                         'get_loaded_models') as mock_get_model:
+
+            mock_get_model.return_value = {
+                "models": [
+                    {
+                        "modelName": "test-model",
+                    }
+                ]
+            }
+
+            response = self.client.get("/models?detailed=false")
+
+            self.assertEqual(response.status_code, 200)
+            mock_get_model.assert_called_once_with(False)
+
+    def test_get_loaded_models_detailed_default(self):
+        """Test get_loaded_models with default(false) parameter"""
+        with mock.patch('marqo.core.inference.model_manager_client.model_manager_client.ModelManagerClient.'
+                         'get_loaded_models') as mock_get_model:
+
+            mock_get_model.return_value = {
+                "models": [
+                    {
+                        "modelName": "test-model",
+                    }
+                ]
+            }
+
+            response = self.client.get("/models?")
+
+            self.assertEqual(response.status_code, 200)
+            mock_get_model.assert_called_once_with(False)
+
+    def test_eject_model(self):
+        """Test eject_model endpoint"""
+        with mock.patch('marqo.core.inference.model_manager_client.model_manager_client.ModelManagerClient.'
+                        'eject_model') as mock_eject_model:
+            mock_eject_model.return_value = {"acknowledged": True}
+
+            response = self.client.delete("/models?model_name=test-model")
+
+            self.assertEqual(response.status_code, 200)
+            mock_eject_model.assert_called_once_with(model_name="test-model")

@@ -14,6 +14,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_index import Model
 
 
 class TestCollapseFields(MarqoTestCase):
@@ -24,7 +25,8 @@ class TestCollapseFields(MarqoTestCase):
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request(
-            collapse_fields=[CollapseField(name="parent_id", minGroups=3)]
+            collapse_fields=[CollapseField(name="parent_id", minGroups=3)],
+            model=Model(name="hf/all-MiniLM-L6-v2")
         )
 
         cls.indexes = cls.create_indexes([
@@ -175,7 +177,7 @@ class TestCollapseFields(MarqoTestCase):
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
                         rankingMethod=ranking_method,
-                        rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
+                        rerankDepthTensor=50,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
                     # parent id is not added here, it will be added in the query for collapsing, but not in the result
                     attributes_to_retrieve=["title", "group"],

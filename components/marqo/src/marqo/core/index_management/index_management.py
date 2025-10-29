@@ -1,17 +1,15 @@
+import semver
 from contextlib import contextmanager
 from typing import List, Tuple
 from typing import Optional
-
-import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
-from marqo.core.exceptions import OperationConflictError
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, OperationConflictError, \
+    ZookeeperLockNotAcquiredError, InternalError, InvalidModelPropertiesError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
     ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
@@ -32,6 +30,7 @@ class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
+    _ALLOWED_MODIFIED_SETTINGS = {"modelProperties"}
 
     def __init__(self,
                  vespa_client: VespaClient,
@@ -219,6 +218,52 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
+    def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+        """
+        Update index settings by settings dict. No schema update. Currently only modelProperties can be updated.
+
+        When calling this method, you must consider the scenario distributed Marqo instances. Some Marqo instances
+        could still be running the old version so the updated modelProperties must be compatible with the old version.
+
+        Args:
+            index_name: Name of the index to update
+            settings_dict: Settings dict to update the index, currently only modelProperties can be updated.
+        Raises:
+            IndexNotFoundError: If an index does not exist
+            UnsupportedFeatureError: If the updated modelProperties results in dimension change
+        """
+        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS): #pragma: no cover
+            # Should not happen since we validate the settings in the API layer
+            raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
+                                f"Provided settings: {list(settings_dict.keys())}")
+
+        with self._vespa_deployment_lock():
+            existing_index = self.get_index(index_name)
+            updated_version = existing_index.version + 1 if existing_index.version is not None else 1
+            updated_index = existing_index.copy(deep=True, update={'version': updated_version})
+
+            if "modelProperties" in settings_dict:
+                self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
+                updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
+
+                logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
+                self._get_vespa_application().update_index_setting(updated_index)
+
+    def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
+        """
+        Create a new MarqoIndex object with updated model properties.
+
+        Args:
+            index: The index object to update.
+            model_properties: A dictionary of model properties to update.
+
+        Returns:
+            A new MarqoIndex object with updated model properties.
+        """
+        index.model.properties = model_properties
+        index.model.custom = True  # Mark the model as custom if model properties are updated
+        return index
+
     def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
         """
         Update index settings and schema
@@ -367,6 +412,40 @@ class IndexManagement:
             raise ApplicationNotInitializedError()
 
         return application
+
+    @staticmethod
+    def validate_updated_model_properties(current_model_properties: dict, updated_model_properties: dict) -> None:
+        """
+        Validate the updated model properties to ensure compatibility with the current model properties.
+
+        Args:
+            current_model_properties: current model properties, as a dict
+            updated_model_properties: updated model properties, as a dict
+
+        Returns:
+            None
+
+        Raises:
+            InvalidModelPropertiesError: If the updated model properties is not compatible with the current model properties.
+        """
+        must_unchanged_keys = ["dimensions", "type"]
+
+        for key in must_unchanged_keys:
+            if current_model_properties.get(key) != updated_model_properties.get(key):
+                raise InvalidModelPropertiesError(
+                    f"Updating model properties resulting in change of '{key}' is not allowed. "
+                    f"Current '{key}': {current_model_properties.get(key)}, "
+                    f"updated '{key}': {updated_model_properties.get(key)} "
+                )
+
+        current_keys = set(current_model_properties.keys())
+        updated_keys = set(updated_model_properties.keys())
+
+        if not current_keys.issubset(updated_keys):
+            raise InvalidModelPropertiesError(
+                f"The updated model properties must contain all keys in the current model properties for compatibility. "
+                f"Current model properties keys: {current_keys}, updated model properties keys: {updated_keys} "
+            )
 
     @contextmanager
     def _vespa_deployment_lock(self):

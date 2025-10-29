@@ -1,5 +1,7 @@
 FROM python:3.11-slim AS base
 
+ARG COMMITHASH
+
 WORKDIR /app
 
 # System deps
@@ -22,6 +24,7 @@ COPY src ./src
 # Set Python path
 ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
+RUN echo $COMMITHASH > build_info.txt
 
 # Run with gunicorn and uvicorn worker
 CMD ["uvicorn", "model_management.main:app", "--host", "0.0.0.0", "--port", "8883"]

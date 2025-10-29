@@ -14,23 +14,26 @@ the zip file is removed after the application package is deployed.
 Note: Vespa CLI is not needed for full-start as we use the REST API to deploy the application package.
 """
 
+import argparse
+import logging
+import math
 import os
 import shutil
 import subprocess
+import sys
 import textwrap
 import time
-import sys
-import yaml
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import math
-import logging
 
 import requests
-import argparse
+import yaml
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "../../../../.env"), verbose=True) # Root of the monorepo
 
 VESPA_VERSION = os.getenv('VESPA_VERSION', '8.513.17')
-VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
+VESPA_DISK_USAGE_LIMIT = float(os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75))
 VESPA_CONFIG_URL="http://localhost:19071"
 VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"

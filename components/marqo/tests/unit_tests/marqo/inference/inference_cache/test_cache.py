@@ -1,7 +1,7 @@
 import unittest
 
-from marqo.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
-from marqo.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
+from marqo.core.inference.inference_cache.marqo_lfu_cache import MarqoLFUCache
+from marqo.core.inference.inference_cache.marqo_lru_cache import MarqoLRUCache
 
 
 class TestCache(unittest.TestCase):

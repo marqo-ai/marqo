@@ -2,10 +2,16 @@ import os
 import subprocess
 import time
 import typing
+import pathlib
+import tempfile
+import yaml
+
+root_project_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent.parent.parent
+compose_file = os.path.join(root_project_dir, "compose.yaml")
 
 
 def disallow_environments(disallowed_configurations: typing.List[str]):
-    """This construct wraps a test to ensure that it does not run for disallowed 
+    """This construct wraps a test to ensure that it does not run for disallowed
     testing environments.
 
     It figures by examining the "TESTING_CONFIGURATION" environment variable.
@@ -15,6 +21,7 @@ def disallow_environments(disallowed_configurations: typing.List[str]):
         "TESTING_CONFIGURATION" matches a configuration in
         disallowed_configurations, then the test will be skipped
     """
+
     def decorator(function):
         def wrapper(*args, **kwargs):
             if os.environ["TESTING_CONFIGURATION"] in disallowed_configurations:
@@ -22,7 +29,9 @@ def disallow_environments(disallowed_configurations: typing.List[str]):
             else:
                 result = function(*args, **kwargs)
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -34,7 +43,9 @@ def allow_environments(allowed_configurations: typing.List[str]):
             else:
                 result = function(*args, **kwargs)
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -44,10 +55,11 @@ def classwide_decorate(decorator, allowed_configurations):
             if method.startswith("test"):
                 setattr(cls, method, (decorator(allowed_configurations))(getattr(cls, method)))
         return cls
+
     return decorate
 
 
-def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
+def rerun_marqo_with_env_vars(env_vars: dict[str, str], calling_class: str = "", target_service: str = "api"):
     """
         Given a list of env vars / flags, stop and rerun Marqo using the start script appropriate
         for the current test config
@@ -60,53 +72,51 @@ def rerun_marqo_with_env_vars(env_vars: list = [], calling_class: str = ""):
 
     if calling_class not in ["TestEnvVarChanges", "TestBackendRetries"]:
         raise RuntimeError(
-            f"Rerun Marqo function should only be called by `TestEnvVarChanges` to ensure other API tests are not affected. Given calling class is {calling_class}")
+            f"Rerun Marqo function should only be called by `TestEnvVarChanges` "
+            f"to ensure other API tests are not affected. Given calling class is {calling_class}"
+        )
 
-    # Stop Marqo
-    print("Attempting to stop marqo.")
-    subprocess.run(["docker", "stop", "marqo"], check=True, capture_output=True)
-    print("Marqo stopped.")
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".env") as fp:
 
-    # Rerun the appropriate start script
-    test_config = os.environ["TESTING_CONFIGURATION"]
+        with open(compose_file, 'r') as compose_fp:
+            compose_content = yaml.safe_load(compose_fp)
 
-    if test_config == "CPU_LOCAL_MARQO":
-        start_script_name = "start_local_marqo.sh"
-    elif test_config == "CPU_DOCKER_MARQO":
-        start_script_name = "start_docker_marqo.sh"
-    elif test_config == "CUDA_DOCKER_MARQO":
-        start_script_name = "start_cuda_docker_marqo.sh"
-    else:
-        raise RuntimeError(f"Invalid testing configuration: {test_config}. "
-                           f"Must be one of ('CPU_LOCAL_MARQO', 'CPU_DOCKER_MARQO', "
-                           f"'CUDA_DOCKER_MARQO') to run the application tests."
-                           f"If you are using a 'CUSTOM', please only run the tests under 'tests/api_tests'")
-    full_script_path = f"{os.environ['MARQO_API_TESTS_ROOT']}/scripts/{start_script_name}"
+        updated_compose_data = compose_content.copy()
 
-    run_process = subprocess.Popen(
-        [
-            "bash",  # command: run
-            full_script_path,  # script to run
-            os.environ['MARQO_IMAGE_NAME'],  # arg $1 in script
-        ] + env_vars,  # args $2 onwards
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True
-    )
+        targe_service_file = updated_compose_data['services'][target_service]
+        for key, value in env_vars.items():
+            if not 'environment' in targe_service_file:
+                targe_service_file['environment'] = {}
+            targe_service_file['environment'][key] = value
 
-    # Read and print the output line by line (in real time)
-    for line in run_process.stdout:
-        print(line, end='')
+        yaml.dump(updated_compose_data, fp)
+        fp.flush()
+        temp_path = pathlib.Path(fp.name).absolute()
 
-    # Wait for the process to complete
-    run_process.wait()
-    return True
+        run_process = subprocess.Popen(
+            [
+                "docker",  # command: run
+                "compose",
+                "-f",
+                temp_path,
+                "up",
+                "-d",
+                "--force-recreate",
+                target_service
+            ],
+        stdout = subprocess.PIPE,
+        stderr = subprocess.STDOUT,
+        universal_newlines = True
+        )
+        # Wait for the process to complete
+        run_process.wait()
+        return True
 
 
 def rerun_marqo_with_default_config(calling_class: str = ""):
     # Do not send any env vars
     # This should act like running the start script at the beginning
-    rerun_marqo_with_env_vars(env_vars=[], calling_class=calling_class)
+    rerun_marqo_with_env_vars(env_vars={}, calling_class=calling_class)
 
 
 docker_log_failure_message = "Failed to fetch docker logs for Marqo"
@@ -126,11 +136,11 @@ def attach_docker_logs(container_name: str, log_collection: typing.List, start_t
             must be in the format: "%Y-%m-%dT%H:%M:%S"
     """
 
-    commands =  ["docker", "logs", container_name]
+    commands = ["docker", "logs", container_name]
 
     if start_time != None:
         commands.append(f"--since={start_time}")
-    
+
     completed_process = subprocess.run(
         commands,
         stdout=subprocess.PIPE,
@@ -178,8 +188,8 @@ def retrieve_docker_logs(
 
 
 def control_marqo_os(
-    container_name: str = "marqo-os",
-    command: str = "start",
+        container_name: str = "marqo-os",
+        command: str = "start",
 ):
     """Stops a Marqo OS container. If Setup is DIND, This executes a command on the marqo container.
 

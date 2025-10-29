@@ -22,7 +22,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Custom settings indexes
         unstructured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
@@ -30,14 +30,14 @@ class TestCustomVectorField(MarqoTestCase):
         )
 
         semi_structured_custom_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular
         )
 
         structured_custom_index = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
             fields=[
@@ -185,7 +185,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         with self.assertRaises(pydantic.error_wrappers.ValidationError) as err:
             self.create_indexes([self.structured_marqo_index_request(
-                model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+                model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
                 normalize_embeddings=False,
                 distance_metric=DistanceMetric.Angular,
                 fields=[
@@ -1093,62 +1093,6 @@ class TestCustomVectorField(MarqoTestCase):
                 self.assertIn("Multimodal subfields must be strings", add_docs_res["items"][0]["error"])
 
 
-    @unittest.skip
-    def test_search_with_custom_vector_field_boosting(self):
-        """
-        SKIPPED WHILE BOOSTING IS NOT YET IMPLEMENTED.
-        Search for the doc, with boosting
-        """
-        mappings = {
-            "my_custom_vector_1": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_2": {
-                "type": "custom_vector"
-            },
-        }
-
-        self.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "doc0",
-                        "my_custom_vector_1": {
-                            "content": "vec 1",
-                            "vector": self.random_vector_1  # size is 512
-                        },
-                    },
-                    {
-                        "_id": "doc1",
-                        "my_custom_vector_2": {
-                            "content": "vec 2",
-                            "vector": self.random_vector_2  # size is 512
-                        },
-                    },
-                ],
-                device="cpu", mappings=mappings
-            )
-        )
-
-        # Normal search should favor doc0
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
-        )
-        assert res["hits"][0]["_id"] == "doc0"
-
-        # Search with boosting should favor doc1
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            boost={"my_custom_vector_2": [5, 1]}
-        )
-        assert res["hits"][0]["_id"] == "doc1"
-
-
 class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
     """
     Test suite for custom vector fields with indexes where `normalize_embeddings` was set to True at the time of index creation.
@@ -1169,7 +1113,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
 
         # Custom settings indexes
         test_unstructured_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=True, #Set normalize_embeddings to True
             distance_metric=DistanceMetric.Angular,
@@ -1177,7 +1121,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
         )
 
         test_semi_structured_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             treat_urls_and_pointers_as_images=True,
             normalize_embeddings=True,  # Set normalize_embeddings to True
             distance_metric=DistanceMetric.Angular
@@ -1185,7 +1129,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
 
 
         test_structured_index_request = cls.structured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
             normalize_embeddings=True,
             distance_metric=DistanceMetric.Angular,
             fields=[
