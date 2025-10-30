@@ -26,6 +26,11 @@ on:
         description: 'Image tag'
         required: true
         type: string
+      platforms:
+        description: 'The target platforms for the image build. Comma separated values. E.g: linux/amd64,linux/arm64'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64'
     outputs:
       api_image_identifier:
         # By image_identifier, we refer to the
@@ -63,6 +68,15 @@ on:
         description: 'Image tag'
         required: true
         type: string
+      platforms:
+        description: 'The target platforms for the image build. Comma separated values. E.g: linux/amd64,linux/arm64'
+        required: false
+        type: choice
+        options:
+          - linux/amd64,linux/arm64
+          - linux/amd64
+          - linux/arm64
+        default: 'linux/amd64,linux/arm64'
 
 concurrency:
     group: build-push-marqo-image-${{ github.ref }}
@@ -83,6 +97,7 @@ jobs:
           echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
           echo "IMAGE_NAMESPACE=${{ inputs.image_namespace || github.event.inputs.image_namespace }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echoe "PLATFORMS=${{ inputs.platforms || github.event.inputs.platforms }}" >> $GITHUB_ENV
 
       - name: Checkout Marqo
         uses: actions/checkout@v3
@@ -118,7 +133,7 @@ jobs:
         with:
           context: ./components/marqo
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api:${{ env.IMAGE_TAG }}
 
       - name: Build and push inference orchestrator image
@@ -127,7 +142,7 @@ jobs:
         with:
           context: ./components/inference-orchestrator
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator:${{ env.IMAGE_TAG }}
 
       - name: Build and push model management image
@@ -136,7 +151,7 @@ jobs:
         with:
           context: ./components/model-management
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
 
       - name: Output image_identifier
