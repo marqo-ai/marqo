@@ -117,7 +117,7 @@ jobs:
           context: ./components/marqo
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/api:${{ env.IMAGE_TAG }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api:${{ env.IMAGE_TAG }}
 
       - name: Build and push inference orchestrator image
         id: build-and-push-inference-orchestrator
@@ -126,7 +126,7 @@ jobs:
           context: ./components/inference-orchestrator
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/inference-orchestrator:${{ env.IMAGE_TAG }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator:${{ env.IMAGE_TAG }}
 
       - name: Build and push model management image
         id: build-and-push-model-management
@@ -135,7 +135,7 @@ jobs:
           context: ./components/model-management
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/model-management:${{ env.IMAGE_TAG }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
 
       - name: Output image_identifier
         # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
