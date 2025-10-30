@@ -115,7 +115,7 @@ jobs:
 
       - name: Build and push api image
         id: build-and-push-api
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./components/marqo
           push: true
@@ -124,7 +124,7 @@ jobs:
 
       - name: Build and push inference orchestrator image
         id: build-and-push-inference-orchestrator
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./components/inference-orchestrator
           push: true
@@ -133,7 +133,7 @@ jobs:
 
       - name: Build and push model management image
         id: build-and-push-model-management
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./components/model-management
           push: true
