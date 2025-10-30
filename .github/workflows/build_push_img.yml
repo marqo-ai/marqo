@@ -71,7 +71,7 @@ on:
         description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
         value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
       model_management_image_identifier:
-        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-model-management/inference-orchestrator@sha256:1234567890abcdef)"
+        description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
         value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
 
 
