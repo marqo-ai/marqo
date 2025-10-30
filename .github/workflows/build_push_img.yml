@@ -16,10 +16,7 @@ on:
       push_to:
         description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
         required: true
-        type: choice
-        options:
-          - OS-ECR
-          - AMI-ECR
+        type: string
         default: OS-ECR
       image_namespace:
         description: 'The namespace of the repo, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
@@ -31,11 +28,17 @@ on:
         required: true
         type: string
     outputs:
-      image_identifier:
+      api_image_identifier:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
-        description: "The image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.image_identifier }}
+        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/api@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier:
+        description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier:
+        description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
 
   workflow_dispatch: #for manual triggers
     inputs:
@@ -61,19 +64,6 @@ on:
         description: 'Image tag'
         required: true
         type: string
-    outputs:
-      api_image_identifier:
-        # By image_identifier, we refer to the
-        # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
-        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/api@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
-      inference_orchestrator_image_identifier:
-        description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
-      model_management_image_identifier:
-        description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
-
 
 jobs:
   Docker-Build:
