@@ -1,3 +1,5 @@
+import os
+
 import contextlib
 import socket
 import threading
@@ -106,10 +108,11 @@ class MarqoTestCase(unittest.TestCase):
         cls.zookeeper_client = zookeeper_client
         cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True,
                                                deployment_lock_timeout_seconds=2)
+        remote_inference_url=os.environ.get("MARQO_REMOTE_INFERENCE_URL", "http://localhost:8884")
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
-                                   inference=InferenceClient(base_url="http://localhost:8884"),
-                                   model_manager=ModelManagerClient(base_url="http://localhost:8884"),
+                                   inference=InferenceClient(base_url=remote_inference_url),
+                                   model_manager=ModelManagerClient(base_url=remote_inference_url),
                                    zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
