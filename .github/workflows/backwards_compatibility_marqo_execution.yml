@@ -60,7 +60,7 @@ jobs:
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     defaults:
         run:
-            working-directory: components/marqo/tests/compatibility_tests
+            working-directory: components/marqo
     steps:
       # Step to check out the Marqo repository
       - name: checkout marqo repo
@@ -102,8 +102,8 @@ jobs:
           TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
           MODE: ${{ inputs.mode || github.event.inputs.mode }}
         run: |
-            export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
-            python compatibility_test_runner.py \
+            export PYTHONPATH=./:$PYTHONPATH
+            python tests/compatibility_tests/compatibility_test_runner.py \
             --mode "$MODE" \
             --from_version "$FROM_VERSION" \
             --to_version "$TO_VERSION" \
