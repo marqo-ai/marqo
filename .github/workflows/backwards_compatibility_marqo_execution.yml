@@ -102,7 +102,7 @@ jobs:
           TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
           MODE: ${{ inputs.mode || github.event.inputs.mode }}
         run: |
-            export PYTHONPATH=./:$PYTHONPATH
+            export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
             python compatibility_test_runner.py \
             --mode "$MODE" \
             --from_version "$FROM_VERSION" \
