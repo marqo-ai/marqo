@@ -58,6 +58,9 @@ jobs:
   compatibility_tests:
     # This job runs on the newly created runner
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    defaults:
+        run:
+            working-directory: components/marqo/tests/compatibility_tests
     steps:
       # Step to check out the Marqo repository
       - name: checkout marqo repo
@@ -75,7 +78,7 @@ jobs:
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
-          pip install -r tests/compatibility_tests/requirements.txt
+          pip install -r requirements.txt
 
       # Step to configure AWS credentials
       - name: Configure AWS credentials
