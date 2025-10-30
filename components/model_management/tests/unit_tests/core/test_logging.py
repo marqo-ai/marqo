@@ -19,315 +19,191 @@ class TestInstantiateLogger(TestCase):
         logging.root.handlers = []
         logging.root.setLevel(logging.WARNING)
 
-    def test_instantiate_logger_with_plain_format_info_level(self):
-        """Test logger instantiation with PLAIN format and INFO level."""
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_configuration_structure(self, mock_dict_config):
+        """Test that logger configuration has the correct base structure."""
         mock_settings = MagicMock(spec=Settings)
         mock_settings.marqo_log_format = LogFormat.PLAIN
         mock_settings.marqo_log_level = LogLevel.INFO
 
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
+        instantiate_logger(mock_settings)
 
-            # Verify dictConfig was called
-            mock_dict_config.assert_called_once()
+        mock_dict_config.assert_called_once()
+        config = mock_dict_config.call_args[0][0]
 
-            # Get the config that was passed
-            config = mock_dict_config.call_args[0][0]
+        # Verify basic structure
+        self.assertEqual(1, config["version"])
+        self.assertFalse(config["disable_existing_loggers"])
 
-            # Verify format is PLAIN
-            self.assertIn("default-plain", config["formatters"])
-            self.assertEqual(
-                "default-plain", config["handlers"]["default"]["formatter"]
-            )
+        # Verify all major sections exist
+        self.assertIn("formatters", config)
+        self.assertIn("handlers", config)
+        self.assertIn("loggers", config)
+        self.assertIn("root", config)
 
-            # Verify log level is INFO
-            self.assertEqual("INFO", config["root"]["level"])
-            self.assertEqual("INFO", config["loggers"]["uvicorn"]["level"])
+        # Verify formatters exist
+        self.assertIn("default-plain", config["formatters"])
+        self.assertIn("default-json", config["formatters"])
+        self.assertIn("access-plain", config["formatters"])
+        self.assertIn("access-json", config["formatters"])
 
-    def test_instantiate_logger_with_json_format_debug_level(self):
-        """Test logger instantiation with JSON format and DEBUG level."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.marqo_log_format = LogFormat.JSON
-        mock_settings.marqo_log_level = LogLevel.DEBUG
+        # Verify handlers exist
+        self.assertIn("default", config["handlers"])
+        self.assertIn("access", config["handlers"])
 
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
+        # Verify loggers exist
+        self.assertIn("uvicorn", config["loggers"])
+        self.assertIn("uvicorn.access", config["loggers"])
+        self.assertIn("httpx", config["loggers"])
+        self.assertIn("httpcore", config["loggers"])
+        self.assertIn("marqo_query", config["loggers"])
 
-            mock_dict_config.assert_called_once()
-            config = mock_dict_config.call_args[0][0]
-
-            # Verify format is JSON
-            self.assertIn("default-json", config["formatters"])
-            self.assertEqual("default-json", config["handlers"]["default"]["formatter"])
-
-            # Verify log level is DEBUG
-            self.assertEqual("DEBUG", config["root"]["level"])
-            self.assertEqual("DEBUG", config["loggers"]["uvicorn"]["level"])
-
-    def test_instantiate_logger_with_warning_level(self):
-        """Test logger instantiation with WARNING level."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.marqo_log_format = LogFormat.PLAIN
-        mock_settings.marqo_log_level = LogLevel.WARNING
-
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
-
-            config = mock_dict_config.call_args[0][0]
-
-            # Verify log level is WARNING
-            self.assertEqual("WARNING", config["root"]["level"])
-            self.assertEqual("WARNING", config["loggers"]["uvicorn"]["level"])
-            self.assertEqual("WARNING", config["loggers"]["httpx"]["level"])
-            self.assertEqual("WARNING", config["loggers"]["httpcore"]["level"])
-
-    def test_instantiate_logger_with_error_level(self):
-        """Test logger instantiation with ERROR level."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.marqo_log_format = LogFormat.PLAIN
-        mock_settings.marqo_log_level = LogLevel.ERROR
-
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
-
-            config = mock_dict_config.call_args[0][0]
-
-            # Verify log level is ERROR
-            self.assertEqual("ERROR", config["root"]["level"])
-            self.assertEqual("ERROR", config["loggers"]["uvicorn"]["level"])
-            self.assertEqual("ERROR", config["loggers"]["httpx"]["level"])
-            self.assertEqual("ERROR", config["loggers"]["httpcore"]["level"])
-
-    def test_instantiate_logger_all_log_formats(self):
-        """Test logger instantiation with all log format options."""
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_log_formats(self, mock_dict_config):
+        """Test that log format selection affects formatter configuration."""
         test_cases = [
+            # (log_format, expected_default_formatter, expected_access_formatter)
             (LogFormat.PLAIN, "default-plain", "access-plain"),
             (LogFormat.JSON, "default-json", "access-json"),
         ]
 
-        for (
-            log_format,
-            expected_default_formatter,
-            expected_access_formatter,
-        ) in test_cases:
+        for log_format, expected_default, expected_access in test_cases:
             with self.subTest(log_format=log_format):
+                mock_dict_config.reset_mock()
                 mock_settings = MagicMock(spec=Settings)
                 mock_settings.marqo_log_format = log_format
                 mock_settings.marqo_log_level = LogLevel.INFO
 
-                with patch("logging.config.dictConfig") as mock_dict_config:
-                    instantiate_logger(mock_settings)
+                instantiate_logger(mock_settings)
 
-                    config = mock_dict_config.call_args[0][0]
+                config = mock_dict_config.call_args[0][0]
 
-                    # Verify formatters are configured correctly
-                    self.assertEqual(
-                        expected_default_formatter,
-                        config["handlers"]["default"]["formatter"],
-                    )
-                    self.assertEqual(
-                        expected_access_formatter,
-                        config["handlers"]["access"]["formatter"],
-                    )
+                # Verify correct formatters are assigned to handlers
+                self.assertEqual(
+                    expected_default,
+                    config["handlers"]["default"]["formatter"],
+                )
+                self.assertEqual(
+                    expected_access,
+                    config["handlers"]["access"]["formatter"],
+                )
 
-    def test_instantiate_logger_all_log_levels(self):
-        """Test logger instantiation with all log level options."""
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_log_levels(self, mock_dict_config):
+        """Test that log level is applied to all relevant loggers."""
         test_cases = [
-            LogLevel.DEBUG,
-            LogLevel.INFO,
-            LogLevel.WARNING,
-            LogLevel.ERROR,
+            # (log_level, httpx_expected_level)
+            (LogLevel.DEBUG, "WARNING"),  # httpx stays WARNING except for ERROR
+            (LogLevel.INFO, "WARNING"),
+            (LogLevel.WARNING, "WARNING"),
+            (LogLevel.ERROR, "ERROR"),  # httpx becomes ERROR when main is ERROR
         ]
 
-        for log_level in test_cases:
+        for log_level, httpx_expected in test_cases:
             with self.subTest(log_level=log_level):
+                mock_dict_config.reset_mock()
                 mock_settings = MagicMock(spec=Settings)
                 mock_settings.marqo_log_format = LogFormat.PLAIN
                 mock_settings.marqo_log_level = log_level
 
-                with patch("logging.config.dictConfig") as mock_dict_config:
-                    instantiate_logger(mock_settings)
+                instantiate_logger(mock_settings)
 
-                    config = mock_dict_config.call_args[0][0]
+                config = mock_dict_config.call_args[0][0]
 
-                    # Verify log level is set correctly
-                    self.assertEqual(log_level.value, config["root"]["level"])
+                # Verify main log level is set correctly for root and uvicorn
+                self.assertEqual(log_level.value, config["root"]["level"])
+                self.assertEqual(log_level.value, config["loggers"]["uvicorn"]["level"])
 
-    def test_instantiate_logger_configuration_structure(self):
-        """Test that logger configuration has the correct structure."""
+                # uvicorn.access is always INFO
+                self.assertEqual("INFO", config["loggers"]["uvicorn.access"]["level"])
+
+                # Verify httpx/httpcore special handling (WARNING except when ERROR)
+                self.assertEqual(httpx_expected, config["loggers"]["httpx"]["level"])
+                self.assertEqual(httpx_expected, config["loggers"]["httpcore"]["level"])
+
+                # marqo_query always stays WARNING
+                self.assertEqual("WARNING", config["loggers"]["marqo_query"]["level"])
+
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_formatter_details(self, mock_dict_config):
+        """Test that formatters are configured with correct details."""
         mock_settings = MagicMock(spec=Settings)
         mock_settings.marqo_log_format = LogFormat.PLAIN
         mock_settings.marqo_log_level = LogLevel.INFO
 
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
+        instantiate_logger(mock_settings)
 
-            config = mock_dict_config.call_args[0][0]
+        config = mock_dict_config.call_args[0][0]
 
-            # Verify basic structure
-            self.assertEqual(1, config["version"])
-            self.assertFalse(config["disable_existing_loggers"])
+        # Check PLAIN formatters have format strings
+        self.assertIn("format", config["formatters"]["default-plain"])
+        self.assertIn("fmt", config["formatters"]["access-plain"])
 
-            # Verify formatters
-            self.assertIn("formatters", config)
-            self.assertIn("default-plain", config["formatters"])
-            self.assertIn("default-json", config["formatters"])
-            self.assertIn("access-plain", config["formatters"])
-            self.assertIn("access-json", config["formatters"])
+        # Check JSON formatters use pythonjsonlogger
+        self.assertEqual(
+            "pythonjsonlogger.orjson.OrjsonFormatter",
+            config["formatters"]["default-json"]["()"],
+        )
+        self.assertIn("rename_fields", config["formatters"]["default-json"])
 
-            # Verify handlers
-            self.assertIn("handlers", config)
-            self.assertIn("default", config["handlers"])
-            self.assertIn("access", config["handlers"])
-
-            # Verify loggers
-            self.assertIn("loggers", config)
-            self.assertIn("uvicorn", config["loggers"])
-            self.assertIn("uvicorn.access", config["loggers"])
-            self.assertIn("httpx", config["loggers"])
-            self.assertIn("httpcore", config["loggers"])
-            self.assertIn("marqo_query", config["loggers"])
-
-            # Verify root logger
-            self.assertIn("root", config)
-            self.assertIn("handlers", config["root"])
-            self.assertIn("level", config["root"])
-
-    def test_instantiate_logger_formatters_configuration(self):
-        """Test that formatters are configured correctly."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.marqo_log_format = LogFormat.PLAIN
-        mock_settings.marqo_log_level = LogLevel.INFO
-
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
-
-            config = mock_dict_config.call_args[0][0]
-
-            # Check plain formatters
-            self.assertIn("format", config["formatters"]["default-plain"])
-            self.assertIn("fmt", config["formatters"]["access-plain"])
-
-            # Check JSON formatters
-            self.assertEqual(
-                "pythonjsonlogger.orjson.OrjsonFormatter",
-                config["formatters"]["default-json"]["()"],
-            )
-            self.assertIn("rename_fields", config["formatters"]["default-json"])
-
-    def test_instantiate_logger_handlers_configuration(self):
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_handler_configuration(self, mock_dict_config):
         """Test that handlers are configured correctly."""
         mock_settings = MagicMock(spec=Settings)
         mock_settings.marqo_log_format = LogFormat.PLAIN
         mock_settings.marqo_log_level = LogLevel.INFO
 
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
+        instantiate_logger(mock_settings)
 
-            config = mock_dict_config.call_args[0][0]
+        config = mock_dict_config.call_args[0][0]
 
-            # Check default handler
-            self.assertEqual(
-                "logging.StreamHandler", config["handlers"]["default"]["class"]
-            )
-            self.assertEqual(
-                "default-plain", config["handlers"]["default"]["formatter"]
-            )
+        # Check default handler
+        self.assertEqual(
+            "logging.StreamHandler", config["handlers"]["default"]["class"]
+        )
+        self.assertEqual("default-plain", config["handlers"]["default"]["formatter"])
 
-            # Check access handler
-            self.assertEqual(
-                "logging.StreamHandler", config["handlers"]["access"]["class"]
-            )
-            self.assertEqual("ext://sys.stdout", config["handlers"]["access"]["stream"])
-            self.assertEqual("access-plain", config["handlers"]["access"]["formatter"])
+        # Check access handler
+        self.assertEqual("logging.StreamHandler", config["handlers"]["access"]["class"])
+        self.assertEqual("ext://sys.stdout", config["handlers"]["access"]["stream"])
+        self.assertEqual("access-plain", config["handlers"]["access"]["formatter"])
 
-    def test_instantiate_logger_specific_loggers_configuration(self):
-        """Test that specific loggers are configured correctly."""
+    @patch("logging.config.dictConfig")
+    def test_instantiate_logger_logger_configuration(self, mock_dict_config):
+        """Test that individual loggers are configured correctly."""
         mock_settings = MagicMock(spec=Settings)
         mock_settings.marqo_log_format = LogFormat.PLAIN
         mock_settings.marqo_log_level = LogLevel.INFO
 
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
+        instantiate_logger(mock_settings)
 
-            config = mock_dict_config.call_args[0][0]
+        config = mock_dict_config.call_args[0][0]
 
-            # Check uvicorn logger
-            self.assertEqual(["default"], config["loggers"]["uvicorn"]["handlers"])
-            self.assertEqual("INFO", config["loggers"]["uvicorn"]["level"])
-            self.assertFalse(config["loggers"]["uvicorn"]["propagate"])
+        # Check uvicorn logger
+        self.assertEqual(["default"], config["loggers"]["uvicorn"]["handlers"])
+        self.assertFalse(config["loggers"]["uvicorn"]["propagate"])
 
-            # Check uvicorn.access logger
-            self.assertEqual(
-                ["access"], config["loggers"]["uvicorn.access"]["handlers"]
-            )
-            self.assertEqual("INFO", config["loggers"]["uvicorn.access"]["level"])
-            self.assertFalse(config["loggers"]["uvicorn.access"]["propagate"])
+        # Check uvicorn.access logger
+        self.assertEqual(["access"], config["loggers"]["uvicorn.access"]["handlers"])
+        self.assertFalse(config["loggers"]["uvicorn.access"]["propagate"])
 
-            # Check httpx logger
-            self.assertEqual(["default"], config["loggers"]["httpx"]["handlers"])
-            self.assertEqual("WARNING", config["loggers"]["httpx"]["level"])
-            self.assertFalse(config["loggers"]["httpx"]["propagate"])
+        # Check httpx logger
+        self.assertEqual(["default"], config["loggers"]["httpx"]["handlers"])
+        self.assertFalse(config["loggers"]["httpx"]["propagate"])
 
-            # Check marqo_query logger
-            self.assertEqual(["default"], config["loggers"]["marqo_query"]["handlers"])
-            self.assertEqual("WARNING", config["loggers"]["marqo_query"]["level"])
-            self.assertFalse(config["loggers"]["marqo_query"]["propagate"])
-
-    def test_instantiate_logger_httpx_level_with_error(self):
-        """Test that httpx logger level is set to ERROR when main level is ERROR."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.marqo_log_format = LogFormat.PLAIN
-        mock_settings.marqo_log_level = LogLevel.ERROR
-
-        with patch("logging.config.dictConfig") as mock_dict_config:
-            instantiate_logger(mock_settings)
-
-            config = mock_dict_config.call_args[0][0]
-
-            # httpx and httpcore should be ERROR when main level is ERROR
-            self.assertEqual("ERROR", config["loggers"]["httpx"]["level"])
-            self.assertEqual("ERROR", config["loggers"]["httpcore"]["level"])
-
-    def test_instantiate_logger_httpx_level_with_non_error(self):
-        """Test that httpx logger level is WARNING when main level is not ERROR."""
-        test_cases = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING]
-
-        for log_level in test_cases:
-            with self.subTest(log_level=log_level):
-                mock_settings = MagicMock(spec=Settings)
-                mock_settings.marqo_log_format = LogFormat.PLAIN
-                mock_settings.marqo_log_level = log_level
-
-                with patch("logging.config.dictConfig") as mock_dict_config:
-                    instantiate_logger(mock_settings)
-
-                    config = mock_dict_config.call_args[0][0]
-
-                    # httpx and httpcore should be WARNING
-                    self.assertEqual("WARNING", config["loggers"]["httpx"]["level"])
-                    self.assertEqual("WARNING", config["loggers"]["httpcore"]["level"])
+        # Check marqo_query logger
+        self.assertEqual(["default"], config["loggers"]["marqo_query"]["handlers"])
+        self.assertFalse(config["loggers"]["marqo_query"]["propagate"])
 
 
 class TestGetLogger(TestCase):
     """Test class for get_logger function."""
 
-    def test_get_logger_returns_logger_instance(self):
-        """Test that get_logger returns a logging.Logger instance."""
-        logger = get_logger("test_logger")
-
-        self.assertIsInstance(logger, logging.Logger)
-
-    def test_get_logger_returns_correct_name(self):
-        """Test that get_logger returns logger with the correct name."""
-        logger_name = "test.module.name"
-        logger = get_logger(logger_name)
-
-        self.assertEqual(logger_name, logger.name)
-
-    def test_get_logger_different_names(self):
-        """Test that get_logger returns different loggers for different names."""
+    def test_get_logger_returns_logger_with_correct_name(self):
+        """Test that get_logger returns a logger with the correct name."""
         test_cases = [
+            "test_logger",
+            "test.module.name",
             "logger1",
             "module.logger2",
             "app.services.logger3",
@@ -351,23 +227,22 @@ class TestGetLogger(TestCase):
         # Should return the same instance
         self.assertIs(logger1, logger2)
 
-    def test_get_logger_with_empty_string(self):
+    def test_get_logger_with_empty_string_returns_root_logger(self):
         """Test get_logger with empty string returns root logger."""
         logger = get_logger("")
 
         # Empty string should return root logger
         self.assertEqual(logging.root, logger)
 
-    def test_get_logger_calls_logging_getLogger(self):
+    @patch("logging.getLogger")
+    def test_get_logger_calls_logging_getLogger(self, mock_getLogger):
         """Test that get_logger internally calls logging.getLogger."""
         logger_name = "test.module"
+        mock_logger = MagicMock(spec=logging.Logger)
+        mock_getLogger.return_value = mock_logger
 
-        with patch("logging.getLogger") as mock_getLogger:
-            mock_logger = MagicMock(spec=logging.Logger)
-            mock_getLogger.return_value = mock_logger
+        result = get_logger(logger_name)
 
-            result = get_logger(logger_name)
-
-            # Verify logging.getLogger was called with correct name
-            mock_getLogger.assert_called_once_with(logger_name)
-            self.assertEqual(mock_logger, result)
+        # Verify logging.getLogger was called with correct name
+        mock_getLogger.assert_called_once_with(logger_name)
+        self.assertEqual(mock_logger, result)

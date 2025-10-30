@@ -60,240 +60,278 @@ class TestExceptionHandlers(TestCase):
             self.assertIn(_app_error_handler, handlers)
             self.assertIn(_catch_all_handler, handlers)
 
-    def test_problem_response_basic_app_error(self):
-        """Test _problem_response converts basic AppError to Problem JSON response."""
-        error = InvalidArgumentError("Invalid model name")
-
-        response = _problem_response(self.mock_request, error)
-
-        self.assertEqual(400, response.status_code)
-        self.assertEqual("application/problem+json", response.media_type)
-
-        body = json.loads(response.body)
-        self.assertEqual("InvalidArgumentError", body["title"])
-        self.assertEqual(400, body["status"])
-        self.assertEqual("INVALID_ARGUMENT", body["code"])
-        self.assertEqual("Invalid model name", body["detail"])
-        self.assertEqual("http://testserver/api/v1/models/load", body["instance"])
-        self.assertEqual("test-request-id-123", body["request_id"])
-
-    def test_problem_response_with_extras(self):
-        """Test _problem_response includes extras field when present."""
-        error = NotFoundError(
-            "Model not found",
-            extras={"model_name": "test-model", "available_models": []},
-        )
-
-        response = _problem_response(self.mock_request, error)
-
-        body = json.loads(response.body)
-        self.assertEqual(404, body["status"])
-        self.assertEqual("NOT_FOUND", body["code"])
-        self.assertIsInstance(body["extras"], dict)
-        self.assertEqual("test-model", body["extras"]["model_name"])
-        self.assertEqual([], body["extras"]["available_models"])
-
-    def test_problem_response_without_request_id(self):
-        """Test _problem_response handles missing request_id gracefully."""
-        mock_request = MagicMock(spec=Request)
-        mock_request.url = "http://testserver/test"
-        # No request_id in state
-        del mock_request.state.request_id
-
-        error = InternalServerError("Something went wrong")
-        response = _problem_response(mock_request, error)
-
-        body = json.loads(response.body)
-        self.assertIsNone(body["request_id"])
-
-    def test_problem_response_different_error_types(self):
-        """Test _problem_response handles different AppError subclasses correctly."""
+    def test_problem_response(self):
+        """Test _problem_response converts AppError to Problem JSON response with various scenarios."""
         test_cases = [
+            # (error, expected_status, expected_code, expected_title, description, extras_check, request_id_check, url_check)
             (
                 InvalidArgumentError("Bad input"),
                 400,
                 "INVALID_ARGUMENT",
                 "InvalidArgumentError",
+                "basic_error",
+                None,
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
             ),
-            (NotFoundError("Not found"), 404, "NOT_FOUND", "NotFoundError"),
+            (
+                NotFoundError("Not found"),
+                404,
+                "NOT_FOUND",
+                "NotFoundError",
+                "not_found_error",
+                None,
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
+            ),
             (
                 OperationConflictError("Conflict"),
                 409,
                 "OPERATION_CONFLICT",
                 "OperationConflictError",
+                "conflict_error",
+                None,
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
             ),
             (
                 InternalServerError("Server error"),
                 500,
                 "INTERNAL_ERROR",
                 "InternalServerError",
+                "internal_error",
+                None,
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
             ),
             (
                 DependencyTimeoutError("Timeout"),
                 504,
                 "DEPENDENCY_TIMEOUT",
                 "DependencyTimeoutError",
+                "timeout_error",
+                None,
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
+            ),
+            (
+                NotFoundError(
+                    "Model not found",
+                    extras={"model_name": "test-model", "available_models": []},
+                ),
+                404,
+                "NOT_FOUND",
+                "NotFoundError",
+                "error_with_extras",
+                {"model_name": "test-model", "available_models": []},
+                "test-request-id-123",
+                "http://testserver/api/v1/models/load",
             ),
         ]
 
-        for error, expected_status, expected_code, expected_title in test_cases:
-            with self.subTest(error_type=type(error).__name__):
+        for (
+            error,
+            expected_status,
+            expected_code,
+            expected_title,
+            description,
+            extras_check,
+            expected_request_id,
+            expected_url,
+        ) in test_cases:
+            with self.subTest(scenario=description):
                 response = _problem_response(self.mock_request, error)
                 body = json.loads(response.body)
 
+                # Check response structure
                 self.assertEqual(expected_status, response.status_code)
+                self.assertEqual("application/problem+json", response.media_type)
+
+                # Check response body
+                self.assertEqual(expected_title, body["title"])
                 self.assertEqual(expected_status, body["status"])
                 self.assertEqual(expected_code, body["code"])
-                self.assertEqual(expected_title, body["title"])
+                self.assertEqual(str(error), body["detail"])
+                self.assertEqual(expected_url, body["instance"])
+                self.assertEqual(expected_request_id, body["request_id"])
+
+                # Check extras if present
+                if extras_check is not None:
+                    self.assertIsInstance(body["extras"], dict)
+                    self.assertEqual(extras_check, body["extras"])
+
+        # Test missing request_id scenario separately
+        with self.subTest(scenario="missing_request_id"):
+            mock_request = MagicMock(spec=Request)
+            mock_request.url = "http://testserver/test"
+            del mock_request.state.request_id
+
+            error = InternalServerError("Something went wrong")
+            response = _problem_response(mock_request, error)
+            body = json.loads(response.body)
+
+            self.assertIsNone(body["request_id"])
 
     def test_validation_error_handler(self):
         """Test validation_error_handler converts RequestValidationError to Problem JSON."""
-        # Create a mock validation error
-        mock_validation_error = MagicMock(spec=RequestValidationError)
-        mock_validation_error.errors.return_value = [
-            {
-                "loc": ("body", "name"),
-                "msg": "field required",
-                "type": "value_error.missing",
-            },
-            {
-                "loc": ("body", "maxBatchSize"),
-                "msg": "value is not a valid integer",
-                "type": "type_error.integer",
-            },
+        test_cases = [
+            # (errors, description, expected_error_count)
+            (
+                [
+                    {
+                        "loc": ("body", "name"),
+                        "msg": "field required",
+                        "type": "value_error.missing",
+                    },
+                    {
+                        "loc": ("body", "maxBatchSize"),
+                        "msg": "value is not a valid integer",
+                        "type": "type_error.integer",
+                    },
+                ],
+                "multiple_validation_errors",
+                2,
+            ),
+            (
+                [
+                    {
+                        "loc": ("body", "name"),
+                        "msg": "field required",
+                        "type": "value_error.missing",
+                    },
+                ],
+                "single_validation_error",
+                1,
+            ),
         ]
 
-        # Call the async handler synchronously - it doesn't actually await anything
-        response = asyncio.run(
-            _validation_error_handler(self.mock_request, mock_validation_error)
-        )
+        for errors, description, expected_count in test_cases:
+            with self.subTest(scenario=description):
+                mock_validation_error = MagicMock(spec=RequestValidationError)
+                mock_validation_error.errors.return_value = errors
 
-        self.assertEqual(400, response.status_code)
-        self.assertEqual("application/problem+json", response.media_type)
+                response = asyncio.run(
+                    _validation_error_handler(self.mock_request, mock_validation_error)
+                )
 
-        body = json.loads(response.body)
-        self.assertEqual(400, body["status"])
-        self.assertEqual("INVALID_ARGUMENT", body["code"])
-        self.assertIn("loc", body["detail"])
-        self.assertIn("msg", body["detail"])
+                # Check response structure
+                self.assertEqual(400, response.status_code)
+                self.assertEqual("application/problem+json", response.media_type)
 
-    def test_validation_error_handler_formats_errors_as_json(self):
-        """Test validation_error_handler formats validation errors as JSON string."""
-        mock_validation_error = MagicMock(spec=RequestValidationError)
-        mock_validation_error.errors.return_value = [
-            {
-                "loc": ("body", "name"),
-                "msg": "field required",
-                "type": "value_error.missing",
-            },
-        ]
+                body = json.loads(response.body)
+                self.assertEqual(400, body["status"])
+                self.assertEqual("INVALID_ARGUMENT", body["code"])
+                self.assertIn("loc", body["detail"])
+                self.assertIn("msg", body["detail"])
 
-        response = asyncio.run(
-            _validation_error_handler(self.mock_request, mock_validation_error)
-        )
-        body = json.loads(response.body)
+                # Detail should be a JSON string of error messages
+                error_messages = json.loads(body["detail"])
+                self.assertIsInstance(error_messages, list)
+                self.assertEqual(expected_count, len(error_messages))
 
-        # Detail should be a JSON string of error messages
-        error_messages = json.loads(body["detail"])
-        self.assertIsInstance(error_messages, list)
-        self.assertEqual(1, len(error_messages))
-        self.assertEqual(["body", "name"], error_messages[0]["loc"])
-        self.assertEqual("field required", error_messages[0]["msg"])
-        self.assertEqual("value_error.missing", error_messages[0]["type"])
+                # Verify first error structure
+                self.assertEqual(list(errors[0]["loc"]), error_messages[0]["loc"])
+                self.assertEqual(errors[0]["msg"], error_messages[0]["msg"])
+                self.assertEqual(errors[0]["type"], error_messages[0]["type"])
 
     def test_map_service_errors_to_http_errors(self):
         """Test mapping of service errors to HTTP errors."""
         test_cases = [
+            # (service_error, expected_http_error_class, expected_status, description)
             (
                 service_errors.ModelDownloadFailedError("Download failed"),
                 InvalidArgumentError,
                 400,
+                "model_download_failed",
             ),
             (
                 service_errors.ModelOperationInProgressError("Operation in progress"),
                 OperationConflictError,
                 409,
+                "model_operation_in_progress",
             ),
             (
                 service_errors.TritonCommunicationError("Triton error"),
                 http_errors.DependencyBadGatewayError,
                 502,
+                "triton_communication_error",
             ),
             (
                 service_errors.InternalServerError("Internal error"),
                 InternalServerError,
                 500,
+                "internal_server_error",
             ),
         ]
 
-        for service_error, expected_http_error_class, expected_status in test_cases:
-            with self.subTest(service_error_type=type(service_error).__name__):
+        for (
+            service_error,
+            expected_http_error_class,
+            expected_status,
+            description,
+        ) in test_cases:
+            with self.subTest(scenario=description):
                 http_error = _map_service_errors_to_http_errors(service_error)
                 self.assertIsInstance(http_error, expected_http_error_class)
                 self.assertEqual(expected_status, http_error.http_status)
                 self.assertEqual(service_error.message, str(http_error))
 
-    def test_map_service_errors_to_http_errors_unknown_error(self):
-        """Test that unknown service errors map to InternalServerError."""
+        # Test unknown service error
+        with self.subTest(scenario="unknown_service_error"):
+            # Create a custom service error that's not in the mapping
+            class UnknownServiceError(service_errors.ServiceError):
+                pass
 
-        # Create a custom service error that's not in the mapping
-        class UnknownServiceError(service_errors.ServiceError):
-            pass
+            unknown_error = UnknownServiceError("Unknown error")
+            http_error = _map_service_errors_to_http_errors(unknown_error)
 
-        unknown_error = UnknownServiceError("Unknown error")
-        http_error = _map_service_errors_to_http_errors(unknown_error)
-
-        self.assertIsInstance(http_error, InternalServerError)
-        self.assertEqual(500, http_error.http_status)
-        self.assertEqual("Unknown error", str(http_error))
+            self.assertIsInstance(http_error, InternalServerError)
+            self.assertEqual(500, http_error.http_status)
+            self.assertEqual("Unknown error", str(http_error))
 
     def test_service_error_handler(self):
         """Test service_error_handler maps service errors to HTTP errors."""
-        error = service_errors.InternalServerError("Database connection failed")
-
-        response = asyncio.run(_service_error_handler(self.mock_request, error))
-
-        self.assertEqual(500, response.status_code)
-        body = json.loads(response.body)
-        self.assertEqual(500, body["status"])
-        self.assertEqual("INTERNAL_ERROR", body["code"])
-        self.assertEqual("Database connection failed", body["detail"])
-
-    def test_service_error_handler_different_service_errors(self):
-        """Test service_error_handler with different service error types."""
         test_cases = [
+            # (service_error, expected_status, expected_code, description)
             (
                 service_errors.ModelDownloadFailedError("Download failed"),
                 400,
                 "INVALID_ARGUMENT",
+                "model_download_failed",
             ),
             (
                 service_errors.ModelOperationInProgressError("Operation in progress"),
                 409,
                 "OPERATION_CONFLICT",
+                "model_operation_in_progress",
             ),
             (
                 service_errors.TritonCommunicationError("Triton error"),
                 502,
                 "DEPENDENCY_BAD_GATEWAY",
+                "triton_communication_error",
             ),
             (
-                service_errors.InternalServerError("Internal error"),
+                service_errors.InternalServerError("Database connection failed"),
                 500,
                 "INTERNAL_ERROR",
+                "internal_server_error",
             ),
         ]
 
-        for service_error, expected_status, expected_code in test_cases:
-            with self.subTest(service_error_type=type(service_error).__name__):
+        for service_error, expected_status, expected_code, description in test_cases:
+            with self.subTest(scenario=description):
                 response = asyncio.run(
                     _service_error_handler(self.mock_request, service_error)
                 )
 
                 self.assertEqual(expected_status, response.status_code)
+                self.assertEqual("application/problem+json", response.media_type)
+
                 body = json.loads(response.body)
                 self.assertEqual(expected_status, body["status"])
                 self.assertEqual(expected_code, body["code"])
+                self.assertEqual(service_error.message, body["detail"])
 
     def test_app_error_handler(self):
         """Test app_error_handler handles AppError and its subclasses."""
@@ -314,31 +352,23 @@ class TestExceptionHandlers(TestCase):
 
     def test_catch_all_handler(self):
         """Test catch_all_handler converts generic exceptions to InternalServerError."""
-        generic_error = ValueError("Unexpected error")
-
-        response = asyncio.run(_catch_all_handler(self.mock_request, generic_error))
-
-        self.assertEqual(500, response.status_code)
-        body = json.loads(response.body)
-        self.assertEqual(500, body["status"])
-        self.assertEqual("INTERNAL_ERROR", body["code"])
-        self.assertEqual("An unexpected error occurred.", body["detail"])
-
-    def test_catch_all_handler_with_different_exceptions(self):
-        """Test catch_all_handler handles various exception types."""
         test_cases = [
-            ValueError("Value error"),
-            KeyError("Key error"),
-            RuntimeError("Runtime error"),
-            AttributeError("Attribute error"),
+            # (exception, description)
+            (ValueError("Value error"), "value_error"),
+            (KeyError("Key error"), "key_error"),
+            (RuntimeError("Runtime error"), "runtime_error"),
+            (AttributeError("Attribute error"), "attribute_error"),
         ]
 
-        for exc in test_cases:
-            with self.subTest(exception_type=type(exc).__name__):
+        for exc, description in test_cases:
+            with self.subTest(scenario=description):
                 response = asyncio.run(_catch_all_handler(self.mock_request, exc))
 
                 self.assertEqual(500, response.status_code)
+                self.assertEqual("application/problem+json", response.media_type)
+
                 body = json.loads(response.body)
+                self.assertEqual(500, body["status"])
                 self.assertEqual("INTERNAL_ERROR", body["code"])
                 self.assertEqual("An unexpected error occurred.", body["detail"])
 
@@ -464,30 +494,3 @@ class TestExceptionHandlers(TestCase):
         self.assertIn("field", error_entry)
         self.assertIn("message", error_entry)
         self.assertIn("type", error_entry)
-
-    def test_error_response_includes_request_url(self):
-        """Test that error responses include the request URL in the instance field."""
-        test_urls = [
-            "http://testserver/api/v1/models/load",
-            "http://testserver/api/v1/models/test-model/unload",
-            "http://localhost:8883/health",
-        ]
-
-        for url in test_urls:
-            with self.subTest(url=url):
-                mock_request = MagicMock(spec=Request)
-                mock_request.url = url
-                mock_request.state.request_id = "test-id"
-
-                error = InvalidArgumentError("Test error")
-                response = _problem_response(mock_request, error)
-                body = json.loads(response.body)
-
-                self.assertEqual(url, body["instance"])
-
-    def test_error_response_content_type_is_problem_json(self):
-        """Test that error responses use application/problem+json content type."""
-        error = NotFoundError("Not found")
-        response = _problem_response(self.mock_request, error)
-
-        self.assertEqual("application/problem+json", response.media_type)
