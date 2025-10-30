@@ -151,20 +151,25 @@ def trigger_rollback_endpoint():
     if response.status_code == 200:
         logger.info("Rollback endpoint triggered successfully")
 
-def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str):
+def backwards_compatibility_test(
+        from_version: str, to_version: str, to_api_image: str, to_inference_orchestrator_image: str,
+        to_model_management_image: str
+    ):
     """
     Perform a backwards compatibility test between two versions of Marqo.
 
     This function starts a container with the from_version, runs tests in prepare mode, stops the container,
     starts a container with the to_version by transferring state from from_version container, and runs tests in test mode.
 
+    Since 2.25.0, Marqo uses separate images for API, Inference Orchestrator, and Model Management.
+    Therefore, this function accepts separate image identifiers for each component to ensure compatibility during the upgrade process
+
     Args:
         from_version (str): The source version of the Marqo container.
         to_version (str): The target version of the Marqo container.
-        to_version_image (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
-                                (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
-                                or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
-                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
+        to_api_image (str): The target API version of the Marqo container.
+        to_inference_orchestrator_image (str): The target Inference Orchestrator version of the Marqo container.
+        to_model_management_image (str): The target Model Management version of the Marqo container.
 
     Raises:
         ValueError: If the major versions of from_version and to_version are incompatible.
@@ -174,9 +179,6 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         load_all_subclasses("tests.compatibility_tests")
         # Step 1: Start from_version container and run tests in prepare mode
         logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
-
-        # Generate a volume name to be used with the "from_version" Marqo container for state transfer.
-        from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
 
         #Start from_version container
         docker_manager.start_marqo_container(from_version)
@@ -191,8 +193,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
 
         # Step 3: Start to_version container by transferring state
         logger.debug(f"Starting Marqo to_version: {to_version} container by transferring state from version {from_version} to {to_version}")
-        docker_manager.start_marqo_container_by_transferring_state(to_version, from_version, from_version_volume,
-                                                    to_version_image, "ECR")
+
+        docker_manager.start_marqo_container(
+            to_version, to_api_image, to_inference_orchestrator_image, to_model_management_image
+        )
 
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
@@ -335,7 +339,9 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["backwards_compatibility", "rollback"], required=True)
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
-    parser.add_argument("--to_image", required=True)
+    parser.add_argument("--to_api_image", required=True)
+    parser.add_argument("--to_inference_orchestrator_image", required=True)
+    parser.add_argument("--to_model_management_image", required=True)
     args = parser.parse_args()
     try:
         from_version = semver.VersionInfo.parse(args.from_version)
@@ -361,7 +367,10 @@ if __name__ == "__main__":
 
     try:
         if args.mode == "backwards_compatibility":
-            backwards_compatibility_test(args.from_version, args.to_version, args.to_image)
+            backwards_compatibility_test(
+                args.from_version, args.to_version, args.to_api_image,
+                args.to_inference_orchestrator_image, args.to_model_management_image
+            )
         elif args.mode == "rollback":
             rollback_test(args.to_version, args.from_version, args.to_image)
 

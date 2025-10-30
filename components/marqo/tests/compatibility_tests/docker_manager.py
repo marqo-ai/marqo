@@ -7,11 +7,17 @@ import requests
 import semver
 from botocore.exceptions import BotoCoreError, ClientError
 from docker.errors import NotFound, APIError, ContainerError, ImageNotFound
+from pathlib import Path
+import tempfile
+import subprocess
 
 from tests.compatibility_tests.compatibility_test_logger import get_logger
+import os
+import yaml
 
 
 MARQO_TRITON_VERSION = semver.VersionInfo.parse("2.25.0")
+FILE_PATH = Path(__file__)
 
 
 class DockerManager:
@@ -152,13 +158,73 @@ class DockerManager:
             self.logger.exception(f"Failed to pull image: {image_name} from source: {source}")
             raise Exception(f"Failed to pull Docker image: {image_name} from source: {source}. Error: {str(e)}") from e
 
-
-    def start_marqo_container(self, version: str):
-
+    def start_marqo_container(
+            self, version: str, to_api_image: str = None, to_inference_orchestrator_image: str = None,
+            to_model_management_image: str = None
+    ):
         if semver.VersionInfo.parse(version) < MARQO_TRITON_VERSION:
             self._start_marqo_container_before_2250(version)
         else:
-            raise NotImplementedError("Starting Marqo containers for versions 2.25.0 and above is not implemented yet.")
+            self._start_marqo_container_post_2250(version, to_api_image, to_inference_orchestrator_image, to_model_management_image)
+
+    def _start_marqo_container_post_2250(
+            self, version: str,
+            api_image: str = None, inference_orchestrator_image: str = None, model_management_image: str = None
+    ):
+        if semver.VersionInfo.parse(version) < MARQO_TRITON_VERSION:
+            raise ValueError(f"Version {version} is less than {MARQO_TRITON_VERSION}, cannot use this method.")
+
+        os_ecr_name_space = "424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai"
+        provided_images = [api_image, inference_orchestrator_image, model_management_image]
+        num_provided = sum(img is not None for img in provided_images)
+
+        if num_provided == 0:
+            # No images provided → use defaults
+            self.logger.info(f"Starting Marqo container with ECR images for version: {version}")
+            api_image = f"{os_ecr_name_space}/api:{version}"
+            inference_orchestrator_image = f"{os_ecr_name_space}/inference-orchestrator:{version}"
+            model_management_image = f"{os_ecr_name_space}/model-management:{version}"
+        elif num_provided == 3:
+            # All provided → use as-is
+            self.logger.info("Starting Marqo container with all custom images.")
+        else:
+            # Partial → configuration error
+            raise ValueError(
+                "Either all or none of api_image, inference_orchestrator_image, and "
+                "model_management_image must be provided."
+            )
+
+        compose_file = os.path.join(FILE_PATH.resolve().parents[5], "compose.yaml")
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as fp:
+            with open(compose_file, 'r') as compose_fp:
+                compose_content = yaml.safe_load(compose_fp)
+
+            compose_content['services']['api']['image'] = api_image
+            compose_content['services']['mioc']['image'] = inference_orchestrator_image
+            compose_content['services']['mmc']['image'] = model_management_image
+
+            yaml.dump(compose_content, fp)
+            fp.flush()
+            temp_path = Path(fp.name).absolute()
+
+            run_process = subprocess.Popen(
+                [
+                    "docker",  # command: run
+                    "compose",
+                    "-f",
+                    temp_path,
+                    "up",
+                    "-d",
+                    "--force-recreate",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+            # Wait for the process to complete
+            run_process.wait()
+            return True
 
     def _start_marqo_container_before_2250(self, version: str):
         """
