@@ -11,6 +11,9 @@ from docker.errors import NotFound, APIError, ContainerError, ImageNotFound
 from tests.compatibility_tests.compatibility_test_logger import get_logger
 
 
+MARQO_TRITON_VERSION = semver.VersionInfo.parse("2.25.0")
+
+
 class DockerManager:
     def __init__(self):
         self.containers_to_cleanup = set()
@@ -150,18 +153,24 @@ class DockerManager:
             raise Exception(f"Failed to pull Docker image: {image_name} from source: {source}. Error: {str(e)}") from e
 
 
-    def start_marqo_container(self, version: str, volume_name: str):
+    def start_marqo_container(self, version: str):
+
+        if semver.VersionInfo.parse(version) < MARQO_TRITON_VERSION:
+            self._start_marqo_container_before_2250(version)
+        else:
+            raise NotImplementedError("Starting Marqo containers for versions 2.25.0 and above is not implemented yet.")
+
+    def _start_marqo_container_before_2250(self, version: str):
         """
         Start a Marqo container after pulling the required image and creating a volume.
 
         Args:
             version (str): The version of the Marqo container to start.
-            volume_name: The volume to use for the container.
         """
         source = "docker"  # Always DockerHub for released images
         image_name = f"marqoai/marqo:{version}"
         container_name = f"marqo-{version}"
-        self.logger.info(f"Starting Marqo container with version: {version}, volume_name: {volume_name}, source: {source}")
+        self.logger.info(f"Starting Marqo container with version: {version}")
 
         # Pull the image
         self.pull_marqo_image(image_name, source)
@@ -175,14 +184,6 @@ class DockerManager:
         except NotFound:
             self.logger.warning(f"Container {container_name} does not exist. Skipping removal.")
 
-        # Create volume and configure mounting
-        volume_name = self.create_volume_for_marqo_version(version, volume_name)
-        if version >= self.marqo_transfer_state_version:
-            volume_mount_path = "/opt/vespa/var"
-        else:
-            volume_mount_path = "/opt/vespa"
-        self.logger.info(f"Mounting volume: {volume_name} to {volume_mount_path}")
-
         # Start the container
         try:
             self.logger.info(f"Starting container: {container_name} with image: {image_name}")
@@ -193,9 +194,15 @@ class DockerManager:
                 ports={"8882/tcp": 8882},
                 environment={
                     "MARQO_ENABLE_BATCH_APIS": "TRUE",
-                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6"
+                    "MARQO_MAX_CPU_MODEL_MEMORY": "4",
+                    "VESPA_CONFIG_URL": "http://host.docker.internal:19071",
+                    "VESPA_DOCUMENT_URL": "http://host.docker.internal:8080",
+                    "VESPA_QUERY_URL": "http://host.docker.internal:8080",
+                    "ZOOKEEPER_HOSTS": "host.docker.internal:2181"
                 },
-                volumes={volume_name: {"bind": volume_mount_path, "mode": "rw"}}
+                extra_hosts={
+                    "host.docker.internal": "host-gateway"
+                }
             )
             log_stream = container.logs(stream=True, follow=True)
             self.containers_to_cleanup.add(container_name)
