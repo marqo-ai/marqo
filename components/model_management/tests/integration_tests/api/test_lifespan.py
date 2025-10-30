@@ -13,90 +13,36 @@ from model_management.api.lifespan import lifespan
 class TestLifespanIntegration(TestCase):
     """Integration tests for application lifespan functionality."""
 
+    def _create_mock_settings(
+        self, log_format="text", log_level="info", preload_models=None
+    ):
+        """Helper to create mock settings."""
+        mock_settings = MagicMock()
+        mock_settings.marqo_log_format = log_format
+        mock_settings.marqo_log_level = log_level
+        mock_settings.marqo_models_to_preload = (
+            preload_models if preload_models is not None else []
+        )
+        return mock_settings
+
     @patch("model_management.api.lifespan.on_start")
     @patch("model_management.api.lifespan.get_config")
     @patch("model_management.api.lifespan.instantiate_logger")
     @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_initializes_settings(
+    def test_lifespan_initialization_components(
         self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
     ):
-        """Test that lifespan initializes settings on startup."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "json"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
+        """Test that lifespan initializes all components correctly."""
+        mock_settings = self._create_mock_settings()
         mock_get_settings.return_value = mock_settings
-
         mock_config = MagicMock()
         mock_get_config.return_value = mock_config
 
         app = FastAPI(lifespan=lifespan)
         with TestClient(app):
             mock_get_settings.assert_called()
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_initializes_logger(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan initializes logger with correct settings."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "json"
-        mock_settings.marqo_log_level = "debug"
-        mock_settings.marqo_models_to_preload = []
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        app = FastAPI(lifespan=lifespan)
-        with TestClient(app):
             mock_instantiate_logger.assert_called_once_with(mock_settings)
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_initializes_config(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan initializes configuration on startup."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        app = FastAPI(lifespan=lifespan)
-        with TestClient(app):
             mock_get_config.assert_called()
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_runs_on_start_tasks(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan runs on_start tasks."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        mock_on_start.return_value = None
-
-        app = FastAPI(lifespan=lifespan)
-        with TestClient(app):
             mock_on_start.assert_called_once_with(mock_config, mock_settings)
 
     @patch("model_management.api.lifespan.get_config")
@@ -108,12 +54,8 @@ class TestLifespanIntegration(TestCase):
         """Test that lifespan handles async on_start tasks."""
         import asyncio
 
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
+        mock_settings = self._create_mock_settings()
         mock_get_settings.return_value = mock_settings
-
         mock_config = MagicMock()
         mock_get_config.return_value = mock_config
 
@@ -123,12 +65,10 @@ class TestLifespanIntegration(TestCase):
 
         app = FastAPI(lifespan=lifespan)
         with patch(
-            "model_management.api.lifespan.on_start",
-            side_effect=async_on_start,
+            "model_management.api.lifespan.on_start", side_effect=async_on_start
         ):
             with TestClient(app):
-                # Should complete without error
-                pass
+                pass  # Should complete without error
 
     @patch("model_management.api.lifespan.on_start")
     @patch("model_management.api.lifespan.get_config")
@@ -139,118 +79,27 @@ class TestLifespanIntegration(TestCase):
     ):
         """Test that lifespan initializes components in correct order."""
         call_order = []
+        mock_settings = self._create_mock_settings()
 
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
-
-        def track_get_settings():
-            call_order.append("get_settings")
-            return mock_settings
-
-        mock_get_settings.side_effect = track_get_settings
-
-        def track_instantiate_logger(s):
-            call_order.append("instantiate_logger")
-
-        mock_logger.side_effect = track_instantiate_logger
-
+        mock_get_settings.side_effect = lambda: (
+            call_order.append("get_settings"),
+            mock_settings,
+        )[1]
+        mock_logger.side_effect = lambda s: call_order.append("instantiate_logger")
         mock_config = MagicMock()
-
-        def track_get_config():
-            call_order.append("get_config")
-            return mock_config
-
-        mock_get_config.side_effect = track_get_config
-
-        def track_on_start(cfg, settings):
-            call_order.append("on_start")
-
-        mock_on_start.side_effect = track_on_start
+        mock_get_config.side_effect = lambda: (
+            call_order.append("get_config"),
+            mock_config,
+        )[1]
+        mock_on_start.side_effect = lambda cfg, settings: call_order.append("on_start")
 
         app = FastAPI(lifespan=lifespan)
         with TestClient(app):
             pass
 
-        # Verify order: settings -> logger -> config -> on_start
         self.assertEqual(
             ["get_settings", "instantiate_logger", "get_config", "on_start"], call_order
         )
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_context_manager_yields_control(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan context manager yields control to application."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        app = FastAPI(lifespan=lifespan)
-
-        # Add a test route
-        @app.get("/test")
-        def test_route():
-            return {"status": "ok"}
-
-        with TestClient(app) as client:
-            # Application should be running and responding
-            response = client.get("/test")
-            self.assertEqual(200, response.status_code)
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_with_preload_models_empty(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan handles empty preload models list."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = []
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        app = FastAPI(lifespan=lifespan)
-        with TestClient(app):
-            mock_on_start.assert_called_once()
-
-    @patch("model_management.api.lifespan.on_start")
-    @patch("model_management.api.lifespan.get_config")
-    @patch("model_management.api.lifespan.instantiate_logger")
-    @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_with_preload_models_not_none(
-        self, mock_get_settings, mock_instantiate_logger, mock_get_config, mock_on_start
-    ):
-        """Test that lifespan handles preload models configuration."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "text"
-        mock_settings.marqo_log_level = "info"
-        mock_settings.marqo_models_to_preload = [
-            MagicMock(name="model1"),
-            MagicMock(name="model2"),
-        ]
-        mock_get_settings.return_value = mock_settings
-
-        mock_config = MagicMock()
-        mock_get_config.return_value = mock_config
-
-        app = FastAPI(lifespan=lifespan)
-        with TestClient(app):
-            mock_on_start.assert_called_once_with(mock_config, mock_settings)
 
     @patch("model_management.api.lifespan.on_start")
     @patch("model_management.api.lifespan.get_config")
@@ -266,21 +115,15 @@ class TestLifespanIntegration(TestCase):
         mock_on_start,
     ):
         """Test that lifespan logs configuration on startup."""
-        mock_settings = MagicMock()
-        mock_settings.marqo_log_format = "json"
-        mock_settings.marqo_log_level = "debug"
-        mock_settings.marqo_models_to_preload = []
+        mock_settings = self._create_mock_settings(log_format="json", log_level="debug")
         mock_get_settings.return_value = mock_settings
-
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
-
         mock_config = MagicMock()
         mock_get_config.return_value = mock_config
 
         app = FastAPI(lifespan=lifespan)
         with TestClient(app):
-            # Verify logger.info was called with configuration
             mock_logger.info.assert_called_once()
             call_args = mock_logger.info.call_args
             self.assertIn("Logger configured", call_args[0][0])
@@ -291,115 +134,48 @@ class TestLifespanWithMainApp(TestCase):
 
     @patch("model_management.config.TritonClient")
     @patch("model_management.config.ModelManager")
-    def test_main_app_starts_successfully(self, mock_manager_class, mock_client_class):
-        """Test that the main application starts successfully with lifespan."""
-        mock_manager = MagicMock()
-        mock_manager_class.return_value = mock_manager
-
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-
-        # Set environment variables to control startup behavior
-        with patch.dict(
-            os.environ,
-            {
-                "MARQO_MODELS_TO_PRELOAD": "[]",
-                "MARQO_LOG_LEVEL": "info",
-                "MARQO_LOG_FORMAT": "text",
-            },
-        ):
-            from model_management.main import app
-
-            with TestClient(app) as client:
-                # Application should start and be responsive
-                response = client.get("/v1/healthz")
-                self.assertEqual(200, response.status_code)
-
-    @patch("model_management.config.TritonClient")
-    @patch("model_management.config.ModelManager")
-    def test_main_app_healthz_available_after_startup(
+    def test_main_app_endpoints_available_after_startup(
         self, mock_manager_class, mock_client_class
     ):
-        """Test that healthz endpoint is available after lifespan startup."""
+        """Test that main application starts successfully and endpoints are available."""
         with patch.dict(
-            os.environ,
-            {"MARQO_MODELS_TO_PRELOAD": "[]", "MARQO_LOG_LEVEL": "error"},
+            os.environ, {"MARQO_MODELS_TO_PRELOAD": "[]", "MARQO_LOG_LEVEL": "error"}
         ):
             from model_management.main import app
 
             with TestClient(app) as client:
+                # Test healthz endpoint
                 response = client.get("/v1/healthz")
                 self.assertEqual(200, response.status_code)
                 self.assertEqual({"status": "ok"}, response.json())
 
-    @patch("model_management.config.TritonClient")
-    @patch("model_management.config.ModelManager")
-    def test_main_app_api_routes_available_after_startup(
-        self, mock_manager_class, mock_client_class
-    ):
-        """Test that API routes are available after lifespan startup."""
-        with patch.dict(os.environ, {"MARQO_MODELS_TO_PRELOAD": "[]"}):
-            from model_management.main import app
-
-            with TestClient(app) as client:
-                # Test unload endpoint (doesn't require model loading)
-                response = client.post("/v1/models/test-model/unload")
-                self.assertEqual(200, response.status_code)
-
-    @patch("model_management.config.TritonClient")
-    @patch("model_management.config.ModelManager")
-    def test_main_app_openapi_schema_available_after_startup(
-        self, mock_manager_class, mock_client_class
-    ):
-        """Test that OpenAPI schema is available after lifespan startup."""
-        with patch.dict(os.environ, {"MARQO_MODELS_TO_PRELOAD": "[]"}):
-            from model_management.main import app
-
-            with TestClient(app) as client:
+                # Test OpenAPI schema available
                 response = client.get("/openapi.json")
                 self.assertEqual(200, response.status_code)
-
                 schema = response.json()
                 self.assertIn("info", schema)
                 self.assertIn("paths", schema)
 
     @patch("model_management.config.TritonClient")
     @patch("model_management.config.ModelManager")
-    def test_main_app_handles_startup_with_different_log_levels(
+    def test_main_app_handles_different_logging_configurations(
         self, mock_manager_class, mock_client_class
     ):
-        """Test that application starts with different log levels."""
-        log_levels = ["debug", "info", "warning", "error"]
+        """Test that application starts with different logging configurations."""
+        test_cases = [
+            ("debug", "text"),
+            ("info", "json"),
+            ("warning", "text"),
+            ("error", "json"),
+        ]
 
-        for log_level in log_levels:
-            with self.subTest(log_level=log_level):
+        for log_level, log_format in test_cases:
+            with self.subTest(log_level=log_level, log_format=log_format):
                 with patch.dict(
                     os.environ,
                     {
                         "MARQO_MODELS_TO_PRELOAD": "[]",
                         "MARQO_LOG_LEVEL": log_level,
-                    },
-                ):
-                    from model_management.main import app
-
-                    with TestClient(app) as client:
-                        response = client.get("/v1/healthz")
-                        self.assertEqual(200, response.status_code)
-
-    @patch("model_management.config.TritonClient")
-    @patch("model_management.config.ModelManager")
-    def test_main_app_handles_startup_with_different_log_formats(
-        self, mock_manager_class, mock_client_class
-    ):
-        """Test that application starts with different log formats."""
-        log_formats = ["text", "json"]
-
-        for log_format in log_formats:
-            with self.subTest(log_format=log_format):
-                with patch.dict(
-                    os.environ,
-                    {
-                        "MARQO_MODELS_TO_PRELOAD": "[]",
                         "MARQO_LOG_FORMAT": log_format,
                     },
                 ):
@@ -411,29 +187,14 @@ class TestLifespanWithMainApp(TestCase):
 
     @patch("model_management.config.TritonClient")
     @patch("model_management.config.ModelManager")
-    def test_lifespan_cleanup_on_shutdown(self, mock_manager_class, mock_client_class):
-        """Test that lifespan properly cleans up on application shutdown."""
+    def test_main_app_lifecycle(self, mock_manager_class, mock_client_class):
+        """Test that application handles startup/shutdown cycles correctly."""
         with patch.dict(os.environ, {"MARQO_MODELS_TO_PRELOAD": "[]"}):
             from model_management.main import app
 
-            with TestClient(app) as client:
-                # Make a request to ensure app is running
-                response = client.get("/v1/healthz")
-                self.assertEqual(200, response.status_code)
-
-            # Context manager exit should trigger shutdown
-            # No exceptions should be raised
-
-    @patch("model_management.config.TritonClient")
-    @patch("model_management.config.ModelManager")
-    def test_multiple_startup_shutdown_cycles(
-        self, mock_manager_class, mock_client_class
-    ):
-        """Test that application can go through multiple startup/shutdown cycles."""
-        with patch.dict(os.environ, {"MARQO_MODELS_TO_PRELOAD": "[]"}):
-            from model_management.main import app
-
+            # Test multiple startup/shutdown cycles
             for _ in range(3):
                 with TestClient(app) as client:
                     response = client.get("/v1/healthz")
                     self.assertEqual(200, response.status_code)
+                # Context manager exit triggers shutdown without exceptions
