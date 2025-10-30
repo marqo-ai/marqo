@@ -65,9 +65,10 @@ class TestModelManager(TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.mock_triton_client = Mock(spec=TritonClient)
-        self.model_base_dir = "/tmp/models"
+        self.marqo_model_cache_path = "/tmp/models"
         self.manager = ModelManager(
-            model_base_dir=self.model_base_dir, triton_client=self.mock_triton_client
+            marqo_model_cache_path=self.marqo_model_cache_path,
+            triton_client=self.mock_triton_client,
         )
 
         self.valid_model_props = TritonModelProperties(
@@ -81,10 +82,10 @@ class TestModelManager(TestCase):
     def test_model_manager_initialization(self):
         """Test ModelManager initialization."""
         manager = ModelManager(
-            model_base_dir="/tmp/test", triton_client=self.mock_triton_client
+            marqo_model_cache_path="/tmp/test", triton_client=self.mock_triton_client
         )
 
-        self.assertEqual("/tmp/test", manager.model_base_dir)
+        self.assertEqual("/tmp/test", manager.marqo_model_cache_path)
         self.assertEqual(self.mock_triton_client, manager.triton_client)
 
     @patch(
@@ -102,7 +103,7 @@ class TestModelManager(TestCase):
         mock_downloader_class.assert_called_once()
         call_kwargs = mock_downloader_class.call_args[1]
         self.assertEqual(self.valid_model_props.sources, call_kwargs["sources"])
-        self.assertEqual(self.model_base_dir, call_kwargs["base_dir"])
+        self.assertEqual(self.marqo_model_cache_path, call_kwargs["base_dir"])
         self.assertEqual("test-model", call_kwargs["model_name"])
         self.assertFalse(call_kwargs["overwrite"])
         self.assertIn("test-model", call_kwargs["config_pbtxt"])

@@ -2968,3 +2968,37 @@ class TestHybridSearch(MarqoTestCase):
                 )
 
                 self.assertEqual(res["hits"], [])
+
+
+    def test_track_total_hits_is_capped_by_MARQO_MAX_RETRIEVABLE_DOCS(self):
+        for index in [self.semi_structured_default_image_index, self.semi_structured_text_index_2_14]:
+            with self.subTest(index_name=index.name):
+                with mock.patch.dict(os.environ, {"MARQO_MAX_RETRIEVABLE_DOCS": "50"}):
+                    # Add 100 documents
+                    docs = [{
+                        "_id": f"doc_{i}",
+                        "text_field_1": f"sample text {i}"
+                    } for i in range(100)]
+
+                    tensor_fields = ["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                    self.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=index.name, docs=docs, tensor_fields=tensor_fields
+                        )
+                    )
+
+                    res = tensor_search.search(
+                        config=self.config, index_name=index.name, text="sample text",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor
+                        ),
+                        track_total_hits=True,
+                        result_count=10
+                    )
+                    self.assertEqual(
+                        50, res["totalHits"],
+                        "total_hits should be capped at MARQO_MAX_RETRIEVABLE_DOCS"
+                    )

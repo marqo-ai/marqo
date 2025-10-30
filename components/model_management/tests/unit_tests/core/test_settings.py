@@ -28,19 +28,13 @@ class TestSettings(TestCase):
 
     def test_default_values(self):
         """Test that default values are set correctly when no environment variables are provided."""
-        default_values = {
-            "TRITON_URL": "http://localhost:8000",
-            "MODEL_BASE_DIR": "./cache/models",
-            "LOG_LEVEL": "INFO",
-            "LOG_FORMAT": "PLAIN",
-            "MARQO_MODELS_TO_PRELOAD": "[]",
-        }
         with patch("os.environ", {}):
             settings = _help_get_settings_without_dota_env()
-            self.assertEqual(default_values["TRITON_URL"], settings.triton_url)
-            self.assertEqual(default_values["MODEL_BASE_DIR"], settings.model_base_dir)
-            self.assertEqual(default_values["LOG_LEVEL"], settings.log_level)
-            self.assertEqual(default_values["LOG_FORMAT"], settings.log_format)
+            self.assertEqual("http://localhost:8000", settings.marqo_triton_rest_url)
+            # marqo_model_cache_path has a dynamic default based on home directory
+            self.assertIsNotNone(settings.marqo_model_cache_path)
+            self.assertEqual(LogLevel.INFO, settings.marqo_log_level)
+            self.assertEqual(LogFormat.PLAIN, settings.marqo_log_format)
             self.assertEqual([], settings.marqo_models_to_preload)
 
     def test_customised_values(self):
@@ -60,20 +54,26 @@ class TestSettings(TestCase):
         ]
 
         custom_values = {
-            "TRITON_URL": "http://custom-triton:8000",
-            "MODEL_BASE_DIR": "/custom/models",
-            "LOG_LEVEL": "DEBUG",
-            "LOG_FORMAT": "JSON",
+            "MARQO_TRITON_REST_URL": "http://custom-triton:8000",
+            "MARQO_MODEL_CACHE_PATH": "/custom/models",
+            "MARQO_LOG_LEVEL": "DEBUG",
+            "MARQO_LOG_FORMAT": "JSON",
             "MARQO_MODELS_TO_PRELOAD": json.dumps(model_to_preload),
         }
         with patch("os.environ", custom_values):
             settings = (
                 _help_get_settings_without_dota_env()
             )  # Avoid loading from .env file during tests
-            self.assertEqual(custom_values["TRITON_URL"], settings.triton_url)
-            self.assertEqual(custom_values["MODEL_BASE_DIR"], settings.model_base_dir)
-            self.assertEqual(custom_values["LOG_LEVEL"], settings.log_level)
-            self.assertEqual(custom_values["LOG_FORMAT"], settings.log_format)
+            self.assertEqual(
+                custom_values["MARQO_TRITON_REST_URL"], settings.marqo_triton_rest_url
+            )
+            self.assertEqual(
+                custom_values["MARQO_MODEL_CACHE_PATH"], settings.marqo_model_cache_path
+            )
+            self.assertEqual(custom_values["MARQO_LOG_LEVEL"], settings.marqo_log_level)
+            self.assertEqual(
+                custom_values["MARQO_LOG_FORMAT"], settings.marqo_log_format
+            )
             self.assertEqual(1, len(settings.marqo_models_to_preload))
             self.assertEqual(
                 TritonModelProperties(**model_to_preload[0]),
@@ -189,10 +189,12 @@ class TestSettings(TestCase):
 
         for env_value, expected, msg in test_cases:
             with self.subTest(msg=msg):
-                env_dict = {"LOG_LEVEL": env_value} if env_value is not None else {}
+                env_dict = (
+                    {"MARQO_LOG_LEVEL": env_value} if env_value is not None else {}
+                )
                 with patch("os.environ", env_dict):
                     settings = _help_get_settings_without_dota_env()
-                    self.assertEqual(expected, settings.log_level)
+                    self.assertEqual(expected, settings.marqo_log_level)
 
     def test_log_format_validation(self):
         """Test log format validation with different cases and values."""
@@ -214,18 +216,20 @@ class TestSettings(TestCase):
 
         for env_value, expected, msg in test_cases:
             with self.subTest(msg=msg):
-                env_dict = {"LOG_FORMAT": env_value} if env_value is not None else {}
+                env_dict = (
+                    {"MARQO_LOG_FORMAT": env_value} if env_value is not None else {}
+                )
                 with patch("os.environ", env_dict):
                     settings = _help_get_settings_without_dota_env()
-                    self.assertEqual(expected, settings.log_format)
+                    self.assertEqual(expected, settings.marqo_log_format)
 
     def test_invalid_log_level_and_format(self):
         """Test that invalid log levels and formats raise ValidationError."""
         invalid_cases = [
-            ({"LOG_LEVEL": "INVALID"}, "invalid log level"),
-            ({"LOG_FORMAT": "INVALID"}, "invalid log format"),
-            ({"LOG_LEVEL": "TRACE"}, "unsupported log level"),
-            ({"LOG_FORMAT": "XML"}, "unsupported log format"),
+            ({"MARQO_LOG_LEVEL": "INVALID"}, "invalid log level"),
+            ({"MARQO_LOG_FORMAT": "INVALID"}, "invalid log format"),
+            ({"MARQO_LOG_LEVEL": "TRACE"}, "unsupported log level"),
+            ({"MARQO_LOG_FORMAT": "XML"}, "unsupported log format"),
         ]
 
         for env_dict, msg in invalid_cases:
@@ -241,8 +245,8 @@ class TestSettings(TestCase):
                 {"MARQO_MODELS_TO_PRELOAD": "invalid json"},
                 "invalid JSON in MARQO_MODELS_TO_PRELOAD",
             ),
-            ({"LOG_LEVEL": "INVALID_LEVEL"}, "invalid LOG_LEVEL"),
-            ({"LOG_FORMAT": "INVALID_FORMAT"}, "invalid LOG_FORMAT"),
+            ({"MARQO_LOG_LEVEL": "INVALID_LEVEL"}, "invalid MARQO_LOG_LEVEL"),
+            ({"MARQO_LOG_FORMAT": "INVALID_FORMAT"}, "invalid MARQO_LOG_FORMAT"),
         ]
 
         for env_dict, msg in invalid_env_cases:
@@ -270,7 +274,7 @@ class TestSettings(TestCase):
                         _help_get_settings_without_dota_env()
 
     def test_triton_url_custom_values(self):
-        """Test triton_url accepts various valid URL formats."""
+        """Test marqo_triton_rest_url accepts various valid URL formats."""
         url_cases = [
             ("http://localhost:8000", "default localhost URL"),
             ("https://triton.example.com:8000", "HTTPS URL with domain"),
@@ -280,12 +284,12 @@ class TestSettings(TestCase):
 
         for url, msg in url_cases:
             with self.subTest(msg=msg):
-                with patch("os.environ", {"TRITON_URL": url}):
+                with patch("os.environ", {"MARQO_TRITON_REST_URL": url}):
                     settings = _help_get_settings_without_dota_env()
-                    self.assertEqual(url, settings.triton_url)
+                    self.assertEqual(url, settings.marqo_triton_rest_url)
 
-    def test_model_base_dir_custom_values(self):
-        """Test model_base_dir accepts various path formats."""
+    def test_marqo_model_cache_path_custom_values(self):
+        """Test marqo_model_cache_path accepts various path formats."""
         path_cases = [
             ("./cache/models", "relative path with dot"),
             ("/tmp/models", "absolute path"),
@@ -295,6 +299,6 @@ class TestSettings(TestCase):
 
         for path, msg in path_cases:
             with self.subTest(msg=msg):
-                with patch("os.environ", {"MODEL_BASE_DIR": path}):
+                with patch("os.environ", {"MARQO_MODEL_CACHE_PATH": path}):
                     settings = _help_get_settings_without_dota_env()
-                    self.assertEqual(path, settings.model_base_dir)
+                    self.assertEqual(path, settings.marqo_model_cache_path)

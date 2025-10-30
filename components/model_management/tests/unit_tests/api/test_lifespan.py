@@ -15,8 +15,8 @@ class TestLifespan(unittest.TestCase):
         """Set up test fixtures."""
         self.app = MagicMock(spec=FastAPI)
         self.mock_settings = MagicMock(spec=Settings)
-        self.mock_settings.log_level = LogLevel.INFO
-        self.mock_settings.log_format = LogFormat.PLAIN
+        self.mock_settings.marqo_log_level = LogLevel.INFO
+        self.mock_settings.marqo_log_format = LogFormat.PLAIN
         self.mock_config = MagicMock(spec=Config)
 
     @patch("model_management.api.lifespan.on_start")
@@ -88,8 +88,10 @@ class TestLifespan(unittest.TestCase):
         self.assertIn("Logger configured", call_args[0])
         self.assertIn("format", call_args[0])
         self.assertIn("level", call_args[0])
-        self.assertEqual(self.mock_settings.log_format, call_args[1])
-        self.assertEqual(self.mock_settings.log_level, call_args[2])
+        self.assertEqual(self.mock_settings.marqo_log_format, call_args[1])
+        self.assertEqual(self.mock_settings.marqo_log_level, call_args[2])
+        self.assertEqual(self.mock_settings.marqo_log_format, call_args[1])
+        self.assertEqual(self.mock_settings.marqo_log_level, call_args[2])
 
     @patch("model_management.api.lifespan.on_start")
     @patch("model_management.api.lifespan.get_config")
@@ -173,8 +175,8 @@ class TestLifespan(unittest.TestCase):
         for log_level in log_levels:
             with self.subTest(log_level=log_level):
                 mock_settings = MagicMock(spec=Settings)
-                mock_settings.log_level = log_level
-                mock_settings.log_format = LogFormat.PLAIN
+                mock_settings.marqo_log_level = log_level
+                mock_settings.marqo_log_format = LogFormat.PLAIN
                 mock_get_settings.return_value = mock_settings
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
@@ -197,7 +199,7 @@ class TestLifespan(unittest.TestCase):
     @patch("model_management.api.lifespan.get_logger")
     @patch("model_management.api.lifespan.instantiate_logger")
     @patch("model_management.api.lifespan.get_settings")
-    def test_lifespan_with_different_log_formats(
+    def test_lifespan_with_different_marqo_log_formats(
         self,
         mock_get_settings,
         mock_instantiate_logger,
@@ -206,13 +208,13 @@ class TestLifespan(unittest.TestCase):
         mock_on_start,
     ):
         """Test that lifespan works with different log formats."""
-        log_formats = [LogFormat.PLAIN, LogFormat.JSON]
+        marqo_log_formats = [LogFormat.PLAIN, LogFormat.JSON]
 
-        for log_format in log_formats:
-            with self.subTest(log_format=log_format):
+        for marqo_log_format in marqo_log_formats:
+            with self.subTest(marqo_log_format=marqo_log_format):
                 mock_settings = MagicMock(spec=Settings)
-                mock_settings.log_level = LogLevel.INFO
-                mock_settings.log_format = log_format
+                mock_settings.marqo_log_level = LogLevel.INFO
+                mock_settings.marqo_log_format = marqo_log_format
                 mock_get_settings.return_value = mock_settings
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger

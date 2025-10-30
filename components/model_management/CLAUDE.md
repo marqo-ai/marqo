@@ -87,7 +87,7 @@ Environment variables (see `env.example`):
 - All configuration should be environment-variable driven
 - Use structured logging with request IDs
 - Models are downloaded to `MODEL_BASE_DIR` and organized by model name
-- Always import everything at the top of the file, avoid inline imports unless necessary to prevent circular dependencies
+- **Always import everything at the top of the file**, avoid inline imports unless necessary to prevent circular dependencies. This applies to both source code and test files
 
 ### Detailed Test Development Guidelines
 - Each source package should have a corresponding test package
@@ -102,3 +102,8 @@ Environment variables (see `env.example`):
 - When you need to test things regarding environment variables, take care of the .env file in the root folder as it may affect the test results. So make sure to set the environment variables explicitly in the test case if needed
 - Avoid testing non-public methods unless absolutely necessary. If you need to test a private method, consider if it should be made public or if the functionality can be tested through a public method
 - In unit tests, avoid using time.sleep or any other blocking calls that may slow down the test execution. Instead, use mocking to simulate delays or timeouts
+- Use helper methods to reduce duplication
+- Group related assertions into single tests
+- Use subtests for testing multiple configurations
+- Clear, concise test names that describe what's being tested
+- No redundant test logic

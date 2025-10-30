@@ -16,7 +16,7 @@ permissions:
 jobs:
   Test-Model-Management:
     name: Run Model Management Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     defaults:
       run:
         working-directory: components/model_management
@@ -39,9 +39,17 @@ jobs:
         run: |
           uv sync --dev
 
+      - name: Run Triton For integration Tests
+        run: |
+          cd ../.. # Back to repo root
+          mkdir ~/.cache/marqo/models -p # Ensure model cache directory exists for triton to mount
+          export MARQO_MODEL_CACHE_PATH=~/.cache/marqo/models
+          docker compose -f compose-triton.yaml up -d
+
       - name: Run Integration Tests
         run: |
           set -o pipefail
+                  
           uv run pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integration_tests/ | tee pytest_output.txt

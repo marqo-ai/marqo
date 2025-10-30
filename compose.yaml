@@ -88,8 +88,8 @@ services:
     environment:
       MARQO_LOG_LEVEL: "INFO"
       MARQO_MODELS_TO_PRELOAD: "[]"
-      TRITON_URL: http://triton:8000
-      MODEL_BASE_DIR: /models
+      MARQO_TRITON_REST_URL: http://triton:8000
+      MARQO_MODEL_CACHE_PATH: /models
     volumes:
       - modelrepo:/models
       - ~/.aws/credentials:/root/.aws/credentials:ro  # If using AWS S3 for model storage
