@@ -29,6 +29,8 @@ from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_doc
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
+from marqo.tensor_search.enums import EnvVars
 
 
 class HybridSearch:
@@ -342,6 +344,8 @@ class HybridSearch:
             if track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
 
+        gathered_results = self._max_value_check_for_total_hits(gathered_results)
+
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
@@ -368,4 +372,14 @@ class HybridSearch:
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
+        return gathered_results
+
+    def _max_value_check_for_total_hits(self, gathered_results: Dict) -> Dict:
+        """
+        Ensure the total hits does not exceed maximum retrievable value.
+        """
+        if "totalHits" in gathered_results and isinstance(gathered_results["totalHits"], int):
+            gathered_results["totalHits"] = (
+                min(gathered_results["totalHits"], read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS))
+            )
         return gathered_results
