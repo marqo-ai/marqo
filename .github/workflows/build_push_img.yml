@@ -132,7 +132,7 @@ jobs:
         id: build-and-push-model-management
         uses: docker/build-push-action@v4
         with:
-          context: ./components/inference-orchestrator
+          context: ./components/model-management
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/model-management:${{ env.IMAGE_TAG }}
