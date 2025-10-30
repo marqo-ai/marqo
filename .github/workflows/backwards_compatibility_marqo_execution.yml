@@ -93,6 +93,11 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Start Vespa Container
+        run: |
+          export PYTHONPATH=./:$PYTHONPATH
+          python ./scripts/vespa_local/vespa_local.py full-start
+
       # Step to run the compatibility test. This step can run both backwards_compatibility and rollback tests, based on the MODE argument
       - name: Run backwards compatibility test
         id: run-backwards-compatibility
