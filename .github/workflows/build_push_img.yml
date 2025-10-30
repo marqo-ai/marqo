@@ -97,7 +97,7 @@ jobs:
           echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
           echo "IMAGE_NAMESPACE=${{ inputs.image_namespace || github.event.inputs.image_namespace }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
-          echoe "PLATFORMS=${{ inputs.platforms || github.event.inputs.platforms }}" >> $GITHUB_ENV
+          echo "PLATFORMS=${{ inputs.platforms || github.event.inputs.platforms }}" >> $GITHUB_ENV
 
       - name: Checkout Marqo
         uses: actions/checkout@v3
