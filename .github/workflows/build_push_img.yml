@@ -79,7 +79,7 @@ on:
         default: 'linux/amd64,linux/arm64'
 
 concurrency:
-    group: build-push-marqo-image-${{ github.ref }}
+    group: build-push-marqo-image-${{ github.ref }} - ${{ github.event.inputs.push_to || inputs.push_to }} - ${{ github.event.inputs.platforms|| inputs.platforms }}
     cancel-in-progress: true
 
 jobs:
@@ -140,7 +140,7 @@ jobs:
         id: build-and-push-inference-orchestrator
         uses: docker/build-push-action@v6
         with:
-          context: ./components/inference-orchestrator
+          context: ./components/inference_orchestrator
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator:${{ env.IMAGE_TAG }}
@@ -149,7 +149,7 @@ jobs:
         id: build-and-push-model-management
         uses: docker/build-push-action@v6
         with:
-          context: ./components/model-management
+          context: ./components/model_management
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
