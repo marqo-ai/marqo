@@ -4,7 +4,6 @@ permissions:
   contents: read
   id-token: write
 
-# TODO: Add concurrency for these tasks (https://s2search.atlassian.net/browse/MQ-274) (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841652402)
 on:
   workflow_call:
     inputs:
@@ -65,10 +64,14 @@ on:
         required: true
         type: string
 
+concurrency:
+    group: build-push-marqo-image-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
   Docker-Build:
     name: Build docker image
-    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     outputs:
       image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
 
