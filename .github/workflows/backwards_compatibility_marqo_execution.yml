@@ -78,7 +78,7 @@ jobs:
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r tests/compatibility_tests/requirements.txt
 
       # Step to configure AWS credentials
       - name: Configure AWS credentials
