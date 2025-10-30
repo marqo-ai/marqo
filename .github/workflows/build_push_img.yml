@@ -21,11 +21,11 @@ on:
           - OS-ECR
           - AMI-ECR
         default: OS-ECR
-      image_repo_prefix:
-        description: 'The prefix of the image repository, by default "marqoai". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
+      image_namespace:
+        description: 'The namespace of the repo, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
         required: true
         type: string
-        default: 'marqoai'
+        default: 'marqoai-dev'
       image_tag:
         description: 'Image tag'
         required: true
@@ -52,21 +52,28 @@ on:
           - OS-ECR
           - AMI-ECR
         default: OS-ECR
-      image_repo_prefix:
-        description: 'The prefix of the image repository, by default "marqoai". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
+      image_namespace:
+        description: 'The prefix of the image repository, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
         required: true
         type: string
-        default: 'marqoai'
+        default: 'marqoai-dev'
       image_tag:
         description: 'Image tag'
         required: true
         type: string
     outputs:
-      image_identifier:
+      api_image_identifier:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
-        description: "The image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.image_identifier }}
+        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-api/inference-orchestrator@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier:
+        description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier:
+        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-model-management/inference-orchestrator@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
+
 
 jobs:
   Docker-Build:
@@ -81,7 +88,7 @@ jobs:
         run: |
           echo "MARQO_REF=${{ inputs.marqo_ref || github.event.inputs.marqo_ref }}" >> $GITHUB_ENV
           echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
-          echo "IMAGE_REPO_PREFIX=${{ inputs.image_repo_prefix || github.event.inputs.image_repo_prefix }}" >> $GITHUB_ENV
+          echo "IMAGE_NAMESPACE=${{ inputs.image_namespace || github.event.inputs.image_namespace }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
 
       - name: Checkout Marqo
@@ -144,6 +151,6 @@ jobs:
         # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
         id: set-image-identifier-in-output
         run: |
-          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO_PRFIX }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "inference_orchestrator_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "model_management_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
