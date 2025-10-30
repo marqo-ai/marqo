@@ -112,6 +112,9 @@ jobs:
     # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/marqo
     needs: [check-if-image-exists, build-and-push-image]
     if: |
       always() &&
