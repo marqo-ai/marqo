@@ -179,7 +179,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
 
         #Start from_version container
-        docker_manager.start_marqo_container(from_version, from_version_volume)
+        docker_manager.start_marqo_container(from_version)
         logger.info(f"Started Marqo container {from_version}")
 
         try:
@@ -237,7 +237,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         logger.info(f"Generated volume name: {from_version_volume} for from_version: {from_version}")
 
         # Step 1: Start a Marqo container using from_version
-        docker_manager.start_marqo_container(from_version, from_version_volume)
+        docker_manager.start_marqo_container(from_version)
         logger.info(f"Step 1: Started Marqo container {from_version}")
 
         # Step 2: Run prepare mode
