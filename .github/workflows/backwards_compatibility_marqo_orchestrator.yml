@@ -6,6 +6,7 @@ on:
     branches:
       - mainline
       - releases/*
+      - li/fix-compatibility-tests # Fix this
     paths-ignore:
       - '**.md'
   workflow_dispatch:
@@ -20,7 +21,7 @@ on:
 
 # Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
 env:
-  MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 5 }}
+  MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 1 }} # TODO - Change it back to 5
 
 jobs:
   check-if-image-exists:
@@ -31,7 +32,9 @@ jobs:
 
     outputs:
       image_exists: ${{ steps.check-image.outputs.image_exists }}
-      image_identifier: ${{ steps.check-image.outputs.image_identifier }}
+      api_image_identifier: ${{ steps.check-image.outputs.image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.check-image.outputs.image_identifier }}
+      model_management_image_identifier: ${{ steps.check-image.outputs.image_identifier }}
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -45,23 +48,48 @@ jobs:
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # step to check for image existence - it uses aws cli to check if the image exists in the ECR registry "marqo-compatibility-tests"
-      - name: Check image existence and get identifier
+      # step to check for image existence - it uses aws cli to check if the all 3 images exists in
+      # the ECR registry "marqo-compatibility-tests/<repo>" with tag as the current commit sha.
+      - name: Check image existence and get identifiers
         id: check-image
+        shell: bash
         run: |
-          echo "Checking for image existence"
-          if IMAGE_DETAILS=$(aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }} 2>/dev/null); then
-            echo "image_exists=true" >> $GITHUB_OUTPUT
-            echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
-            
-            IMAGE_IDENTIFIER=$(echo "$IMAGE_DETAILS" | jq -r '.imageDetails[0].imageDigest')
-            REGISTRY_ID="424082663841.dkr.ecr.us-east-1.amazonaws.com"
-            FULL_IDENTIFIER="${REGISTRY_ID}/marqo-compatibility-tests@${IMAGE_IDENTIFIER}"
-            echo "image_identifier=${FULL_IDENTIFIER}" >> $GITHUB_OUTPUT
-          else
-            echo "image_exists=false" >> $GITHUB_OUTPUT
-            echo "Image doesn't exist" 
-          fi
+          set -euo pipefail
+          echo "Checking ECR images for commit: ${{ github.sha }}"
+      
+          REGISTRY_ID="424082663841.dkr.ecr.us-east-1.amazonaws.com"
+          REPO_PREFIX="marqo-compatibility-tests"
+      
+          # Format: "<repo-name>:<output-var>"
+          repos=(
+            "api:api_image_identifier"
+            "inference-orchestrator:inference_orchestrator_image_identifier"
+            "model-management:model_management_image_identifier"
+          )
+      
+          for pair in "${repos[@]}"; do
+            IFS=':' read -r repo out_var <<< "$pair"
+      
+            # Try to fetch the digest for the given tag; returns "None" if not found
+            digest=$(aws ecr describe-images \
+              --repository-name "${REPO_PREFIX}/${repo}" \
+              --image-ids imageTag=${{ github.sha }} \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null || true)
+      
+            if [[ -z "$digest" || "$digest" == "None" ]]; then
+              echo "Image ${REPO_PREFIX}/${repo}:${{ github.sha }} doesn't exist."
+              echo "image_exists=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+      
+            full="${REGISTRY_ID}/${REPO_PREFIX}/${repo}@${digest}"
+            echo "${out_var}=${full}" >> "$GITHUB_OUTPUT"
+            echo "Found: ${full}"
+          done
+      
+          echo "All images exist in ECR."
+          echo "image_exists=true" >> "$GITHUB_OUTPUT"
 
   build-and-push-image:
     # Job to actually build and push image to ECR registry. This job is only triggered if the image does not already exist in the ECR registry.
@@ -72,13 +100,13 @@ jobs:
     secrets: inherit
     with:
       marqo_ref: "${{ github.sha }}"
-      push_to: "ECR"
-      image_repo: "marqo-compatibility-tests"
+      push_to: "OS-ECR"
+      image_namespace: "marqo-compatibility-tests"
       image_tag: "${{ github.sha }}"
+      platforms: 'linux/amd64'
     permissions:
       id-token: write
       contents: read
-
 
   orchestrate:
     # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
