@@ -65,7 +65,7 @@ on:
       api_image_identifier:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
-        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-api/inference-orchestrator@sha256:1234567890abcdef)"
+        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
         value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
       inference_orchestrator_image_identifier:
         description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
