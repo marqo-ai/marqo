@@ -77,7 +77,6 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         cls.logger.setLevel(log_level)
         cls.logger.info(f"Logging level changed to {level.upper()}")
 
-    @staticmethod
     def _compare_search_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""
         score_fields = ["_score", "_lexical_score", "_tensor_score"]
