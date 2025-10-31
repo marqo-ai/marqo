@@ -6,7 +6,6 @@ on:
     branches:
       - mainline
       - releases/*
-      - li/fix-compatibility-tests # Fix this
     paths-ignore:
       - '**.md'
   workflow_dispatch:

@@ -200,6 +200,8 @@ class DockerManager:
             with open(compose_file, 'r') as compose_fp:
                 compose_content = yaml.safe_load(compose_fp)
 
+            print(compose_content)
+
             compose_content['services']['api']['image'] = api_image
             compose_content['services']['mioc']['image'] = inference_orchestrator_image
             compose_content['services']['mmc']['image'] = model_management_image
