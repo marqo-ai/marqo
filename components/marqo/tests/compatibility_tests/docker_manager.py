@@ -218,6 +218,8 @@ class DockerManager:
                     "-f",
                     str(self.compose_file),
                     "up",
+                    "--profile",
+                    "cpu",
                     "-d",
                     "--force-recreate",
                 ],
