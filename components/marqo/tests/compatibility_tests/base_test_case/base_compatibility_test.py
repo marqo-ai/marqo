@@ -81,7 +81,10 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         """Compare two search results and assert if they match."""
         score_fields = ["_score", "_lexical_score", "_tensor_score"]
         expected_hits = copy.deepcopy(expected_result["hits"])
-        actual_hits = copy.deepcopy(actual_result["hits"])
+        try:
+            actual_hits = copy.deepcopy(actual_result["hits"])
+        except KeyError as e:
+            raise KeyError(f"Actual result is missing 'hits' key: {e}. Actual result: {actual_result}")
 
         for index, expected_hit in enumerate(expected_hits):
             actual_hit = actual_hits[index]

@@ -241,6 +241,9 @@ class DockerManager:
                 pass
             time.sleep(5)
 
+        raise RuntimeError(f"Marqo server failed to start within the expected time. Check images:"
+                           f"{api_image}, {inference_orchestrator_image}, {model_management_image} for issues ")
+
     def _start_marqo_container_before_2250(self, version: str):
         """
         Start a Marqo container after pulling the required image and creating a volume.
