@@ -73,7 +73,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         """Set the logging level for this class's logger"""
         log_level = getattr(logging, level.upper(), None)
         if log_level is None:
-            raise ValueError(f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
+            raise ValueError(
+                f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
         cls.logger.setLevel(log_level)
         cls.logger.info(f"Logging level changed to {level.upper()}")
 
@@ -84,7 +85,10 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
             expected_hits = copy.deepcopy(expected_result["hits"])
             actual_hits = copy.deepcopy(actual_result["hits"])
         except KeyError as e:
-            raise KeyError(f"The result is missing 'hits' key: {e}. Result: {actual_result}")
+            raise KeyError(
+                f"One of the results is missing 'hits' key. Error: {e}. "
+                f"Expected result: {expected_result}, Actual result: {actual_result}"
+            )
 
         for index, expected_hit in enumerate(expected_hits):
             actual_hit = actual_hits[index]
