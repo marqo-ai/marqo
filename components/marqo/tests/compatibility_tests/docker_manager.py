@@ -28,6 +28,7 @@ class DockerManager:
         self.docker_client = docker.from_env()
         self.logger = get_logger(__name__)
         self.marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
+        self.compose_file = None
 
     def get_volume_name_from_marqo_version(self, version: str) -> str:
         """
@@ -207,14 +208,14 @@ class DockerManager:
 
             yaml.dump(compose_content, fp)
             fp.flush()
-            temp_path = Path(fp.name).absolute()
+            self.compose_file= Path(fp.name).absolute()
 
             subprocess.run(
                 [
                     "docker",
                     "compose",
                     "-f",
-                    str(temp_path),
+                    str(self.compose_file),
                     "up",
                     "-d",
                     "--force-recreate",
@@ -222,9 +223,6 @@ class DockerManager:
                 check=True,
                 timeout=60
             )
-
-        print("Finished starting Marqo container post 2.25.0")
-        sys.exit(1)
 
     def _start_marqo_container_before_2250(self, version: str):
         """
@@ -299,155 +297,16 @@ class DockerManager:
 
         except APIError as e:
             raise RuntimeError(
-                f"Failed to start Docker container {container_name}, with version: {version}, and volume_name: {volume_name}"
-            ) from e
-
-    def copy_state_from_container(self, from_version_volume: str, to_version_volume: str, image: str):
-        """
-        Copy the state from one Docker volume to another using a specified Docker image.
-
-        This function runs a Docker container with the specified image, mounts the source and target volumes,
-        and copies the contents from the source volume to the target volume. It is specifically used
-        in case when from_version is <2.9 and to_version is >=2.9.
-
-        Args:
-            from_version_volume (str): The name of the source Docker volume.
-            to_version_volume (str): The name of the target Docker volume.
-            image (str): The Docker image to use for the container.
-
-        Raises:
-            RuntimeError: If there is an error during the Docker container execution or the copy process.
-        """
-        # Construct the command to copy files from source volume to target volume
-        copy_command = "sh -c 'cd /opt/vespa_old && cp -a . /opt/vespa/var'"
-
-        try:
-            # Run a container with the necessary volumes mounted
-            container = self.docker_client.containers.run(
-                image=image,
-                command=copy_command,
-                remove=True,  # Automatically remove the container after it exits
-                entrypoint="",  # Override the default entrypoint
-                volumes={
-                    from_version_volume: {'bind': '/opt/vespa_old', 'mode': 'rw'},
-                    to_version_volume: {'bind': '/opt/vespa/var', 'mode': 'rw'}
-                },
-                tty=True,  # Allocate a pseudo-TTY
-            )
-            self.logger.info(f"Successfully copied state from {from_version_volume} to {to_version_volume}")
-
-        except (APIError, ContainerError) as e:
-            self.logger.error(f"Error during state copy from {from_version_volume} to {to_version_volume}: {e}")
-            raise RuntimeError(f"Failed to copy state from {from_version_volume} to {to_version_volume}.") from e
-
-    def start_marqo_container_by_transferring_state(
-        self,
-        target_version: str,
-        source_version: str,
-        source_volume: str,
-        target_version_image: str = None,
-        source: str = "docker"
-    ):
-        """
-        Start a Marqo container for the specified target_version, transferring state from the source_version container.
-
-        Args:
-            target_version (str): The target version of the Marqo container to start.
-            source_version (str): The source version of the Marqo container.
-            source_volume (str): The volume to use for the container.
-            target_version_image (str): The unique identifier for the target_version image.
-            source (str): The source from which to pull the image.
-        """
-        self.logger.debug(
-            f"Starting Marqo container with target version: {target_version}, "
-            f"source version: {source_version} "
-            f"source_volume: {source_volume}, target_version_image: {target_version_image}, source: {source}"
-        )
-
-        container_name = f"marqo-{target_version}"
-        target_version_parsed = semver.VersionInfo.parse(target_version)
-        source_version_parsed = semver.VersionInfo.parse(source_version)
-
-        if source == "docker":
-            image_name = f"marqoai/marqo:{target_version}"
-        else:
-            image_name = target_version_image
-
-        # Pull the image
-        self.logger.info(f"Pulling image: {image_name}")
-        try:
-            self.pull_marqo_image(image_name, source)
-        except Exception as e:
-            raise RuntimeError(f"Failed to pull image: {image_name}") from e
-
-        # Remove existing container if it exists
-        try:
-            container = self.docker_client.containers.get(container_name)
-            container.remove(force=True)
-            self.logger.debug(f"Removed existing container: {container_name}")
-        except docker.errors.NotFound:
-            self.logger.warning(f"Container {container_name} does not exist, skipping removal.")
-
-        # Prepare the volume mapping
-        volumes = {}
-        if source_version_parsed >= self.marqo_transfer_state_version and target_version_parsed >= self.marqo_transfer_state_version:
-            volumes[source_volume] = {'bind': '/opt/vespa/var', 'mode': 'rw'}
-        elif source_version_parsed < self.marqo_transfer_state_version and target_version_parsed < self.marqo_transfer_state_version:
-            volumes[source_volume] = {'bind': '/opt/vespa', 'mode': 'rw'}
-        elif source_version_parsed < self.marqo_transfer_state_version <= target_version_parsed:
-            # Handle state transfer for versions < 2.9 to >= 2.9
-            target_version_volume = self.create_volume_for_marqo_version(str(target_version))
-            self.copy_state_from_container(source_volume, target_version_volume, image_name)
-            volumes[target_version_volume] = {'bind': '/opt/vespa/var', 'mode': 'rw'}
-
-        # Start the container
-        self.logger.info(f"Starting container {container_name} with volumes: {volumes}")
-        try:
-            container = self.docker_client.containers.run(
-                image=image_name,
-                name=container_name,
-                ports={"8882/tcp": 8882},
-                detach=True,
-                environment={
-                    "MARQO_ENABLE_BATCH_APIS": "TRUE",
-                    "MARQO_MAX_CPU_MODEL_MEMORY": "1.6"
-                },
-                volumes=volumes
-            )
-            self.containers_to_cleanup.add(container_name)
-            self.logger.info(f"Container {container_name} started successfully.")
-            log_stream = container.logs(stream=True, follow=True)
-            # Follow logs until Marqo service starts
-            self.logger.debug("Waiting for Marqo to start...")
-            while True:
-                try:
-                    response = requests.get("http://localhost:8882", verify=False)
-                    if "Marqo" in response.text:
-                        self.logger.info("Marqo server started successfully")
-                        break
-                except requests.ConnectionError:
-                    pass
-                # Read and log container output
-                try:
-                    log_line = next(log_stream)
-                    if log_line:
-                        log_text = log_line.decode("utf-8").strip()
-                        self.logger.debug(log_text)
-                except StopIteration:
-                    self.logger.warning("Log stream unexpectedly ended.")
-                    break
-                time.sleep(0.5)
-
-            #Stop following logs after Marqo starts
-            self.logger.debug("Stopped following docker logs")
-
-        except docker.errors.APIError as e:
-            raise RuntimeError(
-                f"Failed to start Docker container {container_name} by transferring state "
-                f"with target_version: {target_version}, source_version: {source_version}, source_volume: {source_volume}"
+                f"Failed to start Docker container {container_name}, with version: {version}."
             ) from e
 
     def stop_marqo_container(self, version: str):
+        if semver.VersionInfo.parse(version) < MARQO_TRITON_VERSION:
+            self._stop_marqo_container_before_2250(version)
+        else:
+            self._stop_marqo_container_post_2250(version)
+
+    def _stop_marqo_container_post_2250(self, version: str):
         """
         Stop a Marqo container but don't remove it yet.
 
@@ -460,6 +319,35 @@ class DockerManager:
         container_name = f"marqo-{version}"
         self.logger.info(f"Stopping container with container name {container_name}")
 
+        try:
+            subprocess.run(
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    str(self.compose_file),
+                    "down",
+                ],
+                check=True,
+                timeout=60
+            )
+            self.logger.debug(f"Successfully stopped container {container_name}")
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to stop container {container_name}") from e
+
+    def _stop_marqo_container_before_2250(self, version: str):
+        """
+        Stop a Marqo container but don't remove it yet.
+
+        Args:
+            version (str): The version of the Marqo container to stop.
+
+        Raises:
+            RuntimeError: If there is an unexpected error during the container stop process.
+        """
+        container_name = f"marqo-{version}"
+        self.logger.info(f"Stopping container with container name {container_name}")
 
         try:
             # Get the container by name
