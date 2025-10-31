@@ -224,6 +224,16 @@ class DockerManager:
                 timeout=60
             )
 
+        for _ in range(10):
+            try:
+                response = requests.get("http://localhost:8882/health")
+                if response.status_code == 200:
+                    self.logger.info("Marqo server started successfully.")
+                    return
+            except requests.ConnectionError:
+                pass
+            time.sleep(5)
+
     def _start_marqo_container_before_2250(self, version: str):
         """
         Start a Marqo container after pulling the required image and creating a volume.
