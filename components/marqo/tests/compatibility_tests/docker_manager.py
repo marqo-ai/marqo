@@ -209,22 +209,19 @@ class DockerManager:
             fp.flush()
             temp_path = Path(fp.name).absolute()
 
-            run_process = subprocess.Popen(
+            subprocess.run(
                 [
-                    "docker",  # command: run
+                    "docker",
                     "compose",
                     "-f",
-                    temp_path,
+                    str(temp_path),
                     "up",
                     "-d",
                     "--force-recreate",
                 ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True
+                check=True,
+                timeout=60
             )
-            # Wait for the process to complete
-            run_process.wait()
 
         print("Finished starting Marqo container post 2.25.0")
         sys.exit(1)
