@@ -203,8 +203,3 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
                     for query, search_method, idx, error in test_failures
                 ])
                 self.fail(f"Some subtests failed:\n{failure_message}")
-
-    def _compare_search_results(self, expected_result, actual_result):
-        """Compare two search results and assert if they match."""
-        # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
-        self.assertEqual(expected_result.get("hits"), actual_result.get("hits"), f"Results do not match. Expected: {expected_result}, Got: {actual_result}")
