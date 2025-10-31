@@ -208,6 +208,7 @@ class DockerManager:
 
             yaml.dump(compose_content, fp)
             fp.flush()
+            print(compose_content)
             self.compose_file= Path(fp.name).absolute()
 
             subprocess.run(
