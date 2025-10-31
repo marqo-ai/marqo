@@ -215,11 +215,11 @@ class DockerManager:
                 [
                     "docker",
                     "compose",
+                    "--profile",
+                    "cpu",
                     "-f",
                     str(self.compose_file),
                     "up",
-                    "--profile",
-                    "cpu",
                     "-d",
                     "--force-recreate",
                 ],
