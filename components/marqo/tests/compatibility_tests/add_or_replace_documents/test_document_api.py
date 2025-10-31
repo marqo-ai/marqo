@@ -24,6 +24,7 @@ class TestDocumentAPIv2_0(BaseCompatibilityTestCase):
         "indexName": structured_index_name,
         "type": "structured",
         "normalizeEmbeddings": True,
+        "model": "hf/all-MiniLM-L6-v2",
         "allFields": [
             {"name": "Title", "type": "text"},
             {"name": "Description", "type": "text"},
@@ -35,6 +36,7 @@ class TestDocumentAPIv2_0(BaseCompatibilityTestCase):
             "indexName": unstructured_index_name,
             "type": "unstructured",
             "normalizeEmbeddings": True,
+            "model": "hf/all-MiniLM-L6-v2",
         }]
 
     text_docs = [{
