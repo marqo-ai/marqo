@@ -196,6 +196,8 @@ class DockerManager:
 
         compose_file = os.path.join(FILE_PATH.resolve().parents[5], "compose.yaml")
 
+        print(compose_file)
+
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as fp:
             with open(compose_file, 'r') as compose_fp:
                 compose_content = yaml.safe_load(compose_fp)
