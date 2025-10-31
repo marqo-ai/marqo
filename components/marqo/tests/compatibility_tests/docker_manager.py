@@ -196,13 +196,9 @@ class DockerManager:
 
         compose_file = os.path.join(FILE_PATH.resolve().parents[4], "compose.yaml")
 
-        print(compose_file)
-
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as fp:
             with open(compose_file, 'r') as compose_fp:
                 compose_content = yaml.safe_load(compose_fp)
-
-            print(compose_content)
 
             compose_content['services']['api']['image'] = api_image
             compose_content['services']['mioc']['image'] = inference_orchestrator_image
