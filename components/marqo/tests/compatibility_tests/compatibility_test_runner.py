@@ -178,7 +178,7 @@ def backwards_compatibility_test(
     try:
         load_all_subclasses("tests.compatibility_tests")
         # Step 1: Start from_version container and run tests in prepare mode
-        logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
+        logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}")
 
         #Start from_version container
         docker_manager.start_marqo_container(from_version)
@@ -212,7 +212,7 @@ def backwards_compatibility_test(
         except Exception as e:
             raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
     except Exception as e:
-        raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}") from e
+        raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}") from e
     finally:
         # Stop the to_version container (but don't remove it yet)
         logger.info(f"Stopping Marqo to_version ({to_version}) container " + str(to_version))
