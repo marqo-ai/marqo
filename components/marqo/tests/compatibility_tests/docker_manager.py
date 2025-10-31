@@ -226,10 +226,14 @@ class DockerManager:
 
         for _ in range(10):
             try:
-                response = requests.get("http://localhost:8882/health")
-                if response.status_code == 200:
+                response_1 = requests.get("http://localhost:8882/health")
+                response_2 = requests.get("http://localhost:8884/healthz")
+                if response_1.status_code == 200 and response_2.status_code == 200:
                     self.logger.info("Marqo server started successfully.")
                     return
+                else:
+                    time.sleep(5)
+                    continue
             except requests.ConnectionError:
                 pass
             time.sleep(5)
