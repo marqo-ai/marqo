@@ -194,7 +194,7 @@ class DockerManager:
                 "model_management_image must be provided."
             )
 
-        compose_file = os.path.join(FILE_PATH.resolve().parents[5], "compose.yaml")
+        compose_file = os.path.join(FILE_PATH.resolve().parents[4], "compose.yaml")
 
         print(compose_file)
 
