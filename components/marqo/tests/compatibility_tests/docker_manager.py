@@ -9,6 +9,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from docker.errors import NotFound, APIError, ContainerError, ImageNotFound
 from pathlib import Path
 import tempfile
+import sys
 import subprocess
 
 from tests.compatibility_tests.compatibility_test_logger import get_logger
@@ -224,7 +225,9 @@ class DockerManager:
             )
             # Wait for the process to complete
             run_process.wait()
-            return True
+
+        print("Finished starting Marqo container post 2.25.0")
+        sys.exit(1)
 
     def _start_marqo_container_before_2250(self, version: str):
         """

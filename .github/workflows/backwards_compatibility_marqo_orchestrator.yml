@@ -6,7 +6,7 @@ on:
     branches:
       - mainline
       - releases/*
-      - li/fix-compatibility-tests # TODO - Remove this branch specifier after testing
+      # - li/fix-compatibility-tests # TODO - Remove this branch specifier after testing
     paths-ignore:
       - '**.md'
   workflow_dispatch:
