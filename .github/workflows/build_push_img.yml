@@ -89,7 +89,7 @@ jobs:
     outputs:
       api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
       inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
-      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image}}
+      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
 
     steps:
       - name: Set input variables
