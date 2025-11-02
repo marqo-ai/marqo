@@ -120,9 +120,9 @@ jobs:
         env:
           FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
           TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
-          TO_API_IMAGE: ${{ inputs.to_image || github.event.inputs.to_api_image }}
-          TO_INFERENCE_ORCHESTRATOR_IMAGE: ${{ inputs.to_image || github.event.inputs.to_inference_orchestrator_image }}
-          TO_MODEL_MANAGEMENT_IMAGE: ${{ inputs.to_image || github.event.inputs.to_model_management_image }}
+          TO_API_IMAGE: ${{ inputs.to_api_image || github.event.inputs.to_api_image }}
+          TO_INFERENCE_ORCHESTRATOR_IMAGE: ${{ inputs.to_inference_orchestrator_image || github.event.inputs.to_inference_orchestrator_image }}
+          TO_MODEL_MANAGEMENT_IMAGE: ${{ inputs.to_model_management_image || github.event.inputs.to_model_management_image }}
           MODE: ${{ inputs.mode || github.event.inputs.mode }}
         run: |
             export PYTHONPATH=./:$PYTHONPATH
