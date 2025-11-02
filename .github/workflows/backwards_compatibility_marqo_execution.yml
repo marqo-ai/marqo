@@ -130,6 +130,6 @@ jobs:
             --mode "$MODE" \
             --from_version "$FROM_VERSION" \
             --to_version "$TO_VERSION" \
-            --to_api_image "$TO_IMAGE" \
+            --to_api_image "$TO_API_IMAGE" \
             --to_inference_orchestrator_image "$TO_INFERENCE_ORCHESTRATOR_IMAGE" \
             --to_model_management_image "$TO_MODEL_MANAGEMENT_IMAGE"
