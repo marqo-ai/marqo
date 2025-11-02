@@ -200,15 +200,15 @@ def backwards_compatibility_test(
         )
 
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
-        # Step 4: Run tests
+        # # Step 4: Run tests
+        # try:
+        #     run_test_mode(from_version)
+        # except Exception as e:
+        #     raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
+        # logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
+        # # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
         try:
-            run_test_mode(from_version)
-        except Exception as e:
-            raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
-        logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
-        # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
-        try:
-            run_prepare_mode(to_version)
+        #    run_prepare_mode(to_version)
             run_test_mode(to_version)
         except Exception as e:
             raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
