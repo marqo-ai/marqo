@@ -206,10 +206,6 @@ class DockerManager:
             compose_content['services']['mioc']['image'] = inference_orchestrator_image
             compose_content['services']['mmc']['image'] = model_management_image
 
-            for services in ['api', 'mioc', 'mmc']:
-                if "build" in compose_content['services'][services]:
-                    del compose_content['services'][services]['build']
-
             yaml.dump(compose_content, fp)
             fp.flush()
             self.logger.info(f"Marqo backwards compatibility test using compose file: {compose_file}")
@@ -226,6 +222,7 @@ class DockerManager:
                     "up",
                     "-d",
                     "--force-recreate",
+                    "--no-build" # To ignore any build instructions in the compose file
                 ],
                 check=True,
                 timeout=60
