@@ -208,7 +208,7 @@ class DockerManager:
 
             yaml.dump(compose_content, fp)
             fp.flush()
-            self.logger.info(f"Marqo backwards compatibility test using compose file: {compose_file}")
+            self.logger.info(f"Marqo backwards compatibility test using compose file: {compose_content}")
             self.compose_file= Path(fp.name).absolute()
 
             subprocess.run(
