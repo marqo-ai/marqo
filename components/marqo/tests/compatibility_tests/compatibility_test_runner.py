@@ -57,12 +57,13 @@ def load_all_subclasses(package_name):
         except ImportError as e:
             logger.error(f"Could not import module with {name}")
 
-def run_prepare_mode(version_to_test_against: str):
+def run_prepare_mode(version_to_test_against: str) -> list[BaseCompatibilityTestCase]:
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
     errors = []
 
+    collected_classes = []
     # Skip any tests that have already been prepared
     seen_classes = set()
     for test_class in BaseCompatibilityTestCase.__subclasses__():
@@ -115,6 +116,7 @@ def run_prepare_mode(version_to_test_against: str):
                 test_class.setUpClass() #setUpClass will be used to create Marqo client
                 test_instance = test_class()
                 test_instance.prepare() #Prepare method will be used to create index and add documents
+                collected_classes.append(test_instance)
             else: # Skip the test if the version_to_test_against is greater than the version the test is marked
                 logger.info(f"Skipping testcase {test_class.__name__} as {marqo_version} > {version_to_test_against}")
         except Exception as e:
@@ -122,22 +124,26 @@ def run_prepare_mode(version_to_test_against: str):
             errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
 
+    return collected_classes
 
     if errors:
         raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
-def construct_pytest_arguments(version_to_test_against):
+def construct_pytest_arguments(version_to_test_against, prepared_classes: list[BaseCompatibilityTestCase] = None) -> list[str]:
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
         "-s",
         "tests/compatibility_tests"
     ]
+    if prepared_classes:
+        class_filter = " or ".join(cls.__name__ for cls in prepared_classes)
+        pytest_args.extend(["-k", class_filter])
     return pytest_args
 
-def run_test_mode(version_to_test_against):
+def run_test_mode(version_to_test_against, prepared_classes: list[BaseCompatibilityTestCase] = None):
     logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
-    pytest_args = construct_pytest_arguments(version_to_test_against)
+    pytest_args = construct_pytest_arguments(version_to_test_against, prepared_classes=prepared_classes)
     pytest_result = pytest.main(pytest_args)
 
     if pytest_result == 0:
@@ -186,7 +192,7 @@ def backwards_compatibility_test(
         logger.info(f"Started Marqo container {from_version}")
 
         try:
-            run_prepare_mode(from_version)
+            prepared_classes = run_prepare_mode(from_version)
         except Exception as e:
             raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
         # Step 2: Stop from_version container (but don't remove it)
@@ -202,7 +208,7 @@ def backwards_compatibility_test(
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
         try:
-            run_test_mode(from_version)
+            run_test_mode(from_version, prepared_classes=prepared_classes)
         except Exception as e:
             raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
         logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
