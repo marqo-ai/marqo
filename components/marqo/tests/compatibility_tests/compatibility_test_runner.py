@@ -55,7 +55,7 @@ def load_all_subclasses(package_name):
             _imported_modules.add(name)
             logger.debug(f"Imported module with name {name}")
         except ImportError as e:
-            logger.error(f"Could not import module with {name}")
+            logger.error(f"Could not import module with {name}. Original error: {e}", exc_info=True)
 
 def run_prepare_mode(version_to_test_against: str) -> list[BaseCompatibilityTestCase]:
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
@@ -132,21 +132,18 @@ def run_prepare_mode(version_to_test_against: str) -> list[BaseCompatibilityTest
     if errors:
         raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
-def construct_pytest_arguments(version_to_test_against, prepared_classes: list[BaseCompatibilityTestCase] = None) -> list[str]:
+def construct_pytest_arguments(version_to_test_against) -> list[str]:
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
         "-s",
         "tests/compatibility_tests"
     ]
-    if prepared_classes:
-        class_filter = " or ".join(cls.__name__ for cls in prepared_classes)
-        pytest_args.extend(["-k", class_filter])
     return pytest_args
 
-def run_test_mode(version_to_test_against, prepared_classes: list[BaseCompatibilityTestCase] = None):
+def run_test_mode(version_to_test_against):
     logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
-    pytest_args = construct_pytest_arguments(version_to_test_against, prepared_classes=prepared_classes)
+    pytest_args = construct_pytest_arguments(version_to_test_against)
     pytest_result = pytest.main(pytest_args)
 
     if pytest_result == 0:
@@ -195,7 +192,7 @@ def backwards_compatibility_test(
         logger.info(f"Started Marqo container {from_version}")
 
         try:
-            prepared_classes = run_prepare_mode(from_version)
+            run_prepare_mode(from_version)
         except Exception as e:
             raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
         # Step 2: Stop from_version container (but don't remove it)
@@ -211,7 +208,7 @@ def backwards_compatibility_test(
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
         try:
-            run_test_mode(from_version, prepared_classes=prepared_classes)
+            run_test_mode(from_version)
         except Exception as e:
             raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
         logger.info("Finished running tests in Test mode. THIS MARKS THE END OF BACKWARDS COMPATIBILITY TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
