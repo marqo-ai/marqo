@@ -87,7 +87,9 @@ jobs:
     name: Build docker image
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     outputs:
-      image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
+      api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image}}
 
     steps:
       - name: Set input variables
