@@ -124,6 +124,9 @@ def run_prepare_mode(version_to_test_against: str) -> list[BaseCompatibilityTest
             errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
 
+        if len(collected_classes) > 2:
+            break
+
     return collected_classes
 
     if errors:
