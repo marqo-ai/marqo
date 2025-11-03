@@ -159,7 +159,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                         },
                         rerank_depth=2  # To show not all results are reranked
                     )
-                    self._compare_search_results(stored_results[index_name][retrieval_method], result)
+                    self._compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
                 except Exception as e:
                     test_failures.append((index_name, traceback.format_exc()))
 

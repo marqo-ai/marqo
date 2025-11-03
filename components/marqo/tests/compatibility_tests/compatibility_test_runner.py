@@ -57,7 +57,7 @@ def load_all_subclasses(package_name):
         except ImportError as e:
             logger.error(f"Could not import module with {name}. Original error: {e}", exc_info=True)
 
-def run_prepare_mode(version_to_test_against: str) -> list[BaseCompatibilityTestCase]:
+def run_prepare_mode(version_to_test_against: str):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
