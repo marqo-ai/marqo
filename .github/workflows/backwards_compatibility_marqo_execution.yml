@@ -9,7 +9,6 @@ on:
   workflow_call:
     # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
     # to_version: Used as: the identifier for a workflow call and for logging purposes. We cannot use this to pull images from ECR or DockerHub (as opposed to from_version) since the to_version image has not been released yet. We need to pass a version here: ex: 2.11.5
-    # to_image: A unique identifier of the to_version image uploaded to ECR. Can either be the tag or the digest of the "To be released" image. This is specifically used to pull images from ECR.  We need to pass a full qualified docker image name with tag or digest here, example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef resp.
     inputs:
       from_version:
         description: 'Source Marqo version. This is calculated in backwards_compatibility_marqo_orchestrator.yml and passed to this workflow'
@@ -38,8 +37,6 @@ on:
   workflow_dispatch:
     # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
     # to_version: Used as: the identifier for a workflow call and for logging purposes. We cannot use this to pull images from ECR or DockerHub (as opposed to from_version) since the to_version image has not been released yet. We need to pass a version here: ex: 2.11.5
-    # to_image: A unique identifier of the to_version image uploaded to ECR. Can either be the tag or the digest of the "To be released" image. This is specifically used to pull images from ECR.  We need to pass a full qualified docker image name with tag or digest here, example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef resp.
-
     # If running manually, just specify the from_version, to_version and the fully qualified marqo image name with tag or digest in same format of the examples given above
     inputs:
       from_version:
