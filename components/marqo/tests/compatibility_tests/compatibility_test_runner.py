@@ -1,17 +1,15 @@
 import argparse
 import importlib
 import pkgutil
-import subprocess
+import pytest
+import requests
+import semver
 import sys
 from enum import Enum
 from typing import Set
 
-import pytest
-import requests
-import semver
-
-from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.docker_manager import DockerManager
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
@@ -274,9 +272,7 @@ def rollback_test(
                     f"Starting Marqo from_version: {from_version} container again, "
                     f"by transferring state from to_version, which was {to_version}")
         # TODO: Check from_version_volume for the case where the two versions are before and after 2.9 since we create a new volume in that case.
-        prepare_volume_for_rollback(target_version=from_version, source_volume=from_version_volume, source="docker")
-        docker_manager.start_marqo_container_by_transferring_state(target_version=from_version, source_version=to_version,
-                                                    source_volume=from_version_volume, source="docker")
+        docker_manager.start_marqo_container(from_version)
 
         # Step 7: Run test mode
         logger.info(f"Step 7: Running tests in test mode on from_version: {from_version}")
@@ -312,33 +308,6 @@ def rollback_test(
         logger.debug("Cleaning up containers and volumes")
         docker_manager.cleanup_containers()
         docker_manager.cleanup_volumes()
-
-def prepare_volume_for_rollback(target_version: str, source_volume: str, target_version_image_name: str = None,
-                                source="docker"):
-    """
-    This method is used to run a command that adjusts the permissions of files or directories inside a Docker volume,
-    making them accessible to a specific user (vespa) and group (vespa) that the container expects to interact with.
-    """
-    logger.info(f"Preparing volume for rollback with target_version: {target_version}, source_volume: {source_volume}, target_version_image_name: {target_version_image_name}, source: {source}")
-    if source == "docker": # In case the source is docker, we will directly pull the image using version (ex: marqoai/marqo:2.13.0)
-        image_name = f"marqoai/marqo:{target_version}"
-    else:
-        image_name = target_version_image_name
-
-    cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{source_volume}:/opt/vespa/var",
-        "--entrypoint", "/bin/sh",  # Override entrypoint with a shell
-        image_name,
-        "-c", "chown -R vespa:vespa /opt/vespa/var"
-    ]
-
-    logger.info(f"Running this command: {' '.join(cmd)} to prepare volume for rollback using from_version: {target_version}")
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"Failed to run command: {' '.join(cmd)} when preparing volume for rollback: {e}") from e
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Marqo Testing Runner")
