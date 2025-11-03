@@ -80,8 +80,14 @@ class MarqoTestCase(unittest.TestCase):
         # E.g., add it into the `tearDown` function to remove models between test cases.
         loaded_models :list[dict] = requests.get(f"{cls._MARQO_URL}/models").json()["models"]
         for model in loaded_models:
-            model_name = model["modelName"]
-            try:
-                _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model_name}")
-            except requests.exceptions.HTTPError as e:
-                pass
+            if "model_name" in model:
+                try:
+                    _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model['model_name']}&device={model['model_device']}")
+                except requests.exceptions.HTTPError as e:
+                    pass
+            # We remove the device concept in 2.25.0
+            if "modelName" in model:
+                try:
+                    _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model['modelName']}")
+                except requests.exceptions.HTTPError as e:
+                    pass
