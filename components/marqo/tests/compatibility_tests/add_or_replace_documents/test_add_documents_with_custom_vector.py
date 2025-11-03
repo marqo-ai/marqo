@@ -12,7 +12,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
         {
             "indexName": structured_index_name,
             "type": "structured",
-            "model": "ViT-B/32",
+            "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
             "allFields": [{"name": "my_custom_vector", "type": "custom_vector"}],
             "tensorFields": ["my_custom_vector"],
             "annParameters": {
@@ -23,7 +23,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
         {
             "indexName": unstructured_index_name,
             "treatUrlsAndPointersAsImages": True,
-            "model": "ViT-B/32",
+            "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
             "annParameters": {
                 "spaceType": "angular",
                 "parameters": {"efConstruction": 512, "m": 16},
