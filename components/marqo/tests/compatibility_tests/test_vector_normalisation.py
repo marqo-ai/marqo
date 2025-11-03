@@ -17,7 +17,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                 "indexName": text_index_with_normalize_embeddings_true,
                 "type": "structured",
                 "normalizeEmbeddings": True,
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "hf/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "content", "type": "text"},

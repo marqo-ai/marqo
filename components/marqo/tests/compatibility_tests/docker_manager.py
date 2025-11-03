@@ -28,7 +28,7 @@ class DockerManager:
         self.docker_client = docker.from_env()
         self.logger = get_logger(__name__)
         self.marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
-        self.compose_file = None
+        self.compose_file_dict = dict()
 
     def get_volume_name_from_marqo_version(self, version: str) -> str:
         """
@@ -209,7 +209,7 @@ class DockerManager:
             yaml.dump(compose_content, fp)
             fp.flush()
             self.logger.info(f"Marqo backwards compatibility test using compose file: {compose_content}")
-            self.compose_file= Path(fp.name).absolute()
+            self.compose_file_dict[version] = Path(fp.name).absolute()
 
             subprocess.run(
                 [
@@ -218,7 +218,7 @@ class DockerManager:
                     "--profile",
                     "cpu",
                     "-f",
-                    str(self.compose_file),
+                    str(self.compose_file_dict[version]),
                     "up",
                     "-d",
                     "--force-recreate",
@@ -348,7 +348,7 @@ class DockerManager:
                     "--profile",
                     "cpu",
                     "-f",
-                    str(self.compose_file),
+                    str(self.compose_file_dict[version]),
                     "down",
                 ],
                 check=True,
