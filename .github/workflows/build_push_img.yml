@@ -133,9 +133,13 @@ jobs:
         run: |
           if [[ "${{ env.PUSH_TO }}" == "OS-ECR" ]]; then
             echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ env.PUSH_TO }}" == "AMI-ECR" ]]; then
+            echo "registry=975050213659.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
           else
-            echo "registry=marqoai" >> $GITHUB_OUTPUT
+            echo "Error: Unknown PUSH_TO value '${{ env.PUSH_TO }}'. Must be 'OS-ECR' or 'AMI-ECR'." >&2
+            exit 1
           fi
+
 
       - name: Build and push api image
         id: build-and-push-api
