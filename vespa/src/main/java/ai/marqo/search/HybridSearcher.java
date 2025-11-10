@@ -994,6 +994,34 @@ public class HybridSearcher extends Searcher {
             resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
         } else {
             logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
+            // No global score modifiers, but we still need to apply recency multiplier if present
+            for (Hit hit : resultToRerank.asList()) {
+                FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
+                if (matchFeatures != null) {
+                    Object recencyMultiplierObj = matchFeatures.getTensor("recency_multiplier");
+                    if (recencyMultiplierObj != null) {
+                        try {
+                            double recencyMultiplier = ((Tensor) recencyMultiplierObj).asDouble();
+                            double originalScore = hit.getRelevance().getScore();
+                            double modifiedScore = originalScore * recencyMultiplier;
+                            hit.setRelevance(modifiedScore);
+                            logIfVerbose(
+                                    String.format(
+                                            "Applied recency multiplier %.4f to score %.4f -> %.4f"
+                                                    + " for hit %s",
+                                            recencyMultiplier,
+                                            originalScore,
+                                            modifiedScore,
+                                            hit.getId()),
+                                    verbose);
+                        } catch (Exception e) {
+                            logIfVerbose(
+                                    "Failed to apply recency multiplier: " + e.getMessage(),
+                                    verbose);
+                        }
+                    }
+                }
+            }
         }
 
         logIfVerbose("Rescored result list (UNSORTED): ", verbose);
@@ -1409,14 +1437,32 @@ public class HybridSearcher extends Searcher {
                 add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
 
                 if (mult_modifier != null && add_modifier != null) {
+                    // Extract recency multiplier (default to 1.0 if not present)
+                    double recencyMultiplier = 1.0;
+                    Object recencyMultiplierObj = hitMatchFeatures.getTensor("recency_multiplier");
+                    if (recencyMultiplierObj != null) {
+                        try {
+                            recencyMultiplier = ((Tensor) recencyMultiplierObj).asDouble();
+                        } catch (Exception e) {
+                            logIfVerbose(
+                                    "Failed to extract recency_multiplier: " + e.getMessage(),
+                                    verbose);
+                        }
+                    }
+
                     // Apply the modifiers to the hit's relevance
                     original_score = hit.getRelevance().getScore();
-                    modified_score = original_score * mult_modifier + add_modifier;
+                    modified_score =
+                            original_score * mult_modifier * recencyMultiplier + add_modifier;
                     logIfVerbose(
                             String.format(
-                                    "Original score: %.7f, mult modifier: %.5f, add modifier: %.5f,"
-                                            + " Modified score: %.7f",
-                                    original_score, mult_modifier, add_modifier, modified_score),
+                                    "Original score: %.7f, mult modifier: %.5f, recency multiplier:"
+                                            + " %.5f, add modifier: %.5f, Modified score: %.7f",
+                                    original_score,
+                                    mult_modifier,
+                                    recencyMultiplier,
+                                    add_modifier,
+                                    modified_score),
                             verbose);
                     hit.setRelevance(modified_score);
                 } else {

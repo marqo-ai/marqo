@@ -381,6 +381,16 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
+    def _validate_sort_by_cannot_be_used_with_recency(cls, values):
+        """Validate that sortBy cannot be used with recencyParameters"""
+        sort_by = values.get('sort_by')
+        recency_parameters = values.get('recencyParameters')
+        if sort_by is not None and recency_parameters is not None:
+            raise ValueError("'sortBy' cannot be used with 'recencyParameters' in hybrid search. "
+                             "sortBy bypasses relevance scoring, making recency boosting ineffective.")
+        return values
+
+    @root_validator(pre=False)
     def _validate_context_documents_not_supported_for_lexical_search(cls, values):
         """Validate that context.documents is not supported for lexical search"""
         search_method = values.get('searchMethod')
