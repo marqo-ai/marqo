@@ -90,6 +90,8 @@ jobs:
       api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
       inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
       model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
+    environment:
+      name: ${{ (inputs.image_namespace || github.event.inputs.image_namespace) == 'marqoai' && 'production' || 'non-prod' }}
 
     steps:
       - name: Set input variables
@@ -139,7 +141,6 @@ jobs:
             echo "Error: Unknown PUSH_TO value '${{ env.PUSH_TO }}'. Must be 'OS-ECR' or 'AMI-ECR'." >&2
             exit 1
           fi
-
 
       - name: Build and push api image
         id: build-and-push-api
