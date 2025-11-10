@@ -124,7 +124,7 @@ jobs:
         uses: docker/login-action@v2
         if: env.PUSH_TO == 'AMI-ECR'
         with:
-          registry: public.ecr.aws/marqoai
+          registry: 975050213659.dkr.ecr.us-east-1.amazonaws.com
           username: ${{ secrets.AMI_ECR_PUSHER_AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AMI_ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
 
