@@ -18,7 +18,7 @@ on:
         type: string
         default: OS-ECR
       image_namespace:
-        description: 'The namespace of the repo, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
+        description: 'The namespace of the repo, by default "marqoai-dev". We will push 3 images: {ECR}/{name_space}/api, {ECR}/{name_space}/inference-orchestrator, {ECR}/{name_space}/model-management'
         required: true
         type: string
         default: 'marqoai-dev'
