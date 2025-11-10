@@ -1,17 +1,15 @@
 import argparse
 import importlib
 import pkgutil
-import subprocess
+import pytest
+import requests
+import semver
 import sys
 from enum import Enum
 from typing import Set
 
-import pytest
-import requests
-import semver
-
-from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 from tests.compatibility_tests.docker_manager import DockerManager
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
@@ -55,7 +53,7 @@ def load_all_subclasses(package_name):
             _imported_modules.add(name)
             logger.debug(f"Imported module with name {name}")
         except ImportError as e:
-            logger.error(f"Could not import module with {name}")
+            logger.error(f"Could not import module with {name}. Original error: {e}", exc_info=True)
 
 def run_prepare_mode(version_to_test_against: str):
     logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
@@ -63,6 +61,7 @@ def run_prepare_mode(version_to_test_against: str):
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
     errors = []
 
+    collected_classes = []
     # Skip any tests that have already been prepared
     seen_classes = set()
     for test_class in BaseCompatibilityTestCase.__subclasses__():
@@ -115,6 +114,7 @@ def run_prepare_mode(version_to_test_against: str):
                 test_class.setUpClass() #setUpClass will be used to create Marqo client
                 test_instance = test_class()
                 test_instance.prepare() #Prepare method will be used to create index and add documents
+                collected_classes.append(test_instance)
             else: # Skip the test if the version_to_test_against is greater than the version the test is marked
                 logger.info(f"Skipping testcase {test_class.__name__} as {marqo_version} > {version_to_test_against}")
         except Exception as e:
@@ -125,7 +125,7 @@ def run_prepare_mode(version_to_test_against: str):
     if errors:
         raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
-def construct_pytest_arguments(version_to_test_against):
+def construct_pytest_arguments(version_to_test_against) -> list[str]:
     pytest_args = [
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
@@ -151,20 +151,25 @@ def trigger_rollback_endpoint():
     if response.status_code == 200:
         logger.info("Rollback endpoint triggered successfully")
 
-def backwards_compatibility_test(from_version: str, to_version: str, to_version_image: str):
+def backwards_compatibility_test(
+        from_version: str, to_version: str, to_api_image: str, to_inference_orchestrator_image: str,
+        to_model_management_image: str
+    ):
     """
     Perform a backwards compatibility test between two versions of Marqo.
 
     This function starts a container with the from_version, runs tests in prepare mode, stops the container,
     starts a container with the to_version by transferring state from from_version container, and runs tests in test mode.
 
+    Since 2.25.0, Marqo uses separate images for API, Inference Orchestrator, and Model Management.
+    Therefore, this function accepts separate image identifiers for each component to ensure compatibility during the upgrade process
+
     Args:
         from_version (str): The source version of the Marqo container.
         to_version (str): The target version of the Marqo container.
-        to_version_image (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
-                                (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
-                                or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
-                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
+        to_api_image (str): The target API version of the Marqo container.
+        to_inference_orchestrator_image (str): The target Inference Orchestrator version of the Marqo container.
+        to_model_management_image (str): The target Model Management version of the Marqo container.
 
     Raises:
         ValueError: If the major versions of from_version and to_version are incompatible.
@@ -173,13 +178,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
     try:
         load_all_subclasses("tests.compatibility_tests")
         # Step 1: Start from_version container and run tests in prepare mode
-        logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
-
-        # Generate a volume name to be used with the "from_version" Marqo container for state transfer.
-        from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
+        logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}")
 
         #Start from_version container
-        docker_manager.start_marqo_container(from_version, from_version_volume)
+        docker_manager.start_marqo_container(from_version)
         logger.info(f"Started Marqo container {from_version}")
 
         try:
@@ -191,8 +193,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
 
         # Step 3: Start to_version container by transferring state
         logger.debug(f"Starting Marqo to_version: {to_version} container by transferring state from version {from_version} to {to_version}")
-        docker_manager.start_marqo_container_by_transferring_state(to_version, from_version, from_version_volume,
-                                                    to_version_image, "ECR")
+
+        docker_manager.start_marqo_container(
+            to_version, to_api_image, to_inference_orchestrator_image, to_model_management_image
+        )
 
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
@@ -208,7 +212,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         except Exception as e:
             raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
     except Exception as e:
-        raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}") from e
+        raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}") from e
     finally:
         # Stop the to_version container (but don't remove it yet)
         logger.info(f"Stopping Marqo to_version ({to_version}) container " + str(to_version))
@@ -217,7 +221,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         docker_manager.cleanup_containers()
         docker_manager.cleanup_volumes()
 
-def rollback_test(to_version: str, from_version: str, to_version_image: str):
+def rollback_test(
+        from_version: str, to_version: str, to_api_image: str, to_inference_orchestrator_image: str,
+        to_model_management_image: str
+    ):
     """
     Perform a rollback test between two versions of Marqo.
     This function first runs test cases in prepare mode on from_version Marqo container, then upgrades it to to_version Marqo container,
@@ -227,17 +234,17 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
     Args:
         to_version (str): The target version of the Marqo container.
         from_version (str): The source version of the Marqo container.
-        to_version_image (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
+        to_api_image (str): The target API version of the Marqo container.
+        to_inference_orchestrator_image (str): The target Inference Orchestrator version of the Marqo container.
+        to_model_management_image (str): The target Model Management version of
+        the Marqo container
     """
-    logger.info(f"Starting Marqo rollback tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
+    logger.info(f"Starting Marqo rollback tests with from_version: {from_version}, to_version: {to_version}")
     try:
         load_all_subclasses("tests.compatibility_tests")
-        # Step 0: Generate a volume name to be used with the "from_version" Marqo container for state transfer.
-        from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
-        logger.info(f"Generated volume name: {from_version_volume} for from_version: {from_version}")
 
         # Step 1: Start a Marqo container using from_version
-        docker_manager.start_marqo_container(from_version, from_version_volume)
+        docker_manager.start_marqo_container(from_version)
         logger.info(f"Step 1: Started Marqo container {from_version}")
 
         # Step 2: Run prepare mode
@@ -251,8 +258,9 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         # Step 4: Upgrade to to_version container by transferring state
         logger.info(f"Step 4: Starting Marqo to_version: {to_version} container by transferring state from version: "
                     f"{from_version} to version: {to_version}")
-        docker_manager.start_marqo_container_by_transferring_state(to_version, from_version, from_version_volume,
-                                                    to_version_image, "ECR")
+        docker_manager.start_marqo_container(
+            to_version, to_api_image, to_inference_orchestrator_image, to_model_management_image
+        )
 
         #Step 5: Stop Marqo container from Step #4
         logger.info("Step 5: Stopping Marqo container from Step #4")
@@ -264,9 +272,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
                     f"Starting Marqo from_version: {from_version} container again, "
                     f"by transferring state from to_version, which was {to_version}")
         # TODO: Check from_version_volume for the case where the two versions are before and after 2.9 since we create a new volume in that case.
-        prepare_volume_for_rollback(target_version=from_version, source_volume=from_version_volume, source="docker")
-        docker_manager.start_marqo_container_by_transferring_state(target_version=from_version, source_version=to_version,
-                                                    source_volume=from_version_volume, source="docker")
+        docker_manager.start_marqo_container(from_version)
 
         # Step 7: Run test mode
         logger.info(f"Step 7: Running tests in test mode on from_version: {from_version}")
@@ -303,39 +309,14 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         docker_manager.cleanup_containers()
         docker_manager.cleanup_volumes()
 
-def prepare_volume_for_rollback(target_version: str, source_volume: str, target_version_image_name: str = None,
-                                source="docker"):
-    """
-    This method is used to run a command that adjusts the permissions of files or directories inside a Docker volume,
-    making them accessible to a specific user (vespa) and group (vespa) that the container expects to interact with.
-    """
-    logger.info(f"Preparing volume for rollback with target_version: {target_version}, source_volume: {source_volume}, target_version_image_name: {target_version_image_name}, source: {source}")
-    if source == "docker": # In case the source is docker, we will directly pull the image using version (ex: marqoai/marqo:2.13.0)
-        image_name = f"marqoai/marqo:{target_version}"
-    else:
-        image_name = target_version_image_name
-
-    cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{source_volume}:/opt/vespa/var",
-        "--entrypoint", "/bin/sh",  # Override entrypoint with a shell
-        image_name,
-        "-c", "chown -R vespa:vespa /opt/vespa/var"
-    ]
-
-    logger.info(f"Running this command: {' '.join(cmd)} to prepare volume for rollback using from_version: {target_version}")
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"Failed to run command: {' '.join(cmd)} when preparing volume for rollback: {e}") from e
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Marqo Testing Runner")
     parser.add_argument("--mode", choices=["backwards_compatibility", "rollback"], required=True)
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
-    parser.add_argument("--to_image", required=True)
+    parser.add_argument("--to_api_image", required=True)
+    parser.add_argument("--to_inference_orchestrator_image", required=True)
+    parser.add_argument("--to_model_management_image", required=True)
     args = parser.parse_args()
     try:
         from_version = semver.VersionInfo.parse(args.from_version)
@@ -361,9 +342,15 @@ if __name__ == "__main__":
 
     try:
         if args.mode == "backwards_compatibility":
-            backwards_compatibility_test(args.from_version, args.to_version, args.to_image)
+            backwards_compatibility_test(
+                args.from_version, args.to_version, args.to_api_image,
+                args.to_inference_orchestrator_image, args.to_model_management_image
+            )
         elif args.mode == "rollback":
-            rollback_test(args.to_version, args.from_version, args.to_image)
+            rollback_test(
+                args.from_version, args.to_version, args.to_api_image,
+                args.to_inference_orchestrator_image, args.to_model_management_image
+            )
 
     except Exception as e:
         logger.exception(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting", exc_info=True)

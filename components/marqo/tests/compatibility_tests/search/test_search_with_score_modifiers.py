@@ -178,7 +178,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                     "add_to_score": [{"field_name": "double_score_mods", "weight": 2}],
                     }
                 )
-                self.assertEqual(stored_results[index_name]["double_score_mods"].get("hits"), result.get("hits"))
+                self._compare_search_results(stored_results[index_name]["double_score_mods"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -204,7 +204,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "long_score_mods", "weight": 2}],
                     }
                 )
-                self.assertEqual(stored_results[index_name]["long_score_mods"].get("hits"), result.get("hits"))
+                self._compare_search_results(stored_results[index_name]["long_score_mods"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -230,7 +230,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "rating", "weight": 2}],
                     }
                 )
-                self.assertEqual(stored_results[index_name]["rating"].get("hits"), result.get("hits"))
+                self._compare_search_results(stored_results[index_name]["rating"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -256,7 +256,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "popularity", "weight": 2}],
                     }
                 )
-                self.assertEqual(stored_results[index_name]["popularity"].get("hits"), result.get("hits"))
+                self._compare_search_results(stored_results[index_name]["popularity"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 

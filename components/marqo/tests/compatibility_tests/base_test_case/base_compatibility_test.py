@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 from abc import abstractmethod, ABC
@@ -72,6 +73,32 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         """Set the logging level for this class's logger"""
         log_level = getattr(logging, level.upper(), None)
         if log_level is None:
-            raise ValueError(f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
+            raise ValueError(
+                f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
         cls.logger.setLevel(log_level)
         cls.logger.info(f"Logging level changed to {level.upper()}")
+
+    def _compare_search_results(self, expected_result, actual_result):
+        """Compare two search results and assert if they match."""
+        score_fields = ["_score", "_lexical_score", "_tensor_score"]
+        try:
+            expected_hits = copy.deepcopy(expected_result["hits"])
+            actual_hits = copy.deepcopy(actual_result["hits"])
+        except KeyError as e:
+            raise KeyError(
+                f"One of the results is missing 'hits' key. Error: {e}. "
+                f"Expected result: {expected_result}, Actual result: {actual_result}"
+            )
+
+        for index, expected_hit in enumerate(expected_hits):
+            actual_hit = actual_hits[index]
+            for field in score_fields:
+                if field in expected_hit and field in actual_hit:
+                    self.assertAlmostEqual(
+                        expected_hit[field], actual_hit[field], places=5,
+                        msg=f"Score fields do not match for hit. Expected: {expected_hit}, Got: {actual_hit}"
+                    )
+                    expected_hit.pop(field)
+                    actual_hit.pop(field)
+            self.assertEqual(expected_hit, actual_hit,
+                             f"Hit results do not match. Expected: {expected_hit}, Got: {actual_hit}")

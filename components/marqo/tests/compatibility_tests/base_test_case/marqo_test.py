@@ -73,19 +73,21 @@ class MarqoTestCase(unittest.TestCase):
             except requests.exceptions.HTTPError as e:
                 raise MarqoWebError(e)
 
-
     @classmethod
     def removeAllModels(cls) -> None:
         # A function that can be called to remove loaded models in Marqo.
         # Use it whenever you think there is a risk of OOM problem.
         # E.g., add it into the `tearDown` function to remove models between test cases.
-        client = Client(**cls.client_settings)
-        index_names_list: List[str] = [item["indexName"] for item in client.get_indexes()["results"]]
-        for index_name in index_names_list:
-            loaded_models = client.index(index_name).get_loaded_models().get("models", [])
-            for model in loaded_models:
+        loaded_models :list[dict] = requests.get(f"{cls._MARQO_URL}/models").json()["models"]
+        for model in loaded_models:
+            if "model_name" in model:
                 try:
-                    client.index(index_name).eject_model(model_name=model["model_name"], model_device=model["model_device"])
-                except MarqoWebError:
+                    _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model['model_name']}&device={model['model_device']}")
+                except requests.exceptions.HTTPError as e:
                     pass
-
+            # We remove the device concept in 2.25.0
+            if "modelName" in model:
+                try:
+                    _ = requests.delete(f"{cls._MARQO_URL}/models?model_name={model['modelName']}")
+                except requests.exceptions.HTTPError as e:
+                    pass

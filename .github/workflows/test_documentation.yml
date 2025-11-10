@@ -43,4 +43,4 @@ jobs:
 
       - name: Run Documentation Tests
         run: |
-          uv run tests/integ_tests/test_documentation.py
+          uv run pytest tests/integ_tests/test_documentation.py

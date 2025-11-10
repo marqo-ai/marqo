@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: marqo-api-container:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/api:latest
     build: ./components/marqo
     stdin_open: true
     tty: true
@@ -63,7 +63,7 @@ services:
       MARQO_ENABLE_OPS_API: "TRUE"
       MARQO_API_INFERENCE_CACHE_SIZE: "0"
       MARQO_LOG_FORMAT: "plain"
-      MARQO_LOG_LEVEL: "debug"
+      MARQO_LOG_LEVEL: "info"
       MARQO_MAX_CPU_MODEL_MEMORY: "10"
       MARQO_MAX_CUDA_MODEL_MEMORY: "10"
       MARQO_MODELS_TO_PRELOAD: "[]"
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   mmc:
-    image: marqo-model-management-container:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/model-management:latest
     build: ./components/model_management
     stdin_open: true
     tty: true
@@ -99,7 +99,7 @@ services:
     restart: unless-stopped
 
   mioc:
-    image: marqo-inference-orchestrator-container:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/inference-orchestrator:latest
     build: ./components/inference_orchestrator
     stdin_open: true
     tty: true

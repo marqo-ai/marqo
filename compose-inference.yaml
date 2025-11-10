@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
   mmc:
-    image: marqo-model-management-container:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/model-management:latest
     build: ./components/model_management
     stdin_open: true
     tty: true
@@ -72,7 +72,7 @@ services:
     restart: unless-stopped
 
   mioc:
-    image: marqo-inference-orchestrator-container:latest
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/inference-orchestrator:latest
     build: ./components/inference_orchestrator
     stdin_open: true
     tty: true
