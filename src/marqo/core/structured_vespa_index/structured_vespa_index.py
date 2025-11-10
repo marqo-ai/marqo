@@ -569,6 +569,11 @@ class StructuredVespaIndex(VespaIndex):
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
+        # Add recency parameters
+        recency_params = self._get_recency_parameters(marqo_query)
+        if recency_params:
+            query_inputs.update(recency_params)
+
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
 
@@ -602,7 +607,9 @@ class StructuredVespaIndex(VespaIndex):
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
-            'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
+            'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
+
+            'marqo__recency_enabled': recency_params is not None,
         }
 
         query = {k: v for k, v in query.items() if v is not None}

@@ -49,7 +49,8 @@ class HybridSearch:
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
-            collapse_field_name: Optional[str] = None
+            collapse_field_name: Optional[str] = None,
+            recency_parameters=None
     ) -> Dict:
         """
 
@@ -294,7 +295,8 @@ class HybridSearch:
             language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
-            collapse_field_name=collapse_field_name
+            collapse_field_name=collapse_field_name,
+            recency_parameters=recency_parameters
         )
 
         vespa_index = vespa_index_factory(marqo_index)

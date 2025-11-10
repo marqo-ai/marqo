@@ -17,6 +17,7 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
@@ -73,6 +74,7 @@ class SearchQuery(BaseMarqoModel):
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
     collapse_fields: Optional[List[SearchCollapseField]] = Field(default=None, alias="collapseFields")
+    recencyParameters: Optional[RecencyParameters] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -200,6 +202,16 @@ class SearchQuery(BaseMarqoModel):
         search_method = values.get('searchMethod')
         if facets is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"Facets can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_recency_parameters_only_for_hybrid_search(cls, values):
+        """Validate that recency parameters are only provided for hybrid search"""
+        recency_parameters = values.get('recencyParameters')
+        search_method = values.get('searchMethod')
+        if recency_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"Recency parameters can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
         return values
 

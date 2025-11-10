@@ -213,6 +213,35 @@ class VespaIndex(ABC):
 
         return result
 
+    def _get_recency_parameters(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Any]]:
+        """
+        Convert RecencyParameters to Vespa query inputs.
+
+        Returns a dictionary with query inputs for recency scoring, or None if no recency parameters.
+        """
+        if not marqo_query.recency_parameters:
+            return None
+
+        recency_params = marqo_query.recency_parameters
+
+        # Map decay function to numeric value for Vespa
+        decay_function_map = {
+            "exponential": 0.0,
+            "linear": 1.0,
+            "gaussian": 2.0
+        }
+
+        # Convert decay_in_days to seconds for Vespa
+        decay_factor_seconds = recency_params.decay_in_days * 24 * 60 * 60
+
+        return {
+            constants.QUERY_INPUT_RECENCY_ENABLED: 1.0,
+            constants.QUERY_INPUT_RECENCY_DECAY_FACTOR: decay_factor_seconds,
+            constants.QUERY_INPUT_RECENCY_MIN_FACTOR: recency_params.min_factor,
+            constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION: decay_function_map[recency_params.decay_function]
+        }
+
     def _get_rerank_depth_and_additional_hits_from_query(query: Union[MarqoTensorQuery, MarqoHybridQuery]) -> Tuple[int, int]:
         if query.ef_search is not None:
             base_rerank_depth = min(query.limit + query.offset, query.ef_search)

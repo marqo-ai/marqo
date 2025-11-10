@@ -43,6 +43,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=common.VESPA_DOC_MATCH_FEATURES)
     raw_tensor_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE)
     raw_lexical_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE)
+    recency_multiplier: Optional[float] = Field(default=None, alias=common.VESPA_DOC_RECENCY_MULTIPLIER)
 
     @field_validator('int_fields', 'float_fields')
     def check_numeric_fields(cls, v):
@@ -400,6 +401,10 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             marqo_document[index_constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = self.fixed_fields.raw_tensor_score
         if self.fixed_fields.raw_lexical_score is not None:
             marqo_document[index_constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = self.fixed_fields.raw_lexical_score
+
+        # Recency multiplier from Vespa field (set by Java HybridSearcher)
+        if self.fixed_fields.recency_multiplier is not None:
+            marqo_document[index_constants.MARQO_DOC_RECENCY_MULTIPLIER] = self.fixed_fields.recency_multiplier
 
         return marqo_document
 

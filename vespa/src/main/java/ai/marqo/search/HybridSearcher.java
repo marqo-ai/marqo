@@ -52,6 +52,7 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
+    private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
@@ -333,6 +334,10 @@ public class HybridSearcher extends Searcher {
         if (!futureFacets.isEmpty()) {
             attachFacetsResult(futureFacets, timeout, processedHits, verbose);
         }
+
+        // Extract recency multiplier from match features after post-processing (only if recency is
+        // enabled)
+        processedHits = extractRecencyMultiplier(processedHits, query, verbose);
 
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
@@ -619,7 +624,9 @@ public class HybridSearcher extends Searcher {
          */
         HitGroup result = new HitGroup();
         result.addAll(combined);
+
         result.trim(offset, limit);
+
         return result;
     }
 
@@ -1281,6 +1288,22 @@ public class HybridSearcher extends Searcher {
             cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
         }
 
+        // Extract and set recency timestamp key tensor cells
+        String recencyTimestampKeyFeature = addQueryWrapper(QUERY_INPUT_RECENCY_TIMESTAMP_KEY);
+        logIfVerbose(
+                "Attempting to extract recency tensor: " + recencyTimestampKeyFeature, verbose);
+        Tensor recencyTimestampKey = extractTensorRankFeature(query, recencyTimestampKeyFeature);
+        if (recencyTimestampKey != null) {
+            logIfVerbose(
+                    "Successfully extracted recency timestamp key tensor: " + recencyTimestampKey,
+                    verbose);
+            Iterator<Cell> recencyCells = recencyTimestampKey.cellIterator();
+            recencyCells.forEachRemaining(
+                    (cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
+        } else {
+            logIfVerbose("Recency timestamp key tensor is null - not present in query", verbose);
+        }
+
         // Set rank profile (using RANKING method)
         queryNew.getRanking().setProfile(rankProfileNew);
 
@@ -1337,7 +1360,6 @@ public class HybridSearcher extends Searcher {
      */
     Tensor extractTensorRankFeature(Query query, String featureName) {
         Optional<Tensor> optionalTensor = query.getRanking().getFeatures().getTensor(featureName);
-        Tensor resultTensor;
         return optionalTensor.orElse(null);
     }
 
@@ -1411,6 +1433,52 @@ public class HybridSearcher extends Searcher {
                                 + " is missing matchfeatures.");
             }
         }
+        return hits;
+    }
+
+    /**
+     * Extracts recency multiplier from match features and sets it as a field on each hit.
+     * This runs independently of global score modifiers, but only when recency is enabled.
+     *
+     * @param hits The hits to process
+     * @param query The query to check if recency is enabled
+     * @param verbose Whether to log verbose messages
+     * @return The processed hits with recency_multiplier field set
+     */
+    HitGroup extractRecencyMultiplier(HitGroup hits, Query query, boolean verbose) {
+        // Check if recency is enabled
+        boolean recencyEnabled = query.properties().getBoolean("marqo__recency_enabled");
+        if (!recencyEnabled) {
+            logIfVerbose(
+                    "Recency is not enabled. Skipping recency multiplier extraction.", verbose);
+            return hits;
+        }
+
+        if (hits.size() == 0) {
+            logIfVerbose("No hits to extract recency multiplier from. Returning.", verbose);
+            return hits;
+        }
+
+        logIfVerbose(
+                "Recency is enabled. Extracting recency multiplier from match features.", verbose);
+
+        for (Hit hit : hits) {
+            // Extract match features
+            FeatureData hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
+            if (hitMatchFeatures != null) {
+                // Extract recency multiplier if present and set as field
+                Double recency_multiplier = hitMatchFeatures.getDouble("recency_multiplier");
+                if (recency_multiplier != null) {
+                    hit.setField("marqo__recency_multiplier", recency_multiplier);
+                    logIfVerbose(
+                            String.format(
+                                    "Extracted recency multiplier for hit %s: %.5f",
+                                    hit.getId(), recency_multiplier),
+                            verbose);
+                }
+            }
+        }
+
         return hits;
     }
 
