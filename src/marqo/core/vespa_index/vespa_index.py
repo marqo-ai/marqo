@@ -228,7 +228,8 @@ class VespaIndex(ABC):
         decay_function_map = {
             "exponential": 0.0,
             "linear": 1.0,
-            "gaussian": 2.0
+            "gaussian": 2.0,
+            "binary": 3.0
         }
 
         # Convert decay_in_days to seconds for Vespa
