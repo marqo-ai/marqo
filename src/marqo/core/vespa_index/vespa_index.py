@@ -226,21 +226,21 @@ class VespaIndex(ABC):
 
         # Map decay function to numeric value for Vespa
         decay_function_map = {
-            "exponential": 0.0,
-            "linear": 1.0,
-            "gaussian": 2.0,
-            "binary": 3.0
+            "exponential": 0,
+            "linear": 1,
+            "gaussian": 2,
+            "binary": 3
         }
 
         # Convert decay_in_days to seconds for Vespa
         decay_factor_seconds = recency_params.decay_in_days * 24 * 60 * 60
 
         return {
-            constants.QUERY_INPUT_RECENCY_ENABLED: 1.0,
+            constants.QUERY_INPUT_RECENCY_ENABLED: 1,
             constants.QUERY_INPUT_RECENCY_DECAY_FACTOR: decay_factor_seconds,
             constants.QUERY_INPUT_RECENCY_MIN_FACTOR: recency_params.min_factor,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
-            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION: decay_function_map[recency_params.decay_function]
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: decay_function_map[recency_params.decay_function]
         }
 
     def _get_rerank_depth_and_additional_hits_from_query(query: Union[MarqoTensorQuery, MarqoHybridQuery]) -> Tuple[int, int]:
