@@ -154,7 +154,8 @@ schema {{ index.schema_name }} {
             query(marqo__sort_field_weights_1) tensor<double>(p{})
             query(marqo__sort_field_weights_2) tensor<double>(p{})
 
-            query(marqo__recency_enabled) int: 0
+            query(marqo__recency_should_calculate_score) int: 0
+            query(marqo__recency_should_apply_score) int: 0
             query(marqo__recency_decay_factor) double: 604800.0
             query(marqo__recency_min_factor) double: 0.1
             query(marqo__recency_timestamp_key) tensor<double>(p{})
@@ -190,7 +191,7 @@ schema {{ index.schema_name }} {
             expression: if(age_in_seconds() < query(marqo__recency_decay_factor), 1.0, query(marqo__recency_min_factor))
         }
 
-        function recency_score() {
+        function recency_score_router() {
             expression {
                 if (query(marqo__recency_decay_function_type) == 0,
                     recency_score_exponential(),
@@ -202,8 +203,12 @@ schema {{ index.schema_name }} {
             }
         }
 
+        function recency_score() {
+            expression: if(query(marqo__recency_should_calculate_score) != 0, recency_score_router(), 1.0)
+        }
+
         function recency_multiplier() {
-            expression: if(query(marqo__recency_enabled) != 0, recency_score(), 1.0)
+            expression: if(query(marqo__recency_should_apply_score) != 0, recency_score(), 1.0)
         }
 
         function mult_modifier(mult_weights) {
@@ -300,7 +305,7 @@ schema {{ index.schema_name }} {
             sort_field_value_0
             sort_field_value_1
             sort_field_value_2
-            recency_multiplier
+            recency_score
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
     }
@@ -368,7 +373,9 @@ schema {{ index.schema_name }} {
             query(marqo__sort_field_weights_0) tensor<double>(p{})
             query(marqo__sort_field_weights_1) tensor<double>(p{})
             query(marqo__sort_field_weights_2) tensor<double>(p{})
-            query(marqo__recency_enabled) int: 0
+
+            query(marqo__recency_should_calculate_score) int: 0
+            query(marqo__recency_should_apply_score) int: 0
             query(marqo__recency_decay_factor) double: 604800.0
             query(marqo__recency_min_factor) double: 0.1
             query(marqo__recency_timestamp_key) tensor<double>(p{})

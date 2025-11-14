@@ -17,7 +17,7 @@ MARQO_SEARCH_METHOD_LEXICAL = 'lexical'
 # For hybrid search
 MARQO_DOC_HYBRID_TENSOR_SCORE = '_tensor_score'
 MARQO_DOC_HYBRID_LEXICAL_SCORE = '_lexical_score'
-MARQO_DOC_RECENCY_MULTIPLIER = '_recency_multiplier'
+MARQO_DOC_RECENCY_MULTIPLIER = '_recency_score'
 
 MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.10.0')
 MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.11.0')
@@ -44,7 +44,9 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL = 'marqo__add_weights_global'
 MARQO_GLOBAL_SCORE_MODIFIERS = 'global'
 
 # For recency scoring
-QUERY_INPUT_RECENCY_ENABLED = 'marqo__recency_enabled'
+QUERY_INPUT_RECENCY_MODE = 'marqo__recency_mode'
+QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE = 'marqo__recency_should_calculate_score'
+QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE = 'marqo__recency_should_apply_score'
 QUERY_INPUT_RECENCY_DECAY_FACTOR = 'marqo__recency_decay_factor'
 QUERY_INPUT_RECENCY_MIN_FACTOR = 'marqo__recency_min_factor'
 QUERY_INPUT_RECENCY_TIMESTAMP_KEY = 'marqo__recency_timestamp_key'

@@ -53,6 +53,7 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
+    private static String QUERY_INPUT_RECENCY_MODE = "marqo__recency_mode";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
@@ -991,36 +992,42 @@ public class HybridSearcher extends Searcher {
         if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
                 || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
-            resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
+            resultToRerank = applyGlobalScoreModifiers(resultToRerank, query, verbose);
         } else {
             logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
             // No global score modifiers, but we still need to apply recency multiplier if present
-            for (Hit hit : resultToRerank.asList()) {
-                FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
-                if (matchFeatures != null) {
-                    Object recencyMultiplierObj = matchFeatures.getTensor("recency_multiplier");
-                    if (recencyMultiplierObj != null) {
-                        try {
-                            double recencyMultiplier = ((Tensor) recencyMultiplierObj).asDouble();
-                            double originalScore = hit.getRelevance().getScore();
-                            double modifiedScore = originalScore * recencyMultiplier;
-                            hit.setRelevance(modifiedScore);
-                            logIfVerbose(
-                                    String.format(
-                                            "Applied recency multiplier %.4f to score %.4f -> %.4f"
-                                                    + " for hit %s",
-                                            recencyMultiplier,
-                                            originalScore,
-                                            modifiedScore,
-                                            hit.getId()),
-                                    verbose);
-                        } catch (Exception e) {
-                            logIfVerbose(
-                                    "Failed to apply recency multiplier: " + e.getMessage(),
-                                    verbose);
+            // and mode allows global phase application
+            if (shouldApplyRecencyInGlobalPhase(query, verbose)) {
+                for (Hit hit : resultToRerank.asList()) {
+                    FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
+                    if (matchFeatures != null) {
+                        Object recencyMultiplierObj = matchFeatures.getTensor("recency_score");
+                        if (recencyMultiplierObj != null) {
+                            try {
+                                double recencyScore = ((Tensor) recencyMultiplierObj).asDouble();
+                                double originalScore = hit.getRelevance().getScore();
+                                double modifiedScore = originalScore * recencyScore;
+                                hit.setRelevance(modifiedScore);
+                                logIfVerbose(
+                                        String.format(
+                                                "Applied recency score %.4f to score %.4f -> %.4f"
+                                                        + " for hit %s",
+                                                recencyScore,
+                                                originalScore,
+                                                modifiedScore,
+                                                hit.getId()),
+                                        verbose);
+                            } catch (Exception e) {
+                                logIfVerbose(
+                                        "Failed to apply recency score: " + e.getMessage(),
+                                        verbose);
+                            }
                         }
                     }
                 }
+            } else {
+                logIfVerbose(
+                        "Recency mode does not allow global phase application. Skipping.", verbose);
             }
         }
 
@@ -1418,15 +1425,18 @@ public class HybridSearcher extends Searcher {
     /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
      * @param hits The hit group to apply global score modifiers to.
+     * @param query The query to check recency mode.
      * @param verbose Whether to log detailed information about the score modification process.
      */
-    HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
+    HitGroup applyGlobalScoreModifiers(HitGroup hits, Query query, boolean verbose) {
         FeatureData hitMatchFeatures;
         Double mult_modifier, add_modifier, original_score, modified_score;
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
         }
+
+        boolean applyRecency = shouldApplyRecencyInGlobalPhase(query, verbose);
 
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
@@ -1437,30 +1447,31 @@ public class HybridSearcher extends Searcher {
                 add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
 
                 if (mult_modifier != null && add_modifier != null) {
-                    // Extract recency multiplier (default to 1.0 if not present)
-                    double recencyMultiplier = 1.0;
-                    Object recencyMultiplierObj = hitMatchFeatures.getTensor("recency_multiplier");
-                    if (recencyMultiplierObj != null) {
-                        try {
-                            recencyMultiplier = ((Tensor) recencyMultiplierObj).asDouble();
-                        } catch (Exception e) {
-                            logIfVerbose(
-                                    "Failed to extract recency_multiplier: " + e.getMessage(),
-                                    verbose);
+                    // Extract recency score (default to 1.0 if not present or not applying)
+                    double recencyScore = 1.0;
+                    if (applyRecency) {
+                        Object recencyScoreObj = hitMatchFeatures.getTensor("recency_score");
+                        if (recencyScoreObj != null) {
+                            try {
+                                recencyScore = ((Tensor) recencyScoreObj).asDouble();
+                            } catch (Exception e) {
+                                logIfVerbose(
+                                        "Failed to extract recency_score: " + e.getMessage(),
+                                        verbose);
+                            }
                         }
                     }
 
                     // Apply the modifiers to the hit's relevance
                     original_score = hit.getRelevance().getScore();
-                    modified_score =
-                            original_score * mult_modifier * recencyMultiplier + add_modifier;
+                    modified_score = original_score * mult_modifier * recencyScore + add_modifier;
                     logIfVerbose(
                             String.format(
-                                    "Original score: %.7f, mult modifier: %.5f, recency multiplier:"
+                                    "Original score: %.7f, mult modifier: %.5f, recency score:"
                                             + " %.5f, add modifier: %.5f, Modified score: %.7f",
                                     original_score,
                                     mult_modifier,
-                                    recencyMultiplier,
+                                    recencyScore,
                                     add_modifier,
                                     modified_score),
                             verbose);
@@ -1483,43 +1494,62 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extracts recency multiplier from match features and sets it as a field on each hit.
+     * Determines if recency should be applied in global phase based on the mode.
+     *
+     * @param query The query to check the recency mode
+     * @param verbose Whether to log verbose messages
+     * @return true if recency should be applied in global phase, false otherwise
+     */
+    boolean shouldApplyRecencyInGlobalPhase(Query query, boolean verbose) {
+        String recencyMode = query.properties().getString(QUERY_INPUT_RECENCY_MODE);
+        if (recencyMode == null) {
+            logIfVerbose(
+                    "Recency mode not set, defaulting to not applying in global phase.", verbose);
+            return false;
+        }
+
+        logIfVerbose("Recency mode: " + recencyMode, verbose);
+
+        // Apply in global phase for "on" and "only_global" modes
+        return recencyMode.equals("on") || recencyMode.equals("only_global");
+    }
+
+    /**
+     * Extracts recency score from match features and sets it as a field on each hit.
      * This runs independently of global score modifiers, but only when recency is enabled.
      *
      * @param hits The hits to process
      * @param query The query to check if recency is enabled
      * @param verbose Whether to log verbose messages
-     * @return The processed hits with recency_multiplier field set
+     * @return The processed hits with recency_score field set
      */
     HitGroup extractRecencyMultiplier(HitGroup hits, Query query, boolean verbose) {
-        // Check if recency is enabled
-        boolean recencyEnabled = query.properties().getBoolean("marqo__recency_enabled");
-        if (!recencyEnabled) {
-            logIfVerbose(
-                    "Recency is not enabled. Skipping recency multiplier extraction.", verbose);
+        // Check if recency mode is not "off"
+        String recencyMode = query.properties().getString(QUERY_INPUT_RECENCY_MODE);
+        if (recencyMode == null || recencyMode.equals("off")) {
+            logIfVerbose("Recency is not enabled. Skipping recency score extraction.", verbose);
             return hits;
         }
 
         if (hits.size() == 0) {
-            logIfVerbose("No hits to extract recency multiplier from. Returning.", verbose);
+            logIfVerbose("No hits to extract recency score from. Returning.", verbose);
             return hits;
         }
 
-        logIfVerbose(
-                "Recency is enabled. Extracting recency multiplier from match features.", verbose);
+        logIfVerbose("Recency is enabled. Extracting recency score from match features.", verbose);
 
         for (Hit hit : hits) {
             // Extract match features
             FeatureData hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
             if (hitMatchFeatures != null) {
-                // Extract recency multiplier if present and set as field
-                Double recency_multiplier = hitMatchFeatures.getDouble("recency_multiplier");
-                if (recency_multiplier != null) {
-                    hit.setField("marqo__recency_multiplier", recency_multiplier);
+                // Extract recency score if present and set as field
+                Double recency_score = hitMatchFeatures.getDouble("recency_score");
+                if (recency_score != null) {
+                    hit.setField("marqo__recency_score", recency_score);
                     logIfVerbose(
                             String.format(
-                                    "Extracted recency multiplier for hit %s: %.5f",
-                                    hit.getId(), recency_multiplier),
+                                    "Extracted recency score for hit %s: %.5f",
+                                    hit.getId(), recency_score),
                             verbose);
                 }
             }
