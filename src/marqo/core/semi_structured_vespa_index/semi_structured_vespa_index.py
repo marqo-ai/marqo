@@ -143,7 +143,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Convert decay_in_days to seconds for Vespa
         return {
             constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
-            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: recency_params.apply_in_ranking_phase != 'only-global',
+            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == 'only-global' else 1,
             constants.QUERY_INPUT_RECENCY_DECAY_FACTOR: (recency_params.decay_in_days * 24 * 60 * 60),
             constants.QUERY_INPUT_RECENCY_MIN_FACTOR: recency_params.min_factor,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
