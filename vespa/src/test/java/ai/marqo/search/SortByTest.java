@@ -356,7 +356,7 @@ class SortByTest {
 
         spy.search(q, makeEmptyExec());
 
-        verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), anyBoolean());
+        verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 

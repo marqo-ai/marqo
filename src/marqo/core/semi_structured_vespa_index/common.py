@@ -57,4 +57,4 @@ QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
 
 VESPA_DOC_HYBRID_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
 VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
-VESPA_DOC_RECENCY_MULTIPLIER = 'marqo__recency_score'
+VESPA_DOC_RECENCY_SCORE = 'marqo__recency_score'

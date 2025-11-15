@@ -50,7 +50,7 @@ class HybridSearch:
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
             collapse_field_name: Optional[str] = None,
-            recency_parameters=None
+            recency_parameters: Optional[dict] = None
     ) -> Dict:
         """
 

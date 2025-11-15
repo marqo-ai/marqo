@@ -43,7 +43,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=common.VESPA_DOC_MATCH_FEATURES)
     raw_tensor_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE)
     raw_lexical_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE)
-    recency_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_RECENCY_MULTIPLIER)
+    recency_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_RECENCY_SCORE)
 
     @field_validator('int_fields', 'float_fields')
     def check_numeric_fields(cls, v):
