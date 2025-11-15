@@ -5,6 +5,7 @@ from pydantic.v1 import BaseModel, Field, validator
 
 
 class RecencyParameters(BaseModel):
+    # TODO add alias
     """Parameters for recency-based score modification.
 
     Allows boosting of documents based on how recent a timestamp field is,
@@ -34,14 +35,13 @@ class RecencyParameters(BaseModel):
         description="Minimum recency score factor (prevents complete decay)"
     )
 
-    mode: Literal["off", "on", "only_global", "exclude_global"] = Field(
-        default="on",
+    apply_in_ranking_phase: Literal["all", "only-global", "exclude-global"] = Field(
+        default="all",
         description=(
-            "Controls how recency scoring is applied:\n"
-            "- 'off': No recency calculation\n"
-            "- 'on': Apply in both rank profile and global phase (default)\n"
-            "- 'only_global': Calculate in rank profile but apply only in global phase\n"
-            "- 'exclude_global': Apply in rank profile only, not in global phase"
+            "Controls which ranking phases recency scoring is applied in:\n"
+            "- 'all': Apply in all ranking phases (Vespa rank profile and global phase reranking) (default)\n"
+            "- 'only-global': Calculate recency score in Vespa but only apply it during global phase reranking\n"
+            "- 'exclude-global': Apply recency in Vespa rank profile only, exclude from global phase reranking"
         )
     )
 

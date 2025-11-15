@@ -44,7 +44,6 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL = 'marqo__add_weights_global'
 MARQO_GLOBAL_SCORE_MODIFIERS = 'global'
 
 # For recency scoring
-QUERY_INPUT_RECENCY_MODE = 'marqo__recency_mode'
 QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE = 'marqo__recency_should_calculate_score'
 QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE = 'marqo__recency_should_apply_score'
 QUERY_INPUT_RECENCY_DECAY_FACTOR = 'marqo__recency_decay_factor'

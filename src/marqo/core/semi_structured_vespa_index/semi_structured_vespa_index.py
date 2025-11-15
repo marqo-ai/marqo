@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
+from marqo.core import constants
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -19,6 +20,7 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 
@@ -119,7 +121,34 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.collapse_field_name:
             query.update(self._generate_collapse_query_params(marqo_query.collapse_field_name))
 
+        if marqo_query.recency_parameters:
+            # Add recency parameters to query input
+            query_input: Dict[str, Any] = query['query_features']
+            query_input.update(self._get_recency_query_input(marqo_query.recency_parameters))
+
+            query['marqo__recency_enabled'] = True
+            query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != 'exclude_global'
+
         return query
+
+    def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
+        # Map decay function to numeric value for Vespa
+        decay_function_map = {
+            "exponential": 0,
+            "linear": 1,
+            "gaussian": 2,
+            "binary": 3
+        }
+
+        # Convert decay_in_days to seconds for Vespa
+        return {
+            constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
+            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: recency_params.apply_in_ranking_phase != 'only-global',
+            constants.QUERY_INPUT_RECENCY_DECAY_FACTOR: (recency_params.decay_in_days * 24 * 60 * 60),
+            constants.QUERY_INPUT_RECENCY_MIN_FACTOR: recency_params.min_factor,
+            constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: decay_function_map[recency_params.decay_function]
+        }
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
         return {
