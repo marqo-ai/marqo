@@ -158,8 +158,8 @@ schema {{ index.schema_name }} {
             query(marqo__recency_should_apply_score): 0
             query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
-            query(marqo__recency_decay_factor) double: 604800.0
-            query(marqo__recency_min_factor) double: 0.1
+            query(marqo__recency_scale_seconds) double: 604800.0
+            query(marqo__recency_min_score) double: 0.1
         }
 
         # Recency scoring functions
@@ -172,23 +172,23 @@ schema {{ index.schema_name }} {
         }
 
         function age_in_seconds() {
-            expression: now() - get_timestamp()
+            expression: max(0, now() - get_timestamp())
         }
 
         function recency_score_exponential() {
-            expression: max(query(marqo__recency_min_factor), exp(-age_in_seconds() / query(marqo__recency_decay_factor)))
+            expression: max(query(marqo__recency_min_score), exp(-age_in_seconds() / query(marqo__recency_scale_seconds)))
         }
 
         function recency_score_linear() {
-            expression: max(query(marqo__recency_min_factor), 1.0 - (age_in_seconds() / query(marqo__recency_decay_factor)))
+            expression: max(query(marqo__recency_min_score), 1.0 - ((1.0 - query(marqo__recency_min_score)) * age_in_seconds() / query(marqo__recency_scale_seconds)))
         }
 
         function recency_score_gaussian() {
-            expression: max(query(marqo__recency_min_factor), exp(-(age_in_seconds() * age_in_seconds()) / (2.0 * query(marqo__recency_decay_factor) * query(marqo__recency_decay_factor))))
+            expression: max(query(marqo__recency_min_score), exp(-pow(age_in_seconds(), 2) / (2.0 * pow(query(marqo__recency_scale_seconds), 2))))
         }
 
         function recency_score_binary() {
-            expression: if(age_in_seconds() < query(marqo__recency_decay_factor), 1.0, query(marqo__recency_min_factor))
+            expression: if(age_in_seconds() < query(marqo__recency_scale_seconds), 1.0, query(marqo__recency_min_score))
         }
 
         function recency_score_router() {
@@ -378,8 +378,8 @@ schema {{ index.schema_name }} {
             query(marqo__recency_should_apply_score): 0
             query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
-            query(marqo__recency_decay_factor) double: 604800.0
-            query(marqo__recency_min_factor) double: 0.1
+            query(marqo__recency_scale_seconds) double: 604800.0
+            query(marqo__recency_min_score) double: 0.1
         }
     }
 
