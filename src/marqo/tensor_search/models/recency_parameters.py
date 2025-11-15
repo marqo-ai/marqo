@@ -5,7 +5,6 @@ from pydantic.v1 import BaseModel, Field, validator
 
 
 class RecencyParameters(BaseModel):
-    # TODO add alias
     """Parameters for recency-based score modification.
 
     Allows boosting of documents based on how recent a timestamp field is,
@@ -14,29 +13,40 @@ class RecencyParameters(BaseModel):
 
     recency_field: str = Field(
         ...,
+        alias="recencyField",
         description="Name of the timestamp field to use for recency calculation"
     )
 
-    decay_in_days: float = Field(
+    scale: float = Field(
         default=7.0,
         gt=0,
-        description="Number of days for the decay function (half-life for exponential, max age for linear, sigma for gaussian, threshold for binary). Default: 7 days"
+        alias="scaleDays",
+        description=(
+            "Time scale in days controlling decay rate:\n"
+            "- exponential: half-life (score decays to ~37% at this point)\n"
+            "- linear: max_age (score reaches min_score at this point)\n"
+            "- gaussian: sigma/standard deviation (score decays to ~60% at this point)\n"
+            "- binary: threshold (hard cutoff - items older than this get min_score)"
+        )
     )
 
     decay_function: Literal["exponential", "linear", "gaussian", "binary"] = Field(
         default="exponential",
+        alias="decayFunction",
         description="Type of decay function to apply: exponential (smooth decay), linear (constant decay), gaussian (bell curve), binary (step function at threshold)"
     )
 
-    min_factor: float = Field(
+    min_score: float = Field(
         default=0.1,
         ge=0.0,
         le=1.0,
-        description="Minimum recency score factor (prevents complete decay)"
+        alias="minScore",
+        description="Minimum score multiplier (floor to prevent complete decay)"
     )
 
     apply_in_ranking_phase: Literal["all", "only-global", "exclude-global"] = Field(
         default="all",
+        alias="applyInRankingPhase",
         description=(
             "Controls which ranking phases recency scoring is applied in:\n"
             "- 'all': Apply in all ranking phases (Vespa rank profile and global phase reranking) (default)\n"
@@ -47,6 +57,7 @@ class RecencyParameters(BaseModel):
 
     class Config:
         extra: str = "forbid"
+        allow_population_by_field_name = True
 
     @validator('recency_field')
     def validate_field_name(cls, v: str) -> str:
