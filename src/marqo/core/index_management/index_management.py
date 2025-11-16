@@ -285,7 +285,6 @@ class IndexManagement:
                 "schema_diff": str,           # Unified diff between old and new
                 "reason": str,                # Explanation of the result
                 "config_change_actions": {}   # Vespa configChangeActions if any
-                "warning": str                # Optional, only if forced with actions
             }
 
         Raises:
@@ -389,7 +388,6 @@ class IndexManagement:
             result["updated"] = True
             if has_actions:
                 result["reason"] = "Update forced despite required actions"
-                result["warning"] = f"Vespa requires these actions: {config_change_actions}"
             else:
                 result["reason"] = "Schema updated successfully"
 

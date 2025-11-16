@@ -213,7 +213,6 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertTrue(result['updated'])
         self.assertTrue(result['schema_changed'])
         self.assertEqual(result['reason'], "Update forced despite required actions")
-        self.assertIn('warning', result)
         self.assertIn('restart', result['config_change_actions'])
 
         # Verify activate WAS called
