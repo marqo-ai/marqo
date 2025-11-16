@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 
-from marqo.core.exceptions import IndexNotFoundError, InternalError
+from marqo.core.exceptions import IndexNotFoundError, InternalError, UnsupportedFeatureError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.index_management.vespa_application_package import (
     VespaApplicationPackage,
@@ -372,6 +372,26 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertFalse(result['updated'])
         self.assertIn('reindex', result['config_change_actions'])
         mock_vespa_app._store.activate_deployment.assert_not_called()
+
+    def test_update_index_main_schema_version_too_old(self):
+        """Test error when index was created with Marqo < 2.23.0."""
+        # Setup index with old version
+        test_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_name="test_schema",
+            marqo_version="2.22.0"  # Below 2.23.0
+        )
+
+        # Mock get_index
+        self.index_mgmt.get_index = Mock(return_value=test_index)
+
+        # Execute and verify exception
+        with self.assertRaises(UnsupportedFeatureError) as context:
+            self.index_mgmt.update_index_main_schema("test_index")
+
+        # Verify error message contains version information
+        self.assertIn("2.23.0", str(context.exception))
+        self.assertIn("2.22.0", str(context.exception))
 
 
 if __name__ == '__main__':

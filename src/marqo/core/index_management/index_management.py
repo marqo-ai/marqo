@@ -11,7 +11,7 @@ from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
 from marqo.core.exceptions import OperationConflictError
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
+from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError, UnsupportedFeatureError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
     ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
@@ -283,6 +283,7 @@ class IndexManagement:
         Raises:
             IndexNotFoundError: If index doesn't exist
             InternalError: If index type doesn't support schema updates
+            UnsupportedFeatureError: If index was created with Marqo < 2.23.0
             OperationConflictError: If deployment lock cannot be acquired
         """
         with self._vespa_deployment_lock():
@@ -294,6 +295,15 @@ class IndexManagement:
                 raise InternalError(
                     f'Index {index_name} is type {existing_index.type}, '
                     f'only semi-structured indexes support schema updates'
+                )
+
+            # Check minimum version requirement
+            if existing_index.parsed_marqo_version() < constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION:
+                raise UnsupportedFeatureError(
+                    f"Schema update is only supported for indexes created with Marqo "
+                    f"{str(constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION)} or later. "
+                    f"This index was created with Marqo {existing_index.marqo_version}. "
+                    f"Please recreate the index with a newer version of Marqo to use this feature."
                 )
 
             # Generate new schema from current settings using latest template
