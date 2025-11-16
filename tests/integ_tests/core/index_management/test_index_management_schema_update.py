@@ -1,46 +1,80 @@
 import os
+import textwrap
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from marqo.core.exceptions import IndexNotFoundError, InternalError, UnsupportedFeatureError
-from marqo.core.models.marqo_index import Model
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.marqo_index import FieldType
+from marqo.core.models.marqo_index_request import FieldRequest
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestIndexManagementSchemaUpdate(MarqoTestCase):
     """Integration tests for the update_index_main_schema feature."""
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def _add_validation_overrides(self, app_root_path: str):
+        tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime('%Y-%m-%d')
+        content = textwrap.dedent(
+            f'''
+            <validation-overrides>
+                 <allow until='{tomorrow}'>indexing-change</allow>
+                 <allow until='{tomorrow}'>field-type-change</allow>
+                 <allow until='{tomorrow}'>schema-removal</allow>
+            </validation-overrides>
+            '''
+        ).strip()
+        with open(os.path.join(app_root_path, 'validation-overrides.xml'), 'w') as f:
+            f.write(content)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        # Deploy initial app package with validation overrides
+        app_root_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'initial_vespa_app')
+        cls._add_validation_overrides(app_root_path)
+        cls.vespa_client.deploy_application(app_root_path)
+        cls.vespa_client.wait_for_application_convergence()
+
         # Bootstrap Vespa
-        self.index_management.bootstrap_vespa()
+        cls.index_management.bootstrap_vespa()
 
-        # Create a semi-structured index (Marqo >= 2.13.0) for testing
-        self.test_index_name = "test_schema_update_index"
+        # pre-create all indexes for tests
+        index_requests = [
+            cls.unstructured_marqo_index_request(name='test_schema_update_index'),
+            cls.unstructured_marqo_index_request(name='test_config_change_restart'),
+            cls.unstructured_marqo_index_request(name='test_config_change_reindex'),
+            cls.unstructured_marqo_index_request(name='test_config_change_refeed'),
+            cls.unstructured_marqo_index_request(name='old_version_index', marqo_version='2.22.0'),
+            cls.unstructured_marqo_index_request(name='legacy_unstructured_index', marqo_version='2.12.0'),
+            cls.structured_marqo_index_request(
+                name='structured_index',
+                fields=[FieldRequest(name='title', type=FieldType.Text)],
+                tensor_fields=['title']
+            )
+        ]
+        cls.create_indexes(index_requests)
 
-        # Delete the index if it already exists from previous test
-        try:
-            self.index_management.delete_index_by_name(self.test_index_name)
-        except IndexNotFoundError:
-            pass
+        # feed in a doc to add a 'title' lexical field to 'test_config_change_restart'
+        cls.add_documents(cls.config, AddDocsParams(
+            index_name='test_config_change_restart',
+            docs=[{'_id': '1', 'title': 'hello'}],
+            tensor_fields=[]
+        ))
 
-        self.request = self.unstructured_marqo_index_request(
-            name=self.test_index_name,
-            model=Model(name='hf/e5-small')
-        )
-        created_index = self.index_management.create_index(self.request)
+    def _get_validation_overrides(self) -> str:
+        app = self.vespa_client.download_application()
+        with open(os.path.join(app, 'validation-overrides.xml'), 'r') as f:
+            return f.read()
 
-        # Track index for cleanup in tearDownClass
-        if created_index not in self.indexes:
-            self.indexes.append(created_index)
-
-        # Get the created index
-        self.test_index = self.index_management.get_index(self.test_index_name)
-
+    def _get_schema_from_vespa(self, schema_name: str) -> str:
         # Get the original schema for reference by downloading the app
         app = self.vespa_client.download_application()
-        schema_path = os.path.join(app, 'schemas', f'{self.test_index.schema_name}.sd')
+        schema_path = os.path.join(app, 'schemas', f'{schema_name}.sd')
         with open(schema_path, 'r') as f:
-            self.original_schema = f.read()
+            return f.read()
 
     # ============================================================================
     # Basic Flow Tests
@@ -48,53 +82,68 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
     def test_update_schema_no_changes(self):
         """When schema hasn't changed, should return schema_changed=False and not deploy."""
-        result = self.index_management.update_index_main_schema(self.test_index_name)
+        test_index_name = 'test_schema_update_index'
+        result = self.index_management.update_index_main_schema(test_index_name)
+
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+        original_version = saved_index.version
 
         self.assertFalse(result['updated'])
         self.assertFalse(result['schema_changed'])
         self.assertEqual('Schema is already up to date', result['reason'])
         self.assertEqual('No changes', result['schema_diff'])
-        self.assertEqual(self.original_schema, result['old_schema'])
-        self.assertEqual(self.original_schema, result['new_schema'])
+        self.assertEqual(original_schema, result['old_schema'])
+        self.assertEqual(original_schema, result['new_schema'])
+
+        self.assertEqual(original_version, self.index_management.get_index(test_index_name).version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
     def test_update_schema_successful(self, mock_generate_schema):
         """When schema changes with no actions required, should deploy successfully."""
+
+        test_index_name = 'test_schema_update_index'
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+        original_version = saved_index.version
+
         # Generate a modified schema (add a comment to create a harmless change)
-        modified_schema = self.original_schema.replace(
+        modified_schema = original_schema.replace(
             'schema marqo__',
             '# Updated schema\nschema marqo__'
         )
         mock_generate_schema.return_value = modified_schema
 
-        result = self.index_management.update_index_main_schema(self.test_index_name)
+        result = self.index_management.update_index_main_schema(test_index_name)
 
         # Verify the result
         self.assertTrue(result['updated'])
         self.assertTrue(result['schema_changed'])
         self.assertIn('Schema updated successfully', result['reason'])
-        self.assertEqual(self.original_schema, result['old_schema'])
+        self.assertEqual(original_schema, result['old_schema'])
         self.assertEqual(modified_schema, result['new_schema'])
         self.assertIn('# Updated schema', result['schema_diff'])
 
         # Verify schema was actually deployed to Vespa
-        app = self.vespa_client.download_application()
-        schema_path = os.path.join(app, 'schemas', f'{self.test_index.schema_name}.sd')
-        with open(schema_path, 'r') as f:
-            deployed_schema = f.read()
-        self.assertEqual(modified_schema, deployed_schema)
+        self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
+        # Verify the index version is also updated
+        self.assertEqual(original_version + 1, self.index_management.get_index(test_index_name).version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
     def test_update_schema_dry_run_prevents_deployment(self, mock_generate_schema):
         """When dry_run=True, should show changes but never deploy."""
-        modified_schema = self.original_schema.replace(
+        test_index_name = 'test_schema_update_index'
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+
+        modified_schema = original_schema.replace(
             'schema marqo__',
             '# Dry run test\nschema marqo__'
         )
         mock_generate_schema.return_value = modified_schema
 
         result = self.index_management.update_index_main_schema(
-            self.test_index_name,
+            test_index_name,
             dry_run=True
         )
 
@@ -106,204 +155,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('# Dry run test', result['schema_diff'])
 
         # Verify schema was NOT deployed to Vespa (original schema still present)
-        app = self.vespa_client.download_application()
-        schema_path = os.path.join(app, 'schemas', f'{self.test_index.schema_name}.sd')
-        with open(schema_path, 'r') as f:
-            deployed_schema = f.read()
-        self.assertEqual(self.original_schema, deployed_schema)
-        self.assertNotIn('# Dry run test', deployed_schema)
-
-    # ============================================================================
-    # configChangeActions Tests
-    # ============================================================================
-
-    @patch('marqo.vespa.vespa_client.VespaClient.prepare')
-    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_update_schema_with_restart_actions_blocked(self, mock_generate_schema, mock_prepare):
-        """When restart actions are required and force=False, should block deployment."""
-        modified_schema = self.original_schema.replace(
-            'schema marqo__',
-            '# Change requiring restart\nschema marqo__'
-        )
-        mock_generate_schema.return_value = modified_schema
-
-        # Mock Vespa prepare response with restart actions
-        mock_prepare.return_value = {
-            'activate': 'http://activate_url',
-            'configChangeActions': {
-                'restart': [{
-                    'clusterName': 'marqo_content',
-                    'clusterType': 'search',
-                    'serviceType': 'searchnode',
-                    'messages': ['Change requires service restart'],
-                    'services': [{'serviceName': 'searchnode', 'serviceType': 'searchnode'}]
-                }]
-            }
-        }
-
-        result = self.index_management.update_index_main_schema(
-            self.test_index_name,
-            force=False
-        )
-
-        # Verify deployment was blocked
-        self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
-        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('restart', result['config_change_actions'])
-        self.assertEqual(1, len(result['config_change_actions']['restart']))
-
-        # Verify schema was NOT deployed
-        app = self.vespa_client.download_application()
-        schema_path = os.path.join(app, 'schemas', f'{self.test_index.schema_name}.sd')
-        with open(schema_path, 'r') as f:
-            deployed_schema = f.read()
-        self.assertEqual(self.original_schema, deployed_schema)
-
-    @patch('marqo.vespa.vespa_client.VespaClient.activate')
-    @patch('marqo.vespa.vespa_client.VespaClient.prepare')
-    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_update_schema_with_restart_actions_forced(self, mock_generate_schema, mock_prepare, mock_activate):
-        """When restart actions are required and force=True, should deploy anyway."""
-        modified_schema = self.original_schema.replace(
-            'schema marqo__',
-            '# Forced change with restart\nschema marqo__'
-        )
-        mock_generate_schema.return_value = modified_schema
-
-        # Mock Vespa prepare response with restart actions
-        mock_prepare.return_value = {
-            'activate': 'http://activate_url',
-            'configChangeActions': {
-                'restart': [{
-                    'clusterName': 'marqo_content',
-                    'clusterType': 'search',
-                    'serviceType': 'searchnode',
-                    'messages': ['Change requires service restart'],
-                    'services': [{'serviceName': 'searchnode', 'serviceType': 'searchnode'}]
-                }]
-            }
-        }
-
-        result = self.index_management.update_index_main_schema(
-            self.test_index_name,
-            force=True
-        )
-
-        # Verify deployment proceeded despite actions
-        self.assertTrue(result['updated'])
-        self.assertTrue(result['schema_changed'])
-        self.assertIn('Update forced despite required actions', result['reason'])
-        self.assertIn('warning', result)
-        self.assertIn('restart', result['config_change_actions'])
-
-        # Verify activate was called
-        mock_activate.assert_called_once()
-
-    @patch('marqo.vespa.vespa_client.VespaClient.prepare')
-    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_update_schema_with_refeed_actions_blocked(self, mock_generate_schema, mock_prepare):
-        """When refeed actions are required and force=False, should block deployment."""
-        modified_schema = self.original_schema.replace(
-            'schema marqo__',
-            '# Change requiring refeed\nschema marqo__'
-        )
-        mock_generate_schema.return_value = modified_schema
-
-        # Mock Vespa prepare response with refeed actions
-        mock_prepare.return_value = {
-            'activate': 'http://activate_url',
-            'configChangeActions': {
-                'refeed': [{
-                    'name': 'refeed',
-                    'documentType': self.test_index.schema_name,
-                    'clusterName': 'marqo_content',
-                    'messages': ['Field type change requires re-feeding']
-                }]
-            }
-        }
-
-        result = self.index_management.update_index_main_schema(
-            self.test_index_name,
-            force=False
-        )
-
-        # Verify deployment was blocked
-        self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
-        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('refeed', result['config_change_actions'])
-
-    @patch('marqo.vespa.vespa_client.VespaClient.activate')
-    @patch('marqo.vespa.vespa_client.VespaClient.prepare')
-    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_update_schema_with_refeed_actions_forced(self, mock_generate_schema, mock_prepare, mock_activate):
-        """When refeed actions are required and force=True, should deploy anyway."""
-        modified_schema = self.original_schema.replace(
-            'schema marqo__',
-            '# Forced refeed change\nschema marqo__'
-        )
-        mock_generate_schema.return_value = modified_schema
-
-        # Mock Vespa prepare response with refeed actions
-        mock_prepare.return_value = {
-            'activate': 'http://activate_url',
-            'configChangeActions': {
-                'refeed': [{
-                    'name': 'refeed',
-                    'documentType': self.test_index.schema_name,
-                    'clusterName': 'marqo_content',
-                    'messages': ['Field type change requires re-feeding']
-                }]
-            }
-        }
-
-        result = self.index_management.update_index_main_schema(
-            self.test_index_name,
-            force=True
-        )
-
-        # Verify deployment proceeded despite actions
-        self.assertTrue(result['updated'])
-        self.assertTrue(result['schema_changed'])
-        self.assertIn('Update forced despite required actions', result['reason'])
-        self.assertIn('refeed', result['config_change_actions'])
-
-        # Verify activate was called
-        mock_activate.assert_called_once()
-
-    @patch('marqo.vespa.vespa_client.VespaClient.prepare')
-    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_update_schema_with_reindex_actions_blocked(self, mock_generate_schema, mock_prepare):
-        """When reindex actions are required and force=False, should block deployment."""
-        modified_schema = self.original_schema.replace(
-            'schema marqo__',
-            '# Change requiring reindex\nschema marqo__'
-        )
-        mock_generate_schema.return_value = modified_schema
-
-        # Mock Vespa prepare response with reindex actions
-        mock_prepare.return_value = {
-            'activate': 'http://activate_url',
-            'configChangeActions': {
-                'reindex': [{
-                    'name': 'reindex',
-                    'documentType': self.test_index.schema_name,
-                    'messages': ['Indexing script change requires reindexing']
-                }]
-            }
-        }
-
-        result = self.index_management.update_index_main_schema(
-            self.test_index_name,
-            force=False
-        )
-
-        # Verify deployment was blocked
-        self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
-        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('reindex', result['config_change_actions'])
+        self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
     # ============================================================================
     # Error Case Tests
@@ -318,58 +170,202 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
     def test_update_schema_wrong_index_type_structured(self):
         """Should raise InternalError for structured indexes (not supported)."""
-        from marqo.core.models.marqo_index_request import FieldRequest
-        from marqo.core.models.marqo_index import FieldType
+        with self.assertRaisesStrict(InternalError) as ctx:
+            self.index_management.update_index_main_schema('structured_index')
 
-        # Create a structured index
-        structured_request = self.structured_marqo_index_request(
-            name='structured_index',
-            fields=[FieldRequest(name='title', type=FieldType.Text)],
-            tensor_fields=['title']
-        )
-        self.index_management.create_index(structured_request)
-
-        try:
-            with self.assertRaisesStrict(InternalError) as ctx:
-                self.index_management.update_index_main_schema('structured_index')
-
-            self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
-        finally:
-            self.index_management.delete_index_by_name('structured_index')
+        self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
 
     def test_update_schema_wrong_index_type_legacy_unstructured(self):
         """Should raise InternalError for legacy unstructured indexes (Marqo < 2.13.0)."""
-        # Create a legacy unstructured index (marqo_version < 2.13.0)
-        legacy_request = self.unstructured_marqo_index_request(
-            name='legacy_index',
-            marqo_version='2.12.0',
-            model=Model(name='hf/e5-small')
-        )
-        self.index_management.create_index(legacy_request)
+        with self.assertRaisesStrict(InternalError) as ctx:
+            self.index_management.update_index_main_schema('legacy_unstructured_index')
 
-        try:
-            with self.assertRaisesStrict(InternalError) as ctx:
-                self.index_management.update_index_main_schema('legacy_index')
-
-            self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
-        finally:
-            self.index_management.delete_index_by_name('legacy_index')
+        self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
 
     def test_update_schema_version_too_old(self):
         """Should raise UnsupportedFeatureError for indexes created with Marqo < 2.23.0."""
-        # Create an index with Marqo 2.22.0 (before schema update feature)
-        old_version_request = self.unstructured_marqo_index_request(
-            name='old_version_index',
-            marqo_version='2.22.0',
-            model=Model(name='hf/e5-small')
+        with self.assertRaisesStrict(UnsupportedFeatureError) as ctx:
+            self.index_management.update_index_main_schema('old_version_index')
+
+        self.assertIn('Schema update is only supported for indexes created with Marqo 2.23.0 or later',
+                      str(ctx.exception))
+        self.assertIn('created with Marqo 2.22.0', str(ctx.exception))
+
+    # ============================================================================
+    # configChangeActions Tests
+    # ============================================================================
+
+    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
+    def test_update_schema_with_restart_actions(self, mock_generate_schema):
+        """When restart actions are required and force=False, should block deployment.
+        In this case, we will replace
+        ```
+        field marqo__lexical_title type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+        ```
+        with
+        ```
+        field marqo__lexical_title type string {
+            indexing: index | summary | attribute
+            index: enable-bm25
+        }
+        ```
+        Adding the attribute aspect will require a restart.
+        See https://docs.vespa.ai/en/reference/schema-reference.html#changes-that-require-restart-but-not-re-feed for details
+        """
+
+        test_index_name = 'test_config_change_restart'
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+
+        modified_schema = original_schema.replace(
+            'indexing: index | summary',
+            'indexing: index | summary | attribute',
+            1
         )
-        self.index_management.create_index(old_version_request)
+        mock_generate_schema.return_value = modified_schema
 
-        try:
-            with self.assertRaisesStrict(UnsupportedFeatureError) as ctx:
-                self.index_management.update_index_main_schema('old_version_index')
+        # Verify it reject updates if not forced
+        result = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=False
+        )
 
-            self.assertIn('Schema update is only supported for indexes created with Marqo 2.23.0 or later', str(ctx.exception))
-            self.assertIn('created with Marqo 2.22.0', str(ctx.exception))
-        finally:
-            self.index_management.delete_index_by_name('old_version_index')
+        # Verify deployment was blocked
+        self.assertFalse(result['updated'])
+        self.assertTrue(result['schema_changed'])
+        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
+        self.assertIn('restart', result['config_change_actions'])
+        self.assertEqual(1, len(result['config_change_actions']['restart']))
+        self.assertIn("Field 'marqo__lexical_title' changed: add attribute aspect", result['config_change_actions']['restart'][0]['messages'][0])
+
+        # Verify schema was NOT deployed
+        self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
+
+        # Verify it updates the schema when forced set to true
+        result_forced = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=True
+        )
+        self.assertTrue(result_forced['updated'])
+        self.assertTrue(result_forced['schema_changed'])
+        self.assertIn('Update forced despite required actions', result_forced['reason'])
+        self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
+
+    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
+    def test_update_schema_with_refeed_actions(self, mock_generate_schema):
+        """When re-feed actions are required and force=False, should block deployment.
+        In this case, we will replace
+        ```
+        field marqo__id type string
+        summary marqo__id type string
+        ```
+        with
+        ```
+        field marqo__id type int
+        summary marqo__id type int
+        ```
+        Changing field type will require a re-feed.
+        See https://docs.vespa.ai/en/reference/schema-reference.html#changes-that-require-re-feed for details
+        """
+
+        test_index_name = 'test_config_change_refeed'
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+
+        modified_schema = original_schema.replace(
+            'marqo__id type string',
+            'marqo__id type int',
+        )
+        mock_generate_schema.return_value = modified_schema
+
+        result = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=False
+        )
+
+        # Verify deployment was blocked
+        self.assertFalse(result['updated'])
+        self.assertTrue(result['schema_changed'])
+        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
+        self.assertIn('refeed', result['config_change_actions'])
+        self.assertIn("Field 'marqo__id' changed: data type: 'string' -> 'int'",
+                      result['config_change_actions']['refeed'][0]['messages'][0])
+
+        self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
+
+        # Force update
+        result_forced = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=True
+        )
+
+        # Verify deployment proceeded despite actions
+        self.assertTrue(result_forced['updated'])
+        self.assertTrue(result_forced['schema_changed'])
+        self.assertIn('Update forced despite required actions', result_forced['reason'])
+
+        self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
+
+    @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
+    def test_update_schema_with_reindex_actions(self, mock_generate_schema):
+        """When reindex actions are required and force=False, should block deployment.
+        In this case, we will replace
+        ```
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        ```
+        with
+        ```
+        field marqo__id type string {
+            indexing: attribute | summary | index
+            attribute: fast-search
+            rank: filter
+        }
+        ```
+        Adding the index aspect to a string field will require a reindex.
+        See https://docs.vespa.ai/en/reference/schema-reference.html#changes-that-require-reindexing for details
+        """
+        test_index_name = 'test_config_change_reindex'
+        saved_index = self.index_management.get_index(test_index_name)
+        original_schema = self._get_schema_from_vespa(saved_index.schema_name)
+
+        modified_schema = original_schema.replace(
+            'indexing: attribute | summary',
+            'indexing: attribute | summary | index',
+            1
+        )
+        mock_generate_schema.return_value = modified_schema
+
+        result = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=False
+        )
+
+        # Verify deployment was blocked
+        self.assertFalse(result['updated'])
+        self.assertTrue(result['schema_changed'])
+        self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
+        self.assertIn('reindex', result['config_change_actions'])
+        self.assertIn("Field 'marqo__id' changed: add index aspect",
+                      result['config_change_actions']['reindex'][0]['messages'][0])
+
+        self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
+
+        # Force update
+        result_forced = self.index_management.update_index_main_schema(
+            test_index_name,
+            force=True
+        )
+
+        # Verify deployment is done
+        self.assertTrue(result_forced['updated'])
+        self.assertTrue(result_forced['schema_changed'])
+        self.assertIn('Update forced despite required actions', result_forced['reason'])
+        self.assertIn('reindex', result_forced['config_change_actions'])
+        self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
