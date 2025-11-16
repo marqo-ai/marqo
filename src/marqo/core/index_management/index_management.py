@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from typing import Optional
 
 import semver
@@ -253,6 +253,119 @@ class IndexManagement:
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
             logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
+
+    def update_index_main_schema(self, index_name: str, force: bool = False) -> Dict[str, any]:
+        """
+        Update an index's main schema to the latest template version.
+
+        This method:
+        1. Retrieves the existing index
+        2. Generates a new schema from the latest template
+        3. Compares it with the current deployed schema
+        4. If different, prepares the deployment
+        5. Checks Vespa's configChangeActions
+        6. If actions required and force=False, returns actions without deploying
+        7. If force=True or no actions, activates the deployment
+
+        Args:
+            index_name: Name of the index to update
+            force: If True, proceed with update even if configChangeActions are required
+
+        Returns:
+            Dict with update status:
+            {
+                "updated": bool,              # Whether schema was actually deployed
+                "schema_changed": bool,       # Whether generated schema differs from current
+                "reason": str,                # Explanation of the result
+                "config_change_actions": {}   # Vespa configChangeActions if any
+            }
+
+        Raises:
+            IndexNotFoundError: If index doesn't exist
+            InternalError: If index type doesn't support schema updates
+            OperationConflictError: If deployment lock cannot be acquired
+        """
+        with self._vespa_deployment_lock():
+            # Get existing index
+            existing_index = self.get_index(index_name)
+
+            # Only SemiStructuredMarqoIndex supports schema regeneration
+            if not isinstance(existing_index, SemiStructuredMarqoIndex):
+                raise InternalError(
+                    f'Index {index_name} is type {existing_index.type}, '
+                    f'only semi-structured indexes support schema updates'
+                )
+
+            # Generate new schema from current settings using latest template
+            new_schema = SemiStructuredVespaSchema.generate_vespa_schema(existing_index)
+
+            # Get current deployed schema
+            vespa_app = self._get_vespa_application()
+            current_schema = vespa_app.get_schema(existing_index.schema_name)
+
+            # Compare schemas (normalize whitespace for comparison)
+            def normalize_schema(schema: Optional[str]) -> str:
+                if schema is None:
+                    return ""
+                # Remove extra whitespace and blank lines for comparison
+                lines = [line.strip() for line in schema.split('\n') if line.strip()]
+                return '\n'.join(lines)
+
+            if normalize_schema(new_schema) == normalize_schema(current_schema):
+                logger.info(f'Schema for index {index_name} is already up to date')
+                return {
+                    "updated": False,
+                    "schema_changed": False,
+                    "reason": "Schema is already up to date",
+                    "config_change_actions": {}
+                }
+
+            # Schema is different - prepare deployment
+            logger.info(f'Schema for index {index_name} has changes, preparing deployment')
+            prepare_response = vespa_app.update_index_setting_and_schema(
+                existing_index,
+                new_schema,
+                prepare_only=True
+            )
+
+            # Extract configChangeActions from prepare response
+            config_change_actions = prepare_response.get('configChangeActions', {})
+
+            # Check if there are any required actions
+            has_actions = bool(config_change_actions.get('restart') or
+                               config_change_actions.get('refeed') or
+                               config_change_actions.get('reindex'))
+
+            if has_actions and not force:
+                # Actions required but not forced - return without deploying
+                logger.warning(f'Schema update for index {index_name} requires Vespa actions: {config_change_actions}')
+                return {
+                    "updated": False,
+                    "schema_changed": True,
+                    "reason": "Vespa requires manual actions before proceeding. Use force=true to proceed anyway.",
+                    "config_change_actions": config_change_actions
+                }
+
+            # Either no actions required, or force=True - proceed with activation
+            if isinstance(vespa_app._store, ApplicationPackageDeploymentSessionStore):
+                vespa_app._store.activate_deployment(prepare_response)
+                logger.info(f'Successfully updated schema for index {index_name}')
+
+                result = {
+                    "updated": True,
+                    "schema_changed": True,
+                    "config_change_actions": config_change_actions
+                }
+
+                if has_actions:
+                    result["reason"] = "Update forced despite required actions"
+                    result["warning"] = f"Vespa requires these actions: {config_change_actions}"
+                else:
+                    result["reason"] = "Schema updated successfully"
+
+                return result
+            else:
+                raise InternalError("Schema update requires ApplicationPackageDeploymentSessionStore")
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """

@@ -375,6 +375,52 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
+@app.post("/indexes/{index_name}/update-main-schema")
+def update_index_main_schema(index_name: str, force: bool = False, marqo_config: config.Config = Depends(get_config)):
+    """
+    Update an index's main schema to the latest template version.
+
+    This endpoint regenerates the index's Vespa schema from its current settings using
+    the latest schema template. It's useful for applying schema updates (like new features)
+    to existing indexes without recreating them.
+
+    The update process:
+    1. Generates new schema from latest template
+    2. Compares with currently deployed schema
+    3. If different, prepares the deployment in Vespa
+    4. Checks for required Vespa actions (restart, refeed, reindex)
+    5. If actions required and force=false, returns actions without deploying
+    6. If force=true or no actions, deploys the update
+
+    Args:
+        index_name: Name of the index to update
+        force: If true, proceed even if Vespa requires actions (restart/refeed/reindex)
+
+    Returns:
+        JSON response with:
+        - updated: Whether schema was deployed
+        - schema_changed: Whether schema differs from current
+        - reason: Explanation of result
+        - config_change_actions: Vespa actions required (if any)
+        - warning: Warning message if forced despite required actions
+
+    Raises:
+        404: Index not found
+        400: Index type doesn't support schema updates
+        500: Internal error during update
+    """
+    try:
+        result = marqo_config.index_management.update_index_main_schema(index_name, force=force)
+        return JSONResponse(content=result, status_code=200)
+    except core_exceptions.IndexNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except core_exceptions.InternalError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+    except Exception as e:
+        logger.error(f"Error updating schema for index {index_name}: {e}", exc_info=True)
+        return JSONResponse(content={"error": f"Internal error: {str(e)}"}, status_code=500)
+
+
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """

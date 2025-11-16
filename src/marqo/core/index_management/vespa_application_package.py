@@ -559,12 +559,31 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
                 backup.backup_file(self.read_binary_file(*paths), *paths)
             self._vespa_client.delete_content(self._content_base_url, *paths)
 
-    def deploy_application(self) -> None:
+    def prepare_deployment(self) -> Dict:
+        """
+        Prepare deployment without activating.
+
+        Returns:
+            Prepare response from Vespa including configChangeActions
+        """
         prepare_response = self._vespa_client.prepare(self._prepare_url, timeout=self._deploy_timeout)
-        # TODO handle prepare configChangeActions
-        # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
+        return prepare_response
+
+    def activate_deployment(self, prepare_response: Dict) -> None:
+        """
+        Activate a prepared deployment.
+
+        Args:
+            prepare_response: Response from prepare_deployment()
+        """
         self._vespa_client.activate(prepare_response['activate'], timeout=self._deploy_timeout)
         self._vespa_client.wait_for_application_convergence(timeout=self._wait_for_convergence_timeout)
+
+    def deploy_application(self) -> None:
+        prepare_response = self.prepare_deployment()
+        # TODO handle prepare configChangeActions
+        # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
+        self.activate_deployment(prepare_response)
 
 
 class VespaApplicationPackage:
@@ -734,7 +753,20 @@ class VespaApplicationPackage:
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
         self._deploy()
 
-    def update_index_setting_and_schema(self, index: MarqoIndex, schema: str) -> None:
+    def update_index_setting_and_schema(self, index: MarqoIndex, schema: str,
+                                         prepare_only: bool = False) -> Optional[Dict]:
+        """
+        Update index settings and schema in Vespa.
+
+        Args:
+            index: Index with updated settings
+            schema: New schema content
+            prepare_only: If True, only prepare deployment and return configChangeActions without activating
+
+        Returns:
+            If prepare_only=True, returns dict with prepare response including configChangeActions.
+            If prepare_only=False, returns None (deploys immediately).
+        """
         if not self.has_index(index.name):
             raise IndexNotFoundError(f"Index {index.name} not found")
 
@@ -742,10 +774,32 @@ class VespaApplicationPackage:
         self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
         self._index_setting_store.save_index_setting(index.copy(update={'version': version}))
         self._persist_index_settings()
-        self._deploy()
+
+        if prepare_only:
+            # Only prepare, don't activate - return prepare response
+            if isinstance(self._store, ApplicationPackageDeploymentSessionStore):
+                prepare_response = self._store.prepare_deployment()
+                return prepare_response
+            else:
+                raise InternalError("prepare_only mode requires ApplicationPackageDeploymentSessionStore")
+        else:
+            self._deploy()
+            return None
 
     def has_schema(self, name: str) -> bool:
         return self._store.file_exists('schemas', f'{name}.sd')
+
+    def get_schema(self, name: str) -> Optional[str]:
+        """
+        Get the current deployed schema content.
+
+        Args:
+            name: Schema name (without .sd extension)
+
+        Returns:
+            Schema content as string, or None if schema doesn't exist
+        """
+        return self._store.read_text_file('schemas', f'{name}.sd')
 
     def has_index(self, name: str) -> bool:
         return self._index_setting_store.get_index(name) is not None
