@@ -113,7 +113,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertTrue(call_args[1]['prepare_only'])
 
         # Verify activate was called
-        mock_vespa_app._store.activate_deployment.assert_called_once_with(prepare_response)
+        mock_vespa_app.activate_prepared_deployment.assert_called_once_with(prepare_response)
 
     def test_update_index_main_schema_with_actions_not_forced(self):
         """Test update blocks when actions required and force=False."""
@@ -165,7 +165,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('restart', result['config_change_actions'])
 
         # Verify activate was NOT called
-        mock_vespa_app._store.activate_deployment.assert_not_called()
+        mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
     def test_update_index_main_schema_with_actions_forced(self):
         """Test update proceeds when actions required but force=True."""
@@ -217,7 +217,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('restart', result['config_change_actions'])
 
         # Verify activate WAS called
-        mock_vespa_app._store.activate_deployment.assert_called_once_with(prepare_response)
+        mock_vespa_app.activate_prepared_deployment.assert_called_once_with(prepare_response)
 
     def test_update_index_main_schema_index_not_found(self):
         """Test error when index doesn't exist."""
@@ -328,7 +328,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify - should block on refeed action
         self.assertFalse(result['updated'])
         self.assertIn('refeed', result['config_change_actions'])
-        mock_vespa_app._store.activate_deployment.assert_not_called()
+        mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
     def test_configChangeActions_detection_reindex(self):
         """Test detection of reindex actions."""
@@ -371,7 +371,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify - should block on reindex action
         self.assertFalse(result['updated'])
         self.assertIn('reindex', result['config_change_actions'])
-        mock_vespa_app._store.activate_deployment.assert_not_called()
+        mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
     def test_update_index_main_schema_version_too_old(self):
         """Test error when index was created with Marqo < 2.23.0."""

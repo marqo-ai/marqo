@@ -357,25 +357,22 @@ class IndexManagement:
                 }
 
             # Either no actions required, or force=True - proceed with activation
-            if isinstance(vespa_app._store, ApplicationPackageDeploymentSessionStore):
-                vespa_app._store.activate_deployment(prepare_response)
-                logger.info(f'Successfully updated schema for index {index_name}')
+            vespa_app.activate_prepared_deployment(prepare_response)
+            logger.info(f'Successfully updated schema for index {index_name}')
 
-                result = {
-                    "updated": True,
-                    "schema_changed": True,
-                    "config_change_actions": config_change_actions
-                }
+            result = {
+                "updated": True,
+                "schema_changed": True,
+                "config_change_actions": config_change_actions
+            }
 
-                if has_actions:
-                    result["reason"] = "Update forced despite required actions"
-                    result["warning"] = f"Vespa requires these actions: {config_change_actions}"
-                else:
-                    result["reason"] = "Schema updated successfully"
-
-                return result
+            if has_actions:
+                result["reason"] = "Update forced despite required actions"
+                result["warning"] = f"Vespa requires these actions: {config_change_actions}"
             else:
-                raise InternalError("Schema update requires ApplicationPackageDeploymentSessionStore")
+                result["reason"] = "Schema updated successfully"
+
+            return result
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
