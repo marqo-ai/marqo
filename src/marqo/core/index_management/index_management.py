@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from typing import List, Tuple, Dict
 from typing import Optional
+import difflib
 
 import semver
 
@@ -254,7 +255,7 @@ class IndexManagement:
             logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
-    def update_index_main_schema(self, index_name: str, force: bool = False) -> Dict[str, any]:
+    def update_index_main_schema(self, index_name: str, force: bool = False, dry_run: bool = False) -> Dict[str, any]:
         """
         Update an index's main schema to the latest template version.
 
@@ -264,20 +265,27 @@ class IndexManagement:
         3. Compares it with the current deployed schema
         4. If different, prepares the deployment
         5. Checks Vespa's configChangeActions
-        6. If actions required and force=False, returns actions without deploying
-        7. If force=True or no actions, activates the deployment
+        6. Behavior based on parameters:
+           - dry_run=True: Show diff and actions, never deploy
+           - dry_run=False, force=False: Deploy only if no configChangeActions
+           - dry_run=False, force=True: Always deploy
 
         Args:
             index_name: Name of the index to update
             force: If True, proceed with update even if configChangeActions are required
+            dry_run: If True, show schema diff and configChangeActions without deploying
 
         Returns:
             Dict with update status:
             {
                 "updated": bool,              # Whether schema was actually deployed
                 "schema_changed": bool,       # Whether generated schema differs from current
+                "old_schema": str,            # Current deployed schema
+                "new_schema": str,            # Proposed/generated schema
+                "schema_diff": str,           # Unified diff between old and new
                 "reason": str,                # Explanation of the result
                 "config_change_actions": {}   # Vespa configChangeActions if any
+                "warning": str                # Optional, only if forced with actions
             }
 
         Raises:
@@ -313,24 +321,39 @@ class IndexManagement:
             vespa_app = self._get_vespa_application()
             current_schema = vespa_app.get_schema(existing_index.schema_name)
 
-            # Compare schemas (normalize whitespace for comparison)
-            def normalize_schema(schema: Optional[str]) -> str:
-                if schema is None:
-                    return ""
-                # Remove extra whitespace and blank lines for comparison
-                lines = [line.strip() for line in schema.split('\n') if line.strip()]
-                return '\n'.join(lines)
+            # Generate schema diff (always, for all scenarios)
+            current_schema_lines = (current_schema or '').splitlines(keepends=True)
+            new_schema_lines = new_schema.splitlines(keepends=True)
+            diff_lines = list(difflib.unified_diff(
+                current_schema_lines,
+                new_schema_lines,
+                fromfile='old_schema',
+                tofile='new_schema',
+                lineterm=''
+            ))
+            schema_diff = ''.join(diff_lines) if diff_lines else 'No changes'
 
-            if normalize_schema(new_schema) == normalize_schema(current_schema):
+            # Check if schemas are identical (based on diff)
+            schemas_identical = len(diff_lines) == 0
+
+            # Initialize response template with common fields
+            result = {
+                "updated": False,
+                "schema_changed": not schemas_identical,
+                "old_schema": current_schema or '',
+                "new_schema": new_schema,
+                "schema_diff": schema_diff,
+                "config_change_actions": {},
+                "reason": ""
+            }
+
+            # Scenario 1: Schemas are identical - no changes needed
+            if schemas_identical:
                 logger.info(f'Schema for index {index_name} is already up to date')
-                return {
-                    "updated": False,
-                    "schema_changed": False,
-                    "reason": "Schema is already up to date",
-                    "config_change_actions": {}
-                }
+                result["reason"] = "Schema is already up to date"
+                return result
 
-            # Schema is different - prepare deployment
+            # Schema is different - prepare deployment to get configChangeActions
             logger.info(f'Schema for index {index_name} has changes, preparing deployment')
             prepare_response = vespa_app.update_index_setting_and_schema(
                 existing_index,
@@ -340,32 +363,30 @@ class IndexManagement:
 
             # Extract configChangeActions from prepare response
             config_change_actions = prepare_response.get('configChangeActions', {})
+            result["config_change_actions"] = config_change_actions
 
             # Check if there are any required actions
             has_actions = bool(config_change_actions.get('restart') or
                                config_change_actions.get('refeed') or
                                config_change_actions.get('reindex'))
 
-            if has_actions and not force:
-                # Actions required but not forced - return without deploying
-                logger.warning(f'Schema update for index {index_name} requires Vespa actions: {config_change_actions}')
-                return {
-                    "updated": False,
-                    "schema_changed": True,
-                    "reason": "Vespa requires manual actions before proceeding. Use force=true to proceed anyway.",
-                    "config_change_actions": config_change_actions
-                }
+            # Scenario 2: dry_run=True - never deploy, just return info
+            if dry_run:
+                logger.info(f'Dry run for index {index_name} - showing schema diff without deploying')
+                result["reason"] = "Dry run - no changes deployed"
+                return result
 
-            # Either no actions required, or force=True - proceed with activation
+            # Scenario 3: dry_run=False, force=False - block if actions required
+            if has_actions and not force:
+                logger.warning(f'Schema update for index {index_name} requires Vespa actions: {config_change_actions}')
+                result["reason"] = "Vespa requires manual actions before proceeding. Use force=true to proceed anyway."
+                return result
+
+            # Scenario 4: dry_run=False, force=True OR no actions - proceed with deployment
             vespa_app.activate_prepared_deployment(prepare_response)
             logger.info(f'Successfully updated schema for index {index_name}')
 
-            result = {
-                "updated": True,
-                "schema_changed": True,
-                "config_change_actions": config_change_actions
-            }
-
+            result["updated"] = True
             if has_actions:
                 result["reason"] = "Update forced despite required actions"
                 result["warning"] = f"Vespa requires these actions: {config_change_actions}"

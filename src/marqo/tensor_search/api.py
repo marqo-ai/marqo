@@ -376,7 +376,7 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
 
 
 @app.post("/indexes/{index_name}/update-main-schema")
-def update_index_main_schema(index_name: str, force: bool = False, marqo_config: config.Config = Depends(get_config)):
+def update_index_main_schema(index_name: str, force: bool = False, dry_run: bool = False, marqo_config: config.Config = Depends(get_config)):
     """
     Update an index's main schema to the latest template version.
 
@@ -389,17 +389,23 @@ def update_index_main_schema(index_name: str, force: bool = False, marqo_config:
     2. Compares with currently deployed schema
     3. If different, prepares the deployment in Vespa
     4. Checks for required Vespa actions (restart, refeed, reindex)
-    5. If actions required and force=false, returns actions without deploying
-    6. If force=true or no actions, deploys the update
+    5. Behavior based on parameters:
+       - dry_run=true: Show diff and actions, never deploy
+       - dry_run=false, force=false: Deploy only if no configChangeActions
+       - dry_run=false, force=true: Always deploy
 
     Args:
         index_name: Name of the index to update
         force: If true, proceed even if Vespa requires actions (restart/refeed/reindex)
+        dry_run: If true, show schema diff and required actions without deploying
 
     Returns:
         JSON response with:
         - updated: Whether schema was deployed
         - schema_changed: Whether schema differs from current
+        - old_schema: Current deployed schema
+        - new_schema: Proposed/generated schema
+        - schema_diff: Unified diff output
         - reason: Explanation of result
         - config_change_actions: Vespa actions required (if any)
         - warning: Warning message if forced despite required actions
@@ -409,7 +415,7 @@ def update_index_main_schema(index_name: str, force: bool = False, marqo_config:
         400: Index type doesn't support schema updates
         500: Internal error during update
     """
-    result = marqo_config.index_management.update_index_main_schema(index_name, force=force)
+    result = marqo_config.index_management.update_index_main_schema(index_name, force=force, dry_run=dry_run)
     return JSONResponse(content=result, status_code=200)
 
 
