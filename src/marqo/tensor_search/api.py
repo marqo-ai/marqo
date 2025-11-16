@@ -408,7 +408,6 @@ def update_index_main_schema(index_name: str, force: bool = False, dry_run: bool
         - schema_diff: Unified diff output
         - reason: Explanation of result
         - config_change_actions: Vespa actions required (if any)
-        - warning: Warning message if forced despite required actions
 
     Raises:
         404: Index not found
