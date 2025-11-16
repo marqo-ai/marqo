@@ -409,16 +409,8 @@ def update_index_main_schema(index_name: str, force: bool = False, marqo_config:
         400: Index type doesn't support schema updates
         500: Internal error during update
     """
-    try:
-        result = marqo_config.index_management.update_index_main_schema(index_name, force=force)
-        return JSONResponse(content=result, status_code=200)
-    except core_exceptions.IndexNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
-    except core_exceptions.InternalError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=400)
-    except Exception as e:
-        logger.error(f"Error updating schema for index {index_name}: {e}", exc_info=True)
-        return JSONResponse(content={"error": f"Internal error: {str(e)}"}, status_code=500)
+    result = marqo_config.index_management.update_index_main_schema(index_name, force=force)
+    return JSONResponse(content=result, status_code=200)
 
 
 @app.get("/indexes/{index_name}/health")
