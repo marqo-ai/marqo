@@ -6,7 +6,8 @@ from marqo.core.exceptions import IndexNotFoundError, InternalError, Unsupported
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.index_management.vespa_application_package import (
     VespaApplicationPackage,
-    ApplicationPackageDeploymentSessionStore
+    ApplicationPackageDeploymentSessionStore,
+    VespaApplicationFileStore
 )
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
 from tests.unit_tests.marqo_test import MarqoTestCase
@@ -517,6 +518,101 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertFalse(result['updated'])
         self.assertEqual(result['reason'], "Dry run - no changes deployed")
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
+
+    def test_update_index_main_schema_with_old_vespa_store_raises_error(self):
+        """Test that prepare_only with VespaApplicationFileStore raises InternalError.
+
+        This covers the error path in update_index_setting_and_schema() when prepare_only=True
+        is used with VespaApplicationFileStore (old Vespa < 8.382.22 that doesn't support
+        deployment session API).
+        """
+        # Setup
+        test_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_name="test_schema"
+        )
+        current_schema = "schema test_schema { document test_schema {} }"
+        new_schema = "# Modified\nschema test_schema { document test_schema {} }"
+
+        # Mock get_index
+        self.index_mgmt.get_index = Mock(return_value=test_index)
+
+        # Create VespaApplicationPackage with VespaApplicationFileStore (old Vespa)
+        mock_vespa_app = Mock(spec=VespaApplicationPackage)
+        mock_vespa_app.get_schema.return_value = current_schema
+
+        # Create actual VespaApplicationFileStore to trigger the isinstance check
+        mock_file_store = Mock(spec=VespaApplicationFileStore)
+        mock_vespa_app._store = mock_file_store
+
+        # When update_index_setting_and_schema is called with prepare_only=True,
+        # it should raise InternalError because VespaApplicationFileStore doesn't support it
+        def raise_internal_error(*args, **kwargs):
+            if kwargs.get('prepare_only'):
+                raise InternalError("prepare_only mode requires ApplicationPackageDeploymentSessionStore")
+            return None
+
+        mock_vespa_app.update_index_setting_and_schema = Mock(side_effect=raise_internal_error)
+
+        self.index_mgmt._get_vespa_application = Mock(return_value=mock_vespa_app)
+
+        # Mock schema generation
+        with patch('marqo.core.index_management.index_management.SemiStructuredVespaSchema') as mock_schema_class:
+            mock_schema_class.generate_vespa_schema.return_value = new_schema
+
+            # Execute - this should raise InternalError
+            with self.assertRaises(InternalError) as ctx:
+                self.index_mgmt.update_index_main_schema("test_index")
+
+        # Verify error message
+        self.assertIn("prepare_only mode requires ApplicationPackageDeploymentSessionStore", str(ctx.exception))
+
+    def test_activate_prepared_deployment_with_old_vespa_store_raises_error(self):
+        """Test that activate_prepared_deployment with VespaApplicationFileStore raises InternalError.
+
+        This directly tests the activate_prepared_deployment() method's error path when called
+        with VespaApplicationFileStore.
+        """
+        # Create a mock VespaApplicationFileStore with proper XML content
+        mock_file_store = Mock(spec=VespaApplicationFileStore)
+        mock_file_store.file_exists.return_value = True
+
+        # Return valid XML for services.xml and JSON for config files
+        def mock_read_text_file(filename):
+            if filename == 'services.xml':
+                return '''<?xml version="1.0" encoding="utf-8" ?>
+                <services version="1.0">
+                    <container id="default" version="1.0"></container>
+                    <content id="content_default" version="1.0">
+                        <documents>
+                            <document type="test" mode="index"/>
+                        </documents>
+                    </content>
+                </services>'''
+            elif filename == 'marqo_config.json':
+                return '{"version": "1.0.0"}'
+            elif filename in ['marqo_index_settings.json', 'marqo_index_settings_history.json']:
+                return '{}'
+            return None
+
+        mock_file_store.read_text_file.side_effect = mock_read_text_file
+
+        # Create VespaApplicationPackage with the file store
+        vespa_app = VespaApplicationPackage(store=mock_file_store)
+
+        # Prepare response
+        prepare_response = {
+            'activate': 'http://activate_url',
+            'configChangeActions': {}
+        }
+
+        # Execute - should raise InternalError because VespaApplicationFileStore doesn't support
+        # the two-phase deployment (prepare/activate separately)
+        with self.assertRaises(InternalError) as ctx:
+            vespa_app.activate_prepared_deployment(prepare_response)
+
+        # Verify error message
+        self.assertIn("Deployment activation requires ApplicationPackageDeploymentSessionStore", str(ctx.exception))
 
 
 if __name__ == '__main__':
