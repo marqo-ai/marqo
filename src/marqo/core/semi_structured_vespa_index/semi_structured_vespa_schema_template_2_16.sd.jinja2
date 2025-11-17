@@ -215,12 +215,13 @@ schema {{ index.schema_name }} {
         #          score = max(decay_to, exp(-effective_age² / (2σ²)))
         # At effective_age = 0: score = 1.0
         # At effective_age = scale: score = decay_to
+        # Since ln(decay_to) is negative, we divide by -2*ln(decay_to) which is positive
         function recency_score_gaussian() {
             expression {
                 if (effective_age() == 0,
                     1.0,
                     max(query(marqo__recency_decay_to),
-                        exp(-pow(effective_age(), 2) * log(query(marqo__recency_decay_to)) / pow(query(marqo__recency_scale_seconds), 2))))
+                        exp(pow(effective_age(), 2) * log(query(marqo__recency_decay_to)) / (2.0 * pow(query(marqo__recency_scale_seconds), 2)))))
             }
         }
 
