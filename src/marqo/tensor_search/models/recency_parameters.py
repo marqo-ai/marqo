@@ -2,6 +2,7 @@
 
 from typing import Literal
 from pydantic.v1 import BaseModel, Field, validator
+from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
 
 class RecencyParameters(BaseModel):
@@ -17,13 +18,13 @@ class RecencyParameters(BaseModel):
         description="Name of the timestamp field to use for recency calculation"
     )
 
-    scale: float = Field(
-        default=7.0,
-        gt=0,
+    scale: str = Field(
+        default="7d",
         alias="scaleDays",
         description=(
-            "Time scale in days controlling decay rate. At distance offset+scale, "
-            "the score reaches decay_to value:\n"
+            "Time scale controlling decay rate. At distance offset+scale, "
+            "the score reaches decay_to value. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours).\n"
+            "Examples: '7d' (7 days), '168h' (168 hours), '0.5d' (12 hours)\n"
             "- exponential: smooth exponential decay\n"
             "- linear: constant rate decay\n"
             "- gaussian: bell curve decay\n"
@@ -31,13 +32,14 @@ class RecencyParameters(BaseModel):
         )
     )
 
-    offset: float = Field(
-        default=0.0,
-        ge=0.0,
+    offset: str = Field(
+        default="0d",
         alias="offset",
         description=(
-            "Grace period in days before decay begins. Documents within this age receive "
-            "perfect score (1.0) with no decay applied. Decay starts after this period."
+            "Grace period before decay begins. Documents within this age receive "
+            "perfect score (1.0) with no decay applied. Decay starts after this period. "
+            "Format: {number}{unit} where unit is 'd' (days) or 'h' (hours).\n"
+            "Examples: '0d' (no grace period), '2d' (2 days), '12h' (12 hours)"
         )
     )
 
@@ -80,3 +82,29 @@ class RecencyParameters(BaseModel):
         if not v or not v.strip():
             raise ValueError("recency_field cannot be empty")
         return v.strip()
+
+    @validator('scale')
+    def validate_scale(cls, v: str) -> str:
+        """Validate scale duration string format and constraints."""
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid scale format: {e}")
+
+        if seconds <= 0:
+            raise ValueError(f"scale must be greater than 0, got: {v} ({seconds} seconds)")
+
+        return v
+
+    @validator('offset')
+    def validate_offset(cls, v: str) -> str:
+        """Validate offset duration string format and constraints."""
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid offset format: {e}")
+
+        if seconds < 0:
+            raise ValueError(f"offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
+
+        return v

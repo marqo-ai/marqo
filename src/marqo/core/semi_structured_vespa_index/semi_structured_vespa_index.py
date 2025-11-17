@@ -132,6 +132,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
+        from marqo.core.utils.duration_parser import parse_duration_to_seconds
+
         # Map decay function to numeric value for Vespa
         decay_function_map = {
             "exponential": 0,
@@ -140,12 +142,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             "binary": 3
         }
 
-        # Convert scale and offset (in days) to seconds for Vespa
+        # Parse duration strings to seconds for Vespa
+        scale_seconds = parse_duration_to_seconds(recency_params.scale)
+        offset_seconds = parse_duration_to_seconds(recency_params.offset)
+
         return {
             constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
             constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == 'only-global' else 1,
-            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: (recency_params.scale * 24 * 60 * 60),
-            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: (recency_params.offset * 24 * 60 * 60),
+            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: scale_seconds,
+            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
             constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
             constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: decay_function_map[recency_params.decay_function]

@@ -147,13 +147,13 @@ class TestRecencyScoring(MarqoTestCase):
         return 1.0 if effective_age < scale_seconds else decay_to
 
     def test_exponential_decay_no_offset(self):
-        """Test exponential decay with offset=0 (backward compatibility)."""
+        """Test exponential decay with offset=0d."""
         self._add_test_documents()
 
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=7.0,  # 7 days
-            offset=0.0,
+            scale="7d",  # 7 days
+            offset="0d",
             decay_function="exponential",
             decay_to=0.5
         )
@@ -186,13 +186,10 @@ class TestRecencyScoring(MarqoTestCase):
         """Test exponential decay with grace period (offset > 0)."""
         self._add_test_documents()
 
-        offset_days = 3.0
-        scale_days = 7.0
-
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=scale_days,
-            offset=offset_days,
+            scale="7d",
+            offset="3d",
             decay_function="exponential",
             decay_to=0.3
         )
@@ -231,8 +228,8 @@ class TestRecencyScoring(MarqoTestCase):
 
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=14.0,  # 14 days
-            offset=0.0,
+            scale="14d",  # 14 days
+            offset="0d",
             decay_function="linear",
             decay_to=0.2
         )
@@ -254,8 +251,8 @@ class TestRecencyScoring(MarqoTestCase):
 
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=10.0,  # 10 days
-            offset=0.0,
+            scale="10d",  # 10 days
+            offset="0d",
             decay_function="gaussian",
             decay_to=0.4
         )
@@ -274,12 +271,10 @@ class TestRecencyScoring(MarqoTestCase):
         """Test binary decay (step function)."""
         self._add_test_documents()
 
-        threshold_days = 7.0
-
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=threshold_days,
-            offset=0.0,
+            scale="7d",
+            offset="0d",
             decay_function="binary",
             decay_to=0.1
         )
@@ -312,13 +307,10 @@ class TestRecencyScoring(MarqoTestCase):
         """Test binary decay with offset."""
         self._add_test_documents()
 
-        offset_days = 2.0
-        scale_days = 5.0
-
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=scale_days,
-            offset=offset_days,
+            scale="5d",
+            offset="2d",
             decay_function="binary",
             decay_to=0.2
         )
@@ -348,8 +340,8 @@ class TestRecencyScoring(MarqoTestCase):
 
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=5.0,  # Small scale to ensure decay
-            offset=0.0,
+            scale="5d",  # Small scale to ensure decay
+            offset="0d",
             decay_function="exponential",
             decay_to=0.6
         )
@@ -372,15 +364,13 @@ class TestRecencyScoring(MarqoTestCase):
         """Verify score reaches exactly decay_to at distance offset+scale."""
         self._add_test_documents()
 
-        offset_days = 2.0
-        scale_days = 5.0
         decay_to = 0.5
 
         # Test with exponential
         recency_params = RecencyParameters(
             recency_field="release_timestamp",
-            scale=scale_days,
-            offset=offset_days,
+            scale="5d",
+            offset="2d",
             decay_function="exponential",
             decay_to=decay_to
         )
@@ -411,7 +401,7 @@ class TestRecencyScoring(MarqoTestCase):
             try:
                 RecencyParameters(
                     recency_field="release_timestamp",
-                    scale=7.0,
+                    scale="7d",
                     **params
                 )
             except Exception as e:
@@ -424,39 +414,37 @@ class TestRecencyScoring(MarqoTestCase):
             with self.assertRaises(Exception, msg=f"decay_to={decay_to} should raise validation error"):
                 RecencyParameters(
                     recency_field="release_timestamp",
-                    scale=7.0,
+                    scale="7d",
                     decay_to=decay_to
                 )
 
     def test_offset_validation(self):
         """Test that offset must be >= 0."""
         # Valid values
-        valid_offsets = [0.0, 1.0, 10.0]
+        valid_offsets = ["0d", "1d", "10d"]
 
         for offset in valid_offsets:
             try:
                 RecencyParameters(
                     recency_field="release_timestamp",
-                    scale=7.0,
+                    scale="7d",
                     offset=offset
                 )
             except Exception as e:
                 self.fail(f"Valid offset={offset} should not raise: {e}")
 
-        # Invalid values - negative offset
+        # Invalid values - negative offset (invalid format)
         with self.assertRaises(Exception, msg="Negative offset should raise validation error"):
             RecencyParameters(
                 recency_field="release_timestamp",
-                scale=7.0,
-                offset=-1.0
+                scale="7d",
+                offset="-1d"
             )
 
     def test_all_decay_functions_comparison(self):
         """Compare all decay functions with same parameters to verify different behavior."""
         self._add_test_documents()
 
-        scale_days = 10.0
-        offset_days = 2.0
         decay_to = 0.5
 
         decay_functions = ["exponential", "linear", "gaussian", "binary"]
@@ -465,8 +453,8 @@ class TestRecencyScoring(MarqoTestCase):
         for decay_func in decay_functions:
             recency_params = RecencyParameters(
                 recency_field="release_timestamp",
-                scale=scale_days,
-                offset=offset_days,
+                scale="10d",
+                offset="2d",
                 decay_function=decay_func,
                 decay_to=decay_to
             )
@@ -646,8 +634,8 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale=14.0,
-                offset=0.0,
+                scale="14d",
+                offset="0d",
                 decay_function="exponential",
                 decay_to=0.3,
                 apply_in_ranking_phase="all"
@@ -738,8 +726,8 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale=14.0,
-                offset=0.0,
+                scale="14d",
+                offset="0d",
                 decay_function="exponential",
                 decay_to=0.3,
                 apply_in_ranking_phase="only-global"
@@ -824,8 +812,8 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale=14.0,
-                offset=0.0,
+                scale="14d",
+                offset="0d",
                 decay_function="exponential",
                 decay_to=0.3,
                 apply_in_ranking_phase="exclude-global"
@@ -870,6 +858,103 @@ class TestRecencyScoring(MarqoTestCase):
                 recent['_score'],
                 old['_score'],
                 "Recent doc should score at least as high with exclude-global"
+            )
+
+    def test_duration_string_format_hours(self):
+        """Test duration string format using hours unit."""
+        self._add_test_documents()
+
+        # 168 hours = 7 days
+        recency_params = RecencyParameters(
+            recency_field="release_timestamp",
+            scale="168h",  # 7 days in hours
+            offset="0h",
+            decay_function="exponential",
+            decay_to=0.5
+        )
+
+        hits = self._search_with_recency("product", recency_params)
+
+        # Verify we got results
+        self.assertGreater(len(hits), 0)
+
+        # Verify recency scores are present and valid
+        for hit in hits:
+            recency_score = hit.get('_recency_score')
+            self.assertIsNotNone(recency_score)
+            self.assertGreaterEqual(recency_score, 0.5)
+            self.assertLessEqual(recency_score, 1.0)
+
+    def test_duration_string_mixed_units(self):
+        """Test using different units for offset and scale."""
+        self._add_test_documents()
+
+        # offset in hours, scale in days
+        recency_params = RecencyParameters(
+            recency_field="release_timestamp",
+            scale="7d",
+            offset="48h",  # 2 days in hours
+            decay_function="linear",
+            decay_to=0.4
+        )
+
+        hits = self._search_with_recency("product", recency_params)
+
+        # Find documents within and outside offset
+        doc_1day = next((h for h in hits if "1 days old" in h['title']), None)
+        doc_5day = next((h for h in hits if "5 days old" in h['title']), None)
+
+        if doc_1day:
+            # Document within offset (1 day < 48h/2days)
+            self.assertAlmostEqual(
+                doc_1day['_recency_score'],
+                1.0,
+                places=2,
+                msg="Document within offset should have score of 1.0"
+            )
+
+        if doc_5day:
+            # Document outside offset (5 days > 2 days)
+            self.assertLess(
+                doc_5day['_recency_score'],
+                1.0,
+                "Document outside offset should have decayed score"
+            )
+
+    def test_duration_string_equivalence(self):
+        """Test that equivalent durations in different units produce same scores."""
+        self._add_test_documents()
+
+        # Test 7 days = 168 hours
+        recency_params_days = RecencyParameters(
+            recency_field="release_timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5
+        )
+
+        recency_params_hours = RecencyParameters(
+            recency_field="release_timestamp",
+            scale="168h",  # 7 days
+            offset="0h",
+            decay_function="exponential",
+            decay_to=0.5
+        )
+
+        hits_days = self._search_with_recency("product", recency_params_days)
+        hits_hours = self._search_with_recency("product", recency_params_hours)
+
+        # Should have same number of results
+        self.assertEqual(len(hits_days), len(hits_hours))
+
+        # Compare recency scores for the same documents
+        for i in range(min(3, len(hits_days))):  # Check first 3 docs
+            self.assertAlmostEqual(
+                hits_days[i]['_recency_score'],
+                hits_hours[i]['_recency_score'],
+                places=5,
+                msg=f"Recency scores should be equal for equivalent durations (doc {i})"
             )
 
 
