@@ -182,64 +182,76 @@ schema {{ index.schema_name }} {
             expression: max(0, age_in_seconds() - query(marqo__recency_offset_seconds))
         }
 
-        # Exponential decay
+        # Exponential decay (Elasticsearch-compatible)
         # Formula: λ = ln(decay_to) / scale
-        #          score = max(decay_to, exp(λ × effective_age))
-        # At effective_age = 0: score = 1.0
-        # At effective_age = scale: score = decay_to
-        function recency_score_exponential() {
+        #          score = max(decay_to, exp(λ × age))
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
+        function recency_score_exponential(age, scale, decay_to) {
             expression {
-                if (effective_age() == 0,
+                if (age == 0,
                     1.0,
-                    max(query(marqo__recency_decay_to),
-                        exp(log(query(marqo__recency_decay_to)) * effective_age() / query(marqo__recency_scale_seconds))))
+                    max(decay_to, exp(log(decay_to) * age / scale)))
             }
         }
 
-        # Linear decay
-        # Formula: s = scale / (1 - decay_to)
-        #          score = max(decay_to, (s - effective_age) / s)
-        # At effective_age = 0: score = 1.0
-        # At effective_age = scale: score = decay_to
-        function recency_score_linear() {
+        # Linear decay (Elasticsearch-compatible)
+        # Formula: score = max(decay_to, (scale - age × (1 - decay_to)) / scale)
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
+        function recency_score_linear(age, scale, decay_to) {
             expression {
-                if (effective_age() == 0,
+                if (age == 0,
                     1.0,
-                    max(query(marqo__recency_decay_to),
-                        (query(marqo__recency_scale_seconds) - effective_age() * (1.0 - query(marqo__recency_decay_to))) / query(marqo__recency_scale_seconds)))
+                    max(decay_to, (scale - age * (1.0 - decay_to)) / scale))
             }
         }
 
-        # Gaussian decay
+        # Gaussian decay (Elasticsearch-compatible)
         # Formula: σ² = -scale² / (2 × ln(decay_to))
-        #          score = max(decay_to, exp(-effective_age² / (2σ²)))
-        # At effective_age = 0: score = 1.0
-        # At effective_age = scale: score = decay_to
+        #          score = max(decay_to, exp(-age² / (2σ²)))
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
         # Since ln(decay_to) is negative, we divide by -2*ln(decay_to) which is positive
-        function recency_score_gaussian() {
+        function recency_score_gaussian(age, scale, decay_to) {
             expression {
-                if (effective_age() == 0,
+                if (age == 0,
                     1.0,
-                    max(query(marqo__recency_decay_to),
-                        exp(pow(effective_age(), 2) * log(query(marqo__recency_decay_to)) / (2.0 * pow(query(marqo__recency_scale_seconds), 2)))))
+                    max(decay_to, exp(pow(age, 2) * log(decay_to) / (2.0 * pow(scale, 2)))))
             }
         }
 
-        # Binary decay (step function with offset support)
-        # Score is 1.0 until effective_age >= scale, then drops to decay_to
-        function recency_score_binary() {
-            expression: if(effective_age() < query(marqo__recency_scale_seconds), 1.0, query(marqo__recency_decay_to))
+        # Binary decay (step function)
+        # Score is 1.0 until age >= scale, then drops to decay_to
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: threshold in seconds
+        #   decay_to: score after threshold
+        function recency_score_binary(age, scale, decay_to) {
+            expression: if(age < scale, 1.0, decay_to)
         }
 
         function recency_score_router() {
             expression {
                 if (query(marqo__recency_decay_function_type) == 0,
-                    recency_score_exponential(),
+                    recency_score_exponential(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
                     if (query(marqo__recency_decay_function_type) == 1,
-                        recency_score_linear(),
+                        recency_score_linear(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
                         if (query(marqo__recency_decay_function_type) == 2,
-                            recency_score_gaussian(),
-                            recency_score_binary())))
+                            recency_score_gaussian(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
+                            recency_score_binary(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)))))
             }
         }
 
