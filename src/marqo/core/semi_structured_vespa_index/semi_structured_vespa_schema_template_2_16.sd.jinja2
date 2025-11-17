@@ -159,7 +159,8 @@ schema {{ index.schema_name }} {
             query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
             query(marqo__recency_scale_seconds) double: 604800.0
-            query(marqo__recency_min_score) double: 0.1
+            query(marqo__recency_offset_seconds) double: 0.0
+            query(marqo__recency_decay_to) double: 0.5
         }
 
         # Recency scoring functions
@@ -175,20 +176,58 @@ schema {{ index.schema_name }} {
             expression: max(0, now() - get_timestamp())
         }
 
+        # Effective age after applying offset (grace period)
+        # Documents within offset period get 0 effective age (perfect score)
+        function effective_age() {
+            expression: max(0, age_in_seconds() - query(marqo__recency_offset_seconds))
+        }
+
+        # Exponential decay
+        # Formula: λ = ln(decay_to) / scale
+        #          score = max(decay_to, exp(λ × effective_age))
+        # At effective_age = 0: score = 1.0
+        # At effective_age = scale: score = decay_to
         function recency_score_exponential() {
-            expression: max(query(marqo__recency_min_score), exp(-age_in_seconds() / query(marqo__recency_scale_seconds)))
+            expression {
+                if (effective_age() == 0,
+                    1.0,
+                    max(query(marqo__recency_decay_to),
+                        exp(log(query(marqo__recency_decay_to)) * effective_age() / query(marqo__recency_scale_seconds))))
+            }
         }
 
+        # Linear decay
+        # Formula: s = scale / (1 - decay_to)
+        #          score = max(decay_to, (s - effective_age) / s)
+        # At effective_age = 0: score = 1.0
+        # At effective_age = scale: score = decay_to
         function recency_score_linear() {
-            expression: max(query(marqo__recency_min_score), 1.0 - ((1.0 - query(marqo__recency_min_score)) * age_in_seconds() / query(marqo__recency_scale_seconds)))
+            expression {
+                if (effective_age() == 0,
+                    1.0,
+                    max(query(marqo__recency_decay_to),
+                        (query(marqo__recency_scale_seconds) - effective_age() * (1.0 - query(marqo__recency_decay_to))) / query(marqo__recency_scale_seconds)))
+            }
         }
 
+        # Gaussian decay
+        # Formula: σ² = -scale² / (2 × ln(decay_to))
+        #          score = max(decay_to, exp(-effective_age² / (2σ²)))
+        # At effective_age = 0: score = 1.0
+        # At effective_age = scale: score = decay_to
         function recency_score_gaussian() {
-            expression: max(query(marqo__recency_min_score), exp(-pow(age_in_seconds(), 2) / (2.0 * pow(query(marqo__recency_scale_seconds), 2))))
+            expression {
+                if (effective_age() == 0,
+                    1.0,
+                    max(query(marqo__recency_decay_to),
+                        exp(-pow(effective_age(), 2) * log(query(marqo__recency_decay_to)) / pow(query(marqo__recency_scale_seconds), 2))))
+            }
         }
 
+        # Binary decay (step function with offset support)
+        # Score is 1.0 until effective_age >= scale, then drops to decay_to
         function recency_score_binary() {
-            expression: if(age_in_seconds() < query(marqo__recency_scale_seconds), 1.0, query(marqo__recency_min_score))
+            expression: if(effective_age() < query(marqo__recency_scale_seconds), 1.0, query(marqo__recency_decay_to))
         }
 
         function recency_score_router() {
@@ -379,7 +418,8 @@ schema {{ index.schema_name }} {
             query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
             query(marqo__recency_scale_seconds) double: 604800.0
-            query(marqo__recency_min_score) double: 0.1
+            query(marqo__recency_offset_seconds) double: 0.0
+            query(marqo__recency_decay_to) double: 0.5
         }
     }
 

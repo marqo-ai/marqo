@@ -22,11 +22,22 @@ class RecencyParameters(BaseModel):
         gt=0,
         alias="scaleDays",
         description=(
-            "Time scale in days controlling decay rate:\n"
-            "- exponential: half-life (score decays to ~37% at this point)\n"
-            "- linear: max_age (score reaches min_score at this point)\n"
-            "- gaussian: sigma/standard deviation (score decays to ~60% at this point)\n"
-            "- binary: threshold (hard cutoff - items older than this get min_score)"
+            "Time scale in days controlling decay rate. At distance offset+scale, "
+            "the score reaches decay_to value:\n"
+            "- exponential: smooth exponential decay\n"
+            "- linear: constant rate decay\n"
+            "- gaussian: bell curve decay\n"
+            "- binary: step function (no decay until offset+scale, then drops to decay_to)"
+        )
+    )
+
+    offset: float = Field(
+        default=0.0,
+        ge=0.0,
+        alias="offset",
+        description=(
+            "Grace period in days before decay begins. Documents within this age receive "
+            "perfect score (1.0) with no decay applied. Decay starts after this period."
         )
     )
 
@@ -36,12 +47,16 @@ class RecencyParameters(BaseModel):
         description="Type of decay function to apply: exponential (smooth decay), linear (constant decay), gaussian (bell curve), binary (step function at threshold)"
     )
 
-    min_score: float = Field(
-        default=0.1,
-        ge=0.0,
+    decay_to: float = Field(
+        default=0.5,
+        gt=0.0,
         le=1.0,
-        alias="minScore",
-        description="Minimum score multiplier (floor to prevent complete decay)"
+        alias="decayTo",
+        description=(
+            "Target score at distance offset+scale, also acts as floor. "
+            "Must be in range (0.0, 1.0]. This is the score a document receives "
+            "at age = offset + scale, and also the minimum score for older documents. "
+        )
     )
 
     apply_in_ranking_phase: Literal["all", "only-global", "exclude-global"] = Field(
