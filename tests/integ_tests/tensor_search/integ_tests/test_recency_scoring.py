@@ -499,5 +499,379 @@ class TestRecencyScoring(MarqoTestCase):
         )
 
 
+    def test_all_score_modifiers_without_recency(self):
+        """Baseline test: All score modifiers without recency."""
+        from marqo.tensor_search.models.api_models import ScoreModifierLists
+        from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+
+        # Add documents with modifier fields
+        now = datetime.now()
+        documents = [
+            {
+                "_id": "recent-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "recent-low",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 1.0,
+                "add": 0.0
+            },
+            {
+                "_id": "old-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "old-low",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 1.0,
+                "add": 0.0
+            }
+        ]
+
+        add_docs_params = AddDocsParams(
+            index_name=self.index.name,
+            docs=documents,
+            tensor_fields=["title", "description"]
+        )
+        self.add_documents(self.config, add_docs_params)
+
+        # Search with all modifiers but NO recency
+        search_result = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            score_modifiers=ScoreModifierLists(
+                multiply_score_by=[{"field_name": "mult", "weight": 2.0}],
+                add_to_score=[{"field_name": "add", "weight": 5.0}]
+            ),
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                scoreModifiersLexical=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                ),
+                scoreModifiersTensor=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                )
+            ),
+            result_count=10
+        )
+
+        hits = search_result['hits']
+        self.assertGreater(len(hits), 0)
+
+        # Verify high mult/add docs score higher (no recency differentiation)
+        high_docs = [h for h in hits if "high" in h['_id']]
+        low_docs = [h for h in hits if "low" in h['_id']]
+
+        if high_docs and low_docs:
+            avg_high_score = sum(h['_score'] for h in high_docs) / len(high_docs)
+            avg_low_score = sum(h['_score'] for h in low_docs) / len(low_docs)
+            self.assertGreater(avg_high_score, avg_low_score,
+                             "Docs with high modifiers should score higher")
+
+        # Verify NO recency score field
+        for hit in hits:
+            self.assertIsNone(hit.get('_recency_score'),
+                            "Recency score should not be present without recency params")
+
+    def test_all_modifiers_with_recency_apply_all(self):
+        """Test all modifiers + recency with apply_in_ranking_phase='all'."""
+        from marqo.tensor_search.models.api_models import ScoreModifierLists
+        from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+
+        # Add documents with modifier fields
+        now = datetime.now()
+        documents = [
+            {
+                "_id": "recent-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "recent-low",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 1.0,
+                "add": 0.0
+            },
+            {
+                "_id": "old-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "old-low",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 1.0,
+                "add": 0.0
+            }
+        ]
+
+        add_docs_params = AddDocsParams(
+            index_name=self.index.name,
+            docs=documents,
+            tensor_fields=["title", "description"]
+        )
+        self.add_documents(self.config, add_docs_params)
+
+        # Search with all modifiers + recency (apply in all phases)
+        search_result = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale=14.0,
+                offset=0.0,
+                decay_function="exponential",
+                decay_to=0.3,
+                apply_in_ranking_phase="all"
+            ),
+            score_modifiers=ScoreModifierLists(
+                multiply_score_by=[{"field_name": "mult", "weight": 2.0}],
+                add_to_score=[{"field_name": "add", "weight": 5.0}]
+            ),
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                scoreModifiersLexical=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                ),
+                scoreModifiersTensor=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                )
+            ),
+            result_count=10
+        )
+
+        hits = search_result['hits']
+        self.assertGreater(len(hits), 0)
+
+        # Verify recency scores are present
+        for hit in hits:
+            self.assertIsNotNone(hit.get('_recency_score'),
+                               "Recency score should be present")
+
+        # Find specific documents
+        recent_high = next((h for h in hits if h['_id'] == 'recent-high'), None)
+        old_high = next((h for h in hits if h['_id'] == 'old-high'), None)
+
+        if recent_high and old_high:
+            # Recent doc should have higher recency score
+            self.assertGreater(
+                recent_high['_recency_score'],
+                old_high['_recency_score'],
+                "Recent document should have higher recency score"
+            )
+
+            # With apply_in_ranking_phase='all', recency affects both Vespa and global
+            # Recent docs should rank higher even with same modifiers
+            self.assertGreater(
+                recent_high['_score'],
+                old_high['_score'],
+                "Recent document with same modifiers should score higher due to recency"
+            )
+
+    def test_all_modifiers_with_recency_only_global(self):
+        """Test all modifiers + recency with apply_in_ranking_phase='only-global'."""
+        from marqo.tensor_search.models.api_models import ScoreModifierLists
+        from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+
+        # Add documents
+        now = datetime.now()
+        documents = [
+            {
+                "_id": "recent-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "old-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            }
+        ]
+
+        add_docs_params = AddDocsParams(
+            index_name=self.index.name,
+            docs=documents,
+            tensor_fields=["title", "description"]
+        )
+        self.add_documents(self.config, add_docs_params)
+
+        # Search with recency only in global phase
+        search_result = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale=14.0,
+                offset=0.0,
+                decay_function="exponential",
+                decay_to=0.3,
+                apply_in_ranking_phase="only-global"
+            ),
+            score_modifiers=ScoreModifierLists(
+                multiply_score_by=[{"field_name": "mult", "weight": 2.0}],
+                add_to_score=[{"field_name": "add", "weight": 5.0}]
+            ),
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                scoreModifiersLexical=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                ),
+                scoreModifiersTensor=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                )
+            ),
+            result_count=10
+        )
+
+        hits = search_result['hits']
+        self.assertGreater(len(hits), 0)
+
+        # Verify recency scores are present
+        for hit in hits:
+            self.assertIsNotNone(hit.get('_recency_score'))
+
+        # Recent doc should still score higher (recency in global phase)
+        recent = next((h for h in hits if h['_id'] == 'recent-high'), None)
+        old = next((h for h in hits if h['_id'] == 'old-high'), None)
+
+        if recent and old:
+            self.assertGreater(
+                recent['_recency_score'],
+                old['_recency_score']
+            )
+            self.assertGreater(
+                recent['_score'],
+                old['_score'],
+                "Recent doc should score higher with only-global application"
+            )
+
+    def test_all_modifiers_with_recency_exclude_global(self):
+        """Test all modifiers + recency with apply_in_ranking_phase='exclude-global'."""
+        from marqo.tensor_search.models.api_models import ScoreModifierLists
+        from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+
+        # Add documents
+        now = datetime.now()
+        documents = [
+            {
+                "_id": "recent-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": now.timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            },
+            {
+                "_id": "old-high",
+                "title": "product electronics",
+                "description": "test product",
+                "timestamp": (now - timedelta(days=30)).timestamp(),
+                "mult": 3.0,
+                "add": 10.0
+            }
+        ]
+
+        add_docs_params = AddDocsParams(
+            index_name=self.index.name,
+            docs=documents,
+            tensor_fields=["title", "description"]
+        )
+        self.add_documents(self.config, add_docs_params)
+
+        # Search with recency excluded from global phase
+        search_result = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale=14.0,
+                offset=0.0,
+                decay_function="exponential",
+                decay_to=0.3,
+                apply_in_ranking_phase="exclude-global"
+            ),
+            score_modifiers=ScoreModifierLists(
+                multiply_score_by=[{"field_name": "mult", "weight": 2.0}],
+                add_to_score=[{"field_name": "add", "weight": 5.0}]
+            ),
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                scoreModifiersLexical=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                ),
+                scoreModifiersTensor=ScoreModifierLists(
+                    multiply_score_by=[{"field_name": "mult", "weight": 1.5}]
+                )
+            ),
+            result_count=10
+        )
+
+        hits = search_result['hits']
+        self.assertGreater(len(hits), 0)
+
+        # Verify recency scores are present
+        for hit in hits:
+            self.assertIsNotNone(hit.get('_recency_score'))
+
+        # Recency applied in Vespa phases only
+        # Recent doc should still benefit from recency in individual scores
+        recent = next((h for h in hits if h['_id'] == 'recent-high'), None)
+        old = next((h for h in hits if h['_id'] == 'old-high'), None)
+
+        if recent and old:
+            self.assertGreater(
+                recent['_recency_score'],
+                old['_recency_score']
+            )
+            # Score difference may be smaller than 'all' mode since recency
+            # only affects Vespa phase, not global phase
+            self.assertGreaterEqual(
+                recent['_score'],
+                old['_score'],
+                "Recent doc should score at least as high with exclude-global"
+            )
+
+
 if __name__ == '__main__':
     unittest.main()
