@@ -130,8 +130,9 @@ class TestRecencyScoring(MarqoTestCase):
             return 1.0
         # σ² = -scale² / (2 × ln(decay_to))
         # score = max(decay_to, exp(-effective_age² / (2σ²)))
+        # Simplified: score = max(decay_to, exp(effective_age² × ln(decay_to) / scale²))
         score = math.exp(
-            -pow(effective_age, 2) * math.log(decay_to) / pow(scale_seconds, 2)
+            pow(effective_age, 2) * math.log(decay_to) / pow(scale_seconds, 2)
         )
         return max(decay_to, score)
 

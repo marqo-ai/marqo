@@ -224,12 +224,12 @@ schema {{ index.schema_name }} {
         #   decay_to: target score at age=scale, also acts as floor
         # At age = 0: score = 1.0
         # At age = scale: score = decay_to
-        # Since ln(decay_to) is negative, we divide by -2*ln(decay_to) which is positive
+        # Formula: score = exp(age² × ln(decay_to) / scale²)
         function recency_score_gaussian(age, scale, decay_to) {
             expression {
                 if (age == 0,
                     1.0,
-                    max(decay_to, exp(pow(age, 2) * log(decay_to) / (2.0 * pow(scale, 2)))))
+                    max(decay_to, exp(pow(age, 2) * log(decay_to) / pow(scale, 2))))
             }
         }
 
