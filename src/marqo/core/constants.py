@@ -17,7 +17,7 @@ MARQO_SEARCH_METHOD_LEXICAL = 'lexical'
 # For hybrid search
 MARQO_DOC_HYBRID_TENSOR_SCORE = '_tensor_score'
 MARQO_DOC_HYBRID_LEXICAL_SCORE = '_lexical_score'
-MARQO_DOC_RECENCY_MULTIPLIER = '_recency_score'
+MARQO_DOC_RECENCY_SCORE = '_recency_score'
 
 MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.10.0')
 MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.11.0')

@@ -404,7 +404,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
 
         # Recency score from Vespa field (set by Java HybridSearcher)
         if self.fixed_fields.recency_score is not None:
-            marqo_document[index_constants.MARQO_DOC_RECENCY_MULTIPLIER] = self.fixed_fields.recency_score
+            marqo_document[index_constants.MARQO_DOC_RECENCY_SCORE] = self.fixed_fields.recency_score
 
         return marqo_document
 
