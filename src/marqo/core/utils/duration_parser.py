@@ -65,27 +65,3 @@ def parse_duration_to_seconds(duration: str) -> float:
 
     seconds = value * UNIT_TO_SECONDS[unit]
     return seconds
-
-
-def parse_duration_to_days(duration: str) -> float:
-    """
-    Parse an Elasticsearch-style duration string to days.
-
-    Convenience function that converts the duration to days instead of seconds.
-
-    Args:
-        duration: Duration string in format "{number}{unit}" (e.g., "1d", "24h")
-
-    Returns:
-        Duration in days as a float
-
-    Examples:
-        >>> parse_duration_to_days("1d")
-        1.0
-        >>> parse_duration_to_days("24h")
-        1.0
-        >>> parse_duration_to_days("12h")
-        0.5
-    """
-    seconds = parse_duration_to_seconds(duration)
-    return seconds / (24 * 60 * 60)

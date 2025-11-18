@@ -2,7 +2,7 @@
 Unit tests for duration parser utility.
 """
 import unittest
-from marqo.core.utils.duration_parser import parse_duration_to_seconds, parse_duration_to_days
+from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
 
 class TestDurationParser(unittest.TestCase):
@@ -42,14 +42,6 @@ class TestDurationParser(unittest.TestCase):
         """Test parsing very large duration values."""
         self.assertEqual(parse_duration_to_seconds("365d"), 31536000.0)  # 1 year
         self.assertEqual(parse_duration_to_seconds("8760h"), 31536000.0)  # 1 year in hours
-
-    def test_parse_to_days_conversion(self):
-        """Test parse_duration_to_days utility function."""
-        self.assertEqual(parse_duration_to_days("1d"), 1.0)
-        self.assertEqual(parse_duration_to_days("7d"), 7.0)
-        self.assertEqual(parse_duration_to_days("24h"), 1.0)
-        self.assertEqual(parse_duration_to_days("12h"), 0.5)
-        self.assertEqual(parse_duration_to_days("168h"), 7.0)
 
     def test_invalid_format_missing_unit(self):
         """Test error on duration string missing unit."""
