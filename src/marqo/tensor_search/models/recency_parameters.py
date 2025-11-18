@@ -20,7 +20,6 @@ class RecencyParameters(BaseModel):
 
     scale: str = Field(
         default="7d",
-        alias="scaleDays",
         description=(
             "Time scale controlling decay rate. At distance offset+scale, "
             "the score reaches decay_to value. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours).\n"
