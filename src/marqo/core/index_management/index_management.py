@@ -278,13 +278,13 @@ class IndexManagement:
         Returns:
             Dict with update status:
             {
-                "updated": bool,              # Whether schema was actually deployed
-                "schema_changed": bool,       # Whether generated schema differs from current
-                "old_schema": str,            # Current deployed schema
-                "new_schema": str,            # Proposed/generated schema
-                "schema_diff": str,           # Unified diff between old and new
-                "reason": str,                # Explanation of the result
-                "config_change_actions": {}   # Vespa configChangeActions if any
+                "updated": bool,                # Whether schema was actually deployed
+                "schemaChanged": bool,          # Whether generated schema differs from current
+                "oldSchema": str,               # Current deployed schema
+                "newSchema": str,               # Proposed/generated schema
+                "schemaDiff": str,              # Unified diff between old and new
+                "reason": str,                  # Explanation of the result
+                "configChangeActions": {}       # Vespa configChangeActions if any
             }
 
         Raises:
@@ -338,11 +338,11 @@ class IndexManagement:
             # Initialize response template with common fields
             result = {
                 "updated": False,
-                "schema_changed": not schemas_identical,
-                "old_schema": current_schema or '',
-                "new_schema": new_schema,
-                "schema_diff": schema_diff,
-                "config_change_actions": {},
+                "schemaChanged": not schemas_identical,
+                "oldSchema": current_schema or '',
+                "newSchema": new_schema,
+                "schemaDiff": schema_diff,
+                "configChangeActions": {},
                 "reason": ""
             }
 
@@ -362,7 +362,7 @@ class IndexManagement:
 
             # Extract configChangeActions from prepare response
             config_change_actions = prepare_response.get('configChangeActions', {})
-            result["config_change_actions"] = config_change_actions
+            result["configChangeActions"] = config_change_actions
 
             # Check if there are any required actions
             has_actions = bool(config_change_actions.get('restart') or

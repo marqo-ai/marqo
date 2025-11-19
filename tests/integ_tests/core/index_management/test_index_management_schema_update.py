@@ -81,7 +81,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
     # ============================================================================
 
     def test_update_schema_no_changes(self):
-        """When schema hasn't changed, should return schema_changed=False and not deploy."""
+        """When schema hasn't changed, should return schemaChanged=False and not deploy."""
         test_index_name = 'test_schema_update_index'
         result = self.index_management.apply_latest_schema_template(test_index_name)
 
@@ -90,11 +90,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         original_version = saved_index.version
 
         self.assertFalse(result['updated'])
-        self.assertFalse(result['schema_changed'])
+        self.assertFalse(result['schemaChanged'])
         self.assertEqual('Schema is already up to date', result['reason'])
-        self.assertEqual('No changes', result['schema_diff'])
-        self.assertEqual(original_schema, result['old_schema'])
-        self.assertEqual(original_schema, result['new_schema'])
+        self.assertEqual('No changes', result['schemaDiff'])
+        self.assertEqual(original_schema, result['oldSchema'])
+        self.assertEqual(original_schema, result['newSchema'])
 
         self.assertEqual(original_version, self.index_management.get_index(test_index_name).version)
 
@@ -118,11 +118,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify the result
         self.assertTrue(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertIn('Schema updated successfully', result['reason'])
-        self.assertEqual(original_schema, result['old_schema'])
-        self.assertEqual(modified_schema, result['new_schema'])
-        self.assertIn('# Updated schema', result['schema_diff'])
+        self.assertEqual(original_schema, result['oldSchema'])
+        self.assertEqual(modified_schema, result['newSchema'])
+        self.assertIn('# Updated schema', result['schemaDiff'])
 
         # Verify schema was actually deployed to Vespa
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
@@ -149,10 +149,10 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify no deployment occurred
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertEqual('Dry run - no changes deployed', result['reason'])
-        self.assertEqual(modified_schema, result['new_schema'])
-        self.assertIn('# Dry run test', result['schema_diff'])
+        self.assertEqual(modified_schema, result['newSchema'])
+        self.assertIn('# Dry run test', result['schemaDiff'])
 
         # Verify schema was NOT deployed to Vespa (original schema still present)
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
@@ -235,11 +235,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify deployment was blocked
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('restart', result['config_change_actions'])
-        self.assertEqual(1, len(result['config_change_actions']['restart']))
-        self.assertIn("Field 'marqo__lexical_title' changed: add attribute aspect", result['config_change_actions']['restart'][0]['messages'][0])
+        self.assertIn('restart', result['configChangeActions'])
+        self.assertEqual(1, len(result['configChangeActions']['restart']))
+        self.assertIn("Field 'marqo__lexical_title' changed: add attribute aspect", result['configChangeActions']['restart'][0]['messages'][0])
 
         # Verify schema was NOT deployed
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
@@ -250,7 +250,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             force=True
         )
         self.assertTrue(result_forced['updated'])
-        self.assertTrue(result_forced['schema_changed'])
+        self.assertTrue(result_forced['schemaChanged'])
         self.assertIn('Update forced despite required actions', result_forced['reason'])
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
@@ -288,11 +288,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify deployment was blocked
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('refeed', result['config_change_actions'])
+        self.assertIn('refeed', result['configChangeActions'])
         self.assertIn("Field 'marqo__id' changed: data type: 'string' -> 'int'",
-                      result['config_change_actions']['refeed'][0]['messages'][0])
+                      result['configChangeActions']['refeed'][0]['messages'][0])
 
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
@@ -304,7 +304,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify deployment proceeded despite actions
         self.assertTrue(result_forced['updated'])
-        self.assertTrue(result_forced['schema_changed'])
+        self.assertTrue(result_forced['schemaChanged'])
         self.assertIn('Update forced despite required actions', result_forced['reason'])
 
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
@@ -349,11 +349,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify deployment was blocked
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertIn('Vespa requires manual actions before proceeding', result['reason'])
-        self.assertIn('reindex', result['config_change_actions'])
+        self.assertIn('reindex', result['configChangeActions'])
         self.assertIn("Field 'marqo__id' changed: add index aspect",
-                      result['config_change_actions']['reindex'][0]['messages'][0])
+                      result['configChangeActions']['reindex'][0]['messages'][0])
 
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
@@ -365,7 +365,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify deployment is done
         self.assertTrue(result_forced['updated'])
-        self.assertTrue(result_forced['schema_changed'])
+        self.assertTrue(result_forced['schemaChanged'])
         self.assertIn('Update forced despite required actions', result_forced['reason'])
-        self.assertIn('reindex', result_forced['config_change_actions'])
+        self.assertIn('reindex', result_forced['configChangeActions'])
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))

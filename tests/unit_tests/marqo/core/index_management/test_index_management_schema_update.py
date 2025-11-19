@@ -62,9 +62,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertFalse(result['updated'])
-        self.assertFalse(result['schema_changed'])
+        self.assertFalse(result['schemaChanged'])
         self.assertEqual(result['reason'], "Schema is already up to date")
-        self.assertEqual(result['config_change_actions'], {})
+        self.assertEqual(result['configChangeActions'], {})
         mock_vespa_app.update_index_setting_and_schema.assert_not_called()
 
     def test_apply_latest_schema_template_with_changes_no_actions(self):
@@ -104,9 +104,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertTrue(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertEqual(result['reason'], "Schema updated successfully")
-        self.assertEqual(result['config_change_actions'], {})
+        self.assertEqual(result['configChangeActions'], {})
 
         # Verify prepare was called
         mock_vespa_app.update_index_setting_and_schema.assert_called_once()
@@ -161,9 +161,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertIn("Vespa requires manual actions", result['reason'])
-        self.assertIn('restart', result['config_change_actions'])
+        self.assertIn('restart', result['configChangeActions'])
 
         # Verify activate was NOT called
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
@@ -212,9 +212,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertTrue(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertEqual(result['reason'], "Update forced despite required actions")
-        self.assertIn('restart', result['config_change_actions'])
+        self.assertIn('restart', result['configChangeActions'])
 
         # Verify activate WAS called
         mock_vespa_app.activate_prepared_deployment.assert_called_once_with(prepare_response)
@@ -286,7 +286,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify - should block on refeed action
         self.assertFalse(result['updated'])
-        self.assertIn('refeed', result['config_change_actions'])
+        self.assertIn('refeed', result['configChangeActions'])
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
     def test_configChangeActions_detection_reindex(self):
@@ -329,7 +329,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify - should block on reindex action
         self.assertFalse(result['updated'])
-        self.assertIn('reindex', result['config_change_actions'])
+        self.assertIn('reindex', result['configChangeActions'])
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
     def test_apply_latest_schema_template_version_too_old(self):
@@ -379,12 +379,12 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertFalse(result['updated'])
-        self.assertFalse(result['schema_changed'])
+        self.assertFalse(result['schemaChanged'])
         self.assertEqual(result['reason'], "Schema is already up to date")
-        self.assertIn('old_schema', result)
-        self.assertIn('new_schema', result)
-        self.assertIn('schema_diff', result)
-        self.assertEqual(result['schema_diff'], 'No changes')
+        self.assertIn('oldSchema', result)
+        self.assertIn('newSchema', result)
+        self.assertIn('schemaDiff', result)
+        self.assertEqual(result['schemaDiff'], 'No changes')
 
     def test_apply_latest_schema_template_dry_run_with_changes(self):
         """Test dry_run with schema changes - should not deploy."""
@@ -422,12 +422,12 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertFalse(result['updated'])  # Should not be updated in dry run
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertEqual(result['reason'], "Dry run - no changes deployed")
-        self.assertIn('old_schema', result)
-        self.assertIn('new_schema', result)
-        self.assertIn('schema_diff', result)
-        self.assertNotEqual(result['schema_diff'], 'No changes')
+        self.assertIn('oldSchema', result)
+        self.assertIn('newSchema', result)
+        self.assertIn('schemaDiff', result)
+        self.assertNotEqual(result['schemaDiff'], 'No changes')
 
         # Verify prepare was called but activate was NOT
         mock_vespa_app.update_index_setting_and_schema.assert_called_once()
@@ -471,9 +471,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Verify
         self.assertFalse(result['updated'])
-        self.assertTrue(result['schema_changed'])
+        self.assertTrue(result['schemaChanged'])
         self.assertEqual(result['reason'], "Dry run - no changes deployed")
-        self.assertIn('restart', result['config_change_actions'])
+        self.assertIn('restart', result['configChangeActions'])
 
         # Verify activate was NOT called
         mock_vespa_app.activate_prepared_deployment.assert_not_called()

@@ -403,12 +403,12 @@ def apply_latest_schema_template(index_name: str, force: bool = False, dry_run: 
     Returns:
         JSON response with:
         - updated: Whether schema was deployed
-        - schema_changed: Whether schema differs from current
-        - old_schema: Current deployed schema
-        - new_schema: Proposed/generated schema
-        - schema_diff: Unified diff output
+        - schemaChanged: Whether schema differs from current
+        - oldSchema: Current deployed schema
+        - newSchema: Proposed/generated schema
+        - schemaDiff: Unified diff output
         - reason: Explanation of result
-        - config_change_actions: Vespa actions required (if any)
+        - configChangeActions: Vespa actions required (if any)
 
     Raises:
         404: Index not found
