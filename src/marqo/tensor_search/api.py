@@ -375,8 +375,9 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
-@app.post("/indexes/{index_name}/update-main-schema")
-def update_index_main_schema(index_name: str, force: bool = False, dry_run: bool = False, marqo_config: config.Config = Depends(get_config)):
+@app.post("/indexes/{index_name}/apply-latest-schema-template")
+@utils.enable_ops_api()
+def apply_latest_schema_template(index_name: str, force: bool = False, dry_run: bool = False, marqo_config: config.Config = Depends(get_config)):
     """
     Update an index's main schema to the latest template version.
 
@@ -414,7 +415,7 @@ def update_index_main_schema(index_name: str, force: bool = False, dry_run: bool
         400: Index type doesn't support schema updates
         500: Internal error during update
     """
-    result = marqo_config.index_management.update_index_main_schema(index_name, force=force, dry_run=dry_run)
+    result = marqo_config.index_management.apply_latest_schema_template(index_name, force=force, dry_run=dry_run)
     return JSONResponse(content=result, status_code=200)
 
 

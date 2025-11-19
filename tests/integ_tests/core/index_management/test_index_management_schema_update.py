@@ -11,7 +11,7 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestIndexManagementSchemaUpdate(MarqoTestCase):
-    """Integration tests for the update_index_main_schema feature."""
+    """Integration tests for the apply_latest_schema_template feature."""
 
     @classmethod
     def _add_validation_overrides(self, app_root_path: str):
@@ -83,7 +83,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
     def test_update_schema_no_changes(self):
         """When schema hasn't changed, should return schema_changed=False and not deploy."""
         test_index_name = 'test_schema_update_index'
-        result = self.index_management.update_index_main_schema(test_index_name)
+        result = self.index_management.apply_latest_schema_template(test_index_name)
 
         saved_index = self.index_management.get_index(test_index_name)
         original_schema = self._get_schema_from_vespa(saved_index.schema_name)
@@ -114,7 +114,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         )
         mock_generate_schema.return_value = modified_schema
 
-        result = self.index_management.update_index_main_schema(test_index_name)
+        result = self.index_management.apply_latest_schema_template(test_index_name)
 
         # Verify the result
         self.assertTrue(result['updated'])
@@ -142,7 +142,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         )
         mock_generate_schema.return_value = modified_schema
 
-        result = self.index_management.update_index_main_schema(
+        result = self.index_management.apply_latest_schema_template(
             test_index_name,
             dry_run=True
         )
@@ -164,28 +164,28 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
     def test_update_schema_index_not_found(self):
         """Should raise IndexNotFoundError for non-existent index."""
         with self.assertRaisesStrict(IndexNotFoundError) as ctx:
-            self.index_management.update_index_main_schema('nonexistent_index')
+            self.index_management.apply_latest_schema_template('nonexistent_index')
 
         self.assertIn('nonexistent_index', str(ctx.exception))
 
     def test_update_schema_wrong_index_type_structured(self):
         """Should raise InternalError for structured indexes (not supported)."""
         with self.assertRaisesStrict(InternalError) as ctx:
-            self.index_management.update_index_main_schema('structured_index')
+            self.index_management.apply_latest_schema_template('structured_index')
 
         self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
 
     def test_update_schema_wrong_index_type_legacy_unstructured(self):
         """Should raise InternalError for legacy unstructured indexes (Marqo < 2.13.0)."""
         with self.assertRaisesStrict(InternalError) as ctx:
-            self.index_management.update_index_main_schema('legacy_unstructured_index')
+            self.index_management.apply_latest_schema_template('legacy_unstructured_index')
 
         self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
 
     def test_update_schema_version_too_old(self):
         """Should raise UnsupportedFeatureError for indexes created with Marqo < 2.23.0."""
         with self.assertRaisesStrict(UnsupportedFeatureError) as ctx:
-            self.index_management.update_index_main_schema('old_version_index')
+            self.index_management.apply_latest_schema_template('old_version_index')
 
         self.assertIn('Schema update is only supported for indexes created with Marqo 2.23.0 or later',
                       str(ctx.exception))
@@ -228,7 +228,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         mock_generate_schema.return_value = modified_schema
 
         # Verify it reject updates if not forced
-        result = self.index_management.update_index_main_schema(
+        result = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=False
         )
@@ -245,7 +245,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
         # Verify it updates the schema when forced set to true
-        result_forced = self.index_management.update_index_main_schema(
+        result_forced = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=True
         )
@@ -281,7 +281,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         )
         mock_generate_schema.return_value = modified_schema
 
-        result = self.index_management.update_index_main_schema(
+        result = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=False
         )
@@ -297,7 +297,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
         # Force update
-        result_forced = self.index_management.update_index_main_schema(
+        result_forced = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=True
         )
@@ -342,7 +342,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         )
         mock_generate_schema.return_value = modified_schema
 
-        result = self.index_management.update_index_main_schema(
+        result = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=False
         )
@@ -358,7 +358,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
         # Force update
-        result_forced = self.index_management.update_index_main_schema(
+        result_forced = self.index_management.apply_latest_schema_template(
             test_index_name,
             force=True
         )

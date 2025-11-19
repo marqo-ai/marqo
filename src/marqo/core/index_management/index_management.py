@@ -255,7 +255,7 @@ class IndexManagement:
             logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
-    def update_index_main_schema(self, index_name: str, force: bool = False, dry_run: bool = False) -> Dict[str, any]:
+    def apply_latest_schema_template(self, index_name: str, force: bool = False, dry_run: bool = False) -> Dict[str, any]:
         """
         Update an index's main schema to the latest template version.
 

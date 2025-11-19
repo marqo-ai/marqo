@@ -1,4 +1,4 @@
-"""Unit tests for IndexManagement.update_index_main_schema() method."""
+"""Unit tests for IndexManagement.apply_latest_schema_template() method."""
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 
@@ -14,7 +14,7 @@ from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestIndexManagementSchemaUpdate(MarqoTestCase):
-    """Test cases for IndexManagement.update_index_main_schema() method."""
+    """Test cases for IndexManagement.apply_latest_schema_template() method."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -34,7 +34,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.mock_lock.__exit__ = Mock(return_value=None)
         self.index_mgmt._vespa_deployment_lock = Mock(return_value=self.mock_lock)
 
-    def test_update_index_main_schema_no_changes(self):
+    def test_apply_latest_schema_template_no_changes(self):
         """Test update when schema is already up-to-date."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -58,7 +58,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = current_schema
 
             # Execute
-            result = self.index_mgmt.update_index_main_schema("test_index", force=False)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
 
         # Verify
         self.assertFalse(result['updated'])
@@ -67,7 +67,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertEqual(result['config_change_actions'], {})
         mock_vespa_app.update_index_setting_and_schema.assert_not_called()
 
-    def test_update_index_main_schema_with_changes_no_actions(self):
+    def test_apply_latest_schema_template_with_changes_no_actions(self):
         """Test update when schema changed but no Vespa actions required."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -100,7 +100,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute
-            result = self.index_mgmt.update_index_main_schema("test_index", force=False)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
 
         # Verify
         self.assertTrue(result['updated'])
@@ -116,7 +116,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify activate was called
         mock_vespa_app.activate_prepared_deployment.assert_called_once_with(prepare_response)
 
-    def test_update_index_main_schema_with_actions_not_forced(self):
+    def test_apply_latest_schema_template_with_actions_not_forced(self):
         """Test update blocks when actions required and force=False."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -157,7 +157,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute
-            result = self.index_mgmt.update_index_main_schema("test_index", force=False)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
 
         # Verify
         self.assertFalse(result['updated'])
@@ -168,7 +168,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify activate was NOT called
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
-    def test_update_index_main_schema_with_actions_forced(self):
+    def test_apply_latest_schema_template_with_actions_forced(self):
         """Test update proceeds when actions required but force=True."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -208,7 +208,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute
-            result = self.index_mgmt.update_index_main_schema("test_index", force=True)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=True)
 
         # Verify
         self.assertTrue(result['updated'])
@@ -219,16 +219,16 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify activate WAS called
         mock_vespa_app.activate_prepared_deployment.assert_called_once_with(prepare_response)
 
-    def test_update_index_main_schema_index_not_found(self):
+    def test_apply_latest_schema_template_index_not_found(self):
         """Test error when index doesn't exist."""
         # Mock get_index to raise IndexNotFoundError
         self.index_mgmt.get_index = Mock(side_effect=IndexNotFoundError("Index not found"))
 
         # Execute and verify exception
         with self.assertRaises(IndexNotFoundError):
-            self.index_mgmt.update_index_main_schema("nonexistent_index")
+            self.index_mgmt.apply_latest_schema_template("nonexistent_index")
 
-    def test_update_index_main_schema_wrong_index_type(self):
+    def test_apply_latest_schema_template_wrong_index_type(self):
         """Test error when index is not SemiStructuredMarqoIndex."""
         # Setup structured index
         test_index = self.structured_marqo_index(
@@ -241,7 +241,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Execute and verify exception
         with self.assertRaises(InternalError) as context:
-            self.index_mgmt.update_index_main_schema("test_index")
+            self.index_mgmt.apply_latest_schema_template("test_index")
 
         self.assertIn("only semi-structured indexes support schema updates", str(context.exception))
 
@@ -282,7 +282,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute with force=False
-            result = self.index_mgmt.update_index_main_schema("test_index", force=False)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
 
         # Verify - should block on refeed action
         self.assertFalse(result['updated'])
@@ -325,14 +325,14 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute with force=False
-            result = self.index_mgmt.update_index_main_schema("test_index", force=False)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
 
         # Verify - should block on reindex action
         self.assertFalse(result['updated'])
         self.assertIn('reindex', result['config_change_actions'])
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
-    def test_update_index_main_schema_version_too_old(self):
+    def test_apply_latest_schema_template_version_too_old(self):
         """Test error when index was created with Marqo < 2.23.0."""
         # Setup index with old version
         test_index = self.semi_structured_marqo_index(
@@ -346,13 +346,13 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Execute and verify exception
         with self.assertRaises(UnsupportedFeatureError) as context:
-            self.index_mgmt.update_index_main_schema("test_index")
+            self.index_mgmt.apply_latest_schema_template("test_index")
 
         # Verify error message contains version information
         self.assertIn("2.23.0", str(context.exception))
         self.assertIn("2.22.0", str(context.exception))
 
-    def test_update_index_main_schema_dry_run_no_changes(self):
+    def test_apply_latest_schema_template_dry_run_no_changes(self):
         """Test dry_run when schema is already up to date."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -375,7 +375,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = current_schema
 
             # Execute with dry_run=True
-            result = self.index_mgmt.update_index_main_schema("test_index", dry_run=True)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", dry_run=True)
 
         # Verify
         self.assertFalse(result['updated'])
@@ -386,7 +386,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('schema_diff', result)
         self.assertEqual(result['schema_diff'], 'No changes')
 
-    def test_update_index_main_schema_dry_run_with_changes(self):
+    def test_apply_latest_schema_template_dry_run_with_changes(self):
         """Test dry_run with schema changes - should not deploy."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -418,7 +418,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute with dry_run=True
-            result = self.index_mgmt.update_index_main_schema("test_index", dry_run=True)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", dry_run=True)
 
         # Verify
         self.assertFalse(result['updated'])  # Should not be updated in dry run
@@ -433,7 +433,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         mock_vespa_app.update_index_setting_and_schema.assert_called_once()
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
-    def test_update_index_main_schema_dry_run_with_actions(self):
+    def test_apply_latest_schema_template_dry_run_with_actions(self):
         """Test dry_run with actions required - should still not deploy."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -467,7 +467,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute with dry_run=True
-            result = self.index_mgmt.update_index_main_schema("test_index", dry_run=True)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", dry_run=True)
 
         # Verify
         self.assertFalse(result['updated'])
@@ -478,7 +478,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify activate was NOT called
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
-    def test_update_index_main_schema_dry_run_ignores_force(self):
+    def test_apply_latest_schema_template_dry_run_ignores_force(self):
         """Test that dry_run takes precedence over force parameter."""
         # Setup
         test_index = self.semi_structured_marqo_index(
@@ -512,14 +512,14 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
             mock_schema_class.generate_vespa_schema.return_value = new_schema
 
             # Execute with both dry_run=True and force=True
-            result = self.index_mgmt.update_index_main_schema("test_index", force=True, dry_run=True)
+            result = self.index_mgmt.apply_latest_schema_template("test_index", force=True, dry_run=True)
 
         # Verify - dry_run should take precedence, no deployment
         self.assertFalse(result['updated'])
         self.assertEqual(result['reason'], "Dry run - no changes deployed")
         mock_vespa_app.activate_prepared_deployment.assert_not_called()
 
-    def test_update_index_main_schema_with_old_vespa_store_raises_error(self):
+    def test_apply_latest_schema_template_with_old_vespa_store_raises_error(self):
         """Test that prepare_only with VespaApplicationFileStore raises InternalError.
 
         This covers the error path in update_index_setting_and_schema() when prepare_only=True
@@ -562,7 +562,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
             # Execute - this should raise InternalError
             with self.assertRaises(InternalError) as ctx:
-                self.index_mgmt.update_index_main_schema("test_index")
+                self.index_mgmt.apply_latest_schema_template("test_index")
 
         # Verify error message
         self.assertIn("prepare_only mode requires ApplicationPackageDeploymentSessionStore", str(ctx.exception))
