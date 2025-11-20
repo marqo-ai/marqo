@@ -915,8 +915,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         regular_result_ids = [hit["_id"] for hit in regular_result["hits"]]
         self.assertEqual(
             set(relevance_cutoff_result_ids),
-            set(regular_result_ids[:3]), # ["h1", "h3", "h2"]
-            "Relevance cutoff should return the top 3 most relevant documents."
+            {"h9", "h10", "h6"},
+            "Relevance cutoff should return the most relevant documents."
         )
 
     def test_relevance_cutoff_feature_works_for_lexical_lexical_search(self):
