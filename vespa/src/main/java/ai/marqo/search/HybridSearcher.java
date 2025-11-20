@@ -501,7 +501,6 @@ public class HybridSearcher extends Searcher {
             String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
         }
-
         return query;
     }
 
