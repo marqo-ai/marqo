@@ -638,6 +638,88 @@ class RelevanceCutoffTest {
     }
 
     @Nested
+    class UpdateQueryHitsOffsetsAndTargetHitsTest {
+
+        @Test
+        void shouldReturnUnmodifiedQueryWhenBothFlagsAreFalse() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 100, 200, false, false);
+
+            assertThat(query.properties().get("ranking.rerankCount")).isNull();
+        }
+
+        @Test
+        void shouldThrowExceptionWhenBothCandidatesAreNull() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            assertThrows(
+                    RuntimeException.class,
+                    () ->
+                            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
+                                    query, null, null, true, false));
+        }
+
+        @Test
+        void shouldSetRerankCountWithRelevanceCutoffAboveLimitPlusOffset() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 50, null, true, false);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(15);
+        }
+
+        @Test
+        void shouldSetRerankCountWithRelevanceCutoffBelowLimitPlusOffset() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(8);
+        }
+
+        @Test
+        void shouldSetRerankCountWithSortByOnly() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, null, 100, false, true);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(100);
+        }
+
+        @Test
+        void shouldSetRerankCountWithBothEnabledUsingMaxValue() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 150, 100, true, true);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(150);
+        }
+
+        @Test
+        void shouldSetRerankCountToZeroWhenRelevantCandidatesIsZero() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(0);
+        }
+
+        @Test
+        void shouldUpdateTensorYqlTargetHitsWhenSortByEnabled() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+            query.properties()
+                    .set("marqo__yql.tensor", "{targetHits:100, hnsw.exploreAdditionalHits:1900}");
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, null, 150, false, true);
+
+            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(150);
+            assertThat(query.properties().getString("marqo__yql.tensor"))
+                    .isEqualTo("{targetHits:150, hnsw.exploreAdditionalHits:1850}");
+        }
+    }
+
+    @Nested
     class CountGreaterOrEqualTest {
 
         @Test
