@@ -4,16 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.yahoo.search.Query;
-import com.yahoo.search.Searcher;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
+import com.yahoo.tensor.Tensor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class RelevanceCutoffTest {
     private HybridSearcher hybridSearcher;
-    private Searcher downstreamSearcher;
 
     @BeforeEach
     void setUp() {
@@ -638,84 +637,58 @@ class RelevanceCutoffTest {
     }
 
     @Nested
-    class UpdateQueryHitsOffsetsAndTargetHitsTest {
+    class UpdateRankingRerankCountTest {
+
+        @Test
+        void shouldReturnModifiedRankingRerankCount() {
+            Query query = new Query("search/?query=test&hits=10&offset=5");
+            query.properties().set("ranking.rerankCount", 15);
+
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 100, 200, true, true);
+
+            assertThat(query.properties().get("ranking.rerankCount")).isEqualTo(200);
+        }
 
         @Test
         void shouldReturnUnmodifiedQueryWhenBothFlagsAreFalse() {
             Query query = new Query("search/?query=test&hits=10&offset=5");
+            query.properties().set("ranking.rerankCount", 15);
 
             hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 100, 200, false, false);
 
-            assertThat(query.properties().get("ranking.rerankCount")).isNull();
+            assertThat(query.properties().get("ranking.rerankCount")).isEqualTo(15);
         }
 
         @Test
-        void shouldThrowExceptionWhenBothCandidatesAreNull() {
+        void shouldUpdateRankingRerankCountIfOnlySortIsUsed() {
             Query query = new Query("search/?query=test&hits=10&offset=5");
+            query.properties().set("ranking.rerankCount", 15);
 
-            assertThrows(
-                    RuntimeException.class,
-                    () ->
-                            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
-                                    query, null, null, true, false));
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, null, 202, false, true);
+
+            assertThat(query.properties().get("ranking.rerankCount")).isEqualTo(202);
         }
 
         @Test
-        void shouldSetRerankCountWithRelevanceCutoffAboveLimitPlusOffset() {
+        void shouldUnmodifiedRankingRerankIfRelevanceCutoffIsTooSmall() {
             Query query = new Query("search/?query=test&hits=10&offset=5");
+            query.properties().set("ranking.rerankCount", 15);
 
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 50, null, true, false);
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 150, null, true, false);
 
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(15);
+            assertThat(query.properties().get("ranking.rerankCount")).isEqualTo(15);
+            assertThat(query.getHits()).isEqualTo(15);
+            assertThat(query.getOffset()).isEqualTo(0);
         }
 
         @Test
-        void shouldSetRerankCountWithRelevanceCutoffBelowLimitPlusOffset() {
-            Query query = new Query("search/?query=test&hits=10&offset=5");
+        void shouldUpdateRankingRerankIfRelevanceCutoffIsSmall() {
+            Query query = new Query("search/?query=test&hits=100&offset=0");
+            query.properties().set("ranking.rerankCount", 100);
 
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 8, null, true, false);
+            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 100, null, true, false);
 
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(8);
-        }
-
-        @Test
-        void shouldSetRerankCountWithSortByOnly() {
-            Query query = new Query("search/?query=test&hits=10&offset=5");
-
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, null, 100, false, true);
-
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(100);
-        }
-
-        @Test
-        void shouldSetRerankCountWithBothEnabledUsingMaxValue() {
-            Query query = new Query("search/?query=test&hits=10&offset=5");
-
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 150, 100, true, true);
-
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(150);
-        }
-
-        @Test
-        void shouldSetRerankCountToZeroWhenRelevantCandidatesIsZero() {
-            Query query = new Query("search/?query=test&hits=10&offset=5");
-
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, 0, null, true, false);
-
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(0);
-        }
-
-        @Test
-        void shouldUpdateTensorYqlTargetHitsWhenSortByEnabled() {
-            Query query = new Query("search/?query=test&hits=10&offset=5");
-            query.properties()
-                    .set("marqo__yql.tensor", "{targetHits:100, hnsw.exploreAdditionalHits:1900}");
-
-            hybridSearcher.updateQueryHitsOffsetsAndTargetHits(query, null, 150, false, true);
-
-            assertThat(query.properties().getInteger("ranking.rerankCount")).isEqualTo(150);
-            assertThat(query.properties().getString("marqo__yql.tensor"))
-                    .isEqualTo("{targetHits:150, hnsw.exploreAdditionalHits:1850}");
+            assertThat(query.properties().get("ranking.rerankCount")).isEqualTo(100);
         }
     }
 
@@ -816,6 +789,36 @@ class RelevanceCutoffTest {
 
             int result = HybridSearcher.countGreaterOrEqual(scores, 750.0);
             assertThat(result).isEqualTo(251); // 1000, 999, ..., 750 are >= 750
+        }
+    }
+
+    @Nested
+    class CreateProbeLexicalQueryTest {
+        @Test
+        void shouldSetRankingRerankCountToProbeDepth() {
+            Query originalQuery = new Query("search/?query=test&hits=60&offset=0");
+            Integer probeDepth = 2000;
+
+            // Set up minimal required properties for createProbeLexialQuery
+            originalQuery
+                    .properties()
+                    .set("marqo__yql.lexical", "select * from sources * where userQuery()");
+            originalQuery
+                    .properties()
+                    .set("marqo__ranking.lexical.lexical", "lexical_rank_profile");
+
+            // Set up the required tensor for fields to rank (empty tensor is fine for this test)
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", Tensor.from("tensor(p{}):{}"));
+
+            Query probeQuery =
+                    hybridSearcher.createProbeLexialQuery(originalQuery, probeDepth, false);
+
+            assertThat(probeQuery.properties().getInteger("ranking.rerankCount")).isEqualTo(2000);
+            assertThat(probeQuery.getHits()).isEqualTo(2000);
+            assertThat(probeQuery.getOffset()).isEqualTo(0);
         }
     }
 }
