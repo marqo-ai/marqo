@@ -915,7 +915,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         regular_result_ids = [hit["_id"] for hit in regular_result["hits"]]
         self.assertEqual(
             set(relevance_cutoff_result_ids),
-            set("h9", "h10", "h6"),
+            {"h9", "h10", "h6"},
             "Relevance cutoff should return the most relevant documents."
         )
 
