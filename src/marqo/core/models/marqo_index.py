@@ -299,7 +299,6 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
-    schema_version: Optional[str] = None
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
@@ -321,16 +320,6 @@ class MarqoIndex(ImmutableBaseModel, ABC):
 
     def parsed_marqo_version(self) -> semver.VersionInfo:
         return semver.VersionInfo.parse(self.marqo_version)
-
-    def parsed_schema_version(self) -> semver.VersionInfo:
-        """
-        Get the schema version as a semver object.
-        Falls back to marqo_version if schema_version is not set (backward compatibility).
-        """
-        if self.schema_version is not None:
-            return semver.VersionInfo.parse(self.schema_version)
-        # Backward compatibility: old indexes don't have schema_version
-        return self.parsed_marqo_version()
 
     @classmethod
     @abstractmethod
@@ -551,6 +540,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     string_array_fields: Optional[List[
         StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
     collapse_fields: Optional[List[CollapseField]] = None
+    schema_version: Optional[str] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -570,6 +560,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         if not self.collapse_fields:
             return False
         return field_name in [field.name for field in self.collapse_fields]
+
+    def parsed_schema_version(self) -> semver.VersionInfo:
+        """
+        Get the schema version as a semver object.
+        Falls back to marqo_version if schema_version is not set (backward compatibility).
+        """
+        if self.schema_version is not None:
+            return semver.VersionInfo.parse(self.schema_version)
+        # Backward compatibility: old indexes don't have schema_version
+        return self.parsed_marqo_version()
 
     @property
     def field_map(self) -> Dict[str, Field]:
