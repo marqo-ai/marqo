@@ -21,7 +21,6 @@ from marqo.core.models import MarqoIndex
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 import marqo.logging
 from marqo import version as marqo_version
-from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
 
 

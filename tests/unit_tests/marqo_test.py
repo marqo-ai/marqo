@@ -218,6 +218,7 @@ class MarqoTestCase(TestCase):
             filter_string_max_length: int = 50,
             collapse_fields: Optional[List[CollapseField]] = None,
             marqo_version=version.get_version(),
+            schema_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
     ) -> UnstructuredMarqoIndexRequest:
@@ -244,6 +245,7 @@ class MarqoTestCase(TestCase):
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
+            schema_version=schema_version,
             created_at=created_at,
             updated_at=updated_at,
         )
