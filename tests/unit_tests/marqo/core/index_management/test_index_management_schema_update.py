@@ -33,10 +33,10 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.mock_lock.__exit__ = Mock(return_value=None)
         self.index_mgmt._vespa_deployment_lock = Mock(return_value=self.mock_lock)
 
-    def _create_test_index(self, schema_version=None, marqo_version=None):
+    def _create_test_index(self, schema_template_version=None, marqo_version=None):
         """Helper to create a test index with common defaults."""
         kwargs = {
-            'schema_version': schema_version,
+            'schema_template_version': schema_template_version,
             'name': 'test_index',
             'schema_name': 'test_schema'
         }
@@ -403,21 +403,21 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
     @patch('marqo.version.get_version')
     @patch('marqo.core.index_management.index_management.SemiStructuredVespaSchema.generate_vespa_schema')
-    def test_apply_latest_schema_template_schema_version_handling(self, mock_generate_schema, mock_get_version):
-        """Test schema_version-based shortcut and normal processing paths."""
+    def test_apply_latest_schema_template_schema_template_version_handling(self, mock_generate_schema, mock_get_version):
+        """Test schema_template_version-based shortcut and normal processing paths."""
         mock_get_version.return_value = "2.24.6"
 
-        # Test cases: (scenario, schema_version, should_shortcut)
+        # Test cases: (scenario, schema_template_version, should_shortcut)
         test_cases = [
             ("current", "2.24.6", True),
             ("outdated", "2.24.5", False),
             ("none", None, False)
         ]
 
-        for scenario, schema_version, should_shortcut in test_cases:
-            with self.subTest(scenario=scenario, schema_version=schema_version):
-                # Create an index with the test schema_version
-                existing_index = self._create_test_index(schema_version=schema_version)
+        for scenario, schema_template_version, should_shortcut in test_cases:
+            with self.subTest(scenario=scenario, schema_template_version=schema_template_version):
+                # Create an index with the test schema_template_version
+                existing_index = self._create_test_index(schema_template_version=schema_template_version)
                 self.index_mgmt.get_index = Mock(return_value=existing_index)
 
                 if should_shortcut:

@@ -47,11 +47,11 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # pre-create all indexes for tests
         index_requests = [
-            cls.unstructured_marqo_index_request(name='test_schema_update_index', marqo_version=cls.original_marqo_version, schema_version=cls.original_schema_template_version),
-            cls.unstructured_marqo_index_request(name='test_config_change_restart', marqo_version=cls.original_marqo_version, schema_version=cls.original_schema_template_version),
-            cls.unstructured_marqo_index_request(name='test_config_change_reindex', marqo_version=cls.original_marqo_version, schema_version=cls.original_schema_template_version),
-            cls.unstructured_marqo_index_request(name='test_config_change_refeed', marqo_version=cls.original_marqo_version, schema_version=cls.original_schema_template_version),
-            cls.unstructured_marqo_index_request(name='test_schema_version_current'),
+            cls.unstructured_marqo_index_request(name='test_schema_update_index', marqo_version=cls.original_marqo_version, schema_template_version=cls.original_schema_template_version),
+            cls.unstructured_marqo_index_request(name='test_config_change_restart', marqo_version=cls.original_marqo_version, schema_template_version=cls.original_schema_template_version),
+            cls.unstructured_marqo_index_request(name='test_config_change_reindex', marqo_version=cls.original_marqo_version, schema_template_version=cls.original_schema_template_version),
+            cls.unstructured_marqo_index_request(name='test_config_change_refeed', marqo_version=cls.original_marqo_version, schema_template_version=cls.original_schema_template_version),
+            cls.unstructured_marqo_index_request(name='test_schema_template_version_current'),
             cls.unstructured_marqo_index_request(name='old_version_index', marqo_version='2.22.0'),
             cls.unstructured_marqo_index_request(name='legacy_unstructured_index', marqo_version='2.12.0'),
             cls.structured_marqo_index_request(
@@ -102,9 +102,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertEqual(original_schema, result['oldSchema'])
         self.assertEqual(original_schema, result['newSchema'])
 
-        # Verify version and schema_version not updated (remains None when no changes)
+        # Verify version and schema_template_version not updated (remains None when no changes)
         updated_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(self.original_schema_template_version, updated_index.schema_version)
+        self.assertEqual(self.original_schema_template_version, updated_index.schema_template_version)
         self.assertEqual(original_version, updated_index.version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
@@ -136,9 +136,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify schema was actually deployed to Vespa
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version updated to current version; and index version becomes +1
+        # Verify schema_template_version updated to current version; and index version becomes +1
         updated_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(version.get_version(), updated_index.schema_version)
+        self.assertEqual(version.get_version(), updated_index.schema_template_version)
         self.assertEqual(original_version + 1, updated_index.version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
@@ -169,9 +169,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify schema was NOT deployed to Vespa (original schema still present)
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version not updated in dry run
+        # Verify schema_template_version not updated in dry run
         updated_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(self.original_schema_template_version, updated_index.schema_version)
+        self.assertEqual(self.original_schema_template_version, updated_index.schema_template_version)
 
     # ============================================================================
     # Error Case Tests
@@ -198,7 +198,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         self.assertIn('only semi-structured indexes support schema updates', str(ctx.exception))
 
-    def test_update_schema_version_too_old(self):
+    def test_update_schema_template_version_too_old(self):
         """Should raise UnsupportedFeatureError for indexes created with Marqo < 2.23.0."""
         with self.assertRaisesStrict(UnsupportedFeatureError) as ctx:
             self.index_management.apply_latest_schema_template('old_version_index')
@@ -207,10 +207,10 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
                       str(ctx.exception))
         self.assertIn('created with Marqo 2.22.0', str(ctx.exception))
 
-    def test_shortcut_when_schema_version_current(self):
-        """When schema_version matches current version, shortcut is triggered."""
+    def test_shortcut_when_schema_template_version_current(self):
+        """When schema_template_version matches current version, shortcut is triggered."""
         current_version = version.get_version()
-        index_name = 'test_schema_version_current'
+        index_name = 'test_schema_template_version_current'
 
         result = self.index_management.apply_latest_schema_template(index_name)
 
@@ -219,9 +219,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertFalse(result['schemaChanged'])
         self.assertIn(f'already at current Marqo version {current_version}', result['reason'])
 
-        # Verify schema_version unchanged
+        # Verify schema_template_version unchanged
         index = self.index_management.get_index(index_name)
-        self.assertEqual(current_version, index.schema_version)
+        self.assertEqual(current_version, index.schema_template_version)
 
     # ============================================================================
     # configChangeActions Tests
@@ -276,9 +276,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify schema was NOT deployed
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version not updated when blocked
+        # Verify schema_template_version not updated when blocked
         blocked_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(self.original_schema_template_version, blocked_index.schema_version)
+        self.assertEqual(self.original_schema_template_version, blocked_index.schema_template_version)
 
         # Verify it updates the schema when forced set to true
         result_forced = self.index_management.apply_latest_schema_template(
@@ -290,9 +290,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('Update forced despite required actions', result_forced['reason'])
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version updated when forced
+        # Verify schema_template_version updated when forced
         forced_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(version.get_version(), forced_index.schema_version)
+        self.assertEqual(version.get_version(), forced_index.schema_template_version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
     def test_update_schema_with_refeed_actions(self, mock_generate_schema):
@@ -336,9 +336,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version not updated when blocked
+        # Verify schema_template_version not updated when blocked
         blocked_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(self.original_schema_template_version, blocked_index.schema_version)
+        self.assertEqual(self.original_schema_template_version, blocked_index.schema_template_version)
 
         # Force update
         result_forced = self.index_management.apply_latest_schema_template(
@@ -353,9 +353,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version updated when forced
+        # Verify schema_template_version updated when forced
         forced_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(version.get_version(), forced_index.schema_version)
+        self.assertEqual(version.get_version(), forced_index.schema_template_version)
 
     @patch('marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema.SemiStructuredVespaSchema.generate_vespa_schema')
     def test_update_schema_with_reindex_actions(self, mock_generate_schema):
@@ -405,9 +405,9 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         self.assertEqual(original_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version not updated when blocked
+        # Verify schema_template_version not updated when blocked
         blocked_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(self.original_schema_template_version, blocked_index.schema_version)
+        self.assertEqual(self.original_schema_template_version, blocked_index.schema_template_version)
 
         # Force update
         result_forced = self.index_management.apply_latest_schema_template(
@@ -422,6 +422,6 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn('reindex', result_forced['configChangeActions'])
         self.assertEqual(modified_schema, self._get_schema_from_vespa(saved_index.schema_name))
 
-        # Verify schema_version updated when forced
+        # Verify schema_template_version updated when forced
         forced_index = self.index_management.get_index(test_index_name)
-        self.assertEqual(version.get_version(), forced_index.schema_version)
+        self.assertEqual(version.get_version(), forced_index.schema_template_version)

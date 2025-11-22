@@ -136,7 +136,7 @@ class ValidationApiTests(MarqoTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        test_index_request = cls.unstructured_marqo_index_request(schema_version=None)
+        test_index_request = cls.unstructured_marqo_index_request(schema_template_version=None)
         cls.indexes = cls.create_indexes([test_index_request])
 
         cls.test_index = cls.indexes[0]
@@ -252,7 +252,7 @@ class ValidationApiTests(MarqoTestCase):
             index_name = self.test_index.name
             response = self.client.post(f"/indexes/{index_name}/apply-latest-schema-template")
             self.assertEqual(response.status_code, 200)
-            # Since the test index is created with schema_version defaulting to current version,
+            # Since the test index is created with schema_template_version defaulting to current version,
             # the shortcut is triggered
             current_version = version.get_version()
             self.assertEqual(f"Schema is already at current Marqo version {current_version}", response.json()["reason"])

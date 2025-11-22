@@ -42,7 +42,7 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
     collapse_fields: Optional[List[marqo_index.CollapseField]] = None
-    schema_version: Optional[str] = None  # For testing: allows simulating older schema versions
+    schema_template_version: Optional[str] = None  # For testing: allows simulating older schema template versions
 
     @root_validator
     def validate_collapse_fields(cls, values):

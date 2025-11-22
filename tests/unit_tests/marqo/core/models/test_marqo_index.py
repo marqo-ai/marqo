@@ -685,13 +685,13 @@ class TestForwardCompatibility(unittest.TestCase):
 
 
 class TestMarqoIndexSchemaVersion(MarqoTestCase):
-    """Unit tests for MarqoIndex schema_version functionality."""
+    """Unit tests for MarqoIndex schema_template_version functionality."""
 
-    def test_parsed_schema_version(self):
-        """Test parsed_schema_version() returns schema_version when set, or falls back to marqo_version."""
+    def test_parsed_schema_template_version(self):
+        """Test parsed_schema_template_version() returns schema_template_version when set, or falls back to marqo_version."""
         test_cases = [
-            ("with schema_version set", {"schema_version": "2.24.6"}, "2.24.6"),
-            ("fallback to marqo_version", {"marqo_version": "2.24.5", "schema_version": None}, "2.24.5")
+            ("with schema_template_version set", {"schema_template_version": "2.24.6"}, "2.24.6"),
+            ("fallback to marqo_version", {"marqo_version": "2.24.5", "schema_template_version": None}, "2.24.5")
         ]
 
         for case_name, index_kwargs, expected_version in test_cases:
@@ -700,15 +700,15 @@ class TestMarqoIndexSchemaVersion(MarqoTestCase):
                     name="test_index",
                     **index_kwargs
                 )
-                parsed_version = index.parsed_schema_version()
+                parsed_version = index.parsed_schema_template_version()
                 self.assertEqual(str(parsed_version), expected_version)
 
     def test_index_supports_collapse_minimal_summary(self):
-        """Test index_supports_collapse_minimal_summary with different schema_version and marqo_version values."""
+        """Test index_supports_collapse_minimal_summary with different schema_template_version and marqo_version values."""
         test_cases = [
-            ("schema_version >= 2.24.6", {"schema_version": "2.24.6"}, True),
-            ("schema_version < 2.24.6", {"schema_version": "2.24.5"}, False),
-            ("schema_version None, marqo_version < 2.24.6", {"marqo_version": "2.24.5", "schema_version": None}, False)
+            ("schema_template_version >= 2.24.6", {"schema_template_version": "2.24.6"}, True),
+            ("schema_template_version < 2.24.6", {"schema_template_version": "2.24.5"}, False),
+            ("schema_template_version None, marqo_version < 2.24.6", {"marqo_version": "2.24.5", "schema_template_version": None}, False)
         ]
 
         for case_name, index_kwargs, expected_result in test_cases:

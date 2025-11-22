@@ -55,7 +55,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             vector_numeric_type=self._index_request.vector_numeric_type,
             hnsw_config=self._index_request.hnsw_config,
             marqo_version=self._index_request.marqo_version,
-            schema_version=self._index_request.schema_version or self._index_request.marqo_version,
+            schema_template_version=self._index_request.schema_template_version or self._index_request.marqo_version,
             created_at=self._index_request.created_at,
             updated_at=self._index_request.updated_at,
             lexical_fields=[],

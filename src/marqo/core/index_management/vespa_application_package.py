@@ -774,7 +774,7 @@ class VespaApplicationPackage:
         self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
         self._index_setting_store.save_index_setting(index.copy(update={
             'version': version,
-            'schema_version': marqo_version.get_version()
+            'schema_template_version': marqo_version.get_version()
         }))
         self._persist_index_settings()
 

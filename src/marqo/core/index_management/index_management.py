@@ -323,7 +323,7 @@ class IndexManagement:
                 )
 
             # Early return if schema is already at current version
-            if existing_index.schema_version == version.get_version():
+            if existing_index.schema_template_version == version.get_version():
                 logger.info(f'Index {index_name} schema is already at version {version.get_version()}')
                 return {
                     "updated": False,
