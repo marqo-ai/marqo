@@ -9,7 +9,6 @@ from marqo.core.index_management.vespa_application_package import (
     ApplicationPackageDeploymentSessionStore,
     VespaApplicationFileStore
 )
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
 from tests.unit_tests.marqo_test import MarqoTestCase
 
 
@@ -38,6 +37,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test update when schema is already up-to-date."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -71,6 +71,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test update when schema changed but no Vespa actions required."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -120,6 +121,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test update blocks when actions required and force=False."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -172,6 +174,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test update proceeds when actions required but force=True."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -232,6 +235,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test error when index is not SemiStructuredMarqoIndex."""
         # Setup structured index
         test_index = self.structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -249,6 +253,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test detection of refeed actions."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -293,6 +298,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test detection of reindex actions."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -336,6 +342,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test error when index was created with Marqo < 2.23.0."""
         # Setup index with old version
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema",
             marqo_version="2.22.0"  # Below 2.23.0
@@ -356,6 +363,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test dry_run when schema is already up to date."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -390,6 +398,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test dry_run with schema changes - should not deploy."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -437,6 +446,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test dry_run with actions required - should still not deploy."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -482,6 +492,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """Test that dry_run takes precedence over force parameter."""
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
@@ -528,6 +539,7 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         """
         # Setup
         test_index = self.semi_structured_marqo_index(
+            schema_version=None,
             name="test_index",
             schema_name="test_schema"
         )
