@@ -375,6 +375,50 @@ def delete_index(index_name: str, marqo_config: config.Config = Depends(get_conf
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 
+@app.post("/indexes/{index_name}/apply-latest-schema-template")
+@utils.enable_ops_api()
+def apply_latest_schema_template(index_name: str, force: bool = False, dry_run: bool = False, marqo_config: config.Config = Depends(get_config)):
+    """
+    Update an index's main schema to the latest template version.
+
+    This endpoint regenerates the index's Vespa schema from its current settings using
+    the latest schema template. It's useful for applying schema updates (like new features)
+    to existing indexes without recreating them.
+
+    The update process:
+    1. Generates new schema from latest template
+    2. Compares with currently deployed schema
+    3. If different, prepares the deployment in Vespa
+    4. Checks for required Vespa actions (restart, refeed, reindex)
+    5. Behavior based on parameters:
+       - dry_run=true: Show diff and actions, never deploy
+       - dry_run=false, force=false: Deploy only if no configChangeActions
+       - dry_run=false, force=true: Always deploy
+
+    Args:
+        index_name: Name of the index to update
+        force: If true, proceed even if Vespa requires actions (restart/refeed/reindex)
+        dry_run: If true, show schema diff and required actions without deploying
+
+    Returns:
+        JSON response with:
+        - updated: Whether schema was deployed
+        - schemaChanged: Whether schema differs from current
+        - oldSchema: Current deployed schema
+        - newSchema: Proposed/generated schema
+        - schemaDiff: Unified diff output
+        - reason: Explanation of result
+        - configChangeActions: Vespa actions required (if any)
+
+    Raises:
+        404: Index not found
+        400: Index type doesn't support schema updates
+        500: Internal error during update
+    """
+    result = marqo_config.index_management.apply_latest_schema_template(index_name, force=force, dry_run=dry_run)
+    return JSONResponse(content=result, status_code=200)
+
+
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
