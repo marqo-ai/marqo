@@ -614,6 +614,63 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         # Verify error message
         self.assertIn("Deployment activation requires ApplicationPackageDeploymentSessionStore", str(ctx.exception))
 
+    @patch('marqo.version.get_version')
+    def test_apply_latest_schema_template_shortcut_when_schema_already_current(self, mock_get_version):
+        """Test that apply_latest_schema_template returns early when schema_version matches current version."""
+        mock_get_version.return_value = "2.24.6"
+
+        # Create an index with schema_version already at current version
+        existing_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_version="2.24.6"
+        )
+
+        self.index_mgmt.get_index = Mock(return_value=existing_index)
+
+        result = self.index_mgmt.apply_latest_schema_template("test_index", force=False)
+
+        # Verify early shortcut response
+        self.assertFalse(result["updated"])
+        self.assertFalse(result["schemaChanged"])
+        self.assertIn("already at current Marqo version 2.24.6", result["reason"])
+        # Early shortcut doesn't include schemaDiff or other fields
+
+    @patch('marqo.version.get_version')
+    @patch('marqo.core.index_management.index_management.SemiStructuredVespaSchema.generate_vespa_schema')
+    def test_apply_latest_schema_template_proceeds_when_schema_not_current(self, mock_generate_schema, mock_get_version):
+        """Test that apply_latest_schema_template proceeds normally when schema_version is outdated or None."""
+        mock_get_version.return_value = "2.24.6"
+
+        test_cases = [
+            ("outdated schema_version", "2.24.5"),
+            ("schema_version is None (old index)", None)
+        ]
+
+        for case_name, schema_version in test_cases:
+            with self.subTest(case=case_name, schema_version=schema_version):
+                # Create an index with the test schema_version
+                existing_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    schema_version=schema_version
+                )
+
+                # Setup mocks
+                mock_generate_schema.return_value = "new_schema_content"
+                mock_generate_schema.reset_mock()
+
+                mock_vespa_app = Mock()
+                mock_vespa_app.get_schema.return_value = "old_schema_content"
+
+                self.index_mgmt.get_index = Mock(return_value=existing_index)
+                self.index_mgmt._get_vespa_application = Mock(return_value=mock_vespa_app)
+
+                self.index_mgmt.apply_latest_schema_template("test_index", force=False)
+
+                # Verify schema generation was called (not short-circuited)
+                mock_generate_schema.assert_called_once()
+                # Verify get_schema was called to get current schema
+                mock_vespa_app.get_schema.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()
