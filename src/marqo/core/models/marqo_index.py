@@ -299,6 +299,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
+    schema_version: Optional[str] = None
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     # TODO After upgraded to pydantic v2, _cache can be removed. We can use @cached_property instead
@@ -320,6 +321,16 @@ class MarqoIndex(ImmutableBaseModel, ABC):
 
     def parsed_marqo_version(self) -> semver.VersionInfo:
         return semver.VersionInfo.parse(self.marqo_version)
+
+    def parsed_schema_version(self) -> semver.VersionInfo:
+        """
+        Get the schema version as a semver object.
+        Falls back to marqo_version if schema_version is not set (backward compatibility).
+        """
+        if self.schema_version is not None:
+            return semver.VersionInfo.parse(self.schema_version)
+        # Backward compatibility: old indexes don't have schema_version
+        return self.parsed_marqo_version()
 
     @classmethod
     @abstractmethod
@@ -651,6 +662,11 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
 
         return self._cache_or_get('tensor_subfield_map', generate)
 
+    # TODO: Update index_supports_* properties to use parsed_schema_version()
+    # instead of parsed_marqo_version() for more accurate feature detection
+    # after schema updates. This will allow features to be detected based on
+    # the deployed schema version rather than index creation version.
+
     @property
     def index_supports_partial_updates(self) -> bool:
         """
@@ -686,6 +702,17 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         return self._cache_or_get(
             'index_supports_sort_by',
             lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_MINIMUM_VERSION)
+
+    @property
+    def index_supports_collapse_minimal_summary(self) -> bool:
+        """
+        Check if the index schema supports collapse-minimal-summary.
+        This summary class was added in version 2.24.6 to optimize
+        collapse query performance by returning minimal fields.
+        """
+        return self._cache_or_get(
+            'index_supports_collapse_minimal_summary',
+            lambda: self.parsed_schema_version() >= constants.MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

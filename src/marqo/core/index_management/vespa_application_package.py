@@ -20,6 +20,7 @@ from marqo.core.exceptions import InternalError, OperationConflictError, IndexNo
 from marqo.core.models import MarqoIndex
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
 import marqo.logging
+from marqo import version as marqo_version
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
 
@@ -772,7 +773,10 @@ class VespaApplicationPackage:
 
         version = index.version + 1 if index.version is not None else 1
         self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
-        self._index_setting_store.save_index_setting(index.copy(update={'version': version}))
+        self._index_setting_store.save_index_setting(index.copy(update={
+            'version': version,
+            'schema_version': marqo_version.get_version()
+        }))
         self._persist_index_settings()
 
         if prepare_only:
