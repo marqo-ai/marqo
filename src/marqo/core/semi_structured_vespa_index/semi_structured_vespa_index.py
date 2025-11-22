@@ -125,6 +125,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return {
             'collapsefield': collapse_field_name,
             'collapsesize': 1,  # currently fixed to 1, will support multiple if needed in the future
+            'collapse.summary': 'collapse-minimal-summary',  # use minimal summary for collapsed hits to reduce data transfer
 
             # use a different rank profile to ensure diversity in the result returned to Vespa container
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25 + '_diversity',
