@@ -241,6 +241,22 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
         self.assertIn("2.23.0", str(context.exception))
         self.assertIn("2.22.0", str(context.exception))
 
+    def test_apply_latest_schema_template_index_from_future_version(self):
+        """Test error when index was created with Marqo version > current version."""
+        # Setup index with future version
+        test_index = self._create_test_index(marqo_version="2.99.0")
+
+        # Mock get_index
+        self.index_mgmt.get_index = Mock(return_value=test_index)
+
+        # Execute and verify exception
+        with self.assertRaises(InternalError) as context:
+            self.index_mgmt.apply_latest_schema_template("test_index")
+
+        # Verify error message contains version information
+        error_msg = str(context.exception)
+        self.assertIn("The index was created with a newer version of Marqo than is currently running.", error_msg)
+
     def test_apply_latest_schema_template_dry_run(self):
         """Test dry_run mode in different scenarios."""
         # Test cases: (scenario_name, schemas_match, has_actions)
