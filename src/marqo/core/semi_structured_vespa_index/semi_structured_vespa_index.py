@@ -122,7 +122,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return query
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
-        return {
+        params = {
             'collapsefield': collapse_field_name,
             'collapsesize': 1,  # currently fixed to 1, will support multiple if needed in the future
 
@@ -132,6 +132,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
         }
+
+        # Only use minimal summary if the schema supports it (version check)
+        if self.get_marqo_index().index_supports_collapse_minimal_summary:
+            params['collapse.summary'] = 'collapse-minimal-summary'
+
+        return params
 
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
         if marqo_query.relevance_cutoff:

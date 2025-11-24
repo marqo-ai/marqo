@@ -313,6 +313,24 @@ class IndexManagement:
                     f"Please recreate the index with a newer version of Marqo to use this feature."
                 )
 
+            # Validate that index's marqo_version is not greater than current version
+            current_version_parsed = semver.VersionInfo.parse(version.get_version())
+            if existing_index.parsed_marqo_version() > current_version_parsed:
+                raise InternalError(
+                    f"Cannot update schema for index '{index_name}' created with Marqo version "
+                    f"{existing_index.marqo_version} using current Marqo version {version.get_version()}. "
+                    f"The index was created with a newer version of Marqo than is currently running."
+                )
+
+            # Early return if schema is already at current version
+            if existing_index.schema_template_version == version.get_version():
+                logger.info(f'Index {index_name} schema is already at version {version.get_version()}')
+                return {
+                    "updated": False,
+                    "schemaChanged": False,
+                    "reason": f"Schema is already at current Marqo version {version.get_version()}"
+                }
+
             # Generate new schema from current settings using latest template
             new_schema = SemiStructuredVespaSchema.generate_vespa_schema(existing_index)
 
@@ -343,7 +361,6 @@ class IndexManagement:
                 "newSchema": new_schema,
                 "schemaDiff": schema_diff,
                 "configChangeActions": {},
-                "reason": ""
             }
 
             # Scenario 1: Schemas are identical - no changes needed
