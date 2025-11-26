@@ -136,6 +136,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Only use minimal summary if the schema supports it (version check)
         if self.get_marqo_index().index_supports_collapse_minimal_summary:
             params['collapse.summary'] = 'collapse-minimal-summary'
+            params['FieldFiller.disable'] = True
 
         return params
 
