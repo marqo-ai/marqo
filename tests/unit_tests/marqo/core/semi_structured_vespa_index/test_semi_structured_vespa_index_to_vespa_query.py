@@ -805,6 +805,8 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
         # assert collapsefield are populated
         self.assertEqual('parent_id', vespa_query['collapsefield'])
         self.assertEqual(1, vespa_query['collapsesize'])
+        self.assertEqual('collapse-minimal-summary', vespa_query['collapse.summary'])
+        self.assertTrue(vespa_query['FieldFiller.disable'])
 
         # assert rank profiles with '_diversity' suffix is used
         self.assertEqual(common.RANK_PROFILE_BM25 + '_diversity',
@@ -852,6 +854,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
 
         self.assertNotIn('collapsefield', vespa_query)
         self.assertNotIn('collapsesize', vespa_query)
+        self.assertNotIn('collapse.summary', vespa_query)
 
         self.assertEqual(common.RANK_PROFILE_BM25,
                          vespa_query['marqo__ranking.lexical.lexical'])
@@ -878,6 +881,34 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
                          'max(marqo__float_fields{"price"}), count()))) '
                          'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
                          'each(output(count()))) )', vespa_query['marqo__yql.facets'])
+
+    def test_hybrid_query_with_collapse_fields_old_schema_version(self):
+        """Test that collapse minimal summary params are NOT set for older schema versions."""
+        marqo_index = self.semi_structured_marqo_index(
+            "test_index_old",
+            collapse_fields=[CollapseField(name='parent_id')],
+            schema_template_version='2.24.5'  # Edge case: just below minimum 2.24.6
+        )
+        vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+        marqo_query = MarqoHybridQuery(
+            index_name="test_index_old",
+            limit=10,
+            offset=0,
+            or_phrases=[],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(),
+            collapse_field_name='parent_id',
+        )
+        vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+        # Collapse field should still be set
+        self.assertEqual('parent_id', vespa_query['collapsefield'])
+        self.assertEqual(1, vespa_query['collapsesize'])
+
+        # But minimal summary params should NOT be set for old schema versions
+        self.assertNotIn('collapse.summary', vespa_query)
+        self.assertNotIn('FieldFiller.disable', vespa_query)
 
 
 class TestSemiStructuredVespaIndexToVespaQueryFacets(MarqoTestCase):

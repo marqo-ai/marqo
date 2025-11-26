@@ -6,7 +6,6 @@ from unittest import mock
 from unittest.mock import patch
 
 import pydantic
-import pytest
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from pydantic.v1.error_wrappers import ErrorWrapper
@@ -15,6 +14,7 @@ from pydantic_core import InitErrorDetails, PydanticCustomError
 import marqo.tensor_search.api as api
 from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
+from marqo import version
 from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -133,6 +133,14 @@ class ApiTests(MarqoTestCase):
 
 
 class ValidationApiTests(MarqoTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        test_index_request = cls.unstructured_marqo_index_request(schema_template_version=None)
+        cls.indexes = cls.create_indexes([test_index_request])
+
+        cls.test_index = cls.indexes[0]
+
     def setUp(self):
         self.client = TestClient(api.app)
 
@@ -216,6 +224,38 @@ class ValidationApiTests(MarqoTestCase):
             self.assertIn("message", response.json())
             self.assertEqual(response.json()["code"], "invalid_argument")
             self.assertEqual(response.json()["type"], "invalid_request")
+
+    def test_apply_latest_schema_template_defaultDisabled(self):
+        """
+        Test that the apply_latest_schema_template endpoint returns 403 by default.
+        """
+        index_name = self.test_index.name
+        response = self.client.post(f"/indexes/{index_name}/apply-latest-schema-template")
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("This API endpoint is disabled", response.json()["detail"])
+
+    def test_apply_latest_schema_template_disabled(self):
+        """
+        Test that the apply_latest_schema_template endpoint returns 403 when ops API is disabled explicitly.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'FALSE'}):
+            index_name = self.test_index.name
+            response = self.client.post(f"/indexes/{index_name}/apply-latest-schema-template")
+            self.assertEqual(response.status_code, 403)
+            self.assertIn("This API endpoint is disabled", response.json()["detail"])
+
+    def test_apply_latest_schema_template_enabled(self):
+        """
+        Test that the apply_latest_schema_template endpoint is accessible when ops API is enabled.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+            index_name = self.test_index.name
+            response = self.client.post(f"/indexes/{index_name}/apply-latest-schema-template")
+            self.assertEqual(response.status_code, 200)
+            # Since the test index is created with schema_template_version defaulting to current version,
+            # the shortcut is triggered
+            current_version = version.get_version()
+            self.assertEqual(f"Schema is already at current Marqo version {current_version}", response.json()["reason"])
 
 
 class TestApiCustomEnvVars(MarqoTestCase):

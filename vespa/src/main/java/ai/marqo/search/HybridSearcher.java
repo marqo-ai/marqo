@@ -55,6 +55,7 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
+    private static String QUERY_RERANK_COUNT = "ranking.rerankCount";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
 
     // Thread-safe ObjectReader for parsing SortField JSON
@@ -496,6 +497,7 @@ public class HybridSearcher extends Searcher {
         // Update query hits and offset
         query.setHits(newHits);
         query.setOffset(0);
+        query.properties().set(QUERY_RERANK_COUNT, newHits);
 
         // Update tensor YQL targetHits if it exists
         if (currentTensorTargetHits != null
@@ -1092,6 +1094,7 @@ public class HybridSearcher extends Searcher {
 
         probeLexicalQuery.setHits(probeDepth);
         probeLexicalQuery.setOffset(0);
+        probeLexicalQuery.properties().set(QUERY_RERANK_COUNT, probeDepth);
 
         logIfVerbose(
                 String.format(

@@ -520,4 +520,10 @@ schema {{ index.schema_name }} {
         summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
         {%- endfor %}
     }
+
+    {% if collapse_field -%}
+    document-summary collapse-minimal-summary {
+        summary {{ collapse_field.name }} type string {}
+    }
+    {%- endif %}
 }

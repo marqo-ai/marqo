@@ -31,6 +31,8 @@ MARQO_STEMMING_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 MARQO_PARTIAL_UPDATE_MINIMUM_VERSION = semver.VersionInfo.parse('2.16.0')
 MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
 MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
+MARQO_UPDATE_SCHEMA_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
+MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.6')
 
 # For score modifiers
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
