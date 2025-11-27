@@ -175,6 +175,21 @@ class HybridSearch:
                 f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
             )
 
+        if recency_parameters:
+            # Recency scoring is only supported for SemiStructured indexes
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise core_exceptions.UnsupportedFeatureError(
+                    "Recency scoring is only supported for unstructured indexes. "
+                    "Structured indexes do not support the recencyParameters option."
+                )
+            # Check schema version supports recency
+            if not marqo_index.index_supports_recency_scoring:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"Recency scoring is only supported for unstructured indexes created with Marqo "
+                    f"{str(constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)} or later. "
+                    f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                )
+
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
         # split queries into lexical and tensor

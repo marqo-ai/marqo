@@ -79,7 +79,8 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_basic_exponential_decay_increases_recent_doc_score(self):
         """Test that exponential decay gives higher scores to recent documents."""
-        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+        # Recency scoring is only supported for unstructured indexes
+        for index_name in [self.unstructured_index_name]:
             with self.subTest(index=index_name):
                 # Add test documents
                 self._add_test_documents(index_name)
@@ -132,7 +133,8 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_exponential_decay_with_offset_grace_period(self):
         """Test that offset creates a grace period where documents get full score."""
-        for index_name in [self.structured_index_name, self.unstructured_index_name]:
+        # Recency scoring is only supported for unstructured indexes
+        for index_name in [self.unstructured_index_name]:
             with self.subTest(index=index_name):
                 # Add documents with specific timestamps
                 # Use identical content so text relevance is the same
@@ -200,7 +202,8 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_different_decay_functions_work(self):
         """Test that different decay functions (linear, binary) work through API."""
-        index_name = self.structured_index_name
+        # Recency scoring is only supported for unstructured indexes
+        index_name = self.unstructured_index_name
         self._add_test_documents(index_name)
 
         # Test linear decay
@@ -253,7 +256,8 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_duration_format_equivalence(self):
         """Test that '7d' and '168h' produce equivalent results."""
-        index_name = self.structured_index_name
+        # Recency scoring is only supported for unstructured indexes
+        index_name = self.unstructured_index_name
         self._add_test_documents(index_name)
 
         # Search with days format
@@ -315,3 +319,33 @@ class TestRecencyScoring(MarqoTestCase):
                 places=5,
                 msg=f"Scores should be equal for equivalent duration formats (doc {i})"
             )
+
+    def test_structured_index_rejects_recency_parameters(self):
+        """Test that structured indexes reject recency parameters with appropriate error."""
+        self._add_test_documents(self.structured_index_name)
+
+        search_body = {
+            "q": "product",
+            "searchMethod": "HYBRID",
+            "limit": 10,
+            "recencyParameters": {
+                "recencyField": "created_at",
+                "scale": "7d",
+                "decayFunction": "exponential",
+                "decayTo": 0.5,
+                "applyInRankingPhase": "all"
+            }
+        }
+
+        response = requests.post(
+            f"{self._MARQO_URL}/indexes/{self.structured_index_name}/search",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(search_body)
+        )
+
+        # Should return an error status
+        self.assertNotEqual(response.status_code, 200)
+        error_response = response.json()
+        # Check error message mentions recency is not supported for structured indexes
+        self.assertIn("message", error_response)
+        self.assertIn("unstructured", error_response["message"].lower())
