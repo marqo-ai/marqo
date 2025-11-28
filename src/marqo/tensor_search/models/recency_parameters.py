@@ -1,7 +1,6 @@
 """Recency parameters for time-based score boosting."""
 
 from enum import Enum
-from typing import Literal
 from pydantic.v1 import BaseModel, Field, validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
@@ -11,6 +10,24 @@ class ApplyInRankingPhase(str, Enum):
     ALL = "all"
     ONLY_GLOBAL = "only-global"
     EXCLUDE_GLOBAL = "exclude-global"
+
+
+class DecayFunction(str, Enum):
+    """Type of decay function for recency scoring."""
+    EXPONENTIAL = "exponential"
+    LINEAR = "linear"
+    GAUSSIAN = "gaussian"
+    BINARY = "binary"
+
+    @property
+    def vespa_value(self) -> int:
+        """Return the numeric value used by Vespa."""
+        return {
+            DecayFunction.EXPONENTIAL: 0,
+            DecayFunction.LINEAR: 1,
+            DecayFunction.GAUSSIAN: 2,
+            DecayFunction.BINARY: 3
+        }[self]
 
 
 class RecencyParameters(BaseModel):
@@ -50,8 +67,8 @@ class RecencyParameters(BaseModel):
         )
     )
 
-    decay_function: Literal["exponential", "linear", "gaussian", "binary"] = Field(
-        default="exponential",
+    decay_function: DecayFunction = Field(
+        default=DecayFunction.EXPONENTIAL,
         alias="decayFunction",
         description="Type of decay function to apply: exponential (smooth decay), linear (constant decay), gaussian (bell curve), binary (step function at threshold)"
     )

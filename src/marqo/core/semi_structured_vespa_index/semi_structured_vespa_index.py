@@ -20,7 +20,7 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
-from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 
@@ -134,14 +134,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
         from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
-        # Map decay function to numeric value for Vespa
-        decay_function_map = {
-            "exponential": 0,
-            "linear": 1,
-            "gaussian": 2,
-            "binary": 3
-        }
-
         # Parse duration strings to seconds for Vespa
         scale_seconds = parse_duration_to_seconds(recency_params.scale)
         offset_seconds = parse_duration_to_seconds(recency_params.offset)
@@ -153,7 +145,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
             constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
-            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: decay_function_map[recency_params.decay_function]
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value
         }
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
