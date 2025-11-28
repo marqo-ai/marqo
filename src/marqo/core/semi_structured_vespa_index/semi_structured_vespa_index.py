@@ -20,7 +20,7 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
-from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 
@@ -127,7 +127,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query_input.update(self._get_recency_query_input(marqo_query.recency_parameters))
 
             query['marqo__recency_enabled'] = True
-            query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != 'exclude_global'
+            query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
         return query
 
@@ -148,7 +148,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         return {
             constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
-            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == 'only-global' else 1,
+            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == ApplyInRankingPhase.ONLY_GLOBAL else 1,
             constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: scale_seconds,
             constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
             constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,

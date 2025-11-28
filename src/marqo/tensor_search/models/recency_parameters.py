@@ -1,8 +1,16 @@
 """Recency parameters for time-based score boosting."""
 
+from enum import Enum
 from typing import Literal
 from pydantic.v1 import BaseModel, Field, validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
+
+
+class ApplyInRankingPhase(str, Enum):
+    """Controls which ranking phases recency scoring is applied in."""
+    ALL = "all"
+    ONLY_GLOBAL = "only-global"
+    EXCLUDE_GLOBAL = "exclude-global"
 
 
 class RecencyParameters(BaseModel):
@@ -60,8 +68,8 @@ class RecencyParameters(BaseModel):
         )
     )
 
-    apply_in_ranking_phase: Literal["all", "only-global", "exclude-global"] = Field(
-        default="all",
+    apply_in_ranking_phase: ApplyInRankingPhase = Field(
+        default=ApplyInRankingPhase.ALL,
         alias="applyInRankingPhase",
         description=(
             "Controls which ranking phases recency scoring is applied in:\n"
@@ -74,6 +82,7 @@ class RecencyParameters(BaseModel):
     class Config:
         extra: str = "forbid"
         allow_population_by_field_name = True
+        use_enum_values = True
 
     @validator('recency_field')
     def validate_field_name(cls, v: str) -> str:

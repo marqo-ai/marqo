@@ -1,9 +1,11 @@
 """Unit tests for _get_recency_query_input() method in SemiStructuredVespaIndex."""
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from marqo.core import constants
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
+from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
 
@@ -261,6 +263,65 @@ class TestRecencyQueryInput(unittest.TestCase):
 
                 self.assertEqual(result, expected_output)
 
+    def test_global_phase_parameter_for_all_apply_modes(self):
+        """Test marqo__recency_apply_in_global_ranking_phase is set correctly for all modes.
+
+        This tests _to_vespa_hybrid_query() to verify the global phase parameter is set correctly.
+        The bug was using 'exclude_global' (underscore) instead of 'exclude-global' (hyphen).
+        """
+        test_cases = [
+            # (apply_in_ranking_phase, expected_global_phase_value)
+            ("all", True),           # Apply in all phases including global
+            ("only-global", True),   # Apply only in global phase
+            ("exclude-global", False),  # Exclude from global phase
+        ]
+
+        for apply_mode, expected_global_phase in test_cases:
+            with self.subTest(apply_mode=apply_mode):
+                query = self._create_hybrid_query_with_recency(apply_mode)
+
+                with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
+                    mock_parent.return_value = {'query_features': {}}
+                    result = self.vespa_index._to_vespa_hybrid_query(query)
+
+                # Verify recency is enabled
+                self.assertTrue(result['marqo__recency_enabled'])
+
+                # Verify global phase parameter is set correctly
+                self.assertEqual(
+                    result['marqo__recency_apply_in_global_ranking_phase'],
+                    expected_global_phase,
+                    f"apply_in_ranking_phase='{apply_mode}' should set "
+                    f"marqo__recency_apply_in_global_ranking_phase to {expected_global_phase}"
+                )
+
+    def _create_hybrid_query_with_recency(self, apply_in_ranking_phase: str) -> MarqoHybridQuery:
+        """Helper to create a MarqoHybridQuery with recency parameters."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            apply_in_ranking_phase=apply_in_ranking_phase
+        )
+
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF
+        )
+
+        query = MarqoHybridQuery(
+            index_name="test_index",
+            or_phrases=["test", "query"],
+            and_phrases=[],
+            vector_query=None,
+            limit=10,
+            offset=0,
+            hybrid_parameters=hybrid_params,
+            recency_parameters=recency_params
+        )
+        return query
 
 if __name__ == '__main__':
     unittest.main()
