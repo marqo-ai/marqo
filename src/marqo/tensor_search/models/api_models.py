@@ -17,7 +17,7 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
@@ -382,12 +382,20 @@ class SearchQuery(BaseMarqoModel):
 
     @root_validator(pre=False)
     def _validate_sort_by_cannot_be_used_with_recency(cls, values):
-        """Validate that sortBy cannot be used with recencyParameters"""
+        """Validate that sortBy cannot be used with recencyParameters.
+
+        Exception: When apply_in_ranking_phase='exclude-global', recency is only
+        applied in phase-1 ranking while sortBy is applied in global ranking,
+        so they don't conflict.
+        """
         sort_by = values.get('sort_by')
         recency_parameters = values.get('recencyParameters')
         if sort_by is not None and recency_parameters is not None:
-            raise ValueError("'sortBy' cannot be used with 'recencyParameters' in hybrid search. "
-                             "sortBy bypasses relevance scoring, making recency boosting ineffective.")
+            # Allow when recency is excluded from global phase (applied only in phase-1)
+            if recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL:
+                raise ValueError("'sortBy' cannot be used with 'recencyParameters' in hybrid search. "
+                                 "sortBy bypasses relevance scoring, making recency boosting ineffective. "
+                                 "To use both, set applyInRankingPhase to 'exclude-global'.")
         return values
 
     @root_validator(pre=False)
