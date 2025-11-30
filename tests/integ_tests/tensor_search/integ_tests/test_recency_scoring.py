@@ -80,11 +80,26 @@ class TestRecencyScoring(MarqoTestCase):
 
     # ============== Helper Methods ==============
     def _generate_shared_documents(self) -> List[Dict[str, Any]]:
-        """Generate shared documents with various ages and attributes."""
+        """Generate shared documents with various ages and attributes.
+
+        Price groupings for sortBy tie-breaker testing:
+        - Price 100: doc-0d, doc-3d, doc-7d (newer docs should rank first within group)
+        - Price 80: doc-1d, doc-5d, doc-14d
+        - Price 60: doc-10d, doc-30d
+        - Price 40: doc-60d, doc-90d
+        """
         now = datetime.now()
 
         # Document ages: 0, 1, 3, 5, 7, 10, 14, 30, 60, 90 days
         ages_in_days = [0, 1, 3, 5, 7, 10, 14, 30, 60, 90]
+
+        # Price groups - documents with same price will test tie-breaking by recency
+        price_map = {
+            0: 100, 3: 100, 7: 100,      # Group 1: same price, different ages
+            1: 80, 5: 80, 14: 80,        # Group 2: same price, different ages
+            10: 60, 30: 60,              # Group 3: same price, different ages
+            60: 40, 90: 40,              # Group 4: same price, different ages
+        }
 
         documents = []
         for i, age_days in enumerate(ages_in_days):
@@ -94,7 +109,7 @@ class TestRecencyScoring(MarqoTestCase):
                 "title": "product item",
                 "description": f"test product {age_days} days old",
                 "timestamp": timestamp,
-                "sort_value": 100 - age_days,  # Higher for newer docs
+                "price": price_map[age_days],  # Deliberate duplicates for tie-breaker testing
                 "parent_id": f"group-{chr(65 + i % 5)}",  # A-E rotation
                 "mult": 1.0 + (i % 3) * 0.5,  # 1.0, 1.5, 2.0
             })
@@ -104,7 +119,7 @@ class TestRecencyScoring(MarqoTestCase):
             "_id": "doc-no-ts",
             "title": "product item",
             "description": "product without timestamp",
-            "sort_value": 0,
+            "price": 20,  # Unique price for this doc
             "parent_id": "group-F",
             "mult": 1.0,
         })
@@ -473,6 +488,7 @@ class TestRecencyScoring(MarqoTestCase):
 
     # ============== Feature Combination Tests ==============
     def test_with_relevance_cutoff(self):
+        # TODO rewrite this test
         """Test recency + relevance cutoff."""
         self._add_shared_documents()
 
@@ -516,20 +532,34 @@ class TestRecencyScoring(MarqoTestCase):
                     )
 
     def test_with_sort_by_exclude_global(self):
-        """Test recency + sortBy (requires exclude-global)."""
+        """Test recency + sortBy with recency as tie-breaker for equal prices.
+
+        Documents have deliberate price duplicates:
+        - Price 100: doc-0d, doc-3d, doc-7d
+        - Price 80: doc-1d, doc-5d, doc-14d
+        - Price 60: doc-10d, doc-30d
+        - Price 40: doc-60d, doc-90d
+        - Price 20: doc-no-ts
+
+        When sorted by price desc, documents with same price should be
+        ordered by recency (newer docs first) as a tie-breaker.
+
+        Uses scale=120d to ensure all docs (up to 90 days old) have
+        distinct recency scores for proper tie-breaking.
+        """
         self._add_shared_documents()
 
         recency_params = RecencyParameters(
             recency_field="timestamp",
-            scale="7d",
+            scale="120d",  # Large scale so all docs have distinct recency scores
             offset="0d",
             decay_function="exponential",
             decay_to=0.3,
             apply_in_ranking_phase="exclude-global"
         )
         sort_by = SortByModel(
-            fields=[SortByField(field_name="sort_value", order="desc")],
-            min_sort_candidates=10
+            fields=[SortByField(field_name="price", order="desc")],
+            min_sort_candidates=20
         )
 
         search_result = tensor_search.search(
@@ -539,29 +569,39 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=recency_params,
             sort_by=sort_by,
-            hybrid_parameters=HybridParameters(rerankDepthTensor=10),
-            result_count=10
+            hybrid_parameters=HybridParameters(rerankDepthTensor=20),
+            result_count=15
         )
 
         hits = search_result['hits']
-        self.assertGreater(len(hits), 0, "Should have results")
 
-        # Verify sorted correctly
-        sort_values = [h['sort_value'] for h in hits if 'sort_value' in h]
-        self.assertEqual(
-            sort_values,
-            sorted(sort_values, reverse=True),
-            "Results should be sorted by sort_value descending"
+        # 1. Verify exact order of hits
+        # Sorted by price desc, with recency as tie-breaker (newer docs first)
+        expected_order = [
+            "doc-0d", "doc-3d", "doc-7d",      # Price 100: newest to oldest
+            "doc-1d", "doc-5d", "doc-14d",     # Price 80: newest to oldest
+            "doc-10d", "doc-30d",              # Price 60: newest to oldest
+            "doc-60d", "doc-90d",              # Price 40: newest to oldest
+            "doc-no-ts",                       # Price 20: no timestamp
+        ]
+        actual_order = [hit['_id'] for hit in hits]
+        self.assertListEqual(
+            expected_order,
+            actual_order,
+            "Results should be sorted by price desc, with recency as tie-breaker"
         )
 
-        # Verify recency scores present
-        for hit in hits:
-            self.assertIsNotNone(
-                hit.get('_recency_score'),
-                "Recency score should be present"
-            )
+        # 2. Verify recency scores are calculated correctly for each doc
+        self._verify_basic_recency_behavior(
+            hits,
+            decay_to=0.3,
+            scale="120d",
+            offset="0d",
+            decay_function="exponential"
+        )
 
     def test_with_collapsing_field(self):
+        # TODO rewrite this test
         """Test recency + collapsing field."""
         # Add documents to collapse index
         self._add_shared_documents(index=self.collapse_index)
@@ -675,7 +715,7 @@ class TestRecencyScoring(MarqoTestCase):
                             "decayTo": 0.5,
                             "applyInRankingPhase": phase
                         },
-                        sortBy={"fields": [{"fieldName": "sort_value"}]}
+                        sortBy={"fields": [{"fieldName": "price"}]}
                     )
 
                 self.assertIn(
