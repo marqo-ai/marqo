@@ -15,6 +15,8 @@ from marqo.tensor_search.models.search import (
     QueryContent
 )
 from marqo.core.inference.api import Modality
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField, SortOrder
 
 
 class TestSearchQuery(unittest.TestCase):
@@ -436,8 +438,6 @@ class TestSearchQuery(unittest.TestCase):
 
     def test_recency_parameters_validation(self):
         """Test that recency parameters are only allowed for hybrid search."""
-        from marqo.tensor_search.models.recency_parameters import RecencyParameters
-
         recency_params = RecencyParameters(recency_field="created_at")
 
         # Valid cases - recency parameters with hybrid search
@@ -481,9 +481,6 @@ class TestSearchQuery(unittest.TestCase):
         applied in phase-1 ranking while sortBy is applied in global ranking,
         so they don't conflict.
         """
-        from marqo.tensor_search.models.recency_parameters import RecencyParameters
-        from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField, SortOrder
-
         recency_params = RecencyParameters(recency_field="created_at")
         sort_by_params = SortByModel(
             fields=[SortByField(field_name="price", order=SortOrder.Desc)]

@@ -22,6 +22,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
+from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.vespa.models import QueryResult
 
 
@@ -132,8 +133,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
-        from marqo.core.utils.duration_parser import parse_duration_to_seconds
-
         # Parse duration strings to seconds for Vespa
         scale_seconds = parse_duration_to_seconds(recency_params.scale)
         offset_seconds = parse_duration_to_seconds(recency_params.offset)
