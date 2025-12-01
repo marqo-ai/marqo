@@ -68,15 +68,22 @@ class TestRecencyScoring(MarqoTestCase):
             tensor_fields=["title"]
         )
 
+        # 4. Index specifically for relevance cutoff testing (uses different documents)
+        cls.relevance_cutoff_index_request = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+
         cls.indexes = cls.create_indexes([
             cls.main_index_request,
             cls.collapse_index_request,
-            cls.structured_index_request
+            cls.structured_index_request,
+            cls.relevance_cutoff_index_request
         ])
 
         cls.main_index = cls.indexes[0]
         cls.collapse_index = cls.indexes[1]
         cls.structured_index = cls.indexes[2]
+        cls.relevance_cutoff_index = cls.indexes[3]
 
     # ============== Helper Methods ==============
     def _generate_shared_documents(self) -> List[Dict[str, Any]]:
@@ -125,6 +132,112 @@ class TestRecencyScoring(MarqoTestCase):
         })
 
         return documents
+
+    def _generate_relevance_cutoff_documents(self) -> List[Dict[str, Any]]:
+        """Generate documents for deterministic relevance cutoff testing.
+
+        Query: "machine learning artificial intelligence algorithms"
+
+        Document categories by relevance:
+        - HIGH: Contains ALL 5 query words (h1-h10) - 10 docs
+        - MEDIUM: Contains EXACTLY 3 of 5 query words (m1-m3) - 3 docs
+        - LOW: Contains exactly 1 query word (l1-l2) - 2 docs
+        - IRRELEVANT: Contains 0 query words (i1-i5) - 5 docs
+
+        Total: 20 documents with varying ages
+        Expected probe candidates: 13 (HIGH + MEDIUM, excludes LOW and IRRELEVANT)
+        """
+        now = datetime.now()
+
+        # HIGH RELEVANCE (10 docs) - Contains ALL 5 query words
+        # Ages distributed: 0, 1, 3, 5, 7, 10, 14, 21, 28, 30 days
+        high_relevance = [
+            {"_id": "h1",
+             "content": "Machine learning algorithms in artificial intelligence enable systems to adapt.",
+             "timestamp": (now - timedelta(days=0)).timestamp()},
+            {"_id": "h2",
+             "content": "Artificial intelligence relies on machine learning algorithms to build models.",
+             "timestamp": (now - timedelta(days=1)).timestamp()},
+            {"_id": "h3",
+             "content": "Researchers develop artificial intelligence machine learning algorithms.",
+             "timestamp": (now - timedelta(days=3)).timestamp()},
+            {"_id": "h4",
+             "content": "Scalable artificial intelligence frameworks integrate machine learning algorithms.",
+             "timestamp": (now - timedelta(days=5)).timestamp()},
+            {"_id": "h5",
+             "content": "Modern artificial intelligence and machine learning algorithms optimize workflows.",
+             "timestamp": (now - timedelta(days=7)).timestamp()},
+            {"_id": "h6",
+             "content": "Sophisticated artificial intelligence machine learning algorithms optimize mining.",
+             "timestamp": (now - timedelta(days=10)).timestamp()},
+            {"_id": "h7",
+             "content": "Cutting-edge artificial intelligence machine learning algorithms accelerate processing.",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+            {"_id": "h8",
+             "content": "Enterprise artificial intelligence solutions embed machine learning algorithms.",
+             "timestamp": (now - timedelta(days=21)).timestamp()},
+            {"_id": "h9",
+             "content": "Robust artificial intelligence machine learning algorithms improve quality.",
+             "timestamp": (now - timedelta(days=28)).timestamp()},
+            {"_id": "h10",
+             "content": "Innovative artificial intelligence and machine learning algorithms revolutionize analytics.",
+             "timestamp": (now - timedelta(days=30)).timestamp()},
+        ]
+
+        # MEDIUM RELEVANCE (3 docs) - Contains exactly 3 of 5 query words
+        medium_relevance = [
+            {"_id": "m1",
+             "content": "Machine learning algorithms process financial time series for forecasting.",
+             "timestamp": (now - timedelta(days=7)).timestamp()},
+            {"_id": "m2",
+             "content": "Artificial intelligence algorithms underpin recommendation engines.",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+            {"_id": "m3",
+             "content": "Artificial intelligence learning models adapt to new user behaviors.",
+             "timestamp": (now - timedelta(days=21)).timestamp()},
+        ]
+
+        # LOW RELEVANCE (2 docs) - Contains exactly 1 query word
+        low_relevance = [
+            {"_id": "l1",
+             "content": "Engineers use machine tools for precise cutting operations.",
+             "timestamp": (now - timedelta(days=1)).timestamp()},
+            {"_id": "l2",
+             "content": "Innovators encourage collaborative learning environments to foster growth.",
+             "timestamp": (now - timedelta(days=5)).timestamp()},
+        ]
+
+        # IRRELEVANT (5 docs) - Contains 0 query words
+        irrelevant = [
+            {"_id": "i1",
+             "content": "Bright morning sunlight streamed through the quiet study room.",
+             "timestamp": (now - timedelta(days=0)).timestamp()},
+            {"_id": "i2",
+             "content": "Surprising weather patterns emerged across the town.",
+             "timestamp": (now - timedelta(days=3)).timestamp()},
+            {"_id": "i3",
+             "content": "Vibrant wildflowers adorned the rolling hills during summer.",
+             "timestamp": (now - timedelta(days=10)).timestamp()},
+            {"_id": "i4",
+             "content": "Chilly autumn breeze painted golden leaves across streets.",
+             "timestamp": (now - timedelta(days=20)).timestamp()},
+            {"_id": "i5",
+             "content": "The ancient manuscript revealed hidden stories from forgotten civilizations.",
+             "timestamp": (now - timedelta(days=30)).timestamp()},
+        ]
+
+        return high_relevance + medium_relevance + low_relevance + irrelevant
+
+    def _add_relevance_cutoff_documents(self):
+        """Add documents designed for relevance cutoff testing."""
+        documents = self._generate_relevance_cutoff_documents()
+        add_docs_params = AddDocsParams(
+            index_name=self.relevance_cutoff_index.name,
+            docs=documents,
+            tensor_fields=["content"]
+        )
+        self.add_documents(self.config, add_docs_params)
+        time.sleep(1)  # Allow time for indexing
 
     def _add_shared_documents(self, index=None):
         """Add shared documents to the specified or main index."""
@@ -488,48 +601,85 @@ class TestRecencyScoring(MarqoTestCase):
 
     # ============== Feature Combination Tests ==============
     def test_with_relevance_cutoff(self):
-        # TODO rewrite this test
-        """Test recency + relevance cutoff."""
-        self._add_shared_documents()
+        """Test recency + relevance cutoff interaction.
 
-        cutoff_configs = [
-            (RelevanceCutoffMethod.MeanStdDev, MeanStdParameters(stdDevFactor=2.0)),
-            (RelevanceCutoffMethod.GapDetection, None),
-        ]
+        Verifies:
+        1. Relevance cutoff probe query runs with recency DISABLED (pure relevance)
+           - Probe candidates count is deterministic based on semantic/lexical relevance
+           - If recency was applied to probe, results would vary based on document ages
+        2. Returned docs have correctly calculated recency scores
 
-        for method, cutoff_params in cutoff_configs:
-            with self.subTest(method=method.value):
-                recency_params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    offset="0d",
-                    decay_function="exponential",
-                    decay_to=0.5
+        Uses dedicated document set with predictable relevance distribution:
+        - HIGH (10 docs): Contains all 5 query words
+        - MEDIUM (3 docs): Contains 3 of 5 query words
+        - LOW (2 docs): Contains 1 query word
+        - IRRELEVANT (5 docs): Contains 0 query words
+        """
+        self._add_relevance_cutoff_documents()
+
+        QUERY = "machine learning artificial intelligence algorithms"
+        # HIGH (10) + MEDIUM (3) should pass semantic relevance threshold
+        # LOW and IRRELEVANT should be filtered out by relevance cutoff
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+            apply_in_ranking_phase="only-global",  # apply recency at phase-1 ranking defies the purpose of cutoff
+        )
+
+        # Use relative_max_score with moderate threshold to get HIGH relevance docs
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters={"relativeScoreFactor": 0.5}
+        )
+
+        search_result = tensor_search.search(
+            config=self.config,
+            index_name=self.relevance_cutoff_index.name,
+            text=QUERY,
+            search_method=SearchMethod.HYBRID,
+            recency_parameters=recency_params,
+            relevance_cutoff=relevance_cutoff,
+            result_count=20
+        )
+
+        hits = search_result['hits']
+
+        # 1. Verify probe candidates - proves recency was NOT used in probe
+        probe_candidates = search_result.get('_probeCandidates')
+        self.assertEqual(15, probe_candidates, )
+
+        # 2. Verify relevant candidates based on threshold
+        relevant_candidates = search_result.get('_relevantCandidates')
+        self.assertEqual(13, relevant_candidates, "Relevant candidates should cover high and medium relevant docs")
+
+        for hit in hits:
+            actual_recency = hit.get('_recency_score')
+            doc_id = hit.get('_id')
+
+            # 3. Verify returned docs are from HIGH or MEDIUM relevance categories
+            # (LOW and IRRELEVANT should be filtered out by relevance cutoff)
+            self.assertTrue(
+                doc_id.startswith('h') or doc_id.startswith('m'),
+                f"Only HIGH/MEDIUM relevance docs should be returned, got {doc_id}"
+            )
+
+            # 4. Verify recency scores ARE applied to returned results
+            timestamp = hit.get('timestamp')
+            if timestamp is not None:
+                current_time = datetime.now().timestamp()
+                age_seconds = max(0, current_time - timestamp)
+                expected_score = self._calculate_expected_score(
+                    age_seconds, scale="7d", offset="0d",
+                    decay_function="exponential", decay_to=0.3
                 )
-                relevance_cutoff = RelevanceCutoffModel(
-                    method=method,
-                    parameters=cutoff_params
+                self.assertAlmostEqual(
+                    actual_recency, expected_score, places=3,
+                    msg=f"Recency score mismatch for {doc_id}"
                 )
-
-                search_result = tensor_search.search(
-                    config=self.config,
-                    index_name=self.main_index.name,
-                    text="product",
-                    search_method=SearchMethod.HYBRID,
-                    recency_parameters=recency_params,
-                    relevance_cutoff=relevance_cutoff,
-                    result_count=20
-                )
-
-                hits = search_result['hits']
-                self.assertGreater(len(hits), 0, "Should have results")
-
-                # Verify recency scores present on remaining results
-                for hit in hits:
-                    self.assertIsNotNone(
-                        hit.get('_recency_score'),
-                        "Recency score should be present"
-                    )
 
     def test_with_sort_by_exclude_global(self):
         """Test recency + sortBy with recency as tie-breaker for equal prices.

@@ -1092,6 +1092,16 @@ public class HybridSearcher extends Searcher {
                 .getFeatures()
                 .put("query(marqo__add_weights_lexical)", Tensor.from("tensor(p{}):{}"));
 
+        // Turn off recency to make sure we get the raw relevance score
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_should_calculate_score)", 0.0);
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_should_apply_score)", 0.0);
+
         probeLexicalQuery.setHits(probeDepth);
         probeLexicalQuery.setOffset(0);
         probeLexicalQuery.properties().set(QUERY_RERANK_COUNT, probeDepth);
