@@ -9,6 +9,7 @@ import unittest
 from datetime import datetime, timedelta
 
 import math
+import pytest
 
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -600,6 +601,8 @@ class TestRecencyScoring(MarqoTestCase):
                 self._verify_basic_recency_behavior(search_result['hits'], decay_to=0.5)
 
     # ============== Feature Combination Tests ==============
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
     def test_with_relevance_cutoff(self):
         """Test recency + relevance cutoff interaction.
 
