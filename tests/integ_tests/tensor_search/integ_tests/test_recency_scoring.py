@@ -907,9 +907,8 @@ class TestRecencyScoring(MarqoTestCase):
                     )
 
                 self.assertIn(
-                    "sortby",
-                    str(ctx.exception).lower(),
-                    "Error should mention sortBy"
+                    "'sortBy' cannot be used with 'recencyParameters' with global-phase reranking in hybrid search",
+                    str(ctx.exception)
                 )
 
     # ============== Validation Tests ==============

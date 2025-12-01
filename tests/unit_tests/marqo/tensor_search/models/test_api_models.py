@@ -533,7 +533,7 @@ class TestSearchQuery(unittest.TestCase):
                             recencyParameters=recency_params_with_mode,
                             sortBy=sort_by_params
                         )
-                    self.assertIn("'sortBy' cannot be used with 'recencyParameters'", str(cm.exception))
+                    self.assertIn("'sortBy' cannot be used with 'recencyParameters' with global-phase reranking", str(cm.exception))
                     self.assertIn("sortBy bypasses relevance scoring", str(cm.exception))
                 else:
                     # Should NOT raise - exclude-global allows sortBy + recency

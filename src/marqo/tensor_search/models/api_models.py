@@ -393,9 +393,9 @@ class SearchQuery(BaseMarqoModel):
         if sort_by is not None and recency_parameters is not None:
             # Allow when recency is excluded from global phase (applied only in phase-1)
             if recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL:
-                raise ValueError("'sortBy' cannot be used with 'recencyParameters' in hybrid search. "
-                                 "sortBy bypasses relevance scoring, making recency boosting ineffective. "
-                                 "To use both, set applyInRankingPhase to 'exclude-global'.")
+                raise ValueError("'sortBy' cannot be used with 'recencyParameters' with global-phase reranking "
+                                 "in hybrid search. sortBy bypasses relevance scoring, making recency boosting "
+                                 "ineffective. To use both, set applyInRankingPhase to 'exclude-global'.")
         return values
 
     @root_validator(pre=False)
