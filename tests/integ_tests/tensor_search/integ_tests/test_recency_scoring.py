@@ -751,17 +751,31 @@ class TestRecencyScoring(MarqoTestCase):
         )
 
     def test_with_collapsing_field(self):
-        # TODO rewrite this test
-        """Test recency + collapsing field."""
+        """Test recency + collapsing field picks most recent variant per parent.
+
+        Document structure (parent_id uses A-E rotation):
+        - group-A: doc-0d (newest), doc-10d
+        - group-B: doc-1d (newest), doc-14d
+        - group-C: doc-3d (newest), doc-30d
+        - group-D: doc-5d (newest), doc-60d
+        - group-E: doc-7d (newest), doc-90d
+        - group-F: doc-no-ts (only variant)
+
+        With recency boosting, the most recent variant should be selected
+        for each parent group when collapsing.
+
+        Uses scale=120d to ensure all documents (up to 90 days old) have
+        distinct recency scores for proper variant selection.
+        """
         # Add documents to collapse index
         self._add_shared_documents(index=self.collapse_index)
 
         recency_params = RecencyParameters(
             recency_field="timestamp",
-            scale="7d",
+            scale="120d",  # Large scale so all docs have distinct recency scores
             offset="0d",
             decay_function="exponential",
-            decay_to=0.5
+            decay_to=0.3
         )
 
         search_result = tensor_search.search(
@@ -777,7 +791,7 @@ class TestRecencyScoring(MarqoTestCase):
         hits = search_result['hits']
         self.assertGreater(len(hits), 0, "Should have results")
 
-        # Verify collapsing worked (unique parent_ids)
+        # 1. Verify collapsing worked (unique parent_ids)
         parent_ids = [h['parent_id'] for h in hits if 'parent_id' in h]
         self.assertEqual(
             len(parent_ids),
@@ -785,12 +799,33 @@ class TestRecencyScoring(MarqoTestCase):
             "Each result should have unique parent_id (collapsed)"
         )
 
-        # Verify recency scores present
+        # 2. Verify recency scores present
         for hit in hits:
             self.assertIsNotNone(
                 hit.get('_recency_score'),
                 "Recency score should be present"
             )
+
+        # 3. Verify the most recent variant is selected for each parent group
+        # Expected: newest variant should be picked for each group
+        expected_newest_variant = {
+            "group-A": "doc-0d",   # 0d is newer than 10d
+            "group-B": "doc-1d",   # 1d is newer than 14d
+            "group-C": "doc-3d",   # 3d is newer than 30d
+            "group-D": "doc-5d",   # 5d is newer than 60d
+            "group-E": "doc-7d",   # 7d is newer than 90d
+            "group-F": "doc-no-ts",  # Only variant
+        }
+
+        for hit in hits:
+            parent_id = hit.get('parent_id')
+            doc_id = hit.get('_id')
+            if parent_id in expected_newest_variant:
+                expected_doc = expected_newest_variant[parent_id]
+                self.assertEqual(
+                    doc_id, expected_doc,
+                    f"For {parent_id}, expected newest variant {expected_doc} but got {doc_id}"
+                )
 
     # ============== Negative Case Tests ==============
 
