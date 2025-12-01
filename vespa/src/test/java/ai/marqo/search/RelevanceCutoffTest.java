@@ -820,5 +820,52 @@ class RelevanceCutoffTest {
             assertThat(probeQuery.getHits()).isEqualTo(2000);
             assertThat(probeQuery.getOffset()).isEqualTo(0);
         }
+
+        @Test
+        void shouldDisableRecencyScoringInProbeQuery() {
+            Query originalQuery = new Query("search/?query=test&hits=60&offset=0");
+            Integer probeDepth = 2000;
+
+            // Set up minimal required properties for createProbeLexialQuery
+            originalQuery
+                    .properties()
+                    .set("marqo__yql.lexical", "select * from sources * where userQuery()");
+            originalQuery
+                    .properties()
+                    .set("marqo__ranking.lexical.lexical", "lexical_rank_profile");
+
+            // Set up the required tensor for fields to rank
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", Tensor.from("tensor(p{}):{}"));
+
+            // Enable recency scoring in the original query
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_should_calculate_score)", 1.0);
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_should_apply_score)", 1.0);
+
+            Query probeQuery =
+                    hybridSearcher.createProbeLexialQuery(originalQuery, probeDepth, false);
+
+            // Verify recency scoring is disabled in the probe query
+            assertThat(
+                            probeQuery
+                                    .getRanking()
+                                    .getFeatures()
+                                    .getDouble("query(marqo__recency_should_calculate_score)"))
+                    .hasValue(0.0);
+            assertThat(
+                            probeQuery
+                                    .getRanking()
+                                    .getFeatures()
+                                    .getDouble("query(marqo__recency_should_apply_score)"))
+                    .hasValue(0.0);
+        }
     }
 }
