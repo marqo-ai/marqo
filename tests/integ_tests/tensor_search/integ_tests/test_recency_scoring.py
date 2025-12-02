@@ -681,6 +681,8 @@ class TestRecencyScoring(MarqoTestCase):
                     msg=f"Recency score mismatch for {doc_id}"
                 )
 
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
     def test_with_sort_by_exclude_global(self):
         """Test recency + sortBy with recency as tie-breaker for equal prices.
 
@@ -705,7 +707,7 @@ class TestRecencyScoring(MarqoTestCase):
             offset="0d",
             decay_function="exponential",
             decay_to=0.3,
-            apply_in_ranking_phase="all"
+            apply_in_ranking_phase="exclude-global"
         )
         sort_by = SortByModel(
             fields=[SortByField(field_name="price", order="desc")],
