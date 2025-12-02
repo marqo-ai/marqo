@@ -20,7 +20,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.relevance_cutoff_model import (
-    RelevanceCutoffModel, RelevanceCutoffMethod, MeanStdParameters
+    RelevanceCutoffModel, RelevanceCutoffMethod
 )
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
@@ -238,7 +238,6 @@ class TestRecencyScoring(MarqoTestCase):
             tensor_fields=["content"]
         )
         self.add_documents(self.config, add_docs_params)
-        time.sleep(1)  # Allow time for indexing
 
     def _add_shared_documents(self, index=None):
         """Add shared documents to the specified or main index."""
@@ -251,8 +250,6 @@ class TestRecencyScoring(MarqoTestCase):
             tensor_fields=["title", "description"]
         )
         self.add_documents(self.config, add_docs_params)
-        # Allow time for Vespa to fully index the documents including score_modifiers
-        time.sleep(1)
 
     def _add_docs_to_structured_index(self):
         """Add documents to the structured index for negative tests."""
@@ -465,14 +462,14 @@ class TestRecencyScoring(MarqoTestCase):
             with self.subTest(function=decay_func):
                 params = RecencyParameters(
                     recency_field="timestamp",
-                    scale="7d",
+                    scale="8d",
                     offset="0d",
                     decay_function=decay_func,
                     decay_to=0.5
                 )
                 hits = self._search_with_recency("product", params)
                 self._verify_basic_recency_behavior(
-                    hits, decay_to=0.5, scale="7d", offset="0d", decay_function=decay_func
+                    hits, decay_to=0.5, scale="8d", offset="0d", decay_function=decay_func
                 )
 
     def test_scale_offset_combinations(self):

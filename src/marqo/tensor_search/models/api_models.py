@@ -43,6 +43,7 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
+    # TODO refactor this class when migrating to pydantic2 to use snake_case with camelCase alias for field names
     class Config(BaseMarqoModel.Config):
         use_enum_values = True
 
