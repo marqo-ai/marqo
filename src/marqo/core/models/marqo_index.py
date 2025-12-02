@@ -714,6 +714,17 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             'index_supports_collapse_minimal_summary',
             lambda: self.parsed_schema_template_version() >= constants.MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION)
 
+    @property
+    def index_supports_recency_scoring(self) -> bool:
+        """
+        Check if the index schema supports recency scoring.
+        Recency scoring was added in version 2.24.8 to enable time-based
+        score boosting using decay functions.
+        """
+        return self._cache_or_get(
+            'index_supports_recency_scoring',
+            lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'

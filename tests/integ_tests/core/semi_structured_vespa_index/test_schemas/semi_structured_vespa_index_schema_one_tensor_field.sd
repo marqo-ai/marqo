@@ -102,6 +102,114 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__sort_field_weights_0) tensor<double>(p{})
             query(marqo__sort_field_weights_1) tensor<double>(p{})
             query(marqo__sort_field_weights_2) tensor<double>(p{})
+
+            query(marqo__recency_should_calculate_score): 0
+            query(marqo__recency_should_apply_score): 0
+            query(marqo__recency_decay_function_type): 0
+            query(marqo__recency_timestamp_key) tensor<double>(p{})
+            query(marqo__recency_scale_seconds) double: 604800.0
+            query(marqo__recency_offset_seconds) double: 0.0
+            query(marqo__recency_decay_to) double: 0.5
+        }
+
+        # Recency scoring functions
+        function get_timestamp() {
+            expression {
+                if (count(query(marqo__recency_timestamp_key)) > 0,
+                    reduce(attribute(marqo__score_modifiers) * query(marqo__recency_timestamp_key), sum),
+                    0)
+            }
+        }
+
+        function age_in_seconds() {
+            expression: max(0, now() - get_timestamp())
+        }
+
+        # Effective age after applying offset (grace period)
+        # Documents within offset period get 0 effective age (perfect score)
+        function effective_age() {
+            expression: max(0, age_in_seconds() - query(marqo__recency_offset_seconds))
+        }
+
+        # Exponential decay (Elasticsearch-compatible)
+        # Formula: λ = ln(decay_to) / scale
+        #          score = max(decay_to, exp(λ × age))
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
+        function recency_score_exponential(age, scale, decay_to) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(decay_to, exp(log(decay_to) * age / scale)))
+            }
+        }
+
+        # Linear decay (Elasticsearch-compatible)
+        # Formula: score = max(decay_to, (scale - age × (1 - decay_to)) / scale)
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
+        function recency_score_linear(age, scale, decay_to) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(decay_to, (scale - age * (1.0 - decay_to)) / scale))
+            }
+        }
+
+        # Gaussian decay (Elasticsearch-compatible)
+        # Formula: σ² = -scale² / (2 × ln(decay_to))
+        #          score = max(decay_to, exp(-age² / (2σ²)))
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: scale in seconds
+        #   decay_to: target score at age=scale, also acts as floor
+        # At age = 0: score = 1.0
+        # At age = scale: score = decay_to
+        # Formula: score = exp(age² × ln(decay_to) / scale²)
+        function recency_score_gaussian(age, scale, decay_to) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(decay_to, exp(pow(age, 2) * log(decay_to) / pow(scale, 2))))
+            }
+        }
+
+        # Binary decay (step function)
+        # Score is 1.0 until age >= scale, then drops to decay_to
+        # Parameters:
+        #   age: effective age in seconds
+        #   scale: threshold in seconds
+        #   decay_to: score after threshold
+        function recency_score_binary(age, scale, decay_to) {
+            expression: if(age < scale, 1.0, decay_to)
+        }
+
+        function recency_score_router() {
+            expression {
+                if (query(marqo__recency_decay_function_type) == 0,
+                    recency_score_exponential(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
+                    if (query(marqo__recency_decay_function_type) == 1,
+                        recency_score_linear(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
+                        if (query(marqo__recency_decay_function_type) == 2,
+                            recency_score_gaussian(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
+                            recency_score_binary(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)))))
+            }
+        }
+
+        function recency_score() {
+            expression: if(query(marqo__recency_should_calculate_score) != 0, recency_score_router(), 1.0)
+        }
+
+        function recency_multiplier() {
+            expression: if(query(marqo__recency_should_apply_score) != 0, recency_score(), 1.0)
         }
 
         function mult_modifier(mult_weights) {
@@ -111,7 +219,7 @@ schema marqo__test_00semi_00structured_00schema {
             expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
         }
         function modify(score, mult_weights, add_weights) {
-            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+            expression: (mult_modifier(mult_weights) * score + add_modifier(add_weights)) * recency_multiplier()
         }
         function global_mult_modifier() {
             expression: mult_modifier(query(marqo__mult_weights_global))
@@ -123,7 +231,6 @@ schema marqo__test_00semi_00structured_00schema {
         function embedding_score() {
             expression: if (query(marqo__embeddings_tensor_field) > 0, closeness(field, marqo__embeddings_tensor_field), 0)
         }
-
 
         function sort_field_value(sort_weights) {
             expression: if (count(sort_weights * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(sort_weights * attribute(marqo__score_modifiers), prod))
@@ -147,8 +254,9 @@ schema marqo__test_00semi_00structured_00schema {
             sort_field_value_0
             sort_field_value_1
             sort_field_value_2
+            recency_score
+            
         }
-
     }
 
     rank-profile embedding_similarity inherits base_rank_profile {
@@ -161,7 +269,7 @@ schema marqo__test_00semi_00structured_00schema {
         }
     }
 
-
+    
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
@@ -169,6 +277,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        
         summary marqo__chunks_tensor_field type array<string> {}
     }
 
@@ -178,6 +287,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        
         summary marqo__chunks_tensor_field type array<string> {}
         summary marqo__embeddings_tensor_field type tensor<float>(p{}, x[32]) {}
     }

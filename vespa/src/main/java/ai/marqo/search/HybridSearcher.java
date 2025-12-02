@@ -52,6 +52,7 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
+    private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private static String QUERY_RERANK_COUNT = "ranking.rerankCount";
@@ -334,6 +335,10 @@ public class HybridSearcher extends Searcher {
         if (!futureFacets.isEmpty()) {
             attachFacetsResult(futureFacets, timeout, processedHits, verbose);
         }
+
+        // Extract recency multiplier from match features after post-processing (only if recency is
+        // enabled)
+        processedHits = extractRecencyScore(processedHits, query, verbose);
 
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
@@ -621,7 +626,9 @@ public class HybridSearcher extends Searcher {
          */
         HitGroup result = new HitGroup();
         result.addAll(combined);
+
         result.trim(offset, limit);
+
         return result;
     }
 
@@ -986,9 +993,29 @@ public class HybridSearcher extends Searcher {
         if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
                 || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
-            resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
+            resultToRerank = applyGlobalScoreModifiers(resultToRerank, query, verbose);
+        } else if (query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase")) {
+            // apply recency score
+            for (Hit hit : resultToRerank.asList()) {
+                FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
+                if (matchFeatures == null) continue;
+
+                double recencyScore = matchFeatures.getDouble("recency_score");
+                double originalScore = hit.getRelevance().getScore();
+                double modifiedScore = originalScore * recencyScore;
+                hit.setRelevance(modifiedScore);
+                logIfVerbose(
+                        String.format(
+                                "Applied recency score %.4f to score %.4f -> %.4f" + " for hit %s",
+                                recencyScore, originalScore, modifiedScore, hit.getId()),
+                        verbose);
+            }
+
         } else {
-            logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
+            logIfVerbose(
+                    "No global weights found. Skipping applying global score modifiers. Recency is"
+                            + " disabled.",
+                    verbose);
         }
 
         logIfVerbose("Rescored result list (UNSORTED): ", verbose);
@@ -1064,6 +1091,16 @@ public class HybridSearcher extends Searcher {
                 .getRanking()
                 .getFeatures()
                 .put("query(marqo__add_weights_lexical)", Tensor.from("tensor(p{}):{}"));
+
+        // Turn off recency to make sure we get the raw relevance score
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_should_calculate_score)", 0.0);
+        probeLexicalQuery
+                .getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_should_apply_score)", 0.0);
 
         probeLexicalQuery.setHits(probeDepth);
         probeLexicalQuery.setOffset(0);
@@ -1284,6 +1321,22 @@ public class HybridSearcher extends Searcher {
             cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
         }
 
+        // Extract and set recency timestamp key tensor cells
+        String recencyTimestampKeyFeature = addQueryWrapper(QUERY_INPUT_RECENCY_TIMESTAMP_KEY);
+        logIfVerbose(
+                "Attempting to extract recency tensor: " + recencyTimestampKeyFeature, verbose);
+        Tensor recencyTimestampKey = extractTensorRankFeature(query, recencyTimestampKeyFeature);
+        if (recencyTimestampKey != null) {
+            logIfVerbose(
+                    "Successfully extracted recency timestamp key tensor: " + recencyTimestampKey,
+                    verbose);
+            Iterator<Cell> recencyCells = recencyTimestampKey.cellIterator();
+            recencyCells.forEachRemaining(
+                    (cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
+        } else {
+            logIfVerbose("Recency timestamp key tensor is null - not present in query", verbose);
+        }
+
         // Set rank profile (using RANKING method)
         queryNew.getRanking().setProfile(rankProfileNew);
 
@@ -1340,7 +1393,6 @@ public class HybridSearcher extends Searcher {
      */
     Tensor extractTensorRankFeature(Query query, String featureName) {
         Optional<Tensor> optionalTensor = query.getRanking().getFeatures().getTensor(featureName);
-        Tensor resultTensor;
         return optionalTensor.orElse(null);
     }
 
@@ -1371,15 +1423,19 @@ public class HybridSearcher extends Searcher {
     /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
      * @param hits The hit group to apply global score modifiers to.
+     * @param query The query to check recency mode.
      * @param verbose Whether to log detailed information about the score modification process.
      */
-    HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
+    HitGroup applyGlobalScoreModifiers(HitGroup hits, Query query, boolean verbose) {
         FeatureData hitMatchFeatures;
-        Double mult_modifier, add_modifier, original_score, modified_score;
+        Double mult_modifier, add_modifier, original_score, modified_score, recencyScore;
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
         }
+
+        boolean applyRecency =
+                query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase");
 
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
@@ -1388,16 +1444,21 @@ public class HybridSearcher extends Searcher {
             if (hitMatchFeatures != null) {
                 mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
                 add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
+                recencyScore = applyRecency ? hitMatchFeatures.getDouble("recency_score") : 1.0;
 
                 if (mult_modifier != null && add_modifier != null) {
                     // Apply the modifiers to the hit's relevance
                     original_score = hit.getRelevance().getScore();
-                    modified_score = original_score * mult_modifier + add_modifier;
+                    modified_score = (original_score * mult_modifier + add_modifier) * recencyScore;
                     logIfVerbose(
                             String.format(
                                     "Original score: %.7f, mult modifier: %.5f, add modifier: %.5f,"
-                                            + " Modified score: %.7f",
-                                    original_score, mult_modifier, add_modifier, modified_score),
+                                            + " recency score: %.5f, Modified score: %.7f",
+                                    original_score,
+                                    mult_modifier,
+                                    add_modifier,
+                                    recencyScore,
+                                    modified_score),
                             verbose);
                     hit.setRelevance(modified_score);
                 } else {
@@ -1414,6 +1475,49 @@ public class HybridSearcher extends Searcher {
                                 + " is missing matchfeatures.");
             }
         }
+        return hits;
+    }
+
+    /**
+     * Extracts recency score from match features and sets it as a field on each hit.
+     * This runs independently of global score modifiers, but only when recency is enabled.
+     *
+     * @param hits The hits to process
+     * @param query The query to check if recency is enabled
+     * @param verbose Whether to log verbose messages
+     * @return The processed hits with recency_score field set
+     */
+    HitGroup extractRecencyScore(HitGroup hits, Query query, boolean verbose) {
+        boolean recencyEnabled = query.properties().getBoolean("marqo__recency_enabled");
+        if (!recencyEnabled) {
+            logIfVerbose("Recency is not enabled. Skipping recency score extraction.", verbose);
+            return hits;
+        }
+
+        if (hits.size() == 0) {
+            logIfVerbose("No hits to extract recency score from. Returning.", verbose);
+            return hits;
+        }
+
+        logIfVerbose("Recency is enabled. Extracting recency score from match features.", verbose);
+
+        for (Hit hit : hits) {
+            // Extract match features
+            FeatureData hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
+            if (hitMatchFeatures != null) {
+                // Extract recency score if present and set as field
+                Double recency_score = hitMatchFeatures.getDouble("recency_score");
+                if (recency_score != null) {
+                    hit.setField("marqo__recency_score", recency_score);
+                    logIfVerbose(
+                            String.format(
+                                    "Extracted recency score for hit %s: %.5f",
+                                    hit.getId(), recency_score),
+                            verbose);
+                }
+            }
+        }
+
         return hits;
     }
 

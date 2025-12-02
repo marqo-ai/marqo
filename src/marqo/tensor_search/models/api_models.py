@@ -17,6 +17,7 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
@@ -42,6 +43,7 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
+    # TODO refactor this class when migrating to pydantic2 to use snake_case with camelCase alias for field names
     class Config(BaseMarqoModel.Config):
         use_enum_values = True
 
@@ -73,6 +75,7 @@ class SearchQuery(BaseMarqoModel):
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
     collapse_fields: Optional[List[SearchCollapseField]] = Field(default=None, alias="collapseFields")
+    recencyParameters: Optional[RecencyParameters] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3
@@ -200,6 +203,16 @@ class SearchQuery(BaseMarqoModel):
         search_method = values.get('searchMethod')
         if facets is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"Facets can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_recency_parameters_only_for_hybrid_search(cls, values):
+        """Validate that recency parameters are only provided for hybrid search"""
+        recency_parameters = values.get('recencyParameters')
+        search_method = values.get('searchMethod')
+        if recency_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"Recency parameters can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
         return values
 
@@ -366,6 +379,24 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError("'sortBy' cannot be used with 'scoreModifiers'(global score modifiers) in hybrid search "
                              "as they are working in the same rerank phase. "
                              "Please use sortBy only for sorting by fields, and scoreModifiers only for modifying scores")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_sort_by_cannot_be_used_with_recency(cls, values):
+        """Validate that sortBy cannot be used with recencyParameters.
+
+        Exception: When apply_in_ranking_phase='exclude-global', recency is only
+        applied in phase-1 ranking while sortBy is applied in global ranking,
+        so they don't conflict.
+        """
+        sort_by = values.get('sort_by')
+        recency_parameters = values.get('recencyParameters')
+        if sort_by is not None and recency_parameters is not None:
+            # Allow when recency is excluded from global phase (applied only in phase-1)
+            if recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL:
+                raise ValueError("'sortBy' cannot be used with 'recencyParameters' with global-phase reranking "
+                                 "in hybrid search. sortBy bypasses relevance scoring, making recency boosting "
+                                 "ineffective. To use both, set applyInRankingPhase to 'exclude-global'.")
         return values
 
     @root_validator(pre=False)

@@ -15,6 +15,8 @@ from marqo.tensor_search.models.search import (
     QueryContent
 )
 from marqo.core.inference.api import Modality
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField, SortOrder
 
 
 class TestSearchQuery(unittest.TestCase):
@@ -433,6 +435,117 @@ class TestSearchQuery(unittest.TestCase):
                 context=context
             )
         self.assertIn("Context is not supported for lexical/lexical hybrid search", str(cm.exception))
+
+    def test_recency_parameters_validation(self):
+        """Test that recency parameters are only allowed for hybrid search."""
+        recency_params = RecencyParameters(recency_field="created_at")
+
+        # Valid cases - recency parameters with hybrid search
+        valid_cases = [
+            ("hybrid_with_recency", {
+                "q": "test query",
+                "searchMethod": SearchMethod.HYBRID,
+                "recencyParameters": recency_params
+            }),
+        ]
+
+        for test_name, params in valid_cases:
+            with self.subTest(test_name):
+                search_query = SearchQuery(**params)
+                self.assertIsNotNone(search_query.recencyParameters)
+
+        # Invalid cases - recency parameters with non-hybrid search
+        invalid_cases = [
+            ("tensor_with_recency", {
+                "q": "test query",
+                "searchMethod": SearchMethod.TENSOR,
+                "recencyParameters": recency_params
+            }, "Recency parameters can only be provided for 'HYBRID' search"),
+            ("lexical_with_recency", {
+                "q": "test query",
+                "searchMethod": SearchMethod.LEXICAL,
+                "recencyParameters": recency_params
+            }, "Recency parameters can only be provided for 'HYBRID' search"),
+        ]
+
+        for test_name, params, expected_error in invalid_cases:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as cm:
+                    SearchQuery(**params)
+                self.assertIn(expected_error, str(cm.exception))
+
+    def test_sort_by_cannot_be_used_with_recency(self):
+        """Test that sortBy cannot be used with recencyParameters.
+
+        Exception: When apply_in_ranking_phase='exclude-global', recency is only
+        applied in phase-1 ranking while sortBy is applied in global ranking,
+        so they don't conflict.
+        """
+        recency_params = RecencyParameters(recency_field="created_at")
+        sort_by_params = SortByModel(
+            fields=[SortByField(field_name="price", order=SortOrder.Desc)]
+        )
+
+        # Valid cases - only one or neither parameter
+        valid_cases = [
+            ("recency_only", {
+                "q": "test query",
+                "searchMethod": SearchMethod.HYBRID,
+                "recencyParameters": recency_params
+            }),
+            ("sort_by_only", {
+                "q": "test query",
+                "searchMethod": SearchMethod.HYBRID,
+                "sortBy": sort_by_params
+            }),
+            ("neither", {
+                "q": "test query",
+                "searchMethod": SearchMethod.HYBRID
+            }),
+        ]
+
+        for test_name, params in valid_cases:
+            with self.subTest(test_name):
+                search_query = SearchQuery(**params)
+                # Should not raise an error
+                self.assertIsNotNone(search_query)
+
+        # Test sortBy + recencyParameters for all apply_in_ranking_phase values
+        apply_phase_test_cases = [
+            # (apply_in_ranking_phase, should_raise_error)
+            ("all", True),           # Should raise - recency applies in global phase
+            ("only-global", True),   # Should raise - recency applies in global phase
+            ("exclude-global", False),  # Should NOT raise - recency excluded from global phase
+        ]
+
+        for apply_mode, should_raise in apply_phase_test_cases:
+            with self.subTest(apply_in_ranking_phase=apply_mode):
+                recency_params_with_mode = RecencyParameters(
+                    recency_field="created_at",
+                    apply_in_ranking_phase=apply_mode
+                )
+
+                if should_raise:
+                    with self.assertRaises(ValidationError) as cm:
+                        SearchQuery(
+                            q="test query",
+                            searchMethod=SearchMethod.HYBRID,
+                            recencyParameters=recency_params_with_mode,
+                            sortBy=sort_by_params
+                        )
+                    self.assertIn("'sortBy' cannot be used with 'recencyParameters' with global-phase reranking", str(cm.exception))
+                    self.assertIn("sortBy bypasses relevance scoring", str(cm.exception))
+                else:
+                    # Should NOT raise - exclude-global allows sortBy + recency
+                    search_query = SearchQuery(
+                        q="test query",
+                        searchMethod=SearchMethod.HYBRID,
+                        recencyParameters=recency_params_with_mode,
+                        sortBy=sort_by_params
+                    )
+                    self.assertIsNotNone(search_query)
+                    self.assertIsNotNone(search_query.recencyParameters)
+                    self.assertIsNotNone(search_query.sort_by)
 
 
 class TestCustomVectorQuery(unittest.TestCase):
