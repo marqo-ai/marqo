@@ -23,6 +23,7 @@ from marqo.tensor_search.enums import (
 from marqo.core.models import MarqoIndex
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
@@ -50,7 +51,7 @@ class HybridSearch:
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
             collapse_field_name: Optional[str] = None,
-            recency_parameters: Optional[dict] = None
+            recency_parameters: Optional[RecencyParameters] = None
     ) -> Dict:
         """
 
@@ -82,6 +83,7 @@ class HybridSearch:
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
                 collapse_field_name:  field name to collapse the search result on.
+                recency_parameters: parameters for recency boosting
             Returns:
 
             Output format:
