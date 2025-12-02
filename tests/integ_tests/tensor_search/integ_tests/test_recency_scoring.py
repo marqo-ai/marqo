@@ -705,7 +705,7 @@ class TestRecencyScoring(MarqoTestCase):
             offset="0d",
             decay_function="exponential",
             decay_to=0.3,
-            apply_in_ranking_phase="exclude-global"
+            apply_in_ranking_phase="all"
         )
         sort_by = SortByModel(
             fields=[SortByField(field_name="price", order="desc")],
