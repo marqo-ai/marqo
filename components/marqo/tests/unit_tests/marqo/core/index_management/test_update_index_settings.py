@@ -1,17 +1,14 @@
-import unittest
 from unittest.mock import Mock, patch, MagicMock
 
-import marqo.version
-import marqo.version
 from marqo.core.exceptions import InternalError, IndexNotFoundError, InvalidModelPropertiesError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.models.marqo_index import Model, ImagePreProcessing
-from marqo.vespa.vespa_client import VespaClient
-from tests.unit_tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_index import Model
 from marqo.core.models.marqo_index import (
     SemiStructuredMarqoIndex, StructuredMarqoIndex, Field, FieldType, ImagePreProcessing, DistanceMetric,
     HnswConfig, TextPreProcessing
 )
+from marqo.vespa.vespa_client import VespaClient
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestUpdateIndexSettings(MarqoTestCase):

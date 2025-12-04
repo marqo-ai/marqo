@@ -9,7 +9,8 @@ import marqo.vespa.vespa_client
 from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, UnsupportedFeatureError, \
+    InvalidModelPropertiesError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
