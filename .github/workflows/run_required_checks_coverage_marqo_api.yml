@@ -151,7 +151,7 @@ jobs:
           echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
           echo "Integration test coverage: $COVERAGE_PERCENT%"
           if (( $(echo "$COVERAGE_PERCENT < 85" | bc -l) )); then
-            echo "::error::Integration test coverage is below 78%"
+            echo "::error::Integration test coverage is below 85%"
             exit 1
           fi
 
@@ -164,7 +164,7 @@ jobs:
           echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
           echo "Combined test coverage: $COVERAGE_PERCENT%"
           if (( $(echo "$COVERAGE_PERCENT < 90" | bc -l) )); then
-            echo "::error::Combined test coverage is below 80%"
+            echo "::error::Combined test coverage is below 90%"
             exit 1
           fi
 
