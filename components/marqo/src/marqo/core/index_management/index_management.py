@@ -1,15 +1,17 @@
-import semver
+import difflib
 from contextlib import contextmanager
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from typing import Optional
+
+import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, OperationConflictError, \
-    ZookeeperLockNotAcquiredError, InternalError, InvalidModelPropertiesError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, UnsupportedFeatureError, \
+    InvalidModelPropertiesError, OperationConflictError, ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
     ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
@@ -298,6 +300,144 @@ class IndexManagement:
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
             logger.debug(f'Updating index {marqo_index.name} with schema:\n{schema}')
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
+
+    def apply_latest_schema_template(self, index_name: str, force: bool = False, dry_run: bool = False) -> Dict[str, any]:
+        """
+        Update an index's main schema to the latest template version.
+
+        This method:
+        1. Retrieves the existing index
+        2. Generates a new schema from the latest template
+        3. Compares it with the current deployed schema
+        4. If different, prepares the deployment
+        5. Checks Vespa's configChangeActions
+        6. Behavior based on parameters:
+           - dry_run=True: Show diff and actions, never deploy
+           - dry_run=False, force=False: Deploy only if no configChangeActions
+           - dry_run=False, force=True: Always deploy
+
+        Args:
+            index_name: Name of the index to update
+            force: If True, proceed with update even if configChangeActions are required
+            dry_run: If True, show schema diff and configChangeActions without deploying
+
+        Returns:
+            Dict with update status:
+            {
+                "updated": bool,                # Whether schema was actually deployed
+                "schemaChanged": bool,          # Whether generated schema differs from current
+                "oldSchema": str,               # Current deployed schema
+                "newSchema": str,               # Proposed/generated schema
+                "schemaDiff": str,              # Unified diff between old and new
+                "reason": str,                  # Explanation of the result
+                "configChangeActions": {}       # Vespa configChangeActions if any
+            }
+
+        Raises:
+            IndexNotFoundError: If index doesn't exist
+            InternalError: If index type doesn't support schema updates
+            UnsupportedFeatureError: If index was created with Marqo < 2.23.0
+            OperationConflictError: If deployment lock cannot be acquired
+        """
+        with self._vespa_deployment_lock():
+            # Get existing index
+            existing_index = self.get_index(index_name)
+
+            # Only SemiStructuredMarqoIndex supports schema regeneration
+            if not isinstance(existing_index, SemiStructuredMarqoIndex):
+                raise InternalError(
+                    f'Index {index_name} is type {existing_index.type}, '
+                    f'only semi-structured indexes support schema updates'
+                )
+
+            # Check minimum version requirement
+            if existing_index.parsed_marqo_version() < constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION:
+                raise UnsupportedFeatureError(
+                    f"Schema update is only supported for indexes created with Marqo "
+                    f"{str(constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION)} or later. "
+                    f"This index was created with Marqo {existing_index.marqo_version}. "
+                    f"Please recreate the index with a newer version of Marqo to use this feature."
+                )
+
+            # Generate new schema from current settings using latest template
+            new_schema = SemiStructuredVespaSchema.generate_vespa_schema(existing_index)
+
+            # Get current deployed schema
+            vespa_app = self._get_vespa_application()
+            current_schema = vespa_app.get_schema(existing_index.schema_name)
+
+            # Generate schema diff (always, for all scenarios)
+            current_schema_lines = (current_schema or '').splitlines(keepends=True)
+            new_schema_lines = new_schema.splitlines(keepends=True)
+            diff_lines = list(difflib.unified_diff(
+                current_schema_lines,
+                new_schema_lines,
+                fromfile='old_schema',
+                tofile='new_schema',
+                lineterm=''
+            ))
+            schema_diff = ''.join(diff_lines) if diff_lines else 'No changes'
+
+            # Check if schemas are identical (based on diff)
+            schemas_identical = len(diff_lines) == 0
+
+            # Initialize response template with common fields
+            result = {
+                "updated": False,
+                "schemaChanged": not schemas_identical,
+                "oldSchema": current_schema or '',
+                "newSchema": new_schema,
+                "schemaDiff": schema_diff,
+                "configChangeActions": {},
+                "reason": ""
+            }
+
+            # Scenario 1: Schemas are identical - no changes needed
+            if schemas_identical:
+                logger.info(f'Schema for index {index_name} is already up to date')
+                result["reason"] = "Schema is already up to date"
+                return result
+
+            # Schema is different - prepare deployment to get configChangeActions
+            logger.info(f'Schema for index {index_name} has changes, preparing deployment')
+            prepare_response = vespa_app.update_index_setting_and_schema(
+                existing_index,
+                new_schema,
+                prepare_only=True
+            )
+
+            # Extract configChangeActions from prepare response
+            config_change_actions = prepare_response.get('configChangeActions', {})
+            result["configChangeActions"] = config_change_actions
+
+            # Check if there are any required actions
+            has_actions = bool(config_change_actions.get('restart') or
+                               config_change_actions.get('refeed') or
+                               config_change_actions.get('reindex'))
+
+            # Scenario 2: dry_run=True - never deploy, just return info
+            if dry_run:
+                logger.info(f'Dry run for index {index_name} - showing schema diff without deploying')
+                result["reason"] = "Dry run - no changes deployed"
+                return result
+
+            # Scenario 3: dry_run=False, force=False - block if actions required
+            if has_actions and not force:
+                logger.warning(f'Schema update for index {index_name} requires Vespa actions: {config_change_actions}')
+                result["reason"] = "Vespa requires manual actions before proceeding. Use force=true to proceed anyway."
+                return result
+
+            # Scenario 4: dry_run=False, force=True OR no actions - proceed with deployment
+            vespa_app.activate_prepared_deployment(prepare_response)
+            logger.info(f'Successfully updated schema for index {index_name}')
+
+            result["updated"] = True
+            if has_actions:
+                result["reason"] = "Update forced despite required actions"
+            else:
+                result["reason"] = "Schema updated successfully"
+
+            return result
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
