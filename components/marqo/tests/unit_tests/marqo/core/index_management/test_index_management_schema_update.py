@@ -409,15 +409,16 @@ class TestIndexManagementSchemaUpdate(MarqoTestCase):
 
         # Test cases: (scenario, schema_template_version, should_shortcut)
         test_cases = [
-            ("current", "2.24.6", True),
-            ("outdated", "2.24.5", False),
-            ("none", None, False)
+            ("current", "2.24.6", "2.24.6", True),
+            ("outdated", "2.24.0", "2.24.5", False),
+            ("none", "2.24.4", None, False)
         ]
 
-        for scenario, schema_template_version, should_shortcut in test_cases:
+        for scenario, marqo_version, schema_template_version, should_shortcut in test_cases:
             with self.subTest(scenario=scenario, schema_template_version=schema_template_version):
                 # Create an index with the test schema_template_version
-                existing_index = self._create_test_index(schema_template_version=schema_template_version)
+                existing_index = self._create_test_index(schema_template_version=schema_template_version,
+                                                         marqo_version=marqo_version)
                 self.index_mgmt.get_index = Mock(return_value=existing_index)
 
                 if should_shortcut:
