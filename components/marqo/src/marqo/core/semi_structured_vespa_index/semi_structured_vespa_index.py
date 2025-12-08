@@ -136,6 +136,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Only use minimal summary if the schema supports it (version check)
         if self.get_marqo_index().index_supports_collapse_minimal_summary:
             params['collapse.summary'] = 'collapse-minimal-summary'
+            # When used with attributesToRetrieve, the searcher will try to pre-fill the specified fields from the
+            # default summary, which defies the purpose of using a minimal summary for collapsing. Disabling
+            # `FieldFiller` will force the searcher to use `collapse-minimal-summary` for collapsing queries.
+            params['FieldFiller.disable'] = True
 
         return params
 
