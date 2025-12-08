@@ -535,6 +535,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     string_array_fields: Optional[List[
         StringArrayField]]  # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
     collapse_fields: Optional[List[CollapseField]] = None
+    schema_template_version: Optional[str] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -554,6 +555,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         if not self.collapse_fields:
             return False
         return field_name in [field.name for field in self.collapse_fields]
+
+    def parsed_schema_template_version(self) -> semver.VersionInfo:
+        """
+        Get the schema template version as a semver object.
+        Falls back to marqo_version if schema_template_version is not set (backward compatibility).
+        """
+        if self.schema_template_version is not None:
+            return semver.VersionInfo.parse(self.schema_template_version)
+        # Backward compatibility: old indexes don't have schema_template_version
+        return self.parsed_marqo_version()
 
     @property
     def field_map(self) -> Dict[str, Field]:
@@ -646,6 +657,11 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
 
         return self._cache_or_get('tensor_subfield_map', generate)
 
+    # TODO: Update index_supports_* properties to use parsed_schema_template_version()
+    # instead of parsed_marqo_version() for more accurate feature detection
+    # after schema updates. This will allow features to be detected based on
+    # the deployed schema template version rather than index creation version.
+
     @property
     def index_supports_partial_updates(self) -> bool:
         """
@@ -681,6 +697,17 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         return self._cache_or_get(
             'index_supports_sort_by',
             lambda: self.parsed_marqo_version() >= constants.MARQO_SORT_BY_MINIMUM_VERSION)
+
+    @property
+    def index_supports_collapse_minimal_summary(self) -> bool:
+        """
+        Check if the index schema supports collapse-minimal-summary.
+        This summary class was added in version 2.24.6 to optimize
+        collapse query performance by returning minimal fields.
+        """
+        return self._cache_or_get(
+            'index_supports_collapse_minimal_summary',
+            lambda: self.parsed_schema_template_version() >= constants.MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

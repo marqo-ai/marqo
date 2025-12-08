@@ -63,6 +63,7 @@ class MarqoTestCase(TestCase):
                 m=16
             ),
             marqo_version=get_version(),
+            schema_template_version=get_version(),
             created_at=int(time.time()),
             updated_at=int(time.time()),
             version=None
@@ -85,6 +86,7 @@ class MarqoTestCase(TestCase):
             fields=fields,
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
+            schema_template_version=schema_template_version,
             created_at=created_at,
             updated_at=updated_at,
             version=version
@@ -121,6 +123,7 @@ class MarqoTestCase(TestCase):
                 m=16
             ),
             marqo_version=get_version(),
+            schema_template_version=get_version(),  # Default to current version like marqo_version
             created_at=int(time.time()),
             updated_at=int(time.time()),
             treat_urls_and_pointers_as_images=True,
@@ -149,6 +152,7 @@ class MarqoTestCase(TestCase):
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
+            schema_template_version=schema_template_version,
             created_at=created_at,
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
@@ -214,6 +218,7 @@ class MarqoTestCase(TestCase):
             filter_string_max_length: int = 50,
             collapse_fields: Optional[List[CollapseField]] = None,
             marqo_version=version.get_version(),
+            schema_template_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
     ) -> UnstructuredMarqoIndexRequest:
@@ -240,6 +245,7 @@ class MarqoTestCase(TestCase):
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
+            schema_template_version=schema_template_version,
             created_at=created_at,
             updated_at=updated_at,
         )

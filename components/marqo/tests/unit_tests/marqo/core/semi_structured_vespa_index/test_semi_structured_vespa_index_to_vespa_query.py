@@ -805,6 +805,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
         # assert collapsefield are populated
         self.assertEqual('parent_id', vespa_query['collapsefield'])
         self.assertEqual(1, vespa_query['collapsesize'])
+        self.assertEqual('collapse-minimal-summary', vespa_query['collapse.summary'])
 
         # assert rank profiles with '_diversity' suffix is used
         self.assertEqual(common.RANK_PROFILE_BM25 + '_diversity',
@@ -852,6 +853,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
 
         self.assertNotIn('collapsefield', vespa_query)
         self.assertNotIn('collapsesize', vespa_query)
+        self.assertNotIn('collapse.summary', vespa_query)
 
         self.assertEqual(common.RANK_PROFILE_BM25,
                          vespa_query['marqo__ranking.lexical.lexical'])
