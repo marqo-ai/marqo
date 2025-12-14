@@ -153,7 +153,7 @@ class TestRecencyQueryInput(unittest.TestCase):
         )
 
     def test_all_query_input_constants_present(self):
-        """Test that all 7 expected query input constants are present."""
+        """Test that all 8 expected query input constants are present."""
         params = RecencyParameters(recency_field="created_at")
         result = self.vespa_index._get_recency_query_input(params)
 
@@ -165,6 +165,7 @@ class TestRecencyQueryInput(unittest.TestCase):
             constants.QUERY_INPUT_RECENCY_DECAY_TO,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY,
             constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE,
+            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT,
         ]
 
         for key in expected_keys:
@@ -192,6 +193,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.5,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
                 }
             ),
             (
@@ -212,6 +214,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.3,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"updated_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 1,
+                    constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
                 }
             ),
             (
@@ -232,6 +235,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.75,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"publish_date": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 2,
+                    constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
                 }
             ),
             (
@@ -252,6 +256,29 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.01,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"event_time": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 3,
+                    constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                }
+            ),
+            (
+                "with_add_to_score_weight",
+                {
+                    "recency_field": "created_at",
+                    "decay_function": "exponential",
+                    "scale": "7d",
+                    "offset": "0d",
+                    "decay_to": 0.5,
+                    "apply_in_ranking_phase": "all",
+                    "add_to_score_weight": 0.5
+                },
+                {
+                    constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
+                    constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 1,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 604800,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.5,
+                    constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
+                    constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.5,
                 }
             ),
         ]
@@ -262,6 +289,33 @@ class TestRecencyQueryInput(unittest.TestCase):
                 result = self.vespa_index._get_recency_query_input(params)
 
                 self.assertEqual(result, expected_output)
+
+    def test_add_to_score_weight_defaults_to_zero(self):
+        """Test add_to_score_weight defaults to 0.0 when not provided."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT],
+            0.0
+        )
+
+    def test_add_to_score_weight_passed_correctly(self):
+        """Test add_to_score_weight is passed correctly when provided."""
+        weight_values = [0.1, 0.5, 1.0, 10.0]
+
+        for weight in weight_values:
+            with self.subTest(weight=weight):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    add_to_score_weight=weight
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT],
+                    weight
+                )
 
     def test_global_phase_parameter_for_all_apply_modes(self):
         """Test marqo__recency_apply_in_global_ranking_phase is set correctly for all modes.

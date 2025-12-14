@@ -338,3 +338,59 @@ class TestRecencyParameters(unittest.TestCase):
             self.assertIsInstance(json_str, str)
             self.assertIn("created_at", json_str)
             self.assertIn("gaussian", json_str)
+
+    def test_add_to_score_weight_validation(self):
+        """Test add_to_score_weight field validation."""
+        # Valid add_to_score_weight values
+        valid_values = [
+            ("positive_small", 0.1, 0.1),
+            ("positive_large", 10.0, 10.0),
+            ("positive_one", 1.0, 1.0),
+            ("positive_decimal", 0.01, 0.01),
+        ]
+
+        for test_name, add_to_score_weight, expected in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    add_to_score_weight=add_to_score_weight
+                )
+                self.assertEqual(params.add_to_score_weight, expected)
+
+        # Invalid add_to_score_weight values
+        invalid_values = [
+            ("zero", 0.0),
+            ("negative", -0.5),
+            ("negative_large", -10.0),
+        ]
+
+        for test_name, add_to_score_weight in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(
+                        recency_field="created_at",
+                        add_to_score_weight=add_to_score_weight
+                    )
+                errors = exc_info.exception.errors()
+                self.assertTrue(
+                    any('add_to_score_weight' in str(e['loc']) or 'addToScoreWeight' in str(e['loc']) for e in errors),
+                    f"Expected 'add_to_score_weight' or 'addToScoreWeight' in error locations: {errors}"
+                )
+
+    def test_add_to_score_weight_default_none(self):
+        """Test add_to_score_weight defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.add_to_score_weight)
+
+    def test_add_to_score_weight_alias(self):
+        """Test add_to_score_weight alias (addToScoreWeight)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            addToScoreWeight=0.5
+        )
+        self.assertEqual(params.add_to_score_weight, 0.5)
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('addToScoreWeight', result)
+        self.assertEqual(result['addToScoreWeight'], 0.5)

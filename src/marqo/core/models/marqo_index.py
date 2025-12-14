@@ -725,6 +725,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             'index_supports_recency_scoring',
             lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)
 
+    @property
+    def index_supports_recency_additive(self) -> bool:
+        """
+        Check if the index schema supports additive recency scoring.
+        Additive recency scoring was added in version 2.24.9.
+        """
+        return self._cache_or_get(
+            'index_supports_recency_additive',
+            lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION)
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'

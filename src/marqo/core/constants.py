@@ -34,6 +34,7 @@ MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
 MARQO_UPDATE_SCHEMA_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
 MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.6')
 MARQO_RECENCY_SCORING_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.8')
+MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
 
 # For score modifiers
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
@@ -54,3 +55,4 @@ QUERY_INPUT_RECENCY_OFFSET_SECONDS = 'marqo__recency_offset_seconds'
 QUERY_INPUT_RECENCY_DECAY_TO = 'marqo__recency_decay_to'
 QUERY_INPUT_RECENCY_TIMESTAMP_KEY = 'marqo__recency_timestamp_key'
 QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE = 'marqo__recency_decay_function_type'
+QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT = 'marqo__recency_add_to_score_weight'

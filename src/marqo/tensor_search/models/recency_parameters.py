@@ -1,6 +1,7 @@
 """Recency parameters for time-based score boosting."""
 
 from enum import Enum
+from typing import Optional
 from pydantic.v1 import BaseModel, Field, validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
@@ -93,6 +94,16 @@ class RecencyParameters(BaseModel):
             "- 'all': Apply in all ranking phases (Vespa rank profile and global phase reranking) (default)\n"
             "- 'only-global': Calculate recency score in Vespa but only apply it during global phase reranking\n"
             "- 'exclude-global': Apply recency in Vespa rank profile only, exclude from global phase reranking"
+        )
+    )
+
+    add_to_score_weight: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        alias="addToScoreWeight",
+        description=(
+            "If provided, applies recency as an additive factor instead of multiplicative. "
+            "Formula: final_score = modified_score + (recency_score * addToScoreWeight)."
         )
     )
 

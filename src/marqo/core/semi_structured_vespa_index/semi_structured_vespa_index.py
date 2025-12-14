@@ -144,7 +144,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
             constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
-            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value,
+            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
         }
 
     def _generate_collapse_query_params(self, collapse_field_name: str):

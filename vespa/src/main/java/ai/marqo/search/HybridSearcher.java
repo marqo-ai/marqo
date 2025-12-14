@@ -995,18 +995,30 @@ public class HybridSearcher extends Searcher {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
             resultToRerank = applyGlobalScoreModifiers(resultToRerank, query, verbose);
         } else if (query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase")) {
-            // apply recency score
+            // Apply recency score without global score modifiers
+            double addToScoreWeight =
+                    query.properties().getDouble("marqo__recency_add_to_score_weight", 0.0);
+
             for (Hit hit : resultToRerank.asList()) {
                 FeatureData matchFeatures = (FeatureData) hit.getField("matchfeatures");
                 if (matchFeatures == null) continue;
 
                 double recencyScore = matchFeatures.getDouble("recency_score");
                 double originalScore = hit.getRelevance().getScore();
-                double modifiedScore = originalScore * recencyScore;
+                double modifiedScore;
+
+                if (addToScoreWeight > 0) {
+                    // Additive mode
+                    modifiedScore = originalScore + (recencyScore * addToScoreWeight);
+                } else {
+                    // Multiplicative mode (default)
+                    modifiedScore = originalScore * recencyScore;
+                }
+
                 hit.setRelevance(modifiedScore);
                 logIfVerbose(
                         String.format(
-                                "Applied recency score %.4f to score %.4f -> %.4f" + " for hit %s",
+                                "Applied recency score %.4f to score %.4f -> %.4f for hit %s",
                                 recencyScore, originalScore, modifiedScore, hit.getId()),
                         verbose);
             }
@@ -1437,6 +1449,9 @@ public class HybridSearcher extends Searcher {
         boolean applyRecency =
                 query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase");
 
+        double addToScoreWeight =
+                query.properties().getDouble("marqo__recency_add_to_score_weight", 0.0);
+
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
             // Extract the mult and add modifiers from match-features
@@ -1449,15 +1464,26 @@ public class HybridSearcher extends Searcher {
                 if (mult_modifier != null && add_modifier != null) {
                     // Apply the modifiers to the hit's relevance
                     original_score = hit.getRelevance().getScore();
-                    modified_score = (original_score * mult_modifier + add_modifier) * recencyScore;
+                    double baseScore = original_score * mult_modifier + add_modifier;
+
+                    if (applyRecency && addToScoreWeight > 0) {
+                        // Additive mode: base + (recency * weight)
+                        modified_score = baseScore + (recencyScore * addToScoreWeight);
+                    } else {
+                        // Multiplicative mode (default): base * recency
+                        modified_score = baseScore * recencyScore;
+                    }
+
                     logIfVerbose(
                             String.format(
                                     "Original score: %.7f, mult modifier: %.5f, add modifier: %.5f,"
-                                            + " recency score: %.5f, Modified score: %.7f",
+                                        + " recency score: %.5f, addToScoreWeight: %.5f, Modified"
+                                        + " score: %.7f",
                                     original_score,
                                     mult_modifier,
                                     add_modifier,
                                     recencyScore,
+                                    addToScoreWeight,
                                     modified_score),
                             verbose);
                     hit.setRelevance(modified_score);
