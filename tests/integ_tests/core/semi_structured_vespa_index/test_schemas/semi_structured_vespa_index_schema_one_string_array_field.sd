@@ -98,6 +98,7 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_scale_seconds) double: 604800.0
             query(marqo__recency_offset_seconds) double: 0.0
             query(marqo__recency_decay_to) double: 0.5
+            query(marqo__recency_add_to_score_weight) double: 0.0
         }
 
         # Recency scoring functions
@@ -196,10 +197,6 @@ schema marqo__test_00semi_00structured_00schema {
             expression: if(query(marqo__recency_should_calculate_score) != 0, recency_score_router(), 1.0)
         }
 
-        function recency_multiplier() {
-            expression: if(query(marqo__recency_should_apply_score) != 0, recency_score(), 1.0)
-        }
-
         function mult_modifier(mult_weights) {
             expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod))
         }
@@ -207,7 +204,13 @@ schema marqo__test_00semi_00structured_00schema {
             expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
         }
         function modify(score, mult_weights, add_weights) {
-            expression: (mult_modifier(mult_weights) * score + add_modifier(add_weights)) * recency_multiplier()
+            expression {
+                if (query(marqo__recency_should_apply_score) != 0,
+                    if (query(marqo__recency_add_to_score_weight) > 0,
+                        (mult_modifier(mult_weights) * score + add_modifier(add_weights)) + recency_score() * query(marqo__recency_add_to_score_weight),
+                        (mult_modifier(mult_weights) * score + add_modifier(add_weights)) * recency_score()),
+                    mult_modifier(mult_weights) * score + add_modifier(add_weights))
+            }
         }
         function global_mult_modifier() {
             expression: mult_modifier(query(marqo__mult_weights_global))
