@@ -718,3 +718,40 @@ class TestMarqoIndexSchemaVersion(MarqoTestCase):
                     **index_kwargs
                 )
                 self.assertEqual(index.index_supports_collapse_minimal_summary, expected_result)
+
+    def test_index_supports_recency_scoring(self):
+        """Test index_supports_recency_scoring with different schema_template_version and marqo_version values."""
+        test_cases = [
+            ("schema_template_version >= 2.24.8", {"schema_template_version": "2.24.8"}, True),
+            ("schema_template_version > 2.24.8", {"schema_template_version": "2.24.9"}, True),
+            ("schema_template_version < 2.24.8", {"schema_template_version": "2.24.7"}, False),
+            ("schema_template_version None, marqo_version >= 2.24.8", {"marqo_version": "2.24.8", "schema_template_version": None}, True),
+            ("schema_template_version None, marqo_version < 2.24.8", {"marqo_version": "2.24.7", "schema_template_version": None}, False),
+        ]
+
+        for case_name, index_kwargs, expected_result in test_cases:
+            with self.subTest(case=case_name):
+                index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    **index_kwargs
+                )
+                self.assertEqual(index.index_supports_recency_scoring, expected_result)
+
+    def test_index_supports_recency_additive(self):
+        """Test index_supports_recency_additive with different schema_template_version and marqo_version values."""
+        test_cases = [
+            ("schema_template_version >= 2.24.9", {"schema_template_version": "2.24.9"}, True),
+            ("schema_template_version > 2.24.9", {"schema_template_version": "2.24.10"}, True),
+            ("schema_template_version == 2.24.8 (not additive)", {"schema_template_version": "2.24.8"}, False),
+            ("schema_template_version < 2.24.8", {"schema_template_version": "2.24.7"}, False),
+            ("schema_template_version None, marqo_version >= 2.24.9", {"marqo_version": "2.24.9", "schema_template_version": None}, True),
+            ("schema_template_version None, marqo_version < 2.24.9", {"marqo_version": "2.24.8", "schema_template_version": None}, False),
+        ]
+
+        for case_name, index_kwargs, expected_result in test_cases:
+            with self.subTest(case=case_name):
+                index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    **index_kwargs
+                )
+                self.assertEqual(index.index_supports_recency_additive, expected_result)

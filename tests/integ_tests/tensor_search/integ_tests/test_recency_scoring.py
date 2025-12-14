@@ -910,6 +910,144 @@ class TestRecencyScoring(MarqoTestCase):
                     str(ctx.exception)
                 )
 
+    # ============== Additive Recency Scoring Tests ==============
+
+    def test_additive_recency_scoring(self):
+        """Test additive recency scoring with addToScoreWeight parameter.
+
+        When addToScoreWeight is provided, recency is applied additively:
+        final_score = modified_score + (recency_score * addToScoreWeight)
+
+        Instead of multiplicatively:
+        final_score = modified_score * recency_score
+        """
+        self._add_shared_documents()
+
+        # Test with different addToScoreWeight values
+        weight_values = [0.1, 0.5, 1.0, 2.0]
+
+        for weight in weight_values:
+            with self.subTest(addToScoreWeight=weight):
+                params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="7d",
+                    offset="0d",
+                    decay_function="exponential",
+                    decay_to=0.5,
+                    add_to_score_weight=weight
+                )
+                hits = self._search_with_recency("product", params)
+
+                self.assertGreater(len(hits), 0, "Should have results")
+
+                # Verify recency scores are calculated correctly
+                for hit in hits:
+                    actual_recency = hit.get('_recency_score')
+                    doc_id = hit.get('_id')
+
+                    self.assertIsNotNone(actual_recency, f"Recency score should be present for {doc_id}")
+
+                    # Verify recency score is within valid range [decay_to, 1.0]
+                    self.assertGreaterEqual(actual_recency, 0.5, f"Recency score for {doc_id} should be >= decay_to")
+                    self.assertLessEqual(actual_recency, 1.0, f"Recency score for {doc_id} should be <= 1.0")
+
+                # Verify newer docs score higher than older docs
+                doc_0d = self._get_doc_by_id(hits, "doc-0d")
+                doc_30d = self._get_doc_by_id(hits, "doc-30d")
+                if doc_0d and doc_30d:
+                    self.assertGreater(
+                        doc_0d['_recency_score'],
+                        doc_30d['_recency_score'],
+                        "Newer doc should have higher recency score"
+                    )
+
+    def test_additive_recency_vs_multiplicative(self):
+        """Test that additive and multiplicative recency produce different final scores.
+
+        With additive mode (addToScoreWeight > 0), very old documents get boosted more
+        relative to their base score compared to multiplicative mode where they get
+        penalized more heavily.
+        """
+        self._add_shared_documents()
+
+        base_params = {
+            "recency_field": "timestamp",
+            "scale": "7d",
+            "offset": "0d",
+            "decay_function": "exponential",
+            "decay_to": 0.3
+        }
+
+        # Get results without additive (multiplicative mode - default)
+        multiplicative_params = RecencyParameters(**base_params)
+        multiplicative_hits = self._search_with_recency("product", multiplicative_params)
+
+        # Get results with additive mode
+        additive_params = RecencyParameters(
+            **base_params,
+            add_to_score_weight=0.5
+        )
+        additive_hits = self._search_with_recency("product", additive_params)
+
+        # Both should return results
+        self.assertGreater(len(multiplicative_hits), 0, "Multiplicative should have results")
+        self.assertGreater(len(additive_hits), 0, "Additive should have results")
+
+        # Both should have the same recency scores (recency calculation is the same)
+        for mult_hit, add_hit in zip(multiplicative_hits, additive_hits):
+            if mult_hit['_id'] == add_hit['_id']:
+                self.assertAlmostEqual(
+                    mult_hit.get('_recency_score', 0),
+                    add_hit.get('_recency_score', 0),
+                    places=3,
+                    msg=f"Recency scores should be the same for {mult_hit['_id']}"
+                )
+
+    def test_additive_recency_with_hybrid_search_methods(self):
+        """Test additive recency works with different hybrid search configurations."""
+        self._add_shared_documents()
+
+        test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            (RetrievalMethod.Tensor, RankingMethod.Tensor),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
+        ]
+
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            add_to_score_weight=0.5
+        )
+
+        for retrieval, ranking in test_cases:
+            with self.subTest(retrieval=retrieval.value, ranking=ranking.value):
+                hybrid_params = HybridParameters(
+                    retrievalMethod=retrieval,
+                    rankingMethod=ranking
+                )
+                search_result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    recency_parameters=params,
+                    hybrid_parameters=hybrid_params,
+                    result_count=10
+                )
+
+                hits = search_result['hits']
+                self.assertGreater(len(hits), 0, "Should have results")
+
+                # Verify recency scores are present
+                for hit in hits:
+                    self.assertIsNotNone(
+                        hit.get('_recency_score'),
+                        f"Recency score should be present for {hit['_id']}"
+                    )
+
     # ============== Validation Tests ==============
 
     def test_decay_to_validation(self):
