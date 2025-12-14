@@ -254,7 +254,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         an error is raised as StreamingMediaProcessor is not designed to handle images."""
         for url in [
             TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value, TestImageUrls.IMAGE3.value,
-            TestImageUrls.COCO.value
+            TestImageUrls.IMAGE4.value
         ]:
             with self.subTest(url=url):
                 with self.assertRaises(MediaMismatchError) as e:
