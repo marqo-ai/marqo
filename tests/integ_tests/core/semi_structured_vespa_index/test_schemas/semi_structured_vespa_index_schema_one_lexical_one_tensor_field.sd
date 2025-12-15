@@ -119,6 +119,13 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_offset_seconds) double: 0.0
             query(marqo__recency_decay_to) double: 0.5
             query(marqo__recency_add_to_score_weight) double: 0.0
+
+            # Grow parameters for future timestamp scoring
+            query(marqo__recency_grow_enabled): 0
+            query(marqo__recency_grow_from) double: 1.0
+            query(marqo__recency_grow_function_type): 0
+            query(marqo__recency_grow_scale_seconds) double: 604800.0
+            query(marqo__recency_grow_offset_seconds) double: 0.0
         }
 
         # Recency scoring functions
@@ -138,6 +145,17 @@ schema marqo__test_00semi_00structured_00schema {
         # Documents within offset period get 0 effective age (perfect score)
         function effective_age() {
             expression: max(0, age_in_seconds() - query(marqo__recency_offset_seconds))
+        }
+
+        # Future offset: how far timestamp is beyond now() (for grow functions)
+        function future_offset_in_seconds() {
+            expression: max(0, get_timestamp() - now())
+        }
+
+        # Future age after subtracting growOffset (for growth function calculation)
+        # Returns 0 if within the plateau zone (timestamp between now() and now() + growOffset)
+        function future_age_in_seconds() {
+            expression: max(0, future_offset_in_seconds() - query(marqo__recency_grow_offset_seconds))
         }
 
         # Exponential decay (Elasticsearch-compatible)
@@ -213,8 +231,59 @@ schema marqo__test_00semi_00structured_00schema {
             }
         }
 
+        # Grow functions for future timestamps (mirror of decay functions)
+        function recency_grow_score_exponential(age, scale, grow_from) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(grow_from, 1.0 - (1.0 - grow_from) * exp(log(1.0 - grow_from) * age / scale)))
+            }
+        }
+
+        function recency_grow_score_linear(age, scale, grow_from) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(grow_from, 1.0 - (1.0 - grow_from) * age / scale))
+            }
+        }
+
+        function recency_grow_score_gaussian(age, scale, grow_from) {
+            expression {
+                if (age == 0,
+                    1.0,
+                    max(grow_from, 1.0 - (1.0 - grow_from) * (1.0 - exp(pow(age, 2) * log(grow_from) / pow(scale, 2)))))
+            }
+        }
+
+        function recency_grow_score_binary(age, scale, grow_from) {
+            expression: if(age < scale, 1.0, grow_from)
+        }
+
+        function recency_grow_score_router() {
+            expression {
+                if (query(marqo__recency_grow_function_type) == 0,
+                    recency_grow_score_exponential(future_age_in_seconds(), query(marqo__recency_grow_scale_seconds), query(marqo__recency_grow_from)),
+                    if (query(marqo__recency_grow_function_type) == 1,
+                        recency_grow_score_linear(future_age_in_seconds(), query(marqo__recency_grow_scale_seconds), query(marqo__recency_grow_from)),
+                        if (query(marqo__recency_grow_function_type) == 2,
+                            recency_grow_score_gaussian(future_age_in_seconds(), query(marqo__recency_grow_scale_seconds), query(marqo__recency_grow_from)),
+                            recency_grow_score_binary(future_age_in_seconds(), query(marqo__recency_grow_scale_seconds), query(marqo__recency_grow_from)))))
+            }
+        }
+
+        function grow_score() {
+            expression: if(query(marqo__recency_grow_enabled) != 0, recency_grow_score_router(), 1.0)
+        }
+
         function recency_score() {
-            expression: if(query(marqo__recency_should_calculate_score) != 0, recency_score_router(), 1.0)
+            expression {
+                if (query(marqo__recency_should_calculate_score) != 0,
+                    if (get_timestamp() <= now(),
+                        recency_score_router(),
+                        grow_score()),
+                    1.0)
+            }
         }
 
         function mult_modifier(mult_weights) {

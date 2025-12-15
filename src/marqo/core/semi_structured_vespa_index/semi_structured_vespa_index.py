@@ -137,7 +137,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         scale_seconds = parse_duration_to_seconds(recency_params.scale)
         offset_seconds = parse_duration_to_seconds(recency_params.offset)
 
-        return {
+        result = {
             constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
             constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == ApplyInRankingPhase.ONLY_GLOBAL else 1,
             constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: scale_seconds,
@@ -147,6 +147,31 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value,
             constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
         }
+
+        # Add grow parameters if grow_from is specified
+        if recency_params.grow_from is not None:
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED] = 1
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM] = recency_params.grow_from
+
+            # Use grow_function if specified, otherwise default to decay_function
+            grow_func = recency_params.grow_function if recency_params.grow_function else recency_params.decay_function
+            result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE] = DecayFunction(grow_func).vespa_value
+
+            # Use grow_scale if specified, otherwise default to scale
+            grow_scale = recency_params.grow_scale if recency_params.grow_scale else recency_params.scale
+            result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = parse_duration_to_seconds(grow_scale)
+
+            # Use grow_offset if specified, otherwise default to 0
+            grow_offset = recency_params.grow_offset if recency_params.grow_offset else '0d'
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = parse_duration_to_seconds(grow_offset)
+        else:
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED] = 0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM] = 1.0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE] = 0
+            result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = scale_seconds
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = 0
+
+        return result
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
         params = {

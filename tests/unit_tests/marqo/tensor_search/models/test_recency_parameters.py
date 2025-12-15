@@ -394,3 +394,247 @@ class TestRecencyParameters(unittest.TestCase):
         result = params.dict(by_alias=True)
         self.assertIn('addToScoreWeight', result)
         self.assertEqual(result['addToScoreWeight'], 0.5)
+
+    # ============= Grow Parameters Tests =============
+
+    def test_grow_from_validation(self):
+        """Test grow_from field validation."""
+        # Valid grow_from values
+        valid_values = [
+            ("min", 0.01, 0.01),
+            ("mid", 0.5, 0.5),
+            ("max", 1.0, 1.0),
+            ("near_min", 0.001, 0.001),
+        ]
+
+        for test_name, grow_from, expected in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(recency_field="created_at", grow_from=grow_from)
+                self.assertEqual(params.grow_from, expected)
+
+        # Invalid grow_from values
+        invalid_values = [
+            ("zero", 0.0),
+            ("negative", -0.5),
+            ("greater_than_one", 1.5),
+        ]
+
+        for test_name, grow_from in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(recency_field="created_at", grow_from=grow_from)
+                errors = exc_info.exception.errors()
+                self.assertTrue(
+                    any('grow_from' in str(e['loc']) or 'growFrom' in str(e['loc']) for e in errors),
+                    f"Expected 'grow_from' or 'growFrom' in error locations: {errors}"
+                )
+
+    def test_grow_from_default_none(self):
+        """Test grow_from defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.grow_from)
+
+    def test_grow_from_alias(self):
+        """Test grow_from alias (growFrom)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            growFrom=0.3
+        )
+        self.assertEqual(params.grow_from, 0.3)
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('growFrom', result)
+        self.assertEqual(result['growFrom'], 0.3)
+
+    def test_grow_function_validation(self):
+        """Test grow_function field validation."""
+        # Valid grow functions (same as decay functions)
+        valid_functions = ["exponential", "linear", "gaussian", "binary"]
+
+        for func in valid_functions:
+            with self.subTest(func):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=0.5,
+                    grow_function=func
+                )
+                self.assertEqual(params.grow_function, func)
+
+        # Invalid grow functions
+        invalid_functions = [
+            ("invalid", "invalid"),
+            ("case_sensitive", "EXPONENTIAL"),
+        ]
+
+        for test_name, func in invalid_functions:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError):
+                    RecencyParameters(
+                        recency_field="created_at",
+                        grow_from=0.5,
+                        grow_function=func
+                    )
+
+    def test_grow_function_default_none(self):
+        """Test grow_function defaults to None (will use decay_function at query time)."""
+        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
+        self.assertIsNone(params.grow_function)
+
+    def test_grow_function_alias(self):
+        """Test grow_function alias (growFunction)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5,
+            growFunction="linear"
+        )
+        self.assertEqual(params.grow_function, "linear")
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('growFunction', result)
+        self.assertEqual(result['growFunction'], 'linear')
+
+    def test_grow_scale_validation(self):
+        """Test grow_scale field validation."""
+        # Valid scales (same format as scale)
+        valid_scales = [
+            ("days", "7d", "7d"),
+            ("hours", "24h", "24h"),
+            ("decimal_days", "1.5d", "1.5d"),
+            ("decimal_hours", "0.5h", "0.5h"),
+        ]
+
+        for test_name, grow_scale, expected in valid_scales:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=0.5,
+                    grow_scale=grow_scale
+                )
+                self.assertEqual(params.grow_scale, expected)
+
+        # Invalid scales
+        invalid_scales = [
+            ("zero", "0d"),
+            ("negative", "-1d"),
+            ("invalid_format", "7"),
+            ("invalid_unit", "7w"),
+        ]
+
+        for test_name, grow_scale in invalid_scales:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError):
+                    RecencyParameters(
+                        recency_field="created_at",
+                        grow_from=0.5,
+                        grow_scale=grow_scale
+                    )
+
+    def test_grow_scale_default_none(self):
+        """Test grow_scale defaults to None (will use scale at query time)."""
+        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
+        self.assertIsNone(params.grow_scale)
+
+    def test_grow_scale_alias(self):
+        """Test grow_scale alias (growScale)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5,
+            growScale="14d"
+        )
+        self.assertEqual(params.grow_scale, "14d")
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('growScale', result)
+        self.assertEqual(result['growScale'], '14d')
+
+    def test_grow_offset_validation(self):
+        """Test grow_offset field validation."""
+        # Valid offsets (same format as offset)
+        valid_offsets = [
+            ("zero_days", "0d", "0d"),
+            ("days", "1d", "1d"),
+            ("hours", "12h", "12h"),
+            ("decimal_days", "0.5d", "0.5d"),
+        ]
+
+        for test_name, grow_offset, expected in valid_offsets:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=0.5,
+                    grow_offset=grow_offset
+                )
+                self.assertEqual(params.grow_offset, expected)
+
+        # Invalid offsets
+        invalid_offsets = [
+            ("negative", "-1d"),
+            ("invalid_format", "1"),
+            ("invalid_unit", "1m"),
+        ]
+
+        for test_name, grow_offset in invalid_offsets:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError):
+                    RecencyParameters(
+                        recency_field="created_at",
+                        grow_from=0.5,
+                        grow_offset=grow_offset
+                    )
+
+    def test_grow_offset_default_none(self):
+        """Test grow_offset defaults to None (will use '0d' at query time)."""
+        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
+        self.assertIsNone(params.grow_offset)
+
+    def test_grow_offset_alias(self):
+        """Test grow_offset alias (growOffset)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5,
+            growOffset="2d"
+        )
+        self.assertEqual(params.grow_offset, "2d")
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('growOffset', result)
+        self.assertEqual(result['growOffset'], '2d')
+
+    def test_grow_parameters_complete(self):
+        """Test all grow parameters together."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            decay_function="exponential",
+            scale="7d",
+            offset="0d",
+            decay_to=0.5,
+            grow_from=0.3,
+            grow_function="linear",
+            grow_scale="14d",
+            grow_offset="1d"
+        )
+
+        self.assertEqual(params.grow_from, 0.3)
+        self.assertEqual(params.grow_function, "linear")
+        self.assertEqual(params.grow_scale, "14d")
+        self.assertEqual(params.grow_offset, "1d")
+
+    def test_grow_parameters_with_camel_case_aliases(self):
+        """Test grow parameters using camelCase aliases."""
+        params = RecencyParameters(
+            recencyField="created_at",
+            growFrom=0.4,
+            growFunction="gaussian",
+            growScale="21d",
+            growOffset="3d"
+        )
+
+        self.assertEqual(params.recency_field, "created_at")
+        self.assertEqual(params.grow_from, 0.4)
+        self.assertEqual(params.grow_function, "gaussian")
+        self.assertEqual(params.grow_scale, "21d")
+        self.assertEqual(params.grow_offset, "3d")

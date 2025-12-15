@@ -1103,5 +1103,373 @@ class TestRecencyScoring(MarqoTestCase):
                     )
 
 
+    # ============== Grow Parameter Tests ==============
+
+    def _generate_future_documents(self) -> List[Dict[str, Any]]:
+        """Generate documents with future timestamps for grow parameter testing.
+
+        Document ages (relative to now):
+        - Past documents: -7d, -3d, -1d (negative = in the past)
+        - Current: 0d
+        - Future documents: +1d, +3d, +7d, +14d, +30d (positive = in the future)
+        """
+        now = datetime.now()
+
+        # Mix of past, present, and future documents
+        time_offsets_days = [-7, -3, -1, 0, 1, 3, 7, 14, 30]
+
+        documents = []
+        for offset_days in time_offsets_days:
+            timestamp = (now + timedelta(days=offset_days)).timestamp()
+            if offset_days < 0:
+                doc_id = f"doc-past-{abs(offset_days)}d"
+            elif offset_days == 0:
+                doc_id = "doc-now"
+            else:
+                doc_id = f"doc-future-{offset_days}d"
+
+            documents.append({
+                "_id": doc_id,
+                "title": "event announcement",
+                "description": f"event scheduled for {offset_days} days from now",
+                "timestamp": timestamp,
+            })
+
+        return documents
+
+    def _add_future_documents(self, index=None):
+        """Add future timestamp documents to the specified or main index."""
+        if index is None:
+            index = self.main_index
+        documents = self._generate_future_documents()
+        add_docs_params = AddDocsParams(
+            index_name=index.name,
+            docs=documents,
+            tensor_fields=["title", "description"]
+        )
+        self.add_documents(self.config, add_docs_params)
+
+    def _calculate_expected_grow_score(
+        self,
+        future_age_seconds: float,
+        grow_scale: str,
+        grow_offset: str,
+        grow_function: str,
+        grow_from: float
+    ) -> float:
+        """Calculate expected grow score using the same formulas as decay (mirrored)."""
+        scale_seconds = self._parse_duration_to_seconds(grow_scale)
+        offset_seconds = self._parse_duration_to_seconds(grow_offset)
+
+        # Future age after subtracting offset (plateau zone)
+        effective_future_age = max(0.0, future_age_seconds - offset_seconds)
+
+        if effective_future_age == 0:
+            return 1.0
+
+        if grow_function == "exponential":
+            # Mirror of decay: score approaches grow_from at scale
+            score = 1.0 - (1.0 - grow_from) * math.exp(
+                math.log(1.0 - grow_from) * effective_future_age / scale_seconds
+            )
+        elif grow_function == "linear":
+            score = 1.0 - (1.0 - grow_from) * effective_future_age / scale_seconds
+        elif grow_function == "gaussian":
+            score = 1.0 - (1.0 - grow_from) * (
+                1.0 - math.exp(pow(effective_future_age, 2) * math.log(grow_from) / pow(scale_seconds, 2))
+            )
+        elif grow_function == "binary":
+            score = 1.0 if effective_future_age < scale_seconds else grow_from
+        else:
+            raise ValueError(f"Unknown grow function: {grow_function}")
+
+        return max(grow_from, score)
+
+    def test_grow_disabled_by_default(self):
+        """Test future timestamps get score 1.0 when growFrom is not specified."""
+        self._add_future_documents()
+
+        # Without grow_from, future timestamps should get score 1.0
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5
+            # No grow_from specified
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Future documents should have score 1.0 when grow is disabled
+        for hit in hits:
+            doc_id = hit.get('_id')
+            recency_score = hit.get('_recency_score')
+            self.assertIsNotNone(recency_score, f"Recency score should be present for {doc_id}")
+
+            if doc_id.startswith("doc-future"):
+                self.assertAlmostEqual(
+                    recency_score, 1.0, places=2,
+                    msg=f"Future doc {doc_id} should have score 1.0 when grow disabled"
+                )
+
+    def test_grow_functions(self):
+        """Test all grow functions work correctly for future timestamps."""
+        self._add_future_documents()
+
+        for grow_func in ["exponential", "linear", "gaussian", "binary"]:
+            with self.subTest(function=grow_func):
+                params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="7d",
+                    offset="0d",
+                    decay_function="exponential",
+                    decay_to=0.5,
+                    grow_from=0.3,
+                    grow_function=grow_func,
+                    grow_scale="14d",
+                    grow_offset="0d"
+                )
+                hits = self._search_with_recency("event", params)
+
+                self.assertGreater(len(hits), 0, "Should have results")
+
+                # Verify future documents have grow scores applied
+                for hit in hits:
+                    doc_id = hit.get('_id')
+                    recency_score = hit.get('_recency_score')
+                    self.assertIsNotNone(recency_score, f"Recency score should be present for {doc_id}")
+
+                    if doc_id.startswith("doc-future"):
+                        # Score should be between grow_from and 1.0
+                        self.assertGreaterEqual(
+                            recency_score, 0.3,
+                            f"Future doc {doc_id} score should be >= grow_from"
+                        )
+                        self.assertLessEqual(
+                            recency_score, 1.0,
+                            f"Future doc {doc_id} score should be <= 1.0"
+                        )
+
+    def test_grow_with_decay(self):
+        """Test combined grow (future) and decay (past) behavior."""
+        self._add_future_documents()
+
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.3,
+            grow_function="exponential",
+            grow_scale="14d",
+            grow_offset="0d"
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Categorize documents
+        past_docs = [h for h in hits if h['_id'].startswith("doc-past")]
+        future_docs = [h for h in hits if h['_id'].startswith("doc-future")]
+        now_doc = self._get_doc_by_id(hits, "doc-now")
+
+        # Verify now doc has score ~1.0
+        if now_doc:
+            self.assertAlmostEqual(
+                now_doc.get('_recency_score'), 1.0, places=1,
+                msg="Current timestamp should have score ~1.0"
+            )
+
+        # Verify past docs use decay (score between decay_to and 1.0)
+        for hit in past_docs:
+            recency_score = hit.get('_recency_score')
+            self.assertGreaterEqual(recency_score, 0.5, f"Past doc {hit['_id']} should use decay_to as floor")
+            self.assertLessEqual(recency_score, 1.0, f"Past doc {hit['_id']} should be <= 1.0")
+
+        # Verify future docs use grow (score between grow_from and 1.0)
+        for hit in future_docs:
+            recency_score = hit.get('_recency_score')
+            self.assertGreaterEqual(recency_score, 0.3, f"Future doc {hit['_id']} should use grow_from as floor")
+            self.assertLessEqual(recency_score, 1.0, f"Future doc {hit['_id']} should be <= 1.0")
+
+    def test_grow_defaults_to_decay_function(self):
+        """Test growFunction defaults to decayFunction when not specified."""
+        self._add_future_documents()
+
+        # When grow_function is not specified, it should default to decay_function
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="linear",  # Using linear decay
+            decay_to=0.5,
+            grow_from=0.3,
+            # grow_function not specified - should default to "linear"
+            grow_scale="14d",
+            grow_offset="0d"
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Verify future documents have grow scores applied
+        for hit in hits:
+            doc_id = hit.get('_id')
+            recency_score = hit.get('_recency_score')
+
+            if doc_id.startswith("doc-future"):
+                # Score should be between grow_from and 1.0
+                self.assertGreaterEqual(
+                    recency_score, 0.3,
+                    f"Future doc {doc_id} score should be >= grow_from"
+                )
+
+    def test_grow_defaults_to_scale(self):
+        """Test growScale defaults to scale when not specified."""
+        self._add_future_documents()
+
+        # When grow_scale is not specified, it should default to scale
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="14d",  # Using 14d scale
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.3,
+            grow_function="exponential",
+            # grow_scale not specified - should default to "14d"
+            grow_offset="0d"
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Verify future documents have grow scores applied
+        future_14d = self._get_doc_by_id(hits, "doc-future-14d")
+        if future_14d:
+            # At future_age = scale, score should be close to grow_from
+            recency_score = future_14d.get('_recency_score')
+            # Allow some tolerance since we're testing the score at scale
+            self.assertLess(
+                recency_score, 0.5,
+                f"Future doc at scale should have score closer to grow_from"
+            )
+
+    def test_grow_offset_creates_plateau(self):
+        """Test growOffset creates plateau zone where score = 1.0."""
+        self._add_future_documents()
+
+        # With grow_offset=7d, documents with timestamps between now() and now()+7d
+        # should have score 1.0 (plateau zone)
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.3,
+            grow_function="exponential",
+            grow_scale="14d",
+            grow_offset="7d"  # Plateau zone: now() to now()+7d
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Documents in plateau zone (1d, 3d, 7d) should have score ~1.0
+        plateau_docs = ["doc-future-1d", "doc-future-3d", "doc-future-7d"]
+        for doc_id in plateau_docs:
+            hit = self._get_doc_by_id(hits, doc_id)
+            if hit:
+                recency_score = hit.get('_recency_score')
+                self.assertAlmostEqual(
+                    recency_score, 1.0, places=1,
+                    msg=f"Doc {doc_id} within plateau should have score ~1.0"
+                )
+
+        # Documents beyond plateau (14d, 30d) should have score < 1.0
+        beyond_plateau_docs = ["doc-future-14d", "doc-future-30d"]
+        for doc_id in beyond_plateau_docs:
+            hit = self._get_doc_by_id(hits, doc_id)
+            if hit:
+                recency_score = hit.get('_recency_score')
+                self.assertLess(
+                    recency_score, 1.0,
+                    msg=f"Doc {doc_id} beyond plateau should have score < 1.0"
+                )
+
+    def test_grow_binary_function(self):
+        """Test binary grow function creates step function at scale."""
+        self._add_future_documents()
+
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.2,
+            grow_function="binary",
+            grow_scale="10d",  # Step at 10 days
+            grow_offset="0d"
+        )
+        hits = self._search_with_recency("event", params)
+
+        self.assertGreater(len(hits), 0, "Should have results")
+
+        # Documents within scale (1d, 3d, 7d) should have score 1.0
+        within_scale_docs = ["doc-future-1d", "doc-future-3d", "doc-future-7d"]
+        for doc_id in within_scale_docs:
+            hit = self._get_doc_by_id(hits, doc_id)
+            if hit:
+                recency_score = hit.get('_recency_score')
+                self.assertAlmostEqual(
+                    recency_score, 1.0, places=1,
+                    msg=f"Doc {doc_id} within binary scale should have score 1.0"
+                )
+
+        # Documents beyond scale (14d, 30d) should have score = grow_from
+        beyond_scale_docs = ["doc-future-14d", "doc-future-30d"]
+        for doc_id in beyond_scale_docs:
+            hit = self._get_doc_by_id(hits, doc_id)
+            if hit:
+                recency_score = hit.get('_recency_score')
+                self.assertAlmostEqual(
+                    recency_score, 0.2, places=1,
+                    msg=f"Doc {doc_id} beyond binary scale should have score ~grow_from"
+                )
+
+    def test_grow_parameters_validation(self):
+        """Test grow parameter validation."""
+        # Valid grow_from values
+        valid_grow_from = [0.01, 0.5, 1.0]
+        for val in valid_grow_from:
+            with self.subTest(grow_from=val, valid=True):
+                params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="7d",
+                    decay_function="exponential",
+                    decay_to=0.5,
+                    grow_from=val
+                )
+                self.assertEqual(params.grow_from, val)
+
+        # Invalid grow_from values
+        invalid_grow_from = [0.0, -0.1, 1.1]
+        for val in invalid_grow_from:
+            with self.subTest(grow_from=val, valid=False):
+                with self.assertRaises(Exception):
+                    RecencyParameters(
+                        recency_field="timestamp",
+                        scale="7d",
+                        decay_function="exponential",
+                        decay_to=0.5,
+                        grow_from=val
+                    )
+
+
 if __name__ == '__main__':
     unittest.main()

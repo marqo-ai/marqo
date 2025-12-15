@@ -107,6 +107,47 @@ class RecencyParameters(BaseModel):
         )
     )
 
+    grow_from: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        alias="growFrom",
+        description=(
+            "Starting score for documents with timestamps far in the future. "
+            "When set, enables growth function for future timestamps. "
+            "Must be in range (0.0, 1.0]. If not provided, future timestamps get score 1.0."
+        )
+    )
+
+    grow_function: Optional[str] = Field(
+        default=None,
+        alias="growFunction",
+        description=(
+            "Type of growth function for future timestamps: exponential, linear, gaussian, binary. "
+            "If not provided, defaults to the same as decayFunction."
+        )
+    )
+
+    grow_scale: Optional[str] = Field(
+        default=None,
+        alias="growScale",
+        description=(
+            "Time scale for growth function. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
+            "If not provided, defaults to the same as scale."
+        )
+    )
+
+    grow_offset: Optional[str] = Field(
+        default=None,
+        alias="growOffset",
+        description=(
+            "Time offset before growth function starts. Documents with timestamps between now() "
+            "and now() + growOffset get score 1.0 (plateau). Growth function applies to timestamps "
+            "beyond now() + growOffset. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
+            "If not provided, defaults to '0d' (no plateau)."
+        )
+    )
+
     class Config:
         extra: str = "forbid"
         allow_population_by_field_name = True
@@ -142,5 +183,45 @@ class RecencyParameters(BaseModel):
 
         if seconds < 0:
             raise ValueError(f"offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
+
+        return v
+
+    @validator('grow_function')
+    def validate_grow_function(cls, v: Optional[str]) -> Optional[str]:
+        """Validate grow_function is a valid decay function name."""
+        if v is None:
+            return v
+        valid_functions = [f.value for f in DecayFunction]
+        if v not in valid_functions:
+            raise ValueError(f"Invalid grow_function '{v}'. Must be one of: {', '.join(valid_functions)}")
+        return v
+
+    @validator('grow_scale')
+    def validate_grow_scale(cls, v: Optional[str]) -> Optional[str]:
+        """Validate grow_scale duration string format and constraints."""
+        if v is None:
+            return v
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid grow_scale format: {e}")
+
+        if seconds <= 0:
+            raise ValueError(f"grow_scale must be greater than 0, got: {v} ({seconds} seconds)")
+
+        return v
+
+    @validator('grow_offset')
+    def validate_grow_offset(cls, v: Optional[str]) -> Optional[str]:
+        """Validate grow_offset duration string format and constraints."""
+        if v is None:
+            return v
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid grow_offset format: {e}")
+
+        if seconds < 0:
+            raise ValueError(f"grow_offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
         return v

@@ -188,12 +188,18 @@ class TestRecencyQueryInput(unittest.TestCase):
                 {
                     constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
                     constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 1,
-                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 604800,
-                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 604800.0,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0.0,
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.5,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    # Grow parameters (disabled by default)
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
             (
@@ -209,12 +215,18 @@ class TestRecencyQueryInput(unittest.TestCase):
                 {
                     constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
                     constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0,
-                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 1209600,
-                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 86400,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 1209600.0,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 86400.0,
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.3,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"updated_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 1,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    # Grow parameters (disabled by default)
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 1209600.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
             (
@@ -230,12 +242,18 @@ class TestRecencyQueryInput(unittest.TestCase):
                 {
                     constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
                     constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 1,
-                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 86400,
-                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 43200,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 86400.0,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 43200.0,
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.75,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"publish_date": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 2,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    # Grow parameters (disabled by default)
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
             (
@@ -251,12 +269,18 @@ class TestRecencyQueryInput(unittest.TestCase):
                 {
                     constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
                     constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 1,
-                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 86400,
-                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 86400.0,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0.0,
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.01,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"event_time": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 3,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    # Grow parameters (disabled by default)
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
             (
@@ -273,12 +297,18 @@ class TestRecencyQueryInput(unittest.TestCase):
                 {
                     constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
                     constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 1,
-                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 604800,
-                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: 604800.0,
+                    constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: 0.0,
                     constants.QUERY_INPUT_RECENCY_DECAY_TO: 0.5,
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.5,
+                    # Grow parameters (disabled by default)
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
         ]
@@ -376,6 +406,280 @@ class TestRecencyQueryInput(unittest.TestCase):
             recency_parameters=recency_params
         )
         return query
+
+    # ============= Grow Parameters Tests =============
+
+    def test_grow_parameters_disabled_by_default(self):
+        """Test grow parameters are disabled when grow_from is not specified."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED],
+            0
+        )
+
+    def test_grow_parameters_enabled_when_grow_from_specified(self):
+        """Test grow parameters are enabled when grow_from is specified."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED],
+            1
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM],
+            0.5
+        )
+
+    def test_grow_from_values(self):
+        """Test grow_from values are passed correctly."""
+        grow_from_values = [0.01, 0.3, 0.5, 0.75, 0.99, 1.0]
+
+        for grow_from in grow_from_values:
+            with self.subTest(grow_from=grow_from):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=grow_from
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_FROM],
+                    grow_from
+                )
+
+    def test_grow_function_defaults_to_decay_function(self):
+        """Test grow_function defaults to decay_function when not specified."""
+        decay_functions = [
+            ("exponential", 0),
+            ("linear", 1),
+            ("gaussian", 2),
+            ("binary", 3),
+        ]
+
+        for decay_func, expected_code in decay_functions:
+            with self.subTest(decay_func):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    decay_function=decay_func,
+                    grow_from=0.5
+                    # grow_function not specified, should default to decay_function
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE],
+                    expected_code
+                )
+
+    def test_grow_function_mapping(self):
+        """Test grow_function to numeric mapping when specified."""
+        grow_functions = [
+            ("exponential", 0),
+            ("linear", 1),
+            ("gaussian", 2),
+            ("binary", 3),
+        ]
+
+        for function_name, expected_code in grow_functions:
+            with self.subTest(function_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    decay_function="exponential",  # Different from grow_function
+                    grow_from=0.5,
+                    grow_function=function_name
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE],
+                    expected_code
+                )
+
+    def test_grow_scale_defaults_to_scale(self):
+        """Test grow_scale defaults to scale when not specified."""
+        duration_cases = [
+            ("7d", 604800),
+            ("1d", 86400),
+            ("24h", 86400),
+            ("14d", 1209600),
+        ]
+
+        for scale, expected_seconds in duration_cases:
+            with self.subTest(scale=scale):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    scale=scale,
+                    grow_from=0.5
+                    # grow_scale not specified, should default to scale
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS],
+                    expected_seconds
+                )
+
+    def test_grow_scale_to_seconds_conversion(self):
+        """Test grow_scale conversion to seconds when specified."""
+        duration_cases = [
+            ("7d", 604800),
+            ("1d", 86400),
+            ("24h", 86400),
+            ("14d", 1209600),
+            ("1.5d", 129600),
+            ("0.5h", 1800),
+        ]
+
+        for grow_scale, expected_seconds in duration_cases:
+            with self.subTest(grow_scale=grow_scale):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    scale="7d",  # Different from grow_scale
+                    grow_from=0.5,
+                    grow_scale=grow_scale
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS],
+                    expected_seconds
+                )
+
+    def test_grow_offset_defaults_to_zero(self):
+        """Test grow_offset defaults to 0 when not specified."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5
+            # grow_offset not specified, should default to 0
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS],
+            0
+        )
+
+    def test_grow_offset_to_seconds_conversion(self):
+        """Test grow_offset conversion to seconds when specified."""
+        duration_cases = [
+            ("0d", 0),
+            ("1d", 86400),
+            ("12h", 43200),
+            ("2d", 172800),
+            ("0.5d", 43200),
+        ]
+
+        for grow_offset, expected_seconds in duration_cases:
+            with self.subTest(grow_offset=grow_offset):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=0.5,
+                    grow_offset=grow_offset
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS],
+                    expected_seconds
+                )
+
+    def test_all_grow_query_input_constants_present(self):
+        """Test that all grow query input constants are present when grow is enabled."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            grow_from=0.5
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        expected_grow_keys = [
+            constants.QUERY_INPUT_RECENCY_GROW_ENABLED,
+            constants.QUERY_INPUT_RECENCY_GROW_FROM,
+            constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE,
+            constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS,
+            constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS,
+        ]
+
+        for key in expected_grow_keys:
+            with self.subTest(key=key):
+                self.assertIn(key, result)
+
+    def test_complete_grow_parameter_combination(self):
+        """Test complete grow parameter combination produces expected output."""
+        test_cases = [
+            (
+                "grow_with_all_params",
+                {
+                    "recency_field": "created_at",
+                    "decay_function": "exponential",
+                    "scale": "7d",
+                    "offset": "0d",
+                    "decay_to": 0.5,
+                    "grow_from": 0.3,
+                    "grow_function": "linear",
+                    "grow_scale": "14d",
+                    "grow_offset": "1d"
+                },
+                {
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 1,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 0.3,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 1,  # linear
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 1209600,  # 14d
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 86400,  # 1d
+                }
+            ),
+            (
+                "grow_with_defaults",
+                {
+                    "recency_field": "created_at",
+                    "decay_function": "gaussian",
+                    "scale": "24h",
+                    "grow_from": 0.5
+                    # grow_function, grow_scale, grow_offset should use defaults
+                },
+                {
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 1,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 0.5,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 2,  # gaussian (default to decay)
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400,  # 24h (default to scale)
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,  # default to 0
+                }
+            ),
+            (
+                "grow_disabled",
+                {
+                    "recency_field": "created_at",
+                    "decay_function": "exponential",
+                    "scale": "7d",
+                    # grow_from not specified
+                },
+                {
+                    constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800,
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                }
+            ),
+        ]
+
+        for test_name, input_params, expected_grow_output in test_cases:
+            with self.subTest(test_name):
+                params = RecencyParameters(**input_params)
+                result = self.vespa_index._get_recency_query_input(params)
+
+                for key, expected_value in expected_grow_output.items():
+                    self.assertEqual(
+                        result[key],
+                        expected_value,
+                        f"Key {key}: expected {expected_value}, got {result.get(key)}"
+                    )
+
 
 if __name__ == '__main__':
     unittest.main()
