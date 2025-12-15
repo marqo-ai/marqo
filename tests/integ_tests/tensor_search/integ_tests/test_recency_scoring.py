@@ -1350,18 +1350,18 @@ class TestRecencyScoring(MarqoTestCase):
         # Verify future documents have grow scores applied
         future_14d = self._get_doc_by_id(hits, "doc-future-14d")
         if future_14d:
-            # At future_age = scale, exponential score is ~0.51 for grow_from=0.3
-            # (score = 1.0 - 0.7 * exp(ln(0.7)) = 1.0 - 0.7 * 0.7 = 0.51)
+            # At future_age = scale, exponential score equals grow_from (floor)
+            # Formula: exp(log(floor) * age / scale) = exp(log(floor)) = floor at age=scale
             recency_score = future_14d.get('_recency_score')
             # Score should be significantly less than 1.0, showing grow is applied
             self.assertLess(
                 recency_score, 0.7,
                 f"Future doc at scale should have score significantly below 1.0"
             )
-            # Score should be above grow_from floor
-            self.assertGreater(
+            # Score should be at or above grow_from floor (equals floor at exactly scale)
+            self.assertGreaterEqual(
                 recency_score, 0.3,
-                f"Future doc at scale should have score above grow_from"
+                f"Future doc at scale should have score at or above grow_from"
             )
 
     def test_grow_offset_creates_plateau(self):
