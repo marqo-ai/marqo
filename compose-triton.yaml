@@ -1,0 +1,48 @@
+# A docker compose file that sets up a environment with Triton Inference Server only.
+# Can be used to test model management related features.
+
+name: marqo-triton
+
+services:
+  triton-gpu:
+    image: nvcr.io/nvidia/tritonserver:${TRITON_VERSION:-25.08-py3}
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - ${MARQO_MODEL_CACHE_PATH:-$HOME/.cache/marqo/models}:/models
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    profiles: [gpu]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - ${MARQO_MODEL_CACHE_PATH:-$HOME/.cache/marqo/models}:/models
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    profiles: [cpu]
+    restart: unless-stopped

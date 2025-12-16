@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://bit.ly/marqo-community-slack">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
+<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
 </b>
 </p>
 
@@ -11,9 +11,10 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/unit_test_200gb_CI.yml"><img src="https://img.shields.io/github/actions/workflow/status/marqo-ai/marqo/unit_test_200gb_CI.yml?branch=mainline"></a>
-<a align="center" href="https://bit.ly/marqo-community-slack"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 
-## Marqo
+## [NOTICE: THIS REPO IS DEPRECATED AND WILL STOP RECEIVING UPDATES]
+
+## Marqo 
 
 Marqo is more than a vector database, it's an end-to-end vector search engine for both text and images. Vector generation, storage and retrieval are handled out of the box through a single API. No need to bring your own embeddings. 
     
@@ -271,7 +272,7 @@ To power image and text search, Marqo allows users to plug and play with CLIP mo
 ```python
 settings = {
     "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
-    "model":"ViT-L/14"
+    "model": "Marqo/ViT-L-14.laion2b_s32b_b82k"
 }
 response = mq.create_index("my-multimodal-index", **settings)
 ```
@@ -374,7 +375,7 @@ import pprint
 
 mq = marqo.Client(url="http://localhost:8882")
 
-settings = {"treat_urls_and_pointers_as_images": True, "model": "ViT-L/14"}
+settings = {"treat_urls_and_pointers_as_images": True, "model": "Marqo/ViT-L-14.laion2b_s32b_b82k"}
 
 mq.create_index("my-first-multimodal-index", **settings)
 

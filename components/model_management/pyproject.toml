@@ -1,0 +1,59 @@
+[project]
+name = "marqo-model-management"
+version = "0.0.1"
+description = "The model management component of Marqo"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.116.2",
+    "fsspec>=2025.9.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "orjson>=3.11.3",
+    "pydantic>=2.11.9",
+    "pydantic-settings>=2.10.1",
+    "python-json-logger>=3.3.0",
+    "s3fs>=2025.9.0",
+    "tqdm>=4.67.1",
+    "uvicorn>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-md-report>=0.7.0",
+    "diff-cover>=9.7.1",
+    "requests>=2.32.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/model_management/src/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

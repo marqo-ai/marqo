@@ -9,6 +9,9 @@ on:
 jobs:
   verify-patches-merged:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/marqo
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
