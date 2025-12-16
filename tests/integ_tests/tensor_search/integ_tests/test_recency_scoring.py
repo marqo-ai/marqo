@@ -1104,6 +1104,41 @@ class TestRecencyScoring(MarqoTestCase):
                         decay_to=0.5
                     )
 
+    def test_grow_params_all_or_nothing_validation(self):
+        """Test that grow parameters must be either all provided or all omitted."""
+        # Partial combinations should fail
+        partial_cases = [
+            ("only_grow_from", {"grow_from": 0.5}),
+            ("missing_grow_offset", {"grow_from": 0.5, "grow_function": "exponential", "grow_scale": "7d"}),
+            ("missing_grow_scale", {"grow_from": 0.5, "grow_function": "exponential", "grow_offset": "0d"}),
+        ]
+
+        for test_name, grow_params in partial_cases:
+            with self.subTest(test_name):
+                with self.assertRaises(Exception) as ctx:
+                    RecencyParameters(
+                        recency_field="timestamp",
+                        scale="7d",
+                        decay_function="exponential",
+                        decay_to=0.5,
+                        **grow_params
+                    )
+                self.assertIn("all provided or all omitted", str(ctx.exception).lower())
+
+        # All provided should work
+        with self.subTest("all_provided"):
+            params = RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_function="exponential",
+                decay_to=0.5,
+                grow_from=0.5,
+                grow_function="exponential",
+                grow_scale="7d",
+                grow_offset="0d"
+            )
+            self.assertEqual(params.grow_from, 0.5)
+
     def test_grow_from_validation(self):
         """Test grow_from must be in (0.0, 1.0]."""
         valid_values = [0.01, 0.5, 1.0]
@@ -1116,7 +1151,10 @@ class TestRecencyScoring(MarqoTestCase):
                     scale="7d",
                     decay_function="exponential",
                     decay_to=0.5,
-                    grow_from=val
+                    grow_from=val,
+                    grow_function="exponential",
+                    grow_scale="7d",
+                    grow_offset="0d"
                 )
                 self.assertEqual(params.grow_from, val)
 
@@ -1128,7 +1166,10 @@ class TestRecencyScoring(MarqoTestCase):
                         scale="7d",
                         decay_function="exponential",
                         decay_to=0.5,
-                        grow_from=val
+                        grow_from=val,
+                        grow_function="exponential",
+                        grow_scale="7d",
+                        grow_offset="0d"
                     )
 
     def test_grow_function_validation(self):
@@ -1144,7 +1185,9 @@ class TestRecencyScoring(MarqoTestCase):
                     decay_function="exponential",
                     decay_to=0.5,
                     grow_from=0.3,
-                    grow_function=func
+                    grow_function=func,
+                    grow_scale="7d",
+                    grow_offset="0d"
                 )
                 self.assertEqual(params.grow_function, func)
 
@@ -1157,7 +1200,9 @@ class TestRecencyScoring(MarqoTestCase):
                         decay_function="exponential",
                         decay_to=0.5,
                         grow_from=0.3,
-                        grow_function=func
+                        grow_function=func,
+                        grow_scale="7d",
+                        grow_offset="0d"
                     )
 
     def test_grow_scale_validation(self):
@@ -1173,7 +1218,9 @@ class TestRecencyScoring(MarqoTestCase):
                     decay_function="exponential",
                     decay_to=0.5,
                     grow_from=0.3,
-                    grow_scale=fmt
+                    grow_function="exponential",
+                    grow_scale=fmt,
+                    grow_offset="0d"
                 )
                 self.assertEqual(params.grow_scale, fmt)
 
@@ -1186,7 +1233,9 @@ class TestRecencyScoring(MarqoTestCase):
                         decay_function="exponential",
                         decay_to=0.5,
                         grow_from=0.3,
-                        grow_scale=fmt
+                        grow_function="exponential",
+                        grow_scale=fmt,
+                        grow_offset="0d"
                     )
 
     def test_grow_offset_validation(self):
@@ -1202,6 +1251,8 @@ class TestRecencyScoring(MarqoTestCase):
                     decay_function="exponential",
                     decay_to=0.5,
                     grow_from=0.3,
+                    grow_function="exponential",
+                    grow_scale="7d",
                     grow_offset=fmt
                 )
                 self.assertEqual(params.grow_offset, fmt)
@@ -1215,6 +1266,8 @@ class TestRecencyScoring(MarqoTestCase):
                         decay_function="exponential",
                         decay_to=0.5,
                         grow_from=0.3,
+                        grow_function="exponential",
+                        grow_scale="7d",
                         grow_offset=fmt
                     )
 
@@ -1415,14 +1468,13 @@ class TestRecencyScoring(MarqoTestCase):
                 self.assertGreaterEqual(score, 0.3, f"Future doc {doc_id} should be >= grow_from")
                 self.assertLessEqual(score, 1.0, f"Future doc {doc_id} should be <= 1.0")
 
-    def test_grow_defaults_to_decay_function(self):
-        """Test growFunction defaults to decayFunction when not specified.
+    def test_grow_with_linear_function(self):
+        """Test grow with linear function produces correct scores.
 
-        Use linear decay and verify future docs also use linear grow.
+        Use linear grow function and verify future docs have expected scores.
         """
         self._add_shared_documents()
 
-        # grow_function not specified - should default to decay_function (linear)
         params = RecencyParameters(
             recency_field="timestamp",
             scale="120d",
@@ -1430,7 +1482,7 @@ class TestRecencyScoring(MarqoTestCase):
             decay_function="linear",
             decay_to=0.5,
             grow_from=0.3,
-            # grow_function not specified
+            grow_function="linear",
             grow_scale="60d",
             grow_offset="0d"
         )
@@ -1438,7 +1490,7 @@ class TestRecencyScoring(MarqoTestCase):
 
         self.assertGreater(len(hits), 0, "Should have results")
 
-        # Verify scores with linear grow function (defaults from decay)
+        # Verify scores with linear grow function
         self._verify_grow_behavior(
             hits,
             decay_to=0.5,
@@ -1446,44 +1498,43 @@ class TestRecencyScoring(MarqoTestCase):
             scale="120d",
             offset="0d",
             decay_function="linear",
-            grow_function="linear",  # Defaults to decay_function
+            grow_function="linear",
             grow_scale="60d",
             grow_offset="0d"
         )
 
-    def test_grow_defaults_to_scale(self):
-        """Test growScale defaults to scale when not specified.
+    def test_grow_scale_at_boundary(self):
+        """Test grow_scale boundary - doc at exactly scale gets grow_from score.
 
-        Use scale=30d and verify grow also uses 30d scale.
+        Use grow_scale=30d and verify doc+30d has score ~grow_from.
         """
         self._add_shared_documents()
 
-        # grow_scale not specified - should default to scale
         params = RecencyParameters(
             recency_field="timestamp",
-            scale="30d",
+            scale="120d",
             offset="0d",
             decay_function="exponential",
             decay_to=0.5,
             grow_from=0.3,
             grow_function="exponential",
-            # grow_scale not specified - defaults to scale
+            grow_scale="30d",
             grow_offset="0d"
         )
         hits = self._search_with_recency("product", params)
 
         self.assertGreater(len(hits), 0, "Should have results")
 
-        # Verify scores with grow_scale=30d (defaults from scale)
+        # Verify scores
         self._verify_grow_behavior(
             hits,
             decay_to=0.5,
             grow_from=0.3,
-            scale="30d",
+            scale="120d",
             offset="0d",
             decay_function="exponential",
             grow_function="exponential",
-            grow_scale="30d",  # Defaults to scale
+            grow_scale="30d",
             grow_offset="0d"
         )
 

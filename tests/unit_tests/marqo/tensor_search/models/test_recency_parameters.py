@@ -396,21 +396,80 @@ class TestRecencyParameters(unittest.TestCase):
         self.assertEqual(result['addToScoreWeight'], 0.5)
 
     # ============= Grow Parameters Tests =============
+    # Note: Grow parameters follow "all or nothing" rule - either all 4 must be
+    # provided (growFrom, growFunction, growScale, growOffset) or none.
 
-    def test_grow_from_validation(self):
-        """Test grow_from field validation."""
-        # Valid grow_from values
-        valid_values = [
-            ("min", 0.01, 0.01),
-            ("mid", 0.5, 0.5),
-            ("max", 1.0, 1.0),
-            ("near_min", 0.001, 0.001),
+    def test_grow_params_all_or_nothing_validation(self):
+        """Test that grow parameters must be either all provided or all omitted."""
+        # Test partial combinations - all should fail
+        partial_combinations = [
+            # Only one param
+            ("only_grow_from", {"grow_from": 0.5}),
+            ("only_grow_function", {"grow_function": "exponential"}),
+            ("only_grow_scale", {"grow_scale": "7d"}),
+            ("only_grow_offset", {"grow_offset": "1d"}),
+            # Two params
+            ("grow_from_and_function", {"grow_from": 0.5, "grow_function": "exponential"}),
+            ("grow_from_and_scale", {"grow_from": 0.5, "grow_scale": "7d"}),
+            ("grow_from_and_offset", {"grow_from": 0.5, "grow_offset": "1d"}),
+            ("grow_function_and_scale", {"grow_function": "exponential", "grow_scale": "7d"}),
+            # Three params
+            ("missing_grow_from", {"grow_function": "exponential", "grow_scale": "7d", "grow_offset": "1d"}),
+            ("missing_grow_function", {"grow_from": 0.5, "grow_scale": "7d", "grow_offset": "1d"}),
+            ("missing_grow_scale", {"grow_from": 0.5, "grow_function": "exponential", "grow_offset": "1d"}),
+            ("missing_grow_offset", {"grow_from": 0.5, "grow_function": "exponential", "grow_scale": "7d"}),
         ]
 
-        for test_name, grow_from, expected in valid_values:
+        for test_name, grow_params in partial_combinations:
             with self.subTest(test_name):
-                params = RecencyParameters(recency_field="created_at", grow_from=grow_from)
-                self.assertEqual(params.grow_from, expected)
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(recency_field="created_at", **grow_params)
+                error_str = str(exc_info.exception)
+                self.assertIn("all provided or all omitted", error_str.lower(),
+                    f"Expected 'all provided or all omitted' in error: {error_str}")
+
+        # All params provided - should pass
+        with self.subTest("all_provided"):
+            params = RecencyParameters(
+                recency_field="created_at",
+                grow_from=0.5,
+                grow_function="exponential",
+                grow_scale="7d",
+                grow_offset="1d"
+            )
+            self.assertEqual(params.grow_from, 0.5)
+            self.assertEqual(params.grow_function, "exponential")
+            self.assertEqual(params.grow_scale, "7d")
+            self.assertEqual(params.grow_offset, "1d")
+
+        # No grow params - should pass
+        with self.subTest("none_provided"):
+            params = RecencyParameters(recency_field="created_at")
+            self.assertIsNone(params.grow_from)
+            self.assertIsNone(params.grow_function)
+            self.assertIsNone(params.grow_scale)
+            self.assertIsNone(params.grow_offset)
+
+    def test_grow_from_validation(self):
+        """Test grow_from field value validation."""
+        # Valid grow_from values (must provide all grow params)
+        valid_values = [
+            ("min", 0.01),
+            ("mid", 0.5),
+            ("max", 1.0),
+            ("near_min", 0.001),
+        ]
+
+        for test_name, grow_from in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    grow_from=grow_from,
+                    grow_function="exponential",
+                    grow_scale="7d",
+                    grow_offset="0d"
+                )
+                self.assertEqual(params.grow_from, grow_from)
 
         # Invalid grow_from values
         invalid_values = [
@@ -422,7 +481,13 @@ class TestRecencyParameters(unittest.TestCase):
         for test_name, grow_from in invalid_values:
             with self.subTest(test_name):
                 with self.assertRaises(ValidationError) as exc_info:
-                    RecencyParameters(recency_field="created_at", grow_from=grow_from)
+                    RecencyParameters(
+                        recency_field="created_at",
+                        grow_from=grow_from,
+                        grow_function="exponential",
+                        grow_scale="7d",
+                        grow_offset="0d"
+                    )
                 errors = exc_info.exception.errors()
                 self.assertTrue(
                     any('grow_from' in str(e['loc']) or 'growFrom' in str(e['loc']) for e in errors),
@@ -430,7 +495,7 @@ class TestRecencyParameters(unittest.TestCase):
                 )
 
     def test_grow_from_default_none(self):
-        """Test grow_from defaults to None."""
+        """Test grow_from defaults to None when no grow params provided."""
         params = RecencyParameters(recency_field="created_at")
         self.assertIsNone(params.grow_from)
 
@@ -438,7 +503,10 @@ class TestRecencyParameters(unittest.TestCase):
         """Test grow_from alias (growFrom)."""
         params = RecencyParameters(
             recency_field="created_at",
-            growFrom=0.3
+            growFrom=0.3,
+            growFunction="exponential",
+            growScale="7d",
+            growOffset="0d"
         )
         self.assertEqual(params.grow_from, 0.3)
 
@@ -457,7 +525,9 @@ class TestRecencyParameters(unittest.TestCase):
                 params = RecencyParameters(
                     recency_field="created_at",
                     grow_from=0.5,
-                    grow_function=func
+                    grow_function=func,
+                    grow_scale="7d",
+                    grow_offset="0d"
                 )
                 self.assertEqual(params.grow_function, func)
 
@@ -473,20 +543,19 @@ class TestRecencyParameters(unittest.TestCase):
                     RecencyParameters(
                         recency_field="created_at",
                         grow_from=0.5,
-                        grow_function=func
+                        grow_function=func,
+                        grow_scale="7d",
+                        grow_offset="0d"
                     )
-
-    def test_grow_function_default_none(self):
-        """Test grow_function defaults to None (will use decay_function at query time)."""
-        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
-        self.assertIsNone(params.grow_function)
 
     def test_grow_function_alias(self):
         """Test grow_function alias (growFunction)."""
         params = RecencyParameters(
             recency_field="created_at",
             grow_from=0.5,
-            growFunction="linear"
+            growFunction="linear",
+            grow_scale="7d",
+            grow_offset="0d"
         )
         self.assertEqual(params.grow_function, "linear")
 
@@ -499,20 +568,22 @@ class TestRecencyParameters(unittest.TestCase):
         """Test grow_scale field validation."""
         # Valid scales (same format as scale)
         valid_scales = [
-            ("days", "7d", "7d"),
-            ("hours", "24h", "24h"),
-            ("decimal_days", "1.5d", "1.5d"),
-            ("decimal_hours", "0.5h", "0.5h"),
+            ("days", "7d"),
+            ("hours", "24h"),
+            ("decimal_days", "1.5d"),
+            ("decimal_hours", "0.5h"),
         ]
 
-        for test_name, grow_scale, expected in valid_scales:
+        for test_name, grow_scale in valid_scales:
             with self.subTest(test_name):
                 params = RecencyParameters(
                     recency_field="created_at",
                     grow_from=0.5,
-                    grow_scale=grow_scale
+                    grow_function="exponential",
+                    grow_scale=grow_scale,
+                    grow_offset="0d"
                 )
-                self.assertEqual(params.grow_scale, expected)
+                self.assertEqual(params.grow_scale, grow_scale)
 
         # Invalid scales
         invalid_scales = [
@@ -528,20 +599,19 @@ class TestRecencyParameters(unittest.TestCase):
                     RecencyParameters(
                         recency_field="created_at",
                         grow_from=0.5,
-                        grow_scale=grow_scale
+                        grow_function="exponential",
+                        grow_scale=grow_scale,
+                        grow_offset="0d"
                     )
-
-    def test_grow_scale_default_none(self):
-        """Test grow_scale defaults to None (will use scale at query time)."""
-        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
-        self.assertIsNone(params.grow_scale)
 
     def test_grow_scale_alias(self):
         """Test grow_scale alias (growScale)."""
         params = RecencyParameters(
             recency_field="created_at",
             grow_from=0.5,
-            growScale="14d"
+            grow_function="exponential",
+            growScale="14d",
+            grow_offset="0d"
         )
         self.assertEqual(params.grow_scale, "14d")
 
@@ -554,20 +624,22 @@ class TestRecencyParameters(unittest.TestCase):
         """Test grow_offset field validation."""
         # Valid offsets (same format as offset)
         valid_offsets = [
-            ("zero_days", "0d", "0d"),
-            ("days", "1d", "1d"),
-            ("hours", "12h", "12h"),
-            ("decimal_days", "0.5d", "0.5d"),
+            ("zero_days", "0d"),
+            ("days", "1d"),
+            ("hours", "12h"),
+            ("decimal_days", "0.5d"),
         ]
 
-        for test_name, grow_offset, expected in valid_offsets:
+        for test_name, grow_offset in valid_offsets:
             with self.subTest(test_name):
                 params = RecencyParameters(
                     recency_field="created_at",
                     grow_from=0.5,
+                    grow_function="exponential",
+                    grow_scale="7d",
                     grow_offset=grow_offset
                 )
-                self.assertEqual(params.grow_offset, expected)
+                self.assertEqual(params.grow_offset, grow_offset)
 
         # Invalid offsets
         invalid_offsets = [
@@ -582,19 +654,18 @@ class TestRecencyParameters(unittest.TestCase):
                     RecencyParameters(
                         recency_field="created_at",
                         grow_from=0.5,
+                        grow_function="exponential",
+                        grow_scale="7d",
                         grow_offset=grow_offset
                     )
-
-    def test_grow_offset_default_none(self):
-        """Test grow_offset defaults to None (will use '0d' at query time)."""
-        params = RecencyParameters(recency_field="created_at", grow_from=0.5)
-        self.assertIsNone(params.grow_offset)
 
     def test_grow_offset_alias(self):
         """Test grow_offset alias (growOffset)."""
         params = RecencyParameters(
             recency_field="created_at",
             grow_from=0.5,
+            grow_function="exponential",
+            grow_scale="7d",
             growOffset="2d"
         )
         self.assertEqual(params.grow_offset, "2d")

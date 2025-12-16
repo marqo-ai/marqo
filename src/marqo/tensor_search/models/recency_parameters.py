@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional
-from pydantic.v1 import BaseModel, Field, validator
+from pydantic.v1 import BaseModel, Field, validator, root_validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
 
@@ -114,8 +114,9 @@ class RecencyParameters(BaseModel):
         alias="growFrom",
         description=(
             "Starting score for documents with timestamps far in the future. "
-            "When set, enables growth function for future timestamps. "
-            "Must be in range (0.0, 1.0]. If not provided, future timestamps get score 1.0."
+            "Must be in range (0.0, 1.0]. "
+            "NOTE: All grow parameters (growFrom, growFunction, growScale, growOffset) must be "
+            "provided together or all omitted. If omitted, future timestamps get score 1.0."
         )
     )
 
@@ -124,7 +125,7 @@ class RecencyParameters(BaseModel):
         alias="growFunction",
         description=(
             "Type of growth function for future timestamps: exponential, linear, gaussian, binary. "
-            "If not provided, defaults to the same as decayFunction."
+            "NOTE: All grow parameters must be provided together or all omitted."
         )
     )
 
@@ -133,7 +134,7 @@ class RecencyParameters(BaseModel):
         alias="growScale",
         description=(
             "Time scale for growth function. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
-            "If not provided, defaults to the same as scale."
+            "NOTE: All grow parameters must be provided together or all omitted."
         )
     )
 
@@ -144,7 +145,7 @@ class RecencyParameters(BaseModel):
             "Time offset before growth function starts. Documents with timestamps between now() "
             "and now() + growOffset get score 1.0 (plateau). Growth function applies to timestamps "
             "beyond now() + growOffset. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
-            "If not provided, defaults to '0d' (no plateau)."
+            "NOTE: All grow parameters must be provided together or all omitted."
         )
     )
 
@@ -225,3 +226,31 @@ class RecencyParameters(BaseModel):
             raise ValueError(f"grow_offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
         return v
+
+    @root_validator
+    def validate_grow_params_all_or_nothing(cls, values):
+        """Validate that grow parameters are either all provided or all omitted.
+
+        If any grow parameter is provided, all must be provided. If none are provided,
+        grow functionality is disabled and future timestamps get score 1.0.
+        """
+        grow_params = {
+            'growFrom': values.get('grow_from'),
+            'growFunction': values.get('grow_function'),
+            'growScale': values.get('grow_scale'),
+            'growOffset': values.get('grow_offset'),
+        }
+
+        provided = [k for k, v in grow_params.items() if v is not None]
+        missing = [k for k, v in grow_params.items() if v is None]
+
+        # If some but not all are provided, raise error
+        if provided and missing:
+            provided_names = ', '.join(sorted(provided))
+            missing_names = ', '.join(sorted(missing))
+            raise ValueError(
+                f"Grow parameters must be either all provided or all omitted. "
+                f"Provided: [{provided_names}]. Missing: [{missing_names}]."
+            )
+
+        return values
