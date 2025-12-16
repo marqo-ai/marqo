@@ -10,8 +10,6 @@ from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod, RelativeMaxScoreParameters
-from marqo.tensor_search.models.sort_by_model import SortByModel
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -841,11 +839,13 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery, is_facets_term=False) -> str:
+    def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
+            rerank_depth_lexical = marqo_query.hybrid_parameters.rerankDepthLexical
         else:
             score_modifiers = marqo_query.score_modifiers
+            rerank_depth_lexical = 0 # Not used in lexical-only search
 
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
@@ -853,17 +853,27 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
 
-        # Optional tokens
-        if marqo_query.or_phrases and score_modifiers or is_facets_term:
-            or_terms = ' OR '.join([
-                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
-            ])
-        elif marqo_query.or_phrases and not score_modifiers:
-            or_terms = 'weakAnd(%s)' % ', '.join([
-                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
-            ])
+        if rerank_depth_lexical == 0:
+            # Optional tokens
+            if marqo_query.or_phrases and score_modifiers or is_facets_term:
+                or_terms = ' OR '.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+            elif marqo_query.or_phrases and not score_modifiers:
+                or_terms = 'weakAnd(%s)' % ', '.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+            else:
+                or_terms = ''
         else:
-            or_terms = ''
+            # Rerank depth > 0 means we are doing a two-stage retrieval
+            if marqo_query.or_phrases:
+                or_terms = ','.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+                or_terms = f'{{targetHits:{rerank_depth_lexical}}}weakAnd(' + or_terms + f')'
+            else:
+                or_terms = ''
 
         # Required tokens
         if marqo_query.and_phrases:
