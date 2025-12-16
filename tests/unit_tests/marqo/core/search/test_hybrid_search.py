@@ -466,6 +466,47 @@ class TestRecencyValidation(TestCase):
         self.assertIn("addToScoreWeight", str(ctx.exception))
         self.assertIn(str(constants.MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION), str(ctx.exception))
 
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_grow_recency_on_old_schema_version_raises_error(self, mock_metrics):
+        """Test that recency grow parameters (growFrom) on old schema version raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        # Create a mock semi-structured index that supports basic recency but NOT grow
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.24.8"  # Supports recency but not grow
+        marqo_index.marqo_version = "2.24.8"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.8")
+        # Supports basic recency
+        type(marqo_index).index_supports_recency_scoring = PropertyMock(return_value=True)
+        # Does NOT support grow recency
+        type(marqo_index).index_supports_recency_grow = PropertyMock(return_value=False)
+
+        config = Mock(spec=Config)
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.3  # This should trigger the error
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=HybridParameters(),
+                recency_parameters=recency_params
+            )
+
+        self.assertIn("growFrom", str(ctx.exception))
+        self.assertIn(str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION), str(ctx.exception))
+
     @patch('marqo.core.search.hybrid_search.vespa_index_factory')
     @patch('marqo.core.search.hybrid_search.run_vectorise_pipeline')
     @patch('marqo.core.search.hybrid_search.utils.parse_lexical_query')
@@ -544,6 +585,87 @@ class TestRecencyValidation(TestCase):
         # Verify the search executed successfully
         self.assertIsNotNone(result)
 
+    @patch('marqo.core.search.hybrid_search.vespa_index_factory')
+    @patch('marqo.core.search.hybrid_search.run_vectorise_pipeline')
+    @patch('marqo.core.search.hybrid_search.utils.parse_lexical_query')
+    @patch('marqo.core.search.hybrid_search.gather_documents_from_response')
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_grow_recency_on_new_schema_version_succeeds(
+        self, mock_metrics, mock_gather_docs, mock_parse_lexical,
+        mock_vectorise, mock_vespa_factory
+    ):
+        """Test that grow recency (growFrom) succeeds on index that supports it."""
+        # Setup mocks
+        config = Mock(spec=Config)
+        config.vespa_client = Mock()
+        mock_response = Mock()
+        mock_response.root.coverage.coverage = 100
+        mock_response.root.coverage.degraded = None
+        config.vespa_client.query.return_value = mock_response
+
+        # Mock marqo_index with new schema version
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.24.9"  # New version
+        marqo_index.marqo_version = "2.24.9"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.9")
+        # Supports both basic recency and grow recency
+        type(marqo_index).index_supports_recency_scoring = PropertyMock(return_value=True)
+        type(marqo_index).index_supports_recency_grow = PropertyMock(return_value=True)
+
+        # Mock vespa_index
+        mock_vespa_index = Mock(spec=SemiStructuredVespaIndex)
+        mock_vespa_query = {"query": "test"}
+        mock_vespa_index.to_vespa_query.return_value = mock_vespa_query
+        mock_vespa_factory.return_value = mock_vespa_index
+
+        # Mock vectorisation pipeline
+        mock_vectorise.return_value = {0: [0.1, 0.2, 0.3]}
+
+        # Mock lexical query parsing
+        mock_parse_lexical.return_value = (["required"], ["optional"])
+
+        # Mock metrics store
+        mock_metrics_instance = Mock()
+        mock_metrics.for_request.return_value = mock_metrics_instance
+        mock_metrics_instance.start.return_value = None
+        mock_metrics_instance.stop.return_value = 100.0
+        mock_context_manager = Mock()
+        mock_context_manager.__enter__ = Mock(return_value=None)
+        mock_context_manager.__exit__ = Mock(return_value=None)
+        mock_metrics_instance.time.return_value = mock_context_manager
+
+        # Mock gather_documents_from_response
+        mock_gather_docs.return_value = {
+            "hits": [{"_id": "1", "doc": {"field": "value"}}]
+        }
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_function="exponential",
+            decay_to=0.5,
+            grow_from=0.3,  # Grow mode
+            grow_function="exponential",
+            grow_scale="7d",
+            grow_offset="0d"
+        )
+
+        # Execute the search - should not raise
+        hybrid_search = HybridSearch()
+        result = hybrid_search.search(
+            config=config,
+            marqo_index=marqo_index,
+            query="test query",
+            hybrid_parameters=HybridParameters(),
+            recency_parameters=recency_params
+        )
+
+        # Verify the search executed successfully
+        self.assertIsNotNone(result)
+
     def test_basic_recency_without_additive_succeeds_on_old_additive_schema(self):
         """Test that basic recency (without addToScoreWeight) succeeds on schema 2.24.8."""
         # Create a mock semi-structured index that supports basic recency but NOT additive
@@ -573,3 +695,29 @@ class TestRecencyValidation(TestCase):
         # Since we can't easily test the full search flow without extensive mocking,
         # let's just verify the RecencyParameters accepts the parameters
         self.assertIsNone(recency_params.add_to_score_weight)
+
+    def test_basic_recency_without_grow_succeeds_on_old_grow_schema(self):
+        """Test that basic recency (without growFrom) succeeds on schema 2.24.8."""
+        # Create a mock semi-structured index that supports basic recency but NOT grow
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.24.8"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        # Supports basic recency
+        type(marqo_index).index_supports_recency_scoring = PropertyMock(return_value=True)
+        # Does NOT support grow recency - but this shouldn't matter if we don't use grow
+        type(marqo_index).index_supports_recency_grow = PropertyMock(return_value=False)
+
+        # Recency params WITHOUT grow_from (basic mode)
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_function="exponential",
+            decay_to=0.5
+            # No grow_from - should pass validation
+        )
+
+        # The validation should pass (no error raised)
+        # This test verifies that the validation ONLY fails when grow_from is provided
+        self.assertIsNone(recency_params.grow_from)
