@@ -420,10 +420,13 @@ class TestRecencyQueryInput(unittest.TestCase):
         )
 
     def test_grow_parameters_enabled_when_grow_from_specified(self):
-        """Test grow parameters are enabled when grow_from is specified."""
+        """Test grow parameters are enabled when all grow params are specified."""
         params = RecencyParameters(
             recency_field="created_at",
-            grow_from=0.5
+            grow_from=0.5,
+            grow_function="exponential",
+            grow_scale="7d",
+            grow_offset="0d"
         )
         result = self.vespa_index._get_recency_query_input(params)
 
@@ -444,7 +447,10 @@ class TestRecencyQueryInput(unittest.TestCase):
             with self.subTest(grow_from=grow_from):
                 params = RecencyParameters(
                     recency_field="created_at",
-                    grow_from=grow_from
+                    grow_from=grow_from,
+                    grow_function="exponential",
+                    grow_scale="7d",
+                    grow_offset="0d"
                 )
                 result = self.vespa_index._get_recency_query_input(params)
 
@@ -453,32 +459,9 @@ class TestRecencyQueryInput(unittest.TestCase):
                     grow_from
                 )
 
-    def test_grow_function_defaults_to_decay_function(self):
-        """Test grow_function defaults to decay_function when not specified."""
-        decay_functions = [
-            ("exponential", 0),
-            ("linear", 1),
-            ("gaussian", 2),
-            ("binary", 3),
-        ]
-
-        for decay_func, expected_code in decay_functions:
-            with self.subTest(decay_func):
-                params = RecencyParameters(
-                    recency_field="created_at",
-                    decay_function=decay_func,
-                    grow_from=0.5
-                    # grow_function not specified, should default to decay_function
-                )
-                result = self.vespa_index._get_recency_query_input(params)
-
-                self.assertEqual(
-                    result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE],
-                    expected_code
-                )
-
-    def test_grow_function_mapping(self):
-        """Test grow_function to numeric mapping when specified."""
+    def test_grow_function_explicit_mapping(self):
+        """Test grow_function to numeric mapping when explicitly specified."""
+        # All grow params must be provided together
         grow_functions = [
             ("exponential", 0),
             ("linear", 1),
@@ -486,43 +469,21 @@ class TestRecencyQueryInput(unittest.TestCase):
             ("binary", 3),
         ]
 
-        for function_name, expected_code in grow_functions:
-            with self.subTest(function_name):
+        for func_name, expected_code in grow_functions:
+            with self.subTest(func_name):
                 params = RecencyParameters(
                     recency_field="created_at",
-                    decay_function="exponential",  # Different from grow_function
+                    decay_function="exponential",
                     grow_from=0.5,
-                    grow_function=function_name
+                    grow_function=func_name,
+                    grow_scale="7d",
+                    grow_offset="0d"
                 )
                 result = self.vespa_index._get_recency_query_input(params)
 
                 self.assertEqual(
                     result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE],
                     expected_code
-                )
-
-    def test_grow_scale_defaults_to_scale(self):
-        """Test grow_scale defaults to scale when not specified."""
-        duration_cases = [
-            ("7d", 604800),
-            ("1d", 86400),
-            ("24h", 86400),
-            ("14d", 1209600),
-        ]
-
-        for scale, expected_seconds in duration_cases:
-            with self.subTest(scale=scale):
-                params = RecencyParameters(
-                    recency_field="created_at",
-                    scale=scale,
-                    grow_from=0.5
-                    # grow_scale not specified, should default to scale
-                )
-                result = self.vespa_index._get_recency_query_input(params)
-
-                self.assertEqual(
-                    result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS],
-                    expected_seconds
                 )
 
     def test_grow_scale_to_seconds_conversion(self):
@@ -540,9 +501,11 @@ class TestRecencyQueryInput(unittest.TestCase):
             with self.subTest(grow_scale=grow_scale):
                 params = RecencyParameters(
                     recency_field="created_at",
-                    scale="7d",  # Different from grow_scale
+                    scale="7d",
                     grow_from=0.5,
-                    grow_scale=grow_scale
+                    grow_function="exponential",
+                    grow_scale=grow_scale,
+                    grow_offset="0d"
                 )
                 result = self.vespa_index._get_recency_query_input(params)
 
@@ -550,20 +513,6 @@ class TestRecencyQueryInput(unittest.TestCase):
                     result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS],
                     expected_seconds
                 )
-
-    def test_grow_offset_defaults_to_zero(self):
-        """Test grow_offset defaults to 0 when not specified."""
-        params = RecencyParameters(
-            recency_field="created_at",
-            grow_from=0.5
-            # grow_offset not specified, should default to 0
-        )
-        result = self.vespa_index._get_recency_query_input(params)
-
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS],
-            0
-        )
 
     def test_grow_offset_to_seconds_conversion(self):
         """Test grow_offset conversion to seconds when specified."""
@@ -580,6 +529,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                 params = RecencyParameters(
                     recency_field="created_at",
                     grow_from=0.5,
+                    grow_function="exponential",
+                    grow_scale="7d",
                     grow_offset=grow_offset
                 )
                 result = self.vespa_index._get_recency_query_input(params)
@@ -593,7 +544,10 @@ class TestRecencyQueryInput(unittest.TestCase):
         """Test that all grow query input constants are present when grow is enabled."""
         params = RecencyParameters(
             recency_field="created_at",
-            grow_from=0.5
+            grow_from=0.5,
+            grow_function="exponential",
+            grow_scale="7d",
+            grow_offset="0d"
         )
         result = self.vespa_index._get_recency_query_input(params)
 
@@ -634,20 +588,22 @@ class TestRecencyQueryInput(unittest.TestCase):
                 }
             ),
             (
-                "grow_with_defaults",
+                "grow_with_gaussian",
                 {
                     "recency_field": "created_at",
                     "decay_function": "gaussian",
                     "scale": "24h",
-                    "grow_from": 0.5
-                    # grow_function, grow_scale, grow_offset should use defaults
+                    "grow_from": 0.5,
+                    "grow_function": "gaussian",
+                    "grow_scale": "24h",
+                    "grow_offset": "0d"
                 },
                 {
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 1,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 0.5,
-                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 2,  # gaussian (default to decay)
-                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400,  # 24h (default to scale)
-                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,  # default to 0
+                    constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 2,  # gaussian
+                    constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400,  # 24h
+                    constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
                 }
             ),
             (
@@ -656,7 +612,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     "recency_field": "created_at",
                     "decay_function": "exponential",
                     "scale": "7d",
-                    # grow_from not specified
+                    # No grow params specified - grow disabled
                 },
                 {
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
