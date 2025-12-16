@@ -90,57 +90,72 @@ class TestRecencyScoring(MarqoTestCase):
     def _generate_shared_documents(self) -> List[Dict[str, Any]]:
         """Generate shared documents with various ages (past and future) and attributes.
 
-        Price groupings for sortBy tie-breaker testing (past docs):
-        - Price 100: doc-0d, doc-3d, doc-7d (newer docs should rank first within group)
+        Naming convention:
+        - Past docs: doc-Xd where X is days ago (e.g., doc-0d = today, doc-7d = 7 days ago)
+        - Future docs: doc+Xd where X is days in future (e.g., doc+1d = 1 day from now)
+
+        Price groupings for sortBy tie-breaker testing:
+        - Price 120: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d (future docs)
+        - Price 100: doc-0d, doc-3d, doc-7d (past docs - newer)
         - Price 80: doc-1d, doc-5d, doc-14d
         - Price 60: doc-10d, doc-30d
         - Price 40: doc-60d, doc-90d
+        - Price 20: doc-no-ts
 
-        Future docs (for grow testing):
-        - Price 120: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d
+        Parent groupings for collapsing test (future and past docs mixed):
+        - group-A: doc-0d, doc-10d, doc+1d
+        - group-B: doc-1d, doc-14d, doc+3d
+        - group-C: doc-3d, doc-30d, doc+7d
+        - group-D: doc-5d, doc-60d, doc+14d
+        - group-E: doc-7d, doc-90d, doc+30d
+        - group-F: doc-no-ts
         """
         now = datetime.now()
 
-        # Past document ages: 0, 1, 3, 5, 7, 10, 14, 30, 60, 90 days ago
-        past_ages_in_days = [0, 1, 3, 5, 7, 10, 14, 30, 60, 90]
+        # Explicit config for each document: (price, parent_id, mult)
+        # age > 0 means days in past, age < 0 means days in future
+        doc_configs = {
+            # Future docs (negative ages = future timestamps) - Price 120
+            # Mixed into same groups as past docs
+            -30: (120, "group-E", 1.0),   # doc+30d - with doc-7d, doc-90d
+            -14: (120, "group-D", 1.5),   # doc+14d - with doc-5d, doc-60d
+            -7:  (120, "group-C", 2.0),   # doc+7d - with doc-3d, doc-30d
+            -3:  (120, "group-B", 1.0),   # doc+3d - with doc-1d, doc-14d
+            -1:  (120, "group-A", 1.5),   # doc+1d - with doc-0d, doc-10d
 
-        # Future document offsets: 1, 3, 7, 14, 30 days from now
-        future_offsets_in_days = [1, 3, 7, 14, 30]
-
-        # Price groups - documents with same price will test tie-breaking by recency
-        price_map = {
-            0: 100, 3: 100, 7: 100,      # Group 1: same price, different ages
-            1: 80, 5: 80, 14: 80,        # Group 2: same price, different ages
-            10: 60, 30: 60,              # Group 3: same price, different ages
-            60: 40, 90: 40,              # Group 4: same price, different ages
+            # Past docs (positive ages = past timestamps)
+            0:   (100, "group-A", 2.0),   # doc-0d (today)
+            1:   (80,  "group-B", 1.0),   # doc-1d
+            3:   (100, "group-C", 1.5),   # doc-3d
+            5:   (80,  "group-D", 2.0),   # doc-5d
+            7:   (100, "group-E", 1.0),   # doc-7d
+            10:  (60,  "group-A", 1.5),   # doc-10d
+            14:  (80,  "group-B", 2.0),   # doc-14d
+            30:  (60,  "group-C", 1.0),   # doc-30d
+            60:  (40,  "group-D", 1.5),   # doc-60d
+            90:  (40,  "group-E", 2.0),   # doc-90d
         }
 
         documents = []
 
-        # Add past documents
-        for i, age_days in enumerate(past_ages_in_days):
+        for age_days, (price, parent_id, mult) in doc_configs.items():
+            # timestamp = now - age_days (negative age = future timestamp)
             timestamp = (now - timedelta(days=age_days)).timestamp()
+
+            # Doc ID format: doc+Xd for future, doc-Xd for past
+            if age_days < 0:
+                doc_id = f"doc+{abs(age_days)}d"
+            else:
+                doc_id = f"doc-{age_days}d"
+
             documents.append({
-                "_id": f"doc-{age_days}d",
+                "_id": doc_id,
                 "title": "product item",
                 "description": f"test product {age_days} days old",
                 "timestamp": timestamp,
-                "price": price_map[age_days],  # Deliberate duplicates for tie-breaker testing
-                "parent_id": f"group-{chr(65 + i % 5)}",  # A-E rotation
-                "mult": 1.0 + (i % 3) * 0.5,  # 1.0, 1.5, 2.0
-            })
-
-        # Add future documents (for grow parameter testing)
-        for i, offset_days in enumerate(future_offsets_in_days):
-            timestamp = (now + timedelta(days=offset_days)).timestamp()
-            documents.append({
-                "_id": f"doc+{offset_days}d",
-                "title": "product item",
-                "description": f"test product scheduled for {offset_days} days from now",
-                "timestamp": timestamp,
-                "price": 120,  # All future docs have same price (higher than past)
-                "parent_id": f"group-{chr(71 + i % 3)}",  # G-I rotation for future docs
-                "mult": 1.0 + (i % 3) * 0.5,  # 1.0, 1.5, 2.0
+                "price": price,
+                "parent_id": parent_id,
+                "mult": mult,
             })
 
         # Special: Document without timestamp field
@@ -148,7 +163,7 @@ class TestRecencyScoring(MarqoTestCase):
             "_id": "doc-no-ts",
             "title": "product item",
             "description": "product without timestamp",
-            "price": 20,  # Unique price for this doc
+            "price": 20,
             "parent_id": "group-F",
             "mult": 1.0,
         })
@@ -868,38 +883,39 @@ class TestRecencyScoring(MarqoTestCase):
         )
 
     def test_with_collapsing_field(self):
-        """Test recency + collapsing field picks most recent variant per parent.
+        """Test recency + collapsing field picks highest scoring variant per parent.
 
-        Document structure:
-        Past docs (parent_id uses A-E rotation):
-        - group-A: doc-0d (newest, score<1), doc-10d
-        - group-B: doc-1d (newest, score<1), doc-14d
-        - group-C: doc-3d (newest, score<1), doc-30d
-        - group-D: doc-5d (newest, score<1), doc-60d
-        - group-E: doc-7d (newest, score<1), doc-90d
+        Document structure (future and past docs mixed in same groups):
+        - group-A: doc-0d (today, score=1.0), doc-10d, doc+1d
+        - group-B: doc-1d (closest to now), doc-14d, doc+3d
+        - group-C: doc-3d (closest to now), doc-30d, doc+7d
+        - group-D: doc-5d (closest to now), doc-60d, doc+14d
+        - group-E: doc-7d (closest to now), doc-90d, doc+30d
         - group-F: doc-no-ts (only variant, score=0.3)
 
-        Future docs (parent_id uses G-I rotation, all have score=1.0 with grow disabled):
-        - group-G: doc+1d, doc+14d (both score=1.0)
-        - group-H: doc+3d, doc+30d (both score=1.0)
-        - group-I: doc+7d (only variant, score=1.0)
+        With recency boosting and grow enabled, the variant closest to now
+        should be selected for each parent group when collapsing:
+        - Past docs closest to now have highest scores (~1.0)
+        - Future docs have lower scores due to grow function
+        - Old past docs have lowest scores due to decay
 
-        With recency boosting, the most recent variant should be selected
-        for each parent group when collapsing. Future docs all have score=1.0
-        when grow is disabled, so they score higher than past docs.
-
-        Uses scale=120d to ensure all past docs (up to 90 days old) have
-        distinct recency scores for proper variant selection.
+        Uses scale=120d for decay (slower) and grow_scale=60d for grow (faster)
+        to ensure past docs closest to now win over equidistant future docs.
         """
         # Add documents to collapse index
         self._add_shared_documents(index=self.collapse_index)
 
         recency_params = RecencyParameters(
             recency_field="timestamp",
-            scale="120d",  # Large scale so all docs have distinct recency scores
+            scale="120d",  # Large scale so past docs decay slowly
             offset="0d",
             decay_function="exponential",
-            decay_to=0.3
+            decay_to=0.3,
+            # Enable grow so future docs have distinct scores (closer = higher)
+            grow_from=0.2,
+            grow_function="exponential",
+            grow_scale="60d",  # Faster decay for future docs
+            grow_offset="0d"
         )
 
         search_result = tensor_search.search(
@@ -909,7 +925,7 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=recency_params,
             collapse_field_name="parent_id",
-            result_count=15  # Increased to cover all groups
+            result_count=10
         )
 
         hits = search_result['hits']
@@ -930,39 +946,26 @@ class TestRecencyScoring(MarqoTestCase):
                 "Recency score should be present"
             )
 
-        # 3. Verify the most recent variant is selected for each parent group
-        # For past doc groups: newest variant should be picked (distinct scores)
-        expected_newest_variant_past = {
-            "group-A": "doc-0d",   # 0d is newer than 10d
-            "group-B": "doc-1d",   # 1d is newer than 14d
-            "group-C": "doc-3d",   # 3d is newer than 30d
-            "group-D": "doc-5d",   # 5d is newer than 60d
-            "group-E": "doc-7d",   # 7d is newer than 90d
+        # 3. Verify the highest scoring variant is selected for each parent group
+        # Past docs closest to now win because decay is slower than grow
+        expected_winner = {
+            "group-A": "doc-0d",   # 0d (score=1.0) beats doc-10d and doc+1d
+            "group-B": "doc-1d",   # 1d ago beats doc-14d and doc+3d
+            "group-C": "doc-3d",   # 3d ago beats doc-30d and doc+7d
+            "group-D": "doc-5d",   # 5d ago beats doc-60d and doc+14d
+            "group-E": "doc-7d",   # 7d ago beats doc-90d and doc+30d
             "group-F": "doc-no-ts",  # Only variant
-        }
-
-        # For future doc groups: all have score=1.0, closest to now wins
-        expected_newest_variant_future = {
-            "group-G": "doc+1d",   # 1d is closer than 14d
-            "group-H": "doc+3d",   # 3d is closer than 30d
-            "group-I": "doc+7d",   # Only variant
         }
 
         for hit in hits:
             parent_id = hit.get('parent_id')
             doc_id = hit.get('_id')
 
-            if parent_id in expected_newest_variant_past:
-                expected_doc = expected_newest_variant_past[parent_id]
+            if parent_id in expected_winner:
+                expected_doc = expected_winner[parent_id]
                 self.assertEqual(
                     doc_id, expected_doc,
-                    f"For {parent_id}, expected newest variant {expected_doc} but got {doc_id}"
-                )
-            elif parent_id in expected_newest_variant_future:
-                expected_doc = expected_newest_variant_future[parent_id]
-                self.assertEqual(
-                    doc_id, expected_doc,
-                    f"For {parent_id}, expected closest variant {expected_doc} but got {doc_id}"
+                    f"For {parent_id}, expected winner {expected_doc} but got {doc_id}"
                 )
 
     # ============== Negative Case Tests ==============

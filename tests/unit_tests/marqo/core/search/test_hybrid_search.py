@@ -491,7 +491,11 @@ class TestRecencyValidation(TestCase):
             scale="7d",
             decay_function="exponential",
             decay_to=0.5,
-            grow_from=0.3  # This should trigger the error
+            # All grow params required together - this should trigger the schema version error
+            grow_from=0.3,
+            grow_function="exponential",
+            grow_scale="7d",
+            grow_offset="0d"
         )
 
         hybrid_search = HybridSearch()
