@@ -914,7 +914,8 @@ class TestRecencyScoring(MarqoTestCase):
         self._verify_recency_behavior([h for h in hits if not h['_id'].startswith("doc+")], params)
 
     # ============== Apply in Ranking Phase and Add To Score Weight Tests ==============
-
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
     def test_apply_in_ranking_phase_with_score_modifiers(self):
         """Comprehensive test for apply_in_ranking_phase and add_to_score_weight.
 
