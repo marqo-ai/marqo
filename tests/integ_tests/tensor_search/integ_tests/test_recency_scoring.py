@@ -190,6 +190,7 @@ class TestRecencyScoring(MarqoTestCase):
 
         # HIGH RELEVANCE (10 docs) - Contains ALL 5 query words
         # Ages distributed: 0, 1, 3, 5, 7, 10, 14, 21, 28, 30 days
+        # TODO add future documents
         high_relevance = [
             {"_id": "h1",
              "content": "Machine learning algorithms in artificial intelligence enable systems to adapt.",
@@ -495,7 +496,11 @@ class TestRecencyScoring(MarqoTestCase):
         return next((h for h in hits if h.get('_id') == doc_id), None)
 
     def _extract_scores(self, hits: List[Dict]) -> Dict[str, Dict[str, float]]:
-        """Extract score map: {doc_id: {lexical, tensor, score, recency}}"""
+        """Extract score map including field values for modifier calculation.
+
+        Returns:
+            Dict mapping doc_id -> {lexical, tensor, score, recency, mult, timestamp}
+        """
         result = {}
         for hit in hits:
             doc_id = hit['_id']
@@ -504,15 +509,114 @@ class TestRecencyScoring(MarqoTestCase):
                 'tensor': hit.get('_tensor_score'),
                 'score': hit.get('_score'),
                 'recency': hit.get('_recency_score'),
+                # Field values for global score modifier calculation
+                'mult': hit.get('mult'),
+                'timestamp': hit.get('timestamp'),
             }
         return result
+
+    def _calculate_rrf_score(
+        self,
+        scores: Dict[str, Dict[str, float]],
+        alpha: float = 0.5,
+        k: int = 60
+    ) -> Dict[str, float]:
+        """Calculate RRF scores from lexical and tensor scores.
+
+        RRF (Reciprocal Rank Fusion) formula:
+        - tensor_rrf = alpha * (1.0 / (tensor_rank + k))
+        - lexical_rrf = (1 - alpha) * (1.0 / (lexical_rank + k))
+        - combined = tensor_rrf + lexical_rrf (if doc in both)
+
+        Args:
+            scores: Dict mapping doc_id -> {lexical, tensor, recency}
+            alpha: Weight for tensor vs lexical (default 0.5)
+            k: RRF constant (default 60)
+
+        Returns:
+            Dict mapping doc_id -> calculated RRF score
+        """
+        # Extract and rank by lexical scores (descending)
+        lexical_scores = [
+            (doc_id, s['lexical'])
+            for doc_id, s in scores.items()
+            if s['lexical'] is not None
+        ]
+        lexical_scores.sort(key=lambda x: x[1], reverse=True)
+        lexical_ranks = {doc_id: rank + 1 for rank, (doc_id, _) in enumerate(lexical_scores)}
+
+        # Extract and rank by tensor scores (descending)
+        tensor_scores = [
+            (doc_id, s['tensor'])
+            for doc_id, s in scores.items()
+            if s['tensor'] is not None
+        ]
+        tensor_scores.sort(key=lambda x: x[1], reverse=True)
+        tensor_ranks = {doc_id: rank + 1 for rank, (doc_id, _) in enumerate(tensor_scores)}
+
+        # Calculate RRF for each document
+        rrf_scores = {}
+        all_doc_ids = set(lexical_ranks.keys()) | set(tensor_ranks.keys())
+
+        for doc_id in all_doc_ids:
+            rrf = 0.0
+
+            # Tensor contribution
+            if doc_id in tensor_ranks and alpha > 0:
+                rrf += alpha * (1.0 / (tensor_ranks[doc_id] + k))
+
+            # Lexical contribution
+            if doc_id in lexical_ranks and alpha < 1.0:
+                rrf += (1.0 - alpha) * (1.0 / (lexical_ranks[doc_id] + k))
+
+            rrf_scores[doc_id] = rrf
+
+        return rrf_scores
+
+    def _calculate_global_modifiers(
+        self,
+        doc_scores: Dict[str, float],
+        multiply_weights: Dict[str, float],
+        add_weights: Dict[str, float]
+    ) -> tuple:
+        """Calculate global score modifiers from document field values.
+
+        Formula from Vespa schema template:
+        - mult_modifier = product of (weight * field_value) for each field
+        - add_modifier = sum of (weight * field_value) for each field
+
+        Args:
+            doc_scores: Dict with document field values (e.g., {'mult': 2.0, 'timestamp': 1.7e9})
+            multiply_weights: Dict of {field_name: weight} for multiply_score_by
+            add_weights: Dict of {field_name: weight} for add_to_score
+
+        Returns:
+            (mult_modifier, add_modifier) tuple
+        """
+        # Multiplicative: product of (weight * field_value)
+        mult_modifier = 1.0
+        for field_name, weight in multiply_weights.items():
+            field_value = doc_scores.get(field_name)
+            if field_value is not None:
+                mult_modifier *= (weight * field_value)
+
+        # Additive: sum of (weight * field_value)
+        add_modifier = 0.0
+        for field_name, weight in add_weights.items():
+            field_value = doc_scores.get(field_name)
+            if field_value is not None:
+                add_modifier += (weight * field_value)
+
+        return mult_modifier, add_modifier
 
     def _verify_phase_score_changes(
         self,
         baseline: Dict[str, Dict],
         recency: Dict[str, Dict],
         phase: str,
-        add_weight: Optional[float]
+        add_weight: Optional[float],
+        multiply_weights: Optional[Dict[str, float]] = None,
+        add_weights: Optional[Dict[str, float]] = None,
     ):
         """Verify scores changed according to apply_in_ranking_phase setting.
 
@@ -526,6 +630,11 @@ class TestRecencyScoring(MarqoTestCase):
         - 'all': recency applied to lexical, tensor, AND global RRF score
         - 'exclude-global': recency applied to lexical and tensor only
         - 'only-global': recency applied to global RRF score only
+
+        Global score modifiers are calculated from document field values:
+        - mult_modifier = product of (weight * field_value) for each field in multiply_weights
+        - add_modifier = sum of (weight * field_value) for each field in add_weights
+        - base_score = rrf * mult_modifier + add_modifier
         """
         common_docs = set(baseline.keys()) & set(recency.keys())
         self.assertGreater(len(common_docs), 0, "Should have common docs")
@@ -538,8 +647,8 @@ class TestRecencyScoring(MarqoTestCase):
         ]
         self.assertGreater(len(affected_docs), 0, "Should have docs affected by recency")
 
-        def calculate_expected(original: float, recency_score: float) -> float:
-            """Calculate expected score based on recency mode."""
+        def calculate_expected_recency(original: float, recency_score: float) -> float:
+            """Calculate expected score after recency is applied."""
             if add_weight is not None:
                 return original + recency_score * add_weight
             else:
@@ -556,8 +665,8 @@ class TestRecencyScoring(MarqoTestCase):
 
             if phase == "all":
                 # Lexical and tensor scores should be modified by recency
-                expected_lexical = calculate_expected(b['lexical'], recency_score)
-                expected_tensor = calculate_expected(b['tensor'], recency_score)
+                expected_lexical = calculate_expected_recency(b['lexical'], recency_score)
+                expected_tensor = calculate_expected_recency(b['tensor'], recency_score)
 
                 self.assertAlmostEqual(
                     expected_lexical, r['lexical'], places=3,
@@ -569,20 +678,32 @@ class TestRecencyScoring(MarqoTestCase):
                     msg=f"Doc {doc_id}: tensor score mismatch. "
                     f"Expected {expected_tensor:.6f}, got {r['tensor']:.6f}"
                 )
-                # RRF score: We can't verify exact value because RRF depends on ranks,
-                # and ranks may shift when recency modifies lexical/tensor scores.
-                # Just verify it changed from baseline (using relative difference > 1%).
-                # TODO calculate RRF based on the lexical/tensor ranking
-                # self.assertFalse(
-                #     math.isclose(b['score'], r['score'], rel_tol=0.01),
-                #     msg=f"Doc {doc_id}: RRF score should have changed. "
-                #     f"Baseline {b['score']:.6f}, got {r['score']:.6f}"
-                # )
+
+                # Calculate expected RRF from modified lexical/tensor scores
+                rrf_scores = self._calculate_rrf_score(recency)
+                expected_rrf = rrf_scores.get(doc_id, 0)
+
+                # Apply global score modifiers if present
+                if multiply_weights or add_weights:
+                    mult_mod, add_mod = self._calculate_global_modifiers(
+                        r, multiply_weights or {}, add_weights or {}
+                    )
+                    base_score = expected_rrf * mult_mod + add_mod
+                else:
+                    base_score = expected_rrf
+
+                # Apply recency to final score (global phase)
+                expected_final = calculate_expected_recency(base_score, recency_score)
+                self.assertAlmostEqual(
+                    expected_final, r['score'], places=3,
+                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                    f"Expected {expected_final:.6f}, got {r['score']:.6f}"
+                )
 
             elif phase == "exclude-global":
                 # Lexical and tensor modified by recency, but NOT the global RRF score
-                expected_lexical = calculate_expected(b['lexical'], recency_score)
-                expected_tensor = calculate_expected(b['tensor'], recency_score)
+                expected_lexical = calculate_expected_recency(b['lexical'], recency_score)
+                expected_tensor = calculate_expected_recency(b['tensor'], recency_score)
 
                 self.assertAlmostEqual(
                     expected_lexical, r['lexical'], places=3,
@@ -594,10 +715,26 @@ class TestRecencyScoring(MarqoTestCase):
                     msg=f"Doc {doc_id}: tensor score mismatch. "
                     f"Expected {expected_tensor:.6f}, got {r['tensor']:.6f}"
                 )
-                # Note: RRF score will change because inputs changed, but recency
-                # is NOT applied to RRF in global phase. We don't verify exact RRF
-                # value since it depends on ranking which may shift.
-                # TODO calculate RRF based on the lexical/tensor ranking
+
+                # Calculate expected RRF from modified lexical/tensor scores
+                # NO recency applied to RRF in global phase
+                rrf_scores = self._calculate_rrf_score(recency)
+                expected_rrf = rrf_scores.get(doc_id, 0)
+
+                # Apply global score modifiers if present (but no recency)
+                if multiply_weights or add_weights:
+                    mult_mod, add_mod = self._calculate_global_modifiers(
+                        r, multiply_weights or {}, add_weights or {}
+                    )
+                    expected_final = expected_rrf * mult_mod + add_mod
+                else:
+                    expected_final = expected_rrf
+
+                self.assertAlmostEqual(
+                    expected_final, r['score'], places=3,
+                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                    f"Expected {expected_final:.6f}, got {r['score']:.6f}"
+                )
 
             elif phase == "only-global":
                 # Lexical and tensor should remain unchanged
@@ -612,7 +749,8 @@ class TestRecencyScoring(MarqoTestCase):
                     f"Baseline {b['tensor']:.6f}, got {r['tensor']:.6f}"
                 )
                 # RRF score should be modified by recency
-                expected_score = calculate_expected(b['score'], recency_score)
+                # (baseline already has modifiers applied, so we just apply recency)
+                expected_score = calculate_expected_recency(b['score'], recency_score)
                 self.assertAlmostEqual(
                     expected_score, r['score'], places=3,
                     msg=f"Doc {doc_id}: RRF score mismatch. "
@@ -782,11 +920,16 @@ class TestRecencyScoring(MarqoTestCase):
             with self.subTest(phase=phase, add_to_score_weight=add_weight, score_mods=use_score_mods):
                 # 1. Build score modifiers (if enabled)
                 score_mods = None
+                multiply_weights = None
+                add_weights = None
                 if use_score_mods:
                     score_mods = ScoreModifierLists(
                         multiply_score_by=[{"field_name": "mult", "weight": 5.0}],
                         add_to_score=[{"field_name": "timestamp", "weight": 1e-8}]
                     )
+                    # Extract weights for verification
+                    multiply_weights = {"mult": 5.0}
+                    add_weights = {"timestamp": 1e-8}
 
                 # 2. Baseline search: WITH score mods, WITHOUT recency
                 baseline_result = tensor_search.search(
@@ -834,7 +977,9 @@ class TestRecencyScoring(MarqoTestCase):
 
                 # 4. Verify scores changed according to phase setting
                 self._verify_phase_score_changes(
-                    baseline_scores, recency_scores, phase, add_weight
+                    baseline_scores, recency_scores, phase, add_weight,
+                    multiply_weights=multiply_weights,
+                    add_weights=add_weights
                 )
 
     # ============== Retrieval/Ranking Method Combinations ==============
