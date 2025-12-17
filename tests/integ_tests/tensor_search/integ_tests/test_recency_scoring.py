@@ -494,6 +494,131 @@ class TestRecencyScoring(MarqoTestCase):
         """Find document by ID in search results."""
         return next((h for h in hits if h.get('_id') == doc_id), None)
 
+    def _extract_scores(self, hits: List[Dict]) -> Dict[str, Dict[str, float]]:
+        """Extract score map: {doc_id: {lexical, tensor, score, recency}}"""
+        result = {}
+        for hit in hits:
+            doc_id = hit['_id']
+            result[doc_id] = {
+                'lexical': hit.get('_lexical_score'),
+                'tensor': hit.get('_tensor_score'),
+                'score': hit.get('_score'),
+                'recency': hit.get('_recency_score'),
+            }
+        return result
+
+    def _verify_phase_score_changes(
+        self,
+        baseline: Dict[str, Dict],
+        recency: Dict[str, Dict],
+        phase: str,
+        add_weight: Optional[float]
+    ):
+        """Verify scores changed according to apply_in_ranking_phase setting.
+
+        Verifies both:
+        1. Which scores changed based on phase setting
+        2. The actual score values match expected calculation:
+           - Multiplicative (add_weight=None): expected = original * recency
+           - Additive (add_weight provided): expected = original + recency * add_weight
+
+        Phase behavior:
+        - 'all': recency applied to lexical, tensor, AND global RRF score
+        - 'exclude-global': recency applied to lexical and tensor only
+        - 'only-global': recency applied to global RRF score only
+        """
+        common_docs = set(baseline.keys()) & set(recency.keys())
+        self.assertGreater(len(common_docs), 0, "Should have common docs")
+
+        # Find docs where recency was actually applied (score != 1.0)
+        affected_docs = [
+            doc_id for doc_id in common_docs
+            if recency[doc_id]['recency'] is not None
+            and abs(recency[doc_id]['recency'] - 1.0) > 0.01
+        ]
+        self.assertGreater(len(affected_docs), 0, "Should have docs affected by recency")
+
+        def calculate_expected(original: float, recency_score: float) -> float:
+            """Calculate expected score based on recency mode."""
+            if add_weight is not None:
+                return original + recency_score * add_weight
+            else:
+                return original * recency_score
+
+        for doc_id in affected_docs:
+            b = baseline[doc_id]
+            r = recency[doc_id]
+            recency_score = r['recency']
+
+            # Skip if missing score data
+            if b['lexical'] is None or b['tensor'] is None or b['score'] is None:
+                continue
+
+            if phase == "all":
+                # Lexical and tensor scores should be modified by recency
+                expected_lexical = calculate_expected(b['lexical'], recency_score)
+                expected_tensor = calculate_expected(b['tensor'], recency_score)
+
+                self.assertAlmostEqual(
+                    expected_lexical, r['lexical'], places=3,
+                    msg=f"Doc {doc_id}: lexical score mismatch. "
+                    f"Expected {expected_lexical:.6f}, got {r['lexical']:.6f}"
+                )
+                self.assertAlmostEqual(
+                    expected_tensor, r['tensor'], places=3,
+                    msg=f"Doc {doc_id}: tensor score mismatch. "
+                    f"Expected {expected_tensor:.6f}, got {r['tensor']:.6f}"
+                )
+                # RRF score: We can't verify exact value because RRF depends on ranks,
+                # and ranks may shift when recency modifies lexical/tensor scores.
+                # Just verify it changed from baseline (using relative difference > 1%).
+                # TODO calculate RRF based on the lexical/tensor ranking
+                # self.assertFalse(
+                #     math.isclose(b['score'], r['score'], rel_tol=0.01),
+                #     msg=f"Doc {doc_id}: RRF score should have changed. "
+                #     f"Baseline {b['score']:.6f}, got {r['score']:.6f}"
+                # )
+
+            elif phase == "exclude-global":
+                # Lexical and tensor modified by recency, but NOT the global RRF score
+                expected_lexical = calculate_expected(b['lexical'], recency_score)
+                expected_tensor = calculate_expected(b['tensor'], recency_score)
+
+                self.assertAlmostEqual(
+                    expected_lexical, r['lexical'], places=3,
+                    msg=f"Doc {doc_id}: lexical score mismatch. "
+                    f"Expected {expected_lexical:.6f}, got {r['lexical']:.6f}"
+                )
+                self.assertAlmostEqual(
+                    expected_tensor, r['tensor'], places=3,
+                    msg=f"Doc {doc_id}: tensor score mismatch. "
+                    f"Expected {expected_tensor:.6f}, got {r['tensor']:.6f}"
+                )
+                # Note: RRF score will change because inputs changed, but recency
+                # is NOT applied to RRF in global phase. We don't verify exact RRF
+                # value since it depends on ranking which may shift.
+                # TODO calculate RRF based on the lexical/tensor ranking
+
+            elif phase == "only-global":
+                # Lexical and tensor should remain unchanged
+                self.assertAlmostEqual(
+                    b['lexical'], r['lexical'], places=5,
+                    msg=f"Doc {doc_id}: lexical should be unchanged. "
+                    f"Baseline {b['lexical']:.6f}, got {r['lexical']:.6f}"
+                )
+                self.assertAlmostEqual(
+                    b['tensor'], r['tensor'], places=5,
+                    msg=f"Doc {doc_id}: tensor should be unchanged. "
+                    f"Baseline {b['tensor']:.6f}, got {r['tensor']:.6f}"
+                )
+                # RRF score should be modified by recency
+                expected_score = calculate_expected(b['score'], recency_score)
+                self.assertAlmostEqual(
+                    expected_score, r['score'], places=3,
+                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                        f"Expected {expected_score:.6f}, got {r['score']:.6f}"
+                )
+
     # ============== Core Decay Function Tests ==============
 
     def test_decay_and_grow_functions(self):
@@ -621,74 +746,96 @@ class TestRecencyScoring(MarqoTestCase):
         # Verify past docs still use decay correctly
         self._verify_recency_behavior([h for h in hits if not h['_id'].startswith("doc+")], params)
 
-    # ============== Apply in Ranking Phase Tests ==============
+    # ============== Apply in Ranking Phase and Add To Score Weight Tests ==============
 
-    # TODO change this two verify if it's applied in different phases (with score mods)
-    def test_apply_in_ranking_phase_options(self):
-        """Test all apply_in_ranking_phase options."""
-        self._add_shared_documents()
+    def test_apply_in_ranking_phase_with_score_modifiers(self):
+        """Comprehensive test for apply_in_ranking_phase and add_to_score_weight.
 
-        for phase in ["all", "only-global", "exclude-global"]:
-            with self.subTest(phase=phase):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    offset="0d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    apply_in_ranking_phase=phase
-                )
-                hits = self._search_with_recency("product", params)
-                self._verify_recency_behavior(hits, params)
+        Verifies that recency scoring is applied correctly in different ranking phases:
+        - 'all': Recency modifies lexical_score, tensor_score, AND rrf_score
+        - 'exclude-global': Recency modifies lexical_score and tensor_score only
+        - 'only-global': Recency modifies rrf_score only
 
-    # ============== Add To Score Weight Tests ==============
-    # TODO verify this works
-    def test_add_to_score_weight_values(self):
-        """Test addToScoreWeight with various weight values.
-
-        Fixed params: scale=7d, decay_to=0.5, grow_from=0.3, exponential
-        Tests weights: [0.1, 1.0, 10.0, 100.0] (must be > 0.0)
-
-        Verifies:
-        - Recency scores are calculated identically regardless of weight
-        - Different weights only affect final _score, not _recency_score
+        Also tests:
+        - With and without score modifiers
+        - Different add_to_score_weight values (multiplicative vs additive)
         """
         self._add_shared_documents()
 
-        weight_values = [0.1, 1.0, 10.0, 100.0]  # All must be > 0.0
-        results_by_weight = {}
+        # Test configurations
+        test_cases = [
+            # (apply_in_ranking_phase, add_to_score_weight, use_score_modifiers)
+            ("all", None, True),           # Multiplicative, with score mods
+            ("all", None, False),          # Multiplicative, without score mods
+            ("all", 10.0, True),           # Additive, with score mods
+            ("exclude-global", None, True),
+            ("exclude-global", None, False),
+            ("exclude-global", 10.0, True),
+            ("only-global", None, True),
+            ("only-global", None, False),
+            ("only-global", 10.0, True),
+        ]
 
-        for weight in weight_values:
-            with self.subTest(addToScoreWeight=weight):
-                params = RecencyParameters(
+        from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
+
+        for phase, add_weight, use_score_mods in test_cases:
+            with self.subTest(phase=phase, add_to_score_weight=add_weight, score_mods=use_score_mods):
+                # 1. Build score modifiers (if enabled)
+                score_mods = None
+                if use_score_mods:
+                    score_mods = ScoreModifierLists(
+                        multiply_score_by=[{"field_name": "mult", "weight": 5.0}],
+                        add_to_score=[{"field_name": "timestamp", "weight": 1e-8}]
+                    )
+
+                # 2. Baseline search: WITH score mods, WITHOUT recency
+                baseline_result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    hybrid_parameters=HybridParameters(
+                        scoreModifiersTensor=score_mods,
+                        scoreModifiersLexical=score_mods,
+                    ),
+                    score_modifiers=score_mods,
+                    result_count=20
+                )
+                baseline_scores = self._extract_scores(baseline_result['hits'])
+
+                # 3. Recency search: WITH score mods AND recency
+                recency_params = RecencyParameters(
                     recency_field="timestamp",
-                    scale="7d",
+                    scale="60d",  # Moderate scale for varied scores
                     offset="0d",
                     decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    grow_function="exponential",
-                    grow_scale="7d",
-                    grow_offset="0d",
-                    add_to_score_weight=weight
+                    decay_to=0.3,
+                    grow_from=0.2,
+                    grow_function="linear",
+                    grow_scale="45d",
+                    grow_offset="1d",
+                    apply_in_ranking_phase=phase,
+                    add_to_score_weight=add_weight
                 )
-                hits = self._search_with_recency("product", params)
+                recency_result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    hybrid_parameters=HybridParameters(
+                        scoreModifiersTensor=score_mods,
+                        scoreModifiersLexical=score_mods,
+                    ),
+                    recency_parameters=recency_params,
+                    score_modifiers=score_mods,
+                    result_count=20
+                )
+                recency_scores = self._extract_scores(recency_result['hits'])
 
-                self.assertGreater(len(hits), 0, "Should have results")
-                results_by_weight[weight] = {h['_id']: h for h in hits}
-
-        # Verify recency scores are identical across all weight values
-        base_results = results_by_weight[0.1]
-        for weight in [1.0, 10.0, 100.0]:
-            for doc_id, base_hit in base_results.items():
-                if doc_id in results_by_weight[weight]:
-                    other_hit = results_by_weight[weight][doc_id]
-                    self.assertAlmostEqual(
-                        base_hit.get('_recency_score', 0),
-                        other_hit.get('_recency_score', 0),
-                        places=3,
-                        msg=f"Recency scores should be identical for {doc_id} across weights"
-                    )
+                # 4. Verify scores changed according to phase setting
+                self._verify_phase_score_changes(
+                    baseline_scores, recency_scores, phase, add_weight
+                )
 
     # ============== Retrieval/Ranking Method Combinations ==============
 

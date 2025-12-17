@@ -83,7 +83,11 @@ class HybridSearcherRecencyTest {
     private Query createQueryWithAdditiveRecency(
             boolean enabled, boolean applyInGlobalPhase, double addToScoreWeight) {
         Query query = createQueryWithRecency(enabled, applyInGlobalPhase);
-        query.properties().set("marqo__recency_add_to_score_weight", addToScoreWeight);
+        // Set addToScoreWeight in rank features (not properties) - this is where HybridSearcher
+        // reads it from
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_add_to_score_weight)", addToScoreWeight);
         return query;
     }
 
