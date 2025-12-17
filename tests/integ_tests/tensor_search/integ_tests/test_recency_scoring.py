@@ -1043,6 +1043,83 @@ class TestRecencyScoring(MarqoTestCase):
                     str(ctx.exception)
                 )
 
+    def test_recency_on_old_index_2247_not_supported(self):
+        """Recency parameters should fail on index created with schema version 2.24.7."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5
+        )
+
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.old_index_2247.name,
+                text="product",
+                search_method=SearchMethod.HYBRID,
+                recency_parameters=recency_params,
+                result_count=10
+            )
+
+        # Verify error message mentions minimum version requirement
+        self.assertIn("2.24.8", str(ctx.exception), "Error should mention minimum version 2.24.8")
+
+    def test_grow_params_on_old_index_2248_not_supported(self):
+        """Grow parameters should fail on index created with schema version 2.24.8."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            # Grow parameters - not supported on 2.24.8
+            grow_from=0.3,
+            grow_function="exponential",
+            grow_scale="7d",
+            grow_offset="0d"
+        )
+
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.old_index_2248.name,
+                text="product",
+                search_method=SearchMethod.HYBRID,
+                recency_parameters=recency_params,
+                result_count=10
+            )
+
+        # Verify error message mentions growFrom and minimum version
+        error_message = str(ctx.exception)
+        self.assertIn("growFrom", error_message, "Error should mention growFrom parameter")
+
+    def test_add_to_score_weight_on_old_index_2248_not_supported(self):
+        """addToScoreWeight parameter should fail on index created with schema version 2.24.8."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            add_to_score_weight=1.0  # Not supported on 2.24.8
+        )
+
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.old_index_2248.name,
+                text="product",
+                search_method=SearchMethod.HYBRID,
+                recency_parameters=recency_params,
+                result_count=10
+            )
+
+        # Verify error message mentions addToScoreWeight and minimum version
+        error_message = str(ctx.exception)
+        self.assertIn("addToScoreWeight", error_message, "Error should mention addToScoreWeight parameter")
+
 
 if __name__ == '__main__':
     unittest.main()
