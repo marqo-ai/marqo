@@ -134,15 +134,19 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
         # Parse duration strings to seconds for Vespa
+        scale_seconds = parse_duration_to_seconds(recency_params.scale)
+        offset_seconds = parse_duration_to_seconds(recency_params.offset)
+
         result = {
             constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
             constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == ApplyInRankingPhase.ONLY_GLOBAL else 1,
-            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: parse_duration_to_seconds(recency_params.scale),
-            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: parse_duration_to_seconds(recency_params.offset),
+            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: scale_seconds,
+            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
             constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,
             constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
             constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value,
-            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight
+            # Default to 0.0 for multiplicative mode (None means multiplicative)
+            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
         }
 
         # grow params, the recency_params validation ensures all or nothing for these params
@@ -153,7 +157,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = parse_duration_to_seconds(recency_params.grow_scale)
             result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = parse_duration_to_seconds(recency_params.grow_offset)
         else:
+            # Grow disabled - set defaults for all grow parameters
             result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED] = 0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM] = 1.0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE] = 0  # exponential
+            result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = scale_seconds  # use same as decay scale
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = 0
 
         return result
 
