@@ -121,7 +121,7 @@ class HybridParameters(StrictBaseModel):
 
     @root_validator(pre=False)
     def validate_and_set_rerankDepthLexical(cls, values):
-        # We do not distinguish between None and provided here
+        # We do not distinguish between default None and explicitly provided None here
         rerank_depth_lexical = values.get('rerankDepthLexical')
         retrieval_method = values.get('retrievalMethod')
 
