@@ -1,8 +1,6 @@
 from enum import Enum
-from enum import Enum
+from pydantic.v1 import validator, root_validator
 from typing import List, Optional, Union
-
-from pydantic.v1 import validator, root_validator, Field
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
@@ -37,7 +35,7 @@ class HybridParameters(StrictBaseModel):
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
 
     rerankDepthTensor: Optional[int] = None
-    rerankDepthLexical: int = Field(0, ge=0)
+    rerankDepthLexical: Optional[int] = None
 
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
@@ -122,14 +120,16 @@ class HybridParameters(StrictBaseModel):
         return rrfK
 
     @root_validator(pre=False)
-    def validate_rerankDepthLexical_and_retrievalMethod(cls, values):
+    def validate_and_set_rerankDepthLexical(cls, values):
         # We do not distinguish between None and provided here
-        rerank_depth_lexical = values.get('rerankDepthLexical', None)
-
+        rerank_depth_lexical = values.get('rerankDepthLexical')
         retrieval_method = values.get('retrievalMethod')
 
         if rerank_depth_lexical is not None and retrieval_method not in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction]:
             raise ValueError(
                 "'rerankDepthLexical' can only be defined when 'retrievalMethod' is 'lexical' or 'disjunction'"
             )
+        if isinstance(rerank_depth_lexical, int):
+            if rerank_depth_lexical <= 0:
+                raise ValueError("'rerankDepthLexical' must an integer greater than 0")
         return values

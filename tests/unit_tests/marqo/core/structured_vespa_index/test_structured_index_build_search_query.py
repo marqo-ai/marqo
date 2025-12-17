@@ -1,18 +1,7 @@
-from magic import Magic
-from unittest.mock import MagicMock
-
-from marqo.core.exceptions import AddDocumentsError
-from marqo.core.inference.api import Inference, Modality
-from marqo.core.inference.tensor_fields_container import TensorField
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.models.marqo_index import FieldType
-from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
-from marqo.vespa.vespa_client import VespaClient
-from tests.unit_tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
-from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.models.marqo_query import MarqoLexicalQuery
-
+from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from tests.unit_tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):

@@ -842,10 +842,10 @@ class StructuredVespaIndex(VespaIndex):
     def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
-            rerank_depth_lexical = marqo_query.hybrid_parameters.rerankDepthLexical
+            rerank_depth_lexical: Optional[int] = marqo_query.hybrid_parameters.rerankDepthLexical
         else:
             score_modifiers = marqo_query.score_modifiers
-            rerank_depth_lexical = 0 # Not used in lexical-only search
+            rerank_depth_lexical: Optional[int] = None
 
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
@@ -853,9 +853,9 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
 
-        if rerank_depth_lexical == 0:
+        if rerank_depth_lexical is None or is_facets_term:
             # Optional tokens
-            if marqo_query.or_phrases and score_modifiers or is_facets_term:
+            if (marqo_query.or_phrases and score_modifiers) or is_facets_term:
                 or_terms = ' OR '.join([
                     self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
                 ])
@@ -866,12 +866,13 @@ class StructuredVespaIndex(VespaIndex):
             else:
                 or_terms = ''
         else:
-            # Rerank depth > 0 means we are doing a two-stage retrieval
+            if rerank_depth_lexical <= 0: # pragma: no cover
+                raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
             if marqo_query.or_phrases:
                 or_terms = ','.join([
                     self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
                 ])
-                or_terms = f'{{targetHits:{rerank_depth_lexical}}}weakAnd(' + or_terms + f')'
+                or_terms = f'{{targetHits:{rerank_depth_lexical}}}weakAnd(' + or_terms + ')'
             else:
                 or_terms = ''
 
