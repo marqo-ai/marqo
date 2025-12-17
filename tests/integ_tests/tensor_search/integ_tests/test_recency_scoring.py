@@ -74,17 +74,35 @@ class TestRecencyScoring(MarqoTestCase):
             model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
+        # 5. 2.24.7 does not support recency feature
+        cls.old_index_2247_request = cls.unstructured_marqo_index_request(
+            marqo_version="2.24.7",
+            schema_template_version="2.24.7",
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+
+        # 5. 2.24.8 does not support grow params and add_to_score_weight
+        cls.old_index_2248_request = cls.unstructured_marqo_index_request(
+            marqo_version="2.24.8",
+            schema_template_version="2.24.8",
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+
         cls.indexes = cls.create_indexes([
             cls.main_index_request,
             cls.collapse_index_request,
             cls.structured_index_request,
-            cls.relevance_cutoff_index_request
+            cls.relevance_cutoff_index_request,
+            cls.old_index_2247_request,
+            cls.old_index_2248_request
         ])
 
         cls.main_index = cls.indexes[0]
         cls.collapse_index = cls.indexes[1]
         cls.structured_index = cls.indexes[2]
         cls.relevance_cutoff_index = cls.indexes[3]
+        cls.old_index_2247 = cls.indexes[4]
+        cls.old_index_2248 = cls.indexes[5]
 
     # ============== Helper Methods ==============
     def _generate_shared_documents(self) -> List[Dict[str, Any]]:
@@ -93,35 +111,19 @@ class TestRecencyScoring(MarqoTestCase):
         Naming convention:
         - Past docs: doc-Xd where X is days ago (e.g., doc-0d = today, doc-7d = 7 days ago)
         - Future docs: doc+Xd where X is days in future (e.g., doc+1d = 1 day from now)
-
-        Price groupings for sortBy tie-breaker testing:
-        - Price 120: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d (future docs)
-        - Price 100: doc-0d, doc-3d, doc-7d (past docs - newer)
-        - Price 80: doc-1d, doc-5d, doc-14d
-        - Price 60: doc-10d, doc-30d
-        - Price 40: doc-60d, doc-90d
-        - Price 20: doc-no-ts
-
-        Parent groupings for collapsing test (future and past docs mixed):
-        - group-A: doc-0d, doc-10d, doc+1d
-        - group-B: doc-1d, doc-14d, doc+3d
-        - group-C: doc-3d, doc-30d, doc+7d
-        - group-D: doc-5d, doc-60d, doc+14d
-        - group-E: doc-7d, doc-90d, doc+30d
-        - group-F: doc-no-ts
         """
         now = datetime.now()
 
         # Explicit config for each document: (price, parent_id, mult)
         # age > 0 means days in past, age < 0 means days in future
         doc_configs = {
-            # Future docs (negative ages = future timestamps) - Price 120
+            # Future docs (negative ages = future timestamps)
             # Mixed into same groups as past docs
-            -30: (120, "group-E", 1.0),   # doc+30d - with doc-7d, doc-90d
-            -14: (120, "group-D", 1.5),   # doc+14d - with doc-5d, doc-60d
-            -7:  (120, "group-C", 2.0),   # doc+7d - with doc-3d, doc-30d
-            -3:  (120, "group-B", 1.0),   # doc+3d - with doc-1d, doc-14d
-            -1:  (120, "group-A", 1.5),   # doc+1d - with doc-0d, doc-10d
+            -30: (80, "group-C", 1.0),   # doc+30d - with doc-3d, doc-30d: C
+            -14: (40, "group-D", 1.5),   # doc+14d - with doc-5d, doc-60d: D
+            -7:  (60, "group-E", 2.0),   # doc+7d - with doc-7d, doc-90d: E
+            -3:  (100, "group-A", 1.0),   # doc+3d - with doc-0d, doc-10d: A
+            -1:  (80, "group-B", 1.5),   # doc+1d - with doc-1d, doc-14d: B
 
             # Past docs (positive ages = past timestamps)
             0:   (100, "group-A", 2.0),   # doc-0d (today)
@@ -341,11 +343,10 @@ class TestRecencyScoring(MarqoTestCase):
         offset: str,
         decay_function: str,
         decay_to: float,
-        grow_enabled: bool = False,
-        grow_from: float = 0.5,
-        grow_function: str = None,  # Defaults to decay_function
-        grow_scale: str = None,  # Defaults to scale
-        grow_offset: str = None,  # Defaults to "0d"
+        grow_from: float = None,
+        grow_function: str = None,
+        grow_scale: str = None,
+        grow_offset: str = None,
     ) -> float:
         """Calculate expected recency score matching the rank profile logic.
 
@@ -356,17 +357,6 @@ class TestRecencyScoring(MarqoTestCase):
         """
         scale_seconds = self._parse_duration_to_seconds(scale)
         offset_seconds = self._parse_duration_to_seconds(offset)
-
-        # Handle grow parameter defaults
-        if grow_function is None:
-            grow_function = decay_function
-        if grow_scale is None:
-            grow_scale = scale
-        if grow_offset is None:
-            grow_offset = "0d"
-
-        grow_scale_seconds = self._parse_duration_to_seconds(grow_scale)
-        grow_offset_seconds = self._parse_duration_to_seconds(grow_offset)
 
         # Past document (age >= 0): use decay logic
         if age_seconds >= 0:
@@ -384,11 +374,13 @@ class TestRecencyScoring(MarqoTestCase):
                 effective_age, scale_seconds, decay_to, decay_function
             )
 
-        # Future document (age < 0): use grow logic if enabled
-        if not grow_enabled:
+        # Future document (age < 0): use grow logic if enabled, return 1.0 if not
+        if grow_from is None: # if not enabled
             return 1.0
 
         future_age = -age_seconds  # Convert to positive
+        grow_scale_seconds = self._parse_duration_to_seconds(grow_scale)
+        grow_offset_seconds = self._parse_duration_to_seconds(grow_offset)
 
         # Check if within grow offset plateau zone
         if future_age <= grow_offset_seconds:
@@ -462,13 +454,10 @@ class TestRecencyScoring(MarqoTestCase):
 
     # ============== Verification Helpers ==============
 
-    def _verify_basic_recency_behavior(
+    def _verify_recency_behavior(
         self,
         hits: List[Dict],
-        decay_to: float,
-        scale: str = "7d",
-        offset: str = "0d",
-        decay_function: str = "exponential"
+        recency_params: RecencyParameters
     ):
         """Verify recency scores match expected values within 3 decimal places."""
         self.assertGreater(len(hits), 0, "Should have results")
@@ -483,79 +472,23 @@ class TestRecencyScoring(MarqoTestCase):
             age_seconds = self._get_doc_age_seconds(hit)
             if age_seconds is not None:
                 expected_score = self._calculate_expected_score(
-                    age_seconds, scale, offset, decay_function, decay_to
+                    age_seconds, recency_params.scale, recency_params.offset, recency_params.decay_function, recency_params.decay_to,
+                    recency_params.grow_from, recency_params.grow_function, recency_params.grow_scale, recency_params.grow_offset
                 )
                 self.assertAlmostEqual(
-                    actual_score,
                     expected_score,
+                    actual_score,
                     places=3,
                     msg=f"Score mismatch for {doc_id}: expected {expected_score:.4f}, got {actual_score:.4f}"
                 )
             elif doc_id == "doc-no-ts":
                 # Document without timestamp should get decay_to
                 self.assertAlmostEqual(
+                    recency_params.decay_to,
                     actual_score,
-                    decay_to,
                     places=3,
                     msg=f"Doc without timestamp should have decay_to score"
                 )
-
-        # Verify newer docs score higher than older docs
-        doc_0d = self._get_doc_by_id(hits, "doc-0d")
-        doc_30d = self._get_doc_by_id(hits, "doc-30d")
-        if doc_0d and doc_30d:
-            self.assertGreater(
-                doc_0d['_recency_score'],
-                doc_30d['_recency_score'],
-                "Newer doc should have higher recency score"
-            )
-
-    def _verify_decay_to_floor(self, hits: List[Dict], decay_to: float):
-        """Verify that old documents floor at decay_to value."""
-        doc_90d = self._get_doc_by_id(hits, "doc-90d")
-        if doc_90d:
-            self.assertAlmostEqual(
-                doc_90d['_recency_score'],
-                decay_to,
-                places=3,
-                msg=f"Very old doc should be at decay_to floor ({decay_to})"
-            )
-
-    def _verify_offset_behavior(
-        self,
-        hits: List[Dict],
-        offset: str,
-        scale: str = "7d",
-        decay_function: str = "exponential",
-        decay_to: float = 0.5
-    ):
-        """Verify documents within offset have score ~1.0 and verify exact scores."""
-        offset_seconds = self._parse_duration_to_seconds(offset)
-
-        for hit in hits:
-            doc_id = hit.get('_id')
-            actual_score = hit.get('_recency_score')
-            age_seconds = self._get_doc_age_seconds(hit)
-
-            if age_seconds is not None:
-                expected_score = self._calculate_expected_score(
-                    age_seconds, scale, offset, decay_function, decay_to
-                )
-                self.assertAlmostEqual(
-                    actual_score,
-                    expected_score,
-                    places=3,
-                    msg=f"Score mismatch for {doc_id} with offset={offset}"
-                )
-
-                # Additional check: docs within offset should have score 1.0
-                if age_seconds < offset_seconds:
-                    self.assertAlmostEqual(
-                        actual_score,
-                        1.0,
-                        places=3,
-                        msg=f"Doc {doc_id} within offset should have score 1.0"
-                    )
 
     def _get_doc_by_id(self, hits: List[Dict], doc_id: str) -> Optional[Dict]:
         """Find document by ID in search results."""
@@ -563,23 +496,25 @@ class TestRecencyScoring(MarqoTestCase):
 
     # ============== Core Decay Function Tests ==============
 
-    def test_decay_functions(self):
+    def test_decay_and_grow_functions(self):
         """Test all decay functions work correctly."""
         self._add_shared_documents()
 
-        for decay_func in ["exponential", "linear", "gaussian", "binary"]:
-            with self.subTest(function=decay_func):
+        for decay_and_grow_func in ["exponential", "linear", "gaussian", "binary"]:
+            with self.subTest(function=decay_and_grow_func):
                 params = RecencyParameters(
                     recency_field="timestamp",
                     scale="8d",
                     offset="0d",
-                    decay_function=decay_func,
-                    decay_to=0.5
+                    decay_function=decay_and_grow_func,
+                    decay_to=0.5,
+                    grow_function=decay_and_grow_func,
+                    grow_from=0.2,
+                    grow_scale="3d",
+                    grow_offset="1d",
                 )
                 hits = self._search_with_recency("product", params)
-                self._verify_basic_recency_behavior(
-                    hits, decay_to=0.5, scale="8d", offset="0d", decay_function=decay_func
-                )
+                self._verify_recency_behavior(hits, params)
 
     def test_scale_offset_combinations(self):
         """Test representative scale/offset combinations."""
@@ -587,9 +522,8 @@ class TestRecencyScoring(MarqoTestCase):
 
         test_cases = [
             ("7d", "0d"),   # No offset
-            ("7d", "3d"),   # Offset < scale
+            ("3d", "0d"),  # Short scale
             ("14d", "7d"),  # Large scale with offset
-            ("3d", "0d"),   # Short scale
         ]
 
         for scale, offset in test_cases:
@@ -599,30 +533,34 @@ class TestRecencyScoring(MarqoTestCase):
                     scale=scale,
                     offset=offset,
                     decay_function="exponential",
-                    decay_to=0.5
+                    decay_to=0.5,
+                    grow_from=0.2,
+                    grow_function="linear",
+                    grow_scale=scale,
+                    grow_offset=offset,
                 )
                 hits = self._search_with_recency("product", params)
-                self._verify_basic_recency_behavior(
-                    hits, decay_to=0.5, scale=scale, offset=offset, decay_function="exponential"
-                )
-                self._verify_offset_behavior(hits, offset, scale=scale)
+                self._verify_recency_behavior(hits, params)
 
-    def test_decay_to_values(self):
+    def test_decay_to_grow_from_values(self):
         """Test various decay_to floor values."""
         self._add_shared_documents()
 
-        for decay_to in [0.1, 0.3, 0.5, 0.8]:
-            with self.subTest(decay_to=decay_to):
+        for decay_to_grow_from in [0.1, 0.3, 0.5, 0.8]:
+            with self.subTest(decay_to_grow_from=decay_to_grow_from):
                 params = RecencyParameters(
                     recency_field="timestamp",
                     scale="7d",
                     offset="0d",
                     decay_function="exponential",
-                    decay_to=decay_to
+                    decay_to=decay_to_grow_from,
+                    grow_from=decay_to_grow_from,
+                    grow_function="linear",
+                    grow_scale="3d",
+                    grow_offset="1d",
                 )
                 hits = self._search_with_recency("product", params)
-                self._verify_basic_recency_behavior(hits, decay_to=decay_to)
-                self._verify_decay_to_floor(hits, decay_to)
+                self._verify_recency_behavior(hits, params)
 
     def test_missing_field_uses_decay_to(self):
         """Documents without timestamp field get decay_to score."""
@@ -648,8 +586,44 @@ class TestRecencyScoring(MarqoTestCase):
                     msg="Doc without timestamp should have decay_to as recency score"
                 )
 
+    def test_grow_disabled_by_default(self):
+        """Test future timestamps get score 1.0 when growFrom is not specified.
+
+        Shared documents include:
+        - Past docs: doc-0d, doc-1d, doc-3d, ... doc-90d (use decay)
+        - Future docs: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d (all score 1.0)
+        """
+        self._add_shared_documents()
+
+        # Without grow_from, future timestamps should get score 1.0
+        params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5
+            # No grow_from specified - grow disabled
+        )
+        hits = self._search_with_recency("product", params)
+
+        # Verify all future documents have score exactly 1.0
+        for hit in hits:
+            doc_id = hit.get('_id')
+            recency_score = hit.get('_recency_score')
+            self.assertIsNotNone(recency_score, f"Recency score should be present for {doc_id}")
+
+            if doc_id.startswith("doc+"):
+                self.assertAlmostEqual(
+                    recency_score, 1.0, places=3,
+                    msg=f"Future doc {doc_id} should have score 1.0 when grow disabled"
+                )
+
+        # Verify past docs still use decay correctly
+        self._verify_recency_behavior([h for h in hits if not h['_id'].startswith("doc+")], params)
+
     # ============== Apply in Ranking Phase Tests ==============
 
+    # TODO change this two verify if it's applied in different phases (with score mods)
     def test_apply_in_ranking_phase_options(self):
         """Test all apply_in_ranking_phase options."""
         self._add_shared_documents()
@@ -665,7 +639,56 @@ class TestRecencyScoring(MarqoTestCase):
                     apply_in_ranking_phase=phase
                 )
                 hits = self._search_with_recency("product", params)
-                self._verify_basic_recency_behavior(hits, decay_to=0.5)
+                self._verify_recency_behavior(hits, params)
+
+    # ============== Add To Score Weight Tests ==============
+    # TODO verify this works
+    def test_add_to_score_weight_values(self):
+        """Test addToScoreWeight with various weight values.
+
+        Fixed params: scale=7d, decay_to=0.5, grow_from=0.3, exponential
+        Tests weights: [0.1, 1.0, 10.0, 100.0] (must be > 0.0)
+
+        Verifies:
+        - Recency scores are calculated identically regardless of weight
+        - Different weights only affect final _score, not _recency_score
+        """
+        self._add_shared_documents()
+
+        weight_values = [0.1, 1.0, 10.0, 100.0]  # All must be > 0.0
+        results_by_weight = {}
+
+        for weight in weight_values:
+            with self.subTest(addToScoreWeight=weight):
+                params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="7d",
+                    offset="0d",
+                    decay_function="exponential",
+                    decay_to=0.5,
+                    grow_from=0.3,
+                    grow_function="exponential",
+                    grow_scale="7d",
+                    grow_offset="0d",
+                    add_to_score_weight=weight
+                )
+                hits = self._search_with_recency("product", params)
+
+                self.assertGreater(len(hits), 0, "Should have results")
+                results_by_weight[weight] = {h['_id']: h for h in hits}
+
+        # Verify recency scores are identical across all weight values
+        base_results = results_by_weight[0.1]
+        for weight in [1.0, 10.0, 100.0]:
+            for doc_id, base_hit in base_results.items():
+                if doc_id in results_by_weight[weight]:
+                    other_hit = results_by_weight[weight][doc_id]
+                    self.assertAlmostEqual(
+                        base_hit.get('_recency_score', 0),
+                        other_hit.get('_recency_score', 0),
+                        places=3,
+                        msg=f"Recency scores should be identical for {doc_id} across weights"
+                    )
 
     # ============== Retrieval/Ranking Method Combinations ==============
 
@@ -686,7 +709,11 @@ class TestRecencyScoring(MarqoTestCase):
             scale="7d",
             offset="0d",
             decay_function="exponential",
-            decay_to=0.5
+            decay_to=0.5,
+            grow_from=0.2,
+            grow_function="linear",
+            grow_scale="3d",
+            grow_offset="1d"
         )
 
         for retrieval, ranking in test_cases:
@@ -704,7 +731,7 @@ class TestRecencyScoring(MarqoTestCase):
                     hybrid_parameters=hybrid_params,
                     result_count=10
                 )
-                self._verify_basic_recency_behavior(search_result['hits'], decay_to=0.5)
+                self._verify_recency_behavior(search_result['hits'], params)
 
     # ============== Feature Combination Tests ==============
     @pytest.mark.skip_for_multinode(
@@ -795,21 +822,8 @@ class TestRecencyScoring(MarqoTestCase):
     def test_with_sort_by_exclude_global(self):
         """Test recency + sortBy with recency as tie-breaker for equal prices.
 
-        Documents have deliberate price duplicates:
-        - Price 120: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d (future docs)
-        - Price 100: doc-0d, doc-3d, doc-7d
-        - Price 80: doc-1d, doc-5d, doc-14d
-        - Price 60: doc-10d, doc-30d
-        - Price 40: doc-60d, doc-90d
-        - Price 20: doc-no-ts
-
         When sorted by price desc, documents with same price should be
         ordered by recency (newer docs first) as a tie-breaker.
-        Future docs all have score 1.0 (grow disabled), so their relative
-        order within price=120 group is non-deterministic.
-
-        Uses scale=120d to ensure all past docs (up to 90 days old) have
-        distinct recency scores for proper tie-breaking.
         """
         self._add_shared_documents()
 
@@ -819,6 +833,11 @@ class TestRecencyScoring(MarqoTestCase):
             offset="0d",
             decay_function="exponential",
             decay_to=0.3,
+            # faster grow
+            grow_from=0.3,
+            grow_function="exponential",
+            grow_scale="90d",
+            grow_offset="0d",
             apply_in_ranking_phase="exclude-global"
         )
         sort_by = SortByModel(
@@ -841,56 +860,28 @@ class TestRecencyScoring(MarqoTestCase):
         actual_order = [hit['_id'] for hit in hits]
 
         # 1. Verify price ordering (groups should be in correct order)
-        # Future docs (price 120) should come first - order within group is non-deterministic
-        future_docs = {"doc+1d", "doc+3d", "doc+7d", "doc+14d", "doc+30d"}
-        price_100_docs = {"doc-0d", "doc-3d", "doc-7d"}
-        price_80_docs = {"doc-1d", "doc-5d", "doc-14d"}
-        price_60_docs = {"doc-10d", "doc-30d"}
-        price_40_docs = {"doc-60d", "doc-90d"}
+        expected_order = [
+            "doc-0d", "doc-3d", "doc+3d", "doc-7d",  # price=100
+            "doc-1d", "doc+1d", "doc-5d", "doc-14d", "doc+30d",  # price=80
+            "doc+7d", "doc-10d", "doc-30d",  # price=60
+            "doc+14d", "doc-60d", "doc-90d",  # price=40
+            "doc-no-ts",  # price=20
+        ]
 
-        # Verify docs are grouped by price (first 5 should be future, etc.)
-        self.assertEqual(set(actual_order[:5]), future_docs, "First 5 docs should be price 120 (future)")
-        self.assertEqual(set(actual_order[5:8]), price_100_docs, "Next 3 docs should be price 100")
-        self.assertEqual(set(actual_order[8:11]), price_80_docs, "Next 3 docs should be price 80")
-        self.assertEqual(set(actual_order[11:13]), price_60_docs, "Next 2 docs should be price 60")
-        self.assertEqual(set(actual_order[13:15]), price_40_docs, "Next 2 docs should be price 40")
-        self.assertEqual(actual_order[15], "doc-no-ts", "Last doc should be price 20")
+        self.assertListEqual(expected_order, actual_order)
 
-        # 2. Verify recency-based ordering within past doc groups (distinct scores)
-        # Price 100 group: doc-0d should be first, then doc-3d, then doc-7d
-        price_100_order = actual_order[5:8]
-        self.assertEqual(price_100_order, ["doc-0d", "doc-3d", "doc-7d"], "Price 100 group should be ordered by recency")
-
-        # Price 80 group: doc-1d should be first, then doc-5d, then doc-14d
-        price_80_order = actual_order[8:11]
-        self.assertEqual(price_80_order, ["doc-1d", "doc-5d", "doc-14d"], "Price 80 group should be ordered by recency")
-
-        # Price 60 group: doc-10d should be first, then doc-30d
-        price_60_order = actual_order[11:13]
-        self.assertEqual(price_60_order, ["doc-10d", "doc-30d"], "Price 60 group should be ordered by recency")
-
-        # Price 40 group: doc-60d should be first, then doc-90d
-        price_40_order = actual_order[13:15]
-        self.assertEqual(price_40_order, ["doc-60d", "doc-90d"], "Price 40 group should be ordered by recency")
-
-        # 3. Verify recency scores are calculated correctly for each doc
-        self._verify_basic_recency_behavior(
-            hits,
-            decay_to=0.3,
-            scale="120d",
-            offset="0d",
-            decay_function="exponential"
-        )
+        # 2. Verify recency scores are calculated correctly for each doc
+        self._verify_recency_behavior(hits, recency_params)
 
     def test_with_collapsing_field(self):
         """Test recency + collapsing field picks highest scoring variant per parent.
 
         Document structure (future and past docs mixed in same groups):
-        - group-A: doc-0d (today, score=1.0), doc-10d, doc+1d
-        - group-B: doc-1d (closest to now), doc-14d, doc+3d
-        - group-C: doc-3d (closest to now), doc-30d, doc+7d
-        - group-D: doc-5d (closest to now), doc-60d, doc+14d
-        - group-E: doc-7d (closest to now), doc-90d, doc+30d
+        - group-A: doc-0d (today, score=1.0), doc-10d, doc+3d (offset-2d)
+        - group-B: doc+1d (closest to now, with offset-2), doc-1d, doc-14d
+        - group-C: doc-3d (closest to now), doc-30d, doc+30d (offset-2d)
+        - group-D: doc-5d (closest to now), doc-60d, doc+14d (offset-2d)
+        - group-E: doc+7d (closest to now, with offset-2), doc-7d, doc-90d, doc+7d
         - group-F: doc-no-ts (only variant, score=0.3)
 
         With recency boosting and grow enabled, the variant closest to now
@@ -912,10 +903,10 @@ class TestRecencyScoring(MarqoTestCase):
             decay_function="exponential",
             decay_to=0.3,
             # Enable grow so future docs have distinct scores (closer = higher)
-            grow_from=0.2,
+            grow_from=0.3,
             grow_function="exponential",
             grow_scale="60d",  # Faster decay for future docs
-            grow_offset="0d"
+            grow_offset="2d",  # Two days plateau before release date
         )
 
         search_result = tensor_search.search(
@@ -925,7 +916,10 @@ class TestRecencyScoring(MarqoTestCase):
             search_method=SearchMethod.HYBRID,
             recency_parameters=recency_params,
             collapse_field_name="parent_id",
-            result_count=10
+            result_count=10,
+            hybrid_parameters=HybridParameters(
+                rerankDepthTensor=20
+            )
         )
 
         hits = search_result['hits']
@@ -949,11 +943,11 @@ class TestRecencyScoring(MarqoTestCase):
         # 3. Verify the highest scoring variant is selected for each parent group
         # Past docs closest to now win because decay is slower than grow
         expected_winner = {
-            "group-A": "doc-0d",   # 0d (score=1.0) beats doc-10d and doc+1d
-            "group-B": "doc-1d",   # 1d ago beats doc-14d and doc+3d
-            "group-C": "doc-3d",   # 3d ago beats doc-30d and doc+7d
+            "group-A": "doc-0d",   # 0d (score=1.0) beats doc-10d and doc+3d
+            "group-B": "doc+1d",   # 1d away (with growOffset=2, score=1.0) beats doc-14d and doc-1d
+            "group-C": "doc-3d",   # 3d ago beats doc-30d and doc+30d
             "group-D": "doc-5d",   # 5d ago beats doc-60d and doc+14d
-            "group-E": "doc-7d",   # 7d ago beats doc-90d and doc+30d
+            "group-E": "doc-7d",   # 7d ago beats doc-90d and doc+7d (with growOffset=2, but with quicker decay)
             "group-F": "doc-no-ts",  # Only variant
         }
 
@@ -964,7 +958,7 @@ class TestRecencyScoring(MarqoTestCase):
             if parent_id in expected_winner:
                 expected_doc = expected_winner[parent_id]
                 self.assertEqual(
-                    doc_id, expected_doc,
+                    expected_doc, doc_id,
                     f"For {parent_id}, expected winner {expected_doc} but got {doc_id}"
                 )
 
@@ -1048,687 +1042,6 @@ class TestRecencyScoring(MarqoTestCase):
                     "'sortBy' cannot be used with 'recencyParameters' with global-phase reranking in hybrid search",
                     str(ctx.exception)
                 )
-
-    # NOTE: Version check tests for grow and addToScoreWeight are in unit tests
-    # (test_hybrid_search.py::TestRecencyValidation) because integration tests
-    # cannot create indexes with old schema versions.
-
-    # ============== Validation Tests ==============
-
-    def test_decay_to_validation(self):
-        """Test decay_to must be in (0.0, 1.0]."""
-        valid_values = [0.1, 0.5, 1.0]
-        invalid_values = [0.0, -0.1, 1.1]
-
-        for val in valid_values:
-            with self.subTest(decay_to=val, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    decay_function="exponential",
-                    decay_to=val
-                )
-                self.assertEqual(params.decay_to, val)
-
-        for val in invalid_values:
-            with self.subTest(decay_to=val, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=val
-                    )
-
-    def test_duration_format_validation(self):
-        """Test scale/offset duration string formats."""
-        valid_formats = ["1d", "7d", "24h", "168h"]
-        invalid_formats = ["-1d", "abc"]
-
-        for fmt in valid_formats:
-            with self.subTest(format=fmt, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale=fmt,
-                    offset="0d",
-                    decay_function="exponential",
-                    decay_to=0.5
-                )
-                self.assertIsNotNone(params)
-
-        for fmt in invalid_formats:
-            with self.subTest(format=fmt, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale=fmt,
-                        offset="0d",
-                        decay_function="exponential",
-                        decay_to=0.5
-                    )
-
-    def test_grow_params_all_or_nothing_validation(self):
-        """Test that grow parameters must be either all provided or all omitted."""
-        # Partial combinations should fail
-        partial_cases = [
-            ("only_grow_from", {"grow_from": 0.5}),
-            ("missing_grow_offset", {"grow_from": 0.5, "grow_function": "exponential", "grow_scale": "7d"}),
-            ("missing_grow_scale", {"grow_from": 0.5, "grow_function": "exponential", "grow_offset": "0d"}),
-        ]
-
-        for test_name, grow_params in partial_cases:
-            with self.subTest(test_name):
-                with self.assertRaises(Exception) as ctx:
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=0.5,
-                        **grow_params
-                    )
-                self.assertIn("all provided or all omitted", str(ctx.exception).lower())
-
-        # All provided should work
-        with self.subTest("all_provided"):
-            params = RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_function="exponential",
-                decay_to=0.5,
-                grow_from=0.5,
-                grow_function="exponential",
-                grow_scale="7d",
-                grow_offset="0d"
-            )
-            self.assertEqual(params.grow_from, 0.5)
-
-    def test_grow_from_validation(self):
-        """Test grow_from must be in (0.0, 1.0]."""
-        valid_values = [0.01, 0.5, 1.0]
-        invalid_values = [0.0, -0.1, 1.1]
-
-        for val in valid_values:
-            with self.subTest(grow_from=val, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=val,
-                    grow_function="exponential",
-                    grow_scale="7d",
-                    grow_offset="0d"
-                )
-                self.assertEqual(params.grow_from, val)
-
-        for val in invalid_values:
-            with self.subTest(grow_from=val, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=0.5,
-                        grow_from=val,
-                        grow_function="exponential",
-                        grow_scale="7d",
-                        grow_offset="0d"
-                    )
-
-    def test_grow_function_validation(self):
-        """Test grow_function must be a valid function type."""
-        valid_functions = ["exponential", "linear", "gaussian", "binary"]
-        invalid_functions = ["invalid", "exp", "lin"]
-
-        for func in valid_functions:
-            with self.subTest(grow_function=func, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    grow_function=func,
-                    grow_scale="7d",
-                    grow_offset="0d"
-                )
-                self.assertEqual(params.grow_function, func)
-
-        for func in invalid_functions:
-            with self.subTest(grow_function=func, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=0.5,
-                        grow_from=0.3,
-                        grow_function=func,
-                        grow_scale="7d",
-                        grow_offset="0d"
-                    )
-
-    def test_grow_scale_validation(self):
-        """Test grow_scale must be a valid duration format."""
-        valid_formats = ["1d", "7d", "24h", "168h"]
-        invalid_formats = ["-1d", "abc", "0d"]
-
-        for fmt in valid_formats:
-            with self.subTest(grow_scale=fmt, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    grow_function="exponential",
-                    grow_scale=fmt,
-                    grow_offset="0d"
-                )
-                self.assertEqual(params.grow_scale, fmt)
-
-        for fmt in invalid_formats:
-            with self.subTest(grow_scale=fmt, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=0.5,
-                        grow_from=0.3,
-                        grow_function="exponential",
-                        grow_scale=fmt,
-                        grow_offset="0d"
-                    )
-
-    def test_grow_offset_validation(self):
-        """Test grow_offset must be a valid duration format."""
-        valid_formats = ["0d", "1d", "7d", "24h"]
-        invalid_formats = ["-1d", "abc"]
-
-        for fmt in valid_formats:
-            with self.subTest(grow_offset=fmt, valid=True):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    grow_function="exponential",
-                    grow_scale="7d",
-                    grow_offset=fmt
-                )
-                self.assertEqual(params.grow_offset, fmt)
-
-        for fmt in invalid_formats:
-            with self.subTest(grow_offset=fmt, valid=False):
-                with self.assertRaises(Exception):
-                    RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_function="exponential",
-                        decay_to=0.5,
-                        grow_from=0.3,
-                        grow_function="exponential",
-                        grow_scale="7d",
-                        grow_offset=fmt
-                    )
-
-    # ============== Grow Parameter Tests ==============
-
-    def _verify_grow_behavior(
-        self,
-        hits: List[Dict],
-        decay_to: float,
-        grow_from: float,
-        scale: str = "7d",
-        offset: str = "0d",
-        decay_function: str = "exponential",
-        grow_function: str = None,
-        grow_scale: str = None,
-        grow_offset: str = None,
-    ):
-        """Verify recency scores match expected values for both decay and grow.
-
-        Uses _calculate_expected_score which handles both past (decay) and future (grow).
-        """
-        if grow_function is None:
-            grow_function = decay_function
-        if grow_scale is None:
-            grow_scale = scale
-
-        for hit in hits:
-            actual_score = hit.get('_recency_score')
-            doc_id = hit.get('_id')
-
-            self.assertIsNotNone(actual_score, f"Recency score should be present for {doc_id}")
-
-            age_seconds = self._get_doc_age_seconds(hit)
-            if age_seconds is not None:
-                expected_score = self._calculate_expected_score(
-                    age_seconds=age_seconds,
-                    scale=scale,
-                    offset=offset,
-                    decay_function=decay_function,
-                    decay_to=decay_to,
-                    grow_enabled=True,
-                    grow_from=grow_from,
-                    grow_function=grow_function,
-                    grow_scale=grow_scale,
-                    grow_offset=grow_offset,
-                )
-                self.assertAlmostEqual(
-                    actual_score,
-                    expected_score,
-                    places=3,
-                    msg=f"Score mismatch for {doc_id}: expected {expected_score:.4f}, got {actual_score:.4f}"
-                )
-            elif doc_id == "doc-no-ts":
-                # Document without timestamp should get decay_to
-                self.assertAlmostEqual(
-                    actual_score,
-                    decay_to,
-                    places=3,
-                    msg=f"Doc without timestamp should have decay_to score"
-                )
-
-    def test_grow_disabled_by_default(self):
-        """Test future timestamps get score 1.0 when growFrom is not specified.
-
-        Shared documents include:
-        - Past docs: doc-0d, doc-1d, doc-3d, ... doc-90d (use decay)
-        - Future docs: doc+1d, doc+3d, doc+7d, doc+14d, doc+30d (all score 1.0)
-        """
-        self._add_shared_documents()
-
-        # Without grow_from, future timestamps should get score 1.0
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="7d",
-            offset="0d",
-            decay_function="exponential",
-            decay_to=0.5
-            # No grow_from specified - grow disabled
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify all future documents have score exactly 1.0
-        for hit in hits:
-            doc_id = hit.get('_id')
-            recency_score = hit.get('_recency_score')
-            self.assertIsNotNone(recency_score, f"Recency score should be present for {doc_id}")
-
-            if doc_id.startswith("doc+"):
-                self.assertAlmostEqual(
-                    recency_score, 1.0, places=3,
-                    msg=f"Future doc {doc_id} should have score 1.0 when grow disabled"
-                )
-
-        # Verify past docs still use decay correctly
-        self._verify_basic_recency_behavior(
-            [h for h in hits if not h['_id'].startswith("doc+")],
-            decay_to=0.5,
-            scale="7d",
-            offset="0d",
-            decay_function="exponential"
-        )
-
-    def test_grow_functions(self):
-        """Test all grow functions work correctly with precise score verification.
-
-        Fixed decay params: scale=120d, decay_to=0.3, offset=0d, exponential
-        Tests each grow function: exponential, linear, gaussian, binary
-        """
-        self._add_shared_documents()
-
-        for grow_func in ["exponential", "linear", "gaussian", "binary"]:
-            with self.subTest(function=grow_func):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="120d",  # Large decay scale so past docs are distinct
-                    offset="0d",
-                    decay_function="exponential",
-                    decay_to=0.3,
-                    grow_from=0.2,
-                    grow_function=grow_func,
-                    grow_scale="60d",  # Grow scale covers future docs
-                    grow_offset="0d"
-                )
-                hits = self._search_with_recency("product", params)
-
-                self.assertGreater(len(hits), 0, "Should have results")
-
-                # Verify exact scores for all documents
-                self._verify_grow_behavior(
-                    hits,
-                    decay_to=0.3,
-                    grow_from=0.2,
-                    scale="120d",
-                    offset="0d",
-                    decay_function="exponential",
-                    grow_function=grow_func,
-                    grow_scale="60d",
-                    grow_offset="0d"
-                )
-
-    def test_grow_with_decay(self):
-        """Test combined grow (future) and decay (past) with precise score verification.
-
-        Verifies:
-        - doc-0d has score ~1.0 (current)
-        - Past docs have decay scores in [decay_to, 1.0]
-        - Future docs have grow scores in [grow_from, 1.0]
-        """
-        self._add_shared_documents()
-
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            decay_to=0.5,
-            grow_from=0.3,
-            grow_function="exponential",
-            grow_scale="60d",
-            grow_offset="0d"
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify all scores precisely
-        self._verify_grow_behavior(
-            hits,
-            decay_to=0.5,
-            grow_from=0.3,
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            grow_function="exponential",
-            grow_scale="60d",
-            grow_offset="0d"
-        )
-
-        # Additional category checks
-        doc_0d = self._get_doc_by_id(hits, "doc-0d")
-        if doc_0d:
-            self.assertAlmostEqual(
-                doc_0d.get('_recency_score'), 1.0, places=2,
-                msg="doc-0d should have score ~1.0"
-            )
-
-        # Verify decay/grow floor bounds
-        for hit in hits:
-            doc_id = hit.get('_id')
-            score = hit.get('_recency_score')
-
-            if doc_id.startswith("doc-") and doc_id != "doc-0d" and doc_id != "doc-no-ts":
-                self.assertGreaterEqual(score, 0.5, f"Past doc {doc_id} should be >= decay_to")
-                self.assertLessEqual(score, 1.0, f"Past doc {doc_id} should be <= 1.0")
-            elif doc_id.startswith("doc+"):
-                self.assertGreaterEqual(score, 0.3, f"Future doc {doc_id} should be >= grow_from")
-                self.assertLessEqual(score, 1.0, f"Future doc {doc_id} should be <= 1.0")
-
-    def test_grow_with_linear_function(self):
-        """Test grow with linear function produces correct scores.
-
-        Use linear grow function and verify future docs have expected scores.
-        """
-        self._add_shared_documents()
-
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="120d",
-            offset="0d",
-            decay_function="linear",
-            decay_to=0.5,
-            grow_from=0.3,
-            grow_function="linear",
-            grow_scale="60d",
-            grow_offset="0d"
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify scores with linear grow function
-        self._verify_grow_behavior(
-            hits,
-            decay_to=0.5,
-            grow_from=0.3,
-            scale="120d",
-            offset="0d",
-            decay_function="linear",
-            grow_function="linear",
-            grow_scale="60d",
-            grow_offset="0d"
-        )
-
-    def test_grow_scale_at_boundary(self):
-        """Test grow_scale boundary - doc at exactly scale gets grow_from score.
-
-        Use grow_scale=30d and verify doc+30d has score ~grow_from.
-        """
-        self._add_shared_documents()
-
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            decay_to=0.5,
-            grow_from=0.3,
-            grow_function="exponential",
-            grow_scale="30d",
-            grow_offset="0d"
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify scores
-        self._verify_grow_behavior(
-            hits,
-            decay_to=0.5,
-            grow_from=0.3,
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            grow_function="exponential",
-            grow_scale="30d",
-            grow_offset="0d"
-        )
-
-        # Specifically check doc+30d - at exactly scale, score should be at grow_from
-        doc_30d_future = self._get_doc_by_id(hits, "doc+30d")
-        if doc_30d_future:
-            recency_score = doc_30d_future.get('_recency_score')
-            self.assertAlmostEqual(
-                recency_score, 0.3, places=2,
-                msg="Future doc at exactly scale should have score ~grow_from"
-            )
-
-    def test_grow_offset_creates_plateau(self):
-        """Test growOffset creates plateau zone where score = 1.0.
-
-        With grow_offset=10d:
-        - doc+1d, doc+3d, doc+7d should be in plateau (score = 1.0)
-        - doc+14d, doc+30d should be beyond plateau (score < 1.0)
-        """
-        self._add_shared_documents()
-
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            decay_to=0.5,
-            grow_from=0.3,
-            grow_function="exponential",
-            grow_scale="60d",
-            grow_offset="10d"  # Plateau zone: now() to now()+10d
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify scores with grow_offset plateau
-        self._verify_grow_behavior(
-            hits,
-            decay_to=0.5,
-            grow_from=0.3,
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            grow_function="exponential",
-            grow_scale="60d",
-            grow_offset="10d"
-        )
-
-        # Documents in plateau zone (1d, 3d, 7d < 10d) should have score 1.0
-        plateau_docs = ["doc+1d", "doc+3d", "doc+7d"]
-        for doc_id in plateau_docs:
-            hit = self._get_doc_by_id(hits, doc_id)
-            if hit:
-                recency_score = hit.get('_recency_score')
-                self.assertAlmostEqual(
-                    recency_score, 1.0, places=2,
-                    msg=f"Doc {doc_id} within plateau should have score 1.0"
-                )
-
-        # Documents beyond plateau (14d, 30d > 10d) should have score < 1.0
-        beyond_plateau_docs = ["doc+14d", "doc+30d"]
-        for doc_id in beyond_plateau_docs:
-            hit = self._get_doc_by_id(hits, doc_id)
-            if hit:
-                recency_score = hit.get('_recency_score')
-                self.assertLess(
-                    recency_score, 1.0,
-                    msg=f"Doc {doc_id} beyond plateau should have score < 1.0"
-                )
-
-    def test_grow_binary_function(self):
-        """Test binary grow function creates step function at scale.
-
-        With grow_scale=10d:
-        - doc+1d, doc+3d, doc+7d (< 10d) should have score 1.0
-        - doc+14d, doc+30d (>= 10d) should have score = grow_from
-        """
-        self._add_shared_documents()
-
-        params = RecencyParameters(
-            recency_field="timestamp",
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            decay_to=0.5,
-            grow_from=0.2,
-            grow_function="binary",
-            grow_scale="10d",  # Step at 10 days
-            grow_offset="0d"
-        )
-        hits = self._search_with_recency("product", params)
-
-        self.assertGreater(len(hits), 0, "Should have results")
-
-        # Verify exact scores with binary grow
-        self._verify_grow_behavior(
-            hits,
-            decay_to=0.5,
-            grow_from=0.2,
-            scale="120d",
-            offset="0d",
-            decay_function="exponential",
-            grow_function="binary",
-            grow_scale="10d",
-            grow_offset="0d"
-        )
-
-        # Documents within scale (< 10d) should have score 1.0
-        within_scale_docs = ["doc+1d", "doc+3d", "doc+7d"]
-        for doc_id in within_scale_docs:
-            hit = self._get_doc_by_id(hits, doc_id)
-            if hit:
-                recency_score = hit.get('_recency_score')
-                self.assertAlmostEqual(
-                    recency_score, 1.0, places=2,
-                    msg=f"Doc {doc_id} within binary scale should have score 1.0"
-                )
-
-        # Documents beyond scale (>= 10d) should have score = grow_from
-        beyond_scale_docs = ["doc+14d", "doc+30d"]
-        for doc_id in beyond_scale_docs:
-            hit = self._get_doc_by_id(hits, doc_id)
-            if hit:
-                recency_score = hit.get('_recency_score')
-                self.assertAlmostEqual(
-                    recency_score, 0.2, places=2,
-                    msg=f"Doc {doc_id} beyond binary scale should have score ~grow_from"
-                )
-
-    # ============== Add To Score Weight Tests ==============
-
-    def test_add_to_score_weight_values(self):
-        """Test addToScoreWeight with various weight values.
-
-        Fixed params: scale=7d, decay_to=0.5, grow_from=0.3, exponential
-        Tests weights: [0.1, 1.0, 10.0, 100.0] (must be > 0.0)
-
-        Verifies:
-        - Recency scores are calculated identically regardless of weight
-        - Different weights only affect final _score, not _recency_score
-        """
-        self._add_shared_documents()
-
-        weight_values = [0.1, 1.0, 10.0, 100.0]  # All must be > 0.0
-        results_by_weight = {}
-
-        for weight in weight_values:
-            with self.subTest(addToScoreWeight=weight):
-                params = RecencyParameters(
-                    recency_field="timestamp",
-                    scale="7d",
-                    offset="0d",
-                    decay_function="exponential",
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    grow_function="exponential",
-                    grow_scale="7d",
-                    grow_offset="0d",
-                    add_to_score_weight=weight
-                )
-                hits = self._search_with_recency("product", params)
-
-                self.assertGreater(len(hits), 0, "Should have results")
-                results_by_weight[weight] = {h['_id']: h for h in hits}
-
-                # Verify recency scores match expected values
-                self._verify_grow_behavior(
-                    hits,
-                    decay_to=0.5,
-                    grow_from=0.3,
-                    scale="7d",
-                    offset="0d",
-                    decay_function="exponential",
-                    grow_function="exponential",
-                    grow_scale="7d",
-                    grow_offset="0d"
-                )
-
-        # Verify recency scores are identical across all weight values
-        base_results = results_by_weight[0.1]
-        for weight in [1.0, 10.0, 100.0]:
-            for doc_id, base_hit in base_results.items():
-                if doc_id in results_by_weight[weight]:
-                    other_hit = results_by_weight[weight][doc_id]
-                    self.assertAlmostEqual(
-                        base_hit.get('_recency_score', 0),
-                        other_hit.get('_recency_score', 0),
-                        places=3,
-                        msg=f"Recency scores should be identical for {doc_id} across weights"
-                    )
 
 
 if __name__ == '__main__':

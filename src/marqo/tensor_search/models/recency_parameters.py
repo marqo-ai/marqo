@@ -120,7 +120,7 @@ class RecencyParameters(BaseModel):
         )
     )
 
-    grow_function: Optional[str] = Field(
+    grow_function: Optional[DecayFunction] = Field(
         default=None,
         alias="growFunction",
         description=(
@@ -185,16 +185,6 @@ class RecencyParameters(BaseModel):
         if seconds < 0:
             raise ValueError(f"offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
-        return v
-
-    @validator('grow_function')
-    def validate_grow_function(cls, v: Optional[str]) -> Optional[str]:
-        """Validate grow_function is a valid decay function name."""
-        if v is None:
-            return v
-        valid_functions = [f.value for f in DecayFunction]
-        if v not in valid_functions:
-            raise ValueError(f"Invalid grow_function '{v}'. Must be one of: {', '.join(valid_functions)}")
         return v
 
     @validator('grow_scale')
