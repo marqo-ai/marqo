@@ -1204,6 +1204,8 @@ class TestRecencyScoring(MarqoTestCase):
         # 2. Verify recency scores are calculated correctly for each doc
         self._verify_recency_behavior(hits, recency_params)
 
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
     def test_with_collapsing_field(self):
         """Test recency + collapsing field picks highest scoring variant per parent.
 
