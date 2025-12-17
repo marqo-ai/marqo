@@ -617,6 +617,7 @@ class TestRecencyScoring(MarqoTestCase):
         add_weight: Optional[float],
         multiply_weights: Optional[Dict[str, float]] = None,
         add_weights: Optional[Dict[str, float]] = None,
+        rerank_depth: Optional[int] = None,
     ):
         """Verify scores changed according to apply_in_ranking_phase setting.
 
@@ -635,6 +636,9 @@ class TestRecencyScoring(MarqoTestCase):
         - mult_modifier = product of (weight * field_value) for each field in multiply_weights
         - add_modifier = sum of (weight * field_value) for each field in add_weights
         - base_score = rrf * mult_modifier + add_modifier
+
+        rerank_depth: If provided, only the top N documents (by RRF score) get global
+        phase processing (modifiers + recency). Documents beyond this depth keep raw RRF.
         """
         common_docs = set(baseline.keys()) & set(recency.keys())
         self.assertGreater(len(common_docs), 0, "Should have common docs")
@@ -654,6 +658,14 @@ class TestRecencyScoring(MarqoTestCase):
             else:
                 return original * recency_score
 
+        # Calculate RRF scores and ranks (needed for rerank_depth logic)
+        rrf_scores = self._calculate_rrf_score(recency)
+
+        # Create a ranking of documents by RRF score (for rerank_depth check)
+        # Rank is 1-indexed (top doc has rank 1)
+        rrf_ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+        doc_rrf_rank = {doc_id: rank + 1 for rank, (doc_id, _) in enumerate(rrf_ranked)}
+
         for doc_id in affected_docs:
             b = baseline[doc_id]
             r = recency[doc_id]
@@ -662,6 +674,10 @@ class TestRecencyScoring(MarqoTestCase):
             # Skip if missing score data
             if b['lexical'] is None or b['tensor'] is None or b['score'] is None:
                 continue
+
+            # Check if this doc is within rerank_depth (gets global phase processing)
+            doc_rank = doc_rrf_rank.get(doc_id, float('inf'))
+            within_rerank_depth = rerank_depth is None or doc_rank <= rerank_depth
 
             if phase == "all":
                 # Lexical and tensor scores should be modified by recency
@@ -680,23 +696,27 @@ class TestRecencyScoring(MarqoTestCase):
                 )
 
                 # Calculate expected RRF from modified lexical/tensor scores
-                rrf_scores = self._calculate_rrf_score(recency)
                 expected_rrf = rrf_scores.get(doc_id, 0)
 
-                # Apply global score modifiers if present
-                if multiply_weights or add_weights:
-                    mult_mod, add_mod = self._calculate_global_modifiers(
-                        r, multiply_weights or {}, add_weights or {}
-                    )
-                    base_score = expected_rrf * mult_mod + add_mod
-                else:
-                    base_score = expected_rrf
+                if within_rerank_depth:
+                    # Apply global score modifiers if present
+                    if multiply_weights or add_weights:
+                        mult_mod, add_mod = self._calculate_global_modifiers(
+                            r, multiply_weights or {}, add_weights or {}
+                        )
+                        base_score = expected_rrf * mult_mod + add_mod
+                    else:
+                        base_score = expected_rrf
 
-                # Apply recency to final score (global phase)
-                expected_final = calculate_expected_recency(base_score, recency_score)
+                    # Apply recency to final score (global phase)
+                    expected_final = calculate_expected_recency(base_score, recency_score)
+                else:
+                    # Beyond rerank_depth: no global modifiers or recency applied to RRF
+                    expected_final = expected_rrf
+
                 self.assertAlmostEqual(
                     expected_final, r['score'], places=3,
-                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                    msg=f"Doc {doc_id} (rank {doc_rank}): RRF score mismatch. "
                     f"Expected {expected_final:.6f}, got {r['score']:.6f}"
                 )
 
@@ -718,21 +738,24 @@ class TestRecencyScoring(MarqoTestCase):
 
                 # Calculate expected RRF from modified lexical/tensor scores
                 # NO recency applied to RRF in global phase
-                rrf_scores = self._calculate_rrf_score(recency)
                 expected_rrf = rrf_scores.get(doc_id, 0)
 
-                # Apply global score modifiers if present (but no recency)
-                if multiply_weights or add_weights:
-                    mult_mod, add_mod = self._calculate_global_modifiers(
-                        r, multiply_weights or {}, add_weights or {}
-                    )
-                    expected_final = expected_rrf * mult_mod + add_mod
+                if within_rerank_depth:
+                    # Apply global score modifiers if present (but no recency)
+                    if multiply_weights or add_weights:
+                        mult_mod, add_mod = self._calculate_global_modifiers(
+                            r, multiply_weights or {}, add_weights or {}
+                        )
+                        expected_final = expected_rrf * mult_mod + add_mod
+                    else:
+                        expected_final = expected_rrf
                 else:
+                    # Beyond rerank_depth: no global modifiers applied
                     expected_final = expected_rrf
 
                 self.assertAlmostEqual(
                     expected_final, r['score'], places=3,
-                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                    msg=f"Doc {doc_id} (rank {doc_rank}): RRF score mismatch. "
                     f"Expected {expected_final:.6f}, got {r['score']:.6f}"
                 )
 
@@ -748,12 +771,18 @@ class TestRecencyScoring(MarqoTestCase):
                     msg=f"Doc {doc_id}: tensor should be unchanged. "
                     f"Baseline {b['tensor']:.6f}, got {r['tensor']:.6f}"
                 )
-                # RRF score should be modified by recency
-                # (baseline already has modifiers applied, so we just apply recency)
-                expected_score = calculate_expected_recency(b['score'], recency_score)
+
+                if within_rerank_depth:
+                    # RRF score should be modified by recency
+                    # (baseline already has modifiers applied, so we just apply recency)
+                    expected_score = calculate_expected_recency(b['score'], recency_score)
+                else:
+                    # Beyond rerank_depth: no recency applied, score equals baseline
+                    expected_score = b['score']
+
                 self.assertAlmostEqual(
                     expected_score, r['score'], places=3,
-                    msg=f"Doc {doc_id}: RRF score mismatch. "
+                    msg=f"Doc {doc_id} (rank {doc_rank}): RRF score mismatch. "
                         f"Expected {expected_score:.6f}, got {r['score']:.6f}"
                 )
 
@@ -901,23 +930,29 @@ class TestRecencyScoring(MarqoTestCase):
         self._add_shared_documents()
 
         # Test configurations
+        # (apply_in_ranking_phase, add_to_score_weight, use_score_modifiers, rerank_depth)
         test_cases = [
-            # (apply_in_ranking_phase, add_to_score_weight, use_score_modifiers)
-            ("all", None, True),           # Multiplicative, with score mods
-            ("all", None, False),          # Multiplicative, without score mods
-            ("all", 10.0, True),           # Additive, with score mods
-            ("exclude-global", None, True),
-            ("exclude-global", None, False),
-            ("exclude-global", 10.0, True),
-            ("only-global", None, True),
-            ("only-global", None, False),
-            ("only-global", 10.0, True),
+            # Standard cases without rerank_depth limit
+            ("all", None, True, None),           # Multiplicative, with score mods
+            ("all", None, False, None),          # Multiplicative, without score mods
+            ("all", 10.0, True, None),           # Additive, with score mods
+            ("exclude-global", None, True, None),
+            ("exclude-global", None, False, None),
+            ("exclude-global", 10.0, True, None),
+            ("only-global", None, True, None),
+            ("only-global", None, False, None),
+            ("only-global", 10.0, True, None),
+
+            # These verify that docs beyond rerank_depth don't get global processing, only top 5 get modifiers+recency in global
+            ("all", None, True, 5),
+            ("exclude-global", None, True, 5),
+            ("only-global", None, True, 5),
         ]
 
         from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
-        for phase, add_weight, use_score_mods in test_cases:
-            with self.subTest(phase=phase, add_to_score_weight=add_weight, score_mods=use_score_mods):
+        for phase, add_weight, use_score_mods, rerank_depth in test_cases:
+            with self.subTest(phase=phase, add_to_score_weight=add_weight, score_mods=use_score_mods, rerank_depth=rerank_depth):
                 # 1. Build score modifiers (if enabled)
                 score_mods = None
                 multiply_weights = None
@@ -942,7 +977,8 @@ class TestRecencyScoring(MarqoTestCase):
                         scoreModifiersLexical=score_mods,
                     ),
                     score_modifiers=score_mods,
-                    result_count=20
+                    result_count=20,
+                    rerank_depth=rerank_depth,  # Controls global phase processing (score modifiers + recency)
                 )
                 baseline_scores = self._extract_scores(baseline_result['hits'])
 
@@ -971,7 +1007,8 @@ class TestRecencyScoring(MarqoTestCase):
                     ),
                     recency_parameters=recency_params,
                     score_modifiers=score_mods,
-                    result_count=20
+                    result_count=20,
+                    rerank_depth=rerank_depth,  # Controls global phase processing (score modifiers + recency)
                 )
                 recency_scores = self._extract_scores(recency_result['hits'])
 
@@ -979,7 +1016,8 @@ class TestRecencyScoring(MarqoTestCase):
                 self._verify_phase_score_changes(
                     baseline_scores, recency_scores, phase, add_weight,
                     multiply_weights=multiply_weights,
-                    add_weights=add_weights
+                    add_weights=add_weights,
+                    rerank_depth=rerank_depth
                 )
 
     # ============== Retrieval/Ranking Method Combinations ==============
