@@ -18,6 +18,22 @@ class RankingMethod(str, Enum):
     Lexical = 'lexical'
 
 
+class WeakAndParameters(StrictBaseModel):
+    stopwordLimit: Optional[float] = Field(None, ge=0, le=1)
+    adjustTarget: Optional[float] = Field(None, ge=0, le=1)
+    allowDropAll: Optional[bool] = None
+    filterThreshold: Optional[float] = Field(None, ge=0, le=1)
+
+    def convert_to_vespa_query_dict(self):
+        dict = {
+            "ranking.matching.weakand.stopwordLimit": self.stopwordLimit,
+            "ranking.matching.weakand.adjustTarget": self.adjustTarget,
+            "ranking.matching.weakand.allowDropAll": self.allowDropAll,
+            "ranking.matching.filterThreshold": self.filterThreshold,
+        }
+        return {k: v for k, v in dict.items() if v is not None}
+
+
 class HybridParameters(StrictBaseModel):
     class Config(StrictBaseModel.Config):
         use_enum_values = True
@@ -38,6 +54,8 @@ class HybridParameters(StrictBaseModel):
     rerankDepthLexical: Optional[int] = Field(None, ge=1)
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
+    weakAndParameters: Optional[WeakAndParameters] = None
+
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
@@ -127,5 +145,16 @@ class HybridParameters(StrictBaseModel):
         if rerank_depth_lexical is not None and retrieval_method not in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction]:
             raise ValueError(
                 "'rerankDepthLexical' can only be set when 'retrievalMethod' is 'lexical' or 'disjunction'"
+            )
+        return values
+
+    @root_validator(pre=False)
+    def validate_weakand_parameters(cls, values):
+        rerank_depth_lexical = values.get('rerankDepthLexical')
+        weak_and_parameters = values.get('weakAndParameters')
+
+        if rerank_depth_lexical is None and weak_and_parameters is not None:
+            raise ValueError(
+                "'weakAndParameters' can only be set when 'rerankDepthLexical' is set"
             )
         return values

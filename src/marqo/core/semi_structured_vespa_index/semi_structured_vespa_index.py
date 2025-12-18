@@ -106,7 +106,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
-    def _to_vespa_hybrid_query(self, marqo_query):
+    def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # get base query from parents
         # TODO we will need a refactoring to duplicate this
         query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
@@ -130,6 +130,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
+        if marqo_query.hybrid_parameters.weakAndParameters:
+            query.update(marqo_query.hybrid_parameters.weakAndParameters.convert_to_vespa_query_dict())
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
