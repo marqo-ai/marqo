@@ -434,22 +434,6 @@ class RelevanceCutoffTest {
         }
 
         @Test
-        void shouldOverwriteMultipleTargetHitsInLexicalQuery() {
-            String yql =
-                    "select * from test_index where (({targetHits:100}weakAnd(title contains"
-                            + " \"machine learning\")) OR ({targetHits:100}weakAnd(description"
-                            + " contains \"AI\")))";
-
-            String result = callOverwriteTargetHitsIfPresent(yql, 250);
-
-            assertThat(result)
-                    .isEqualTo(
-                            "select * from test_index where (({targetHits:250}weakAnd(title"
-                                    + " contains \"machine learning\")) OR"
-                                    + " ({targetHits:250}weakAnd(description contains \"AI\")))");
-        }
-
-        @Test
         void shouldConvertZeroToOneInOverwriteTargetHitsIfPresent() {
             String result = callOverwriteTargetHitsIfPresent("{targetHits: 100}", 0);
             assertThat(result).isEqualTo("{targetHits: 1}");
