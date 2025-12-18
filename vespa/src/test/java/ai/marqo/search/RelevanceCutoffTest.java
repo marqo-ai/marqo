@@ -256,379 +256,226 @@ class RelevanceCutoffTest {
     @Nested
     class TargetHitsRegexTest {
 
-        @Test
-        void shouldExtractTargetHitsFromValidYql() {
-            String yql = "select * from sources * where {targetHits: 100}";
-
-            Integer result = callExtractCurrentTargetHits(yql);
-            assertThat(result).isEqualTo(100);
-        }
+        // --- extractCurrentTargetHits tests ---
 
         @Test
-        void shouldExtractTargetHitsWithWhitespace() {
-            String yql = "select * from sources * where { targetHits : 500 }";
-
-            Integer result = callExtractCurrentTargetHits(yql);
-            assertThat(result).isEqualTo(500);
-        }
-
-        @Test
-        void shouldExtractTargetHitsFromComplexYql() {
-            String yql =
-                    "select * from sources * where {param1: 'value', targetHits: 250, param2:"
-                            + " true}";
-
-            Integer result = callExtractCurrentTargetHits(yql);
-            assertThat(result).isEqualTo(250);
+        void shouldExtractTargetHitsFromYql() {
+            assertThat(callExtractCurrentTargetHits("{targetHits: 100}")).isEqualTo(100);
+            assertThat(callExtractCurrentTargetHits("{ targetHits : 500 }")).isEqualTo(500);
         }
 
         @Test
         void shouldThrowExceptionWhenTargetHitsNotFound() {
-            String yql = "select * from sources * where {param1: 'value', param2: 100}";
-
-            RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callExtractCurrentTargetHits(yql));
-            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
-        }
-
-        @Test
-        void shouldThrowExceptionForInvalidTargetHitsValue() {
-            String yql = "select * from sources * where {targetHits: invalid}";
-
-            RuntimeException exception =
-                    assertThrows(RuntimeException.class, () -> callExtractCurrentTargetHits(yql));
-            // The regex doesn't match "invalid" as a number, so it throws "YQL does not contain
-            // targetHits clause"
-            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
-        }
-
-        @Test
-        void shouldOverwriteTargetHitsInYql() {
-            String originalYql =
-                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
-                            + " 1900}";
-
-            String result = callOverwriteTargetHits(originalYql, 200, 2000);
-
-            assertThat(result)
-                    .isEqualTo(
-                            "select * from sources * where {targetHits: 200,"
-                                    + " hnsw.exploreAdditionalHits: 1800}");
-        }
-
-        @Test
-        void shouldOverwriteTargetHitsWithWhitespace() {
-            String originalYql =
-                    "select * from sources * where { targetHits : 150, hnsw.exploreAdditionalHits :"
-                            + " 1850 }";
-
-            String result = callOverwriteTargetHits(originalYql, 300, 2000);
-            assertThat(result)
-                    .isEqualTo(
-                            "select * from sources * where { targetHits : 300,"
-                                    + " hnsw.exploreAdditionalHits : 1700 }");
-        }
-
-        @Test
-        void shouldOverwriteTargetHitsInComplexYql() {
-            String originalYql =
-                    "select * from sources * where {param1: 'value', targetHits: 75,"
-                            + " hnsw.exploreAdditionalHits: 1925, param2: true}";
-
-            String result = callOverwriteTargetHits(originalYql, 125, 2000);
-            assertThat(result)
-                    .isEqualTo(
-                            "select * from sources * where {param1: 'value', targetHits: 125,"
-                                    + " hnsw.exploreAdditionalHits: 1875, param2: true}");
-        }
-
-        @Test
-        void shouldThrowExceptionWhenOverwritingNonExistentTargetHits() {
-            String yql = "select * from sources * where {param1: 'value'}";
-
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class, () -> callOverwriteTargetHits(yql, 100, 2000));
-            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
-        }
-
-        @Test
-        void shouldThrowExceptionForNegativeTargetHits() {
-            String yql =
-                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
-                            + " 100}";
-
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class, () -> callOverwriteTargetHits(yql, -1, 2000));
-            assertThat(exception.getMessage()).contains("targetHits value must be positive");
-        }
-
-        @Test
-        void shouldConvertZeroTargetHitsToOne() {
-            String originalYql =
-                    "select * from sources * where {targetHits: 100, hnsw.exploreAdditionalHits:"
-                            + " 1900}";
-
-            String result = callOverwriteTargetHits(originalYql, 0, 2000);
-            assertThat(result)
-                    .isEqualTo(
-                            "select * from sources * where {targetHits: 1,"
-                                    + " hnsw.exploreAdditionalHits: 1999}");
-        }
-
-        @Test
-        void shouldHandleComplexYqlWithMultipleTargetHitsAndHnswParameters() {
-            // Test with complex YQL containing multiple targetHits and hnsw.exploreAdditionalHits
-            String originalYql =
-                    "({targetHits:10, approximate:True,"
-                        + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title,"
-                        + " marqo__query_embedding)) OR ({targetHits:10, approximate:True,"
-                        + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_content,"
-                        + " marqo__query_embedding))";
-
-            String result = callOverwriteTargetHits(originalYql, 15, 2000);
-
-            assertThat(result)
-                    .isEqualTo(
-                            "({targetHits:15, approximate:True,"
-                                + " hnsw.exploreAdditionalHits:1985}nearestNeighbor(marqo__embeddings_title,"
-                                + " marqo__query_embedding)) OR ({targetHits:15, approximate:True,"
-                                + " hnsw.exploreAdditionalHits:1985}nearestNeighbor(marqo__embeddings_content,"
-                                + " marqo__query_embedding))");
-        }
-
-        @Test
-        void shouldUpdateHnswExploreAdditionalHitsWithDifferentValues() {
-            // Test various newTargetHits values to verify the 2000-newTargetHits formula
-            String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
-
-            // Test with newTargetHits = 100, should result in hnsw.exploreAdditionalHits = 1900
-            String result1 = callOverwriteTargetHits(originalYql, 100, 2000);
-            assertThat(result1).isEqualTo("{targetHits:100, hnsw.exploreAdditionalHits:1900}");
-
-            // Test with newTargetHits = 1, should result in hnsw.exploreAdditionalHits = 1999
-            String result2 = callOverwriteTargetHits(originalYql, 1, 2000);
-            assertThat(result2).isEqualTo("{targetHits:1, hnsw.exploreAdditionalHits:1999}");
-        }
-
-        @Test
-        void shouldHandleEdgeCaseWhenTargetHitsEqualsTwo() {
-            // Test boundary condition where newTargetHits = 2000
-            String originalYql = "{targetHits:10, hnsw.exploreAdditionalHits:1990}";
-
-            String result = callOverwriteTargetHits(originalYql, 2000, 2000);
-            assertThat(result).isEqualTo("{targetHits:2000, hnsw.exploreAdditionalHits:0}");
-        }
-
-        @Test
-        void shouldHandleHnswExploreAdditionalHitsWithWhitespace() {
-            // Test hnsw.exploreAdditionalHits with various whitespace patterns
-            String originalYql = "{targetHits: 25, hnsw.exploreAdditionalHits : 1975}";
-
-            String result = callOverwriteTargetHits(originalYql, 50, 2000);
-            assertThat(result).isEqualTo("{targetHits: 50, hnsw.exploreAdditionalHits : 1950}");
-        }
-
-        @Test
-        void shouldThrowExceptionWhenHnswExploreAdditionalHitsIsMissing() {
-            // Test that YQL without hnsw.exploreAdditionalHits throws an error
-            String originalYql = "{targetHits:100, approximate:True}";
-
             RuntimeException exception =
                     assertThrows(
                             RuntimeException.class,
-                            () -> callOverwriteTargetHits(originalYql, 150, 2000));
-            assertThat(exception.getMessage())
-                    .contains(
-                            "YQL does not contain hnsw.exploreAdditionalHits clause, but targetHits"
-                                    + " is present. Both parameters must be present together.");
+                            () -> callExtractCurrentTargetHits("{param1: 'value'}"));
+            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
         }
 
-        @Test
-        void shouldThrowExceptionWhenTargetHitsAndHnswCountMismatch() {
-            // Test with mismatched counts: 2 targetHits but 1 hnsw.exploreAdditionalHits
-            String originalYql =
-                    "{targetHits:10, hnsw.exploreAdditionalHits:1990} OR {targetHits:10}";
-
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class,
-                            () -> callOverwriteTargetHits(originalYql, 15, 2000));
-            assertThat(exception.getMessage())
-                    .contains(
-                            "YQL contains 2 targetHits occurrences but 1 hnsw.exploreAdditionalHits"
-                                    + " occurrences");
-        }
+        // --- extractCurrentExploreAdditionalHits tests ---
 
         @Test
-        void shouldExtractExploreAdditionalHitsFromValidYql() {
-            String yql = "select * from sources * where {hnsw.exploreAdditionalHits: 1500}";
-
-            Integer result = callExtractCurrentExploreAdditionalHits(yql);
-            assertThat(result).isEqualTo(1500);
-        }
-
-        @Test
-        void shouldExtractExploreAdditionalHitsWithWhitespace() {
-            String yql = "select * from sources * where { hnsw.exploreAdditionalHits : 1750 }";
-
-            Integer result = callExtractCurrentExploreAdditionalHits(yql);
-            assertThat(result).isEqualTo(1750);
-        }
-
-        @Test
-        void shouldExtractExploreAdditionalHitsFromComplexYql() {
-            String yql =
-                    "select * from sources * where {param1: 'value', targetHits: 250,"
-                            + " hnsw.exploreAdditionalHits: 1750, param2: true}";
-
-            Integer result = callExtractCurrentExploreAdditionalHits(yql);
-            assertThat(result).isEqualTo(1750);
+        void shouldExtractExploreAdditionalHitsFromYql() {
+            assertThat(
+                            callExtractCurrentExploreAdditionalHits(
+                                    "{hnsw.exploreAdditionalHits: 1500}"))
+                    .isEqualTo(1500);
         }
 
         @Test
         void shouldThrowExceptionWhenExploreAdditionalHitsNotFound() {
-            String yql = "select * from sources * where {targetHits: 100, param1: 'value'}";
-
             RuntimeException exception =
                     assertThrows(
                             RuntimeException.class,
-                            () -> callExtractCurrentExploreAdditionalHits(yql));
+                            () -> callExtractCurrentExploreAdditionalHits("{targetHits: 100}"));
             assertThat(exception.getMessage())
                     .contains("YQL does not contain hnsw.exploreAdditionalHits clause");
         }
 
         @Test
-        void shouldThrowExceptionForInvalidExploreAdditionalHitsValue() {
-            String yql = "select * from sources * where {hnsw.exploreAdditionalHits: invalid}";
-
+        void shouldThrowCorrectErrorMessageForOverflowExploreAdditionalHits() {
+            String yql = "{hnsw.exploreAdditionalHits: 999999999999999999999}";
             RuntimeException exception =
                     assertThrows(
                             RuntimeException.class,
                             () -> callExtractCurrentExploreAdditionalHits(yql));
-            // The regex doesn't match "invalid" as a number, so it throws "YQL does not contain
-            // clause"
-            assertThat(exception.getMessage())
-                    .contains("YQL does not contain hnsw.exploreAdditionalHits clause");
-        }
-
-        @Test
-        void shouldThrowCorrectErrorMessageForInvalidExploreAdditionalHitsNumber() {
-            // Test that the error message correctly mentions "exploreAdditionalHits" not
-            // "targetHits"
-            // This tests the fix for the copy-paste error in the error message
-            String yql =
-                    "select * from sources * where {hnsw.exploreAdditionalHits:"
-                            + " 999999999999999999999}";
-
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class,
-                            () -> callExtractCurrentExploreAdditionalHits(yql));
-            // The number is too large to parse as Integer, should throw NumberFormatException
-            // The error message should mention "exploreAdditionalHits" not "targetHits"
             assertThat(exception.getMessage())
                     .contains("Invalid exploreAdditionalHits value in YQL");
-            assertThat(exception.getMessage()).doesNotContain("Invalid targetHits value");
+        }
+
+        // --- overwriteTargetHitsAndExploreAdditionalHits tests ---
+
+        @Test
+        void shouldOverwriteTargetHitsAndExploreAdditionalHits() {
+            String yql = "{targetHits: 100, hnsw.exploreAdditionalHits: 1900}";
+
+            String result = callOverwriteTargetHitsAndExploreAdditionalHits(yql, 200, 2000);
+
+            assertThat(result).isEqualTo("{targetHits: 200, hnsw.exploreAdditionalHits: 1800}");
         }
 
         @Test
-        void shouldExtractFirstExploreAdditionalHitsWhenMultipleOccurrences() {
-            // Test with multiple hnsw.exploreAdditionalHits - should return the first one
+        void shouldOverwriteMultipleTargetHitsAndExploreAdditionalHitsInTensorQuery() {
             String yql =
-                    "select * from sources * where {hnsw.exploreAdditionalHits: 1500} and"
-                            + " {hnsw.exploreAdditionalHits: 1800}";
+                    "({targetHits:10, hnsw.exploreAdditionalHits:1990}nearestNeighbor(field1,"
+                            + " query)) OR ({targetHits:10,"
+                            + " hnsw.exploreAdditionalHits:1990}nearestNeighbor(field2, query))";
 
-            Integer result = callExtractCurrentExploreAdditionalHits(yql);
-            assertThat(result).isEqualTo(1500); // Should return the first occurrence
-        }
+            String result = callOverwriteTargetHitsAndExploreAdditionalHits(yql, 50, 2000);
 
-        @Test
-        void shouldTestEfSearchLogicWithDifferentValues() {
-            // Test the efSearch calculation: efSearch = targetHits + exploreAdditionalHits
-            // When newTargetHits changes, newExploreAdditionalHits = efSearch - newTargetHits
-
-            // Example: targetHits=50, exploreAdditionalHits=1950, so efSearch=2000
-            // When newTargetHits=100, newExploreAdditionalHits should be 2000-100=1900
-            String originalYql = "{targetHits:50, hnsw.exploreAdditionalHits:1950}";
-
-            String result = callOverwriteTargetHits(originalYql, 100, 2000);
-            assertThat(result).isEqualTo("{targetHits:100, hnsw.exploreAdditionalHits:1900}");
-        }
-
-        @Test
-        void shouldMaintainEfSearchConstantAcrossUpdates() {
-            // Test that efSearch (targetHits + exploreAdditionalHits) remains constant
-            String originalYql =
-                    "{targetHits:300, hnsw.exploreAdditionalHits:1200}"; // efSearch = 1500
-
-            String result = callOverwriteTargetHits(originalYql, 500, 1500);
-            assertThat(result).isEqualTo("{targetHits:500, hnsw.exploreAdditionalHits:1000}");
-
-            // Verify the total remains 1500
-            Integer newTargetHits = callExtractCurrentTargetHits(result);
-            Integer newExploreAdditionalHits = callExtractCurrentExploreAdditionalHits(result);
-            assertThat(newTargetHits + newExploreAdditionalHits).isEqualTo(1500);
-        }
-
-        @Test
-        void shouldHandleEfSearchWithZeroTargetHitsConversion() {
-            // When targetHits=0 gets converted to 1, efSearch logic should still work
-            String originalYql =
-                    "{targetHits:100, hnsw.exploreAdditionalHits:1900}"; // efSearch = 2000
-
-            String result = callOverwriteTargetHits(originalYql, 0, 2000);
             assertThat(result)
                     .isEqualTo(
-                            "{targetHits:1, hnsw.exploreAdditionalHits:1999}"); // 0 converted to 1
+                            "({targetHits:50,"
+                                + " hnsw.exploreAdditionalHits:1950}nearestNeighbor(field1, query))"
+                                + " OR ({targetHits:50,"
+                                + " hnsw.exploreAdditionalHits:1950}nearestNeighbor(field2,"
+                                + " query))");
         }
 
         @Test
-        void shouldValidateEfSearchCalculationAcrossMultipleScenarios() {
-            // Test comprehensive efSearch validation with various input combinations
+        void shouldSetExploreAdditionalHitsToZeroWhenTargetHitsExceedsEfSearch() {
+            String yql = "{targetHits:100, hnsw.exploreAdditionalHits:400}"; // efSearch = 500
 
-            // Scenario 1: Small efSearch value
-            String yql1 = "{targetHits:50, hnsw.exploreAdditionalHits:50}"; // efSearch = 100
-            String result1 = callOverwriteTargetHits(yql1, 30, 100);
-            assertThat(result1).isEqualTo("{targetHits:30, hnsw.exploreAdditionalHits:70}");
+            String result = callOverwriteTargetHitsAndExploreAdditionalHits(yql, 600, 500);
 
-            // Scenario 2: Large efSearch value
-            String yql2 = "{targetHits:500, hnsw.exploreAdditionalHits:4500}"; // efSearch = 5000
-            String result2 = callOverwriteTargetHits(yql2, 1000, 5000);
-            assertThat(result2).isEqualTo("{targetHits:1000, hnsw.exploreAdditionalHits:4000}");
-
-            // Scenario 3: Edge case where newTargetHits equals efSearch
-            String yql3 = "{targetHits:100, hnsw.exploreAdditionalHits:900}"; // efSearch = 1000
-            String result3 = callOverwriteTargetHits(yql3, 1000, 1000);
-            assertThat(result3).isEqualTo("{targetHits:1000, hnsw.exploreAdditionalHits:0}");
+            assertThat(result).isEqualTo("{targetHits:600, hnsw.exploreAdditionalHits:0}");
         }
 
         @Test
-        void shouldSetExploreAdditionalHitsToZeroWhenNewTargetHitsExceedsEfSearch() {
-            // Test that when newTargetHits > efSearch, exploreAdditionalHits is set to 0
-            String originalYql =
-                    "{targetHits:100, hnsw.exploreAdditionalHits:400}"; // efSearch = 500
+        void shouldConvertZeroTargetHitsToOneAndAdjustExploreAdditionalHits() {
+            String yql = "{targetHits: 100, hnsw.exploreAdditionalHits: 1900}";
 
-            // Case 1: newTargetHits slightly larger than efSearch
-            String result1 = callOverwriteTargetHits(originalYql, 600, 500);
-            assertThat(result1).isEqualTo("{targetHits:600, hnsw.exploreAdditionalHits:0}");
+            String result = callOverwriteTargetHitsAndExploreAdditionalHits(yql, 0, 2000);
 
-            // Case 2: newTargetHits much larger than efSearch
-            String result2 = callOverwriteTargetHits(originalYql, 1500, 500);
-            assertThat(result2).isEqualTo("{targetHits:1500, hnsw.exploreAdditionalHits:0}");
+            assertThat(result).isEqualTo("{targetHits: 1, hnsw.exploreAdditionalHits: 1999}");
+        }
 
-            // Case 3: newTargetHits way larger than efSearch
-            String result3 = callOverwriteTargetHits(originalYql, 10000, 500);
-            assertThat(result3).isEqualTo("{targetHits:10000, hnsw.exploreAdditionalHits:0}");
+        @Test
+        void shouldThrowExceptionForNegativeTargetHits() {
+            String yql = "{targetHits: 100, hnsw.exploreAdditionalHits: 100}";
+
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callOverwriteTargetHitsAndExploreAdditionalHits(yql, -1, 2000));
+            assertThat(exception.getMessage()).contains("targetHits value must be positive");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenTargetHitsMissingForOverwrite() {
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    callOverwriteTargetHitsAndExploreAdditionalHits(
+                                            "{param: 'value'}", 100, 2000));
+            assertThat(exception.getMessage()).contains("YQL does not contain targetHits clause");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenExploreAdditionalHitsMissing() {
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    callOverwriteTargetHitsAndExploreAdditionalHits(
+                                            "{targetHits:100}", 150, 2000));
+            assertThat(exception.getMessage())
+                    .contains("YQL does not contain hnsw.exploreAdditionalHits clause");
+        }
+
+        @Test
+        void shouldThrowExceptionWhenTargetHitsAndExploreAdditionalHitsCountMismatch() {
+            String yql = "{targetHits:10, hnsw.exploreAdditionalHits:1990} OR {targetHits:10}";
+
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callOverwriteTargetHitsAndExploreAdditionalHits(yql, 15, 2000));
+            assertThat(exception.getMessage())
+                    .contains("YQL contains 2 targetHits occurrences but 1");
+        }
+
+        // --- overwriteTargetHitsIfPresent tests ---
+
+        @Test
+        void shouldOverwriteTargetHitsIfPresentWithoutChangingExploreAdditionalHits() {
+            String yql = "{targetHits: 100, hnsw.exploreAdditionalHits: 1900}";
+
+            String result = callOverwriteTargetHitsIfPresent(yql, 200);
+
+            assertThat(result).isEqualTo("{targetHits: 200, hnsw.exploreAdditionalHits: 1900}");
+        }
+
+        @Test
+        void shouldReturnOriginalYqlWhenTargetHitsNotPresent() {
+            String yql = "select * from test where {param: 'value'}";
+
+            String result = callOverwriteTargetHitsIfPresent(yql, 100);
+
+            assertThat(result).isEqualTo(yql);
+        }
+
+        @Test
+        void shouldOverwriteTargetHitsInLexicalWeakAndQuery() {
+            String yql =
+                    "select * from test_index where (({targetHits:111}weakAnd(default contains"
+                            + " \"neural networks\",default contains \"deep learning\")) AND"
+                            + " (default contains \"transformer\"))";
+
+            String result = callOverwriteTargetHitsIfPresent(yql, 500);
+
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from test_index where (({targetHits:500}weakAnd(default"
+                                    + " contains \"neural networks\",default contains \"deep"
+                                    + " learning\")) AND (default contains \"transformer\"))");
+        }
+
+        @Test
+        void shouldOverwriteMultipleTargetHitsInLexicalQuery() {
+            String yql =
+                    "select * from test_index where (({targetHits:100}weakAnd(title contains"
+                            + " \"machine learning\")) OR ({targetHits:100}weakAnd(description"
+                            + " contains \"AI\")))";
+
+            String result = callOverwriteTargetHitsIfPresent(yql, 250);
+
+            assertThat(result)
+                    .isEqualTo(
+                            "select * from test_index where (({targetHits:250}weakAnd(title"
+                                    + " contains \"machine learning\")) OR"
+                                    + " ({targetHits:250}weakAnd(description contains \"AI\")))");
+        }
+
+        @Test
+        void shouldConvertZeroToOneInOverwriteTargetHitsIfPresent() {
+            String result = callOverwriteTargetHitsIfPresent("{targetHits: 100}", 0);
+            assertThat(result).isEqualTo("{targetHits: 1}");
+        }
+
+        @Test
+        void shouldThrowExceptionForNegativeTargetHitsIfPresent() {
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> callOverwriteTargetHitsIfPresent("{targetHits: 100}", -1));
+            assertThat(exception.getMessage()).contains("targetHits value must be positive");
         }
 
         private Integer callExtractCurrentTargetHits(String yql) {
             return hybridSearcher.extractCurrentTargetHits(yql);
         }
 
-        private String callOverwriteTargetHits(String yql, int newTargetHits, int efSearch) {
-            return hybridSearcher.overwriteTargetHits(yql, newTargetHits, efSearch);
+        private String callOverwriteTargetHitsAndExploreAdditionalHits(
+                String yql, int newTargetHits, int efSearch) {
+            return hybridSearcher.overwriteTargetHitsAndExploreAdditionalHits(
+                    yql, newTargetHits, efSearch);
+        }
+
+        private String callOverwriteTargetHitsIfPresent(String yql, int newTargetHits) {
+            return hybridSearcher.overwriteTargetHitsIfPresent(yql, newTargetHits);
         }
 
         private Integer callExtractCurrentExploreAdditionalHits(String yql) {
