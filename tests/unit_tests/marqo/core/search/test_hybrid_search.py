@@ -725,3 +725,53 @@ class TestRecencyValidation(TestCase):
         # The validation should pass (no error raised)
         # This test verifies that the validation ONLY fails when grow_from is provided
         self.assertIsNone(recency_params.grow_from)
+
+
+class TestRerankDepthLexicalValidation(TestCase):
+    """Tests for rerankDepthLexical parameter validation in HybridParameters."""
+
+    def test_rerankDepthLexical_valid_retrieval_methods(self):
+        """Test rerankDepthLexical is valid with lexical or disjunction retrieval."""
+        test_cases = [
+            ('lexical', RetrievalMethod.Lexical, RankingMethod.Tensor, 100),
+            ('disjunction', RetrievalMethod.Disjunction, RankingMethod.RRF, 200),
+            ('minimum_value', RetrievalMethod.Lexical, RankingMethod.Lexical, 1),
+        ]
+        for name, retrieval, ranking, depth in test_cases:
+            with self.subTest(name):
+                params = HybridParameters(
+                    retrievalMethod=retrieval, rankingMethod=ranking, rerankDepthLexical=depth
+                )
+                self.assertEqual(params.rerankDepthLexical, depth)
+
+    def test_rerankDepthLexical_invalid_with_tensor_retrieval(self):
+        """Test rerankDepthLexical raises error with tensor retrieval method."""
+        with self.assertRaises(ValidationError) as ctx:
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Tensor,
+                rankingMethod=RankingMethod.Tensor,
+                rerankDepthLexical=100
+            )
+        self.assertIn('rerankDepthLexical', str(ctx.exception))
+
+    def test_rerankDepthLexical_invalid_values(self):
+        """Test rerankDepthLexical raises error for values < 1."""
+        for value in [0, -10]:
+            with self.subTest(value=value):
+                with self.assertRaises(ValidationError):
+                    HybridParameters(
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor,
+                        rerankDepthLexical=value
+                    )
+
+    def test_rerankDepthLexical_none_valid_for_all_methods(self):
+        """Test rerankDepthLexical=None is valid for all retrieval methods."""
+        for retrieval, ranking in [
+            (RetrievalMethod.Tensor, RankingMethod.Tensor),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+        ]:
+            with self.subTest(retrieval=retrieval.value):
+                params = HybridParameters(retrievalMethod=retrieval, rankingMethod=ranking)
+                self.assertIsNone(params.rerankDepthLexical)
