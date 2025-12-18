@@ -55,7 +55,8 @@ class HybridParameters(StrictBaseModel):
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
     weakAndParameters: Optional[WeakAndParameters] = None
-
+    rerankCount: Optional[int] = Field(None, ge=1)
+    secondPhaseModifier: Optional[bool] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):

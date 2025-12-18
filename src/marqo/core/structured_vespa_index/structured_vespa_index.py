@@ -574,7 +574,8 @@ class StructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,
+            'ranking.rerankCount': marqo_query.hybrid_parameters.rerankCount if \
+                marqo_query.hybrid_parameters.rerankCount else marqo_query.limit + marqo_query.offset,
             # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
@@ -593,7 +594,7 @@ class StructuredVespaIndex(VespaIndex):
             ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
 
-            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
+            'marqo__ranking.lexical.lexical': "bm25_new" if marqo_query.hybrid_parameters.secondPhaseModifier else common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
