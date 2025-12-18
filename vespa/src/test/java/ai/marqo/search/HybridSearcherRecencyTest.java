@@ -77,6 +77,20 @@ class HybridSearcherRecencyTest {
         return query;
     }
 
+    /**
+     * Helper method to create a query with additive recency enabled
+     */
+    private Query createQueryWithAdditiveRecency(
+            boolean enabled, boolean applyInGlobalPhase, double addToScoreWeight) {
+        Query query = createQueryWithRecency(enabled, applyInGlobalPhase);
+        // Set addToScoreWeight in rank features (not properties) - this is where HybridSearcher
+        // reads it from
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__recency_add_to_score_weight)", addToScoreWeight);
+        return query;
+    }
+
     @Nested
     class ExtractRecencyScoreTests {
         @Test
@@ -234,6 +248,73 @@ class HybridSearcherRecencyTest {
             // Expected: (0.75 * 3.0 + 1.0) * 0.6 = (2.25 + 1.0) * 0.6 = 3.25 * 0.6 = 1.95
             assertThat(result.get(0).getRelevance().getScore()).isCloseTo(1.95, within(0.0001));
         }
+
+        @Test
+        void shouldApplyAdditiveRecencyInGlobalRankingPhase() {
+            Query query = createQueryWithAdditiveRecency(true, true, 0.5);
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithScoreModifiers("index:test/0/doc1", 1.0, 2.0, 0.5, 0.8));
+
+            HitGroup result = hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            // Expected: (1.0 * 2.0 + 0.5) + (0.8 * 0.5) = 2.5 + 0.4 = 2.9
+            assertThat(result.get(0).getRelevance().getScore()).isCloseTo(2.9, within(0.0001));
+        }
+
+        @Test
+        void shouldUseDefaultMultiplicativeModeWhenAddToScoreWeightIsZero() {
+            Query query = createQueryWithAdditiveRecency(true, true, 0.0);
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithScoreModifiers("index:test/0/doc1", 1.0, 2.0, 0.5, 0.8));
+
+            HitGroup result = hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            // Expected: (1.0 * 2.0 + 0.5) * 0.8 = 2.5 * 0.8 = 2.0 (multiplicative mode)
+            assertThat(result.get(0).getRelevance().getScore()).isCloseTo(2.0, within(0.0001));
+        }
+
+        @Test
+        void shouldHandleVariousAdditiveRecencyWeights() {
+            // Test different addToScoreWeight values
+            double[] weights = {0.1, 0.5, 1.0, 10.0};
+            double baseScore = 1.0;
+            double multModifier = 1.0;
+            double addModifier = 0.0;
+            double recencyScore = 0.8;
+
+            for (double weight : weights) {
+                Query query = createQueryWithAdditiveRecency(true, true, weight);
+                HitGroup hits = new HitGroup();
+                hits.add(
+                        createHitWithScoreModifiers(
+                                "index:test/0/doc1",
+                                baseScore,
+                                multModifier,
+                                addModifier,
+                                recencyScore));
+
+                HitGroup result = hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+                // Expected: (baseScore * multModifier + addModifier) + (recencyScore * weight)
+                double expected =
+                        (baseScore * multModifier + addModifier) + (recencyScore * weight);
+                assertThat(result.get(0).getRelevance().getScore())
+                        .as("Failed for weight=" + weight)
+                        .isCloseTo(expected, within(0.0001));
+            }
+        }
+
+        @Test
+        void shouldHandleAdditiveRecencyWithComplexScoreModifiers() {
+            Query query = createQueryWithAdditiveRecency(true, true, 2.0);
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithScoreModifiers("index:test/0/doc1", 0.75, 3.0, 1.0, 0.6));
+
+            HitGroup result = hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            // Expected: (0.75 * 3.0 + 1.0) + (0.6 * 2.0) = 3.25 + 1.2 = 4.45
+            assertThat(result.get(0).getRelevance().getScore()).isCloseTo(4.45, within(0.0001));
+        }
     }
 
     @Nested
@@ -345,6 +426,71 @@ class HybridSearcherRecencyTest {
             HitGroup result = hybridSearcher.postProcessResults(hits, query, null, 5, 0, false);
 
             assertThat(result.size()).isEqualTo(5);
+        }
+
+        @Test
+        void shouldApplyAdditiveRecencyWithoutGlobalWeights() {
+            Query query = createQueryWithAdditiveRecency(true, true, 0.5);
+            // Set empty global weights to trigger standalone recency path
+            RankFeatures rankFeatures = query.getRanking().getFeatures();
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor emptyTensor = Tensor.Builder.of(tensorType).build();
+            rankFeatures.put("query(marqo__mult_weights_global)", emptyTensor);
+            rankFeatures.put("query(marqo__add_weights_global)", emptyTensor);
+
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.8));
+            hits.add(createHitWithRecencyScore("index:test/0/doc2", 0.9, 0.6));
+
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, 10, 0, false);
+
+            // Additive mode: score + (recencyScore * weight)
+            // doc1: 1.0 + (0.8 * 0.5) = 1.0 + 0.4 = 1.4
+            // doc2: 0.9 + (0.6 * 0.5) = 0.9 + 0.3 = 1.2
+            assertThat(result.get(0).getRelevance().getScore()).isCloseTo(1.4, within(0.0001));
+            assertThat(result.get(1).getRelevance().getScore()).isCloseTo(1.2, within(0.0001));
+        }
+
+        @Test
+        void shouldUseMultiplicativeModeWhenAddToScoreWeightIsZeroStandalone() {
+            Query query = createQueryWithAdditiveRecency(true, true, 0.0);
+            RankFeatures rankFeatures = query.getRanking().getFeatures();
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor emptyTensor = Tensor.Builder.of(tensorType).build();
+            rankFeatures.put("query(marqo__mult_weights_global)", emptyTensor);
+            rankFeatures.put("query(marqo__add_weights_global)", emptyTensor);
+
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.8));
+
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, 10, 0, false);
+
+            // Multiplicative mode (default): score * recencyScore
+            // doc1: 1.0 * 0.8 = 0.8
+            assertThat(result.get(0).getRelevance().getScore()).isCloseTo(0.8, within(0.0001));
+        }
+
+        @Test
+        void shouldRerankCorrectlyAfterAdditiveRecency() {
+            Query query = createQueryWithAdditiveRecency(true, true, 1.0);
+            RankFeatures rankFeatures = query.getRanking().getFeatures();
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor emptyTensor = Tensor.Builder.of(tensorType).build();
+            rankFeatures.put("query(marqo__mult_weights_global)", emptyTensor);
+            rankFeatures.put("query(marqo__add_weights_global)", emptyTensor);
+
+            HitGroup hits = new HitGroup();
+            // Add hits that will change order after additive recency
+            hits.add(createHitWithRecencyScore("index:test/0/doc1", 0.5, 1.0)); // 0.5 + 1.0 = 1.5
+            hits.add(createHitWithRecencyScore("index:test/0/doc2", 1.0, 0.3)); // 1.0 + 0.3 = 1.3
+            hits.add(createHitWithRecencyScore("index:test/0/doc3", 0.6, 0.8)); // 0.6 + 0.8 = 1.4
+
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, 10, 0, false);
+
+            // After sorting: doc1 (1.5), doc3 (1.4), doc2 (1.3)
+            assertThat(result.get(0).getId().toString()).contains("doc1");
+            assertThat(result.get(1).getId().toString()).contains("doc3");
+            assertThat(result.get(2).getId().toString()).contains("doc2");
         }
     }
 

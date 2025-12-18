@@ -321,7 +321,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah",
-                "image" : TestImageUrls.COCO.value
+                "image" : TestImageUrls.IMAGE1.value
             }]
 
         self.add_documents(config=config, add_docs_params=AddDocsParams(
@@ -369,7 +369,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         epsilon = 1e-7
 
-        image = TestImageUrls.COCO.value
+        image = TestImageUrls.IMAGE1.value
 
         model_name = "test-model"
         model_properties = {
@@ -408,7 +408,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         epsilon = 1e-7
 
-        image = TestImageUrls.COCO.value
+        image = TestImageUrls.IMAGE1.value
 
         model_name = "test-model"
         model_properties = {

@@ -1,7 +1,8 @@
 """Recency parameters for time-based score boosting."""
 
 from enum import Enum
-from pydantic.v1 import BaseModel, Field, validator
+from typing import Optional
+from pydantic.v1 import BaseModel, Field, validator, root_validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
 
@@ -96,6 +97,58 @@ class RecencyParameters(BaseModel):
         )
     )
 
+    add_to_score_weight: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        alias="addToScoreWeight",
+        description=(
+            "If provided, applies recency as an additive factor instead of multiplicative. "
+            "Formula: final_score = modified_score + (recency_score * addToScoreWeight)."
+        )
+    )
+
+    grow_from: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        alias="growFrom",
+        description=(
+            "Starting score for documents with timestamps far in the future. "
+            "Must be in range (0.0, 1.0]. "
+            "NOTE: All grow parameters (growFrom, growFunction, growScale, growOffset) must be "
+            "provided together or all omitted. If omitted, future timestamps get score 1.0."
+        )
+    )
+
+    grow_function: Optional[DecayFunction] = Field(
+        default=None,
+        alias="growFunction",
+        description=(
+            "Type of growth function for future timestamps: exponential, linear, gaussian, binary. "
+            "NOTE: All grow parameters must be provided together or all omitted."
+        )
+    )
+
+    grow_scale: Optional[str] = Field(
+        default=None,
+        alias="growScale",
+        description=(
+            "Time scale for growth function. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
+            "NOTE: All grow parameters must be provided together or all omitted."
+        )
+    )
+
+    grow_offset: Optional[str] = Field(
+        default=None,
+        alias="growOffset",
+        description=(
+            "Time offset before growth function starts. Documents with timestamps between now() "
+            "and now() + growOffset get score 1.0 (plateau). Growth function applies to timestamps "
+            "beyond now() + growOffset. Format: {number}{unit} where unit is 'd' (days) or 'h' (hours). "
+            "NOTE: All grow parameters must be provided together or all omitted."
+        )
+    )
+
     class Config:
         extra: str = "forbid"
         allow_population_by_field_name = True
@@ -133,3 +186,61 @@ class RecencyParameters(BaseModel):
             raise ValueError(f"offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
         return v
+
+    @validator('grow_scale')
+    def validate_grow_scale(cls, v: Optional[str]) -> Optional[str]:
+        """Validate grow_scale duration string format and constraints."""
+        if v is None:
+            return v
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid grow_scale format: {e}")
+
+        if seconds <= 0:
+            raise ValueError(f"grow_scale must be greater than 0, got: {v} ({seconds} seconds)")
+
+        return v
+
+    @validator('grow_offset')
+    def validate_grow_offset(cls, v: Optional[str]) -> Optional[str]:
+        """Validate grow_offset duration string format and constraints."""
+        if v is None:
+            return v
+        try:
+            seconds = parse_duration_to_seconds(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid grow_offset format: {e}")
+
+        if seconds < 0:
+            raise ValueError(f"grow_offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
+
+        return v
+
+    @root_validator
+    def validate_grow_params_all_or_nothing(cls, values):
+        """Validate that grow parameters are either all provided or all omitted.
+
+        If any grow parameter is provided, all must be provided. If none are provided,
+        grow functionality is disabled and future timestamps get score 1.0.
+        """
+        grow_params = {
+            'growFrom': values.get('grow_from'),
+            'growFunction': values.get('grow_function'),
+            'growScale': values.get('grow_scale'),
+            'growOffset': values.get('grow_offset'),
+        }
+
+        provided = [k for k, v in grow_params.items() if v is not None]
+        missing = [k for k, v in grow_params.items() if v is None]
+
+        # If some but not all are provided, raise error
+        if provided and missing:
+            provided_names = ', '.join(sorted(provided))
+            missing_names = ', '.join(sorted(missing))
+            raise ValueError(
+                f"Grow parameters must be either all provided or all omitted. "
+                f"Provided: [{provided_names}]. Missing: [{missing_names}]."
+            )
+
+        return values
