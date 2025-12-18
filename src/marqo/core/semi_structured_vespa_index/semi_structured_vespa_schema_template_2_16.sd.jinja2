@@ -366,6 +366,13 @@ schema {{ index.schema_name }} {
         }
     }
 
+    rank-profile weakand inherits  bm25 {
+        weakand {
+            stopword-limit: 0.6
+            adjust-target: 0.01
+        }
+    }
+
     {% if index.lexical_fields -%}
     rank-profile bm25 inherits base_rank_profile {
         first-phase {
