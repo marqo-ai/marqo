@@ -81,7 +81,7 @@ class TestHybridSearchUnstructured(BaseCompatibilityTestCase):
         {
             "_id": f"example_doc_6",
             "text_field": "Woman skiing",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg",
+            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
             'tags': ['ski'],
             'caption': 'example_doc_6'
         },

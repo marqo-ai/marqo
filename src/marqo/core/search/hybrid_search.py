@@ -191,6 +191,22 @@ class HybridSearch:
                     f"{str(constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)} or later. "
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
                 )
+            # Check if addToScoreWeight requires newer schema version
+            if recency_parameters.add_to_score_weight is not None:
+                if not marqo_index.index_supports_recency_additive:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Additive recency scoring (addToScoreWeight) is only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
+            # Check if growFrom requires newer schema version
+            if recency_parameters.grow_from is not None:
+                if not marqo_index.index_supports_recency_grow:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Recency grow parameters (growFrom) are only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)

@@ -154,113 +154,103 @@ schema {{ index.schema_name }} {
             query(marqo__sort_field_weights_1) tensor<double>(p{})
             query(marqo__sort_field_weights_2) tensor<double>(p{})
 
+            # Recency parameters
             query(marqo__recency_should_calculate_score): 0
             query(marqo__recency_should_apply_score): 0
-            query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
+            query(marqo__recency_add_to_score_weight) double: 0.0
+            query(marqo__recency_decay_function_type): 0
             query(marqo__recency_scale_seconds) double: 604800.0
             query(marqo__recency_offset_seconds) double: 0.0
             query(marqo__recency_decay_to) double: 0.5
+            query(marqo__recency_grow_enabled): 0
+            query(marqo__recency_grow_function_type): 0
+            query(marqo__recency_grow_scale_seconds) double: 604800.0
+            query(marqo__recency_grow_offset_seconds) double: 0.0
+            query(marqo__recency_grow_from) double: 0.5
         }
 
-        # Recency scoring functions
+        # ============ RECENCY SCORING FUNCTIONS ============
         function get_timestamp() {
-            expression {
-                if (count(query(marqo__recency_timestamp_key)) > 0,
-                    reduce(attribute(marqo__score_modifiers) * query(marqo__recency_timestamp_key), sum),
-                    0)
-            }
+            expression: reduce(attribute(marqo__score_modifiers) * query(marqo__recency_timestamp_key), sum)
         }
 
         function age_in_seconds() {
-            expression: max(0, now() - get_timestamp())
+            expression: now() - get_timestamp()
         }
 
-        # Effective age after applying offset (grace period)
-        # Documents within offset period get 0 effective age (perfect score)
-        function effective_age() {
-            expression: max(0, age_in_seconds() - query(marqo__recency_offset_seconds))
+        # ============ UNIFIED SCORING FUNCTIONS ============
+        # These work for both decay (past) and grow (future) by taking (age, scale, floor_val):
+        # - At age=0: returns 1.0
+        # - At age=scale: returns floor_val
+        # - Beyond scale: clamps to floor_val
+
+        function score_exponential(age, scale, floor_val) {
+            expression: max(floor_val, exp(log(floor_val) * age / scale))
         }
 
-        # Exponential decay (Elasticsearch-compatible)
-        # Formula: λ = ln(decay_to) / scale
-        #          score = max(decay_to, exp(λ × age))
-        # Parameters:
-        #   age: effective age in seconds
-        #   scale: scale in seconds
-        #   decay_to: target score at age=scale, also acts as floor
-        # At age = 0: score = 1.0
-        # At age = scale: score = decay_to
-        function recency_score_exponential(age, scale, decay_to) {
+        function score_linear(age, scale, floor_val) {
+            expression: max(floor_val, (scale - age * (1.0 - floor_val)) / scale)
+        }
+
+        function score_gaussian(age, scale, floor_val) {
+            expression: max(floor_val, exp(pow(age, 2) * log(floor_val) / pow(scale, 2)))
+        }
+
+        function score_binary(age, scale, floor_val) {
+            expression: if(age < scale, 1.0, floor_val)
+        }
+
+        # Router: selects function based on type (0=exp, 1=linear, 2=gaussian, 3=binary)
+        function compute_score(age, scale, floor_val, func_type) {
             expression {
-                if (age == 0,
-                    1.0,
-                    max(decay_to, exp(log(decay_to) * age / scale)))
+                if (func_type == 0,
+                    score_exponential(age, scale, floor_val),
+                    if (func_type == 1,
+                        score_linear(age, scale, floor_val),
+                        if (func_type == 2,
+                            score_gaussian(age, scale, floor_val),
+                            score_binary(age, scale, floor_val))))
             }
         }
 
-        # Linear decay (Elasticsearch-compatible)
-        # Formula: score = max(decay_to, (scale - age × (1 - decay_to)) / scale)
-        # Parameters:
-        #   age: effective age in seconds
-        #   scale: scale in seconds
-        #   decay_to: target score at age=scale, also acts as floor
-        # At age = 0: score = 1.0
-        # At age = scale: score = decay_to
-        function recency_score_linear(age, scale, decay_to) {
-            expression {
-                if (age == 0,
-                    1.0,
-                    max(decay_to, (scale - age * (1.0 - decay_to)) / scale))
-            }
-        }
-
-        # Gaussian decay (Elasticsearch-compatible)
-        # Formula: σ² = -scale² / (2 × ln(decay_to))
-        #          score = max(decay_to, exp(-age² / (2σ²)))
-        # Parameters:
-        #   age: effective age in seconds
-        #   scale: scale in seconds
-        #   decay_to: target score at age=scale, also acts as floor
-        # At age = 0: score = 1.0
-        # At age = scale: score = decay_to
-        # Formula: score = exp(age² × ln(decay_to) / scale²)
-        function recency_score_gaussian(age, scale, decay_to) {
-            expression {
-                if (age == 0,
-                    1.0,
-                    max(decay_to, exp(pow(age, 2) * log(decay_to) / pow(scale, 2))))
-            }
-        }
-
-        # Binary decay (step function)
-        # Score is 1.0 until age >= scale, then drops to decay_to
-        # Parameters:
-        #   age: effective age in seconds
-        #   scale: threshold in seconds
-        #   decay_to: score after threshold
-        function recency_score_binary(age, scale, decay_to) {
-            expression: if(age < scale, 1.0, decay_to)
-        }
-
-        function recency_score_router() {
-            expression {
-                if (query(marqo__recency_decay_function_type) == 0,
-                    recency_score_exponential(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
-                    if (query(marqo__recency_decay_function_type) == 1,
-                        recency_score_linear(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
-                        if (query(marqo__recency_decay_function_type) == 2,
-                            recency_score_gaussian(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)),
-                            recency_score_binary(effective_age(), query(marqo__recency_scale_seconds), query(marqo__recency_decay_to)))))
-            }
-        }
-
+        # ============ UNIFIED RECENCY SCORE ============
+        # Single entry point with early exits for performance
+        # Logic flow:
+        # 1. If recency disabled → 1.0
+        # 2. Elif no timestamp (get_timestamp=0) → decay_to (treat as very old)
+        # 3. Elif age >= scale + offset → decay_to (very old, beyond decay range)
+        # 4. Elif age >= offset → compute decay score
+        # 5. Elif grow disabled → 1.0 (future timestamp, no penalty when grow is disabled)
+        # 6. Elif age >= -growOffset → 1.0 (future, within plateau)
+        # 7. Elif age >= -growOffset - growScale → compute grow score
+        # 8. Else → grow_from (far future)
         function recency_score() {
-            expression: if(query(marqo__recency_should_calculate_score) != 0, recency_score_router(), 1.0)
-        }
-
-        function recency_multiplier() {
-            expression: if(query(marqo__recency_should_apply_score) != 0, recency_score(), 1.0)
+            expression {
+                if (query(marqo__recency_should_calculate_score) == 0,
+                    1.0,
+                    if (get_timestamp() == 0,
+                        query(marqo__recency_decay_to),
+                        if (age_in_seconds() >= query(marqo__recency_scale_seconds) + query(marqo__recency_offset_seconds),
+                            query(marqo__recency_decay_to),
+                            if (age_in_seconds() >= query(marqo__recency_offset_seconds),
+                                compute_score(
+                                    age_in_seconds() - query(marqo__recency_offset_seconds),
+                                    query(marqo__recency_scale_seconds),
+                                    query(marqo__recency_decay_to),
+                                    query(marqo__recency_decay_function_type)),
+                                if (query(marqo__recency_grow_enabled) == 0,
+                                    1.0,
+                                    if (age_in_seconds() >= -query(marqo__recency_grow_offset_seconds),
+                                        1.0,
+                                        if (age_in_seconds() >= -query(marqo__recency_grow_offset_seconds) - query(marqo__recency_grow_scale_seconds),
+                                            compute_score(
+                                                -age_in_seconds() - query(marqo__recency_grow_offset_seconds),
+                                                query(marqo__recency_grow_scale_seconds),
+                                                query(marqo__recency_grow_from),
+                                                query(marqo__recency_grow_function_type)),
+                                            query(marqo__recency_grow_from))))))))
+            }
         }
 
         function mult_modifier(mult_weights) {
@@ -269,8 +259,22 @@ schema {{ index.schema_name }} {
         function add_modifier(add_weights) {
             expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
         }
+        function apply_score_modifiers(score, mult_weights, add_weights) {
+            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+        }
+        function apply_recency_score(original_score) {
+            expression {
+                if (query(marqo__recency_add_to_score_weight) > 0,
+                    original_score + recency_score() * query(marqo__recency_add_to_score_weight),
+                    original_score * recency_score())
+            }
+        }
         function modify(score, mult_weights, add_weights) {
-            expression: (mult_modifier(mult_weights) * score + add_modifier(add_weights)) * recency_multiplier()
+            expression {
+                if (query(marqo__recency_should_apply_score) == 0,
+                    apply_score_modifiers(score, mult_weights, add_weights),
+                    apply_recency_score(apply_score_modifiers(score, mult_weights, add_weights)))
+            }
         }
         function global_mult_modifier() {
             expression: mult_modifier(query(marqo__mult_weights_global))
@@ -426,13 +430,20 @@ schema {{ index.schema_name }} {
             query(marqo__sort_field_weights_1) tensor<double>(p{})
             query(marqo__sort_field_weights_2) tensor<double>(p{})
 
+            # Recency parameters
             query(marqo__recency_should_calculate_score): 0
             query(marqo__recency_should_apply_score): 0
-            query(marqo__recency_decay_function_type): 0
             query(marqo__recency_timestamp_key) tensor<double>(p{})
+            query(marqo__recency_add_to_score_weight) double: 0.0
+            query(marqo__recency_decay_function_type): 0
             query(marqo__recency_scale_seconds) double: 604800.0
             query(marqo__recency_offset_seconds) double: 0.0
             query(marqo__recency_decay_to) double: 0.5
+            query(marqo__recency_grow_enabled): 0
+            query(marqo__recency_grow_function_type): 0
+            query(marqo__recency_grow_scale_seconds) double: 604800.0
+            query(marqo__recency_grow_offset_seconds) double: 0.0
+            query(marqo__recency_grow_from) double: 0.5
         }
     }
 

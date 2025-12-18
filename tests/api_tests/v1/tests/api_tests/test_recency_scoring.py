@@ -349,3 +349,270 @@ class TestRecencyScoring(MarqoTestCase):
         # Check error message mentions recency is not supported for structured indexes
         self.assertIn("message", error_response)
         self.assertIn("unstructured", error_response["message"].lower())
+
+    def test_grow_function_penalizes_future_documents(self):
+        """Test that growFrom/growFunction penalizes documents with future timestamps."""
+        index_name = self.unstructured_index_name
+
+        # Add documents with future timestamps
+        now = datetime.now()
+        docs = [
+            {
+                "_id": "present",
+                "title": "laptop computer device",
+                "description": "tech gadget product",
+                "created_at": int(now.timestamp())
+            },
+            {
+                "_id": "near-future",
+                "title": "laptop computer device",
+                "description": "tech gadget product",
+                "created_at": int((now + timedelta(days=3)).timestamp())
+            },
+            {
+                "_id": "far-future",
+                "title": "laptop computer device",
+                "description": "tech gadget product",
+                "created_at": int((now + timedelta(days=30)).timestamp())
+            }
+        ]
+
+        self.client.index(index_name).add_documents(docs, tensor_fields=["title", "description"])
+
+        # Search with grow function enabled
+        search_body = {
+            "q": "laptop",
+            "searchMethod": "HYBRID",
+            "limit": 10,
+            "recencyParameters": {
+                "recencyField": "created_at",
+                "scale": "7d",
+                "offset": "0d",
+                "decayFunction": "exponential",
+                "decayTo": 0.5,
+                "growFrom": 0.3,  # Future docs start at 0.3 and grow toward 1.0
+                "growFunction": "exponential",
+                "growScale": "7d",
+                "growOffset": "0d",
+                "applyInRankingPhase": "all"
+            }
+        }
+
+        response = requests.post(
+            f"{self._MARQO_URL}/indexes/{index_name}/search",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(search_body)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hits = response.json()["hits"]
+
+        present_doc = next((h for h in hits if h["_id"] == "present"), None)
+        near_future_doc = next((h for h in hits if h["_id"] == "near-future"), None)
+        far_future_doc = next((h for h in hits if h["_id"] == "far-future"), None)
+
+        # All documents should be found
+        self.assertIsNotNone(present_doc, "Present document should be in results")
+        self.assertIsNotNone(near_future_doc, "Near-future document should be in results")
+        self.assertIsNotNone(far_future_doc, "Far-future document should be in results")
+
+        # Present document should score highest (score = 1.0)
+        # Far future document should score lowest (penalized most)
+        self.assertGreater(
+            present_doc["_score"],
+            far_future_doc["_score"],
+            f"Present document (score={present_doc['_score']:.6f}) should score higher "
+            f"than far-future document (score={far_future_doc['_score']:.6f})"
+        )
+
+        # Near future should be between present and far future
+        self.assertGreater(
+            near_future_doc["_score"],
+            far_future_doc["_score"],
+            f"Near-future document (score={near_future_doc['_score']:.6f}) should score higher "
+            f"than far-future document (score={far_future_doc['_score']:.6f})"
+        )
+
+    def test_grow_offset_creates_future_plateau(self):
+        """Test that growOffset creates a plateau where future docs get score 1.0."""
+        index_name = self.unstructured_index_name
+
+        now = datetime.now()
+        docs = [
+            {
+                "_id": "present",
+                "title": "camera photography device",
+                "description": "digital equipment gear",
+                "created_at": int(now.timestamp())
+            },
+            {
+                "_id": "within-grow-offset",
+                "title": "camera photography device",
+                "description": "digital equipment gear",
+                "created_at": int((now + timedelta(days=2)).timestamp())  # Within 3-day offset
+            },
+            {
+                "_id": "beyond-grow-offset",
+                "title": "camera photography device",
+                "description": "digital equipment gear",
+                "created_at": int((now + timedelta(days=10)).timestamp())  # Beyond 3-day offset
+            }
+        ]
+
+        self.client.index(index_name).add_documents(docs, tensor_fields=["title", "description"])
+
+        # Search with 3-day grow offset (plateau)
+        search_body = {
+            "q": "camera",
+            "searchMethod": "HYBRID",
+            "limit": 10,
+            "recencyParameters": {
+                "recencyField": "created_at",
+                "scale": "7d",
+                "offset": "0d",
+                "decayFunction": "exponential",
+                "decayTo": 0.5,
+                "growFrom": 0.2,
+                "growFunction": "exponential",
+                "growScale": "7d",
+                "growOffset": "3d",  # 3-day plateau for future timestamps
+                "applyInRankingPhase": "all"
+            }
+        }
+
+        response = requests.post(
+            f"{self._MARQO_URL}/indexes/{index_name}/search",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(search_body)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hits = response.json()["hits"]
+
+        present = next((h for h in hits if h["_id"] == "present"), None)
+        within_offset = next((h for h in hits if h["_id"] == "within-grow-offset"), None)
+        beyond_offset = next((h for h in hits if h["_id"] == "beyond-grow-offset"), None)
+
+        self.assertIsNotNone(present)
+        self.assertIsNotNone(within_offset)
+        self.assertIsNotNone(beyond_offset)
+
+        # Present and within-offset should have similar scores (both get 1.0 recency)
+        # Beyond-offset should be penalized
+        self.assertGreater(
+            within_offset["_score"],
+            beyond_offset["_score"],
+            f"Doc within grow offset (score={within_offset['_score']:.6f}) should score higher "
+            f"than doc beyond offset (score={beyond_offset['_score']:.6f})"
+        )
+
+    def test_add_to_score_weight_additive_mode(self):
+        """Test that addToScoreWeight applies recency as additive instead of multiplicative."""
+        index_name = self.unstructured_index_name
+
+        now = datetime.now()
+        docs = [
+            {
+                "_id": "recent-additive",
+                "title": "headphones audio device",
+                "description": "music listening gear",
+                "created_at": int(now.timestamp())
+            },
+            {
+                "_id": "old-additive",
+                "title": "headphones audio device",
+                "description": "music listening gear",
+                "created_at": int((now - timedelta(days=30)).timestamp())
+            }
+        ]
+
+        self.client.index(index_name).add_documents(docs, tensor_fields=["title", "description"])
+
+        # Search with additive recency scoring
+        search_body = {
+            "q": "headphones",
+            "searchMethod": "HYBRID",
+            "limit": 10,
+            "recencyParameters": {
+                "recencyField": "created_at",
+                "scale": "7d",
+                "offset": "0d",
+                "decayFunction": "exponential",
+                "decayTo": 0.1,
+                "addToScoreWeight": 0.5,  # Add recency_score * 0.5 to the base score
+                "applyInRankingPhase": "all"
+            }
+        }
+
+        response = requests.post(
+            f"{self._MARQO_URL}/indexes/{index_name}/search",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(search_body)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hits = response.json()["hits"]
+
+        recent = next((h for h in hits if h["_id"] == "recent-additive"), None)
+        old = next((h for h in hits if h["_id"] == "old-additive"), None)
+
+        self.assertIsNotNone(recent, "Recent document should be in results")
+        self.assertIsNotNone(old, "Old document should be in results")
+
+        # Recent document should score higher due to additive recency boost
+        self.assertGreater(
+            recent["_score"],
+            old["_score"],
+            f"Recent document (score={recent['_score']:.6f}) should score higher "
+            f"than old document (score={old['_score']:.6f}) with additive recency"
+        )
+
+        # The difference should be noticeable since we're adding recency_score * 0.5
+        # Recent doc: base_score + 1.0 * 0.5
+        # Old doc: base_score + 0.1 * 0.5
+        # The absolute difference depends on base scores from hybrid search
+        score_difference = recent["_score"] - old["_score"]
+        self.assertGreater(
+            score_difference,
+            0.01,  # Should have meaningful difference due to additive boost
+            f"Score difference ({score_difference:.6f}) should be meaningful with additive scoring"
+        )
+
+    def test_gaussian_decay_function(self):
+        """Test that gaussian decay function works correctly."""
+        index_name = self.unstructured_index_name
+        self._add_test_documents(index_name)
+
+        search_body = {
+            "q": "product",
+            "searchMethod": "HYBRID",
+            "limit": 10,
+            "recencyParameters": {
+                "recencyField": "created_at",
+                "scale": "14d",
+                "offset": "0d",
+                "decayFunction": "gaussian",
+                "decayTo": 0.3,
+                "applyInRankingPhase": "all"
+            }
+        }
+
+        response = requests.post(
+            f"{self._MARQO_URL}/indexes/{index_name}/search",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(search_body)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hits = response.json()["hits"]
+
+        recent_doc = next((h for h in hits if h["_id"] == "recent"), None)
+        month_old_doc = next((h for h in hits if h["_id"] == "month-old"), None)
+
+        # Verify gaussian decay gives recent docs higher scores
+        if recent_doc and month_old_doc:
+            self.assertGreater(
+                recent_doc["_score"],
+                month_old_doc["_score"],
+                "Gaussian decay should give recent documents higher scores"
+            )
