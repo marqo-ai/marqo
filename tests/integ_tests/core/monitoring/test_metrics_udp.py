@@ -5,6 +5,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from typing import List
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -365,3 +366,12 @@ class TestStatsDClientDualStack(unittest.TestCase):
                 _has(pkt, r"test\.ipv6\.latency:250\|ms"),
                 msg=f"IPv6 timing metric not received\nSeen:\n{pkt}",
             )
+
+    def test_statsd_client_fallback_to_ipv4_when_resolution_fails(self):
+        """If getaddrinfo raises, we fall back to IPv4 and do not raise on send."""
+        with patch("socket.getaddrinfo", side_effect=socket.gaierror("mock resolution failure")):
+            client = sc.StatsDClient(host="does-not-resolve.invalid", port=8125)
+            # Fallback path should create an IPv4 socket
+            self.assertEqual(client._sock.family, socket.AF_INET)
+            # Sending should not raise (errors are swallowed and logged at debug)
+            client.increment("test.fallback.counter", 1)
