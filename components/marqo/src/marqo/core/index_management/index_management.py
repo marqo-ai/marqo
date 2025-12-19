@@ -2,6 +2,7 @@ import difflib
 from contextlib import contextmanager
 from typing import List, Tuple, Dict
 from typing import Optional
+import difflib
 
 import semver
 

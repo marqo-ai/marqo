@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
+from marqo.core import constants
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -19,7 +20,9 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
+from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.vespa.models import QueryResult
 
 
@@ -119,7 +122,49 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.collapse_field_name:
             query.update(self._generate_collapse_query_params(marqo_query.collapse_field_name))
 
+        if marqo_query.recency_parameters:
+            # Add recency parameters to query input
+            query_input: Dict[str, Any] = query['query_features']
+            query_input.update(self._get_recency_query_input(marqo_query.recency_parameters))
+
+            query['marqo__recency_enabled'] = True
+            query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
+
         return query
+
+    def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
+        # Parse duration strings to seconds for Vespa
+        scale_seconds = parse_duration_to_seconds(recency_params.scale)
+        offset_seconds = parse_duration_to_seconds(recency_params.offset)
+
+        result = {
+            constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE: 1,
+            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE: 0 if recency_params.apply_in_ranking_phase == ApplyInRankingPhase.ONLY_GLOBAL else 1,
+            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS: scale_seconds,
+            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS: offset_seconds,
+            constants.QUERY_INPUT_RECENCY_DECAY_TO: recency_params.decay_to,
+            constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {recency_params.recency_field: 1.0},
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: DecayFunction(recency_params.decay_function).vespa_value,
+            # Default to 0.0 for multiplicative mode (None means multiplicative)
+            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
+        }
+
+        # grow params, the recency_params validation ensures all or nothing for these params
+        if recency_params.grow_from is not None:
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED] = 1
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM] = recency_params.grow_from
+            result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE] = DecayFunction(recency_params.grow_function).vespa_value
+            result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = parse_duration_to_seconds(recency_params.grow_scale)
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = parse_duration_to_seconds(recency_params.grow_offset)
+        else:
+            # Grow disabled - set defaults for all grow parameters
+            result[constants.QUERY_INPUT_RECENCY_GROW_ENABLED] = 0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FROM] = 1.0
+            result[constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE] = 0  # exponential
+            result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = scale_seconds  # use same as decay scale
+            result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = 0
+
+        return result
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
         params = {

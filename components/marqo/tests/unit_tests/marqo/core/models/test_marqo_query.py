@@ -352,3 +352,113 @@ class TestMarqoHybridQuery(TestCase):
             "'searchableAttributes' cannot be used for hybrid search",
             str(context.exception)
         )
+
+    def test_recency_parameters_field(self):
+        """Test that recency_parameters can be set on MarqoHybridQuery."""
+        from marqo.tensor_search.models.recency_parameters import RecencyParameters
+
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF
+        )
+
+        # Test cases with different recency parameters
+        test_cases = [
+            ("exponential_default", RecencyParameters(recency_field="created_at")),
+            ("linear_custom", RecencyParameters(
+                recency_field="updated_at",
+                decay_function="linear",
+                scale="14d",
+                offset="1d",
+                decay_to=0.3
+            )),
+            ("gaussian_with_offset", RecencyParameters(
+                recency_field="publish_date",
+                decay_function="gaussian",
+                scale="24h",
+                offset="12h",
+                decay_to=0.75
+            )),
+            ("binary_step", RecencyParameters(
+                recency_field="event_time",
+                decay_function="binary",
+                scale="1d",
+                decay_to=0.01
+            )),
+        ]
+
+        for test_name, recency_params in test_cases:
+            with self.subTest(test_name):
+                query = MarqoHybridQuery(
+                    index_name="test_index",
+                    limit=10,
+                    or_phrases=["phrase1"],
+                    and_phrases=["phrase2"],
+                    hybrid_parameters=hybrid_parameters,
+                    recency_parameters=recency_params
+                )
+
+                self.assertIsNotNone(query.recency_parameters)
+                self.assertEqual(query.recency_parameters.recency_field, recency_params.recency_field)
+                self.assertEqual(query.recency_parameters.decay_function, recency_params.decay_function)
+
+    def test_recency_parameters_optional(self):
+        """Test that recency_parameters is optional."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF
+        )
+
+        query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            or_phrases=["phrase1"],
+            and_phrases=["phrase2"],
+            hybrid_parameters=hybrid_parameters
+        )
+
+        self.assertIsNone(query.recency_parameters)
+
+    def test_recency_parameters_inherited_from_marqo_query(self):
+        """Test that recency_parameters is inherited from MarqoQuery base class."""
+        # Verify it's defined in MarqoQuery
+        self.assertTrue(hasattr(MarqoQuery, '__fields__'))
+        self.assertIn('recency_parameters', MarqoQuery.__fields__)
+
+        # Verify it's accessible in all query types
+        from marqo.tensor_search.models.recency_parameters import RecencyParameters
+        recency_params = RecencyParameters(recency_field="created_at")
+
+        # MarqoTensorQuery should have it
+        tensor_query = MarqoTensorQuery(
+            index_name="test_index",
+            limit=10,
+            vector_query=[0.1, 0.2, 0.3],
+            recency_parameters=recency_params
+        )
+        self.assertIsNotNone(tensor_query.recency_parameters)
+
+        # MarqoLexicalQuery should have it
+        lexical_query = MarqoLexicalQuery(
+            index_name="test_index",
+            limit=10,
+            or_phrases=["phrase1"],
+            and_phrases=["phrase2"],
+            recency_parameters=recency_params
+        )
+        self.assertIsNotNone(lexical_query.recency_parameters)
+
+        # MarqoHybridQuery should have it
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF
+        )
+        hybrid_query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            or_phrases=["phrase1"],
+            and_phrases=["phrase2"],
+            hybrid_parameters=hybrid_parameters,
+            recency_parameters=recency_params
+        )
+        self.assertIsNotNone(hybrid_query.recency_parameters)
