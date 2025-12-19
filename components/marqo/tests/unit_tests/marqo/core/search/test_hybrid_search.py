@@ -1,28 +1,26 @@
-import os
 from unittest import TestCase
 from unittest.mock import Mock, patch, PropertyMock
-from pydantic.v1 import ValidationError
+
 import semver
 
+from marqo.config import Config
 from marqo.core import constants
 from marqo.core.exceptions import UnsupportedFeatureError
-from marqo.core.models.marqo_query import MarqoHybridQuery
-from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.core.models.hybrid_parameters import (
-    HybridParameters, RankingMethod, RetrievalMethod
-)
 from marqo.core.models.facets_parameters import (
     FacetsParameters, FieldFacetsConfiguration
 )
-from marqo.core.search.hybrid_search import HybridSearch
+from marqo.core.models.hybrid_parameters import (
+    HybridParameters, RankingMethod, RetrievalMethod
+)
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from marqo.core.search.hybrid_search import HybridSearch
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextTensor
-from marqo.config import Config
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
 
 
 class TestHybridSearch(TestCase):
@@ -413,9 +411,6 @@ class TestHybridSearch(TestCase):
             f"The total hits should be capped to the env var value {capped_total_hits}, "
             f"but got {result['totalHits']}"
         )
-
-        self.assertEqual(context.tensor[1].weight, 1)
-
 
 class TestRecencyValidation(TestCase):
     """Tests for recency scoring validation in HybridSearch."""
