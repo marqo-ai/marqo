@@ -1,6 +1,6 @@
 import logging
 import socket
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import marqo.logging
 from marqo.tensor_search.enums import EnvVars
@@ -24,16 +24,46 @@ class StatsDClient:
         port: Optional[int] = None,
         prefix: str = "",
     ) -> None:
-        self.addr = (
-            host or read_env_vars_and_defaults(EnvVars.STATSD_HOST),
-            int(port or read_env_vars_and_defaults_ints(EnvVars.STATSD_PORT)),
-        )
+        host = host or read_env_vars_and_defaults(EnvVars.STATSD_HOST)
+        port = int(port or read_env_vars_and_defaults_ints(EnvVars.STATSD_PORT))
+
         self.prefix = prefix
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.setblocking(False)
+        self._sock, self.addr = self._create_socket(host, port)
 
         # Parse once; reused for every metric
         self._common_tags = self._parse_common_tags(read_env_vars_and_defaults(EnvVars.STATSD_COMMON_TAGS))
+
+    @staticmethod
+    def _create_socket(host: str, port: int) -> Tuple[socket.socket, Tuple]:
+        """
+        Create a UDP socket that supports both IPv4 and IPv6 (dual-stack).
+
+        Args:
+            host: The hostname or IP address to connect to.
+            port: The port number.
+
+        Returns:
+            A tuple of (socket, address) where address is suitable for sendto().
+        """
+        # getaddrinfo returns a list of 5-tuples: (family, type, proto, canonname, sockaddr)
+        try:
+            addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_DGRAM)
+        except socket.gaierror:
+            addr_info = None
+
+        if addr_info:
+            # Use the first resolved address - socket family matches the host address type
+            # (IPv4 addresses get AF_INET, IPv6 addresses get AF_INET6)
+            family, socktype, proto, canonname, addr = addr_info[0]
+        else:
+            # Fall back to IPv4 if address resolution fails
+            family, socktype, proto = socket.AF_INET, socket.SOCK_DGRAM, 0
+            addr = (host, port)
+
+        sock = socket.socket(family, socktype, proto)
+        sock.setblocking(False)
+
+        return sock, addr
 
     def increment(
         self,
