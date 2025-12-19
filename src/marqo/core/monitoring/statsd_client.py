@@ -46,22 +46,28 @@ class StatsDClient:
             A tuple of (socket, address) where address is suitable for sendto().
         """
         # getaddrinfo returns a list of 5-tuples: (family, type, proto, canonname, sockaddr)
+        logger.debug(f"Resolving address for StatsD: host={host}, port={port}")
         try:
             addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_DGRAM)
-        except socket.gaierror:
+        except socket.gaierror as e:
+            logger.debug(f"Address resolution failed for {host}:{port}: {e}")
             addr_info = None
 
         if addr_info:
             # Use the first resolved address - socket family matches the host address type
             # (IPv4 addresses get AF_INET, IPv6 addresses get AF_INET6)
             family, socktype, proto, canonname, addr = addr_info[0]
+            family_name = "IPv6" if family == socket.AF_INET6 else "IPv4"
+            logger.debug(f"Address resolved: family={family_name}, addr={addr}")
         else:
             # Fall back to IPv4 if address resolution fails
             family, socktype, proto = socket.AF_INET, socket.SOCK_DGRAM, 0
             addr = (host, port)
+            logger.debug(f"Falling back to IPv4 socket: addr={addr}")
 
         sock = socket.socket(family, socktype, proto)
         sock.setblocking(False)
+        logger.debug(f"StatsD socket created: family={sock.family}, blocking=False")
 
         return sock, addr
 
