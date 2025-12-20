@@ -1453,6 +1453,97 @@ class TestRecencyScoring(MarqoTestCase):
         error_message = str(ctx.exception)
         self.assertIn("addToScoreWeight", error_message, "Error should mention addToScoreWeight parameter")
 
+    # ============== Parameter Validation Tests ==============
+
+    def test_recency_parameter_validation_errors(self):
+        """Test validation errors for RecencyParameters.
+
+        Covers error paths in recency_parameters.py and duration_parser.py:
+        - Empty recency_field
+        - Invalid scale/offset format
+        - Zero or negative scale/offset values
+        - Partial grow parameters
+        """
+        validation_cases = [
+            # (description, kwargs, expected_error_substring)
+            (
+                "empty recency_field",
+                {"recency_field": "", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5},
+                "recency_field cannot be empty"
+            ),
+            (
+                "whitespace recency_field",
+                {"recency_field": "   ", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5},
+                "recency_field cannot be empty"
+            ),
+            (
+                "invalid scale format",
+                {"recency_field": "timestamp", "scale": "invalid", "decay_function": "exponential", "decay_to": 0.5},
+                "Invalid scale format"
+            ),
+            (
+                "zero scale",
+                {"recency_field": "timestamp", "scale": "0d", "decay_function": "exponential", "decay_to": 0.5},
+                "scale must be greater than 0"
+            ),
+            (
+                "invalid offset format",
+                {"recency_field": "timestamp", "scale": "7d", "offset": "bad", "decay_function": "exponential", "decay_to": 0.5},
+                "Invalid offset format"
+            ),
+            (
+                "negative offset",
+                {"recency_field": "timestamp", "scale": "7d", "offset": "-1d", "decay_function": "exponential", "decay_to": 0.5},
+                "Invalid offset format"  # Regex doesn't match negative values
+            ),
+            (
+                "invalid grow_scale format",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_function": "exponential", "grow_scale": "invalid", "grow_offset": "0d"},
+                "Invalid grow_scale format"
+            ),
+            (
+                "zero grow_scale",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_function": "exponential", "grow_scale": "0d", "grow_offset": "0d"},
+                "grow_scale must be greater than 0"
+            ),
+            (
+                "invalid grow_offset format",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_function": "exponential", "grow_scale": "7d", "grow_offset": "bad"},
+                "Invalid grow_offset format"
+            ),
+            (
+                "negative grow_offset",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_function": "exponential", "grow_scale": "7d", "grow_offset": "-1d"},
+                "Invalid grow_offset format"  # Regex doesn't match negative values
+            ),
+            (
+                "partial grow params - missing grow_function",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_scale": "7d", "grow_offset": "0d"},
+                "Grow parameters must be either all provided or all omitted"
+            ),
+            (
+                "partial grow params - missing grow_scale and grow_offset",
+                {"recency_field": "timestamp", "scale": "7d", "decay_function": "exponential", "decay_to": 0.5,
+                 "grow_from": 0.5, "grow_function": "exponential"},
+                "Grow parameters must be either all provided or all omitted"
+            ),
+        ]
+
+        for description, kwargs, expected_error in validation_cases:
+            with self.subTest(case=description):
+                with self.assertRaises(ValueError) as ctx:
+                    RecencyParameters(**kwargs)
+                self.assertIn(
+                    expected_error,
+                    str(ctx.exception),
+                    f"Error for '{description}' should contain '{expected_error}'"
+                )
+
 
 if __name__ == '__main__':
     unittest.main()
