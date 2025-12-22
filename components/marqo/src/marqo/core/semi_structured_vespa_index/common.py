@@ -51,6 +51,7 @@ QUERY_INPUT_BM25_AGGREGATOR = 'marqo__bm25_aggregator'
 RANK_PROFILE_HYBRID_CUSTOM_SEARCHER = 'hybrid_custom_searcher'
 RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY = 'hybrid_bm25_then_embedding_similarity'
 RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 = 'hybrid_embedding_similarity_then_bm25'
+RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS = 'hybrid_bm25_second_phase_modifiers'
 
 QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL = "marqo__fields_to_rank_lexical"
 QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"

@@ -430,7 +430,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'marqo__hybrid.retrievalMethod': RetrievalMethod.Disjunction,
                     'marqo__hybrid.rrf_k': 60,
                     'marqo__hybrid.verbose': False,
-                    'marqo__ranking.lexical.lexical': 'new_bm25',
+                    'marqo__ranking.lexical.lexical': 'hybrid_bm25_second_phase_modifiers',
                     'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
                     'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
                     'marqo__ranking.tensor.tensor': 'embedding_similarity',

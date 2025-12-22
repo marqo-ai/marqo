@@ -371,7 +371,7 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
-    rank-profile bm25_new inherits base_rank_profile {
+    rank-profile hybrid_bm25_second_phase_modifiers inherits base_rank_profile {
         first-phase {
             expression: lexical_score()
         }

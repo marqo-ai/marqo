@@ -132,7 +132,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
-            query["marqo__ranking.lexical.lexical"] = "new_bm25"
+            query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
         if marqo_query.hybrid_parameters.rerankCount:
             query["ranking.rerankCount"] = marqo_query.hybrid_parameters.rerankCount
         if marqo_query.hybrid_parameters.weakAndParameters:
