@@ -339,6 +339,179 @@ class TestFacetsParameters(unittest.TestCase):
                 order="invalid"
             )
 
+class TestHybridParametersValidation(unittest.TestCase):
+    """Tests for HybridParameters validation logic."""
+
+    def test_rerank_depth_lexical_valid_with_lexical_retrieval(self):
+        """Test rerankDepthLexical is valid with lexical retrieval method."""
+        hp = HybridParameters(
+            retrievalMethod=RetrievalMethod.Lexical,
+            rankingMethod=RankingMethod.Tensor,
+            rerankDepthLexical=100
+        )
+        self.assertEqual(hp.rerankDepthLexical, 100)
+
+    def test_rerank_depth_lexical_valid_with_disjunction_retrieval(self):
+        """Test rerankDepthLexical is valid with disjunction retrieval method."""
+        hp = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            rerankDepthLexical=50
+        )
+        self.assertEqual(hp.rerankDepthLexical, 50)
+
+    def test_rerank_depth_lexical_invalid_with_tensor_retrieval(self):
+        """Test rerankDepthLexical fails with tensor retrieval method."""
+        with self.assertRaises(ValueError) as ctx:
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Tensor,
+                rankingMethod=RankingMethod.Tensor,
+                rerankDepthLexical=100
+            )
+        self.assertIn("rerankDepthLexical", str(ctx.exception))
+        self.assertIn("lexical", str(ctx.exception).lower())
+
+    def test_rerank_depth_lexical_must_be_at_least_1(self):
+        """Test rerankDepthLexical must be >= 1."""
+        with self.assertRaises(ValidationError):
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Lexical,
+                rankingMethod=RankingMethod.Tensor,
+                rerankDepthLexical=0
+            )
+
+    def test_weak_and_parameters_valid_with_rerank_depth_lexical(self):
+        """Test weakAndParameters is valid when rerankDepthLexical is set."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        hp = HybridParameters(
+            retrievalMethod=RetrievalMethod.Lexical,
+            rankingMethod=RankingMethod.Tensor,
+            rerankDepthLexical=100,
+            weakAndParameters=WeakAndParameters(
+                stopwordLimit=0.5,
+                adjustTarget=0.3
+            )
+        )
+        self.assertIsNotNone(hp.weakAndParameters)
+        self.assertEqual(hp.weakAndParameters.stopwordLimit, 0.5)
+
+    def test_weak_and_parameters_invalid_without_rerank_depth_lexical(self):
+        """Test weakAndParameters fails when rerankDepthLexical is not set."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        with self.assertRaises(ValueError) as ctx:
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                weakAndParameters=WeakAndParameters(
+                    stopwordLimit=0.5
+                )
+            )
+        self.assertIn("weakAndParameters", str(ctx.exception))
+        self.assertIn("rerankDepthLexical", str(ctx.exception))
+
+
+class TestWeakAndParameters(unittest.TestCase):
+    """Tests for WeakAndParameters model."""
+
+    def test_valid_weak_and_parameters(self):
+        """Test valid WeakAndParameters with all fields."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        params = WeakAndParameters(
+            stopwordLimit=0.5,
+            adjustTarget=0.3,
+            allowDropAll=True,
+            filterThreshold=0.1
+        )
+        self.assertEqual(params.stopwordLimit, 0.5)
+        self.assertEqual(params.adjustTarget, 0.3)
+        self.assertTrue(params.allowDropAll)
+        self.assertEqual(params.filterThreshold, 0.1)
+
+    def test_weak_and_parameters_optional_fields(self):
+        """Test WeakAndParameters with no fields (all optional)."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        params = WeakAndParameters()
+        self.assertIsNone(params.stopwordLimit)
+        self.assertIsNone(params.adjustTarget)
+        self.assertIsNone(params.allowDropAll)
+        self.assertIsNone(params.filterThreshold)
+
+    def test_weak_and_parameters_stopword_limit_range(self):
+        """Test stopwordLimit must be between 0 and 1."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        # Valid boundary values
+        WeakAndParameters(stopwordLimit=0)
+        WeakAndParameters(stopwordLimit=1)
+        WeakAndParameters(stopwordLimit=0.5)
+
+        # Invalid values
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(stopwordLimit=-0.1)
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(stopwordLimit=1.1)
+
+    def test_weak_and_parameters_adjust_target_range(self):
+        """Test adjustTarget must be between 0 and 1."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        # Valid boundary values
+        WeakAndParameters(adjustTarget=0)
+        WeakAndParameters(adjustTarget=1)
+
+        # Invalid values
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(adjustTarget=-0.1)
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(adjustTarget=1.1)
+
+    def test_weak_and_parameters_filter_threshold_range(self):
+        """Test filterThreshold must be between 0 and 1."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        # Valid boundary values
+        WeakAndParameters(filterThreshold=0)
+        WeakAndParameters(filterThreshold=1)
+
+        # Invalid values
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(filterThreshold=-0.1)
+        with self.assertRaises(ValidationError):
+            WeakAndParameters(filterThreshold=1.1)
+
+    def test_convert_to_vespa_query_dict_all_fields(self):
+        """Test convert_to_vespa_query_dict with all fields set."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        params = WeakAndParameters(
+            stopwordLimit=0.5,
+            adjustTarget=0.3,
+            allowDropAll=True,
+            filterThreshold=0.1
+        )
+        result = params.convert_to_vespa_query_dict()
+        self.assertEqual(result["ranking.matching.weakand.stopwordLimit"], 0.5)
+        self.assertEqual(result["ranking.matching.weakand.adjustTarget"], 0.3)
+        self.assertTrue(result["ranking.matching.weakand.allowDropAll"])
+        self.assertEqual(result["ranking.matching.filterThreshold"], 0.1)
+
+    def test_convert_to_vespa_query_dict_partial_fields(self):
+        """Test convert_to_vespa_query_dict excludes None fields."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        params = WeakAndParameters(
+            stopwordLimit=0.5,
+            allowDropAll=False
+        )
+        result = params.convert_to_vespa_query_dict()
+        self.assertEqual(result["ranking.matching.weakand.stopwordLimit"], 0.5)
+        self.assertFalse(result["ranking.matching.weakand.allowDropAll"])
+        self.assertNotIn("ranking.matching.weakand.adjustTarget", result)
+        self.assertNotIn("ranking.matching.filterThreshold", result)
+
+    def test_convert_to_vespa_query_dict_empty(self):
+        """Test convert_to_vespa_query_dict with no fields returns empty dict."""
+        from marqo.core.models.hybrid_parameters import WeakAndParameters
+        params = WeakAndParameters()
+        result = params.convert_to_vespa_query_dict()
+        self.assertEqual(result, {})
+
+
 if __name__ == "__main__":
     unittest.main()
 
