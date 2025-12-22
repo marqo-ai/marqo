@@ -207,6 +207,7 @@ class HybridSearch:
                     raise core_exceptions.UnsupportedFeatureError(
                         f"Recency grow parameters (growFrom) are only supported for unstructured indexes "
                         f"created with Marqo {str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
                     )
 
         if hybrid_parameters.secondPhaseModifier or hybrid_parameters.rerankCount:

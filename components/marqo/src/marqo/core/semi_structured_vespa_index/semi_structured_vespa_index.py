@@ -130,6 +130,14 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
+        # add lexical specific hybrid parameters
+        if marqo_query.hybrid_parameters.secondPhaseModifier:
+            query["marqo__ranking.lexical.lexical"] = "new_bm25"
+        if marqo_query.hybrid_parameters.rerankCount:
+            query["ranking.rerankCount"] = marqo_query.hybrid_parameters.rerankCount
+        if marqo_query.hybrid_parameters.weakAndParameters:
+            weak_and_query_dict = marqo_query.hybrid_parameters.weakAndParameters.convert_to_vespa_query_dict()
+            query.update(weak_and_query_dict)
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:

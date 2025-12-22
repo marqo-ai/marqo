@@ -596,7 +596,7 @@ class StructuredVespaIndex(VespaIndex):
             ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
 
-            'marqo__ranking.lexical.lexical': "bm25_new" if marqo_query.hybrid_parameters.secondPhaseModifier else common.RANK_PROFILE_BM25,
+            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,

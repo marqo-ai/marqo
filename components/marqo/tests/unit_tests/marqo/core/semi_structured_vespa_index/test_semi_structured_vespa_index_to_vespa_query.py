@@ -7,7 +7,7 @@ from typing import List
 from unittest.mock import MagicMock
 
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod, WeakAndParameters
 from marqo.core.models.marqo_index import (
     Model, TextPreProcessing, TextSplitMethod,
     ImagePreProcessing, HnswConfig, DistanceMetric, Field, FieldType,
@@ -409,6 +409,14 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                         alpha=0.5,
                         rrfK=60,
                         rerankDepthLexical=111,
+                        rerankCount=222,
+                        weakAndParameters=WeakAndParameters(
+                            stopwordLimit=0.2,
+                            adjustTarget=0.3,
+                            allowDropAll=True,
+                            filterThreshold=0.4
+                        ),
+                        secondPhaseModifier=True
                     ),
                     'approximate': True,
                     'approximate_threshold': 0.85,
@@ -422,10 +430,15 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'marqo__hybrid.retrievalMethod': RetrievalMethod.Disjunction,
                     'marqo__hybrid.rrf_k': 60,
                     'marqo__hybrid.verbose': False,
-                    'marqo__ranking.lexical.lexical': 'bm25',
+                    'marqo__ranking.lexical.lexical': 'new_bm25',
                     'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
                     'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
                     'marqo__ranking.tensor.tensor': 'embedding_similarity',
+                    'ranking.rerankCount': 222,
+                    "ranking.matching.weakand.stopwordLimit": 0.2,
+                    "ranking.matching.weakand.adjustTarget": 0.3,
+                    "ranking.matching.weakand.allowDropAll": True,
+                    "ranking.matching.filterThreshold": 0.4,
                     # Facets should still use the OR query structure
                     'marqo__yql.facets': 'select * from test_index where ((default contains "neural networks" OR default contains "deep learning") '
                                          'AND (default contains "transformer") OR '
@@ -450,7 +463,6 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     },
                     'ranking': 'hybrid_custom_searcher',
                     'ranking.matching.approximateThreshold': 0.85,
-                    'ranking.rerankCount': 40,
                     'searchChain': 'marqo',
                     'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.'
                 },
