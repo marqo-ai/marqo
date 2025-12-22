@@ -740,6 +740,18 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             'index_supports_recency_grow',
             lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)
 
+    @property
+    def index_supports_second_phase_lexical_score_modifiers(self) -> bool:
+        """
+        Check if the index schema supports second phase lexical score modifiers.
+        The second phase lexical score modifiers were added in version 2.25.0 as a new ranking profile is added.
+        """
+        return self._cache_or_get(
+            "index_supports_second_phase_lexical_score_modifiers",
+            lambda: self.parsed_schema_template_version() >= constants.
+            MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION
+        )
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'

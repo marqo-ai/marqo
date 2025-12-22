@@ -375,12 +375,10 @@ schema {{ index.schema_name }} {
         first-phase {
             expression: lexical_score()
         }
-
         second-phase {
             expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
-
     {% if collapse_field -%}
     rank-profile bm25_diversity inherits bm25 {
         diversity {
@@ -393,9 +391,6 @@ schema {{ index.schema_name }} {
     }
     {% endif -%}
     {% endif -%}
-
-
-
     {# We provide this rank profile even without the tensor field to support embed requests -#}
     rank-profile embedding_similarity inherits base_rank_profile {
         first-phase {

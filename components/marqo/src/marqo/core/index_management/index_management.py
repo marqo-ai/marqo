@@ -1,5 +1,4 @@
 import difflib
-import difflib
 import semver
 from contextlib import contextmanager
 from typing import List, Tuple, Dict
