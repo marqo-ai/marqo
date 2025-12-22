@@ -1,0 +1,31 @@
+name: "multimodal-model"
+backend: "onnxruntime"
+max_batch_size: 16
+
+input [
+
+  {
+    name: "image"
+    data_type: TYPE_FP32
+    dims: [3, 224, 224]
+  },
+
+  {
+    name: "text"
+    data_type: TYPE_INT64
+    dims: [77]
+  }
+
+]
+
+output [
+
+  {
+    name: "embeddings"
+    data_type: TYPE_FP32
+    dims: [512]
+  }
+
+]
+
+dynamic_batching { }

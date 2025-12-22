@@ -1,0 +1,77 @@
+[project]
+name = "marqo-api"
+version = "0.0.1"
+description = "The core API component of Marqo"
+readme = "README.md"
+requires-python = ">=3.11, <3.12"
+dependencies = [
+    "blake3>=1.0.7",
+    "cachetools>=6.2.1",
+    "fastapi>=0.119.0",
+    "httpx>=0.28.1",
+    "jsonschema>=4.25.1",
+    "kazoo>=2.10.0",
+    "memory-profiler>=0.61.0",
+    "msgpack>=1.1.2",
+    "msgpack-numpy>=0.4.8",
+    "nltk>=3.9.2",
+    "orjson>=3.11.3",
+    "pillow>=11.3.0",
+    "psutil>=7.1.0",
+    "pydantic>=2.12.0",
+    "python-json-logger>=4.0.0",
+    "python-magic>=0.4.27",
+    "readerwriterlock>=1.0.9",
+    "semver>=3.0.4",
+    "uvicorn>=0.37.0",
+    "validators>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "diff-cover>=9.7.1",
+    "docker>=7.1.0",
+    "dotenv>=0.9.9",
+    "hypothesis>=6.140.3",
+    "notebook>=7.4.7",
+    "opentelemetry-test-utils>=0.58b0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-md-report>=0.7.0",
+    "pytest-retry>=1.7.0",
+    "pytest-subtests>=0.14.2",
+    "pyvespa>=0.62.0",
+    "pyyaml>=6.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+pythonpath = ["src",  "."]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/marqo/src/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

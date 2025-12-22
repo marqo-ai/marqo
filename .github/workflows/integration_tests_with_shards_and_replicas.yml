@@ -24,21 +24,21 @@ permissions:
 
 jobs:
   Unit-Tests-1-Shard-1-Replica:
-    uses: ./.github/workflows/integration_tests_CI.yml
+    uses: ./.github/workflows/integration_tests_CI_marqo_api.yml
     secrets: inherit
     with:
       number_of_shards: 1
       number_of_replicas: 1
 
   Unit-Tests-2-Shard-0-Replica:
-    uses: ./.github/workflows/integration_tests_CI.yml
+    uses: ./.github/workflows/integration_tests_CI_marqo_api.yml
     secrets: inherit
     with:
       number_of_shards: 2
       number_of_replicas: 0
 
   Unit-Tests-2-Shard-1-Replica:
-    uses: ./.github/workflows/integration_tests_CI.yml
+    uses: ./.github/workflows/integration_tests_CI_marqo_api.yml
     secrets: inherit
     with:
       number_of_shards: 2

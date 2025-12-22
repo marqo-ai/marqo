@@ -1,0 +1,25 @@
+name: "{{ name }}"
+backend: "onnxruntime"
+max_batch_size: {{ max_batch_size }}
+
+input [
+{% for inp in input %}
+  {
+    name: "{{ inp.name }}"
+    data_type: {{ inp.data_type }}
+    dims: [{{ inp.dims | join(', ') }}]
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+
+output [
+{% for out in output %}
+  {
+    name: "{{ out.name }}"
+    data_type: {{ out.data_type }}
+    dims: [{{ out.dims | join(', ') }}]
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+
+dynamic_batching { }
