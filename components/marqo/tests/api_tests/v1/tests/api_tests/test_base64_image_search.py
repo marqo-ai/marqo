@@ -76,7 +76,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                     },
                     {
                         "_id": "coco_doc",
-                        "image": TestImageUrls.COCO.value,
+                        "image": TestImageUrls.IMAGE1.value,
                         "title": "COCO dataset image"
                     }
                 ]
@@ -152,7 +152,7 @@ class TestBase64ImageSearch(MarqoTestCase):
             },
             {
                 "_id": "coco_doc",
-                "image": TestImageUrls.COCO.value,
+                "image": TestImageUrls.IMAGE1.value,
                 "title": "COCO dataset image"
             }
         ]
@@ -205,7 +205,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                     },
                     {
                         "_id": "coco_doc",
-                        "image": TestImageUrls.COCO.value,
+                        "image": TestImageUrls.IMAGE1.value,
                         "title": "COCO dataset image with various objects"
                     },
                     {
@@ -308,7 +308,7 @@ class TestBase64ImageSearch(MarqoTestCase):
                     },
                     {
                         "_id": "coco_doc",
-                        "image": TestImageUrls.COCO.value,
+                        "image": TestImageUrls.IMAGE1.value,
                         "title": "COCO dataset image with various objects"
                     },
                     {

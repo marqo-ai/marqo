@@ -23,6 +23,7 @@ from marqo.tensor_search.enums import (
 from marqo.core.models import MarqoIndex
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
@@ -51,7 +52,8 @@ class HybridSearch:
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
-            collapse_field_name: Optional[str] = None
+            collapse_field_name: Optional[str] = None,
+            recency_parameters: Optional[RecencyParameters] = None
     ) -> Dict:
         """
 
@@ -83,6 +85,7 @@ class HybridSearch:
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
                 collapse_field_name:  field name to collapse the search result on.
+                recency_parameters: parameters for recency boosting
             Returns:
 
             Output format:
@@ -175,6 +178,37 @@ class HybridSearch:
                 f"The 'relevanceCutoff' feature is only supported for unstructured indexes created "
                 f"with Marqo version {constants.MARQO_SEMI_UNSTRUCTURED_INDEX_VERSION} or later "
             )
+
+        if recency_parameters:
+            # Recency scoring is only supported for SemiStructured indexes
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise core_exceptions.UnsupportedFeatureError(
+                    "Recency scoring is only supported for unstructured indexes. "
+                    "Structured indexes do not support the recencyParameters option."
+                )
+            # Check schema version supports recency
+            if not marqo_index.index_supports_recency_scoring:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"Recency scoring is only supported for unstructured indexes created with Marqo "
+                    f"{str(constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)} or later. "
+                    f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                )
+            # Check if addToScoreWeight requires newer schema version
+            if recency_parameters.add_to_score_weight is not None:
+                if not marqo_index.index_supports_recency_additive:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Additive recency scoring (addToScoreWeight) is only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
+            # Check if growFrom requires newer schema version
+            if recency_parameters.grow_from is not None:
+                if not marqo_index.index_supports_recency_grow:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Recency grow parameters (growFrom) are only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -296,7 +330,8 @@ class HybridSearch:
             language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
-            collapse_field_name=collapse_field_name
+            collapse_field_name=collapse_field_name,
+            recency_parameters=recency_parameters
         )
 
         vespa_index = vespa_index_factory(marqo_index)

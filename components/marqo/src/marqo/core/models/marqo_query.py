@@ -11,6 +11,7 @@ from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParse
 from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.recency_parameters import RecencyParameters
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -25,6 +26,7 @@ class MarqoQuery(StrictBaseModel, ABC):
     filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
+    recency_parameters: Optional[RecencyParameters] = None
 
     @validator('filter', pre=True, always=True)
     def parse_filter(cls, filter):
