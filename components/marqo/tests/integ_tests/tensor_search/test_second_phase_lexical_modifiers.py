@@ -1,16 +1,22 @@
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierOperator
 from tests.integ_tests.marqo_test import MarqoTestCase
+import pytest
+from marqo.core.exceptions import UnsupportedFeatureError
 
 
+@pytest.mark.skip_for_multinode
 class TestSecondPhaseLexicalModifiers(MarqoTestCase):
     """
     Combined tests for unstructured and structured hybrid search.
+    Note that these tests are skipped for multinode as the multinode setup as the rerankCount is applied to
+    each content node separately.
     """
 
     @classmethod
@@ -142,3 +148,62 @@ class TestSecondPhaseLexicalModifiers(MarqoTestCase):
         ]
         # The relevant document should not be in the results as it is squeezed out
         self.assertNotIn("relevant_0", second_phase_score_modifier_results_large_rerank_count_ids)
+
+
+class TestUnsupportedScenarioForSecondPhaseLexicalModifiers(MarqoTestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        structured_default_text_index = cls.structured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            fields=[FieldRequest(name='title', type=FieldType.Text)],
+            tensor_fields = ['title']
+        )
+        unstructured_index_with_collapse_field = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            collapse_fields=[CollapseField(name="category")],
+        )
+
+        cls.create_indexes([
+            structured_default_text_index,
+            unstructured_index_with_collapse_field,
+        ])
+
+        cls.structured_marqo_index = structured_default_text_index.name
+        cls.unstructured_index_with_collapse_field = unstructured_index_with_collapse_field.name
+
+    def test_structured_index_raises_error(self):
+        with self.assertRaises(UnsupportedFeatureError) as cm:
+             tensor_search.search(
+                config=self.config,
+                index_name=self.structured_marqo_index,
+                text="test",
+                search_method=SearchMethod.HYBRID,
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Lexical,
+                    secondPhaseModifier=True,
+                    rerankCount=10,
+                ),
+                result_count=10,
+                offset=0
+            )
+        self.assertIn("is only supported for unstructured indexes", str(cm.exception))
+
+    def test_unstructured_index_with_collapse_field_raises_error(self):
+        with self.assertRaises(UnsupportedFeatureError) as cm:
+             tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_index_with_collapse_field,
+                text="test",
+                search_method=SearchMethod.HYBRID,
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Lexical,
+                    secondPhaseModifier=True,
+                    rerankCount=10,
+                ),
+                result_count=10,
+                offset=0
+            )
+        self.assertIn("collapse fields as the collapse operation disables second phase", str(cm.exception))

@@ -798,3 +798,104 @@ class TestRecencyValidation(TestCase):
         # The validation should pass (no error raised)
         # This test verifies that the validation ONLY fails when grow_from is provided
         self.assertIsNone(recency_params.grow_from)
+
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_second_phase_modifier_on_structured_index_raises_error(self, mock_metrics):
+        """Test that secondPhaseModifier on structured index raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        # Create a mock structured index
+        marqo_index = Mock(spec=StructuredMarqoIndex)
+        marqo_index.name = "test_structured_index"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
+
+        config = Mock(spec=Config)
+
+        hybrid_parameters = HybridParameters(
+            secondPhaseModifier=True
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=hybrid_parameters
+            )
+
+        self.assertIn("secondPhaseModifier", str(ctx.exception))
+        self.assertIn("unstructured", str(ctx.exception).lower())
+
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_second_phase_modifier_on_old_schema_version_raises_error(self, mock_metrics):
+        """Test that secondPhaseModifier on old schema version raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        # Create a mock semi-structured index with old schema version
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.24.0"  # Old version
+        marqo_index.marqo_version = "2.24.0"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.24.0")
+        # Does NOT support second phase lexical score modifiers
+        type(marqo_index).index_supports_second_phase_lexical_score_modifiers = PropertyMock(return_value=False)
+        marqo_index.collapse_fields = None
+
+        config = Mock(spec=Config)
+
+        hybrid_parameters = HybridParameters(
+            secondPhaseModifier=True
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=hybrid_parameters
+            )
+
+        self.assertIn("secondPhaseModifier", str(ctx.exception))
+        self.assertIn(str(constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION), str(ctx.exception))
+
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_second_phase_modifier_with_collapse_fields_raises_error(self, mock_metrics):
+        """Test that secondPhaseModifier with collapse fields raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        # Create a mock semi-structured index with collapse fields
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.25.0"  # New version
+        marqo_index.marqo_version = "2.25.0"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
+        # Supports second phase lexical score modifiers
+        type(marqo_index).index_supports_second_phase_lexical_score_modifiers = PropertyMock(return_value=True)
+        # Has collapse fields
+        marqo_index.collapse_fields = [Mock(name="category")]
+
+        config = Mock(spec=Config)
+
+        hybrid_parameters = HybridParameters(
+            secondPhaseModifier=True
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=hybrid_parameters
+            )
+
+        self.assertIn("secondPhaseModifier", str(ctx.exception))
+        self.assertIn("collapse", str(ctx.exception).lower())
