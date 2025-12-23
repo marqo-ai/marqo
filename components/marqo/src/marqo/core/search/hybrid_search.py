@@ -210,23 +210,23 @@ class HybridSearch:
                         f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
                     )
 
-        if hybrid_parameters.secondPhaseModifier or hybrid_parameters.rerankCount:
+        if hybrid_parameters.secondPhaseModifier:
             if not isinstance(marqo_index, SemiStructuredMarqoIndex):
                 raise core_exceptions.UnsupportedFeatureError(
-                    f"'secondPhaseModifier' and 'rerankCount' are only supported for unstructured indexes created "
+                    f"'secondPhaseModifier' is only supported for unstructured indexes created "
                     f"with Marqo {constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION} or later "
                 )
 
             if not marqo_index.index_supports_second_phase_lexical_score_modifiers:
                 raise core_exceptions.UnsupportedFeatureError(
-                    f"'secondPhaseModifier' and 'rerankCount' are only supported for unstructured indexes created "
+                    f"'secondPhaseModifier' is supported for unstructured indexes created "
                     f"with Marqo {constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION} or later. "
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
             if marqo_index.collapse_fields is not None:
                 raise core_exceptions.UnsupportedFeatureError(
-                    f"'secondPhaseModifier' and 'rerankCount' cannot be used when an index has "
+                    f"'secondPhaseModifier' cannot be used when an index has "
                     f"collapse fields as the collapse operation disables second phase ranking "
                 )
 

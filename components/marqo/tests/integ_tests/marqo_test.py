@@ -117,6 +117,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True,
                                                deployment_lock_timeout_seconds=2)
         remote_inference_url=os.environ.get("MARQO_REMOTE_INFERENCE_URL", "http://localhost:8884")
+        print(f"Using remote inference url: {remote_inference_url}")
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client,
                                    inference=InferenceClient(base_url=remote_inference_url),
