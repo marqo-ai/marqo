@@ -186,7 +186,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             relevance_cutoff: Optional[dict] = None,
             sort_by: Optional[dict] = None,
             limit: int = 10, offset: int = 0,
-            hybrid_parameters: Optional[dict] = None
+            hybrid_parameters: Optional[dict] = None,
+            rerankDepthLexical: Optional[int] = None,
     ) -> dict:
         """Helper method to perform search with consistent parameters."""
 
@@ -194,8 +195,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
                 "rankingMethod": "rrf",
-                "alpha": 0.5
-
+                "alpha": 0.5,
+                "rerankDepthLexical": rerankDepthLexical
             }
 
         if index_name is None:
@@ -521,8 +522,30 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             "Most restrictive threshold should exclude low-relevance docs"
         )
 
+    def test_sort_with_relevance_cutoff_preserves_high_relevance_docs_with_rerankDepthLexical(self):
+        """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values when using
+        weakAnd in the lexical search."""
+        result = self._search_helper(
+            sort_by={
+                "fields": [{"field_name": "sort_value", "order": "asc"}]  # Ascending favors low sort values
+            },
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "parameters": {"relativeScoreFactor": 0.6}
+            },
+            limit=15,
+            rerankDepthLexical=150,
+        )
+
+        ids = [hit["_id"] for hit in result["hits"]]
+
+        self.assertEqual(16, result["_relevantCandidates"])
+        self.assertEqual(25, result["_probeCandidates"])
+        self.assertEqual(['m10', 'm7', 'h7', 'm6', 'm5', 'h5', 'm2', 'm4', 'h3', 'h9', 'h1', 'h10', 'h6', 'h8', 'h2'],
+                         ids)
+
     def test_sort_with_relevance_cutoff_preserves_high_relevance_docs(self):
-        """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values."""
+        """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values"""
         result = self._search_helper(
             sort_by={
                 "fields": [{"field_name": "sort_value", "order": "asc"}]  # Ascending favors low sort values
