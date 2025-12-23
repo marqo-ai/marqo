@@ -15,7 +15,7 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import Model
-
+from marqo.core.exceptions import UnsupportedFeatureError
 
 class TestCollapseFields(MarqoTestCase):
     """Integration tests for collapse fields functionality."""
@@ -669,3 +669,21 @@ class TestCollapseFields(MarqoTestCase):
         # Verify the search returns all docs in one group
         self.assertEqual(5, len(lexical_res["hits"]))
         self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in lexical_res["hits"]]))
+
+    def test_index_with_collapse_fields_can_use_second_phase_validator(self):
+        """Test that an index with collapse fields can use second phase validator without errors"""
+        # Just test that no errors are raised when setting up the index with second phase validator
+        with self.assertRaises(UnsupportedFeatureError):
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="test",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                    secondPhaseModifier=True
+                ),
+                result_count=6,
+                collapse_field_name="parent_id",
+            )

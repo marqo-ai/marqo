@@ -27,6 +27,14 @@ from marqo.core.inference.inference_client.inference_client import InferenceClie
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
+import dotenv
+
+
+# Load environment variables from .env file if it exists in the component's root directory
+component_bath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if os.path.exists(os.path.join(component_bath, '.env')):
+    print(f"Loading .env file at {component_bath}/.env to run tests")
+    dotenv.load_dotenv(os.path.join(component_bath, '.env'))
 
 
 class TestImageUrls(str, Enum):

@@ -224,6 +224,12 @@ class HybridSearch:
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
+            if marqo_index.collapse_fields is not None:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"'secondPhaseModifier' and 'rerankCount' cannot be used when an index has "
+                    f"collapse fields as the collapse operation disables second phase ranking "
+                )
+
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
         # split queries into lexical and tensor

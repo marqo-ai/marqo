@@ -1,13 +1,11 @@
+import httpx
+import pytest
+import vespa.application as pyvespa
 from unittest.mock import patch
 
-import httpx
-import vespa.application as pyvespa
-
-from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
 from tests.integ_tests.marqo_test import AsyncMarqoTestCase
-import pytest
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):

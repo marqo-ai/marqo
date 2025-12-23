@@ -371,6 +371,7 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
+    {% if not collapse_field -%}
     rank-profile hybrid_bm25_second_phase_modifiers inherits base_rank_profile {
         first-phase {
             expression: lexical_score()
@@ -379,6 +380,7 @@ schema {{ index.schema_name }} {
             expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
+    {% endif -%}
     {% if collapse_field -%}
     rank-profile bm25_diversity inherits bm25 {
         diversity {

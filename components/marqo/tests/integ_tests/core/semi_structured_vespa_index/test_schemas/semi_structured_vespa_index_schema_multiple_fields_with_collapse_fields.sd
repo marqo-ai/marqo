@@ -331,6 +331,7 @@ schema marqo__test_00semi_00structured_00schema {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
+
     rank-profile bm25_diversity inherits bm25 {
         diversity {
             attribute: parent_id
