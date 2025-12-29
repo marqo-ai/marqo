@@ -361,7 +361,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            sort_by: Optional[SortByModel] = None,
            interpolation_method: Optional[InterpolationMethod] = None,
            collapse_field_name: Optional[str] = None,
-           recency_parameters=None
+           recency_parameters=None,
+           query_tag=None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -534,7 +535,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 relevance_cutoff=relevance_cutoff, sort_by=sort_by,
                 interpolation_method=interpolation_method,
                 collapse_field_name=collapse_field_name,
-                recency_parameters=recency_parameters
+                recency_parameters=recency_parameters,
+                query_tag=query_tag,
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:

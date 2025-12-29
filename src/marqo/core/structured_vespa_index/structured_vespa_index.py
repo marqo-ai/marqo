@@ -603,7 +603,7 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
-
+            'marqo__query_tag': marqo_query.query_tag,
         }
 
         query = {k: v for k, v in query.items() if v is not None}

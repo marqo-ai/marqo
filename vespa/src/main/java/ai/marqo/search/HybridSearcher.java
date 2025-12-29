@@ -12,10 +12,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.container.logging.HitCounts;
 import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.handler.SearchResponse;
+import com.yahoo.search.result.Coverage;
 import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
@@ -134,6 +137,9 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    // Add these fields to track stats from sub-queries
+    private record SubQueryStats(String queryId, long totalHits, int hits, Coverage coverage) {}
+
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern DOC_ID_PATTERN =
             Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -235,6 +241,10 @@ public class HybridSearcher extends Searcher {
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled);
 
+        // TODO do we need to capture modified or original query or both?
+        Result finalResult = new Result(query);
+        List<SubQueryStats> subQueryStatsList = new ArrayList<>();
+
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
@@ -264,33 +274,50 @@ public class HybridSearcher extends Searcher {
                                 + e.toString());
             }
 
+            subQueryStatsList.add(
+                    new SubQueryStats(
+                            "l1", // main-lexical
+                            resultLexical.getTotalHitCount(),
+                            resultLexical.hits().size(),
+                            resultLexical.getCoverage(false)));
+            finalResult.mergeWith(resultLexical);
+
+            subQueryStatsList.add(
+                    new SubQueryStats(
+                            "t1", // main-tensor
+                            resultTensor.getTotalHitCount(),
+                            resultTensor.hits().size(),
+                            resultTensor.getCoverage(false)));
+            finalResult.mergeWith(resultTensor);
+
             // Collect errors from lexical and tensor results.
             HitGroup combinedErrors =
                     collectErrorsFromResults(resultLexical, resultTensor, verbose);
             if (combinedErrors.getError() != null) {
-                return new Result(query, combinedErrors);
-            }
-
-            logIfVerbose(
-                    "LEXICAL RESULTS: "
-                            + resultLexical.toString()
-                            + " || TENSOR RESULTS: "
-                            + resultTensor.toString(),
-                    verbose);
-
-            // Execute fusion ranking on the two result sets.
-            if (rankingMethod.equals("rrf")) {
-                hitsForPostProcessing =
-                        rrf(
-                                resultTensor.hits(),
-                                resultLexical.hits(),
-                                rrf_k,
-                                alpha,
-                                verbose,
-                                collapse);
+                hitsForPostProcessing = combinedErrors;
+                finalResult.setHits(combinedErrors);
             } else {
-                throw new RuntimeException(
-                        "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
+                logIfVerbose(
+                        "LEXICAL RESULTS: "
+                                + resultLexical.toString()
+                                + " || TENSOR RESULTS: "
+                                + resultTensor.toString(),
+                        verbose);
+                // Execute fusion ranking on the two result sets.
+                if (rankingMethod.equals("rrf")) {
+                    hitsForPostProcessing =
+                            rrf(
+                                    resultTensor.hits(),
+                                    resultLexical.hits(),
+                                    rrf_k,
+                                    alpha,
+                                    verbose,
+                                    collapse);
+                } else {
+                    // TODO validate input in one place
+                    throw new RuntimeException(
+                            "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
+                }
             }
 
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
@@ -299,6 +326,8 @@ public class HybridSearcher extends Searcher {
                         createSubQuery(query, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
+                finalResult.setHits(hitsForPostProcessing);
+                finalResult.mergeWith(result);
                 logIfVerbose("Unprocessed results: ", verbose);
                 logHitGroup(hitsForPostProcessing, verbose);
             } else {
@@ -311,52 +340,104 @@ public class HybridSearcher extends Searcher {
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
 
-        // Determine post-processing mode based on query parameters
-        HitGroup processedHits;
         Integer sortCandidates = null;
-        if (sortByFields != null) {
-            // If sortBy is set, we will sort the hits after post-processing
-            processedHits =
-                    postProcessBySort(
-                            hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
-            sortCandidates = hitsForPostProcessing.size();
-        } else {
-            // If sortBy is not set, we use the default post-processing
-            processedHits =
-                    postProcessResults(
-                            hitsForPostProcessing,
-                            query,
-                            rerankDepthGlobal,
-                            limit,
-                            offset,
-                            verbose);
-        }
+        if (finalResult.hits().getError() == null) {
+            // Determine post-processing mode based on query parameters
+            HitGroup processedHits;
 
-        if (!futureFacets.isEmpty()) {
-            attachFacetsResult(futureFacets, timeout, processedHits, verbose);
-        }
+            if (sortByFields != null) {
+                // If sortBy is set, we will sort the hits after post-processing
+                processedHits =
+                        postProcessBySort(
+                                hitsForPostProcessing,
+                                sortByFields,
+                                sortBySortDepth,
+                                limit,
+                                offset);
+                sortCandidates = hitsForPostProcessing.size();
+            } else {
+                // If sortBy is not set, we use the default post-processing
+                processedHits =
+                        postProcessResults(
+                                hitsForPostProcessing,
+                                query,
+                                rerankDepthGlobal,
+                                limit,
+                                offset,
+                                verbose);
+            }
 
-        // Extract recency multiplier from match features after post-processing (only if recency is
-        // enabled)
-        processedHits = extractRecencyScore(processedHits, query, verbose);
+            if (!futureFacets.isEmpty()) {
+                // TODO attach facets query stats
+                attachFacetsResult(
+                        futureFacets, timeout, processedHits, subQueryStatsList, verbose);
+            }
+
+            // Extract recency multiplier from match features after post-processing (only if recency
+            // is
+            // enabled)
+            processedHits = extractRecencyScore(processedHits, query, verbose);
+
+            finalResult.setHits(processedHits);
+        }
 
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
+        finalResult.hits().setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
 
-        processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
-        return new Result(query, processedHits);
+        String tag = query.properties().getString("marqo__query_tag", "");
+        populateAccessLogHitCounts(query, finalResult, tag, subQueryStatsList);
+        return finalResult;
+    }
+
+    private void populateAccessLogHitCounts(
+            Query query, Result result, String tag, List<SubQueryStats> subQueryStatsList) {
+        var httpRequest = query.getHttpRequest();
+        if (httpRequest == null) return;
+
+        httpRequest
+                .getAccessLogEntry()
+                .ifPresent(
+                        entry -> {
+                            HitCounts hitCounts = SearchResponse.createHitCounts(query, result);
+                            entry.setHitCounts(hitCounts);
+                            entry.addKeyValue("tag", tag);
+                            subQueryStatsList.forEach(
+                                    (stats) -> {
+                                        entry.addKeyValue(
+                                                stats.queryId + "_hits",
+                                                String.valueOf(stats.hits()));
+                                        entry.addKeyValue(
+                                                stats.queryId + "_total",
+                                                String.valueOf(stats.totalHits()));
+                                        Coverage coverage = stats.coverage();
+                                        if (coverage != null) {
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_cov_docs",
+                                                    String.valueOf(coverage.getDocs()));
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_cov_pct",
+                                                    String.valueOf(coverage.getResultPercentage()));
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_cov_deg",
+                                                    coverage.isDegraded() ? "1" : "0");
+                                        }
+                                    });
+                        });
     }
 
     private void attachFacetsResult(
             List<Future<Result>> futureFacets,
             Integer timeout,
             HitGroup processedHits,
+            List<SubQueryStats> subQueryStatsList,
             boolean verbose) {
         try {
             long startTime = System.currentTimeMillis();
             int facetCounter = 0;
             for (Future<Result> futureFacet : futureFacets) {
                 Result facetsResult = futureFacet.get(timeout, TimeUnit.MILLISECONDS);
+
                 if (facetsResult != null && facetsResult.hits() != null) {
                     // Ensure unique IDs for each facet group by adding counter
                     int hitCounter = 0;
@@ -370,6 +451,13 @@ public class HybridSearcher extends Searcher {
                     // Add facets as children to the processed hits
                     processedHits.addAll(facetsResult.hits().asList());
                     facetCounter++;
+
+                    subQueryStatsList.add(
+                            new SubQueryStats(
+                                    "f" + facetCounter,
+                                    facetsResult.getTotalHitCount(),
+                                    facetsResult.hits().size(),
+                                    facetsResult.getCoverage(false)));
                 }
             }
             long facetsTime = System.currentTimeMillis() - startTime;

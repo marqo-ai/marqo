@@ -60,6 +60,15 @@
     </dependencies>
     <build>
         <plugins>
+            <plugin>
+                <groupId>com.yahoo.vespa</groupId>
+                <artifactId>bundle-plugin</artifactId>
+                <version>${vespa.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <suppressWarningPublicApi>true</suppressWarningPublicApi>
+                </configuration>
+            </plugin>
             <plugin>    <!-- To avoid the @ warning -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -167,5 +176,6 @@
         <java.version>17</java.version>
         <error-prone.version>2.28.0</error-prone.version>
         <org.junit.version>5.10.3</org.junit.version>
+        <vespa.version>8.332.5</vespa.version>
     </properties>
 </project>
