@@ -500,6 +500,13 @@ public class HybridSearcher extends Searcher {
         query.properties().set(QUERY_RERANK_COUNT, newHits);
 
         // Update tensor YQL targetHits if it exists
+        /* Update to lexical YQL is not needed
+        1. if the relevantCandidates < current lexical targetHits, fetching more is not harmful,
+        2. if the relevantCandidates > current lexical targetHits, we should not increase it as it
+        could potentially change the results set. We don't want to change the result set if
+        relevance cut-off determines a higher hits number. This behavior is consistent with how we
+        handle tensor targetHits.
+         */
         if (currentTensorTargetHits != null
                 && !Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
             int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
@@ -507,12 +514,6 @@ public class HybridSearcher extends Searcher {
                     overwriteTargetHitsAndExploreAdditionalHits(
                             tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
-
-            String lexicalYQL =
-                    query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_LEXICAL, "");
-            String updatedLexicalYQL =
-                    overwriteTargetHitsIfPresent(lexicalYQL, newTensorTargetHits);
-            query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_LEXICAL, updatedLexicalYQL);
         }
         return query;
     }

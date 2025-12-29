@@ -749,7 +749,6 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     def index_supports_second_phase_lexical_score_modifiers(self) -> bool:
         """
         Check if the index schema supports second phase lexical score modifiers.
-        The second phase lexical score modifiers were added in version 2.25.0 as a new ranking profile is added.
         """
         return self._cache_or_get(
             "index_supports_second_phase_lexical_score_modifiers",
