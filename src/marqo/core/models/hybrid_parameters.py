@@ -163,3 +163,19 @@ class HybridParameters(StrictBaseModel):
                 "'weakAndParameters' can only be set when 'rerankDepthLexical' is set"
             )
         return values
+
+    @root_validator(pre=False)
+    def validate_second_phase_modifier(cls, values):
+        second_phase_modifier = values.get('secondPhaseModifier')
+        ranking_method = values.get('rankingMethod')
+        retrieval_method = values.get('retrievalMethod')
+
+        if second_phase_modifier is True and not (
+            (retrieval_method == RetrievalMethod.Lexical and ranking_method == RankingMethod.Lexical)
+            or retrieval_method == RetrievalMethod.Disjunction
+        ):
+            raise ValueError(
+                "'secondPhaseModifier' can only be set to True when 'retrievalMethod' is 'disjunction' or both "
+                "'retrievalMethod' and 'rankingMethod' are 'lexical'"
+            )
+        return values

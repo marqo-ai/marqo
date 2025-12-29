@@ -132,14 +132,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
-            query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
+            if marqo_query.collapse_field_name:
+                query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity'
+            else:
+                query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
         if marqo_query.hybrid_parameters.rerankCount:
             query["ranking.rerankCount"] = marqo_query.hybrid_parameters.rerankCount
         if marqo_query.hybrid_parameters.weakAndParameters:
             weak_and_query_dict = marqo_query.hybrid_parameters.weakAndParameters.convert_to_vespa_query_dict()
             query.update(weak_and_query_dict)
-
-
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:
