@@ -1,8 +1,7 @@
 from enum import Enum
-from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic.v1 import validator, root_validator
+from pydantic.v1 import validator, root_validator, Field
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
@@ -18,6 +17,22 @@ class RankingMethod(str, Enum):
     RRF = 'rrf'
     Tensor = 'tensor'
     Lexical = 'lexical'
+
+
+class WeakAndParameters(StrictBaseModel):
+    stopwordLimit: Optional[float] = Field(None, ge=0, le=1)
+    adjustTarget: Optional[float] = Field(None, ge=0, le=1)
+    allowDropAll: Optional[bool] = None
+    filterThreshold: Optional[float] = Field(None, ge=0, le=1)
+
+    def convert_to_vespa_query_dict(self):
+        dict = {
+            "ranking.matching.weakand.stopwordLimit": self.stopwordLimit,
+            "ranking.matching.weakand.adjustTarget": self.adjustTarget,
+            "ranking.matching.weakand.allowDropAll": self.allowDropAll,
+            "ranking.matching.filterThreshold": self.filterThreshold,
+        }
+        return {k: v for k, v in dict.items() if v is not None}
 
 
 class HybridParameters(StrictBaseModel):
@@ -37,8 +52,14 @@ class HybridParameters(StrictBaseModel):
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
 
     rerankDepthTensor: Optional[int] = None
+    rerankDepthLexical: Optional[int] = Field(None, ge=1)
+
     queryLexical: Optional[str] = None
     queryTensor: Optional[Union[str, dict]] = None
+
+    weakAndParameters: Optional[WeakAndParameters] = None
+    rerankCount: Optional[int] = Field(None, ge=1)
+    secondPhaseModifier: Optional[bool] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
@@ -118,3 +139,27 @@ class HybridParameters(StrictBaseModel):
             if rrfK < 0:
                 raise ValueError("rrfK can only be greater than or equal to 0")
         return rrfK
+
+    @root_validator(pre=False)
+    def validate_and_set_rerankDepthLexical(cls, values):
+        # We do not distinguish between default None and explicitly provided None here
+        rerank_depth_lexical = values.get('rerankDepthLexical')
+        retrieval_method = values.get('retrievalMethod')
+
+        if rerank_depth_lexical is not None and retrieval_method not in [RetrievalMethod.Lexical,
+                                                                         RetrievalMethod.Disjunction]:
+            raise ValueError(
+                "'rerankDepthLexical' can only be set when 'retrievalMethod' is 'lexical' or 'disjunction'"
+            )
+        return values
+
+    @root_validator(pre=False)
+    def validate_weakand_parameters(cls, values):
+        rerank_depth_lexical = values.get('rerankDepthLexical')
+        weak_and_parameters = values.get('weakAndParameters')
+
+        if rerank_depth_lexical is None and weak_and_parameters is not None:
+            raise ValueError(
+                "'weakAndParameters' can only be set when 'rerankDepthLexical' is set"
+            )
+        return values

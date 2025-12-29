@@ -42,6 +42,7 @@ RANK_PROFILE_MODIFIERS = 'modifiers'
 RANK_PROFILE_BM25_MODIFIERS_2_9 = 'bm25_modifiers'
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 = 'embedding_similarity_modifiers'
 
+
 # Note field names are also used as query inputs, so make sure these reserved names have a marqo__ prefix
 QUERY_INPUT_EMBEDDING_2_10 = 'embedding_query'      # Keep for backwards compatibility
 QUERY_INPUT_EMBEDDING = "marqo__query_embedding"    # TODO: see if this change from 'embedding_query' to 'embedding_query' changes anything
@@ -51,6 +52,7 @@ QUERY_INPUT_BM25_AGGREGATOR = 'marqo__bm25_aggregator'
 RANK_PROFILE_HYBRID_CUSTOM_SEARCHER = 'hybrid_custom_searcher'
 RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY = 'hybrid_bm25_then_embedding_similarity'
 RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 = 'hybrid_embedding_similarity_then_bm25'
+RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS = 'hybrid_bm25_second_phase_modifiers'
 
 QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL = "marqo__fields_to_rank_lexical"
 QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
@@ -58,3 +60,4 @@ QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
 VESPA_DOC_HYBRID_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
 VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
 VESPA_DOC_RECENCY_SCORE = 'marqo__recency_score'
+

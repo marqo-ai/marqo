@@ -576,7 +576,8 @@ class StructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,
+            'ranking.rerankCount': marqo_query.hybrid_parameters.rerankCount if \
+                marqo_query.hybrid_parameters.rerankCount else marqo_query.limit + marqo_query.offset,
             # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
@@ -841,11 +842,19 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery, is_facets_term=False) -> str:
+    def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) \
+            -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
+            rerank_depth_lexical: Optional[int] = marqo_query.hybrid_parameters.rerankDepthLexical
         else:
             score_modifiers = marqo_query.score_modifiers
+            rerank_depth_lexical: Optional[int] = None
+
+        # Adjust rerank depth if needed. We adjust it here instead of in the query object as the hybrids parameters
+        # has no access to limit and offset
+        if rerank_depth_lexical is not None:
+            rerank_depth_lexical = max(marqo_query.limit+marqo_query.offset, rerank_depth_lexical)
 
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
@@ -854,16 +863,27 @@ class StructuredVespaIndex(VespaIndex):
             return 'true'
 
         # Optional tokens
-        if marqo_query.or_phrases and score_modifiers or is_facets_term:
-            or_terms = ' OR '.join([
-                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
-            ])
-        elif marqo_query.or_phrases and not score_modifiers:
-            or_terms = 'weakAnd(%s)' % ', '.join([
-                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
-            ])
+        if rerank_depth_lexical is None or is_facets_term:
+            if (marqo_query.or_phrases and score_modifiers) or is_facets_term:
+                or_terms = ' OR '.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+            elif marqo_query.or_phrases and not score_modifiers:
+                or_terms = 'weakAnd(%s)' % ', '.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+            else:
+                or_terms = ''
         else:
-            or_terms = ''
+            if rerank_depth_lexical <= 0:  # pragma: no cover
+                raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
+            if marqo_query.or_phrases:
+                or_terms = ','.join([
+                    self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+                ])
+                or_terms = f'{{targetHits:{rerank_depth_lexical}}}weakAnd(' + or_terms + ')'
+            else:
+                or_terms = ''
 
         # Required tokens
         if marqo_query.and_phrases:
