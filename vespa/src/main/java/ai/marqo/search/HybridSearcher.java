@@ -1269,7 +1269,7 @@ public class HybridSearcher extends Searcher {
         }
 
         if (newTargetHits == 0) {
-            newTargetHits = 1;
+            newTargetHits = 1; // The newTargetHits could be 0 if the relevantCandidates is 0
         }
 
         long targetHitsCount = TARGET_HITS_PATTERN.matcher(yql).results().count();
