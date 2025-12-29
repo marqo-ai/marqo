@@ -10,6 +10,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierOperator
 from tests.integ_tests.marqo_test import MarqoTestCase
+from pydantic.v1 import ValidationError
 
 
 @pytest.mark.skip_for_multinode
@@ -239,6 +240,34 @@ class TestUnsupportedScenarioForSecondPhaseLexicalModifiers(MarqoTestCase):
                 offset=0
             )
         self.assertIn("is only supported for unstructured indexes", str(cm.exception))
+
+    def test_unsupported_retrieval_and_ranking_combination_raises_error(self):
+        test_cases = [
+            (RetrievalMethod.Tensor, RankingMethod.Lexical, "retrievalMethod: tensor, rankingMethod: lexical"),
+            (RetrievalMethod.Lexical, RankingMethod.Tensor, "retrievalMethod: lexical, rankingMethod: tensor"),
+            (RetrievalMethod.Tensor, RankingMethod.Tensor, "retrievalMethod: tensor, rankingMethod: tensor"),
+        ]
+        for retrieval_method, ranking_method, description in test_cases:
+            with self.subTest(description=description):
+                with self.assertRaises(ValidationError) as cm:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.unstructured_index_with_collapse_field,
+                        text="test",
+                        search_method=SearchMethod.HYBRID,
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=retrieval_method,
+                            rankingMethod=ranking_method,
+                            secondPhaseModifier=True,
+                            rerankCount=10,
+                        ),
+                        result_count=10,
+                        offset=0
+                    )
+                self.assertIn(
+                    "'secondPhaseModifier' can only be set to True when 'retrievalMethod' is 'disjunction' or both "
+                    "'retrievalMethod' and 'rankingMethod' are 'lexical'", str(cm.exception)
+                )
 
 
 class TestRerankDepthLexicalAndWeakAndParameters(MarqoTestCase):

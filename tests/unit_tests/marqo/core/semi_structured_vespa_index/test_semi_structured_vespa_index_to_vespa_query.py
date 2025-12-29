@@ -49,7 +49,8 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
         name: str,
         lexical_field_names: List[str] = [],
         tensor_field_names: List[str] = [],
-        string_array_field_names: List[str] = []
+        string_array_field_names: List[str] = [],
+        version: str = '2.16.0' # Version that supports hybrid search and partial updates
     ) -> SemiStructuredMarqoIndex:
         """Helper method to create a semi-structured Marqo index for testing."""
         
@@ -97,7 +98,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
             distance_metric=DistanceMetric.Angular,
             vector_numeric_type='float',
             hnsw_config=HnswConfig(ef_construction=100, m=16),
-            marqo_version='2.16.0',  # Version that supports hybrid search and partial updates
+            marqo_version=version,
             created_at=time.time(),
             updated_at=time.time(),
             text_preprocessing=TextPreProcessing(
@@ -445,7 +446,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                                          '(({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) '
                                          'OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))) '
                                          'limit 0 | all(group(1.1) each(output(count())))',
-                    'marqo__yql.lexical': 'select * from test_index where (({targetHits:111}weakAnd(default contains "neural networks",default contains "deep learning")) AND (default contains "transformer"))',
+                    'marqo__yql.lexical': 'select * from test_index where (({targetHits:111}weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
                     'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
                     'model_restrict': 'test_index',
                     'offset': 10,
@@ -482,7 +483,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                         rankingMethod=RankingMethod.RRF,
                         alpha=0.8,
                         rrfK=100,
-                        rerankDepthLexical=111
+                        rerankDepthLexical=111,
                     )
                 },
                 'expected_query': {
@@ -518,7 +519,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.'
                 },
                 'should_have_language': False
-            }
+            },
         ]
 
         for test_case in test_cases:
@@ -1051,6 +1052,58 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
         # But minimal summary params should NOT be set for old schema versions
         self.assertNotIn('collapse.summary', vespa_query)
         self.assertNotIn('FieldFiller.disable', vespa_query)
+
+    def test_hybrid_query_with_collapse_fields_and_second_phase_modifier(self):
+        marqo_query = MarqoHybridQuery(
+            index_name="test_index",
+            limit=10,
+            offset=0,
+            or_phrases=[],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(secondPhaseModifier=True),
+            collapse_field_name='parent_id',
+            facets=FacetsParameters(
+                fields={
+                    "price": FieldFacetsConfiguration(type="number", ranges=[
+                        {"from": 0, "to": 1},
+                        {"from": 1, "to": 3},
+                    ]),
+                    "color": FieldFacetsConfiguration(type="string")
+                }
+            ),
+            track_total_hits=True,
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+
+        # assert collapsefield are populated
+        self.assertEqual('parent_id', vespa_query['collapsefield'])
+        self.assertEqual(1, vespa_query['collapsesize'])
+        self.assertEqual('collapse-minimal-summary', vespa_query['collapse.summary'])
+        self.assertTrue(vespa_query['FieldFiller.disable'])
+
+        # assert rank profiles with '_diversity' suffix is used
+        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity',
+                         vespa_query['marqo__ranking.lexical.lexical'])
+        self.assertEqual(common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.tensor.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.lexical.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
+                         vespa_query['marqo__ranking.tensor.lexical'])
+
+        # assert facets query has an extra grouping
+        self.assertEqual('select * from test_index where (false OR False) limit 0 | all(group(1.1) '
+                         'each(group(parent_id) output(count())))\n'
+                         '---MARQO-YQL-QUERY-DELIMITER---\n'
+                         'select * from test_index where (false OR False) limit 0 | all( '
+                         'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
+                         'bucket(1.0, 3.0))) max(100) order(-count()) each(group(parent_id) '
+                         'output(count()))) all(group(predefined(marqo__float_fields{"price"}, '
+                         'bucket(0.0, 1.0), bucket(1.0, 3.0))) max(100) order(-count()) '
+                         'each(group(parent_id) output(count()))) '
+                         'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
+                         'each(group(parent_id) output(count()))) )', vespa_query['marqo__yql.facets'])
+
 
 
 class TestSemiStructuredVespaIndexToVespaQueryFacets(MarqoTestCase):
