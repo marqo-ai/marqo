@@ -12,6 +12,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.container.logging.AccessLogEntry;
 import com.yahoo.container.logging.HitCounts;
 import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
@@ -25,6 +26,7 @@ import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.AsyncExecution;
 import com.yahoo.search.searchchain.Execution;
+import com.yahoo.search.statistics.ElapsedTime;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
@@ -89,6 +91,18 @@ public class HybridSearcher extends Searcher {
                 throw new RuntimeException(e);
             }
         }
+
+        public void addToAccessLogEntry(AccessLogEntry entry) {
+            if (sortCandidates != null) {
+                entry.addKeyValue("c_sort", String.valueOf(sortCandidates));
+            }
+            if (probeCandidates != null) {
+                entry.addKeyValue("c_probe", String.valueOf(probeCandidates));
+            }
+            if (relevantCandidates != null) {
+                entry.addKeyValue("c_rel", String.valueOf(relevantCandidates));
+            }
+        }
     }
 
     /**
@@ -138,7 +152,8 @@ public class HybridSearcher extends Searcher {
     }
 
     // Add these fields to track stats from sub-queries
-    private record SubQueryStats(String queryId, long totalHits, int hits, Coverage coverage) {}
+    private record SubQueryStats(
+            String queryId, long totalHits, int hits, Coverage coverage, ElapsedTime elapsedTime) {}
 
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern DOC_ID_PATTERN =
@@ -147,6 +162,15 @@ public class HybridSearcher extends Searcher {
             Pattern.compile("(targetHits\\s*:\\s*)(\\d+)");
     private static final Pattern HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN =
             Pattern.compile("(hnsw\\.exploreAdditionalHits\\s*:\\s*)(\\d+)");
+
+    private SubQueryStats statsFromResult(String queryId, Result result) {
+        return new SubQueryStats(
+                queryId,
+                result.getTotalHitCount(),
+                result.hits().size(),
+                result.getCoverage(false),
+                result.getElapsedTime());
+    }
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -207,6 +231,10 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Query limit cannot be null.");
         }
 
+        // TODO do we need to capture modified or original query or both?
+        Result finalResult = new Result(query);
+        List<SubQueryStats> subQueryStatsList = new ArrayList<>();
+
         List<Future<Result>> futureFacets =
                 getFacetsFutureList(query, execution, verbose, collapse);
 
@@ -219,6 +247,9 @@ public class HybridSearcher extends Searcher {
             Query probeLexicalQuery =
                     createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
             Result probeLexicalResult = execution.search(probeLexicalQuery);
+
+            subQueryStatsList.add(statsFromResult("p", probeLexicalResult));
+
             probeCandidates = probeLexicalResult.hits().size();
             relevantCandidates =
                     detectCutoffCount(
@@ -240,10 +271,6 @@ public class HybridSearcher extends Searcher {
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled);
-
-        // TODO do we need to capture modified or original query or both?
-        Result finalResult = new Result(query);
-        List<SubQueryStats> subQueryStatsList = new ArrayList<>();
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -274,20 +301,10 @@ public class HybridSearcher extends Searcher {
                                 + e.toString());
             }
 
-            subQueryStatsList.add(
-                    new SubQueryStats(
-                            "l1", // main-lexical
-                            resultLexical.getTotalHitCount(),
-                            resultLexical.hits().size(),
-                            resultLexical.getCoverage(false)));
+            subQueryStatsList.add(statsFromResult("l", resultLexical));
             finalResult.mergeWith(resultLexical);
 
-            subQueryStatsList.add(
-                    new SubQueryStats(
-                            "t1", // main-tensor
-                            resultTensor.getTotalHitCount(),
-                            resultTensor.hits().size(),
-                            resultTensor.getCoverage(false)));
+            subQueryStatsList.add(statsFromResult("t", resultTensor));
             finalResult.mergeWith(resultTensor);
 
             // Collect errors from lexical and tensor results.
@@ -386,12 +403,16 @@ public class HybridSearcher extends Searcher {
         finalResult.hits().setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
 
         String tag = query.properties().getString("marqo__query_tag", "");
-        populateAccessLogHitCounts(query, finalResult, tag, subQueryStatsList);
+        populateAccessLogHitCounts(query, finalResult, tag, subQueryStatsList, marqoMetadataFields);
         return finalResult;
     }
 
     private void populateAccessLogHitCounts(
-            Query query, Result result, String tag, List<SubQueryStats> subQueryStatsList) {
+            Query query,
+            Result result,
+            String tag,
+            List<SubQueryStats> subQueryStatsList,
+            MarqoMetadataFields marqoMetadataFields) {
         var httpRequest = query.getHttpRequest();
         if (httpRequest == null) return;
 
@@ -402,6 +423,10 @@ public class HybridSearcher extends Searcher {
                             HitCounts hitCounts = SearchResponse.createHitCounts(query, result);
                             entry.setHitCounts(hitCounts);
                             entry.addKeyValue("tag", tag);
+                            entry.addKeyValue("limit", String.valueOf(query.getHits()));
+                            entry.addKeyValue("offset", String.valueOf(query.getOffset()));
+                            marqoMetadataFields.addToAccessLogEntry(entry);
+
                             subQueryStatsList.forEach(
                                     (stats) -> {
                                         entry.addKeyValue(
@@ -418,9 +443,16 @@ public class HybridSearcher extends Searcher {
                                             entry.addKeyValue(
                                                     stats.queryId + "_cov_pct",
                                                     String.valueOf(coverage.getResultPercentage()));
+                                            // TODO log out degradation reason if degraded
+                                        }
+                                        ElapsedTime elapsedTime = stats.elapsedTime();
+                                        if (elapsedTime != null) {
                                             entry.addKeyValue(
-                                                    stats.queryId + "_cov_deg",
-                                                    coverage.isDegraded() ? "1" : "0");
+                                                    stats.queryId + "_t_search",
+                                                    String.valueOf(elapsedTime.searchTime()));
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_t_fill",
+                                                    String.valueOf(elapsedTime.fillTime()));
                                         }
                                     });
                         });
@@ -452,12 +484,7 @@ public class HybridSearcher extends Searcher {
                     processedHits.addAll(facetsResult.hits().asList());
                     facetCounter++;
 
-                    subQueryStatsList.add(
-                            new SubQueryStats(
-                                    "f" + facetCounter,
-                                    facetsResult.getTotalHitCount(),
-                                    facetsResult.hits().size(),
-                                    facetsResult.getCoverage(false)));
+                    subQueryStatsList.add(statsFromResult("f" + facetCounter, facetsResult));
                 }
             }
             long facetsTime = System.currentTimeMillis() - startTime;
