@@ -503,8 +503,16 @@ public class HybridSearcher extends Searcher {
         if (currentTensorTargetHits != null
                 && !Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
             int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
-            String tensorYQLUpdated = overwriteTargetHits(tensorYQL, newTensorTargetHits, efSearch);
+            String tensorYQLUpdated =
+                    overwriteTargetHitsAndExploreAdditionalHits(
+                            tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
+
+            String lexicalYQL =
+                    query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_LEXICAL, "");
+            String updatedLexicalYQL =
+                    overwriteTargetHitsIfPresent(lexicalYQL, newTensorTargetHits);
+            query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_LEXICAL, updatedLexicalYQL);
         }
         return query;
     }
@@ -626,9 +634,7 @@ public class HybridSearcher extends Searcher {
          */
         HitGroup result = new HitGroup();
         result.addAll(combined);
-
         result.trim(offset, limit);
-
         return result;
     }
 
@@ -1121,6 +1127,10 @@ public class HybridSearcher extends Searcher {
         probeLexicalQuery.setOffset(0);
         probeLexicalQuery.properties().set(QUERY_RERANK_COUNT, probeDepth);
 
+        String currentYql = probeLexicalQuery.properties().getString("yql");
+        String updatedYql = overwriteTargetHitsIfPresent(currentYql, probeDepth);
+        probeLexicalQuery.properties().set("yql", updatedYql);
+
         logIfVerbose(
                 String.format(
                         "Created probe lexical query as: %s", probeLexicalQuery.toDetailString()),
@@ -1203,17 +1213,8 @@ public class HybridSearcher extends Searcher {
      * @return Updated YQL string with new targetHits and hnsw.exploreAdditionalHits values.
      */
     @VisibleForTesting
-    String overwriteTargetHits(String yql, int newTargetHits, int efSearch) {
-        // Validate input
-        if (newTargetHits < 0) {
-            throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
-        }
-
-        if (newTargetHits == 0) {
-            // If targetHits is set to 0, we can set it to 1 to avoid error from Vespa
-            newTargetHits = 1;
-        }
-
+    String overwriteTargetHitsAndExploreAdditionalHits(
+            String yql, int newTargetHits, int efSearch) {
         // Count targetHits occurrences
         long targetHitsCount = TARGET_HITS_PATTERN.matcher(yql).results().count();
 
@@ -1240,18 +1241,41 @@ public class HybridSearcher extends Searcher {
                             + " hnsw.exploreAdditionalHits occurrences. Both must have the same"
                             + " count.");
         }
+        // Overwrite targetHits
+        String updatedYql = overwriteTargetHitsIfPresent(yql, newTargetHits);
 
-        // Replace all targetHits occurrences
-        String updatedYql = TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
-
-        // Also update hnsw.exploreAdditionalHits to max(efSearch - newTargetHits, 0)
-        int newExploreAdditionalHits = Math.max(efSearch - newTargetHits, 0);
+        // Also update hnsw.exploreAdditionalHits to max(efSearch - normalizedTargetHits, 0)
+        // Note: overwriteTargetHit normalizes 0 to 1, so we must use the same normalized value here
+        int newExploreAdditionalHits = Math.max(efSearch - Math.max(newTargetHits, 1), 0);
         updatedYql =
                 HNSW_EXPLORE_ADDITIONAL_HITS_PATTERN
                         .matcher(updatedYql)
                         .replaceAll("$1" + newExploreAdditionalHits);
 
         return updatedYql;
+    }
+
+    /**
+     * Overwrites the targetHits in the YQL string if it is present.
+     * @param yql The original YQL string containing targetHits.
+     * @param newTargetHits The new targetHits value to set in the YQL string.
+     * @return Updated YQL string with new targetHits value if present, otherwise returns original YQL.
+     */
+    String overwriteTargetHitsIfPresent(String yql, Integer newTargetHits) {
+        // Validate input
+        if (newTargetHits < 0) {
+            throw new RuntimeException("targetHits value must be positive, got: " + newTargetHits);
+        }
+
+        if (newTargetHits == 0) {
+            newTargetHits = 1;
+        }
+
+        long targetHitsCount = TARGET_HITS_PATTERN.matcher(yql).results().count();
+        if (targetHitsCount == 0) {
+            return yql;
+        }
+        return TARGET_HITS_PATTERN.matcher(yql).replaceAll("$1" + newTargetHits);
     }
 
     public Query createSubQuery(

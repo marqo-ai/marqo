@@ -378,7 +378,14 @@ schema marqo__test_00semi_00structured_00schema {
         }
     }
 
-    
+    rank-profile hybrid_bm25_second_phase_modifiers inherits base_rank_profile {
+        first-phase {
+            expression: lexical_score()
+        }
+        second-phase {
+            expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
