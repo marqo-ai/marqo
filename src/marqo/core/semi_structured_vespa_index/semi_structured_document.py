@@ -24,6 +24,7 @@ def generate_uuid_str() -> str:
 class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
+    marqo__popularity: Optional[float] = None
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
@@ -153,6 +154,7 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
             id=doc_id,
             fixed_fields=SemiStructuredVespaDocumentFields(
                 marqo__id=doc_id,
+                marqo__popularity=document.get('popularity', 0.0),
                 version_uuid=generate_uuid_str() if index_supports_partial_updates else None,
             ),
             index_supports_partial_updates=index_supports_partial_updates
