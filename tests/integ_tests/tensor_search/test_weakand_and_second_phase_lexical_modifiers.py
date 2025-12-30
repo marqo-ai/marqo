@@ -200,6 +200,35 @@ class TestSecondPhaseLexicalModifiers(MarqoTestCase):
         # The relevant document should be the only result
         self.assertEqual("relevant_0", second_phase_score_modifier_results_rerank_1_ids[0])
 
+    def test_second_phase_modifier_work_with_disjunction(self):
+        """Ensure that second phase lexical modifiers work with disjunction retrieval method."""
+        disjunction_result = tensor_search.search(
+            config=self.config,
+            index_name=self.index_name,
+            text="relevant documents",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0.01, # Set a low alpha to prioritise lexical scores
+                scoreModifiersLexical=ScoreModifierLists(
+                    add_to_score=[
+                        ScoreModifierOperator(
+                            field_name="score_modifier_value",
+                            weight=1.0
+                        )
+                    ]
+                ),
+                secondPhaseModifier=True,
+                rerankCount=10,
+            ),
+            result_count=10,
+            offset=0
+        )
+
+        ids = [doc['_id'] for doc in disjunction_result['hits']]
+        self.assertEqual("relevant_0", ids[-1])
+
 
 class TestUnsupportedScenarioForSecondPhaseLexicalModifiers(MarqoTestCase):
     @classmethod
@@ -444,3 +473,122 @@ class TestRerankDepthLexicalAndWeakAndParameters(MarqoTestCase):
         )
 
         self.assertEqual([], results_with_stop_word_limit_and_drop_all['hits'])
+
+
+class TestSecondPhaseLexicalModifiersAndCollapseField(MarqoTestCase):
+    """
+    A test class to verify that using second phase lexical modifiers with collapse field raises an error.
+    """
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        semi_structured_default_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            collapse_fields=[CollapseField(name="parent_id")],
+        )
+
+        cls.create_indexes([
+            semi_structured_default_text_index,
+        ])
+
+        cls.index_name = semi_structured_default_text_index.name
+
+        documents =[
+            {
+                "title": "red speedo goggles",
+                "parent_id": "group_1",
+                "_id": "doc_1_1"
+            },
+            {
+                "title": "blue speedo goggles",
+                "parent_id": "group_1",
+                "_id": "doc_1_2"
+            },
+            {
+                "title": "green speedo goggles",
+                "parent_id": "group_1",
+                "add_to_score": 100.0,
+                "_id": "doc_1_3"
+            },
+            {
+                "title": "yellow speedo goggles",
+                "parent_id": "group_1",
+                "_id": "doc_1_4"
+            },
+        ]
+
+
+
+        _ = cls.add_documents(
+            config=cls.config, add_docs_params=AddDocsParams(
+                index_name=cls.index_name,
+                docs=documents,
+                tensor_fields=['title'],
+            )
+        )
+
+    def setUp(self) -> None:
+        # To override the default behavior of cleaning up indexes after each test
+        self.assertEqual(4, self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents)
+
+    def test_collapse_field_collapse_to_high_score_modifier_documents(self):
+        """
+        A test to verify that when using collapse field, the document with highest score modifier is returned
+        due to first phase lexical scoring.
+        """
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.index_name,
+            text="red speedo goggles",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Lexical,
+                rankingMethod=RankingMethod.Lexical,
+                scoreModifiersLexical=ScoreModifierLists(
+                    add_to_score=[
+                        ScoreModifierOperator(
+                            field_name="add_to_score",
+                            weight=1.0
+                        )
+                    ]
+                ),
+                secondPhaseModifier=False,
+            ),
+            collapse_field_name="parent_id",
+            result_count=10,
+            offset=0
+        )
+
+        ids = [doc['_id'] for doc in res['hits']]
+        self.assertEqual('doc_1_3', ids[0])
+
+    def test_collapse_field_collapse_to_high_relevance_documents(self):
+        """
+        A test to verify that when using collapse field, the document with highest relevance is returned
+        due to second phase lexical scoring.
+        """
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.index_name,
+            text="red speedo goggles",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Lexical,
+                rankingMethod=RankingMethod.Lexical,
+                scoreModifiersLexical=ScoreModifierLists(
+                    add_to_score=[
+                        ScoreModifierOperator(
+                            field_name="add_to_score",
+                            weight=1.0
+                        )
+                    ]
+                ),
+                secondPhaseModifier=True,
+            ),
+            collapse_field_name="parent_id",
+            result_count=10,
+            offset=0
+        )
+
+        ids = [doc['_id'] for doc in res['hits']]
+        self.assertEqual('doc_1_1', ids[0])
