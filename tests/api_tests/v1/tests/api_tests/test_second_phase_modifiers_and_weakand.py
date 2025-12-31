@@ -80,7 +80,7 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         )
         hits_ids = [hit["_id"] for hit in response['hits']]
         # The relevant document should exist now due to second phase lexical score modifiers
-        self.assertIn('relevant_0', hits_ids[9])
+        self.assertEqual('relevant_0', hits_ids[9])
 
     def test_weakand_and_second_phase_lexical_score_modifiers_work(self):
         response = self.client.index(self.unstructured_index_name).search(
@@ -106,7 +106,7 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         )
         hits_ids = [hit["_id"] for hit in response['hits']]
         # The relevant document should exist now due to second phase lexical score modifiers
-        self.assertIn('relevant_0', hits_ids[0])
+        self.assertEqual('relevant_0', hits_ids[0])
 
     def test_second_phase_lexical_score_modifiers_works_in_disjunction(self):
         response = self.client.index(self.unstructured_index_name).search(
@@ -125,7 +125,7 @@ class TestRelevanceCutoffFeature(MarqoTestCase):
         )
         hits_ids = [hit["_id"] for hit in response['hits']]
         # The relevant document should exist now due to second phase lexical score modifiers
-        self.assertIn('relevant_0', hits_ids[9])
+        self.assertEqual('relevant_0', hits_ids[9])
 
     def test_unsupported_retrieval_ranking_method_combination_raises_error(self):
         test_case = [
