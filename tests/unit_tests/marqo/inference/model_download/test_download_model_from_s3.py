@@ -18,6 +18,7 @@ class TestGetPresignedS3Url:
             ("true", True),
             ("False", False),
             ("", False),
+            (None, False),
         ],
     )
     def test_dualstack_flag_is_parsed_case_insensitive(self, caplog, env_value, expected):

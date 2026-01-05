@@ -25,7 +25,8 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
     TODO: add link to proper usage in error messages
     """
     # Require dual stack endpoint to support IPv6 addresses
-    use_dual_stack = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODEL_DOWNLOAD_S3_USE_DUAL_STACK).upper() == "TRUE"
+    env_val = utils.read_env_vars_and_defaults(EnvVars.MARQO_MODEL_DOWNLOAD_S3_USE_DUAL_STACK) or "FALSE"
+    use_dual_stack = env_val.upper() == "TRUE"
     logger.info("Using dual stack endpoint for S3: %s", use_dual_stack)
 
     s3_client = boto3.client('s3',config=Config(use_dualstack_endpoint=use_dual_stack), **(auth.dict() if auth is not None else {}))
