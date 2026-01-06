@@ -812,37 +812,7 @@ class VespaApplicationPackage:
 
         self._index_setting_store.save_index_setting(index)
         self._persist_index_settings()
-
-        if prepare_only:
-            # Only prepare, don't activate - return prepare response
-            if isinstance(self._store, ApplicationPackageDeploymentSessionStore):
-                prepare_response = self._store.prepare_deployment()
-                return prepare_response
-            else:
-                raise InternalError("prepare_only mode requires ApplicationPackageDeploymentSessionStore")
-        else:
-            self._deploy()
-            return None
-
-    def activate_prepared_deployment(self, prepare_response: Dict) -> None:
-        """
-        Activate a prepared deployment session.
-
-        This method should be called after update_index_setting_and_schema() with prepare_only=True
-        to complete the two-phase deployment process.
-
-        Args:
-            prepare_response: The response dict returned from a prepare_only update operation.
-                             Must contain an 'activate' URL from Vespa.
-
-        Raises:
-            InternalError: If the underlying store doesn't support two-phase deployment
-                          (requires ApplicationPackageDeploymentSessionStore, which needs Vespa >= 8.382.22)
-        """
-        if isinstance(self._store, ApplicationPackageDeploymentSessionStore):
-            self._store.activate_deployment(prepare_response)
-        else:
-            raise InternalError("Deployment activation requires ApplicationPackageDeploymentSessionStore")
+        self._deploy()
 
     def has_schema(self, name: str) -> bool:
         return self._store.file_exists('schemas', f'{name}.sd')

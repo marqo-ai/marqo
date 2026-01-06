@@ -224,37 +224,6 @@ class HybridSearch:
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
-        if recency_parameters:
-            # Recency scoring is only supported for SemiStructured indexes
-            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
-                raise core_exceptions.UnsupportedFeatureError(
-                    "Recency scoring is only supported for unstructured indexes. "
-                    "Structured indexes do not support the recencyParameters option."
-                )
-            # Check schema version supports recency
-            if not marqo_index.index_supports_recency_scoring:
-                raise core_exceptions.UnsupportedFeatureError(
-                    f"Recency scoring is only supported for unstructured indexes created with Marqo "
-                    f"{str(constants.MARQO_RECENCY_SCORING_MINIMUM_VERSION)} or later. "
-                    f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
-                )
-            # Check if addToScoreWeight requires newer schema version
-            if recency_parameters.add_to_score_weight is not None:
-                if not marqo_index.index_supports_recency_additive:
-                    raise core_exceptions.UnsupportedFeatureError(
-                        f"Additive recency scoring (addToScoreWeight) is only supported for unstructured indexes "
-                        f"created with Marqo {str(constants.MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION)} or later. "
-                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
-                    )
-            # Check if growFrom requires newer schema version
-            if recency_parameters.grow_from is not None:
-                if not marqo_index.index_supports_recency_grow:
-                    raise core_exceptions.UnsupportedFeatureError(
-                        f"Recency grow parameters (growFrom) are only supported for unstructured indexes "
-                        f"created with Marqo {str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)} or later. "
-                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
-                    )
-
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
         # split queries into lexical and tensor
