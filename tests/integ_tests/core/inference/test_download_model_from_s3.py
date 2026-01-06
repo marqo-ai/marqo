@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import botocore
+from botocore.config import Config
 from botocore.exceptions import NoCredentialsError
 
 from marqo.inference.model_download.download_model_from_s3 import (
@@ -19,6 +20,26 @@ class TestModelAuthEdgeCases(unittest.TestCase):
     def setUp(self):
         self.s3_location = S3Location(Bucket="test-bucket", Key="test-key")
         self.s3_auth = S3Auth(aws_access_key_id="test-access-key", aws_secret_access_key="test-secret-key")
+
+    def test_get_presigned_s3_url_uses_dualstack_when_env_true(self):
+        with patch("marqo.tensor_search.utils.read_env_vars_and_defaults", return_value="TRUE"):
+            with patch("boto3.client") as boto3_client_mock:
+                boto3_client_mock.return_value.generate_presigned_url.return_value = "https://example"
+                get_presigned_s3_url(self.s3_location, self.s3_auth)
+
+                _, kwargs = boto3_client_mock.call_args
+                self.assertIsInstance(kwargs.get("config"), Config)
+                self.assertTrue(kwargs["config"].use_dualstack_endpoint)
+
+    def test_get_presigned_s3_url_does_not_use_dualstack_when_env_false(self):
+        with patch("marqo.tensor_search.utils.read_env_vars_and_defaults", return_value="FALSE"):
+            with patch("boto3.client") as boto3_client_mock:
+                boto3_client_mock.return_value.generate_presigned_url.return_value = "https://example"
+                get_presigned_s3_url(self.s3_location, self.s3_auth)
+
+                _, kwargs = boto3_client_mock.call_args
+                self.assertIsInstance(kwargs.get("config"), Config)
+                self.assertFalse(kwargs["config"].use_dualstack_endpoint)
 
     def test_get_presigned_s3_url_no_credentials_error(self):
         with patch("boto3.client") as boto3_client_mock:
