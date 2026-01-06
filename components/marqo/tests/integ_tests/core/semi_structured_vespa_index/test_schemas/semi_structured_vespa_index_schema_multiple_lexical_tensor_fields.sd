@@ -304,7 +304,7 @@ schema marqo__test_00semi_00structured_00schema {
             sort_field_value_1
             sort_field_value_2
             recency_score
-            
+
         }
     }
 
@@ -378,7 +378,14 @@ schema marqo__test_00semi_00structured_00schema {
         }
     }
 
-    
+    rank-profile hybrid_bm25_second_phase_modifiers inherits base_rank_profile {
+        first-phase {
+            expression: lexical_score()
+        }
+        second-phase {
+            expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
@@ -386,7 +393,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
-        
+
         summary text_field1 type string {source: marqo__lexical_text_field1}
         summary text_field2 type string {source: marqo__lexical_text_field2}
         summary marqo__chunks_tensor_field1 type array<string> {}
@@ -399,7 +406,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
-        
+
         summary text_field1 type string {source: marqo__lexical_text_field1}
         summary text_field2 type string {source: marqo__lexical_text_field2}
         summary marqo__chunks_tensor_field1 type array<string> {}
