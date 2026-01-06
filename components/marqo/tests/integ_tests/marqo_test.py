@@ -1,32 +1,37 @@
-import os
-
 import contextlib
+import dotenv
+import os
 import socket
 import threading
 import time
 import unittest
 import uuid
-from typing import Generator
-from unittest.mock import patch, Mock
-
 import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
+from typing import Generator
+from unittest.mock import patch, Mock
 
 from marqo import config, version
 from marqo.config import Config
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.inference.inference_client.inference_client import InferenceClient
+from marqo.core.inference.model_manager_client.model_manager_client import ModelManagerClient
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
-from marqo.core.inference.model_manager_client.model_manager_client import ModelManagerClient
-from marqo.core.inference.inference_client.inference_client import InferenceClient
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
+
+# Load environment variables from .env file if it exists in the component's root directory
+component_bath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if os.path.exists(os.path.join(component_bath, '.env')):
+    print(f"Loading .env file at {component_bath}/.env to run tests")
+    dotenv.load_dotenv(os.path.join(component_bath, '.env'))
 
 
 class TestImageUrls(str, Enum):

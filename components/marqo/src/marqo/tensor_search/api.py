@@ -594,7 +594,7 @@ def update_index_settings(
         dry_run=dry_run
     )
 
-    return JSONResponse(content={"message": "Index settings update is successful."})
+    return JSONResponse(content=res)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

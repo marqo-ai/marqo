@@ -235,7 +235,7 @@ class IndexManagement:
         3. Behavior based on parameters:
            - dry_run=True: Show changes, never deploy
            - dry_run=False, force=False: Deploy only if validation passes
-           - dry_run=False, force=True: Always deploy (skip validation)
+           - dry_run=False, force=True: Always deploy, despite validation errors
 
         Args:
             index_name: Name of the index to update
@@ -247,7 +247,7 @@ class IndexManagement:
             Dict with update status:
             {
                 "updated": bool,                    # Whether settings were actually deployed
-                "settingsChanged": bool,            # Whether settings differ from current
+                "error": bool,                      # Whether there was a validation error
                 "oldSettings": dict,                # Current settings (for updated fields only)
                 "newSettings": dict,                # Proposed new settings (for updated fields only)
                 "settingsDiff": str,                # Unified diff between old and new settings
@@ -256,7 +256,7 @@ class IndexManagement:
 
         Raises:
             IndexNotFoundError: If an index does not exist
-            InvalidModelPropertiesError: If the updated modelProperties is not compatible (when force=False)
+            OperationConflictError: If deployment lock cannot be acquired
         """
         if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):  # pragma: no cover
             # Should not happen since we validate the settings in the API layer
@@ -296,7 +296,7 @@ class IndexManagement:
             # Initialize response template
             result = {
                 "updated": False,
-                "settingsChanged": settings_changed,
+                "error": False,
                 "oldSettings": old_settings,
                 "newSettings": new_settings,
                 "settingsDiff": settings_diff,
@@ -311,15 +311,15 @@ class IndexManagement:
 
             # Validate unless force=True
             validation_error = None
-            if not force:
-                try:
-                    if "modelProperties" in settings_dict:
-                        self.validate_updated_model_properties(
-                            existing_index.model.properties,
-                            settings_dict["modelProperties"]
-                        )
-                except InvalidModelPropertiesError as e:
-                    validation_error = e
+            try:
+                if "modelProperties" in settings_dict:
+                    self.validate_updated_model_properties(
+                        existing_index.model.properties,
+                        settings_dict["modelProperties"]
+                    )
+            except InvalidModelPropertiesError as e:
+                validation_error = e
+                result["error"] = True
 
             # Scenario 2: dry_run=True - never deploy, just return info
             if dry_run:
@@ -332,8 +332,8 @@ class IndexManagement:
 
             # Scenario 3: dry_run=False, force=False - block if validation fails
             if validation_error and not force:
-                logger.warning(f'Settings update for index {index_name} failed validation: {validation_error}')
-                raise validation_error
+                result["reason"] = "Validation failed: " + str(validation_error)
+                return result
 
             # Scenario 4: dry_run=False, force=True OR validation passed - proceed with deployment
             if "modelProperties" in settings_dict:
@@ -345,7 +345,7 @@ class IndexManagement:
 
             result["updated"] = True
             if force and validation_error:
-                result["reason"] = "Update forced despite validation errors"
+                result["reason"] = "Update forced despite validation errors: " + str(validation_error)
             else:
                 result["reason"] = "Settings updated successfully"
 

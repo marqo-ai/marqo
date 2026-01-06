@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 import httpx
-import vespa.application as pyvespa
+import vespa.application as pyviespa
 
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.models import VespaDocument
