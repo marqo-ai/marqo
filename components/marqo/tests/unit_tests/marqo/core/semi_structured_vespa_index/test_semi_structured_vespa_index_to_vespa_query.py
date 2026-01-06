@@ -7,7 +7,7 @@ from typing import List
 from unittest.mock import MagicMock
 
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod, WeakAndParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import (
     Model, TextPreProcessing, TextSplitMethod,
     ImagePreProcessing, HnswConfig, DistanceMetric, Field, FieldType,
@@ -49,8 +49,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
         name: str,
         lexical_field_names: List[str] = [],
         tensor_field_names: List[str] = [],
-        string_array_field_names: List[str] = [],
-        version: str = '2.16.0' # Version that supports hybrid search and partial updates
+        string_array_field_names: List[str] = []
     ) -> SemiStructuredMarqoIndex:
         """Helper method to create a semi-structured Marqo index for testing."""
         
@@ -98,7 +97,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
             distance_metric=DistanceMetric.Angular,
             vector_numeric_type='float',
             hnsw_config=HnswConfig(ef_construction=100, m=16),
-            marqo_version=version,
+            marqo_version='2.16.0',  # Version that supports hybrid search and partial updates
             created_at=time.time(),
             updated_at=time.time(),
             text_preprocessing=TextPreProcessing(
@@ -388,148 +387,6 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
 
                 self.assertEqual(test_case['expected_query'], vespa_query)
                 
-                if not test_case['should_have_language']:
-                    self.assertNotIn('language', vespa_query)
-
-    def test_to_vespa_query_hybrid_lexical_with_rerankDepthLexical(self):
-        """A test that to_vespa_query correctly handles lexical queries with rerankDepthLexical."""
-        test_cases = [
-            {
-                'name': 'with_language_and_rrf_ranking',
-                'query_params': {
-                    'index_name': 'test_index',
-                    'limit': 30,
-                    'offset': 10,
-                    'vector_query': [0.1, 0.2, 0.3, 0.4],
-                    'or_phrases': ['neural networks', 'deep learning'],
-                    'and_phrases': ['transformer'],
-                    'language': 'en',
-                    'hybrid_parameters': HybridParameters(
-                        retrievalMethod=RetrievalMethod.Disjunction,
-                        rankingMethod=RankingMethod.RRF,
-                        alpha=0.5,
-                        rrfK=60,
-                        rerankDepthLexical=111,
-                        rerankCount=222,
-                        weakAndParameters=WeakAndParameters(
-                            stopwordLimit=0.2,
-                            adjustTarget=0.3,
-                            allowDropAll=True,
-                            filterThreshold=0.4
-                        ),
-                        secondPhaseModifier=True
-                    ),
-                    'approximate': True,
-                    'approximate_threshold': 0.85,
-                    'track_total_hits': True,
-                },
-                'expected_query': {
-                    'hits': 30,
-                    'language': 'en',
-                    'marqo__hybrid.alpha': 0.5,
-                    'marqo__hybrid.rankingMethod': RankingMethod.RRF,
-                    'marqo__hybrid.retrievalMethod': RetrievalMethod.Disjunction,
-                    'marqo__hybrid.rrf_k': 60,
-                    'marqo__hybrid.verbose': False,
-                    'marqo__ranking.lexical.lexical': 'hybrid_bm25_second_phase_modifiers',
-                    'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
-                    'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
-                    'marqo__ranking.tensor.tensor': 'embedding_similarity',
-                    'ranking.rerankCount': 222,
-                    "ranking.matching.weakand.stopwordLimit": 0.2,
-                    "ranking.matching.weakand.adjustTarget": 0.3,
-                    "ranking.matching.weakand.allowDropAll": True,
-                    "ranking.matching.filterThreshold": 0.4,
-                    # Facets should still use the OR query structure
-                    'marqo__yql.facets': 'select * from test_index where ((default contains "neural networks" OR default contains "deep learning") '
-                                         'AND (default contains "transformer") OR '
-                                         '(({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) '
-                                         'OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))) '
-                                         'limit 0 | all(group(1.1) each(output(count())))',
-                    'marqo__yql.lexical': 'select * from test_index where (({targetHits:111}weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
-                    'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
-                    'model_restrict': 'test_index',
-                    'offset': 10,
-                    'presentation.summary': 'all-non-vector-summary',
-                    'query_features': {
-                        'marqo__fields_to_rank_lexical': {
-                            'marqo__lexical_description': 1,
-                            'marqo__lexical_title': 1
-                        },
-                        'marqo__fields_to_rank_tensor': {
-                            'marqo__embeddings_description': 1,
-                            'marqo__embeddings_title': 1
-                        },
-                        'marqo__query_embedding': [0.1, 0.2, 0.3, 0.4]
-                    },
-                    'ranking': 'hybrid_custom_searcher',
-                    'ranking.matching.approximateThreshold': 0.85,
-                    'searchChain': 'marqo',
-                    'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.'
-                },
-                'should_have_language': True
-            },
-            {
-                'name': 'without_language',
-                'query_params': {
-                    'index_name': 'test_index',
-                    'limit': 25,
-                    'offset': 0,
-                    'vector_query': [0.3, 0.3, 0.3, 0.3],
-                    'or_phrases': ['general search'],
-                    'and_phrases': [],
-                    'hybrid_parameters': HybridParameters(
-                        retrievalMethod=RetrievalMethod.Disjunction,
-                        rankingMethod=RankingMethod.RRF,
-                        alpha=0.8,
-                        rrfK=100,
-                        rerankDepthLexical=111,
-                    )
-                },
-                'expected_query': {
-                    'hits': 25,
-                    'marqo__hybrid.alpha': 0.8,
-                    'marqo__hybrid.rankingMethod': RankingMethod.RRF,
-                    'marqo__hybrid.retrievalMethod': RetrievalMethod.Disjunction,
-                    'marqo__hybrid.rrf_k': 100,
-                    'marqo__hybrid.verbose': False,
-                    'marqo__ranking.lexical.lexical': 'bm25',
-                    'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
-                    'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
-                    'marqo__ranking.tensor.tensor': 'embedding_similarity',
-                    'marqo__yql.lexical': 'select * from test_index where ({targetHits:111}weakAnd(default contains "general search"))',
-                    'marqo__yql.tensor': 'select * from test_index where (({targetHits:25, approximate:True, hnsw.exploreAdditionalHits:1975}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:25, approximate:True, hnsw.exploreAdditionalHits:1975}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
-                    'model_restrict': 'test_index',
-                    'offset': 0,
-                    'presentation.summary': 'all-non-vector-summary',
-                    'query_features': {
-                        'marqo__fields_to_rank_lexical': {
-                            'marqo__lexical_description': 1,
-                            'marqo__lexical_title': 1
-                        },
-                        'marqo__fields_to_rank_tensor': {
-                            'marqo__embeddings_description': 1,
-                            'marqo__embeddings_title': 1
-                        },
-                        'marqo__query_embedding': [0.3, 0.3, 0.3, 0.3]
-                    },
-                    'ranking': 'hybrid_custom_searcher',
-                    'ranking.rerankCount': 25,
-                    'searchChain': 'marqo',
-                    'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.'
-                },
-                'should_have_language': False
-            },
-        ]
-
-        for test_case in test_cases:
-            with self.subTest(case=test_case['name']):
-                self.maxDiff = None
-                marqo_query = MarqoHybridQuery(**test_case['query_params'])
-                vespa_query = self.vespa_index.to_vespa_query(marqo_query)
-
-                self.assertEqual(test_case['expected_query'], vespa_query)
-
                 if not test_case['should_have_language']:
                     self.assertNotIn('language', vespa_query)
 
@@ -1052,58 +909,6 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
         # But minimal summary params should NOT be set for old schema versions
         self.assertNotIn('collapse.summary', vespa_query)
         self.assertNotIn('FieldFiller.disable', vespa_query)
-
-    def test_hybrid_query_with_collapse_fields_and_second_phase_modifier(self):
-        marqo_query = MarqoHybridQuery(
-            index_name="test_index",
-            limit=10,
-            offset=0,
-            or_phrases=[],
-            and_phrases=[],
-            hybrid_parameters=HybridParameters(secondPhaseModifier=True),
-            collapse_field_name='parent_id',
-            facets=FacetsParameters(
-                fields={
-                    "price": FieldFacetsConfiguration(type="number", ranges=[
-                        {"from": 0, "to": 1},
-                        {"from": 1, "to": 3},
-                    ]),
-                    "color": FieldFacetsConfiguration(type="string")
-                }
-            ),
-            track_total_hits=True,
-        )
-        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
-
-        # assert collapsefield are populated
-        self.assertEqual('parent_id', vespa_query['collapsefield'])
-        self.assertEqual(1, vespa_query['collapsesize'])
-        self.assertEqual('collapse-minimal-summary', vespa_query['collapse.summary'])
-        self.assertTrue(vespa_query['FieldFiller.disable'])
-
-        # assert rank profiles with '_diversity' suffix is used
-        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity',
-                         vespa_query['marqo__ranking.lexical.lexical'])
-        self.assertEqual(common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
-                         vespa_query['marqo__ranking.tensor.tensor'])
-        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
-                         vespa_query['marqo__ranking.lexical.tensor'])
-        self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
-                         vespa_query['marqo__ranking.tensor.lexical'])
-
-        # assert facets query has an extra grouping
-        self.assertEqual('select * from test_index where (false OR False) limit 0 | all(group(1.1) '
-                         'each(group(parent_id) output(count())))\n'
-                         '---MARQO-YQL-QUERY-DELIMITER---\n'
-                         'select * from test_index where (false OR False) limit 0 | all( '
-                         'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), '
-                         'bucket(1.0, 3.0))) max(100) order(-count()) each(group(parent_id) '
-                         'output(count()))) all(group(predefined(marqo__float_fields{"price"}, '
-                         'bucket(0.0, 1.0), bucket(1.0, 3.0))) max(100) order(-count()) '
-                         'each(group(parent_id) output(count()))) '
-                         'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
-                         'each(group(parent_id) output(count()))) )', vespa_query['marqo__yql.facets'])
-
 
 
 class TestSemiStructuredVespaIndexToVespaQueryFacets(MarqoTestCase):

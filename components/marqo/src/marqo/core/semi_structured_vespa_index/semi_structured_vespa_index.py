@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple
 
-from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
+from marqo.core import constants
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
@@ -19,10 +19,10 @@ from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import 
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
+from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.vespa.models import QueryResult
 
 
@@ -130,17 +130,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
-        # add lexical specific hybrid parameters
-        if marqo_query.hybrid_parameters.secondPhaseModifier:
-            if marqo_query.collapse_field_name:
-                query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity'
-            else:
-                query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
-        if marqo_query.hybrid_parameters.rerankCount:
-            query["ranking.rerankCount"] = marqo_query.hybrid_parameters.rerankCount
-        if marqo_query.hybrid_parameters.weakAndParameters:
-            weak_and_query_dict = marqo_query.hybrid_parameters.weakAndParameters.convert_to_vespa_query_dict()
-            query.update(weak_and_query_dict)
         return query
 
     def _get_recency_query_input(self, recency_params: RecencyParameters) -> dict:

@@ -1,7 +1,7 @@
 import unittest
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod, WeakAndParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
@@ -338,125 +338,6 @@ class TestFacetsParameters(unittest.TestCase):
                 fields={"category": FieldFacetsConfiguration(type="string")},
                 order="invalid"
             )
-
-class TestHybridParametersValidation(unittest.TestCase):
-    """Tests for HybridParameters validation logic."""
-
-    def test_rerank_depth_lexical_validation(self):
-        """Test rerankDepthLexical validation with different retrieval methods."""
-        # Valid cases: rerankDepthLexical with lexical or disjunction retrieval
-        valid_cases = [
-            ("lexical_retrieval", RetrievalMethod.Lexical, RankingMethod.Tensor, 100),
-            ("disjunction_retrieval", RetrievalMethod.Disjunction, RankingMethod.RRF, 50),
-        ]
-        for name, retrieval, ranking, depth in valid_cases:
-            with self.subTest(name):
-                hp = HybridParameters(
-                    retrievalMethod=retrieval,
-                    rankingMethod=ranking,
-                    rerankDepthLexical=depth
-                )
-                self.assertEqual(hp.rerankDepthLexical, depth)
-
-        # Invalid: rerankDepthLexical with tensor retrieval
-        with self.subTest("tensor_retrieval_fails"):
-            with self.assertRaises(ValueError) as ctx:
-                HybridParameters(
-                    retrievalMethod=RetrievalMethod.Tensor,
-                    rankingMethod=RankingMethod.Tensor,
-                    rerankDepthLexical=100
-                )
-            self.assertIn("rerankDepthLexical", str(ctx.exception))
-
-        # Invalid: rerankDepthLexical must be >= 1
-        with self.subTest("must_be_at_least_1"):
-            with self.assertRaises(ValidationError):
-                HybridParameters(
-                    retrievalMethod=RetrievalMethod.Lexical,
-                    rankingMethod=RankingMethod.Tensor,
-                    rerankDepthLexical=0
-                )
-
-    def test_weak_and_parameters_validation(self):
-        """Test weakAndParameters requires rerankDepthLexical to be set."""
-        # Valid: weakAndParameters with rerankDepthLexical
-        with self.subTest("valid_with_rerank_depth"):
-            hp = HybridParameters(
-                retrievalMethod=RetrievalMethod.Lexical,
-                rankingMethod=RankingMethod.Tensor,
-                rerankDepthLexical=100,
-                weakAndParameters=WeakAndParameters(stopwordLimit=0.5, adjustTarget=0.3)
-            )
-            self.assertIsNotNone(hp.weakAndParameters)
-            self.assertEqual(hp.weakAndParameters.stopwordLimit, 0.5)
-
-        # Invalid: weakAndParameters without rerankDepthLexical
-        with self.subTest("invalid_without_rerank_depth"):
-            with self.assertRaises(ValueError) as ctx:
-                HybridParameters(
-                    retrievalMethod=RetrievalMethod.Disjunction,
-                    rankingMethod=RankingMethod.RRF,
-                    weakAndParameters=WeakAndParameters(stopwordLimit=0.5)
-                )
-            self.assertIn("weakAndParameters", str(ctx.exception))
-            self.assertIn("rerankDepthLexical", str(ctx.exception))
-
-
-class TestWeakAndParameters(unittest.TestCase):
-    """Tests for WeakAndParameters model."""
-
-    def test_weak_and_parameters_creation(self):
-        """Test WeakAndParameters creation with various field combinations."""
-        test_cases = [
-            ("all_fields", {"stopwordLimit": 0.5, "adjustTarget": 0.3, "allowDropAll": True, "filterThreshold": 0.1},
-             {"stopwordLimit": 0.5, "adjustTarget": 0.3, "allowDropAll": True, "filterThreshold": 0.1}),
-            ("no_fields", {},
-             {"stopwordLimit": None, "adjustTarget": None, "allowDropAll": None, "filterThreshold": None}),
-            ("partial_fields", {"stopwordLimit": 0.5, "allowDropAll": False},
-             {"stopwordLimit": 0.5, "adjustTarget": None, "allowDropAll": False, "filterThreshold": None}),
-        ]
-
-        for name, input_params, expected in test_cases:
-            with self.subTest(name):
-                params = WeakAndParameters(**input_params)
-                for field, value in expected.items():
-                    self.assertEqual(getattr(params, field), value)
-
-    def test_weak_and_parameters_field_ranges(self):
-        """Test field range validation (0 to 1) for stopwordLimit, adjustTarget, filterThreshold."""
-        fields = ["stopwordLimit", "adjustTarget", "filterThreshold"]
-
-        for field in fields:
-            # Valid boundary values
-            for valid_value in [0, 0.5, 1]:
-                with self.subTest(field=field, value=valid_value, expected="valid"):
-                    WeakAndParameters(**{field: valid_value})  # Should not raise
-
-            # Invalid values
-            for invalid_value in [-0.1, 1.1]:
-                with self.subTest(field=field, value=invalid_value, expected="invalid"):
-                    with self.assertRaises(ValidationError):
-                        WeakAndParameters(**{field: invalid_value})
-
-    def test_convert_to_vespa_query_dict(self):
-        """Test convert_to_vespa_query_dict with various field combinations."""
-        test_cases = [
-            ("all_fields",
-             {"stopwordLimit": 0.5, "adjustTarget": 0.3, "allowDropAll": True, "filterThreshold": 0.1},
-             {"ranking.matching.weakand.stopwordLimit": 0.5, "ranking.matching.weakand.adjustTarget": 0.3,
-              "ranking.matching.weakand.allowDropAll": True, "ranking.matching.filterThreshold": 0.1}),
-            ("partial_fields",
-             {"stopwordLimit": 0.5, "allowDropAll": False},
-             {"ranking.matching.weakand.stopwordLimit": 0.5, "ranking.matching.weakand.allowDropAll": False}),
-            ("empty", {}, {}),
-        ]
-
-        for name, input_params, expected in test_cases:
-            with self.subTest(name):
-                params = WeakAndParameters(**input_params)
-                result = params.convert_to_vespa_query_dict()
-                self.assertEqual(result, expected)
-
 
 if __name__ == "__main__":
     unittest.main()

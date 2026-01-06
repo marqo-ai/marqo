@@ -291,16 +291,6 @@ schema marqo__test_00semi_00structured_00schema {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
-
-    rank-profile hybrid_bm25_second_phase_modifiers inherits base_rank_profile {
-        first-phase {
-            expression: lexical_score()
-        }
-        second-phase {
-            expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
-        }
-    }
-
     rank-profile embedding_similarity inherits base_rank_profile {
         first-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))

@@ -35,7 +35,7 @@ MARQO_UPDATE_SCHEMA_MINIMUM_VERSION = semver.VersionInfo.parse('2.23.0')
 MARQO_COLLAPSE_MINIMAL_SUMMARY_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.6')
 MARQO_RECENCY_SCORING_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.8')
 MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
-MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.11')
+MARQO_RECENCY_GROW_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
 
 # For score modifiers
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
@@ -57,11 +57,8 @@ QUERY_INPUT_RECENCY_DECAY_TO = 'marqo__recency_decay_to'
 QUERY_INPUT_RECENCY_TIMESTAMP_KEY = 'marqo__recency_timestamp_key'
 QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE = 'marqo__recency_decay_function_type'
 QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT = 'marqo__recency_add_to_score_weight'
-
-# For grow (future timestamp) scoring
 QUERY_INPUT_RECENCY_GROW_ENABLED = 'marqo__recency_grow_enabled'
 QUERY_INPUT_RECENCY_GROW_FROM = 'marqo__recency_grow_from'
 QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE = 'marqo__recency_grow_function_type'
 QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS = 'marqo__recency_grow_scale_seconds'
 QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS = 'marqo__recency_grow_offset_seconds'
-MARQO_RECENCY_GROW_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
