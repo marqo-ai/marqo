@@ -348,7 +348,8 @@ class IndexManagement:
                 result["reason"] = "Update forced despite validation errors: " + str(validation_error)
             else:
                 result["reason"] = "Settings updated successfully"
-
+            from marqo.tensor_search import index_meta_cache
+            index_meta_cache.get_index(self, index_name, force_refresh=True)  # Refresh cache
             return result
 
     def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
