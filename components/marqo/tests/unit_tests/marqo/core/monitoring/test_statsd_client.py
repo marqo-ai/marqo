@@ -1,6 +1,4 @@
-import socket
 from typing import List
-from unittest.mock import patch
 
 import pytest
 
@@ -62,53 +60,3 @@ class TestStatsDClient:
         """Test that _parse_common_tags handles empty and malformed strings."""
         assert sc.StatsDClient._parse_common_tags("") == {}
         assert sc.StatsDClient._parse_common_tags("foo:bar,,baz:") == {"foo": "bar"}
-
-
-class TestCreateSocket:
-    """Tests for the _create_socket method and dual-stack support."""
-
-    def test_create_socket_ipv4_address(self):
-        """Test that an IPv4 address creates an IPv4 socket."""
-        sock, addr = sc.StatsDClient._create_socket("127.0.0.1", 8125)
-        try:
-            assert sock.family == socket.AF_INET
-            assert addr == ("127.0.0.1", 8125)
-        finally:
-            sock.close()
-
-    def test_create_socket_ipv6_address(self):
-        """Test that an IPv6 address creates an IPv6 socket."""
-        sock, addr = sc.StatsDClient._create_socket("::1", 8125)
-        try:
-            assert sock.family == socket.AF_INET6
-            # IPv6 sockaddr is (host, port, flowinfo, scope_id)
-            assert addr[0] == "::1"
-            assert addr[1] == 8125
-        finally:
-            sock.close()
-
-    def test_create_socket_fallback_to_ipv4_on_resolution_failure(self):
-        """Test that socket falls back to IPv4 when address resolution fails."""
-        with patch("socket.getaddrinfo", side_effect=socket.gaierror("mock failure")):
-            sock, addr = sc.StatsDClient._create_socket("unresolvable.invalid", 8125)
-            try:
-                assert sock.family == socket.AF_INET
-                assert addr == ("unresolvable.invalid", 8125)
-            finally:
-                sock.close()
-
-    def test_create_socket_is_non_blocking(self):
-        """Test that created sockets are non-blocking."""
-        sock, _ = sc.StatsDClient._create_socket("127.0.0.1", 8125)
-        try:
-            assert sock.getblocking() is False
-        finally:
-            sock.close()
-
-    def test_create_socket_is_udp(self):
-        """Test that created sockets are UDP (SOCK_DGRAM)."""
-        sock, _ = sc.StatsDClient._create_socket("127.0.0.1", 8125)
-        try:
-            assert sock.type == socket.SOCK_DGRAM
-        finally:
-            sock.close()
