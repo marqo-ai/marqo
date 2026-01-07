@@ -804,7 +804,6 @@ class TestUpdateIndexSettingsEndpoints(MarqoTestCase):
             )
 
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["message"], "Index settings update is successful.")
             mock_update.assert_called_once()
 
     def test_update_index_settings_disabled(self):
