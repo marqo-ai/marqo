@@ -1,0 +1,99 @@
+[project]
+name = "marqo-inference-orchestrator"
+version = "0.0.1"
+description = "Inference orchestrator for Marqo"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "blake3>=1.0.6",
+    "cachetools>=6.2.0",
+    "fastapi>=0.117.1",
+    "hf-transfer>=0.1.9",
+    "httpx>=0.28.1",
+    "more-itertools>=10.8.0",
+    "msgpack>=1.1.1",
+    "msgpack-numpy>=0.4.8",
+    "nltk>=3.9.1",
+    "notebook>=7.4.7",
+    "open-clip-torch>=3.2.0",
+    "opentelemetry-api>=1.37.0",
+    "opentelemetry-sdk>=1.37.0",
+    "orjson>=3.11.3",
+    "pillow>=11.3.0",
+    "pycurl>=7.45.7",
+    "pydantic>=2.11.9",
+    "pydantic-settings>=2.11.0",
+    "python-json-logger>=3.3.0",
+    "readerwriterlock>=1.0.9",
+    "semver>=3.0.4",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "transformers>=4.56.2",
+    "tritonclient[grpc,http]==2.60.0",
+    "uvicorn>=0.37.0",
+    "validators>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "opentelemetry-test-utils>=0.58b0",
+    "parameterized>=0.9.0",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-md-report>=0.7.0",
+    "pytest-retry>=1.7.0",
+    "pytest-subtests>=0.14.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+
+[tool.uv.sources]
+# Only override the index for Linux
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+]
+torchvision = [
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/marqo/components/inference_orchestrator/src/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.ruff]
+extend-exclude = [
+  "*.ipynb",
+]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # enable import sorting

@@ -1,0 +1,335 @@
+import os
+import unittest
+from unittest import mock
+
+import numpy as np
+
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.marqo_index import FieldFeature
+from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
+    ImagePreProcessing, VideoPreProcessing, AudioPreProcessing, Model, DistanceMetric, VectorNumericType, \
+    HnswConfig, TextSplitMethod, IndexType
+from marqo.core.models.marqo_index_request import (FieldRequest)
+from marqo.tensor_search import enums
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.api import embed
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+
+
+class TestPrefix(MarqoTestCase):
+    """
+    Tests the prefix logic for adding prefixes to text fields and search queries.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        # UNSTRUCTURED indexes
+        unstructured_index_1 = cls.unstructured_marqo_index_request(
+            model=Model(name='random/small'),
+            treat_urls_and_pointers_as_images=True
+        )
+        unstructured_index_e5 = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/e5-small-v2'),
+            treat_urls_and_pointers_as_images=True
+        )
+        unstructured_index_multimodal = cls.unstructured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
+            treat_urls_and_pointers_as_images=True
+        )
+
+        unstructured_index_with_model_default = cls.unstructured_marqo_index_request(
+            model=Model(name="hf/e5-small-v2"),
+            treat_urls_and_pointers_as_images=False,
+        )
+
+        unstructured_index_with_override = cls.unstructured_marqo_index_request(
+            model=Model(
+                name="hf/e5-small-v2",
+                text_chunk_prefix="index-override: ",
+                text_query_prefix="index-override: "
+            ),
+            treat_urls_and_pointers_as_images=True,
+        )
+
+        # STRUCTURED indexes
+        structured_text_index = cls.structured_marqo_index_request(
+            model=Model(name="random/small"),
+            fields=[
+                FieldRequest(name="text", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter])
+            ],
+            tensor_fields=["text"]
+        )
+
+        structured_multimodal_index = cls.structured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
+            fields=[
+                FieldRequest(name="TITLE", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="image_field", type=FieldType.ImagePointer),
+                FieldRequest(name="multimodal_fields", type=FieldType.MultimodalCombination,
+                             dependent_fields={"text_field": 0.5, "image_field": 0.5})
+            ],
+            tensor_fields=["multimodal_fields"]
+        )
+
+        cls.indexes = cls.create_indexes([
+            unstructured_index_1,
+            unstructured_index_e5,
+            unstructured_index_multimodal,
+            unstructured_index_with_model_default,
+            unstructured_index_with_override,
+            structured_text_index,
+            structured_multimodal_index,
+        ])
+
+        # Assign to objects so they can be used in tests
+        cls.unstructured_index_1 = cls.indexes[0]
+        cls.unstructured_index_e5 = cls.indexes[1]
+        cls.unstructured_index_multimodal = cls.indexes[2]
+        cls.unstructured_index_with_model_default = cls.indexes[3]
+        cls.unstructured_index_with_override = cls.indexes[4]
+        cls.structured_text_index = cls.indexes[5]
+        cls.structured_multimodal_index = cls.indexes[6]
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Any tests that call add_documents, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.device_patcher.stop()
+
+    def test_prefix_text_chunks(self):
+        """Ensures that when adding documents with a prefix, each chunk has the prefix included in the vector,
+        but the actual chunk text does not have the prefix."""
+
+        for index in [self.unstructured_index_1, self.structured_text_index]:
+            with self.subTest(index=index.type):
+                # A) Add normal text document (1 chunk)
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # B) Add same text document but WITH PREFIX (1 chunk)
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
+                    text_chunk_prefix="PREFIX: ",
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # C) Add document with prefix built into text itself (1 chunk)
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_c", "text": "PREFIX: hello"}], auto_refresh=True,
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # Get all documents (with vectors)
+                res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index.name, document_ids=["doc_a", "doc_b", "doc_c"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)["results"]
+                retrieved_doc_a = res[0]
+                retrieved_doc_b = res[1]
+                retrieved_doc_c = res[2]
+
+                embed_res = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request_dict={"content": ["hello"]},
+                    device="cpu"
+                )
+
+                # Chunk content: For A) and B), should be exactly the same. C) is different.
+                self.assertEqual(retrieved_doc_a["text"], "hello")
+                self.assertEqual(retrieved_doc_b["text"], "hello")
+                self.assertEqual(retrieved_doc_c["text"], "PREFIX: hello")
+
+                # Chunk embedding: For B) and C), should be exactly the same. A) is different.
+                self.assertTrue(np.allclose(retrieved_doc_b["_tensor_facets"][0]["_embedding"],
+                                            retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
+                self.assertFalse(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
+                                             retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
+
+                # embedding in document_b should be the same as direct embedding with no prefix
+                self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
+                                            embed_res["embeddings"][0]))
+
+    def test_prefix_text_chunks_e5(self):
+        """Ensures that the default prefix and the request level prefix are applied correctly.
+        for the e5-small model."""
+
+        for index in [self.unstructured_index_e5]:
+            with self.subTest(index=index.type):
+                # A) prefix should default to "passage: " with the e5-small model
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # B) manually set prefix at the request level
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
+                    text_chunk_prefix="passage: ",
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # C) Set no prefix 
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_c", "text": "hello"}], auto_refresh=True,
+                    text_chunk_prefix="custom_prefix: ",
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # Get all documents (with vectors)
+                res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index.name, document_ids=["doc_a", "doc_b", "doc_c"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)["results"]
+                retrieved_doc_a = res[0]
+                retrieved_doc_b = res[1]
+                retrieved_doc_c = res[2]
+
+                embed_res_document_prefix = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request_dict={"content": ["hello"], "content_type": "document"},
+                    device="cpu"
+                )
+
+                embed_res_no_prefix = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request_dict={"content": ["custom_prefix: hello"], "content_type": None},
+                    device="cpu"
+                )
+
+                # Assert that the embedding in document_a is the same as embed_res_document_prefix with the prefix
+                self.assertTrue(np.allclose(embed_res_document_prefix["embeddings"][0],
+                                            retrieved_doc_a["_tensor_facets"][0]["_embedding"]))
+
+                # Assert that the embedding in document_b is the same as the embedding in document_a
+                self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
+                                            retrieved_doc_b["_tensor_facets"][0]["_embedding"]))
+
+                # Assert that the embedding in document_c is the same as the embedding with no prefix
+                self.assertTrue(np.allclose(embed_res_no_prefix["embeddings"][0],
+                                            retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
+
+    def test_add_prefix_to_multimodal_queries(self):
+        """Ensures that prefix gets added to each query."""
+        for index in [self.unstructured_index_1, self.structured_text_index]:
+            with self.subTest(index=index.type):
+                # Single text query (prefix added)
+                queries = [BulkSearchQueryEntity(q="hello", text_query_prefix="PREFIX: ", index=index)]
+                prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+                self.assertEqual(prefixed_queries[0].q, "PREFIX: hello")
+
+                # Dict query (text has prefix, image does not)
+                queries = [BulkSearchQueryEntity(
+                    q={"text query": 0.5,
+                       TestImageUrls.HIPPO_REALISTIC.value: 0.5},
+                    text_query_prefix="PREFIX: ",
+                    index=index
+                )]
+
+                prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+                self.assertEqual(prefixed_queries[0].q, {"PREFIX: text query": 0.5,
+                                                         TestImageUrls.HIPPO_REALISTIC.value: 0.5})
+
+    def test_prefix_text_search(self):
+        """Ensures that search query has prefix added to it for vectorisation."""
+        for index in [self.unstructured_index_1, self.structured_text_index]:
+            with self.subTest(index=index.type):
+                original_query = self.config.vespa_client.query
+
+                def pass_through_query(*arg, **kwargs):
+                    return original_query(*arg, **kwargs)
+
+                mock_vespa_client_query = unittest.mock.MagicMock()
+                mock_vespa_client_query.side_effect = pass_through_query
+
+                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                def run():
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, text="testing query",
+                        search_method=enums.SearchMethod.TENSOR, text_query_prefix="PREFIX: "
+                    )
+                    return True
+
+                self.assertTrue(run())
+
+                call_args = mock_vespa_client_query.call_args_list
+                self.assertEqual(len(call_args), 1)
+
+                vespa_query_kwargs = call_args[0].kwargs
+                search_query_embedding = vespa_query_kwargs["query_features"]["marqo__query_embedding"]
+
+                # Embed request the same text
+                embed_res = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request_dict={"content": ["PREFIX: testing query"]},
+                    device="cpu"
+                )
+
+                # Sanity check
+                self.assertEqual(embed_res["content"], ["PREFIX: testing query"])
+
+                # Assert vectors are equal. That is, the explicitly embedded query is the same as the query we sent
+                # with set custom prefix
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
+
+    def test_backward_compatibility_no_prefix(self):
+        """
+        Ensures backward compatibility with older versions of Marqo that don't have prefix functionality.
+        """
+
+        mock_old_marqo_index = UnstructuredMarqoIndex(
+            name="old_index",
+            schema_name="old_index",
+            type=IndexType.Unstructured,
+            model=Model(
+                name="hf/e5-small-v2-v2",
+                text_chunk_prefix=None,
+                text_query_prefix=None
+            ),
+            normalize_embeddings=True,
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=False,
+            filter_string_max_length=1000,
+            text_preprocessing=TextPreProcessing(
+                splitLength=6,
+                splitOverlap=1,
+                splitMethod=TextSplitMethod.Character
+            ),
+            image_preprocessing=ImagePreProcessing(),
+            video_preprocessing=VideoPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
+            audio_preprocessing=AudioPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
+            distance_metric=DistanceMetric.DotProduct,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(
+                ef_construction=100,
+                m=42
+            ),
+            marqo_version="0.0.1",
+            created_at=1,
+            updated_at=1,
+        )
+
+        # Assert that when we attempt to get the text chunk prefix and text query prefix, it returns an empty string
+        self.assertEqual(mock_old_marqo_index.model.get_text_chunk_prefix(), "")
+        self.assertEqual(mock_old_marqo_index.model.get_text_query_prefix(), "")
+
+    # NOTE: For tests on the prefix functionality on the embed endpoint, see tests_embed.py under 
+    # integration tests.

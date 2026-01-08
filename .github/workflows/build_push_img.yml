@@ -4,7 +4,6 @@ permissions:
   contents: read
   id-token: write
 
-# TODO: Add concurrency for these tasks (https://s2search.atlassian.net/browse/MQ-274) (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841652402)
 on:
   workflow_call:
     inputs:
@@ -14,53 +13,85 @@ on:
         type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "ECR" or "DockerHub" (Can be added in the future)'
+        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
         required: true
         type: string
-        default: 'ECR'
-      image_repo:
-        description: 'Image repository'
+        default: OS-ECR
+      image_namespace:
+        description: 'The namespace of the repo, by default "marqoai-dev". We will push 3 images: {ECR}/{name_space}/api, {ECR}/{name_space}/inference-orchestrator, {ECR}/{name_space}/model-management'
         required: true
         type: string
-        default: 'marqo'
+        default: 'marqoai-dev'
       image_tag:
         description: 'Image tag'
         required: true
         type: string
+      platforms:
+        description: 'The target platforms for the image build. Comma separated values. E.g: linux/amd64,linux/arm64'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64'
     outputs:
-      image_identifier:
+      api_image_identifier:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
-        description: "The image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.image_identifier }}
+        description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/api@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier:
+        description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier:
+        description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
+        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
 
   workflow_dispatch: #for manual triggers
     inputs:
       marqo_ref:
         description: 'Marqo branch-name, commit SHA or tag'
         required: false
+        type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "ECR", "DockerHub"'
+        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
         required: true
+        type: choice
         options:
-          - ECR
-          - DockerHub
-      image_repo:
-        description: 'Image repository'
+          - OS-ECR
+          - AMI-ECR
+        default: OS-ECR
+      image_namespace:
+        description: 'The prefix of the image repository, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
         required: true
-        default: 'marqo'
+        type: string
+        default: 'marqoai-dev'
       image_tag:
         description: 'Image tag'
         required: true
+        type: string
+      platforms:
+        description: 'The target platforms for the image build. Comma separated values. E.g: linux/amd64,linux/arm64'
+        required: false
+        type: choice
+        options:
+          - linux/amd64,linux/arm64
+          - linux/amd64
+          - linux/arm64
+        default: 'linux/amd64,linux/arm64'
+
+concurrency:
+    group: build-push-marqo-image-${{ github.ref }} - ${{ github.event.inputs.push_to || inputs.push_to }} - ${{ github.event.inputs.platforms|| inputs.platforms }}
+    cancel-in-progress: true
 
 jobs:
   Docker-Build:
     name: Build docker image
-    runs-on: "runs-on=${{ github.run_id }}/family=t3.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
     outputs:
-      image_identifier: ${{ steps.set-image-identifier-in-output.outputs.image_identifier }}
-
+      api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
+    environment:
+      name: ${{ (inputs.image_namespace || github.event.inputs.image_namespace) == 'marqoai' && 'production' || 'non-prod' }}
 
     steps:
       - name: Set input variables
@@ -68,8 +99,9 @@ jobs:
         run: |
           echo "MARQO_REF=${{ inputs.marqo_ref || github.event.inputs.marqo_ref }}" >> $GITHUB_ENV
           echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
-          echo "IMAGE_REPO=${{ inputs.image_repo || github.event.inputs.image_repo }}" >> $GITHUB_ENV
+          echo "IMAGE_NAMESPACE=${{ inputs.image_namespace || github.event.inputs.image_namespace }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echo "PLATFORMS=${{ inputs.platforms || github.event.inputs.platforms }}" >> $GITHUB_ENV
 
       - name: Checkout Marqo
         uses: actions/checkout@v3
@@ -78,39 +110,69 @@ jobs:
           ref: ${{ env.MARQO_REF }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
-      - name: Login to ECR
+      - name: Login to OS-ECR
         uses: docker/login-action@v2
-        if: env.PUSH_TO == 'ECR'
+        if: env.PUSH_TO == 'OS-ECR'
         with:
           registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com
           username: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
 
+      - name: Login to AMI-ECR
+        uses: docker/login-action@v2
+        if: env.PUSH_TO == 'AMI-ECR'
+        with:
+          registry: 975050213659.dkr.ecr.us-east-1.amazonaws.com
+          username: ${{ secrets.AMI_ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AMI_ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+
       - name: Set registry and image repo
         id: prepare
         run: |
-          if [[ "${{ env.PUSH_TO }}" == "ECR" ]]; then
+          if [[ "${{ env.PUSH_TO }}" == "OS-ECR" ]]; then
             echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ env.PUSH_TO }}" == "AMI-ECR" ]]; then
+            echo "registry=975050213659.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
           else
-            echo "registry=marqoai" >> $GITHUB_OUTPUT
+            echo "Error: Unknown PUSH_TO value '${{ env.PUSH_TO }}'. Must be 'OS-ECR' or 'AMI-ECR'." >&2
+            exit 1
           fi
 
-      - name: Build and push
-        id: build-and-push
-        uses: docker/build-push-action@v4
+      - name: Build and push api image
+        id: build-and-push-api
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./components/marqo
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
+          platforms: ${{ env.PLATFORMS }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api:${{ env.IMAGE_TAG }}
+
+      - name: Build and push inference orchestrator image
+        id: build-and-push-inference-orchestrator
+        uses: docker/build-push-action@v6
+        with:
+          context: ./components/inference_orchestrator
+          push: true
+          platforms: ${{ env.PLATFORMS }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator:${{ env.IMAGE_TAG }}
+
+      - name: Build and push model management image
+        id: build-and-push-model-management
+        uses: docker/build-push-action@v6
+        with:
+          context: ./components/model_management
+          push: true
+          platforms: ${{ env.PLATFORMS }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
 
       - name: Output image_identifier
         # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
         id: set-image-identifier-in-output
         run: |
-          echo "image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}@${{ steps.build-and-push.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "inference_orchestrator_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
+          echo "model_management_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
