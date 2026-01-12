@@ -5,6 +5,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from typing import List
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -16,11 +17,12 @@ import marqo.core.monitoring.statsd_middleware as sm
 
 class _UDPSink:
     """A UDP sink that captures packets sent to it, thread-safe via _lock."""
-    def __init__(self, host: str = "127.0.0.1", port: int = 0):
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # ensure recvfrom() wakes up regularly so stop()/join() can’t hang
+    def __init__(self, host: str = "127.0.0.1", port: int = 0, family: int = socket.AF_INET):
+        self._sock = socket.socket(family, socket.SOCK_DGRAM)
+        # ensure recvfrom() wakes up regularly so stop()/join() can't hang
         self._sock.settimeout(0.2)
         self._sock.bind((host, port))
+        self.host = self._sock.getsockname()[0]
         self.port = self._sock.getsockname()[1]
 
         self._lock = threading.Lock()
@@ -47,7 +49,7 @@ class _UDPSink:
         self._running = False
         # poke the socket so recvfrom() unblocks on stubborn kernels
         try:
-            self._sock.sendto(b"", ("127.0.0.1", self.port))
+            self._sock.sendto(b"", (self.host, self.port))
         except OSError:
             pass
         self._sock.close()
@@ -69,9 +71,9 @@ class _UDPSink:
 
 
 @contextmanager
-def udp_sink():
+def udp_sink(host: str = "127.0.0.1", family: int = socket.AF_INET):
     """Context manager to create a UDP sink for capturing metrics."""
-    sink = _UDPSink()
+    sink = _UDPSink(host=host, family=family)
     try:
         yield sink
     finally:
@@ -298,3 +300,78 @@ class TestStatsDMiddlewareUDP(unittest.TestCase):
             _has(pkt, r"#path:/indexes/foo/documents/<document_id>,method:GET,status_code:200"),
             msg=f"Missing redacted packet\nSeen:\n{pkt}",
         )
+
+
+class TestStatsDClientDualStack(unittest.TestCase):
+    """Integration tests for StatsDClient dual-stack (IPv4/IPv6) socket support."""
+
+    def test_statsd_client_ipv4_sends_metrics(self):
+        """Test that StatsDClient can send metrics over IPv4."""
+        with udp_sink(host="127.0.0.1", family=socket.AF_INET) as sink:
+            client = sc.StatsDClient(host="127.0.0.1", port=sink.port)
+
+            # Verify socket is IPv4
+            self.assertEqual(client._sock.family, socket.AF_INET)
+
+            # Send a metric and verify it arrives
+            client.increment("test.ipv4.counter", 1)
+            sink.wait(n=1)
+
+            pkt = sink.decoded()
+            self.assertTrue(
+                _has(pkt, r"test\.ipv4\.counter:1\|c"),
+                msg=f"IPv4 metric not received\nSeen:\n{pkt}",
+            )
+
+    def test_statsd_client_ipv6_sends_metrics(self):
+        """Test that StatsDClient can send metrics over IPv6."""
+        with udp_sink(host="::1", family=socket.AF_INET6) as sink:
+            client = sc.StatsDClient(host="::1", port=sink.port)
+
+            # Verify socket is IPv6
+            self.assertEqual(client._sock.family, socket.AF_INET6)
+
+            # Send a metric and verify it arrives
+            client.increment("test.ipv6.counter", 1)
+            sink.wait(n=1)
+
+            pkt = sink.decoded()
+            self.assertTrue(
+                _has(pkt, r"test\.ipv6\.counter:1\|c"),
+                msg=f"IPv6 metric not received\nSeen:\n{pkt}",
+            )
+
+    def test_statsd_client_ipv4_timing_metric(self):
+        """Test that timing metrics work over IPv4."""
+        with udp_sink(host="127.0.0.1", family=socket.AF_INET) as sink:
+            client = sc.StatsDClient(host="127.0.0.1", port=sink.port)
+            client.timing("test.ipv4.latency", 150)
+            sink.wait(n=1)
+
+            pkt = sink.decoded()
+            self.assertTrue(
+                _has(pkt, r"test\.ipv4\.latency:150\|ms"),
+                msg=f"IPv4 timing metric not received\nSeen:\n{pkt}",
+            )
+
+    def test_statsd_client_ipv6_timing_metric(self):
+        """Test that timing metrics work over IPv6."""
+        with udp_sink(host="::1", family=socket.AF_INET6) as sink:
+            client = sc.StatsDClient(host="::1", port=sink.port)
+            client.timing("test.ipv6.latency", 250)
+            sink.wait(n=1)
+
+            pkt = sink.decoded()
+            self.assertTrue(
+                _has(pkt, r"test\.ipv6\.latency:250\|ms"),
+                msg=f"IPv6 timing metric not received\nSeen:\n{pkt}",
+            )
+
+    def test_statsd_client_fallback_to_ipv4_when_resolution_fails(self):
+        """If getaddrinfo raises, we fall back to IPv4 and do not raise on send."""
+        with patch("socket.getaddrinfo", side_effect=socket.gaierror("mock resolution failure")):
+            client = sc.StatsDClient(host="does-not-resolve.invalid", port=8125)
+            # Fallback path should create an IPv4 socket
+            self.assertEqual(client._sock.family, socket.AF_INET)
+            # Sending should not raise (errors are swallowed and logged at debug)
+            client.increment("test.fallback.counter", 1)

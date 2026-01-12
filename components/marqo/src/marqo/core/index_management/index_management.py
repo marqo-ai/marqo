@@ -1,8 +1,8 @@
 import difflib
-import json
 import semver
 from contextlib import contextmanager
-from typing import List, Tuple, Dict, Optional, Any
+from typing import List, Tuple, Dict
+from typing import Optional
 
 import marqo.logging
 import marqo.vespa.vespa_client

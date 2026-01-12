@@ -186,7 +186,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             relevance_cutoff: Optional[dict] = None,
             sort_by: Optional[dict] = None,
             limit: int = 10, offset: int = 0,
-            hybrid_parameters: Optional[dict] = None
+            hybrid_parameters: Optional[dict] = None,
+            rerank_depth_lexical : Optional[int] = None,
     ) -> dict:
         """Helper method to perform search with consistent parameters."""
 
@@ -194,8 +195,8 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
                 "rankingMethod": "rrf",
-                "alpha": 0.5
-
+                "alpha": 0.5,
+                "rerankDepthLexical": rerank_depth_lexical
             }
 
         if index_name is None:
@@ -520,6 +521,42 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             {"l1", "l4", "l5"}.isdisjoint(restrictive_ids),
             "Most restrictive threshold should exclude low-relevance docs"
         )
+
+    def test_sort_with_relevance_cutoff_preserves_high_relevance_docs_with_rerankDepthLexical(self):
+        """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values when using
+        weakAnd in the lexical search, with varying rerankDepthLexical values.
+
+        Note that the tagetHits for rerankDepthLexical is not a strict constraint on the matched or returned documents
+        from Vespa. So no matter what value we set for rerankDepthLexical, the results remain the same in this test.
+        """
+        test_cases = [
+            (1, "small rerankDepthLexical 1",),
+            (10, "medium rerankDepthLexical 10"),
+            (100, "large rerankDepthLexical 100"),
+        ]
+
+        for rerank_depth_lexical, description in test_cases:
+            with self.subTest(description):
+                result = self._search_helper(
+                    sort_by={
+                        "fields": [{"field_name": "sort_value", "order": "asc"}]  # Ascending favors low sort values
+                    },
+                    relevance_cutoff={
+                        "method": "relative_max_score",
+                        "parameters": {"relativeScoreFactor": 0.6}
+                    },
+                    limit=15,
+                    rerank_depth_lexical=rerank_depth_lexical,
+                )
+
+                ids = [hit["_id"] for hit in result["hits"]]
+
+                self.assertEqual(16, result["_relevantCandidates"])
+                self.assertEqual(25, result["_probeCandidates"])
+                self.assertEqual(
+                    ['m10', 'm7', 'h7', 'm6', 'm5', 'h5', 'm2', 'm4', 'h3', 'h9', 'h1', 'h10', 'h6', 'h8', 'h2'],
+                    ids
+                )
 
     def test_sort_with_relevance_cutoff_preserves_high_relevance_docs(self):
         """Test that relevance cutoff with sort preserves high-relevance docs regardless of sort values."""

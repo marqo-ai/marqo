@@ -1,14 +1,13 @@
+import pydantic.v1 as pydantic
 import re
+import semver
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional, Dict, Any, Set
-
-import pydantic.v1 as pydantic
-import semver
 from pydantic.v1 import PrivateAttr, root_validator
 from pydantic.v1 import ValidationError, validator
 from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic.v1.utils import ROOT_KEY
+from typing import List, Optional, Dict, Any, Set
 
 import marqo.core.inference.api.exceptions as inference_exceptions
 from marqo.base_model import ImmutableBaseModel, MarqoBaseModel
@@ -740,6 +739,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             'index_supports_recency_grow',
             lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)
 
+    @property
+    def index_supports_second_phase_lexical_score_modifiers(self) -> bool:
+        """
+        Check if the index schema supports second phase lexical score modifiers.
+        """
+        return self._cache_or_get(
+            "index_supports_second_phase_lexical_score_modifiers",
+            lambda: self.parsed_schema_template_version() >= constants.
+            MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION
+        )
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
