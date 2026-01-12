@@ -53,6 +53,7 @@ class HybridSearch:
             collapse_field_name: Optional[str] = None,
             recency_parameters: Optional[RecencyParameters] = None,
             query_tag: Optional[str] = None,
+            extra_params: dict = {},
     ) -> Dict:
         """
 
@@ -332,6 +333,7 @@ class HybridSearch:
             collapse_field_name=collapse_field_name,
             recency_parameters=recency_parameters,
             query_tag=query_tag,
+            extra_params=extra_params
         )
 
         vespa_index = vespa_index_factory(marqo_index)
@@ -404,5 +406,7 @@ class HybridSearch:
                 )
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
+
+        gathered_results['trace'] = responses.trace
 
         return gathered_results

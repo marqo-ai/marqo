@@ -363,6 +363,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            collapse_field_name: Optional[str] = None,
            recency_parameters=None,
            query_tag=None,
+           extra_params={},
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -537,6 +538,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 collapse_field_name=collapse_field_name,
                 recency_parameters=recency_parameters,
                 query_tag=query_tag,
+                extra_params=extra_params,
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:

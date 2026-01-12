@@ -489,6 +489,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None,
                 recency_parameters=search_query.recencyParameters,
                 query_tag=search_query.queryTag,
+                extra_params=search_query.extraParams,
             )
             return ORJSONResponse(result)
         except Exception as e:

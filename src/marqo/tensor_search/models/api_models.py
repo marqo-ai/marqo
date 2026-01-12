@@ -77,6 +77,7 @@ class SearchQuery(BaseMarqoModel):
     collapse_fields: Optional[List[SearchCollapseField]] = Field(default=None, alias="collapseFields")
     recencyParameters: Optional[RecencyParameters] = None
     queryTag: Optional[str] = None
+    extraParams: dict = {}
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
     _DEFAULT_SORT_CANDIDATES_MULTIPLIER = 3

@@ -606,6 +606,8 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__query_tag': marqo_query.query_tag,
         }
 
+        query.update(marqo_query.extra_params)
+
         query = {k: v for k, v in query.items() if v is not None}
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
