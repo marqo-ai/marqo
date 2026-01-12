@@ -1,28 +1,25 @@
+import io
 import json
 import os
-import io
+import semver
 import tarfile
 import tempfile
 import textwrap
+import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
+from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Union, Tuple, Generator, Dict
 
-import semver
-from datetime import datetime
-
-from pathlib import Path
-import xml.etree.ElementTree as ET
-
+import marqo.logging
+from marqo import version as marqo_version
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.constants import MARQO_TYPEAHEAD_SCHEMA_MINIMUM_VERSION
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError, \
     ApplicationRollbackError
 from marqo.core.models import MarqoIndex
 from marqo.core.typeahead.typeahead_vespa_schema import TypeaheadVespaSchema
-import marqo.logging
-from marqo import version as marqo_version
 from marqo.vespa.vespa_client import VespaClient
-
 
 logger = marqo.logging.get_logger(__name__)
 

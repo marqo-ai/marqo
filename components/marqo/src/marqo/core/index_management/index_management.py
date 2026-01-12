@@ -1,9 +1,8 @@
 import difflib
+import semver
 from contextlib import contextmanager
 from typing import List, Tuple, Dict
 from typing import Optional
-
-import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
