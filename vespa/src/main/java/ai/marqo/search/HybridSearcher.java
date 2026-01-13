@@ -210,6 +210,8 @@ public class HybridSearcher extends Searcher {
         Integer sortByMinSortCandidates =
                 query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", null);
 
+        boolean facetsDropRanking = query.properties().getBoolean("facets.drop_ranking", false);
+
         // Collapse Parameters
         boolean collapse = query.properties().getString("collapsefield") != null;
 
@@ -236,7 +238,7 @@ public class HybridSearcher extends Searcher {
         List<SubQueryStats> subQueryStatsList = new ArrayList<>();
 
         List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse);
+                getFacetsFutureList(query, execution, verbose, collapse, facetsDropRanking);
 
         // --- Begin relevance cut-off handling ---
         // Execute probe lexical search for relevance cut-off if parameters are provided
@@ -504,7 +506,11 @@ public class HybridSearcher extends Searcher {
 
     @VisibleForTesting
     List<Future<Result>> getFacetsFutureList(
-            Query query, Execution execution, boolean verbose, boolean collapse) {
+            Query query,
+            Execution execution,
+            boolean verbose,
+            boolean collapse,
+            boolean facetsDropRanking) {
         // Check for custom facets YQL properties - expect array of strings
         String[] facetsYqlQueries =
                 query.properties()
@@ -527,6 +533,14 @@ public class HybridSearcher extends Searcher {
                     // CollapseFieldSearch does extra searches
                     queryFacets.properties().set("collapsefield", null);
                 }
+                if (facetsDropRanking) {
+                    queryFacets.getRanking().setProfile("unranked");
+                }
+                logIfVerbose(
+                        String.format(
+                                "Rank Profile changed to '%s' for facet query: %s",
+                                queryFacets.getRanking().getProfile(), facetsYql),
+                        verbose);
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
             }
