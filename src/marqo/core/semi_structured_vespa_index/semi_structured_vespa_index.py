@@ -247,12 +247,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
             base_yql = f'select * from {self._marqo_index.schema_name} where {tensor_term}'
 
+        total_hit_query_term = ''
+        if marqo_query.track_total_hits is not None:
+            if marqo_query.collapse_field_name:
+                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
+            else:
+                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
+
+            if should_separate_total_hits_query:
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query_term))
+
         has_default_facet_query = False
         if marqo_query.facets is not None:
             facets_term = self._get_facets_term(marqo_query.facets,
                                                 collapse_field_name=marqo_query.collapse_field_name,
                                                 should_show_stats=should_show_stats,
-                                                should_drop_numbers=should_drop_numbers)
+                                                should_drop_numbers=should_drop_numbers,
+                                                total_hits_term=total_hit_query_term if not should_separate_total_hits_query else '')
 
             if facets_term is not None:
                 # make sure it's the first facet query
@@ -277,22 +288,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                                                             should_drop_numbers=should_drop_numbers)
                     facet_queries.append(facets_query_skeleton % (f'{base_yql}{new_filter_term}', new_facets_term))
 
-        if marqo_query.track_total_hits is not None:
-            if marqo_query.collapse_field_name:
-                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
-            else:
-                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
-
-            if not should_separate_total_hits_query and has_default_facet_query:
-                facet_queries[0] = facet_queries[0].replace('all(', f'all({total_hit_query_term} ', 1)
-            else:
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query_term))
-
         return QUERY_DELIMITER.join(facet_queries)
 
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None,
                          collapse_field_name: Optional[str] = None, should_show_stats: bool = True,
-                         should_drop_numbers: bool = False) -> str:
+                         should_drop_numbers: bool = False, total_hits_term: str = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -375,6 +375,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if facets_parameters.max_depth is not None:
             grouping_query += f"max({facets_parameters.max_depth}) "
             # all(max(n) - state of grouping query
+
+        if total_hits_term:
+            grouping_query += total_hits_term
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
