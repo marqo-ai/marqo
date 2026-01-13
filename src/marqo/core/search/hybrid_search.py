@@ -378,7 +378,7 @@ class HybridSearch:
                     # Set empty dict for array facets if not present (we skipped them in request)
                     if facet_field_name not in gathered_results["facets"] and facet_field_parameters.type == "array":
                         gathered_results.get("facets", {}).update({facet_field_name: {}})
-            if track_total_hits is not None and "totalHits" not in gathered_results:
+            if track_total_hits and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")

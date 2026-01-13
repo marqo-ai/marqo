@@ -248,14 +248,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             base_yql = f'select * from {self._marqo_index.schema_name} where {tensor_term}'
 
         total_hit_query_term = ''
-        if marqo_query.track_total_hits is not None:
+        if marqo_query.track_total_hits:
             if marqo_query.collapse_field_name:
                 total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
             else:
                 total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
-
-            if should_separate_total_hits_query:
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query_term))
 
         has_default_facet_query = False
         if marqo_query.facets is not None:
@@ -287,6 +284,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                                                             should_show_stats=should_show_stats,
                                                             should_drop_numbers=should_drop_numbers)
                     facet_queries.append(facets_query_skeleton % (f'{base_yql}{new_filter_term}', new_facets_term))
+
+        if total_hit_query_term and (should_separate_total_hits_query or not has_default_facet_query):
+            facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query_term))
 
         return QUERY_DELIMITER.join(facet_queries)
 
