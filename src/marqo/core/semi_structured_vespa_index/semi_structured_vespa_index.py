@@ -222,7 +222,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         unique_exclusions = []
         facet_queries = []
 
-        select_attributes = self._get_select_attributes(marqo_query)
+        should_separate_total_hits_query = marqo_query.extra_params.get('facets.separate_total_hits_query', True)
+        should_show_stats = marqo_query.extra_params.get('facets.show_stats', True)
+        should_drop_numbers = marqo_query.extra_params.get('facets.drop_numbers', False)
 
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
@@ -239,28 +241,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             tensor_term = self._get_tensor_search_term(marqo_query)
 
         facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
-        base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term})'
+        base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term})'
         if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
-            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
+            base_yql = f'select *  from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
-            base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
+            base_yql = f'select * from {self._marqo_index.schema_name} where {tensor_term}'
 
-        if marqo_query.track_total_hits is not None:
-            # 0 is byte representation of letter "t"
-            if marqo_query.collapse_field_name:
-                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
-            else:
-                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
-            facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query))
-
+        has_default_facet_query = False
         if marqo_query.facets is not None:
             facets_term = self._get_facets_term(marqo_query.facets,
-                                                collapse_field_name=marqo_query.collapse_field_name)
+                                                collapse_field_name=marqo_query.collapse_field_name,
+                                                should_show_stats=should_show_stats,
+                                                should_drop_numbers=should_drop_numbers)
 
             if facets_term is not None:
-                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
-
-            # Using a unique delimiter that's unlikely to appear in YQL
+                # make sure it's the first facet query
+                facet_queries.insert(0, facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
+                has_default_facet_query = True
 
             for facet_field in marqo_query.facets.fields.items():
                 facet_name, facet_parameters = facet_field
@@ -275,16 +272,27 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     else:
                         new_filter_term = ''
                     new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms,
-                                                            collapse_field_name=marqo_query.collapse_field_name)
+                                                            collapse_field_name=marqo_query.collapse_field_name,
+                                                            should_show_stats=should_show_stats,
+                                                            should_drop_numbers=should_drop_numbers)
+                    facet_queries.append(facets_query_skeleton % (f'{base_yql}{new_filter_term}', new_facets_term))
 
-                    query_yql = f'{base_yql}{new_filter_term}'
+        if marqo_query.track_total_hits is not None:
+            if marqo_query.collapse_field_name:
+                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
+            else:
+                total_hit_query_term = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
 
-                    facet_queries.append(facets_query_skeleton % (query_yql, new_facets_term))
+            if not should_separate_total_hits_query and has_default_facet_query:
+                facet_queries[0] = facet_queries[0].replace('all(', f'all({total_hit_query_term} ', 1)
+            else:
+                facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query_term))
 
         return QUERY_DELIMITER.join(facet_queries)
 
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None,
-                         collapse_field_name: Optional[str] = None) -> str:
+                         collapse_field_name: Optional[str] = None, should_show_stats: bool = True,
+                         should_drop_numbers: bool = False) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -340,7 +348,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Handle fields without ranges
             return str(field_id) if field_type in [INT_FIELDS, FLOAT_FIELDS] else f'{field_type}{{"{field_name}"}}'
 
-        def build_field_group(field_config, field_name, field_id, field_type_overwrite=None) -> str:
+        def build_field_group(field_config, field_name, field_id, field_type_overwrite=None, should_show_stats: bool = True) -> str:
             """Build the complete group request for a field."""
             group_expr = build_group_expression(field_config, field_name, field_id, field_type_overwrite)
             params = build_group_parameters(field_config)
@@ -349,7 +357,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if collapse_field_name:
                 # we can only get the count collapsed to this field regardless of data type
                 output = f"each(group({collapse_field_name}) output(count()))"
-            elif field_config.type == "number":
+            elif field_config.type == "number" and should_show_stats:
                 # if we do not collapse, we can get the following stats with count for number type
                 aggregations = ["sum", "avg", "min", "max"]
                 field_type = FIELD_TYPES[field_type_overwrite]
@@ -378,9 +386,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 continue
             any_field = True
             if field_parameters.type == "number":
-                # we build 2 queries for number: flot and int
-                grouping_query += build_field_group(field_parameters, field_name, field_id, field_type_overwrite="int")
-                grouping_query += build_field_group(field_parameters, field_name, f"-{field_id}", field_type_overwrite="float")
+                if not should_drop_numbers:
+                    # we build 2 queries for number: flot and int
+                    grouping_query += build_field_group(field_parameters, field_name, field_id, field_type_overwrite="int", should_show_stats=should_show_stats)
+                    grouping_query += build_field_group(field_parameters, field_name, f"-{field_id}", field_type_overwrite="float", should_show_stats=should_show_stats)
             else:
                 if field_parameters.type == "array":
                     if self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
