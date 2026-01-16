@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -210,8 +211,6 @@ public class HybridSearcher extends Searcher {
         Integer sortByMinSortCandidates =
                 query.properties().getInteger("marqo__hybrid.sortBy.minSortCandidates", null);
 
-        boolean facetsDropRanking = query.properties().getBoolean("facets.drop_ranking", false);
-
         // Collapse Parameters
         boolean collapse = query.properties().getString("collapsefield") != null;
 
@@ -238,7 +237,7 @@ public class HybridSearcher extends Searcher {
         List<SubQueryStats> subQueryStatsList = new ArrayList<>();
 
         List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse, facetsDropRanking);
+                getFacetsFutureList(query, execution, verbose, collapse);
 
         // --- Begin relevance cut-off handling ---
         // Execute probe lexical search for relevance cut-off if parameters are provided
@@ -506,20 +505,26 @@ public class HybridSearcher extends Searcher {
 
     @VisibleForTesting
     List<Future<Result>> getFacetsFutureList(
-            Query query,
-            Execution execution,
-            boolean verbose,
-            boolean collapse,
-            boolean facetsDropRanking) {
+            Query query, Execution execution, boolean verbose, boolean collapse) {
         // Check for custom facets YQL properties - expect array of strings
         String[] facetsYqlQueries =
                 query.properties()
                         .getString("marqo__yql.facets", "")
                         .split("\n---MARQO-YQL-QUERY-DELIMITER---\n");
+
+        // If not specified, will use the default rank profile for lexical.
+        // On the other hand, we can specify to use `unranked` or `fast_facets`
+        String rankProfileTotalHits =
+                query.properties().getString("facets.rank_profile_total_hits");
+        String rankProfileFacets = query.properties().getString("facets.rank_profile_facets");
+
         List<Future<Result>> futureFacets = new ArrayList<>();
 
         for (String facetsYql : facetsYqlQueries) {
             if (!facetsYql.isEmpty()) {
+                String rankProfile =
+                        facetsYql.contains("group(1.1)") ? rankProfileTotalHits : rankProfileFacets;
+
                 // Create a subquery for each facet query
                 Query queryFacets =
                         createSubQuery(
@@ -527,20 +532,14 @@ public class HybridSearcher extends Searcher {
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 verbose,
-                                facetsYql);
+                                facetsYql,
+                                rankProfile);
                 if (collapse) {
                     // Carrying collapsefield parameter to facets query will cause extra count since
                     // CollapseFieldSearch does extra searches
                     queryFacets.properties().set("collapsefield", null);
                 }
-                if (facetsDropRanking) {
-                    queryFacets.getRanking().setProfile("unranked");
-                }
-                logIfVerbose(
-                        String.format(
-                                "Rank Profile changed to '%s' for facet query: %s",
-                                queryFacets.getRanking().getProfile(), facetsYql),
-                        verbose);
+
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);
                 futureFacets.add(asyncExecutionFacets.search(queryFacets));
             }
@@ -1386,7 +1385,7 @@ public class HybridSearcher extends Searcher {
     public Query createSubQuery(
             Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
         // Default exactQuery to an empty string (or any default value you prefer)
-        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "");
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "", "");
     }
 
     /**
@@ -1408,7 +1407,8 @@ public class HybridSearcher extends Searcher {
             String retrievalMethod,
             String rankingMethod,
             boolean verbose,
-            String exactQuery) {
+            String exactQuery,
+            String rankProfile) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -1425,9 +1425,15 @@ public class HybridSearcher extends Searcher {
         }
 
         // Rank Profile uses RETRIEVAL + RANKING method
-        String rankProfileNew =
-                query.properties()
-                        .getString("marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
+        String rankProfileNew;
+        if (!Strings.isNullOrEmpty(rankProfile)) {
+            rankProfileNew = rankProfile;
+        } else {
+            rankProfileNew =
+                    query.properties()
+                            .getString(
+                                    "marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
+        }
 
         // Log fetched properties
         logIfVerbose(String.format("YQL %s found: %s", retrievalMethod, yqlNew), verbose);

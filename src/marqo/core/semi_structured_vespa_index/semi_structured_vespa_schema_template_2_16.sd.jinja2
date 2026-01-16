@@ -366,6 +366,12 @@ schema {{ index.schema_name }} {
         }
     }
 
+    rank-profile fast_facets inherits base_rank_profile {
+        first-phase {
+            expression: 0
+        }
+    }
+
     {% if index.lexical_fields -%}
     rank-profile bm25 inherits base_rank_profile {
         first-phase {
