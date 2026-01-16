@@ -305,13 +305,13 @@ class IndexManagement:
                 )
 
             # Check minimum version requirement
-            if existing_index.parsed_marqo_version() < constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION:
-                raise UnsupportedFeatureError(
-                    f"Schema update is only supported for indexes created with Marqo "
-                    f"{str(constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION)} or later. "
-                    f"This index was created with Marqo {existing_index.marqo_version}. "
-                    f"Please recreate the index with a newer version of Marqo to use this feature."
-                )
+            # if existing_index.parsed_marqo_version() < constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION:
+            #     raise UnsupportedFeatureError(
+            #         f"Schema update is only supported for indexes created with Marqo "
+            #         f"{str(constants.MARQO_UPDATE_SCHEMA_MINIMUM_VERSION)} or later. "
+            #         f"This index was created with Marqo {existing_index.marqo_version}. "
+            #         f"Please recreate the index with a newer version of Marqo to use this feature."
+            #     )
 
             # Validate that index's marqo_version is not greater than current version
             current_version_parsed = semver.VersionInfo.parse(version.get_version())
