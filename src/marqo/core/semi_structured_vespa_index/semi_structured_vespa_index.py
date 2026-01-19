@@ -381,7 +381,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
-            if field_parameters.exclude_terms is not None:
+            if field_parameters.exclude_terms:
                 # We want this field to be in a separate query if any of the exclusions are not in the exclusions list
                 if exclusion_terms is None or any([exclusion_term not in exclusion_terms for exclusion_term in field_parameters.exclude_terms]):
                     continue
