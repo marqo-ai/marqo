@@ -245,7 +245,10 @@ public class HybridSearcher extends Searcher {
             logIfVerbose("Executing probe lexical search for relevance cut-off", verbose);
             Query probeLexicalQuery =
                     createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
-            Result probeLexicalResult = execution.search(probeLexicalQuery);
+
+            // Create new execution with parent's context - traces will be nested
+            Execution probeExecution = new Execution(execution);
+            Result probeLexicalResult = probeExecution.search(probeLexicalQuery);
 
             subQueryStatsList.add(statsFromResult("p", probeLexicalResult));
 
@@ -279,10 +282,15 @@ public class HybridSearcher extends Searcher {
                             query,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
-                            verbose);
+                            verbose,
+                            "lexical");
             Query queryTensor =
                     createSubQuery(
-                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                            query,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            verbose,
+                            "tensor");
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -339,7 +347,8 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(
+                                query, retrievalMethod, rankingMethod, verbose, retrievalMethod);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 finalResult.setHits(hitsForPostProcessing);
@@ -536,7 +545,6 @@ public class HybridSearcher extends Searcher {
             if (!facetsYql.isEmpty()) {
                 String rankProfile =
                         facetsYql.contains("group(1.1)") ? rankProfileTotalHits : rankProfileFacets;
-
                 // Create a subquery for each facet query
                 Query queryFacets =
                         createSubQuery(
@@ -545,7 +553,8 @@ public class HybridSearcher extends Searcher {
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 verbose,
                                 facetsYql,
-                                rankProfile);
+                                rankProfile,
+                                getFacetsQueryId(facetsYql, rankProfile));
                 if (collapse) {
                     // Carrying collapsefield parameter to facets query will cause extra count since
                     // CollapseFieldSearch does extra searches
@@ -557,6 +566,16 @@ public class HybridSearcher extends Searcher {
             }
         }
         return futureFacets;
+    }
+
+    private static String getFacetsQueryId(String facetsYql, String rankProfile) {
+        String groupingClause = facetsYql.substring(facetsYql.indexOf("| all"));
+        String groupingExcerpt =
+                groupingClause.length() > 52
+                        ? String.format("'%s...'", groupingClause.substring(2, 52))
+                        : String.format("'%s'", groupingClause.substring(2));
+        return String.format(
+                "facets:%s (%s)", groupingExcerpt, rankProfile != null ? rankProfile : "bm25");
     }
 
     /**
@@ -1235,7 +1254,11 @@ public class HybridSearcher extends Searcher {
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
         Query probeLexicalQuery =
                 createSubQuery(
-                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                        query,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        verbose,
+                        "probe");
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery
@@ -1395,9 +1418,13 @@ public class HybridSearcher extends Searcher {
     }
 
     public Query createSubQuery(
-            Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
+            Query query,
+            String retrievalMethod,
+            String rankingMethod,
+            boolean verbose,
+            String queryId) {
         // Default exactQuery to an empty string (or any default value you prefer)
-        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "", "");
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "", "", queryId);
     }
 
     /**
@@ -1420,7 +1447,8 @@ public class HybridSearcher extends Searcher {
             String rankingMethod,
             boolean verbose,
             String exactQuery,
-            String rankProfile) {
+            String rankProfile,
+            String queryId) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -1511,11 +1539,7 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(
                 String.format("Rank Profile: %s", queryNew.getRanking().getProfile()), verbose);
 
-        String queryType =
-                exactQuery.isEmpty()
-                        ? "facets"
-                        : "lexical".equalsIgnoreCase(retrievalMethod) ? "lexical" : "tensor";
-        queryNew.trace(String.format("starting subquery: %s", queryType), 2);
+        queryNew.trace(String.format("starting subquery: %s", queryId), 2);
 
         return queryNew;
     }

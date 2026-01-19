@@ -243,7 +243,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
         base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term})'
         if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
-            base_yql = f'select *  from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
+            base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
             base_yql = f'select * from {self._marqo_index.schema_name} where {tensor_term}'
 
@@ -269,7 +269,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             for facet_field in marqo_query.facets.fields.items():
                 facet_name, facet_parameters = facet_field
-                if facet_parameters.exclude_terms is not None:
+                if facet_parameters.exclude_terms:  # is not None and has value in it
                     if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in
                            unique_exclusions):
                         continue
@@ -370,14 +370,14 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return f"all(group({group_expr}) {params} {output}) "
 
         # Start building the overall grouping query.
-        grouping_query = "all( "
+        grouping_query = "all("
         any_field = False # when exclusions are present, we need to check if any field is included in the default query
         if facets_parameters.max_depth is not None:
             grouping_query += f"max({facets_parameters.max_depth}) "
             # all(max(n) - state of grouping query
 
         if total_hits_term:
-            grouping_query += total_hits_term
+            grouping_query += f"{total_hits_term} "
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
@@ -386,6 +386,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 if exclusion_terms is None or any([exclusion_term not in exclusion_terms for exclusion_term in field_parameters.exclude_terms]):
                     continue
             elif exclusion_terms is not None:
+                # TODO why?
                 continue
             any_field = True
             if field_parameters.type == "number":

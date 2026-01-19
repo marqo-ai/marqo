@@ -366,7 +366,8 @@ class HybridSearcherTest {
                 String retrievalMethod, String rankingMethod) {
             Query query = getHybridQuery(60, 0.5, "test", retrievalMethod, rankingMethod);
             Query subQuery =
-                    hybridSearcher.createSubQuery(query, retrievalMethod, rankingMethod, true);
+                    hybridSearcher.createSubQuery(
+                            query, retrievalMethod, rankingMethod, true, retrievalMethod);
             RankFeatures features = subQuery.getRanking().getFeatures();
 
             assertThat(features.getDouble("query(marqo__lexical_text_field_1)")).hasValue(1.0);
@@ -378,7 +379,8 @@ class HybridSearcherTest {
         @Test
         void shouldOnlyIncludeTensorRankFieldsWhenRetrieveAndRankByTensor() {
             Query query = getHybridQuery(60, 0.5, "test", "tensor", "tensor");
-            Query subQuery = hybridSearcher.createSubQuery(query, "tensor", "tensor", true);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "tensor", "tensor", true, "tensor");
             RankFeatures features = subQuery.getRanking().getFeatures();
 
             assertThat(features.getDouble("query(marqo__embeddings_text_field_1)")).hasValue(1.0);
@@ -390,7 +392,8 @@ class HybridSearcherTest {
         @Test
         void shouldOnlyIncludeLexicalRankFieldsRetrieveAndRankByLexical() {
             Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
-            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", true);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "lexical", "lexical", true, "tensor");
             RankFeatures features = subQuery.getRanking().getFeatures();
 
             assertThat(features.getDouble("query(marqo__lexical_text_field_1)")).hasValue(1.0);
