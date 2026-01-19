@@ -14,12 +14,10 @@ import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.container.logging.AccessLogEntry;
-import com.yahoo.container.logging.HitCounts;
 import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
-import com.yahoo.search.handler.SearchResponse;
 import com.yahoo.search.result.Coverage;
 import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.FeatureData;
@@ -408,6 +406,22 @@ public class HybridSearcher extends Searcher {
         return finalResult;
     }
 
+    private void logCoverage(Coverage coverage, String queryId, AccessLogEntry entry) {
+        if (coverage == null) {
+            return;
+        }
+        entry.addKeyValue(queryId + "_cov_docs", String.valueOf(coverage.getDocs()));
+        entry.addKeyValue(queryId + "_cov_pct", String.valueOf(coverage.getResultPercentage()));
+        if (coverage.isDegraded()) {
+            int degradation =
+                    com.yahoo.container.logging.Coverage.toDegradation(
+                            coverage.isDegradedByMatchPhase(),
+                            coverage.isDegradedByTimeout(),
+                            coverage.isDegradedByAdapativeTimeout());
+            entry.addKeyValue(queryId + "_cov_deg_reasons", String.valueOf(degradation));
+        }
+    }
+
     private void populateAccessLogHitCounts(
             Query query,
             Result result,
@@ -421,11 +435,16 @@ public class HybridSearcher extends Searcher {
                 .getAccessLogEntry()
                 .ifPresent(
                         entry -> {
-                            HitCounts hitCounts = SearchResponse.createHitCounts(query, result);
-                            entry.setHitCounts(hitCounts);
+                            // query metadata
                             entry.addKeyValue("tag", tag);
                             entry.addKeyValue("limit", String.valueOf(query.getHits()));
                             entry.addKeyValue("offset", String.valueOf(query.getOffset()));
+
+                            // result
+                            entry.addKeyValue("a_hits", String.valueOf(result.getHitCount()));
+                            entry.addKeyValue("a_total", String.valueOf(result.getTotalHitCount()));
+                            logCoverage(result.getCoverage(false), "a", entry);
+
                             marqoMetadataFields.addToAccessLogEntry(entry);
 
                             subQueryStatsList.forEach(
@@ -436,16 +455,9 @@ public class HybridSearcher extends Searcher {
                                         entry.addKeyValue(
                                                 stats.queryId + "_total",
                                                 String.valueOf(stats.totalHits()));
-                                        Coverage coverage = stats.coverage();
-                                        if (coverage != null) {
-                                            entry.addKeyValue(
-                                                    stats.queryId + "_cov_docs",
-                                                    String.valueOf(coverage.getDocs()));
-                                            entry.addKeyValue(
-                                                    stats.queryId + "_cov_pct",
-                                                    String.valueOf(coverage.getResultPercentage()));
-                                            // TODO log out degradation reason if degraded
-                                        }
+
+                                        logCoverage(stats.coverage(), stats.queryId, entry);
+
                                         ElapsedTime elapsedTime = stats.elapsedTime();
                                         if (elapsedTime != null) {
                                             entry.addKeyValue(
@@ -1498,6 +1510,12 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(queryNew.getRanking().getFeatures().toString(), verbose);
         logIfVerbose(
                 String.format("Rank Profile: %s", queryNew.getRanking().getProfile()), verbose);
+
+        String queryType =
+                exactQuery.isEmpty()
+                        ? "facets"
+                        : "lexical".equalsIgnoreCase(retrievalMethod) ? "lexical" : "tensor";
+        queryNew.trace(String.format("starting subquery: %s", queryType), 2);
 
         return queryNew;
     }
