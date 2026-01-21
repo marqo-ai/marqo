@@ -377,7 +377,9 @@ class CollapseSearch:
                 "scoreModifiersTensor": None,
             }
         )
-        copied_search_params.score_modifiers=None
+        copied_search_params.score_modifiers = None
+        copied_search_params.sort_by = None
+        copied_search_params.relevance_cutoff = None
 
         if copied_search_params.query is None:
             copied_search_params.query = "*"
@@ -472,7 +474,7 @@ class CollapseSearch:
                 or
                 copied_search_params.hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
         ):
-            with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
+            with RequestMetricsStore.for_request().time("collapse_relevance_sort.sorted_collapse.inference_time"):
                 qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
                     copied_search_params.config, queries, copied_search_params.device,
                     copied_search_params.interpolation_method)
@@ -521,9 +523,7 @@ class CollapseSearch:
         vespa_query = vespa_index.to_vespa_query(marqo_query)
 
         # SEARCH TIMER-LOGGER (roundtrip)
-        with RequestMetricsStore.for_request().time("search.hybrid.vespa",
-                                                    lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
-                                                    ):
+        with RequestMetricsStore.for_request().time("collapse_relevance_sort.sorted_collapse.vespa_time"):
             try:
                 responses = copied_search_params.config.vespa_client.query(**vespa_query)
             except VespaStatusError as e:
@@ -545,11 +545,11 @@ class CollapseSearch:
             )
 
         # SEARCH TIMER-LOGGER (post-processing)
-        RequestMetricsStore.for_request().start("search.hybrid.postprocess")
-        gathered_results = gather_documents_from_response(responses, copied_search_params.marqo_index,
-                                                          copied_search_params.highlights,
-                                                          copied_search_params.attributes_to_retrieve)
-        total_results = len(gathered_results["hits"])
+        gathered_results = gather_documents_from_response(
+            responses, copied_search_params.marqo_index,
+            copied_search_params.highlights,
+            copied_search_params.attributes_to_retrieve
+        )
         if copied_search_params.facets is not None or copied_search_params.track_total_hits is not None:
             if isinstance(vespa_index, SemiStructuredVespaIndex):
                 gathered_results.update(vespa_index.gather_facets_from_response(responses, copied_search_params.facets))
@@ -560,33 +560,6 @@ class CollapseSearch:
                         gathered_results.get("facets", {}).update({facet_field_name: {}})
             if copied_search_params.track_total_hits is not None and "totalHits" not in gathered_results:
                 gathered_results["totalHits"] = 0
-
-        total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
-        logger.debug(
-            f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
-            f"{total_results} results from Vespa."
-        )
-
-        # Collect metadata for sort by
-        if copied_search_params.sort_by is not None:
-            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None:  # pragma: no cover
-                raise core_exceptions.InternalError(
-                    f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
-                )
-            gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.sort_candidates
-
-        # Collect metadata for relevance cutoff
-        if copied_search_params.relevance_cutoff is not None:
-            if responses.root.fields.marqo_fields is None \
-                    or responses.root.fields.marqo_fields.relevant_candidates is None \
-                    or responses.root.fields.marqo_fields.probe_candidates is None:  # pragma: no cover
-                raise core_exceptions.InternalError(
-                    f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
-                    f"probeCandidates in the response "
-                )
-            gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
-            gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
-
         return gathered_results
 
     def merge_two_collapse_results(self, relevance_collapse_results, sorted_collapse_results, parent_ids: List[str]):
