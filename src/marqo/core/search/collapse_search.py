@@ -373,6 +373,7 @@ class CollapseSearch:
                 "scoreModifiersTensor": None,
             }
         )
+        copied_search_params.score_modifiers=None
 
         if copied_search_params.query is None:
             copied_search_params.query = "*"
