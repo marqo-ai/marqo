@@ -383,6 +383,8 @@ class CollapseSearch:
         copied_search_params.sort_by = None
         copied_search_params.relevance_cutoff = None
         copied_search_params.facets = None
+        copied_search_params.track_total_hits = None
+        copied_search_params.recency_parameters = None
 
         if copied_search_params.query is None:
             copied_search_params.query = "*"
