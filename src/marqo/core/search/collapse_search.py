@@ -359,10 +359,9 @@ class CollapseSearch:
         copied_search_params = self.internal_params.copy(deep=False)
         document_ids_filter_string = " OR ".join(
             [f"{self.internal_params.collapse.name}:{doc_id}" for doc_id in document_ids])
-        copied_search_params.filter_string = f"{copied_search_params.filter_string} AND ({document_ids_filter_string})" \
-            if copied_search_params.filter_string else document_ids_filter_string
+        if document_ids_filter_string and copied_search_params.filter_string:
+            copied_search_params.filter_string = f"{copied_search_params.filter_string} AND ({document_ids_filter_string})"
         copied_search_params.collapse.enable_execute_sort()
-
         copied_search_params.hybrid_parameters.update(
             {
                 "rankingMethod": RankingMethod.Lexical,
