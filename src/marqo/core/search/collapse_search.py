@@ -375,11 +375,14 @@ class CollapseSearch:
                 "alpha": None,
                 "scoreModifiersLexical": None,
                 "scoreModifiersTensor": None,
+                "track_total_hits": None,
+                "recencyParameters": None
             }
         )
         copied_search_params.score_modifiers = None
         copied_search_params.sort_by = None
         copied_search_params.relevance_cutoff = None
+        copied_search_params.facets = None
 
         if copied_search_params.query is None:
             copied_search_params.query = "*"
@@ -452,35 +455,7 @@ class CollapseSearch:
             query_text_vectorise = tensor_query
             query_text_search = lexical_query
 
-        queries = [BulkSearchQueryEntity(
-            q=query_text_vectorise,
-            searchableAttributes=copied_search_params.searchable_attributes,
-            searchMethod=SearchMethod.HYBRID,
-            limit=copied_search_params.result_count,
-            offset=copied_search_params.offset, showHighlights=False,
-            filter=copied_search_params.filter_string,
-            attributesToRetrieve=copied_search_params.attributes_to_retrieve,
-            boost=copied_search_params.boost, mediaDownloadHeaders=copied_search_params.media_download_headers,
-            context=copied_search_params.context,
-            scoreModifiers=copied_search_params.score_modifiers,
-            index=copied_search_params.marqo_index, modelAuth=copied_search_params.model_auth,
-            text_query_prefix=text_query_prefix,
-            hybridParameters=copied_search_params.hybrid_parameters
-        )]
-
-        if (
-                copied_search_params.hybrid_parameters.retrievalMethod in [RetrievalMethod.Tensor,
-                                                                           RetrievalMethod.Disjunction]
-                or
-                copied_search_params.hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
-        ):
-            with RequestMetricsStore.for_request().time("collapse_relevance_sort.sorted_collapse.inference_time"):
-                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(
-                    copied_search_params.config, queries, copied_search_params.device,
-                    copied_search_params.interpolation_method)
-            vectorised_text = list(qidx_to_vectors.values())[0]
-        else:
-            vectorised_text = None
+        vectorised_text = None
 
         # Parse text into required and optional terms.
         if query_text_search:
