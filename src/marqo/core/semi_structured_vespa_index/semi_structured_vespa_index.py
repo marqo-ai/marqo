@@ -24,6 +24,7 @@ from marqo.tensor_search.models.recency_parameters import RecencyParameters, App
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.vespa.models import QueryResult
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -84,9 +85,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             marqo_query.attributes_to_retrieve.append(common.VESPA_FIELD_ID)
 
             # Add collapse field if provided, this is critical for collapsing search result
-            if (isinstance(marqo_query, MarqoHybridQuery) and marqo_query.collapse_field_name
-                    and marqo_query.collapse_field_name not in marqo_query.attributes_to_retrieve):
-                marqo_query.attributes_to_retrieve.append(marqo_query.collapse_field_name)
+            if (isinstance(marqo_query, MarqoHybridQuery) and marqo_query.collapse
+                    and marqo_query.collapse.name not in marqo_query.attributes_to_retrieve):
+                marqo_query.attributes_to_retrieve.append(marqo_query.collapse.name)
 
             # add chunk field names for tensor fields
             marqo_query.attributes_to_retrieve.extend(
@@ -119,8 +120,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self._add_relevance_cutoff_and_sort_by_params(marqo_query, query)
 
         # add the collapse_field to query
-        if marqo_query.collapse_field_name:
-            query.update(self._generate_collapse_query_params(marqo_query.collapse_field_name))
+        if marqo_query.collapse:
+            query.update(self._generate_collapse_query_params(marqo_query.collapse))
+
+            if marqo_query.collapse.should_execute_sort():
+                query['marqo__ranking.lexical.lexical'] = "collapse_to_sort_value"
+                query["query_features"]["marqo__collapse_sort_weights"] = marqo_query.collapse.generate_vespa_sort_by_query_input()
 
         if marqo_query.recency_parameters:
             # Add recency parameters to query input
@@ -132,7 +137,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
-            if marqo_query.collapse_field_name:
+            if marqo_query.collapse:
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity'
             else:
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
@@ -177,9 +182,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         return result
 
-    def _generate_collapse_query_params(self, collapse_field_name: str):
-        params = {
-            'collapsefield': collapse_field_name,
+    def _generate_collapse_query_params(self, collapse: CollapseModel):
+        params: Dict[str, Any] = {
+            'collapsefield': collapse.name,
             'collapsesize': 1,  # currently fixed to 1, will support multiple if needed in the future
 
             # use a different rank profile to ensure diversity in the result returned to Vespa container
@@ -196,7 +201,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # default summary, which defies the purpose of using a minimal summary for collapsing. Disabling
             # `FieldFiller` will force the searcher to use `collapse-minimal-summary` for collapsing queries.
             params['FieldFiller.disable'] = True
-
         return params
 
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):

@@ -30,9 +30,16 @@ from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_doc
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.collapse_model import CollapseModel
+from marqo.base_model import ImmutableStrictBaseModel
+from marqo.core.search.collapse_search import CollapseSearch
+
 
 
 class HybridSearch:
+    def __init__(self):
+        self._internal_params = None
+
     def search(
             self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
@@ -50,11 +57,10 @@ class HybridSearch:
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
-            collapse_field_name: Optional[str] = None,
+            collapse: Optional[CollapseModel] = None,
             recency_parameters: Optional[RecencyParameters] = None
     ) -> Dict:
         """
-
             Args:
                 config:
                 marqo_index: index object fetched by calling function
@@ -82,7 +88,7 @@ class HybridSearch:
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
-                collapse_field_name:  field name to collapse the search result on.
+                collapse: A CollapseModel object to specify collapsing of search results.
                 recency_parameters: parameters for recency boosting
             Returns:
 
@@ -98,6 +104,9 @@ class HybridSearch:
                     },
                 ]
             """
+        # Use default hybrid settings if not provided
+        if hybrid_parameters is None:
+            hybrid_parameters = HybridParameters()
 
         # # SEARCH TIMER-LOGGER (pre-processing)
         if boost is not None:
@@ -131,10 +140,6 @@ class HybridSearch:
                 f"{str(constants.MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION)} or later. "
                 f"This index was created with Marqo {marqo_index_version}."
             )
-
-        # Use default hybrid settings if not provided
-        if hybrid_parameters is None:
-            hybrid_parameters = HybridParameters()
 
         # TODO: Remove when unstructured searchable attributes are supported
         if (isinstance(marqo_index, UnstructuredMarqoIndex) and
@@ -221,6 +226,39 @@ class HybridSearch:
                     f"with Marqo {constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION} or later. "
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
+
+        if collapse and collapse.sort_by:
+            return CollapseSearch(
+                config=config,
+                marqo_index=marqo_index,
+                query=query,
+                result_count=result_count,
+                offset=offset,
+                rerank_depth=rerank_depth,
+                ef_search=ef_search,
+                approximate=approximate,
+                approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
+                filter_string=filter_string,
+                device=device,
+                attributes_to_retrieve=attributes_to_retrieve,
+                boost=boost,
+                media_download_headers=media_download_headers,
+                context=context,
+                score_modifiers=score_modifiers,
+                model_auth=model_auth,
+                highlights=highlights,
+                text_query_prefix=text_query_prefix,
+                hybrid_parameters=hybrid_parameters,
+                facets=facets,
+                track_total_hits=track_total_hits,
+                language=language,
+                relevance_cutoff=relevance_cutoff,
+                sort_by=sort_by,
+                interpolation_method=interpolation_method,
+                collapse=collapse,  # Collapse is handled in this function
+                recency_parameters=recency_parameters
+            ).search()
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -342,7 +380,7 @@ class HybridSearch:
             language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
-            collapse_field_name=collapse_field_name,
+            collapse=collapse,
             recency_parameters=recency_parameters
         )
 
