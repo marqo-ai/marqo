@@ -123,14 +123,19 @@ class CollapseSearch:
         )
 
     def search(self):
-        relevance_collapse_results = self.search_with_relevance_collapse()
+        with RequestMetricsStore.for_request().time("collapse_relevance_sort.relevance_collapse"):
+            relevance_collapse_results = self.search_with_relevance_collapse()
 
-        collected_document_ids = self.collect_documents_ids(relevance_collapse_results)
-        sorted_collapse_results = self.search_with_sorted_collapse(collected_document_ids)
+        with RequestMetricsStore.for_request().time("collapse_relevance_sort.collect_documents_ids"):
+            collected_document_ids = self.collect_documents_ids(relevance_collapse_results)
 
-        merged_results = self.merge_two_collapse_results(
-            relevance_collapse_results, sorted_collapse_results, collected_document_ids
-        )
+        with RequestMetricsStore.for_request().time("collapse_relevance_sort.sorted_collapse"):
+            sorted_collapse_results = self.search_with_sorted_collapse(collected_document_ids)
+
+        with RequestMetricsStore.for_request().time("collapse_relevance_sort.merge_results"):
+            merged_results = self.merge_two_collapse_results(
+                relevance_collapse_results, sorted_collapse_results, collected_document_ids
+            )
 
         return merged_results
 
