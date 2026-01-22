@@ -45,7 +45,7 @@ class HybridSearchInternalParameters(StrictBaseModel):
     ef_search: Optional[int] = None
     approximate: bool = True
     approximate_threshold: Optional[float] = None
-    searchable_attributes: Iterable[str] = None
+    searchable_attributes: Optional[Iterable[str]] = None
     filter_string: Optional[str] = None,
     device: str = None
     attributes_to_retrieve: Optional[List[str]] = None
@@ -362,10 +362,14 @@ class CollapseSearch:
 
     def search_with_sorted_collapse(self, document_ids: List[str]):
         copied_search_params = self.internal_params.copy(deep=False)
-        document_ids_filter_string = " OR ".join(
-            [f"{self.internal_params.collapse.name}:{doc_id}" for doc_id in document_ids])
-        if document_ids_filter_string and copied_search_params.filter_string:
-            copied_search_params.filter_string = f"{copied_search_params.filter_string} AND ({document_ids_filter_string})"
+        if document_ids:
+            document_ids_filter_string = (
+                    f'{copied_search_params.collapse.name} in ('
+                    + ', '.join(f'"{doc_id}"' for doc_id in document_ids)
+                    + ')'
+            )
+            copied_search_params.collapse.collapse_filter_string = document_ids_filter_string
+
         copied_search_params.collapse.enable_execute_sort()
         copied_search_params.hybrid_parameters.update(
             {
@@ -376,7 +380,9 @@ class CollapseSearch:
                 "scoreModifiersLexical": None,
                 "scoreModifiersTensor": None,
                 "track_total_hits": None,
-                "recencyParameters": None
+                "recencyParameters": None,
+                "searchableAttributesLexical": None,
+                "searchableAttributesTensor": None
             }
         )
         copied_search_params.score_modifiers = None
@@ -385,9 +391,10 @@ class CollapseSearch:
         copied_search_params.facets = None
         copied_search_params.track_total_hits = None
         copied_search_params.recency_parameters = None
+        copied_search_params.query = "*"
+        copied_search_params.searchable_attributes = None
 
-        if copied_search_params.query is None:
-            copied_search_params.query = "*"
+        logger.debug(f"Performing sorted collapse search with params: {copied_search_params.dict()}")
 
         # Determine the text query prefix
         text_query_prefix = copied_search_params.marqo_index.model.get_text_query_prefix(

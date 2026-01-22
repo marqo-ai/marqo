@@ -528,10 +528,17 @@ class StructuredVespaIndex(VespaIndex):
 
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
-        if filter_term:
+
+        s = marqo_query.collapse.collapse_filter_string
+        if filter_term and s:
+            filter_term = f' AND ({s}) AND ({filter_term})'
+        elif filter_term and not s:
             filter_term = f' AND ({filter_term})'
+        elif not filter_term and s:
+            filter_term = f' AND ({s})'
         else:
             filter_term = ''
+
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 

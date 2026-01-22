@@ -19,6 +19,7 @@ class CollapseModel(StrictBaseModel):
     )
 
     _execute: bool = PrivateAttr(False)
+    collapse_filter_string: Optional[str] = Field(None, alias="collapseFilterString")
 
     def generate_vespa_sort_by_query_input(self):
         if self.sort_by is None:
