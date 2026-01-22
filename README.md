@@ -497,7 +497,6 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 ## Support
 
-- Ask questions and share your creations with the community on our [Discourse forum](https://community.marqo.ai).
 - Join our [Slack community](https://bit.ly/marqo-community-slack) and chat with other community members about ideas.
 
 
