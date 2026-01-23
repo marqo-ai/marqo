@@ -227,7 +227,7 @@ class HybridSearch:
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
-        if collapse and collapse.sort_by:
+        if collapse:
             return CollapseSearch(
                 config=config,
                 marqo_index=marqo_index,

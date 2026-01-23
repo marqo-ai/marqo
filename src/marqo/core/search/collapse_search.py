@@ -126,6 +126,9 @@ class CollapseSearch:
         with RequestMetricsStore.for_request().time("collapse_relevance_sort.relevance_collapse"):
             relevance_collapse_results = self.search_with_relevance_collapse()
 
+        if not self.internal_params.collapse.sort_by:
+            return relevance_collapse_results
+
         with RequestMetricsStore.for_request().time("collapse_relevance_sort.collect_documents_ids"):
             collected_document_ids = self.collect_documents_ids(relevance_collapse_results)
 
@@ -136,7 +139,6 @@ class CollapseSearch:
             merged_results = self.merge_two_collapse_results(
                 relevance_collapse_results, sorted_collapse_results, collected_document_ids
             )
-
         return merged_results
 
     def search_with_relevance_collapse(self):
