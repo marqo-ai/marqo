@@ -114,6 +114,8 @@ class HybridSearch:
 
         RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
 
+        RequestMetricsStore.for_request().start("search.hybrid.processing_before_collapse_search")
+
         index_name = marqo_index.name
 
         # Version checks (different for structured and unstructured)

@@ -123,6 +123,9 @@ class CollapseSearch:
         )
 
     def search(self):
+
+        RequestMetricsStore.for_request().stop("search.hybrid.processing_before_collapse_search")
+
         with RequestMetricsStore.for_request().time("collapse_relevance_sort.relevance_collapse"):
             relevance_collapse_results = self.search_with_relevance_collapse()
 
