@@ -267,19 +267,31 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 facet_queries.insert(0, facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
                 has_default_facet_query = True
 
+            # Get all terms that exist in the filter (once, before the loop)
+            all_filter_terms = self._get_all_filter_terms(marqo_query)
+
             for facet_field in marqo_query.facets.fields.items():
                 facet_name, facet_parameters = facet_field
                 if facet_parameters.exclude_terms:  # is not None and has value in it
-                    if any(set(facet_parameters.exclude_terms) == unique_exclusion for unique_exclusion in
+                    # Filter out exclude_terms that are not in the filter
+                    valid_exclude_terms = [term for term in facet_parameters.exclude_terms
+                                           if term in all_filter_terms]
+
+                    # If no valid exclude_terms remain, skip constructing separate query
+                    if not valid_exclude_terms:
+                        continue
+
+                    # Check for duplicate exclusion sets (using filtered terms)
+                    if any(set(valid_exclude_terms) == unique_exclusion for unique_exclusion in
                            unique_exclusions):
                         continue
-                    unique_exclusions.append(set(facet_parameters.exclude_terms))
-                    new_filter_term = self._get_filter_term(marqo_query, facet_parameters.exclude_terms)
+                    unique_exclusions.append(set(valid_exclude_terms))
+                    new_filter_term = self._get_filter_term(marqo_query, valid_exclude_terms)
                     if new_filter_term:
                         new_filter_term = f' AND {new_filter_term}'
                     else:
                         new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms,
+                    new_facets_term = self._get_facets_term(marqo_query.facets, valid_exclude_terms,
                                                             collapse_field_name=marqo_query.collapse_field_name,
                                                             should_show_stats=should_show_stats,
                                                             should_drop_numbers=should_drop_numbers)
@@ -409,6 +421,35 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         name_to_string_array_field_map = self.get_marqo_index().name_to_string_array_field_map
         return [name_to_string_array_field_map[att].string_array_field_name for att in attributes_to_retrieve if
                 name_to_string_array_field_map.get(att)]
+
+    def _get_all_filter_terms(self, marqo_query: MarqoQuery) -> set:
+        """Collect all string representations of filter nodes (Terms and Modifiers).
+
+        This is used to validate exclude_terms - if an exclude_term is not in the filter,
+        there's no point constructing a separate facets query for it.
+
+        Args:
+            marqo_query: The Marqo query containing the filter
+
+        Returns:
+            A set of string representations of all Term and Modifier nodes in the filter
+        """
+        if marqo_query.filter is None:
+            return set()
+
+        terms = set()
+
+        def collect_terms(node: search_filter.Node):
+            if isinstance(node, (search_filter.Term, search_filter.Modifier)):
+                terms.add(str(node))
+            if isinstance(node, search_filter.Operator):
+                collect_terms(node.left)
+                collect_terms(node.right)
+            if isinstance(node, search_filter.Modifier):
+                collect_terms(node.modified)
+
+        collect_terms(marqo_query.filter.root)
+        return terms
 
     def _get_filter_term(self, marqo_query: MarqoQuery, exclude_terms: Optional[List[str]]=None) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
