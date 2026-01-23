@@ -225,6 +225,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         should_separate_total_hits_query = marqo_query.extra_params.get('facets.separate_total_hits_query', True)
         should_show_stats = marqo_query.extra_params.get('facets.show_stats', True)
         should_drop_numbers = marqo_query.extra_params.get('facets.drop_numbers', False)
+        should_ignore_max_depth = marqo_query.extra_params.get('facets.ignore_max_depth', False)
+        should_use_lexical_for_rrf = marqo_query.extra_params.get('facets.use_lexical_for_rrf', False)
 
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
@@ -242,7 +244,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
         base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term})'
-        if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
+        if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction and not should_use_lexical_for_rrf:
             base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
             base_yql = f'select * from {self._marqo_index.schema_name} where {tensor_term}'
@@ -260,6 +262,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                                                 collapse_field_name=marqo_query.collapse_field_name,
                                                 should_show_stats=should_show_stats,
                                                 should_drop_numbers=should_drop_numbers,
+                                                should_ignore_max_depth = should_ignore_max_depth,
                                                 total_hits_term=total_hit_query_term if not should_separate_total_hits_query else '')
 
             if facets_term is not None:
@@ -304,7 +307,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None,
                          collapse_field_name: Optional[str] = None, should_show_stats: bool = True,
-                         should_drop_numbers: bool = False, total_hits_term: str = None) -> str:
+                         should_drop_numbers: bool = False, should_ignore_max_depth: bool = False,
+                         total_hits_term: str = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -384,7 +388,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Start building the overall grouping query.
         grouping_query = "all("
         any_field = False # when exclusions are present, we need to check if any field is included in the default query
-        if facets_parameters.max_depth is not None:
+        if facets_parameters.max_depth is not None and not should_ignore_max_depth:
             grouping_query += f"max({facets_parameters.max_depth}) "
             # all(max(n) - state of grouping query
 
