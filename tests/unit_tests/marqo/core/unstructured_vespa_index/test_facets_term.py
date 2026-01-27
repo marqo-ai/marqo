@@ -611,11 +611,21 @@ class TestGenerateFacetQueriesExcludeTermsFiltering(unittest.TestCase):
         queries = [q for q in queries if q.strip()]  # Remove empty strings
 
         # Should have exactly 2 queries:
-        # 1. Main facets query (all fields without valid exclude_terms)
+        # 1. Main facets query (all fields including named_tags - its exclude_terms are invalid)
         # 2. Total hits query (because track_total_hits=True and separate_total_hits_query=True)
         # NOT 3 queries (no separate exclusion query for "category:Dresses" since it's not in filter)
         self.assertEqual(len(queries), 2,
                          f"Expected 2 queries (main facets + total hits), got {len(queries)}: {queries}")
+
+        # The main facets query (first query) should include ALL fields including named_tags
+        # because named_tags' exclude_terms are invalid (not in filter)
+        main_facets_query = queries[0]
+        self.assertIn('marqo__string_array_named_tags', main_facets_query,
+                      "named_tags should be included in main query since its exclude_terms are not in the filter")
+        self.assertIn('marqo__short_string_fields{"color"}', main_facets_query)
+        self.assertIn('marqo__string_array_all_sizes_in_stock_array', main_facets_query)
+        self.assertIn('marqo__int_fields{"price"}', main_facets_query)
+        self.assertIn('marqo__float_fields{"price"}', main_facets_query)
 
     def test_get_all_filter_terms_preserves_raw_format(self):
         """Verify that _get_all_filter_terms preserves the original raw format of filter terms.

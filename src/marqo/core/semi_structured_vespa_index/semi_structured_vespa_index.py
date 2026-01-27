@@ -258,20 +258,21 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         has_default_facet_query = False
         if marqo_query.facets is not None:
+            # Get all terms that exist in the filter (once, before all _get_facets_term calls)
+            all_filter_terms = self._get_all_filter_terms(marqo_query)
+
             facets_term = self._get_facets_term(marqo_query.facets,
                                                 collapse_field_name=marqo_query.collapse_field_name,
                                                 should_show_stats=should_show_stats,
                                                 should_drop_numbers=should_drop_numbers,
-                                                should_ignore_max_depth = should_ignore_max_depth,
-                                                total_hits_term=total_hit_query_term if not should_separate_total_hits_query else '')
+                                                should_ignore_max_depth=should_ignore_max_depth,
+                                                total_hits_term=total_hit_query_term if not should_separate_total_hits_query else '',
+                                                all_filter_terms=all_filter_terms)
 
             if facets_term is not None:
                 # make sure it's the first facet query
                 facet_queries.insert(0, facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
                 has_default_facet_query = True
-
-            # Get all terms that exist in the filter (once, before the loop)
-            all_filter_terms = self._get_all_filter_terms(marqo_query)
 
             for facet_field in marqo_query.facets.fields.items():
                 facet_name, facet_parameters = facet_field
@@ -297,7 +298,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     new_facets_term = self._get_facets_term(marqo_query.facets, valid_exclude_terms,
                                                             collapse_field_name=marqo_query.collapse_field_name,
                                                             should_show_stats=should_show_stats,
-                                                            should_drop_numbers=should_drop_numbers)
+                                                            should_drop_numbers=should_drop_numbers,
+                                                            all_filter_terms=all_filter_terms)
                     facet_queries.append(facets_query_skeleton % (f'{base_yql}{new_filter_term}', new_facets_term))
 
         if total_hit_query_term and (should_separate_total_hits_query or not has_default_facet_query):
@@ -308,7 +310,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def _get_facets_term(self, facets_parameters: FacetsParameters, exclusion_terms: List[str] = None,
                          collapse_field_name: Optional[str] = None, should_show_stats: bool = True,
                          should_drop_numbers: bool = False, should_ignore_max_depth: bool = False,
-                         total_hits_term: str = None) -> str:
+                         total_hits_term: str = None, all_filter_terms: set = None) -> str:
         """
         Build a facets grouping query string from the provided facets_parameters.
         """
@@ -397,12 +399,18 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         for field_id, field_data in enumerate(facets_parameters.fields.items()):
             field_name, field_parameters = field_data
-            if field_parameters.exclude_terms:
-                # We want this field to be in a separate query if any of the exclusions are not in the exclusions list
-                if exclusion_terms is None or any([exclusion_term not in exclusion_terms for exclusion_term in field_parameters.exclude_terms]):
+
+            # Get valid exclude_terms (those that exist in the filter)
+            valid_exclude_terms = field_parameters.exclude_terms
+            if valid_exclude_terms and all_filter_terms is not None:
+                valid_exclude_terms = [t for t in valid_exclude_terms if t in all_filter_terms]
+
+            if valid_exclude_terms:
+                # Field has valid exclude_terms - skip in main query, include in matching exclusion query
+                if exclusion_terms is None or any(t not in exclusion_terms for t in valid_exclude_terms):
                     continue
             elif exclusion_terms is not None:
-                # TODO why?
+                # Field has no (valid) exclude_terms - skip in exclusion queries
                 continue
             any_field = True
             if field_parameters.type == "number":
