@@ -538,6 +538,8 @@ public class HybridSearcher extends Searcher {
         String rankProfileTotalHits =
                 query.properties().getString("facets.rank_profile_total_hits");
         String rankProfileFacets = query.properties().getString("facets.rank_profile_facets");
+        Double approximateThreshold =
+                query.properties().getDouble("facets.ranking_matching_approximate_threshold");
 
         List<Future<Result>> futureFacets = new ArrayList<>();
 
@@ -559,6 +561,17 @@ public class HybridSearcher extends Searcher {
                     // Carrying collapsefield parameter to facets query will cause extra count since
                     // CollapseFieldSearch does extra searches
                     queryFacets.properties().set("collapsefield", null);
+                }
+
+                if (approximateThreshold != null) {
+                    logIfVerbose(
+                            String.format(
+                                    "Setting approximate_threshold to %f", approximateThreshold),
+                            verbose);
+                    queryFacets
+                            .getRanking()
+                            .getMatching()
+                            .setApproximateThreshold(approximateThreshold);
                 }
 
                 AsyncExecution asyncExecutionFacets = new AsyncExecution(execution);

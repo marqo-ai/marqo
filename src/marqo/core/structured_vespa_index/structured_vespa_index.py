@@ -676,7 +676,8 @@ class StructuredVespaIndex(VespaIndex):
             return [self._marqo_index.field_map[f].lexical_field_name
                     for f in fields_to_search]
 
-    def _get_individual_field_tensor_search_terms(self, marqo_query: MarqoTensorQuery) -> List[str]:
+    def _get_individual_field_tensor_search_terms(self, marqo_query: MarqoTensorQuery,
+                                                  ef_search_override: Optional[int] = None) -> List[str]:
         """
         Returns list of strings representing the tensor search terms for each field in the query.
         """
@@ -696,6 +697,9 @@ class StructuredVespaIndex(VespaIndex):
         else:
             rerank_depth = marqo_query.limit + marqo_query.offset
 
+        if ef_search_override is not None:
+            rerank_depth = min(rerank_depth, ef_search_override)
+            marqo_query.ef_search = ef_search_override
         if marqo_query.ef_search is not None:
             rerank_depth = min(rerank_depth, marqo_query.ef_search)
         else:
@@ -722,8 +726,8 @@ class StructuredVespaIndex(VespaIndex):
             )
         return terms
 
-    def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
-        terms = self._get_individual_field_tensor_search_terms(marqo_query)
+    def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery, ef_search_override=None) -> str:
+        terms = self._get_individual_field_tensor_search_terms(marqo_query, ef_search_override)
 
         if terms:
             return f'({" OR ".join(terms)})'

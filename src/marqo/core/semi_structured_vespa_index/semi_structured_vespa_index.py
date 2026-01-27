@@ -227,6 +227,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         should_drop_numbers = marqo_query.extra_params.get('facets.drop_numbers', False)
         should_ignore_max_depth = marqo_query.extra_params.get('facets.ignore_max_depth', False)
         should_use_lexical_for_rrf = marqo_query.extra_params.get('facets.use_lexical_for_rrf', False)
+        ef_search_override = marqo_query.extra_params.get('facets.ef_search', None)
+
+        # parameters used in custom searcher
+        # facets.rank_profile_total_hits
+        # facets.rank_profile_facets
+        # facets.ranking_matching_approximate_threshold
 
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
@@ -240,7 +246,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         tensor_term = "False"
         if fields_to_search_tensor:
             marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
-            tensor_term = self._get_tensor_search_term(marqo_query)
+            tensor_term = self._get_tensor_search_term(marqo_query, ef_search_override)
 
         facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
         base_yql = f'select * from {self._marqo_index.schema_name} where ({facets_lexical_term})'
