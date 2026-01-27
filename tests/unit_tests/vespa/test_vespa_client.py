@@ -159,5 +159,6 @@ class TestVespaClient(unittest.TestCase):
                     self.assertEqual(5.0, timeout_obj.pool)
 
 
+
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()
