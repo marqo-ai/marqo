@@ -810,6 +810,23 @@ class TestVespaClient(AsyncMarqoTestCase):
             self.assertIn("title", response.document.fields)
             self.assertNotIn("contents", response.document.fields)
 
+    def test_get_document_async_with_specific_fields_deserializes_response(self):
+        """Covers vespa_client.py line 1022 — orjson deserialization in _get_document_async_with_specific_fields"""
+        feed_docs = [VespaDocument(id="specific_fields_doc1", fields={"title": "Title 1", "contents": "Content 1"})]
+        self.client.feed_batch(feed_docs, self.TEST_SCHEMA)
+
+        async def _run():
+            async with httpx.AsyncClient() as async_client:
+                semaphore = asyncio.Semaphore(1)
+                return await self.client._get_document_async_with_specific_fields(
+                    semaphore, async_client, "specific_fields_doc1", ["title"], self.TEST_SCHEMA, 60
+                )
+
+        result = asyncio.run(_run())
+        self.assertEqual(result.status, 200)
+        self.assertIn("title", result.document.fields)
+        self.assertNotIn("contents", result.document.fields)
+
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.put", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
     async def test_update_document_json_decode_error(self, mock_put):

@@ -3,7 +3,7 @@ import os
 import sys
 import uuid
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import pydantic
 from fastapi.exceptions import RequestValidationError
@@ -130,6 +130,46 @@ class ApiTests(MarqoTestCase):
                 self.assertIn(f"The search result offset must be less than or equal "
                               f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                               response.json()["message"])
+
+
+class TestApiGetDocumentEndpoints(MarqoTestCase):
+    """Integration tests for get document endpoints returning ORJSONResponse"""
+
+    def setUp(self):
+        self.client = TestClient(api.app)
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids')
+    def test_get_documents_by_ids_via_get_returns_orjson_response(self, mock_get_docs):
+        """Covers api.py line 629 — ORJSONResponse wrapping"""
+        mock_result = Mock()
+        mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
+        mock_result.get_header_dict.return_value = {}
+        mock_get_docs.return_value = mock_result
+
+        # Call endpoint function directly (GET with list param doesn't route cleanly via TestClient)
+        from marqo.tensor_search.api import get_documents_by_ids_via_get, get_config
+        from fastapi.responses import ORJSONResponse
+        response = get_documents_by_ids_via_get(
+            index_name="test_index", document_ids=["doc1"],
+            marqo_config=get_config(), expose_facets=False
+        )
+        self.assertIsInstance(response, ORJSONResponse)
+        self.assertEqual(response.status_code, 200)
+
+    @mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids')
+    def test_get_documents_by_ids_via_post_returns_orjson_response(self, mock_get_docs):
+        """Covers api.py line 651 — ORJSONResponse wrapping"""
+        mock_result = Mock()
+        mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
+        mock_result.get_header_dict.return_value = {}
+        mock_get_docs.return_value = mock_result
+
+        resp = self.client.post(
+            "/indexes/test_index/documents/get-batch",
+            json={"documentIds": ["doc1"]}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["results"][0]["_id"], "doc1")
 
 
 class ValidationApiTests(MarqoTestCase):
