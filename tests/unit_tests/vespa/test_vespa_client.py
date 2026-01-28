@@ -1,6 +1,8 @@
+import asyncio
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 import httpx
+import orjson
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -157,6 +159,96 @@ class TestVespaClient(unittest.TestCase):
                     self.assertEqual(5.0, timeout_obj.connect)
                     self.assertEqual(5.0, timeout_obj.write)
                     self.assertEqual(5.0, timeout_obj.pool)
+
+
+    def test_get_document_deserializes_response(self):
+        """Test that get_document correctly deserializes the Vespa response"""
+        response_data = {
+            'pathId': '/document/v1/test_schema/test_schema/docid/doc1',
+            'id': 'id:test_schema:test_schema::doc1',
+            'fields': {'title': 'Test Title', 'body': 'Test Body'}
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            result = self.vespa_client.get_document(id='doc1', schema='test_schema')
+
+        self.assertEqual(result.path_id, response_data['pathId'])
+        self.assertEqual(result.document.id, response_data['id'])
+        self.assertEqual(result.document.fields, response_data['fields'])
+
+    def test_get_all_documents_deserializes_response(self):
+        """Test that get_all_documents correctly deserializes the Vespa response"""
+        response_data = {
+            'pathId': '/document/v1/test_schema/test_schema/docid',
+            'documents': [
+                {'id': 'id:test_schema:test_schema::doc1', 'fields': {'title': 'Title 1'}},
+                {'id': 'id:test_schema:test_schema::doc2', 'fields': {'title': 'Title 2'}},
+            ],
+            'documentCount': 2
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            result = self.vespa_client.get_all_documents(schema='test_schema')
+
+        self.assertEqual(result.path_id, response_data['pathId'])
+        self.assertEqual(result.document_count, 2)
+        self.assertEqual(len(result.documents), 2)
+        self.assertEqual(result.documents[0].id, 'id:test_schema:test_schema::doc1')
+
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_deserializes_response(self, mock_async_client_class):
+        """Test that get_batch correctly deserializes the Vespa response"""
+        response_data = {
+            'pathId': '/document/v1/test_schema/test_schema/docid/doc1',
+            'id': 'id:test_schema:test_schema::doc1',
+            'fields': {'title': 'Test Title'}
+        }
+        mock_async_client = mock_async_client_class.return_value.__aenter__.return_value
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+        mock_async_client.get.return_value = mock_response
+
+        result = self.vespa_client.get_batch(ids=['doc1'], schema='test_schema')
+
+        self.assertEqual(len(result.responses), 1)
+        self.assertFalse(result.errors)
+        self.assertEqual(result.responses[0].status, 200)
+        self.assertEqual(result.responses[0].document.fields, {'title': 'Test Title'})
+
+    def test_get_document_async_with_specific_fields_deserializes_response(self):
+        """Test that _get_document_async_with_specific_fields correctly deserializes the response"""
+        response_data = {
+            'pathId': '/document/v1/test_schema/test_schema/docid/doc1',
+            'id': 'id:test_schema:test_schema::doc1',
+            'fields': {'title': 'Test Title'}
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+
+        async def _run():
+            semaphore = asyncio.Semaphore(1)
+            return await self.vespa_client._get_document_async_with_specific_fields(
+                semaphore, mock_client, 'doc1', ['title'], 'test_schema', 60
+            )
+
+        result = asyncio.run(_run())
+
+        self.assertEqual(result.status, 200)
+        self.assertEqual(result.document.fields, {'title': 'Test Title'})
+        # Verify the fieldSet parameter was included in the URL
+        call_url = mock_client.get.call_args[0][0]
+        self.assertIn('fieldSet=test_schema:title', call_url)
 
 
 if __name__ == '__main__':

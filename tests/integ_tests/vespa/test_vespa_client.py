@@ -787,6 +787,29 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(get_batch_response.responses[0].status, 404)
         self.assertEqual(get_batch_response.responses[1].status, 404)
 
+    def test_get_batch_with_fields_parameter(self):
+        """Test that get_batch with fields parameter only returns requested fields"""
+        feed_batch_docs = [
+            VespaDocument(id="fields_doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="fields_doc2", fields={"title": "Title 2", "contents": "Content 2"}),
+        ]
+
+        batch_response = self.client.feed_batch(feed_batch_docs, self.TEST_SCHEMA)
+        self.assertEqual(batch_response.errors, False)
+
+        # Get batch with only 'title' field
+        get_batch_response = self.client.get_batch(
+            ids=["fields_doc1", "fields_doc2"],
+            schema=self.TEST_SCHEMA,
+            fields=["title"]
+        )
+        self.assertEqual(get_batch_response.errors, False)
+        self.assertEqual(len(get_batch_response.responses), 2)
+        for response in get_batch_response.responses:
+            self.assertEqual(response.status, 200)
+            self.assertIn("title", response.document.fields)
+            self.assertNotIn("contents", response.document.fields)
+
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.put", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
     async def test_update_document_json_decode_error(self, mock_put):
