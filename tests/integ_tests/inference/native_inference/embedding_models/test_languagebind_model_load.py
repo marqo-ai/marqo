@@ -41,6 +41,7 @@ class TestLanguagebindModelLoad(unittest.TestCase):
         model = LanguagebindModel(device="cuda", model_properties=model_properties)
         model.load()
 
+    @unittest.skip(reason="we are hitting limit hf private repos, no user is using models in private hf repo")
     def test_loading_languagebind_model_from_a_private_hf_repo(self):
         """A test for loading a LanguagebindModel from a private Hugging Face repo."""
         model_properties = {

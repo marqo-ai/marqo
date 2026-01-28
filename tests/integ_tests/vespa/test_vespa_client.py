@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import httpcore
 import httpx
+import orjson
 import pytest
 import vespa.application as pyvespa
 
@@ -526,22 +527,22 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
+        mock_response.content = orjson.dumps({
             'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
             'id': 'test::doc1',
             'fields': {'title': 'Test'}
-        }
-        
+        })
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Feed a document first to ensure the schema exists
         test_doc = VespaDocument(id="doc1", fields={"title": "Test Title"})
         self.client.feed_document(test_doc, self.TEST_SCHEMA)
-        
+
         # Call get_batch
         self.client.get_batch(['doc1'], self.TEST_SCHEMA)
-        
+
         # Verify AsyncClient was created
         mock_async_client_class.assert_called_once()
 
@@ -555,15 +556,15 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
+        mock_response.content = orjson.dumps({
             'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
             'id': 'test::doc1',
             'fields': {'title': 'Test'}
-        }
-        
+        })
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Create client with specific get_pool_size
         get_pool_size = 20
         client = VespaClient(
@@ -785,6 +786,46 @@ class TestVespaClient(AsyncMarqoTestCase):
         self.assertEqual(len(get_batch_response.responses), 2)
         self.assertEqual(get_batch_response.responses[0].status, 404)
         self.assertEqual(get_batch_response.responses[1].status, 404)
+
+    def test_get_batch_with_fields_parameter(self):
+        """Test that get_batch with fields parameter only returns requested fields"""
+        feed_batch_docs = [
+            VespaDocument(id="fields_doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="fields_doc2", fields={"title": "Title 2", "contents": "Content 2"}),
+        ]
+
+        batch_response = self.client.feed_batch(feed_batch_docs, self.TEST_SCHEMA)
+        self.assertEqual(batch_response.errors, False)
+
+        # Get batch with only 'title' field
+        get_batch_response = self.client.get_batch(
+            ids=["fields_doc1", "fields_doc2"],
+            schema=self.TEST_SCHEMA,
+            fields=["title"]
+        )
+        self.assertEqual(get_batch_response.errors, False)
+        self.assertEqual(len(get_batch_response.responses), 2)
+        for response in get_batch_response.responses:
+            self.assertEqual(response.status, 200)
+            self.assertIn("title", response.document.fields)
+            self.assertNotIn("contents", response.document.fields)
+
+    def test_get_document_async_with_specific_fields_deserializes_response(self):
+        """Test that _get_document_async_with_specific_fields correctly deserializes the response using orjson"""
+        feed_docs = [VespaDocument(id="specific_fields_doc1", fields={"title": "Title 1", "contents": "Content 1"})]
+        self.client.feed_batch(feed_docs, self.TEST_SCHEMA)
+
+        async def _run():
+            async with httpx.AsyncClient() as async_client:
+                semaphore = asyncio.Semaphore(1)
+                return await self.client._get_document_async_with_specific_fields(
+                    semaphore, async_client, "specific_fields_doc1", ["title"], self.TEST_SCHEMA, 60
+                )
+
+        result = asyncio.run(_run())
+        self.assertEqual(result.status, 200)
+        self.assertIn("title", result.document.fields)
+        self.assertNotIn("contents", result.document.fields)
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.put", return_value=httpx.Response(status_code=200, content="Invalid JSON"))
