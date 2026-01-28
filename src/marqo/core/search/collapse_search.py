@@ -161,46 +161,46 @@ class CollapseSearch:
             )
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.collect_documents_ids"):
-            collected_document_ids = self.collect_documents_ids(relevance_collapse_results)
+            collected_document_ids = self.collect_document_ids(relevance_collapse_results)
 
         if not collected_document_ids:
             return relevance_collapse_results
 
         with (RequestMetricsStore.for_request().time("search.hybrid.collapse_search.generate_collapse_sort_by_query")):
-            collapse_sorty_query: HybridSearchInternalParameters = \
+            collapse_sort_query: HybridSearchInternalParameters = \
             self.generate_collapse_sort_by_query(collected_document_ids)
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.sorted_collapse"):
             sorted_collapse_results = HybridSearch().execute_search(
                 config=self.internal_params.config,
-                marqo_index=collapse_sorty_query.marqo_index,
-                query=collapse_sorty_query.query,
-                result_count=collapse_sorty_query.result_count,
-                offset=collapse_sorty_query.offset,
-                rerank_depth=collapse_sorty_query.rerank_depth,
-                ef_search=collapse_sorty_query.ef_search,
-                approximate=collapse_sorty_query.approximate,
-                approximate_threshold=collapse_sorty_query.approximate_threshold,
-                searchable_attributes=collapse_sorty_query.searchable_attributes,
-                filter_string=collapse_sorty_query.filter_string,
-                device=collapse_sorty_query.device,
-                attributes_to_retrieve=collapse_sorty_query.attributes_to_retrieve,
-                boost=collapse_sorty_query.boost,
-                media_download_headers=collapse_sorty_query.media_download_headers,
-                context=collapse_sorty_query.context,
-                score_modifiers=collapse_sorty_query.score_modifiers,
-                model_auth=collapse_sorty_query.model_auth,
-                highlights=collapse_sorty_query.highlights,
-                text_query_prefix=collapse_sorty_query.text_query_prefix,
-                hybrid_parameters=collapse_sorty_query.hybrid_parameters,
-                facets=collapse_sorty_query.facets,
-                track_total_hits=collapse_sorty_query.track_total_hits,
-                language=collapse_sorty_query.language,
-                relevance_cutoff=collapse_sorty_query.relevance_cutoff,
-                sort_by=collapse_sorty_query.sort_by,
-                interpolation_method=collapse_sorty_query.interpolation_method,
-                collapse=collapse_sorty_query.collapse,
-                recency_parameters=collapse_sorty_query.recency_parameters,
+                marqo_index=collapse_sort_query.marqo_index,
+                query=collapse_sort_query.query,
+                result_count=collapse_sort_query.result_count,
+                offset=collapse_sort_query.offset,
+                rerank_depth=collapse_sort_query.rerank_depth,
+                ef_search=collapse_sort_query.ef_search,
+                approximate=collapse_sort_query.approximate,
+                approximate_threshold=collapse_sort_query.approximate_threshold,
+                searchable_attributes=collapse_sort_query.searchable_attributes,
+                filter_string=collapse_sort_query.filter_string,
+                device=collapse_sort_query.device,
+                attributes_to_retrieve=collapse_sort_query.attributes_to_retrieve,
+                boost=collapse_sort_query.boost,
+                media_download_headers=collapse_sort_query.media_download_headers,
+                context=collapse_sort_query.context,
+                score_modifiers=collapse_sort_query.score_modifiers,
+                model_auth=collapse_sort_query.model_auth,
+                highlights=collapse_sort_query.highlights,
+                text_query_prefix=collapse_sort_query.text_query_prefix,
+                hybrid_parameters=collapse_sort_query.hybrid_parameters,
+                facets=collapse_sort_query.facets,
+                track_total_hits=collapse_sort_query.track_total_hits,
+                language=collapse_sort_query.language,
+                relevance_cutoff=collapse_sort_query.relevance_cutoff,
+                sort_by=collapse_sort_query.sort_by,
+                interpolation_method=collapse_sort_query.interpolation_method,
+                collapse=collapse_sort_query.collapse,
+                recency_parameters=collapse_sort_query.recency_parameters,
                 telemetry_prefix="search.hybrid.collapse_search.sorted_collapse"
             )
 
@@ -211,7 +211,7 @@ class CollapseSearch:
 
         return merged_results
 
-    def collect_documents_ids(self, search_results: Dict) -> List[str]:
+    def collect_document_ids(self, search_results: Dict) -> List[str]:
         document_ids = []
         for hit in search_results.get("hits", []):
             if hit.get(self.internal_params.collapse.sort_by[0].field_name) is not None:
@@ -226,7 +226,7 @@ class CollapseSearch:
             config=self.internal_params.config,
             marqo_index=self.internal_params.marqo_index,
             query="*",
-            result_count=9999,
+            result_count=len(parent_ids),
             offset=0,
             rerank_depth=None,
             ef_search=None,
@@ -255,7 +255,7 @@ class CollapseSearch:
             relevance_cutoff=None,
             sort_by=None,
             interpolation_method=None,
-            collapse=self.internal_params.collapse,
+            collapse=self.internal_params.collapse.copy(deep=True),
             recency_parameters=None
         )
 
@@ -282,15 +282,15 @@ class CollapseSearch:
             Merged results with structure from relevance_collapse_results but variants from sorted_collapse_results
         """
 
-        def merge_hit(sorted_hit, relevance_hit):
-            dict = {}
+        def merge_hit(sorted_hit, relevance_hit) -> Dict:
+            merged_hit = {}
             for key, value in relevance_hit.items():
                 if key.startswith("_") and key not in ["_id", "_highlights"]:
-                    dict[key] = value
+                    merged_hit[key] = value
                 else:
-                    dict[key] = sorted_hit.get(key, value)
-                dict["_highlights"] = [{}]
-            return dict
+                    merged_hit[key] = sorted_hit.get(key, value)
+                merged_hit["_highlights"] = [{}]
+            return merged_hit
 
         collapse_field_name = self.internal_params.collapse.name
 
