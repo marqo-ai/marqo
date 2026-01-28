@@ -14,6 +14,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 
 class TestCollapseFields(MarqoTestCase):
@@ -135,7 +136,7 @@ class TestCollapseFields(MarqoTestCase):
                 index_name=self.default_text_index.name,
                 text="test query",
                 search_method="HYBRID",
-                collapse_field_name="non_existent_field"
+                collapse=CollapseModel(name="non_existent_field")
             )
         
         self.assertIn("Field 'non_existent_field' is not configured as a collapse field for this index",
@@ -179,7 +180,7 @@ class TestCollapseFields(MarqoTestCase):
                     ),
                     # parent id is not added here, it will be added in the query for collapsing, but not in the result
                     attributes_to_retrieve=["title", "group"],
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                     result_count=6
                 )
 
@@ -229,7 +230,7 @@ class TestCollapseFields(MarqoTestCase):
                         rankingMethod=ranking_method,
                         rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                     filter="price:[* TO 3] AND (color:red OR color:yellow)",
                     result_count=6
                 )
@@ -283,7 +284,7 @@ class TestCollapseFields(MarqoTestCase):
                         rankingMethod=ranking_method,
                         rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                     filter="price:[0 TO 4] AND (color:red OR color:yellow)",
                     facets=FacetsParameters(
                         fields={
@@ -354,7 +355,7 @@ class TestCollapseFields(MarqoTestCase):
                         rankingMethod=ranking_method,
                         rerankDepthTensor=100,  # set a large value to expand the tensor retrieval set
                     ),
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                     result_count=6
                 )
 
@@ -372,7 +373,7 @@ class TestCollapseFields(MarqoTestCase):
                         rankingMethod=ranking_method,
                         rerankDepthTensor=100,  # set a large value to expand the tensor retrieval set
                     ),
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                     offset=6,
                     result_count=6
                 )
@@ -414,7 +415,7 @@ class TestCollapseFields(MarqoTestCase):
             sort_by=SortByModel(fields=[
                SortByField(field_name="price", order="desc"),
             ], min_sort_candidates=18),
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             filter="price:[* TO 3] AND (color:red OR color:yellow)",
             result_count=6
         )
@@ -565,7 +566,7 @@ class TestCollapseFields(MarqoTestCase):
             ]),
             relevance_cutoff=RelevanceCutoffModel(method=RelevanceCutoffMethod.MeanStdDev,
                                                   parameters=MeanStdParameters(stdDevFactor=0.5)),
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             result_count=6
         )
 
@@ -617,7 +618,7 @@ class TestCollapseFields(MarqoTestCase):
                         scoreModifiersLexical=score_modifiers if ranking_method != RankingMethod.Tensor or retrieval_method != RetrievalMethod.Tensor else None,
                     ),
                     result_count=6,
-                    collapse_field_name="parent_id",
+                    collapse=CollapseModel(name="parent_id"),
                 )
 
                 # Verify that the result only contains doc with rating 5

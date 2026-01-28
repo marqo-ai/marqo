@@ -528,8 +528,10 @@ class StructuredVespaIndex(VespaIndex):
 
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
-
-        s = marqo_query.collapse.collapse_filter_string
+        if marqo_query.collapse:
+            s = marqo_query.collapse.get_collapse_filter_string()
+        else:
+            s = None
         if filter_term and s:
             filter_term = f' AND ({s}) AND ({filter_term})'
         elif filter_term and not s:

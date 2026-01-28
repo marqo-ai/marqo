@@ -24,6 +24,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
 )
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 
 class TestRecencyScoring(MarqoTestCase):
@@ -1248,7 +1249,7 @@ class TestRecencyScoring(MarqoTestCase):
             text="product",
             search_method=SearchMethod.HYBRID,
             recency_parameters=recency_params,
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             result_count=10,
             hybrid_parameters=HybridParameters(
                 rerankDepthTensor=20

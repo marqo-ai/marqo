@@ -55,8 +55,4 @@ class CollapseModel(StrictBaseModel):
         self._collapse_filter_string = filter_string
 
     def get_collapse_filter_string(self) -> str:
-        if not self.should_execute_sort():
-            raise RuntimeError(
-                "Cannot get collapse filter string when execute sort is disabled"
-            )
         return self._collapse_filter_string
