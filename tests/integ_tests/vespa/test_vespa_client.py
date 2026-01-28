@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import httpcore
 import httpx
+import orjson
 import pytest
 import vespa.application as pyvespa
 
@@ -526,22 +527,22 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
+        mock_response.content = orjson.dumps({
             'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
             'id': 'test::doc1',
             'fields': {'title': 'Test'}
-        }
-        
+        })
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Feed a document first to ensure the schema exists
         test_doc = VespaDocument(id="doc1", fields={"title": "Test Title"})
         self.client.feed_document(test_doc, self.TEST_SCHEMA)
-        
+
         # Call get_batch
         self.client.get_batch(['doc1'], self.TEST_SCHEMA)
-        
+
         # Verify AsyncClient was created
         mock_async_client_class.assert_called_once()
 
@@ -555,15 +556,15 @@ class TestVespaClient(AsyncMarqoTestCase):
         # Mock the response object
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
+        mock_response.content = orjson.dumps({
             'pathId': '/document/v1/test_vespa_client/test_vespa_client/docid/doc1',
             'id': 'test::doc1',
             'fields': {'title': 'Test'}
-        }
-        
+        })
+
         # Make the async client's get method return the mock response
         mock_async_client.get.return_value = mock_response
-        
+
         # Create client with specific get_pool_size
         get_pool_size = 20
         client = VespaClient(
