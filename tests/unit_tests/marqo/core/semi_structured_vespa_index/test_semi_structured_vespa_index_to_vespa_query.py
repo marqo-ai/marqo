@@ -29,7 +29,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.version import get_version
 from tests.unit_tests.marqo_test import MarqoTestCase
-
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
 
@@ -931,7 +931,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
             facets=FacetsParameters(
                 fields={
                     "price": FieldFacetsConfiguration(type="number", ranges=[
@@ -1041,7 +1041,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
         )
         vespa_query = vespa_index.to_vespa_query(marqo_query)
 
@@ -1061,7 +1061,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(secondPhaseModifier=True),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
             facets=FacetsParameters(
                 fields={
                     "price": FieldFacetsConfiguration(type="number", ranges=[
@@ -1171,7 +1171,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=["title", "description"],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1201,7 +1201,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=[],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1227,7 +1227,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=["title", "parent_id"],  # collapse field already present
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1275,7 +1275,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             ),
             or_phrases=["test query"],
             and_phrases=[],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
