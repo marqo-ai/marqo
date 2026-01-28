@@ -11,7 +11,10 @@ from fastapi.testclient import TestClient
 from pydantic.v1.error_wrappers import ErrorWrapper
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
+from fastapi.responses import ORJSONResponse
+
 import marqo.tensor_search.api as api
+from marqo.tensor_search.api import get_documents_by_ids_via_get, get_config
 from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 from marqo import version
@@ -140,15 +143,13 @@ class TestApiGetDocumentEndpoints(MarqoTestCase):
 
     @mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids')
     def test_get_documents_by_ids_via_get_returns_orjson_response(self, mock_get_docs):
-        """Covers api.py line 629 — ORJSONResponse wrapping"""
+        """Test that GET /indexes/{index}/documents returns ORJSONResponse"""
         mock_result = Mock()
         mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
         mock_result.get_header_dict.return_value = {}
         mock_get_docs.return_value = mock_result
 
         # Call endpoint function directly (GET with list param doesn't route cleanly via TestClient)
-        from marqo.tensor_search.api import get_documents_by_ids_via_get, get_config
-        from fastapi.responses import ORJSONResponse
         response = get_documents_by_ids_via_get(
             index_name="test_index", document_ids=["doc1"],
             marqo_config=get_config(), expose_facets=False
@@ -158,7 +159,7 @@ class TestApiGetDocumentEndpoints(MarqoTestCase):
 
     @mock.patch('marqo.tensor_search.tensor_search.get_documents_by_ids')
     def test_get_documents_by_ids_via_post_returns_orjson_response(self, mock_get_docs):
-        """Covers api.py line 651 — ORJSONResponse wrapping"""
+        """Test that POST /indexes/{index}/documents/get-batch returns ORJSONResponse"""
         mock_result = Mock()
         mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
         mock_result.get_header_dict.return_value = {}

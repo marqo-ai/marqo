@@ -1,9 +1,11 @@
 import unittest
 from unittest.mock import patch, Mock
 
+from fastapi.responses import ORJSONResponse
 from starlette.testclient import TestClient
 
 from marqo.tensor_search import api
+from marqo.tensor_search.api import get_documents_by_ids_via_get
 
 
 class TestApiInitialisation(unittest.TestCase):
@@ -38,7 +40,7 @@ class TestApiGetDocumentEndpoints(unittest.TestCase):
 
     @patch("marqo.tensor_search.api.tensor_search.get_document_by_id")
     def test_get_document_by_id_returns_orjson_response(self, mock_get_doc):
-        """Test that GET /indexes/{index}/documents/{id} returns ORJSONResponse (covers api.py line 610)"""
+        """Test that GET /indexes/{index}/documents/{id} returns ORJSONResponse"""
         mock_get_doc.return_value = {"_id": "doc1", "title": "test"}
 
         resp = self.client.get("/indexes/test_index/documents/doc1")
@@ -49,14 +51,12 @@ class TestApiGetDocumentEndpoints(unittest.TestCase):
 
     @patch("marqo.tensor_search.api.tensor_search.get_documents_by_ids")
     def test_get_documents_by_ids_via_get_returns_orjson_response(self, mock_get_docs):
-        """Test that GET /indexes/{index}/documents returns ORJSONResponse (covers api.py line 629)"""
+        """Test that GET /indexes/{index}/documents returns ORJSONResponse"""
         mock_result = Mock()
         mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
         mock_result.get_header_dict.return_value = {}
         mock_get_docs.return_value = mock_result
 
-        from marqo.tensor_search.api import get_documents_by_ids_via_get
-        from fastapi.responses import ORJSONResponse
         response = get_documents_by_ids_via_get(
             index_name="test_index",
             document_ids=["doc1"],
@@ -69,7 +69,7 @@ class TestApiGetDocumentEndpoints(unittest.TestCase):
 
     @patch("marqo.tensor_search.api.tensor_search.get_documents_by_ids")
     def test_get_documents_by_ids_via_post_returns_orjson_response(self, mock_get_docs):
-        """Test that POST /indexes/{index}/documents/get-batch returns ORJSONResponse (covers api.py line 651)"""
+        """Test that POST /indexes/{index}/documents/get-batch returns ORJSONResponse"""
         mock_result = Mock()
         mock_result.dict.return_value = {"results": [{"_id": "doc1", "_found": True}], "errors": False}
         mock_result.get_header_dict.return_value = {}

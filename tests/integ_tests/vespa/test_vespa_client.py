@@ -811,7 +811,7 @@ class TestVespaClient(AsyncMarqoTestCase):
             self.assertNotIn("contents", response.document.fields)
 
     def test_get_document_async_with_specific_fields_deserializes_response(self):
-        """Covers vespa_client.py line 1022 — orjson deserialization in _get_document_async_with_specific_fields"""
+        """Test that _get_document_async_with_specific_fields correctly deserializes the response using orjson"""
         feed_docs = [VespaDocument(id="specific_fields_doc1", fields={"title": "Title 1", "contents": "Content 1"})]
         self.client.feed_batch(feed_docs, self.TEST_SCHEMA)
 
