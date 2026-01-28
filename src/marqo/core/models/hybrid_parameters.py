@@ -179,8 +179,3 @@ class HybridParameters(StrictBaseModel):
                 "'retrievalMethod' and 'rankingMethod' are 'lexical'"
             )
         return values
-
-    def update(self, updated_dict: dict):
-        if not isinstance(updated_dict, dict):
-            raise TypeError("'updated_dict' must be a dict")
-        self.__dict__.update(updated_dict)

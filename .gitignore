@@ -161,9 +161,3 @@ scripts/vespa_local/hosts.xml
 scripts/vespa_local/multinode/docker-compose.yml
 scripts/vespa_local/multinode/services.xml
 scripts/vespa_local/multinode/hosts.xml
-
-# Internal tools
-model_properties_tool.py
-
-# Dev plans (not tracked)
-COLLAPSE_SEARCH_DEV_PLAN.md
