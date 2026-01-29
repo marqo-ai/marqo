@@ -193,7 +193,7 @@ class HybridSearch:
         # Use default hybrid settings if not provided
         if hybrid_parameters is None:
             hybrid_parameters = HybridParameters()
-        
+
         if telemetry_prefix is None:
             telemetry_prefix = "search.hybrid"
 
@@ -313,6 +313,20 @@ class HybridSearch:
                 raise core_exceptions.UnsupportedFeatureError(
                     f"'secondPhaseModifier' is supported for unstructured indexes created "
                     f"with Marqo {constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION} or later. "
+                    f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
+                )
+
+        if collapse and collapse.sort_by:
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"'collapse.sortBy' is only supported for unstructured indexes created "
+                    f"with Marqo {constants.MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION} or later "
+                )
+
+            if not marqo_index.index_supports_collapse_sort_by:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"'collapse.sortBy' is supported for unstructured indexes created "
+                    f"with Marqo {constants.MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION} or later. "
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
