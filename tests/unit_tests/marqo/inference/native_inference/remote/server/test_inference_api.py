@@ -17,6 +17,7 @@ from marqo.core.inference.api import InferenceRequest, Modality, ModelConfig, Te
     InferenceResult, InferenceError
 from marqo.inference.native_inference.remote.server import inference_api
 from marqo.inference.native_inference.remote.server.inference_api import app
+from marqo.tensor_search import utils
 
 
 class TestInferenceAPI(unittest.TestCase):
@@ -162,8 +163,9 @@ class TestInferenceAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
+    @patch("marqo.inference.native_inference.remote.server.inference_api.setup_signal_handlers")
     @patch("marqo.inference.native_inference.remote.server.inference_api.bootstrap_otel")
-    def test_lifespan_integration_bootstrap_and_shutdown_otel(self, mock_bootstrap_otel):
+    def test_lifespan_integration_bootstrap_and_shutdown_otel(self, mock_bootstrap_otel, mock_setup_signal_handlers):
         mock_otel_shutdown_hook = Mock()
         mock_bootstrap_otel.return_value = mock_otel_shutdown_hook
 
@@ -173,6 +175,7 @@ class TestInferenceAPI(unittest.TestCase):
             mock_bootstrap_otel.assert_called_once_with(inference_api.app, service_name='marqo-inference')
 
         mock_otel_shutdown_hook.assert_called_once()
+        mock_setup_signal_handlers.assert_called_once()
 
     @unittest.skip(reason='not supported yet')
     def test_healthz_fails_if_exception_raised(self):
@@ -186,4 +189,22 @@ class TestInferenceAPI(unittest.TestCase):
                     response = self.client.get("/healthz")
                     self.assertEqual(response.status_code, 503)
                     self.assertIn(cuda_exception.message, response.json()['message'])
+
+    def test_threads_returns_403_when_debug_api_disabled(self):
+        """Test that /threads returns 403 when MARQO_ENABLE_DEBUG_API is not 'true'."""
+        with patch.object(utils, 'read_env_vars_and_defaults', return_value='false'):
+            response = self.client.get("/threads")
+            self.assertEqual(response.status_code, 403)
+            self.assertIn("This API endpoint is disabled", response.json()["detail"])
+
+    def test_threads_returns_thread_dump_when_debug_api_enabled(self):
+        """Test that /threads returns thread dump when MARQO_ENABLE_DEBUG_API is 'true'."""
+        with patch.object(utils, 'read_env_vars_and_defaults', return_value='true'):
+            response = self.client.get("/threads")
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertIn("pid", data)
+            self.assertIn("thread_count", data)
+            self.assertIn("threads", data)
+            self.assertIn("thread_pool", data)
 

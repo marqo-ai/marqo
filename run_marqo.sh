@@ -9,7 +9,7 @@ fi
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
-trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
+# Trap will be set after api_pid is captured (see below)
 
 function wait_for_process () {
     local max_retries=30
@@ -156,11 +156,18 @@ MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 # set the default host to 0.0.0.0
 export MARQO_HOST=${MARQO_HOST:-"0.0.0.0"}
 
+# Configurable shutdown signal and delay
+export MARQO_SHUTDOWN_SIGNAL=${MARQO_SHUTDOWN_SIGNAL:-USR1}
+export MARQO_SHUTDOWN_DELAY=${MARQO_SHUTDOWN_DELAY:-2}
+
 case "$MARQO_MODE" in
   COMBINED)
     # Start the combined Marqo API and Inference in the background
     cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
     uvicorn api:app --host "$MARQO_HOST" --port 8882 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    api_pid=$!
+    # Single process mode - signal api_pid directly
+    trap 'kill -$MARQO_SHUTDOWN_SIGNAL $api_pid 2>/dev/null; bash /app/scripts/shutdown.sh; exit' SIGTERM SIGINT
     ;;
   API)
     # set default number of workers to 1
@@ -171,11 +178,23 @@ case "$MARQO_MODE" in
     # Start the Marqo API in the background
     cd /app/src/marqo/tensor_search || { echo "Failed to navigate to tensor_search directory"; exit 1; }
     uvicorn api:app --host "$MARQO_HOST" --port 8882 --workers $MARQO_API_WORKERS --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    api_pid=$!
+    # Set trap based on worker count: --workers 1 runs as single process (no children),
+    # while --workers >1 spawns a parent process manager with child workers
+    if [ "$MARQO_API_WORKERS" -eq 1 ]; then
+      trap 'kill -$MARQO_SHUTDOWN_SIGNAL $api_pid 2>/dev/null; bash /app/scripts/shutdown.sh; exit' SIGTERM SIGINT
+    else
+      # Multi-worker mode - signal each child with delay to prevent interleaved output
+      trap 'for pid in $(pgrep -P $api_pid 2>/dev/null); do kill -$MARQO_SHUTDOWN_SIGNAL $pid 2>/dev/null; sleep $MARQO_SHUTDOWN_DELAY; done; bash /app/scripts/shutdown.sh; exit' SIGTERM SIGINT
+    fi
     ;;
   INFERENCE)
     # Start the native Inference server app in the background
     cd /app/src/marqo/inference/native_inference/remote/server || { echo "Failed to navigate to inference server directory"; exit 1; }
     uvicorn inference_api:app --host "$MARQO_HOST" --port 8881 --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
+    api_pid=$!
+    # Single process mode - signal api_pid directly
+    trap 'kill -$MARQO_SHUTDOWN_SIGNAL $api_pid 2>/dev/null; bash /app/scripts/shutdown.sh; exit' SIGTERM SIGINT
     ;;
   *)
     echo "Invalid MARQO_MODE: $MARQO_MODE. Supported modes are 'COMBINED', 'API' and 'INFERENCE'"
@@ -183,8 +202,6 @@ case "$MARQO_MODE" in
     ;;
 esac
 
-# Capture the PID of the last background process
-export api_pid=$!
 # Wait for the Uvicorn process to terminate
 wait "$api_pid"
 # Exit with status of process that exited first

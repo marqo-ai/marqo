@@ -17,6 +17,10 @@ import uvicorn
 import msgpack
 import msgpack_numpy
 
+from marqo.core.monitoring.thread_diagnostics import setup_signal_handlers, get_thread_dump
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search import utils
+
 msgpack_numpy.patch()
 
 
@@ -30,6 +34,7 @@ if __name__ in ["__main__", "inference_api"]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-inference')
+    setup_signal_handlers()
 
     yield
 
@@ -161,6 +166,14 @@ def get_loaded_models(config: Config = Depends(get_config)):
 @app.delete("/models")
 def eject_model(model_name: str, model_device: str, config: Config = Depends(get_config)):
     return config.model_manager.eject_model(model_name, model_device)
+
+
+@app.get('/threads', include_in_schema=False)
+async def threads():
+    if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower() != 'true':
+        raise HTTPException(status_code=403,
+                            detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.")
+    return get_thread_dump()
 
 
 if __name__ == "__main__":

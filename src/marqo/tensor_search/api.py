@@ -31,6 +31,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.inference.api import exceptions as inference_exceptions
 from marqo.core.models.typeahead import TypeaheadRequest, TypeaheadIndexingRequest
 from marqo.core.monitoring import memory_profiler
+from marqo.core.monitoring.thread_diagnostics import setup_signal_handlers
 from marqo.core.search.query_logger import QueryLogger
 from marqo.inference.inference_cache.caching_inference import CachingInference
 from marqo.inference.native_inference.remote.client.inference_client import NativeInferenceClient
@@ -117,6 +118,7 @@ if __name__ in ["__main__", "api"]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     otel_shutdown_hook = bootstrap_otel(app, service_name='marqo-api')
+    setup_signal_handlers()
 
     yield
 
@@ -872,6 +874,16 @@ def get_queries(index_name: str, queries: List[str], marqo_config: config.Config
 @utils.enable_debug_apis()
 def memory():
     return memory_profiler.get_memory_profile()
+
+
+@app.get('/threads', include_in_schema=False)
+async def threads():
+    from marqo.core.monitoring.thread_diagnostics import get_thread_dump
+    if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower() != 'true':
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403,
+                            detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.")
+    return get_thread_dump()
 
 
 @app.get("/health", include_in_schema=False)
