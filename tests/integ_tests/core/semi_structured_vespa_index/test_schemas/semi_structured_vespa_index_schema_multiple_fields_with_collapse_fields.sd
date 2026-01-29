@@ -162,6 +162,8 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            query(marqo__collapse_sort_weights) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -315,6 +317,11 @@ schema marqo__test_00semi_00structured_00schema {
         function collapse_field_hash() {
             expression: attribute(parent_id)
         }
+
+        function collapse_sort_value() {
+            expression: if (count(query(marqo__collapse_sort_weights) * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(query(marqo__collapse_sort_weights) * attribute(marqo__score_modifiers), prod))
+        }
+
         match-features {
             global_mult_modifier
             global_add_modifier
@@ -355,6 +362,18 @@ schema marqo__test_00semi_00structured_00schema {
         }
         second-phase {
             expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+    rank-profile collapse_to_sort_value inherits base_rank_profile{
+        first-phase {
+            expression: collapse_sort_value()
+        }
+        diversity {
+            attribute: parent_id
+            min-groups: 100
+        }
+        second-phase {
+            expression: firstPhase
         }
     }
     rank-profile embedding_similarity inherits base_rank_profile {
@@ -407,6 +426,8 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            query(marqo__collapse_sort_weights) tensor<double>(p{})
         }
     }
 
