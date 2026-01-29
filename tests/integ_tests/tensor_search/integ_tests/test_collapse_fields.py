@@ -14,7 +14,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortByField
+from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
 
 
 class TestCollapseFields(MarqoTestCase):
@@ -690,27 +690,21 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
 
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        self.device_patcher.stop()
-
     def _add_shoe_documents(self):
         """Add sample shoe documents across two category groups with varying prices."""
         docs = [
             # Category A - 5 variants with different prices
-            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "buyboxCost": 95.0, "brandSlug": "nike"},
-            {"_id": "shoe_a2", "title": "Running Shoe Beta", "category": "shoes_a", "price": 89.99, "buyboxCost": 70.0, "brandSlug": "adidas"},
-            {"_id": "shoe_a3", "title": "Running Shoe Gamma", "category": "shoes_a", "price": 150.0, "buyboxCost": 110.0, "brandSlug": "nike"},
-            {"_id": "shoe_a4", "title": "Running Shoe Delta", "category": "shoes_a", "price": 65.0, "buyboxCost": 50.0},
-            {"_id": "shoe_a5", "title": "Running Shoe Epsilon", "category": "shoes_a", "price": 200.0, "buyboxCost": 160.0, "brandSlug": "puma"},
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "cost": 95.0, "brand": "nike"},
+            {"_id": "shoe_a2", "title": "Running Shoe Beta", "category": "shoes_a", "price": 89.99, "cost": 70.0, "brand": "adidas"},
+            {"_id": "shoe_a3", "title": "Running Shoe Gamma", "category": "shoes_a", "price": 150.0, "cost": 110.0, "brand": "nike"},
+            {"_id": "shoe_a4", "title": "Running Shoe Delta", "category": "shoes_a", "price": 65.0, "cost": 50.0},
+            {"_id": "shoe_a5", "title": "Running Shoe Epsilon", "category": "shoes_a", "price": 200.0, "cost": 160.0, "brand": "puma"},
             # Category B - 5 variants with different prices
-            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 180.0, "buyboxCost": 140.0, "brandSlug": "merrell"},
-            {"_id": "shoe_b2", "title": "Hiking Boot Beta", "category": "shoes_b", "price": 75.0, "buyboxCost": 55.0, "brandSlug": "columbia"},
-            {"_id": "shoe_b3", "title": "Hiking Boot Gamma", "category": "shoes_b", "price": 220.0, "buyboxCost": 170.0, "brandSlug": "merrell"},
-            {"_id": "shoe_b4", "title": "Hiking Boot Delta", "category": "shoes_b", "price": 99.0, "buyboxCost": 78.0},
-            {"_id": "shoe_b5", "title": "Hiking Boot Epsilon", "category": "shoes_b", "price": 55.0, "buyboxCost": 40.0, "brandSlug": "columbia"},
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 180.0, "cost": 140.0, "brand": "merrell"},
+            {"_id": "shoe_b2", "title": "Hiking Boot Beta", "category": "shoes_b", "price": 75.0, "cost": 55.0, "brand": "columbia"},
+            {"_id": "shoe_b3", "title": "Hiking Boot Gamma", "category": "shoes_b", "price": 220.0, "cost": 170.0, "brand": "merrell"},
+            {"_id": "shoe_b4", "title": "Hiking Boot Delta", "category": "shoes_b", "price": 99.0, "cost": 78.0},
+            {"_id": "shoe_b5", "title": "Hiking Boot Epsilon", "category": "shoes_b", "price": 55.0, "cost": 40.0, "brand": "columbia"},
         ]
         self.add_documents(
             config=self.config,
@@ -720,10 +714,11 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                 tensor_fields=["title"]
             )
         )
-        return docs
+
+    # ---- Scenario 1: Collapse sort by works ----
 
     def test_collapse_sort_by_price_asc(self):
-        """Test collapse with sortBy returns the cheapest variant per category."""
+        """Scenario 1a: Collapse with sortBy asc returns the cheapest variant per category."""
         self._add_shoe_documents()
 
         res = tensor_search.search(
@@ -737,26 +732,15 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             ),
             collapse=CollapseModel(
                 name="category",
-                sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
             ),
             result_count=10
         )
 
-        self.assertEqual(2, len(res["hits"]))
-        categories = {hit["category"] for hit in res["hits"]}
-        self.assertEqual({"shoes_a", "shoes_b"}, categories)
-
-        # Cheapest in shoes_a is shoe_a4 (65.0), cheapest in shoes_b is shoe_b5 (55.0)
-        for hit in res["hits"]:
-            if hit["category"] == "shoes_a":
-                self.assertEqual("shoe_a4", hit["_id"])
-                self.assertEqual(65.0, hit["price"])
-            else:
-                self.assertEqual("shoe_b5", hit["_id"])
-                self.assertEqual(55.0, hit["price"])
+        self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
 
     def test_collapse_sort_by_price_desc(self):
-        """Test collapse with sortBy desc returns the most expensive variant per category."""
+        """Scenario 1b: Collapse with sortBy desc returns the most expensive variant per category."""
         self._add_shoe_documents()
 
         res = tensor_search.search(
@@ -770,24 +754,37 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             ),
             collapse=CollapseModel(
                 name="category",
-                sortBy=[CollapseSortByField(fieldName="price", order="desc")]
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="desc")])
             ),
             result_count=10
         )
 
-        self.assertEqual(2, len(res["hits"]))
+        self.assertEqual(["shoe_a5", "shoe_b3"], [hit["_id"] for hit in res["hits"]])
 
-        # Most expensive in shoes_a is shoe_a5 (200.0), in shoes_b is shoe_b3 (220.0)
-        for hit in res["hits"]:
-            if hit["category"] == "shoes_a":
-                self.assertEqual("shoe_a5", hit["_id"])
-                self.assertEqual(200.0, hit["price"])
-            else:
-                self.assertEqual("shoe_b3", hit["_id"])
-                self.assertEqual(220.0, hit["price"])
+    def test_collapse_sort_by_different_numerical_field(self):
+        """Scenario 1c: Collapse sortBy using cost instead of price."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="cost", order="asc")])
+            ),
+            result_count=10
+        )
+
+        self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
 
     def test_collapse_sort_by_with_filter(self):
-        """Test collapse sortBy combined with a filter."""
+        """Scenario 1d: Collapse sortBy combined with a filter."""
         self._add_shoe_documents()
 
         res = tensor_search.search(
@@ -801,61 +798,22 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             ),
             collapse=CollapseModel(
                 name="category",
-                sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
             ),
-            filter="price:[* TO 100]",
+            filter="price:[100 TO 200]",
             result_count=10
         )
 
-        self.assertEqual(2, len(res["hits"]))
-        for hit in res["hits"]:
-            self.assertLessEqual(hit["price"], 100)
-            if hit["category"] == "shoes_a":
-                # Cheapest under 100 in shoes_a: shoe_a4 (65.0)
-                self.assertEqual("shoe_a4", hit["_id"])
-            else:
-                # Cheapest under 100 in shoes_b: shoe_b5 (55.0)
-                self.assertEqual("shoe_b5", hit["_id"])
-
-    def test_collapse_sort_by_different_field(self):
-        """Test collapse sortBy using buyboxCost instead of price."""
-        self._add_shoe_documents()
-
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.default_text_index.name,
-            text="shoe",
-            search_method="HYBRID",
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF,
-            ),
-            collapse=CollapseModel(
-                name="category",
-                sortBy=[CollapseSortByField(fieldName="buyboxCost", order="asc")]
-            ),
-            result_count=10
-        )
-
-        self.assertEqual(2, len(res["hits"]))
-
-        # Cheapest buyboxCost in shoes_a: shoe_a4 (50.0), in shoes_b: shoe_b5 (40.0)
-        for hit in res["hits"]:
-            if hit["category"] == "shoes_a":
-                self.assertEqual("shoe_a4", hit["_id"])
-                self.assertEqual(50.0, hit["buyboxCost"])
-            else:
-                self.assertEqual("shoe_b5", hit["_id"])
-                self.assertEqual(40.0, hit["buyboxCost"])
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
 
     def test_collapse_sort_by_across_retrieval_methods(self):
-        """Test collapse sortBy works across different retrieval/ranking methods."""
-        # Use documents with same title prefix so lexical search matches all groups
+        """Scenario 1e: Collapse sortBy works across different retrieval/ranking methods."""
+        # group_a matches "premium running shoe" on all 3 words, group_b matches on 2 ("running shoe")
         docs = [
-            {"_id": f"doc_a{i}", "title": f"Alpha product variant {i}", "category": "group_a", "price": float(10 * (i + 1))}
+            {"_id": f"doc_a{i}", "title": f"Premium running shoe model {i}", "category": "group_a", "price": float(10 * (i + 1))}
             for i in range(5)
         ] + [
-            {"_id": f"doc_b{i}", "title": f"Alpha product variant {i}", "category": "group_b", "price": float(10 * (i + 1))}
+            {"_id": f"doc_b{i}", "title": f"Running shoe basic model {i}", "category": "group_b", "price": float(10 * (i + 1))}
             for i in range(5)
         ]
         self.add_documents(
@@ -878,7 +836,7 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.default_text_index.name,
-                    text="Alpha product",
+                    text="premium running shoe",
                     search_method="HYBRID",
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
@@ -886,21 +844,293 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                     ),
                     collapse=CollapseModel(
                         name="category",
-                        sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+                        sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
                     ),
                     result_count=10
                 )
 
-                self.assertEqual(2, len(res["hits"]))
-                categories = {hit["category"] for hit in res["hits"]}
-                self.assertEqual({"group_a", "group_b"}, categories)
+                # Both groups should return their cheapest doc (price=10.0)
+                self.assertEqual(["doc_a0", "doc_b0"], sorted([hit["_id"] for hit in res["hits"]]))
 
-                # Cheapest per group (price=10.0) should be consistent across methods
-                for hit in res["hits"]:
-                    self.assertEqual(10.0, hit["price"])
+    # ---- Scenario 2: No collapse sort by, based on original relevancy ----
 
-    def test_collapse_without_sort_by_returns_most_relevant(self):
-        """Test that collapse without sortBy returns the most relevant doc per group (default behavior)."""
+    def test_collapse_without_sort_by_returns_relevancy_based(self):
+        """Scenario 2: Collapse without sortBy returns the most relevant doc per group (default behavior)."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe Alpha",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(name="category"),
+            result_count=10
+        )
+
+        # alpha should match shoes_a1 and shoes_b1 best in their respective groups due to higher relevance
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
+
+    # ---- Scenario 3: Some documents missing the sort by field ----
+
+    def test_collapse_sort_by_with_some_docs_missing_sort_field(self):
+        """Scenario 3: When some docs in a collapse group are missing the sort field,
+        the group with missing field falls back to relevance-based selection."""
+        docs = [
+            {"_id": "a1", "title": "Running shoe premium model", "category": "group_a", "price": 100.0},
+            {"_id": "a2", "title": "Running shoe budget model", "category": "group_a", "price": 50.0},
+            {"_id": "a3", "title": "Running shoe deluxe model", "category": "group_a", "price": 200.0},
+            {"_id": "b1", "title": "Casual leather sandal basic", "category": "group_b"},
+            {"_id": "b2", "title": "Casual leather sandal premium", "category": "group_b"},
+            {"_id": "b3", "title": "Casual leather sandal deluxe", "category": "group_b"},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running shoe premium",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=10
+        )
+
+        hit_ids = [hit["_id"] for hit in res["hits"]]
+        # group_a has price, so sort_by picks the cheapest (a2, price=50.0),
+        # group_b falls back to relevance (b2 best match)
+        self.assertEqual(["a2", "b2"], hit_ids)
+
+    def test_collapse_sort_by_with_mixed_missing_field_within_group(self):
+        """Scenario 3b: When some docs within a group have the sort field and some don't,
+        the collapse still works. The relevance-based phase picks the representative,
+        and the sort-based phase only processes groups whose representative has the sort field."""
+        docs = [
+            {"_id": "a1", "title": "Running shoe premium model", "category": "group_a", "price": 100.0},
+            {"_id": "a2", "title": "Running shoe budget model", "category": "group_a"},  # missing price
+            {"_id": "a3", "title": "Running shoe deluxe model", "category": "group_a", "price": 30.0},
+            {"_id": "b1", "title": "Casual leather sandal basic budget", "category": "group_b", "price": 80.0},
+            {"_id": "b2", "title": "Casual leather sandal premium", "category": "group_b", "price": 20.0},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running shoe budget",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=10
+        )
+
+        hits = [hit["_id"] for hit in res["hits"]]
+        # Note: group_a representative is a2 (best relevance), which lacks price,
+        # so group_a falls back to relevance (a2).
+        # group_b representative is b1 (best relevance), which has price, so sort_by picks b2 (cheapest).
+        self.assertEqual(["a2", "b2"], hits)
+
+    # ---- Scenario 4: All documents missing the sort by field ----
+
+    def test_collapse_sort_by_all_docs_missing_sort_field(self):
+        """Scenario 4: When ALL documents lack the sort by field, collapse falls back
+        entirely to relevance-based selection (no sort-based phase runs)."""
+        docs = [
+            {"_id": "a1", "title": "Running shoe premium model", "category": "group_a"},
+            {"_id": "a2", "title": "Running shoe budget model", "category": "group_a"},
+            {"_id": "b1", "title": "Running Casual leather sandal basic", "category": "group_b"},
+            {"_id": "b2", "title": "Casual leather sandal", "category": "group_b"},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running shoe budget",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="void_field", order="asc")])
+            ),
+            result_count=10
+        )
+
+        hits = [hit["_id"] for hit in res["hits"]]
+        self.assertEqual(["a2", "b1"], hits)
+
+    # ---- Scenario 5: Sort by field is a string field (non-numerical) ----
+
+    def test_collapse_sort_by_string_field_falls_back_to_relevance(self):
+        """Scenario 5: Collapse sortBy on a string field. The Vespa collapse_sort_value rank profile
+        uses numeric tensor operations (marqo__score_modifiers), so string fields are not stored in that
+        tensor. When the sort field is a string, the sort-based phase cannot find numeric values to sort,
+        and the result falls back to relevance-based selection. We verify the search still succeeds and
+        returns one representative per group."""
+        docs = [
+            {"_id": "a1", "title": "Running shoe premium model", "category": "group_a", "brand": "nike"},
+            {"_id": "a2", "title": "Running shoe budget model", "category": "group_a", "brand": "adidas"},
+            {"_id": "a3", "title": "Running shoe deluxe model", "category": "group_a", "brand": "puma"},
+            {"_id": "b1", "title": "Casual leather sandal basic", "category": "group_b", "brand": "merrell"},
+            {"_id": "b2", "title": "Casual leather sandal premium", "category": "group_b", "brand": "columbia"},
+            {"_id": "b3", "title": "Casual leather sandal deluxe", "category": "group_b", "brand": "salomon"},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running shoe premium model",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="brand", order="asc")])
+            ),
+            result_count=10
+        )
+        self.assertEqual(["a1", "b2"], [hit["_id"] for hit in res["hits"]])
+
+    def test_collapse_sort_by_with_always_fetch_variants(self):
+        """Scenario 5b: With alwaysFetchVariants=True, the sort-by phase runs even when the
+        first-phase representative has a non-numeric (or missing) sort field value.
+
+        In collect_document_ids, the check is:
+            if always_fetch_variants or isinstance(value, (int, float))
+        Without the flag, groups whose representative lacks a numeric sort field value skip the
+        sort-by phase. With the flag, all groups enter the sort-by phase regardless.
+
+        Setup: group_a's most relevant doc (a1) has no price field, group_b's most relevant doc (b1)
+        has price. Without alwaysFetchVariants, group_a skips the sort-by phase (representative is a1).
+        With alwaysFetchVariants=True, group_a enters the sort-by phase and picks the cheapest (a3)."""
+        docs = [
+            {"_id": "a1", "title": "Running shoe budget model", "category": "group_a"},
+            {"_id": "a2", "title": "Running shoe premium model", "category": "group_a", "price": 100.0},
+            {"_id": "a3", "title": "Running shoe deluxe model", "category": "group_a", "price": 30.0},
+
+            {"_id": "b1", "title": "Casual leather sandal basic budget", "category": "group_b", "price": 80.0},
+            {"_id": "b2", "title": "Casual leather sandal premium", "category": "group_b", "price": 20.0},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        with self.subTest("alwaysFetchVariants=False"):
+            # group_a representative is a1 (best lexical match for "running shoe budget"), which lacks price
+            # → sort-by skipped for group_a → a1 stays as representative
+            # group_b representative is b1 (best relevance), which has price → sort-by picks b2 (cheapest)
+            res_without = tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="running shoe budget",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                    alpha=0,
+                ),
+                collapse=CollapseModel(
+                    name="category",
+                    sort_by=CollapseSortBy(
+                        fields=[CollapseSortByField(fieldName="price", order="asc")],
+                    )
+                ),
+                result_count=10
+            )
+            # group_a falls back to relevance (a1, no price), group_b sort-by picks b2 (cheapest)
+            self.assertEqual(["a1", "b2"], [hit["_id"] for hit in res_without["hits"]])
+
+        with self.subTest("alwaysFetchVariants=True"):
+            # group_a representative is still a1 (no price), but always_fetch_variants forces the sort-by phase
+            # → sort-by picks a3 (cheapest at 30.0)
+            # group_b is the same: sort-by picks b2 (cheapest at 20.0)
+            res_with = tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="running shoe budget",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                    alpha=0,
+                ),
+                collapse=CollapseModel(
+                    name="category",
+                    sort_by=CollapseSortBy(
+                        fields=[CollapseSortByField(fieldName="price", order="asc")],
+                        alwaysFetchVariants=True,
+                    )
+                ),
+                result_count=10
+            )
+            # Now group_a enters sort-by phase and picks a3 (cheapest at 30.0), group_b still picks b2
+            self.assertEqual(["a3", "b2"], [hit["_id"] for hit in res_with["hits"]])
+
+    # ---- Scenario 6: Collapse sort by with main sort by ----
+
+    def test_collapse_sort_by_with_main_sort_by(self):
+        """Scenario 6: When both main sortBy and collapse sortBy are provided,
+        the main sortBy controls group ordering in the relevance phase while collapse sortBy
+        picks the representative within each group in the sort phase."""
         self._add_shoe_documents()
 
         res = tensor_search.search(
@@ -912,10 +1142,231 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF,
             ),
-            collapse=CollapseModel(name="category"),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            sort_by=SortByModel(
+                fields=[SortByField(fieldName="price", order="desc")],
+                minSortCandidates=10
+            ),
+            result_count=10
+        )
+
+        # Collapse sortBy picks cheapest per group. Main sortBy price desc orders groups by
+        # their first-phase representative's price: shoes_b max=220 > shoes_a max=200
+        self.assertEqual(["shoe_b5", "shoe_a4"], [hit["_id"] for hit in res["hits"]])
+
+    # ---- Scenario 7: Collapse sort by with main sort by + disableIfMainSortByFields ----
+
+    def test_collapse_sort_by_disabled_when_main_sort_by_matches_disable_list(self):
+        """Scenario 7: When the main query sortBy field is in disableIfMainSortByFields,
+        collapse sortBy is pruned (set to None), so collapse.sortBy is not used.
+        This requires going through the SearchQuery validator."""
+        from marqo.tensor_search.models.api_models import SearchQuery
+
+        # Construct SearchQuery which triggers the remove_collapse_sort_by_if_main_query_has_sort_by validator
+        search_query = SearchQuery(
+            q="shoe",
+            searchMethod="HYBRID",
+            hybridParameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapseFields=[CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(
+                    fields=[CollapseSortByField(fieldName="price", order="asc")],
+                    disableIfMainSortByFields={"price"},
+                ),
+            )],
+            sortBy=SortByModel(
+                fields=[SortByField(fieldName="price", order="desc")]
+            ),
+            limit=10
+        )
+
+        # The validator should have pruned collapse.sortBy because "price" is in disableIfMainSortByFields
+        self.assertIsNone(search_query.collapse_fields[0].sort_by)
+
+        # Now actually execute the search with the pruned collapse model
+        self._add_shoe_documents()
+
+        collapse = search_query.collapse_fields[0]
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=collapse,
+            sort_by=SortByModel(
+                fields=[SortByField(fieldName="price", order="desc")],
+                minSortCandidates=10
+            ),
+            result_count=10
+        )
+
+        # Main sortBy orders by price desc. Collapse sortBy was pruned so representatives are relevance-based.
+        # shoes_b has higher max price (220) than shoes_a (200), so shoes_b first.
+        self.assertEqual(["shoes_b", "shoes_a"], [hit["category"] for hit in res["hits"]])
+
+    def test_collapse_sort_by_kept_when_main_sort_by_not_in_disable_list(self):
+        """Scenario 7b: When the main query sortBy field is NOT in disableIfMainSortByFields,
+        collapse sortBy is preserved and the sort-based representative selection still works."""
+        from marqo.tensor_search.models.api_models import SearchQuery
+
+        search_query = SearchQuery(
+            q="shoe",
+            searchMethod="HYBRID",
+            hybridParameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapseFields=[CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(
+                    fields=[CollapseSortByField(fieldName="price", order="asc")],
+                    disableIfMainSortByFields={"cost"},  # price is NOT in this set
+                ),
+            )],
+            sortBy=SortByModel(
+                fields=[SortByField(fieldName="price", order="desc")]
+            ),
+            limit=10
+        )
+
+        # Validator should NOT prune collapse.sortBy because "price" is not in {"cost"}
+        self.assertIsNotNone(search_query.collapse_fields[0].sort_by)
+        self.assertEqual("price", search_query.collapse_fields[0].sort_by.fields[0].field_name)
+
+        # Execute the search with collapse sortBy preserved
+        self._add_shoe_documents()
+
+        collapse = search_query.collapse_fields[0]
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=collapse,
+            sort_by=SortByModel(
+                fields=[SortByField(fieldName="price", order="desc")],
+                minSortCandidates=10
+            ),
+            result_count=10
+        )
+
+        # Collapse sortBy asc picks cheapest per group. Main sortBy price desc orders groups by
+        # their first-phase representative's price: shoes_b max=220 > shoes_a max=200
+        self.assertEqual(["shoe_b5", "shoe_a4"], [hit["_id"] for hit in res["hits"]])
+
+    # ---- Scenario 8: Other edge cases ----
+
+    def test_collapse_sort_by_single_group(self):
+        """Scenario 8a: Collapse sortBy when all documents belong to a single group."""
+        docs = [
+            {"_id": f"doc{i}", "title": f"Alpha product variant {i}", "category": "only_group", "price": float(10 * (i + 1))}
+            for i in range(5)
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="Alpha product",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=10
+        )
+
+        self.assertEqual(["doc0"], [hit["_id"] for hit in res["hits"]])
+
+    def test_collapse_sort_by_with_attributes_to_retrieve(self):
+        """Scenario 8b: Collapse sortBy respects attributes_to_retrieve."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            attributes_to_retrieve=["title", "price"],
             result_count=10
         )
 
         self.assertEqual(2, len(res["hits"]))
-        categories = {hit["category"] for hit in res["hits"]}
-        self.assertEqual({"shoes_a", "shoes_b"}, categories)
+        for hit in res["hits"]:
+            # Should only contain requested attributes plus meta fields
+            non_meta_keys = {k for k in hit.keys() if not k.startswith("_")}
+            self.assertTrue(non_meta_keys.issubset({"title", "price"}))
+
+    def test_collapse_sort_by_many_groups(self):
+        """Scenario 8c: Collapse sortBy with many groups and pagination."""
+        docs = [
+            {"_id": f"doc{g}{i}", "title": f"Alpha product variant {g} {i}",
+             "category": f"group_{g}", "price": float(10 * (i + 1))}
+            for g in range(8) for i in range(3)
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="Alpha product",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=5
+        )
+
+        # Should get at most 5 groups (limited by result_count)
+        self.assertLessEqual(len(res["hits"]), 5)
+        # Each hit should have the cheapest price for its group (10.0)
+        for hit in res["hits"]:
+            self.assertEqual(10.0, hit["price"])
+        # All groups should be unique
+        categories = [hit["category"] for hit in res["hits"]]
+        self.assertEqual(len(categories), len(set(categories)))

@@ -484,8 +484,9 @@ class SearchQuery(BaseMarqoModel):
 
         if collapse_fields is not None and sort_by is not None:
             collapse_field = collapse_fields[0]
-            if (collapse_field.disable_if_main_sort_by_fields is not None and
-                any(field.field_name in collapse_field.disable_if_main_sort_by_fields for field in sort_by.fields)):
+            if (collapse_field.sort_by is not None and
+                collapse_field.sort_by.disable_if_main_sort_by_fields is not None and
+                any(field.field_name in collapse_field.sort_by.disable_if_main_sort_by_fields for field in sort_by.fields)):
                 collapse_field.sort_by = None
         return values
 

@@ -19,33 +19,31 @@ class CollapseSortByField(StrictBaseModel):
     order: SortOrder = SortOrder.Desc
 
 
-class CollapseModel(StrictBaseModel):
+class CollapseSortBy(StrictBaseModel):
     """
-    The model defining the parameters for collapsing search results based on a specific field. This model
-    will be used in the codebase to represent collapse parameters since we only allow one collapse field at the moment.
+    The model defining the sort-by configuration within a collapse group. This controls how the
+    representative document is selected from each collapse group.
 
     Attributes:
-        name (str): The name of the field to collapse on.
-        sort_by (Optional[List[SortByField]]): List of fields to sort by within the collapse group. The highest
-        ranked document in each collapse group will be returned as the representative document for that group.
+        fields (List[CollapseSortByField]): List of fields to sort by within the collapse group (max 1).
+        num_threads_per_search (Optional[int]): Number of threads to use per search for collapse operation.
+        disable_if_main_sort_by_fields (Optional[set[str]]): If the main query is sorted by any of these fields,
+            the sortBy feature in the collapse will be disabled to avoid conflicts.
+        always_fetch_variants (bool): Whether to always fetch all variants within each collapse group.
+            By default (False), only fetch variants if the sort field value is numerical.
 
     Private Attributes:
-        _execute (bool): A flag indicating whether to execute sorting within collapse groups. It will be used when
-        generating the Vespa query input.
+        _execute (bool): A flag indicating whether to execute sorting within collapse groups.
         _collapse_filter_string (str): A string representing the collapse filter to be applied in the Vespa query.
 
     Class Variables:
-        COLLAPSE_SORT_BY_QUERY_LIMIT (int): The limit(hits) to be used when generating the Vespa query input for collapse sorting.
-        We deliberately set it to a high number to avoid the built-in retry mechanism of the Vespa collapse feature.
-        By default, Vespa wll retry 4 times with increasing hits (default hits: 10, then 50, 250, 1250, 6250).
-        However, it will break if totalHits is smaller than the hits used in the query.
-        Therefore, we set a high limit to have an early termination of the retry mechanism.
+        COLLAPSE_SORT_BY_QUERY_LIMIT (int): The limit (hits) to be used when generating the Vespa query input
+            for collapse sorting. Set to a high number to avoid Vespa's built-in retry mechanism.
     """
-    name: str = Field(..., description="The name of the field to collapse on.")
-    sort_by: Optional[List[CollapseSortByField]] = Field(
-        None, alias="sortBy", max_items=1, min_items=1,
-        description="List of fields to sort by within the collapse group.",
+    fields: List[CollapseSortByField] = Field(
+        ..., min_items=1, max_items=1, description="List of fields to sort by within the collapse group."
     )
+
     num_threads_per_search: Optional[int] = Field(
         None,
         alias="numThreadsPerSearch",
@@ -60,16 +58,22 @@ class CollapseModel(StrictBaseModel):
                     "will be disabled to avoid conflicts.",
     )
 
+    always_fetch_variants: bool= Field(
+        False, alias="alwaysFetchVariants",
+        description=
+        "Whether to always fetch all variants within each collapse group. "
+        "By default(False), only fetch the sort_by variants if the returned document has "
+        "the target collapse sort_by field, and the value of the field is numrical. "
+    )
+
     _execute: bool = PrivateAttr(False)
     _collapse_filter_string: str = PrivateAttr("")
 
     COLLAPSE_SORT_BY_QUERY_LIMIT: ClassVar[int] = 9999
 
     def generate_vespa_sort_by_query_input(self):
-        if self.sort_by is None:
-            return None
         return_body = {}
-        for field in self.sort_by:
+        for field in self.fields:
             return_body[field.field_name] = 1 if field.order == "desc" else -1
         return return_body
 
@@ -82,26 +86,29 @@ class CollapseModel(StrictBaseModel):
     def disable_execute_sort(self):
         self._execute = False
 
-    def set_collapse_filter_string(self, filter_string: str):
+    def set_collapse_sort_by_filter_string(self, filter_string: str):
         if not self.should_execute_sort():
             raise RuntimeError(
                 "Cannot set collapse filter string when execute sort is disabled"
             )
         self._collapse_filter_string = filter_string
 
-    def get_collapse_filter_string(self) -> str:
+    def get_collapse_sort_by_filter_string(self) -> str:
         return self._collapse_filter_string
 
-    @root_validator(pre=False)
-    def validate_num_threads_per_search(cls, values):
-        num_threads_per_search = values.get("num_threads_per_search")
-        sort_by = values.get("sort_by")
 
-        print(num_threads_per_search, sort_by)
+class CollapseModel(StrictBaseModel):
+    """
+    The model defining the parameters for collapsing search results based on a specific field. This model
+    will be used in the codebase to represent collapse parameters since we only allow one collapse field at the moment.
 
-        if num_threads_per_search is not None and sort_by is None:
-            raise ValueError(
-                "numThreadsPerSearch is set but sortBy is not provided. "
-                "numThreadsPerSearch can only be set when sortBy(collapseField) is provided "
-            )
-        return values
+    Attributes:
+        name (str): The name of the field to collapse on.
+        sort_by (Optional[CollapseSortBy]): The sort-by configuration for selecting the representative
+            document within each collapse group. Contains fields, threading, and variant-fetching options.
+    """
+    name: str = Field(..., description="The name of the field to collapse on.")
+    sort_by: Optional[CollapseSortBy] = Field(
+        None, description="List of fields to sort by within the collapse group.",
+        aliases="sortBy",
+    )

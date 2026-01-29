@@ -214,7 +214,8 @@ class CollapseSearch:
     def collect_document_ids(self, search_results: Dict) -> List[str]:
         document_ids = []
         for hit in search_results.get("hits", []):
-            if hit.get(self.internal_params.collapse.sort_by[0].field_name) is not None:
+            value = hit.get(self.internal_params.collapse.sort_by.fields[0].field_name)
+            if self.internal_params.collapse.sort_by.always_fetch_variants or isinstance(value, (int, float)):
                 document_ids.append(hit.get(self.internal_params.collapse.name))
         return document_ids
 
@@ -259,13 +260,13 @@ class CollapseSearch:
             recency_parameters=None
         )
 
-        collapse_sort_by_hybrid_parameters.collapse.enable_execute_sort()
+        collapse_sort_by_hybrid_parameters.collapse.sort_by.enable_execute_sort()
         collapse_filter_string = (
                 f'{collapse_sort_by_hybrid_parameters.collapse.name} in ('
                 + ', '.join(f'"{doc_id}"' for doc_id in parent_ids)
                 + ')'
         )
-        collapse_sort_by_hybrid_parameters.collapse.set_collapse_filter_string(collapse_filter_string)
+        collapse_sort_by_hybrid_parameters.collapse.sort_by.set_collapse_sort_by_filter_string(collapse_filter_string)
         return collapse_sort_by_hybrid_parameters
 
     def merge_two_collapse_results(self, relevance_collapse_results, sorted_collapse_results, parent_ids: List[str]):

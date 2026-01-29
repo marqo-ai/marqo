@@ -528,7 +528,7 @@ class StructuredVespaIndex(VespaIndex):
 
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
-        collapse_filter = marqo_query.collapse.get_collapse_filter_string() if marqo_query.collapse else None
+        collapse_filter = marqo_query.collapse.sort_by.get_collapse_sort_by_filter_string() if marqo_query.collapse and marqo_query.collapse.sort_by else None
         parts = [f'({p})' for p in [collapse_filter, filter_term] if p]
         filter_term = (' AND ' + ' AND '.join(parts)) if parts else ''
 
