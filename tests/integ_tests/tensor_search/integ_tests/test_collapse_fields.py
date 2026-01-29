@@ -14,7 +14,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from tests.integ_tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.models.collapse_model import CollapseModel
+from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortByField
 
 
 class TestCollapseFields(MarqoTestCase):
@@ -668,3 +668,254 @@ class TestCollapseFields(MarqoTestCase):
         # Verify the search returns all docs in one group
         self.assertEqual(5, len(lexical_res["hits"]))
         self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in lexical_res["hits"]]))
+
+
+class TestCollapseWithSortByFeature(MarqoTestCase):
+    """Integration tests for collapse fields with sort by functionality."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        default_text_index = cls.unstructured_marqo_index_request(
+            collapse_fields=[CollapseField(name="category", minGroups=2)]
+        )
+
+        cls.indexes = cls.create_indexes([
+            default_text_index,
+        ])
+
+        cls.default_text_index = cls.indexes[0]
+
+    def setUp(self) -> None:
+        self.clear_indexes(self.indexes)
+
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher.start()
+
+    def tearDown(self) -> None:
+        self.device_patcher.stop()
+
+    def _add_shoe_documents(self):
+        """Add sample shoe documents across two category groups with varying prices."""
+        docs = [
+            # Category A - 5 variants with different prices
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "buyboxCost": 95.0, "brandSlug": "nike"},
+            {"_id": "shoe_a2", "title": "Running Shoe Beta", "category": "shoes_a", "price": 89.99, "buyboxCost": 70.0, "brandSlug": "adidas"},
+            {"_id": "shoe_a3", "title": "Running Shoe Gamma", "category": "shoes_a", "price": 150.0, "buyboxCost": 110.0, "brandSlug": "nike"},
+            {"_id": "shoe_a4", "title": "Running Shoe Delta", "category": "shoes_a", "price": 65.0, "buyboxCost": 50.0},
+            {"_id": "shoe_a5", "title": "Running Shoe Epsilon", "category": "shoes_a", "price": 200.0, "buyboxCost": 160.0, "brandSlug": "puma"},
+            # Category B - 5 variants with different prices
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 180.0, "buyboxCost": 140.0, "brandSlug": "merrell"},
+            {"_id": "shoe_b2", "title": "Hiking Boot Beta", "category": "shoes_b", "price": 75.0, "buyboxCost": 55.0, "brandSlug": "columbia"},
+            {"_id": "shoe_b3", "title": "Hiking Boot Gamma", "category": "shoes_b", "price": 220.0, "buyboxCost": 170.0, "brandSlug": "merrell"},
+            {"_id": "shoe_b4", "title": "Hiking Boot Delta", "category": "shoes_b", "price": 99.0, "buyboxCost": 78.0},
+            {"_id": "shoe_b5", "title": "Hiking Boot Epsilon", "category": "shoes_b", "price": 55.0, "buyboxCost": 40.0, "brandSlug": "columbia"},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+        return docs
+
+    def test_collapse_sort_by_price_asc(self):
+        """Test collapse with sortBy returns the cheapest variant per category."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+            ),
+            result_count=10
+        )
+
+        self.assertEqual(2, len(res["hits"]))
+        categories = {hit["category"] for hit in res["hits"]}
+        self.assertEqual({"shoes_a", "shoes_b"}, categories)
+
+        # Cheapest in shoes_a is shoe_a4 (65.0), cheapest in shoes_b is shoe_b5 (55.0)
+        for hit in res["hits"]:
+            if hit["category"] == "shoes_a":
+                self.assertEqual("shoe_a4", hit["_id"])
+                self.assertEqual(65.0, hit["price"])
+            else:
+                self.assertEqual("shoe_b5", hit["_id"])
+                self.assertEqual(55.0, hit["price"])
+
+    def test_collapse_sort_by_price_desc(self):
+        """Test collapse with sortBy desc returns the most expensive variant per category."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sortBy=[CollapseSortByField(fieldName="price", order="desc")]
+            ),
+            result_count=10
+        )
+
+        self.assertEqual(2, len(res["hits"]))
+
+        # Most expensive in shoes_a is shoe_a5 (200.0), in shoes_b is shoe_b3 (220.0)
+        for hit in res["hits"]:
+            if hit["category"] == "shoes_a":
+                self.assertEqual("shoe_a5", hit["_id"])
+                self.assertEqual(200.0, hit["price"])
+            else:
+                self.assertEqual("shoe_b3", hit["_id"])
+                self.assertEqual(220.0, hit["price"])
+
+    def test_collapse_sort_by_with_filter(self):
+        """Test collapse sortBy combined with a filter."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+            ),
+            filter="price:[* TO 100]",
+            result_count=10
+        )
+
+        self.assertEqual(2, len(res["hits"]))
+        for hit in res["hits"]:
+            self.assertLessEqual(hit["price"], 100)
+            if hit["category"] == "shoes_a":
+                # Cheapest under 100 in shoes_a: shoe_a4 (65.0)
+                self.assertEqual("shoe_a4", hit["_id"])
+            else:
+                # Cheapest under 100 in shoes_b: shoe_b5 (55.0)
+                self.assertEqual("shoe_b5", hit["_id"])
+
+    def test_collapse_sort_by_different_field(self):
+        """Test collapse sortBy using buyboxCost instead of price."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sortBy=[CollapseSortByField(fieldName="buyboxCost", order="asc")]
+            ),
+            result_count=10
+        )
+
+        self.assertEqual(2, len(res["hits"]))
+
+        # Cheapest buyboxCost in shoes_a: shoe_a4 (50.0), in shoes_b: shoe_b5 (40.0)
+        for hit in res["hits"]:
+            if hit["category"] == "shoes_a":
+                self.assertEqual("shoe_a4", hit["_id"])
+                self.assertEqual(50.0, hit["buyboxCost"])
+            else:
+                self.assertEqual("shoe_b5", hit["_id"])
+                self.assertEqual(40.0, hit["buyboxCost"])
+
+    def test_collapse_sort_by_across_retrieval_methods(self):
+        """Test collapse sortBy works across different retrieval/ranking methods."""
+        # Use documents with same title prefix so lexical search matches all groups
+        docs = [
+            {"_id": f"doc_a{i}", "title": f"Alpha product variant {i}", "category": "group_a", "price": float(10 * (i + 1))}
+            for i in range(5)
+        ] + [
+            {"_id": f"doc_b{i}", "title": f"Alpha product variant {i}", "category": "group_b", "price": float(10 * (i + 1))}
+            for i in range(5)
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical),
+            (RetrievalMethod.Tensor, RankingMethod.Tensor),
+        ]
+
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index.name,
+                    text="Alpha product",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=retrieval_method,
+                        rankingMethod=ranking_method,
+                    ),
+                    collapse=CollapseModel(
+                        name="category",
+                        sortBy=[CollapseSortByField(fieldName="price", order="asc")]
+                    ),
+                    result_count=10
+                )
+
+                self.assertEqual(2, len(res["hits"]))
+                categories = {hit["category"] for hit in res["hits"]}
+                self.assertEqual({"group_a", "group_b"}, categories)
+
+                # Cheapest per group (price=10.0) should be consistent across methods
+                for hit in res["hits"]:
+                    self.assertEqual(10.0, hit["price"])
+
+    def test_collapse_without_sort_by_returns_most_relevant(self):
+        """Test that collapse without sortBy returns the most relevant doc per group (default behavior)."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(name="category"),
+            result_count=10
+        )
+
+        self.assertEqual(2, len(res["hits"]))
+        categories = {hit["category"] for hit in res["hits"]}
+        self.assertEqual({"shoes_a", "shoes_b"}, categories)

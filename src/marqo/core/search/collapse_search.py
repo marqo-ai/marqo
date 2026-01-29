@@ -265,7 +265,7 @@ class CollapseSearch:
                 + ', '.join(f'"{doc_id}"' for doc_id in parent_ids)
                 + ')'
         )
-        collapse_sort_by_hybrid_parameters.collapse.collapse_filter_string = collapse_filter_string
+        collapse_sort_by_hybrid_parameters.collapse.set_collapse_filter_string(collapse_filter_string)
         return collapse_sort_by_hybrid_parameters
 
     def merge_two_collapse_results(self, relevance_collapse_results, sorted_collapse_results, parent_ids: List[str]):
