@@ -290,8 +290,8 @@ class CollapseSearch:
                     merged_hit[key] = value
                 else:
                     merged_hit[key] = sorted_hit.get(key, value)
-                merged_hit["_highlights"] = [{}]
-                merged_hit["_originalId"] = relevance_hit.get("_id")
+            merged_hit["_highlights"] = [{}]
+            merged_hit["_originalId"] = relevance_hit.get("_id")
             return merged_hit
 
         collapse_field_name = self.internal_params.collapse.name

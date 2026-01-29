@@ -110,5 +110,5 @@ class CollapseModel(StrictBaseModel):
     name: str = Field(..., description="The name of the field to collapse on.")
     sort_by: Optional[CollapseSortBy] = Field(
         None, description="List of fields to sort by within the collapse group.",
-        aliases="sortBy",
+        alias="sortBy",
     )
