@@ -607,10 +607,10 @@ def get_document_by_id(index_name: str, document_id: str,
     Gets a document using its ID. Please refer to
     [Get document API](https://docs.marqo.ai/latest/reference/api/documents/get-one-document/) for details.
     """
-    return tensor_search.get_document_by_id(
+    return ORJSONResponse(tensor_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id,
         show_vectors=expose_facets
-    )
+    ))
 
 
 @app.get("/indexes/{index_name}/documents")
@@ -626,7 +626,7 @@ def get_documents_by_ids_via_get(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+    return ORJSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/get-batch")
@@ -648,7 +648,7 @@ def get_documents_by_ids_via_post(
         config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
         show_vectors=expose_facets
     )
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+    return ORJSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")

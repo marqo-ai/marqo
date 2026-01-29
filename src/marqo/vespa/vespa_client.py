@@ -391,7 +391,7 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return GetDocumentResponse(**resp.json())
+        return GetDocumentResponse(**orjson.loads(resp.content))
 
     def get_all_documents(self,
                           schema: str,
@@ -423,7 +423,7 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return VisitDocumentsResponse(**resp.json())
+        return VisitDocumentsResponse(**orjson.loads(resp.content))
 
     def get_batch(self,
                   ids: List[str],
@@ -999,7 +999,7 @@ class VespaClient:
                 raise VespaError(e) from e
 
             if resp.status_code in [200, 404]:
-                return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
+                return GetBatchDocumentResponse(**orjson.loads(resp.content), status=resp.status_code)
 
             self._raise_for_status(resp)
 
@@ -1019,7 +1019,7 @@ class VespaClient:
                 raise VespaError(e) from e
 
             if resp.status_code in [200, 404]:
-                return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
+                return GetBatchDocumentResponse(**orjson.loads(resp.content), status=resp.status_code)
 
             self._raise_for_status(resp)
 

@@ -82,6 +82,7 @@ class TestPrivateModelLoading(MarqoTestCase):
         self.assertEqual(False, res.errors)
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
 
+    @unittest.skip(reason="we are hitting limit hf private repos, no user is using models in private hf repo")
     def test_load_private_hf_model_from_a_private_hf_repo(self):
         model = "private-e5-repo-on-hf"
         model_properties = {
@@ -146,6 +147,7 @@ class TestPrivateModelLoading(MarqoTestCase):
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
         self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_vectors, 2)
 
+    @unittest.skip(reason="we are hitting limit hf private repos, no user is using models in private hf repo")
     def test_load_private_open_clip_model_from_a_private_ckpt_on_hf(self):
         model = "private-marqo-fashion-siglip-model-ckpt-on-hf"
         model_properties = {
