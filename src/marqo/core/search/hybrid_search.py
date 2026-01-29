@@ -7,32 +7,30 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models import MarqoIndex
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex, \
     IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
-from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
-from marqo.core.models.interpolation_method import InterpolationMethod
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
     SearchMethod
 )
-from marqo.core.models import MarqoIndex
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
+from marqo.tensor_search.models.collapse_model import CollapseModel
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
+from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
-from marqo.tensor_search.models.sort_by_model import SortByModel
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
-from marqo.tensor_search.models.collapse_model import CollapseModel
-from marqo.base_model import ImmutableStrictBaseModel
-from marqo.core.search.collapse_search import CollapseSearch
 
 
 class HybridSearch:

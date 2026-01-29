@@ -64,6 +64,10 @@ Coverage map:
             - boost, media_download_headers, context, score_modifiers, model_auth are set to None
         26. generate_collapse_sort_by_query_single_parent_id
             - Works with a single parent ID
+        27. merge_sets_original_id_from_relevance_hit
+            - _originalId is set to the relevance hit's _id on merged hits
+        28. merge_original_id_equals_id_when_same_variant_selected
+            - When sorted variant has same _id as relevance hit, _originalId still equals relevance _id
 """
 import unittest
 from unittest.mock import MagicMock, patch
@@ -329,6 +333,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
 
         self.assertEqual("h3", merged_hit["_id"])
         self.assertEqual(10, merged_hit["price"])
+        self.assertEqual("h1", merged_hit["_originalId"])
 
     def test_merge_keeps_meta_fields_from_relevance_hit(self):
         """14. Meta fields (_score) come from relevance hit, not sorted hit."""
@@ -394,6 +399,55 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
         result = cs.merge_two_collapse_results(relevance, sorted_res, [])
 
         self.assertEqual(["h1", "h2"], [h["_id"] for h in result["hits"]])
+
+    def test_merge_sets_original_id_from_relevance_hit(self):
+        """27. _originalId is set to the relevance hit's _id on merged hits."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "rel1", "category": "g1", "price": 100, "_score": 0.9},
+            {"_id": "rel2", "category": "g2", "price": 200, "_score": 0.8},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "sorted1", "category": "g1", "price": 10},
+            {"_id": "sorted2", "category": "g2", "price": 20},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1", "g2"])
+
+        self.assertEqual("sorted1", result["hits"][0]["_id"])
+        self.assertEqual("rel1", result["hits"][0]["_originalId"])
+        self.assertEqual("sorted2", result["hits"][1]["_id"])
+        self.assertEqual("rel2", result["hits"][1]["_originalId"])
+
+    def test_merge_original_id_equals_id_when_same_variant_selected(self):
+        """28. When sorted picks the same doc as relevance, _originalId equals _id."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "same1", "category": "g1", "price": 10, "_score": 0.9},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "same1", "category": "g1", "price": 10},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        merged_hit = result["hits"][0]
+
+        self.assertEqual("same1", merged_hit["_id"])
+        self.assertEqual("same1", merged_hit["_originalId"])
+
+    def test_merge_no_original_id_on_unmerged_hits(self):
+        """Hits not in sorted results (kept as-is) should NOT have _originalId."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+        ]}
+        sorted_res = {"hits": []}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, [])
+        self.assertNotIn("_originalId", result["hits"][0])
 
     def test_merge_sorted_hit_missing_field_falls_back_to_relevance(self):
         """18. When sorted hit lacks a field, falls back to relevance hit value via .get(key, value)."""

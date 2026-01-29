@@ -249,7 +249,7 @@ class CollapseSearch:
                 rankingMethod=RankingMethod.Lexical,
                 searchableAttributesLexical=self.internal_params.hybrid_parameters.searchableAttributesLexical,
                 searchableAttributesTensor=None
-            ),
+            ) if self.internal_params.hybrid_parameters else None,
             facets=None,
             track_total_hits=False,
             language=self.internal_params.language,
@@ -291,6 +291,7 @@ class CollapseSearch:
                 else:
                     merged_hit[key] = sorted_hit.get(key, value)
                 merged_hit["_highlights"] = [{}]
+                merged_hit["_originalId"] = relevance_hit.get("_id")
             return merged_hit
 
         collapse_field_name = self.internal_params.collapse.name

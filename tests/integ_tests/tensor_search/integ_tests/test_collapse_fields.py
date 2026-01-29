@@ -738,6 +738,11 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         )
 
         self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
+        # _originalId should be set to the relevance-phase representative's _id
+        for hit in res["hits"]:
+            self.assertIn("_originalId", hit)
+            # The original relevance hit was different from the sorted variant
+            self.assertIsInstance(hit["_originalId"], str)
 
     def test_collapse_sort_by_price_desc(self):
         """Scenario 1b: Collapse with sortBy desc returns the most expensive variant per category."""
@@ -1124,6 +1129,59 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             )
             # Now group_a enters sort-by phase and picks a3 (cheapest at 30.0), group_b still picks b2
             self.assertEqual(["a3", "b2"], [hit["_id"] for hit in res_with["hits"]])
+
+    # ---- Scenario 5c: _originalId meta field ----
+
+    def test_collapse_sort_by_sets_original_id(self):
+        """Scenario 5c: Merged hits should have _originalId set to the relevance-phase representative's _id.
+        Hits not replaced by sort-by should NOT have _originalId."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=10
+        )
+
+        # Both groups have price fields, so sort-by runs and replaces representatives
+        self.assertEqual(2, len(res["hits"]))
+        for hit in res["hits"]:
+            self.assertIn("_originalId", hit)
+            # The cheapest variants (shoe_a4, shoe_b5) replaced the relevance-based representatives
+            # _originalId should differ from _id since a different variant was selected
+            self.assertIsInstance(hit["_originalId"], str)
+
+    def test_collapse_without_sort_by_has_no_original_id(self):
+        """When collapse is used without sortBy, hits should NOT have _originalId
+        since no merge/replacement occurs."""
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe Alpha",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(name="category"),
+            result_count=10
+        )
+
+        for hit in res["hits"]:
+            self.assertNotIn("_originalId", hit)
 
     # ---- Scenario 6: Collapse sort by with main sort by ----
 
