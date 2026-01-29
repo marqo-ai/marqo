@@ -1,6 +1,6 @@
 from typing import List, Optional, ClassVar
 
-from pydantic.v1 import Field, PrivateAttr, root_validator
+from pydantic.v1 import Field, PrivateAttr, root_validator, validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.sort_by_model import SortOrder
@@ -47,7 +47,7 @@ class CollapseModel(StrictBaseModel):
         description="List of fields to sort by within the collapse group.",
     )
     num_threads_per_search: Optional[int] = Field(
-        1,
+        None,
         alias="numThreadsPerSearch",
         description="Number of threads to use per search for collapse operation.",
         ge=1
@@ -97,8 +97,11 @@ class CollapseModel(StrictBaseModel):
         num_threads_per_search = values.get("num_threads_per_search")
         sort_by = values.get("sort_by")
 
+        print(num_threads_per_search, sort_by)
+
         if num_threads_per_search is not None and sort_by is None:
             raise ValueError(
                 "numThreadsPerSearch is set but sortBy is not provided. "
                 "numThreadsPerSearch can only be set when sortBy(collapseField) is provided "
             )
+        return values

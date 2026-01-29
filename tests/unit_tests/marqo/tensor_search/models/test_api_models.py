@@ -6,7 +6,8 @@ from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsCon
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery, SearchCollapseField
+from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery, CollapseModel
+from marqo.tensor_search.models.collapse_model import CollapseSortByField
 from marqo.tensor_search.models.search import (
     SearchContext, 
     SearchContextTensor, 
@@ -810,7 +811,7 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
 
     def test_collapse_fields_valid_format(self):
         """Test that collapse fields with valid format are accepted"""
-        collapse_fields = [SearchCollapseField(name="product_id")]
+        collapse_fields = [CollapseModel(name="product_id")]
         
         search_query = SearchQuery(
             q="test query",
@@ -823,7 +824,7 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
 
     def test_collapse_fields_only_for_hybrid_search(self):
         """Test that collapse fields are only allowed for hybrid search"""
-        collapse_fields = [SearchCollapseField(name="product_id")]
+        collapse_fields = [CollapseModel(name="product_id")]
         
         with self.subTest("TENSOR search method"):
             with self.assertRaises(ValueError) as cm:
@@ -847,8 +848,8 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
         """Test that exactly one collapse field must be provided"""
         with self.subTest("Multiple collapse fields"):
             collapse_fields = [
-                SearchCollapseField(name="product_id"),
-                SearchCollapseField(name="category_id")
+                CollapseModel(name="product_id"),
+                CollapseModel(name="category_id")
             ]
             
             with self.assertRaises(ValueError) as cm:
@@ -881,7 +882,164 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
     def test_search_collapse_field_requires_name(self):
         """Test that SearchCollapseField requires name field"""
         with self.assertRaises(ValidationError):
-            SearchCollapseField()  # Missing required name field
+            CollapseModel()  # Missing required name field
+
+    def test_collapse_model_sort_by_construction(self):
+        """Test CollapseModel sortBy construction and validation"""
+        with self.subTest("valid sort_by with explicit order"):
+            model = CollapseModel(
+                name="product_id",
+                sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)]
+            )
+            self.assertEqual(model.name, "product_id")
+            self.assertEqual(len(model.sort_by), 1)
+            self.assertEqual(model.sort_by[0].field_name, "price")
+            self.assertEqual(model.sort_by[0].order, SortOrder.Asc)
+
+        with self.subTest("order defaults to desc"):
+            field = CollapseSortByField(fieldName="price")
+            self.assertEqual(field.order, SortOrder.Desc)
+
+        with self.subTest("None sort_by is valid"):
+            model = CollapseModel(name="product_id")
+            self.assertIsNone(model.sort_by)
+
+        with self.subTest("multiple sort_by fields rejected"):
+            with self.assertRaises(ValidationError):
+                CollapseModel(
+                    name="product_id",
+                    sortBy=[
+                        CollapseSortByField(fieldName="price", order=SortOrder.Asc),
+                        CollapseSortByField(fieldName="rating", order=SortOrder.Desc)
+                    ]
+                )
+
+    def test_collapse_model_generate_vespa_sort_by_query_input(self):
+        """Test generate_vespa_sort_by_query_input produces correct output"""
+        with self.subTest("desc order returns 1"):
+            model = CollapseModel(
+                name="product_id",
+                sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Desc)]
+            )
+            self.assertEqual(model.generate_vespa_sort_by_query_input(), {"price": 1})
+
+        with self.subTest("asc order returns -1"):
+            model = CollapseModel(
+                name="product_id",
+                sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)]
+            )
+            self.assertEqual(model.generate_vespa_sort_by_query_input(), {"price": -1})
+
+        with self.subTest("no sort_by returns None"):
+            model = CollapseModel(name="product_id")
+            self.assertIsNone(model.generate_vespa_sort_by_query_input())
+
+    def test_collapse_model_execute_sort_and_filter_string(self):
+        """Test execute sort lifecycle and collapse filter string"""
+        model = CollapseModel(
+            name="product_id",
+            sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)]
+        )
+
+        with self.subTest("default state"):
+            self.assertFalse(model.should_execute_sort())
+            self.assertEqual(model.get_collapse_filter_string(), "")
+
+        with self.subTest("cannot set filter before enabling sort"):
+            with self.assertRaises(RuntimeError):
+                model.set_collapse_filter_string("product_id in (\"a\", \"b\")")
+
+        with self.subTest("enable sort, then set filter"):
+            model.enable_execute_sort()
+            self.assertTrue(model.should_execute_sort())
+            model.set_collapse_filter_string("product_id in (\"a\", \"b\")")
+            self.assertEqual(model.get_collapse_filter_string(), "product_id in (\"a\", \"b\")")
+
+        with self.subTest("disable sort"):
+            model.disable_execute_sort()
+            self.assertFalse(model.should_execute_sort())
+
+    def test_collapse_model_num_threads_per_search(self):
+        """Test numThreadsPerSearch validation"""
+        with self.subTest("valid with sort_by"):
+            model = CollapseModel(
+                name="product_id",
+                sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)],
+                numThreadsPerSearch=4
+            )
+            self.assertEqual(model.num_threads_per_search, 4)
+
+        with self.subTest("requires sort_by"):
+            with self.assertRaises(ValueError):
+                CollapseModel(name="product_id", numThreadsPerSearch=4)
+
+        with self.subTest("must be >= 1"):
+            with self.assertRaises(ValidationError):
+                CollapseModel(
+                    name="product_id",
+                    sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)],
+                    numThreadsPerSearch=0
+                )
+
+    def test_collapse_model_disable_if_main_sort_by_fields(self):
+        """Test disableIfMainSortByFields is stored correctly"""
+        model = CollapseModel(
+            name="product_id",
+            disableIfMainSortByFields={"price", "rating"}
+        )
+        self.assertEqual(model.disable_if_main_sort_by_fields, {"price", "rating"})
+
+    def test_search_query_with_collapse_and_sort_by(self):
+        """Test CollapseModel construction via SearchQuery and collapse.sortBy pruning when main query has sortBy"""
+        with self.subTest("collapse with sortBy constructed via SearchQuery"):
+            sq = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                collapseFields=[CollapseModel(
+                    name="product_id",
+                    sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)]
+                )]
+            )
+            self.assertIsNotNone(sq.collapse_fields[0].sort_by)
+            self.assertEqual(sq.collapse_fields[0].sort_by[0].field_name, "price")
+
+        with self.subTest("collapse.sortBy pruned when main sortBy matches disableIfMainSortByFields"):
+            sq = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                collapseFields=[CollapseModel(
+                    name="product_id",
+                    sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)],
+                    disableIfMainSortByFields={"price"}
+                )],
+                sortBy=SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
+            )
+            self.assertIsNone(sq.collapse_fields[0].sort_by)
+
+        with self.subTest("collapse.sortBy kept when main sortBy does not match disableIfMainSortByFields"):
+            sq = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                collapseFields=[CollapseModel(
+                    name="product_id",
+                    sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)],
+                    disableIfMainSortByFields={"rating"}
+                )],
+                sortBy=SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
+            )
+            self.assertIsNotNone(sq.collapse_fields[0].sort_by)
+
+        with self.subTest("collapse.sortBy kept when disableIfMainSortByFields is None"):
+            sq = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                collapseFields=[CollapseModel(
+                    name="product_id",
+                    sortBy=[CollapseSortByField(fieldName="price", order=SortOrder.Asc)]
+                )],
+                sortBy=SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
+            )
+            self.assertIsNotNone(sq.collapse_fields[0].sort_by)
 
 
 if __name__ == '__main__':

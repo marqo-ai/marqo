@@ -127,7 +127,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 query['marqo__ranking.lexical.lexical'] = "collapse_to_sort_value"
                 query["query_features"]["marqo__collapse_sort_weights"] = marqo_query.collapse.generate_vespa_sort_by_query_input()
                 query["hits"] = marqo_query.collapse.COLLAPSE_SORT_BY_QUERY_LIMIT
-                query["ranking.matching.numThreadsPerSearch"] = marqo_query.collapse.num_threads_per_search
+                if marqo_query.collapse.num_threads_per_search is not None:
+                    query["ranking.matching.numThreadsPerSearch"] = marqo_query.collapse.num_threads_per_search
 
         if marqo_query.recency_parameters:
             # Add recency parameters to query input
