@@ -168,6 +168,7 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+            query(marqo__recency_center_seconds) double: 0
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -176,7 +177,7 @@ schema {{ index.schema_name }} {
         }
 
         function age_in_seconds() {
-            expression: now() - get_timestamp()
+            expression: if (query(marqo__recency_center_seconds) > 0, query(marqo__recency_center_seconds) - get_timestamp(), now() - get_timestamp())
         }
 
         # ============ UNIFIED SCORING FUNCTIONS ============
@@ -461,6 +462,7 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+            query(marqo__recency_center_seconds) double: 0
         }
     }
 

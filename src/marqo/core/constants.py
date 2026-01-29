@@ -65,3 +65,10 @@ QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE = 'marqo__recency_grow_function_type'
 QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS = 'marqo__recency_grow_scale_seconds'
 QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS = 'marqo__recency_grow_offset_seconds'
 MARQO_RECENCY_GROW_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
+
+# For recency center parameter (custom reference timestamp instead of now())
+QUERY_INPUT_RECENCY_CENTER_SECONDS = 'marqo__recency_center_seconds'
+
+# For controlling which subqueries get recency in hybrid search
+QUERY_INPUT_RECENCY_APPLY_TO_TENSOR = 'marqo__recency_apply_to_tensor'
+QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL = 'marqo__recency_apply_to_lexical'

@@ -1,7 +1,7 @@
 """Recency parameters for time-based score boosting."""
 
 from enum import Enum
-from typing import Optional
+from typing import List, Literal, Optional
 from pydantic.v1 import BaseModel, Field, validator, root_validator
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 
@@ -149,6 +149,26 @@ class RecencyParameters(BaseModel):
         )
     )
 
+    center: Optional[float] = Field(
+        default=None,
+        alias="center",
+        description=(
+            "Center point for recency calculation as Unix epoch seconds. "
+            "If not specified, uses current time (now()). This allows for reproducible "
+            "scores when querying with a fixed reference timestamp."
+        )
+    )
+
+    apply_to_subqueries: Optional[List[Literal["tensor", "lexical"]]] = Field(
+        default=None,
+        alias="applyToSubqueries",
+        description=(
+            "Which subqueries to apply recency to in hybrid search. "
+            "Options: 'tensor', 'lexical'. Default (None) means both ['tensor', 'lexical']. "
+            "Empty list means neither subquery gets recency applied (only global phase if enabled)."
+        )
+    )
+
     class Config:
         extra: str = "forbid"
         allow_population_by_field_name = True
@@ -215,6 +235,23 @@ class RecencyParameters(BaseModel):
         if seconds < 0:
             raise ValueError(f"grow_offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
+        return v
+
+    @validator('center')
+    def validate_center(cls, v: Optional[float]) -> Optional[float]:
+        """Validate center timestamp is a positive number."""
+        if v is not None and v < 0:
+            raise ValueError(f"center must be a non-negative Unix epoch timestamp, got: {v}")
+        return v
+
+    @validator('apply_to_subqueries')
+    def validate_apply_to_subqueries(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate apply_to_subqueries contains only valid values."""
+        if v is not None:
+            valid_values = {"tensor", "lexical"}
+            for item in v:
+                if item not in valid_values:
+                    raise ValueError(f"Invalid value '{item}' in applyToSubqueries. Must be 'tensor' or 'lexical'")
         return v
 
     @root_validator

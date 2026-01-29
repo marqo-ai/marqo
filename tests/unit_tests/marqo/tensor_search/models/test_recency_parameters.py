@@ -709,3 +709,162 @@ class TestRecencyParameters(unittest.TestCase):
         self.assertEqual(params.grow_function, "gaussian")
         self.assertEqual(params.grow_scale, "21d")
         self.assertEqual(params.grow_offset, "3d")
+
+    # ============= Center Parameter Tests =============
+
+    def test_center_validation(self):
+        """Test center field validation."""
+        # Valid center values
+        valid_values = [
+            ("zero", 0, 0),
+            ("positive", 1609459200, 1609459200),  # 2021-01-01 00:00:00 UTC
+            ("large", 1735689600, 1735689600),  # 2025-01-01 00:00:00 UTC
+            ("decimal", 1609459200.5, 1609459200.5),
+        ]
+
+        for test_name, center, expected in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    center=center
+                )
+                self.assertEqual(params.center, expected)
+
+        # Invalid center values
+        invalid_values = [
+            ("negative", -1),
+            ("negative_large", -1609459200),
+        ]
+
+        for test_name, center in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(
+                        recency_field="created_at",
+                        center=center
+                    )
+                errors = exc_info.exception.errors()
+                self.assertTrue(
+                    any('center' in str(e['loc']) for e in errors),
+                    f"Expected 'center' in error locations: {errors}"
+                )
+
+    def test_center_default_none(self):
+        """Test center defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.center)
+
+    def test_center_alias(self):
+        """Test center works with both alias and field name."""
+        # Using field name
+        params1 = RecencyParameters(
+            recency_field="created_at",
+            center=1609459200
+        )
+        self.assertEqual(params1.center, 1609459200)
+
+        # Using alias (same as field name in this case)
+        params2 = RecencyParameters(
+            recencyField="created_at",
+            center=1609459200
+        )
+        self.assertEqual(params2.center, 1609459200)
+
+        # Test dict serialization
+        result = params1.dict(by_alias=True)
+        self.assertIn('center', result)
+        self.assertEqual(result['center'], 1609459200)
+
+    # ============= Apply To Subqueries Parameter Tests =============
+
+    def test_apply_to_subqueries_validation(self):
+        """Test apply_to_subqueries field validation."""
+        # Valid values
+        valid_values = [
+            ("both", ["tensor", "lexical"]),
+            ("tensor_only", ["tensor"]),
+            ("lexical_only", ["lexical"]),
+            ("empty_list", []),
+            ("reversed_order", ["lexical", "tensor"]),
+        ]
+
+        for test_name, apply_to in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    apply_to_subqueries=apply_to
+                )
+                self.assertEqual(params.apply_to_subqueries, apply_to)
+
+        # Invalid values
+        invalid_values = [
+            ("invalid_string", ["invalid"]),
+            ("mixed_invalid", ["tensor", "invalid"]),
+            ("uppercase", ["TENSOR"]),
+            ("wrong_type_hybrid", ["hybrid"]),
+        ]
+
+        for test_name, apply_to in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(
+                        recency_field="created_at",
+                        apply_to_subqueries=apply_to
+                    )
+                error_str = str(exc_info.exception)
+                self.assertTrue(
+                    "apply_to_subqueries" in error_str.lower() or "applytosubqueries" in error_str.lower(),
+                    f"Expected 'apply_to_subqueries' in error: {error_str}"
+                )
+
+    def test_apply_to_subqueries_default_none(self):
+        """Test apply_to_subqueries defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.apply_to_subqueries)
+
+    def test_apply_to_subqueries_alias(self):
+        """Test apply_to_subqueries alias (applyToSubqueries)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            applyToSubqueries=["tensor"]
+        )
+        self.assertEqual(params.apply_to_subqueries, ["tensor"])
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('applyToSubqueries', result)
+        self.assertEqual(result['applyToSubqueries'], ["tensor"])
+
+    def test_apply_to_subqueries_with_center(self):
+        """Test apply_to_subqueries works together with center parameter."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            center=1609459200,
+            apply_to_subqueries=["tensor"]
+        )
+        self.assertEqual(params.center, 1609459200)
+        self.assertEqual(params.apply_to_subqueries, ["tensor"])
+
+    def test_all_new_parameters_together(self):
+        """Test center and apply_to_subqueries work with all other parameters."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            decay_function="exponential",
+            scale="7d",
+            offset="1d",
+            decay_to=0.5,
+            apply_in_ranking_phase="all",
+            add_to_score_weight=0.5,
+            center=1609459200,
+            apply_to_subqueries=["tensor", "lexical"],
+            grow_from=0.3,
+            grow_function="linear",
+            grow_scale="14d",
+            grow_offset="2d"
+        )
+
+        self.assertEqual(params.recency_field, "created_at")
+        self.assertEqual(params.decay_function, "exponential")
+        self.assertEqual(params.center, 1609459200)
+        self.assertEqual(params.apply_to_subqueries, ["tensor", "lexical"])
+        self.assertEqual(params.grow_from, 0.3)

@@ -200,6 +200,10 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                    # Center and apply_to_subqueries (defaults)
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -227,6 +231,10 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 1209600.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                    # Center and apply_to_subqueries (defaults)
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -254,6 +262,10 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                    # Center and apply_to_subqueries (defaults)
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -281,6 +293,10 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                    # Center and apply_to_subqueries (defaults)
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -309,6 +325,10 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
+                    # Center and apply_to_subqueries (defaults)
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
+                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
         ]
@@ -635,6 +655,194 @@ class TestRecencyQueryInput(unittest.TestCase):
                         expected_value,
                         f"Key {key}: expected {expected_value}, got {result.get(key)}"
                     )
+
+
+    # ============= Center Parameter Tests =============
+
+    def test_center_defaults_to_zero_sentinel(self):
+        """Test center defaults to 0 (sentinel for 'use now()') when not provided."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS],
+            0
+        )
+
+    def test_center_passed_correctly_when_specified(self):
+        """Test center is passed correctly when provided."""
+        center_values = [0, 1609459200, 1735689600, 1609459200.5]
+
+        for center in center_values:
+            with self.subTest(center=center):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    center=center
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS],
+                    center
+                )
+
+    def test_center_query_input_constant_present(self):
+        """Test that center query input constant is always present."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertIn(constants.QUERY_INPUT_RECENCY_CENTER_SECONDS, result)
+
+    # ============= Apply To Subqueries Tests =============
+
+    def test_apply_to_subqueries_defaults_to_both(self):
+        """Test apply_to_subqueries defaults to both tensor and lexical."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            1
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            1
+        )
+
+    def test_apply_to_subqueries_tensor_only(self):
+        """Test apply_to_subqueries with tensor only."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=["tensor"]
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            1
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            0
+        )
+
+    def test_apply_to_subqueries_lexical_only(self):
+        """Test apply_to_subqueries with lexical only."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=["lexical"]
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            0
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            1
+        )
+
+    def test_apply_to_subqueries_empty_list(self):
+        """Test apply_to_subqueries with empty list (neither subquery gets recency)."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=[]
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            0
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            0
+        )
+
+    def test_apply_to_subqueries_both_explicit(self):
+        """Test apply_to_subqueries with both explicitly specified."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=["tensor", "lexical"]
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            1
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            1
+        )
+
+    def test_apply_to_subqueries_query_input_constants_present(self):
+        """Test that apply_to_subqueries query input constants are always present."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, result)
+        self.assertIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, result)
+
+    def test_all_new_query_input_constants_in_result(self):
+        """Test that all query input constants including new ones are present."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        expected_keys = [
+            constants.QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE,
+            constants.QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE,
+            constants.QUERY_INPUT_RECENCY_SCALE_SECONDS,
+            constants.QUERY_INPUT_RECENCY_OFFSET_SECONDS,
+            constants.QUERY_INPUT_RECENCY_DECAY_TO,
+            constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY,
+            constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE,
+            constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT,
+            constants.QUERY_INPUT_RECENCY_GROW_ENABLED,
+            constants.QUERY_INPUT_RECENCY_GROW_FROM,
+            constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE,
+            constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS,
+            constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS,
+            # New constants
+            constants.QUERY_INPUT_RECENCY_CENTER_SECONDS,
+            constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR,
+            constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL,
+        ]
+
+        for key in expected_keys:
+            with self.subTest(key=key):
+                self.assertIn(key, result)
+
+    def test_complete_parameter_combination_with_new_fields(self):
+        """Test complete parameter combination with center and apply_to_subqueries."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            decay_function="exponential",
+            scale="7d",
+            offset="0d",
+            decay_to=0.5,
+            apply_in_ranking_phase="all",
+            center=1609459200,
+            apply_to_subqueries=["tensor"]
+        )
+        result = self.vespa_index._get_recency_query_input(params)
+
+        # Verify center
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS],
+            1609459200
+        )
+
+        # Verify apply_to_subqueries
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
+            1
+        )
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
+            0
+        )
 
 
 if __name__ == '__main__':

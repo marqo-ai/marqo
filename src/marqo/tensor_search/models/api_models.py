@@ -217,6 +217,22 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
+    def validate_apply_to_subqueries_only_for_hybrid_search(cls, values):
+        """Validate that applyToSubqueries in recencyParameters is only used with hybrid search.
+
+        Note: This is a more specific check - the general recencyParameters check above ensures
+        recency is only for hybrid. This extra validation ensures applyToSubqueries specifically
+        doesn't accidentally get used in non-hybrid contexts if we ever relax recency constraints.
+        """
+        recency_parameters = values.get('recencyParameters')
+        search_method = values.get('searchMethod')
+        if recency_parameters is not None and recency_parameters.apply_to_subqueries is not None:
+            if search_method.upper() != SearchMethod.HYBRID:
+                raise ValueError(f"applyToSubqueries can only be used with 'HYBRID' search. "
+                                 f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
     def validate_facet_exclude_terms_in_filter(cls, values):
         """Validate that excluded facet fields appear in filter string.
 

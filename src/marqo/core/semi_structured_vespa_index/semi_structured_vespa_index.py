@@ -175,6 +175,21 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             result[constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS] = scale_seconds  # use same as decay scale
             result[constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS] = 0
 
+        # Center parameter: 0 is sentinel value meaning "use now()" in Vespa
+        if recency_params.center is not None:
+            result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS] = recency_params.center
+        else:
+            result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS] = 0  # Sentinel for "use now()"
+
+        # Apply to subqueries parameter: controls which hybrid subqueries get recency
+        # Default (None) means apply to both
+        apply_to = recency_params.apply_to_subqueries
+        if apply_to is None:
+            apply_to = ["tensor", "lexical"]
+
+        result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR] = 1 if "tensor" in apply_to else 0
+        result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL] = 1 if "lexical" in apply_to else 0
+
         return result
 
     def _generate_collapse_query_params(self, collapse_field_name: str):
