@@ -33,7 +33,7 @@ class HybridSearchInternalParameters(StrictBaseModel):
     approximate: bool = True
     approximate_threshold: Optional[float] = None
     searchable_attributes: Optional[Iterable[str]] = None
-    filter_string: Optional[str] = None,
+    filter_string: Optional[str] = None
     device: str = None
     attributes_to_retrieve: Optional[List[str]] = None
     boost: Optional[Dict] = None

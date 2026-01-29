@@ -263,10 +263,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
             base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
 
+        collapse_field_name = marqo_query.collapse.name if marqo_query.collapse else None
+
         if marqo_query.track_total_hits is not None:
             # 0 is byte representation of letter "t"
             if marqo_query.collapse:
-                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse.name}) output(count())))"
+                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({collapse_field_name}) output(count())))"
             else:
                 total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
             facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query))
@@ -274,7 +276,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.facets is not None:
             facets_term = self._get_facets_term(
                 marqo_query.facets,
-                collapse_field_name=marqo_query.collapse.name if marqo_query.collapse else None
+                collapse_field_name=collapse_field_name
             )
 
             if facets_term is not None:
@@ -294,8 +296,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                         new_filter_term = f' AND {new_filter_term}'
                     else:
                         new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms,
-                                                            collapse_field_name=marqo_query.collapse.name)
+                    new_facets_term = self._get_facets_term(
+                        marqo_query.facets, facet_parameters.exclude_terms,
+                        collapse_field_name=collapse_field_name
+                    )
 
                     query_yql = f'{base_yql}{new_filter_term}'
 

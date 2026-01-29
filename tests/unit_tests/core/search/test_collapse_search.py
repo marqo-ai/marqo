@@ -42,6 +42,28 @@ Coverage map:
             - Merged hits always get _highlights=[{}]
         17. merge_handles_empty_sorted_results
             - When sorted results have no hits, all relevance hits are kept as-is
+        18. merge_sorted_hit_missing_field_falls_back_to_relevance
+            - When sorted hit lacks a field, falls back to relevance hit value via .get(key, value)
+        19. merge_skips_sorted_hit_with_none_collapse_field
+            - Sorted hits with None collapse field value are not indexed in lookup map
+        20. merge_preserves_non_hit_keys_from_relevance_results
+            - Non-hit keys (e.g., totalHits, processingTimeMs) are preserved in merged output
+
+    CollapseSearch.collect_document_ids():
+        21. collect_document_ids_excludes_boolean_values
+            - Boolean values are not int/float instances (bool is subclass of int in Python, so True/False ARE collected)
+        22. collect_document_ids_excludes_none_value
+            - None sort field value is excluded
+        23. collect_document_ids_negative_numbers
+            - Negative numbers are collected as valid numeric values
+
+    CollapseSearch.generate_collapse_sort_by_query():
+        24. generate_collapse_sort_by_query_preserves_searchable_attributes
+            - searchable_attributes from original params are passed through
+        25. generate_collapse_sort_by_query_nullifies_optional_params
+            - boost, media_download_headers, context, score_modifiers, model_auth are set to None
+        26. generate_collapse_sort_by_query_single_parent_id
+            - Works with a single parent ID
 """
 import unittest
 from unittest.mock import MagicMock, patch
@@ -372,6 +394,136 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
         result = cs.merge_two_collapse_results(relevance, sorted_res, [])
 
         self.assertEqual(["h1", "h2"], [h["_id"] for h in result["hits"]])
+
+    def test_merge_sorted_hit_missing_field_falls_back_to_relevance(self):
+        """18. When sorted hit lacks a field, falls back to relevance hit value via .get(key, value)."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "color": "red", "_score": 0.9},
+        ]}
+        # Sorted hit has category but no "color" field
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": "g1", "price": 10},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        merged_hit = result["hits"][0]
+
+        self.assertEqual("h3", merged_hit["_id"])
+        self.assertEqual(10, merged_hit["price"])
+        # "color" falls back to relevance value
+        self.assertEqual("red", merged_hit["color"])
+
+    def test_merge_skips_sorted_hit_with_none_collapse_field(self):
+        """19. Sorted hits with None collapse field value are not indexed in lookup map."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+        ]}
+        # Sorted hit has None for collapse field
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": None, "price": 10},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        # g1 not found in sorted lookup → original kept
+        self.assertEqual("h1", result["hits"][0]["_id"])
+
+    def test_merge_preserves_non_hit_keys_from_relevance_results(self):
+        """20. Non-hit keys (totalHits, processingTimeMs) are preserved in merged output."""
+        cs = _make_collapse_search()
+
+        relevance = {
+            "hits": [{"_id": "h1", "category": "g1", "price": 100, "_score": 0.9}],
+            "totalHits": 42,
+            "processingTimeMs": 15,
+        }
+        sorted_res = {"hits": [{"_id": "h3", "category": "g1", "price": 10}]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+
+        self.assertEqual(42, result["totalHits"])
+        self.assertEqual(15, result["processingTimeMs"])
+
+
+class TestCollectDocumentIdsAdditional(unittest.TestCase):
+    """Additional tests for CollapseSearch.collect_document_ids()."""
+
+    def test_collect_document_ids_boolean_values_are_collected(self):
+        """21. In Python, bool is a subclass of int, so True/False pass isinstance(value, (int, float))."""
+        cs = _make_collapse_search()
+        results = {"hits": [
+            {"_id": "h1", "category": "g1", "price": True},
+            {"_id": "h2", "category": "g2", "price": False},
+        ]}
+        # bool IS subclass of int in Python, so these are collected
+        self.assertEqual(["g1", "g2"], cs.collect_document_ids(results))
+
+    def test_collect_document_ids_excludes_none_value(self):
+        """22. None sort field value is excluded."""
+        cs = _make_collapse_search()
+        results = {"hits": [
+            {"_id": "h1", "category": "g1", "price": None},
+        ]}
+        self.assertEqual([], cs.collect_document_ids(results))
+
+    def test_collect_document_ids_negative_numbers(self):
+        """23. Negative numbers are collected as valid numeric values."""
+        cs = _make_collapse_search()
+        results = {"hits": [
+            {"_id": "h1", "category": "g1", "price": -50},
+            {"_id": "h2", "category": "g2", "price": -0.5},
+        ]}
+        self.assertEqual(["g1", "g2"], cs.collect_document_ids(results))
+
+
+class TestGenerateCollapseSortByQueryAdditional(unittest.TestCase):
+    """Additional tests for CollapseSearch.generate_collapse_sort_by_query()."""
+
+    def test_generate_collapse_sort_by_query_preserves_searchable_attributes(self):
+        """24. searchable_attributes from original params are passed through."""
+        cs = _make_collapse_search()
+        cs.internal_params.searchable_attributes = ["title", "description"]
+
+        with _patch_internal_params_validation() as MockParams:
+            cs.generate_collapse_sort_by_query(["g1"])
+
+        call_kwargs = MockParams.call_args[1]
+        self.assertEqual(["title", "description"], call_kwargs["searchable_attributes"])
+
+    def test_generate_collapse_sort_by_query_nullifies_optional_params(self):
+        """25. boost, media_download_headers, context, score_modifiers, model_auth are set to None."""
+        cs = _make_collapse_search()
+        # Set non-None values on original params
+        cs.internal_params.boost = {"field": 2.0}
+        cs.internal_params.media_download_headers = {"Authorization": "Bearer x"}
+        cs.internal_params.context = MagicMock()
+        cs.internal_params.score_modifiers = MagicMock()
+        cs.internal_params.model_auth = MagicMock()
+
+        with _patch_internal_params_validation() as MockParams:
+            cs.generate_collapse_sort_by_query(["g1"])
+
+        call_kwargs = MockParams.call_args[1]
+        self.assertIsNone(call_kwargs["boost"])
+        self.assertIsNone(call_kwargs["media_download_headers"])
+        self.assertIsNone(call_kwargs["context"])
+        self.assertIsNone(call_kwargs["score_modifiers"])
+        self.assertIsNone(call_kwargs["model_auth"])
+
+    def test_generate_collapse_sort_by_query_single_parent_id(self):
+        """26. Works with a single parent ID."""
+        cs = _make_collapse_search()
+
+        with _patch_internal_params_validation() as MockParams:
+            result = cs.generate_collapse_sort_by_query(["only_one"])
+
+        call_kwargs = MockParams.call_args[1]
+        self.assertEqual(1, call_kwargs["result_count"])
+        filter_str = result.collapse.sort_by.get_collapse_sort_by_filter_string()
+        self.assertEqual('category in ("only_one")', filter_str)
 
 
 if __name__ == "__main__":
