@@ -34,9 +34,6 @@ from marqo.vespa.exceptions import VespaStatusError
 
 
 class HybridSearch:
-    def __init__(self):
-        self._internal_params = None
-
     def search(
             self,
             config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
