@@ -200,10 +200,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
-                    # Center and apply_to_subqueries (defaults)
+                    # Center (default)
                     constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -231,10 +229,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 1209600.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
-                    # Center and apply_to_subqueries (defaults)
+                    # Center (default)
                     constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -262,10 +258,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
-                    # Center and apply_to_subqueries (defaults)
+                    # Center (default)
                     constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -293,10 +287,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 86400.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
-                    # Center and apply_to_subqueries (defaults)
+                    # Center (default)
                     constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
             (
@@ -325,10 +317,8 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS: 604800.0,
                     constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS: 0,
-                    # Center and apply_to_subqueries (defaults)
+                    # Center (default)
                     constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR: 1,
-                    constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL: 1,
                 }
             ),
         ]
@@ -693,97 +683,56 @@ class TestRecencyQueryInput(unittest.TestCase):
 
         self.assertIn(constants.QUERY_INPUT_RECENCY_CENTER_SECONDS, result)
 
-    # ============= Apply To Subqueries Tests =============
+    # ============= Apply To Subqueries Tests (top-level query properties) =============
 
-    def test_apply_to_subqueries_defaults_to_both(self):
-        """Test apply_to_subqueries defaults to both tensor and lexical."""
-        params = RecencyParameters(recency_field="created_at")
-        result = self.vespa_index._get_recency_query_input(params)
+    def test_apply_to_subqueries_top_level_defaults(self):
+        """Test apply_to_subqueries defaults to both tensor and lexical as top-level properties."""
+        query = self._create_hybrid_query_with_recency("all")
+        # Override apply_to_subqueries to None (default)
+        query.recency_parameters.apply_to_subqueries = None
 
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            1
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            1
-        )
+        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
+            mock_parent.return_value = {'query_features': {}}
+            result = self.vespa_index._to_vespa_hybrid_query(query)
 
-    def test_apply_to_subqueries_tensor_only(self):
-        """Test apply_to_subqueries with tensor only."""
-        params = RecencyParameters(
-            recency_field="created_at",
-            apply_to_subqueries=["tensor"]
-        )
-        result = self.vespa_index._get_recency_query_input(params)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 1)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 1)
 
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            1
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            0
-        )
+    def test_apply_to_subqueries_top_level_tensor_only(self):
+        """Test apply_to_subqueries with tensor only as top-level properties."""
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters.apply_to_subqueries = ["tensor"]
 
-    def test_apply_to_subqueries_lexical_only(self):
-        """Test apply_to_subqueries with lexical only."""
-        params = RecencyParameters(
-            recency_field="created_at",
-            apply_to_subqueries=["lexical"]
-        )
-        result = self.vespa_index._get_recency_query_input(params)
+        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
+            mock_parent.return_value = {'query_features': {}}
+            result = self.vespa_index._to_vespa_hybrid_query(query)
 
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            0
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            1
-        )
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 1)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 0)
 
-    def test_apply_to_subqueries_empty_list(self):
+    def test_apply_to_subqueries_top_level_lexical_only(self):
+        """Test apply_to_subqueries with lexical only as top-level properties."""
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters.apply_to_subqueries = ["lexical"]
+
+        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
+            mock_parent.return_value = {'query_features': {}}
+            result = self.vespa_index._to_vespa_hybrid_query(query)
+
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 0)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 1)
+
+    def test_apply_to_subqueries_top_level_empty_list(self):
         """Test apply_to_subqueries with empty list (neither subquery gets recency)."""
-        params = RecencyParameters(
-            recency_field="created_at",
-            apply_to_subqueries=[]
-        )
-        result = self.vespa_index._get_recency_query_input(params)
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters.apply_to_subqueries = []
 
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            0
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            0
-        )
+        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
+            mock_parent.return_value = {'query_features': {}}
+            result = self.vespa_index._to_vespa_hybrid_query(query)
 
-    def test_apply_to_subqueries_both_explicit(self):
-        """Test apply_to_subqueries with both explicitly specified."""
-        params = RecencyParameters(
-            recency_field="created_at",
-            apply_to_subqueries=["tensor", "lexical"]
-        )
-        result = self.vespa_index._get_recency_query_input(params)
-
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            1
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            1
-        )
-
-    def test_apply_to_subqueries_query_input_constants_present(self):
-        """Test that apply_to_subqueries query input constants are always present."""
-        params = RecencyParameters(recency_field="created_at")
-        result = self.vespa_index._get_recency_query_input(params)
-
-        self.assertIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, result)
-        self.assertIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, result)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 0)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 0)
 
     def test_all_new_query_input_constants_in_result(self):
         """Test that all query input constants including new ones are present."""
@@ -806,8 +755,6 @@ class TestRecencyQueryInput(unittest.TestCase):
             constants.QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS,
             # New constants
             constants.QUERY_INPUT_RECENCY_CENTER_SECONDS,
-            constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR,
-            constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL,
         ]
 
         for key in expected_keys:
@@ -834,15 +781,6 @@ class TestRecencyQueryInput(unittest.TestCase):
             1609459200
         )
 
-        # Verify apply_to_subqueries
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR],
-            1
-        )
-        self.assertEqual(
-            result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL],
-            0
-        )
 
 
 if __name__ == '__main__':

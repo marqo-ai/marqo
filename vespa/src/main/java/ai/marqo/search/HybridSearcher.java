@@ -1383,11 +1383,9 @@ public class HybridSearcher extends Searcher {
 
         // Check if recency should apply to this subquery type (default: apply to both)
         int applyRecencyToTensor =
-                query.properties()
-                        .getInteger(addQueryWrapper(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR), 1);
+                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, 1);
         int applyRecencyToLexical =
-                query.properties()
-                        .getInteger(addQueryWrapper(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL), 1);
+                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, 1);
 
         boolean shouldApplyRecencyToThisSubquery =
                 (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && applyRecencyToTensor == 1)
