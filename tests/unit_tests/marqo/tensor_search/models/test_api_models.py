@@ -548,6 +548,63 @@ class TestSearchQuery(unittest.TestCase):
                     self.assertIsNotNone(search_query.sort_by)
 
 
+    def test_apply_to_subqueries_requires_rrf_ranking(self):
+        """Test that applyToSubqueries requires RRF ranking method."""
+        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+
+        # Non-RRF ranking methods should fail when applyToSubqueries is set
+        non_rrf_cases = [
+            (RetrievalMethod.Tensor, RankingMethod.Tensor, ["tensor"]),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical, ["lexical"]),
+        ]
+
+        for retrieval_method, ranking_method, apply_to_subqueries in non_rrf_cases:
+            with self.subTest(rankingMethod=ranking_method.value, applyToSubqueries=apply_to_subqueries):
+                with self.assertRaises(ValidationError) as cm:
+                    BulkSearchQueryEntity(
+                        index="test-index",
+                        q="product",
+                        searchMethod="HYBRID",
+                        hybridParameters=HybridParameters(
+                            retrievalMethod=retrieval_method,
+                            rankingMethod=ranking_method,
+                        ),
+                        recencyParameters={
+                            "recencyField": "timestamp",
+                            "scale": "7d",
+                            "decayFunction": "exponential",
+                            "decayTo": 0.5,
+                            "applyToSubqueries": apply_to_subqueries,
+                        }
+                    )
+                self.assertIn("RRF", str(cm.exception))
+
+        # RRF ranking with applyToSubqueries should NOT raise
+        valid_cases = [
+            (RankingMethod.RRF, ["tensor"]),
+            (RankingMethod.RRF, ["lexical"]),
+            (RankingMethod.RRF, ["tensor", "lexical"]),
+            (None, ["tensor"]),  # None defaults to RRF
+        ]
+
+        for ranking_method, apply_to_subqueries in valid_cases:
+            with self.subTest(rankingMethod=ranking_method, applyToSubqueries=apply_to_subqueries):
+                hybrid_params = HybridParameters(rankingMethod=ranking_method) if ranking_method else None
+                query = SearchQuery(
+                    q="product",
+                    searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=hybrid_params,
+                    recencyParameters=RecencyParameters(
+                        recency_field="timestamp",
+                        scale="7d",
+                        decay_function="exponential",
+                        decay_to=0.5,
+                        apply_to_subqueries=apply_to_subqueries,
+                    )
+                )
+                self.assertIsNotNone(query)
+
+
 class TestCustomVectorQuery(unittest.TestCase):
 
     def test_custom_vector_query_creation(self):

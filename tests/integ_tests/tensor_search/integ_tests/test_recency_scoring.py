@@ -434,12 +434,16 @@ class TestRecencyScoring(MarqoTestCase):
 
         return max(floor_value, score)
 
-    def _get_doc_age_seconds(self, hit: Dict) -> Optional[float]:
+    def _get_doc_age_seconds(self, hit: Dict, center_timestamp: Optional[float] = None) -> Optional[float]:
         """Get the age in seconds for a document based on its timestamp field.
 
+        Args:
+            hit: Search result hit containing document fields.
+            center_timestamp: If provided, use this as the reference time instead of now().
+
         Returns:
-            - Positive value: past document (timestamp < now)
-            - Negative value: future document (timestamp > now)
+            - Positive value: past document (timestamp < reference time)
+            - Negative value: future document (timestamp > reference time)
             - None: document has no timestamp field
         """
         doc_id = hit.get('_id')
@@ -449,7 +453,7 @@ class TestRecencyScoring(MarqoTestCase):
         # Use the actual timestamp from the document
         timestamp = hit.get('timestamp')
         if timestamp is not None:
-            current_time = datetime.now().timestamp()
+            current_time = center_timestamp if center_timestamp is not None else datetime.now().timestamp()
             return current_time - timestamp  # Can be negative for future docs
         return None
 
@@ -463,6 +467,9 @@ class TestRecencyScoring(MarqoTestCase):
         """Verify recency scores match expected values within 3 decimal places."""
         self.assertGreater(len(hits), 0, "Should have results")
 
+        # Use center from recency params if available
+        center_timestamp = recency_params.center
+
         for hit in hits:
             actual_score = hit.get('_recency_score')
             doc_id = hit.get('_id')
@@ -470,7 +477,7 @@ class TestRecencyScoring(MarqoTestCase):
             self.assertIsNotNone(actual_score, f"Recency score should be present for {doc_id}")
 
             # Calculate expected score
-            age_seconds = self._get_doc_age_seconds(hit)
+            age_seconds = self._get_doc_age_seconds(hit, center_timestamp=center_timestamp)
             if age_seconds is not None:
                 expected_score = self._calculate_expected_score(
                     age_seconds, recency_params.scale, recency_params.offset, recency_params.decay_function, recency_params.decay_to,
@@ -1452,6 +1459,248 @@ class TestRecencyScoring(MarqoTestCase):
         # Verify error message mentions addToScoreWeight and minimum version
         error_message = str(ctx.exception)
         self.assertIn("addToScoreWeight", error_message, "Error should mention addToScoreWeight parameter")
+
+
+    # ============== Center Parameter Tests ==============
+
+    def test_center_deterministic_scores_and_calculation_accuracy(self):
+        """Test that using center produces deterministic scores and matches expected math.
+
+        With a fixed center timestamp, scores should be identical across runs
+        (unlike now()-based scoring which changes every second).
+        """
+        self._add_shared_documents()
+
+        center = datetime(2025, 6, 15, 12, 0, 0).timestamp()
+
+        for decay_func in ["exponential", "linear", "gaussian", "binary"]:
+            with self.subTest(function=decay_func):
+                params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="8d",
+                    offset="0d",
+                    decay_function=decay_func,
+                    decay_to=0.5,
+                    center=center,
+                )
+
+                # Run the same search twice with a sleep between
+                hits_1 = self._search_with_recency("product", params)
+                time.sleep(2)
+                hits_2 = self._search_with_recency("product", params)
+
+                # Assert all recency scores are identical across both runs (5 decimal places)
+                scores_1 = {h['_id']: h['_recency_score'] for h in hits_1}
+                scores_2 = {h['_id']: h['_recency_score'] for h in hits_2}
+
+                common_ids = set(scores_1.keys()) & set(scores_2.keys())
+                self.assertGreater(len(common_ids), 0, "Should have common docs")
+
+                for doc_id in common_ids:
+                    self.assertAlmostEqual(
+                        scores_1[doc_id], scores_2[doc_id], places=5,
+                        msg=f"Scores for {doc_id} should be deterministic with fixed center. "
+                            f"Run 1: {scores_1[doc_id]:.6f}, Run 2: {scores_2[doc_id]:.6f}"
+                    )
+
+                # Verify scores match expected center-based math (3 decimal places)
+                self._verify_recency_behavior(hits_1, params)
+
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
+    def test_center_with_apply_in_ranking_phase(self):
+        """Test center parameter works correctly with different apply_in_ranking_phase settings."""
+        self._add_shared_documents()
+
+        center = datetime.now().timestamp()
+
+        for phase in ["all", "exclude-global", "only-global"]:
+            with self.subTest(phase=phase):
+                # Baseline: no recency
+                baseline_result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    result_count=20
+                )
+                baseline_scores = self._extract_scores(baseline_result['hits'])
+
+                # Recency search with center
+                recency_params = RecencyParameters(
+                    recency_field="timestamp",
+                    scale="60d",
+                    offset="0d",
+                    decay_function="exponential",
+                    decay_to=0.3,
+                    apply_in_ranking_phase=phase,
+                    center=center,
+                )
+                recency_result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    recency_parameters=recency_params,
+                    result_count=20
+                )
+                recency_scores = self._extract_scores(recency_result['hits'])
+
+                # Verify phase behavior
+                self._verify_phase_score_changes(
+                    baseline_scores, recency_scores, phase, add_weight=None
+                )
+
+    # ============== ApplyToSubqueries Tests ==============
+
+    def test_apply_to_subqueries_tensor_only(self):
+        """Test that applyToSubqueries=['tensor'] is accepted and returns valid recency scores.
+
+        Note: Full subquery-level score isolation (tensor modified, lexical unchanged) requires
+        the custom HybridSearcher Java component, which is not available in local Vespa.
+        This test verifies the parameter is accepted, the query succeeds, and recency scores
+        are correctly calculated.
+        """
+        self._add_shared_documents()
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="60d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+            apply_in_ranking_phase="exclude-global",
+            apply_to_subqueries=["tensor"],
+        )
+        hits = self._search_with_recency("product", recency_params)
+
+        # Verify recency scores are calculated correctly
+        self.assertGreater(len(hits), 0, "Should have results")
+        self._verify_recency_behavior(hits, recency_params)
+
+    def test_apply_to_subqueries_lexical_only(self):
+        """Test that applyToSubqueries=['lexical'] is accepted and returns valid recency scores.
+
+        Note: Full subquery-level score isolation (lexical modified, tensor unchanged) requires
+        the custom HybridSearcher Java component, which is not available in local Vespa.
+        This test verifies the parameter is accepted, the query succeeds, and recency scores
+        are correctly calculated.
+        """
+        self._add_shared_documents()
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="60d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+            apply_in_ranking_phase="exclude-global",
+            apply_to_subqueries=["lexical"],
+        )
+        hits = self._search_with_recency("product", recency_params)
+
+        # Verify recency scores are calculated correctly
+        self.assertGreater(len(hits), 0, "Should have results")
+        self._verify_recency_behavior(hits, recency_params)
+
+    def test_apply_to_subqueries_both_equals_default(self):
+        """Test that applyToSubqueries=['tensor', 'lexical'] gives same scores as None (default)."""
+        self._add_shared_documents()
+
+        base_params = dict(
+            recency_field="timestamp",
+            scale="60d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+        )
+
+        # Search with applyToSubqueries=["tensor", "lexical"]
+        params_explicit = RecencyParameters(
+            **base_params,
+            apply_to_subqueries=["tensor", "lexical"],
+        )
+        hits_explicit = self._search_with_recency("product", params_explicit)
+
+        # Search with applyToSubqueries=None (default)
+        params_default = RecencyParameters(**base_params)
+        hits_default = self._search_with_recency("product", params_default)
+
+        # Build score maps
+        scores_explicit = {h['_id']: h for h in hits_explicit}
+        scores_default = {h['_id']: h for h in hits_default}
+
+        common_ids = set(scores_explicit.keys()) & set(scores_default.keys())
+        self.assertGreater(len(common_ids), 0, "Should have common docs")
+
+        for doc_id in common_ids:
+            for score_key in ['_recency_score', '_tensor_score', '_lexical_score', '_score']:
+                explicit_val = scores_explicit[doc_id].get(score_key)
+                default_val = scores_default[doc_id].get(score_key)
+
+                if explicit_val is not None and default_val is not None:
+                    self.assertAlmostEqual(
+                        explicit_val, default_val, places=3,
+                        msg=f"Doc {doc_id}: {score_key} should be identical. "
+                            f"Explicit: {explicit_val:.6f}, Default: {default_val:.6f}"
+                    )
+
+    def test_apply_to_subqueries_rejects_non_rrf_ranking(self):
+        """Test that applyToSubqueries requires RRF ranking method (validated in api_models.py)."""
+        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+
+        from marqo.core.models.hybrid_parameters import RetrievalMethod as RM
+
+        # Non-RRF ranking methods should fail
+        non_rrf_cases = [
+            (RM.Tensor, RankingMethod.Tensor, ["tensor"]),
+            (RM.Lexical, RankingMethod.Lexical, ["lexical"]),
+        ]
+
+        for retrieval_method, ranking_method, apply_to_subqueries in non_rrf_cases:
+            with self.subTest(rankingMethod=ranking_method.value, applyToSubqueries=apply_to_subqueries):
+                with self.assertRaises(ValueError) as ctx:
+                    BulkSearchQueryEntity(
+                        index=self.main_index.name,
+                        q="product",
+                        searchMethod="HYBRID",
+                        hybridParameters=HybridParameters(
+                            retrievalMethod=retrieval_method,
+                            rankingMethod=ranking_method,
+                        ),
+                        recencyParameters={
+                            "recencyField": "timestamp",
+                            "scale": "7d",
+                            "decayFunction": "exponential",
+                            "decayTo": 0.5,
+                            "applyToSubqueries": apply_to_subqueries,
+                        }
+                    )
+
+                self.assertIn(
+                    "RRF",
+                    str(ctx.exception),
+                    "Error should mention RRF requirement"
+                )
+
+        # RRF ranking with applyToSubqueries should NOT raise
+        from marqo.tensor_search.models.api_models import SearchQuery
+        with self.subTest(rankingMethod="rrf", applyToSubqueries=["tensor"]):
+            query = SearchQuery(
+                q="product",
+                searchMethod="HYBRID",
+                hybridParameters=HybridParameters(
+                    rankingMethod=RankingMethod.RRF
+                ),
+                recencyParameters=RecencyParameters(
+                    recency_field="timestamp",
+                    scale="7d",
+                    decay_function="exponential",
+                    decay_to=0.5,
+                    apply_to_subqueries=["tensor"],
+                )
+            )
+            self.assertIsNotNone(query)
 
 
 if __name__ == '__main__':

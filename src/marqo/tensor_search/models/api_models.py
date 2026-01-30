@@ -218,18 +218,33 @@ class SearchQuery(BaseMarqoModel):
 
     @root_validator(pre=False)
     def validate_apply_to_subqueries_only_for_hybrid_search(cls, values):
-        """Validate that applyToSubqueries in recencyParameters is only used with hybrid search.
+        """Validate that applyToSubqueries in recencyParameters is only used with hybrid search
+        and RRF ranking.
 
         Note: This is a more specific check - the general recencyParameters check above ensures
         recency is only for hybrid. This extra validation ensures applyToSubqueries specifically
         doesn't accidentally get used in non-hybrid contexts if we ever relax recency constraints.
+
+        applyToSubqueries only makes sense with RRF ranking, where tensor and lexical scores are
+        separate subqueries. With Tensor or Lexical ranking, there is only one subquery.
         """
         recency_parameters = values.get('recencyParameters')
         search_method = values.get('searchMethod')
+        hybrid_parameters = values.get('hybridParameters')
         if recency_parameters is not None and recency_parameters.apply_to_subqueries is not None:
             if search_method.upper() != SearchMethod.HYBRID:
                 raise ValueError(f"applyToSubqueries can only be used with 'HYBRID' search. "
                                  f"Search method is {search_method}.")
+            # Check that ranking method is RRF (or None, which defaults to RRF)
+            if hybrid_parameters is not None and hybrid_parameters.rankingMethod is not None:
+                from marqo.core.models.hybrid_parameters import RankingMethod
+                if hybrid_parameters.rankingMethod != RankingMethod.RRF:
+                    raise ValueError(
+                        f"applyToSubqueries can only be used with 'RRF' ranking method. "
+                        f"Ranking method is '{hybrid_parameters.rankingMethod}'. "
+                        f"applyToSubqueries controls which subqueries (tensor/lexical) get recency applied, "
+                        f"which only applies to RRF ranking where both subqueries are used independently."
+                    )
         return values
 
     @root_validator(pre=False)
