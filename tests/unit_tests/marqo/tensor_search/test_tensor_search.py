@@ -561,6 +561,61 @@ class TestTensorSearchValidation(MarqoTestCase):
 
 
 
+class TestGetPreprocessingConfig(MarqoTestCase):
+    """Test _get_preprocessing_config for search path."""
+
+    @patch('marqo.tensor_search.tensor_search.read_env_vars_and_defaults_ints', return_value=7500)
+    def test_image_preprocessing_config_uses_env_var_for_download_timeout(self, mock_read_env):
+        """Test that _get_preprocessing_config reads download_timeout_ms from the env var."""
+        from marqo.core.inference.api import Modality, ImagePreprocessingConfig
+
+        config = tensor_search._get_preprocessing_config(
+            Modality.IMAGE, media_download_headers={'Authorization': 'Bearer token'}
+        )
+
+        self.assertIsInstance(config, ImagePreprocessingConfig)
+        self.assertEqual(config.download_timeout_ms, 7500)
+        self.assertEqual(config.download_header, {'Authorization': 'Bearer token'})
+        self.assertEqual(config.download_thread_count, 1)
+
+    @patch('marqo.tensor_search.tensor_search.read_env_vars_and_defaults_ints', return_value=3000)
+    def test_image_preprocessing_config_default_timeout(self, mock_read_env):
+        """Test that _get_preprocessing_config works with the default timeout value."""
+        from marqo.core.inference.api import Modality, ImagePreprocessingConfig
+
+        config = tensor_search._get_preprocessing_config(Modality.IMAGE, media_download_headers=None)
+
+        self.assertIsInstance(config, ImagePreprocessingConfig)
+        self.assertEqual(config.download_timeout_ms, 3000)
+        self.assertIsNone(config.download_header)
+
+    def test_text_preprocessing_config(self):
+        """Test that TEXT modality returns TextPreprocessingConfig."""
+        from marqo.core.inference.api import Modality, TextPreprocessingConfig
+
+        config = tensor_search._get_preprocessing_config(Modality.TEXT, media_download_headers=None)
+        self.assertIsInstance(config, TextPreprocessingConfig)
+
+    @patch('marqo.tensor_search.tensor_search.read_env_vars_and_defaults_ints', return_value=500000000)
+    def test_audio_preprocessing_config(self, mock_read_env):
+        """Test that AUDIO modality returns AudioPreprocessingConfig without download_timeout_ms."""
+        from marqo.core.inference.api import Modality, AudioPreprocessingConfig
+
+        config = tensor_search._get_preprocessing_config(Modality.AUDIO, media_download_headers={'a': 'b'})
+        self.assertIsInstance(config, AudioPreprocessingConfig)
+        self.assertEqual(config.download_header, {'a': 'b'})
+        self.assertFalse(hasattr(config, 'download_timeout_ms') and config.download_timeout_ms is not None
+                         and isinstance(config, ImagePreprocessingConfig))
+
+    @patch('marqo.tensor_search.tensor_search.read_env_vars_and_defaults_ints', return_value=500000000)
+    def test_video_preprocessing_config(self, mock_read_env):
+        """Test that VIDEO modality returns VideoPreprocessingConfig without download_timeout_ms."""
+        from marqo.core.inference.api import Modality, VideoPreprocessingConfig
+
+        config = tensor_search._get_preprocessing_config(Modality.VIDEO, media_download_headers=None)
+        self.assertIsInstance(config, VideoPreprocessingConfig)
+
+
 class TestGetQueryVectorFromJobs(unittest.TestCase):
 
     def test_get_query_vector_from_jobs_fails_if_no_vector_is_collected(self):

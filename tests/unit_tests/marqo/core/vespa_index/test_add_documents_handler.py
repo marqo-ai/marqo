@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
@@ -302,7 +302,8 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertFalse(for_subfield.should_chunk)
         self.assertIsNone(for_subfield.chunk_config)
 
-    def test_preprocessing_config_for_image_modality_without_patch_method(self):
+    @patch('marqo.core.vespa_index.add_documents_handler.read_env_vars_and_defaults_ints', return_value=4500)
+    def test_preprocessing_config_for_image_modality_without_patch_method(self, mock_read_env):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
@@ -320,14 +321,17 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertIsNone(for_top_level_field.patch_method)
         self.assertEqual(for_top_level_field.download_header, {'a': 'b'})
         self.assertEqual(for_top_level_field.download_thread_count, 3)
+        self.assertEqual(for_top_level_field.download_timeout_ms, 4500)
 
         for_subfield = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=False)
         self.assertFalse(for_subfield.should_chunk)
         self.assertIsNone(for_subfield.patch_method)
         self.assertEqual(for_subfield.download_header, {'a': 'b'})
         self.assertEqual(for_subfield.download_thread_count, 3)
+        self.assertEqual(for_subfield.download_timeout_ms, 4500)
 
-    def test_preprocessing_config_for_image_modality_with_patch_method(self):
+    @patch('marqo.core.vespa_index.add_documents_handler.read_env_vars_and_defaults_ints', return_value=4500)
+    def test_preprocessing_config_for_image_modality_with_patch_method(self, mock_read_env):
         handler = DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             inference=self.inference,
@@ -347,12 +351,14 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual(for_top_level_field.patch_method, 'simple')
         self.assertIsNone(for_top_level_field.download_header)
         self.assertEqual(for_top_level_field.download_thread_count, 5)
+        self.assertEqual(for_top_level_field.download_timeout_ms, 4500)
 
         for_subfield = handler._get_preprocessing_config(Modality.IMAGE, for_top_level_field=False)
         self.assertFalse(for_subfield.should_chunk)
         self.assertIsNone(for_subfield.patch_method)
         self.assertIsNone(for_subfield.download_header)
         self.assertEqual(for_subfield.download_thread_count, 5)
+        self.assertEqual(for_subfield.download_timeout_ms, 4500)
 
     def test_preprocessing_config_for_audio_modality(self):
         handler = DummyAddDocumentsHandler(

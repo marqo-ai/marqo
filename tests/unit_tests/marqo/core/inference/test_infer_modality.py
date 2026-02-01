@@ -6,7 +6,7 @@ from io import BytesIO
 import requests
 from PIL import Image
 
-from marqo.core.inference.api import Modality
+from marqo.core.inference.api import Modality, MediaDownloadError
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
     get_url_file_extension, is_base64_image
@@ -23,6 +23,29 @@ class TestMultimodalUtils(unittest.TestCase):
 
         with fetch_content_sample(url) as sample:
             self.assertEqual(sample.read(), b'sample content')
+
+        mock_get.assert_called_once_with(url, stream=True, headers=None, timeout=3.0)
+
+    @patch('requests.get')
+    def test_fetch_content_sample_custom_timeout(self, mock_get):
+        url = "https://example.com/sample.txt"
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b'sample content']
+        mock_get.return_value = mock_response
+
+        with fetch_content_sample(url, timeout_ms=5000) as sample:
+            self.assertEqual(sample.read(), b'sample content')
+
+        mock_get.assert_called_once_with(url, stream=True, headers=None, timeout=5.0)
+
+    @patch('requests.get')
+    def test_fetch_content_sample_timeout_error(self, mock_get):
+        url = "https://example.com/timeout.txt"
+        mock_get.side_effect = requests.exceptions.Timeout("Connection timed out")
+
+        with self.assertRaises(requests.exceptions.Timeout):
+            with fetch_content_sample(url):
+                pass
 
     @patch('requests.get')
     def test_fetch_content_sample_large_size(self, mock_get):
@@ -119,6 +142,49 @@ class TestMultimodalUtils(unittest.TestCase):
             with self.subTest(msg=message, url=url):
                 inferred_modality = _infer_modality_based_on_extension(get_url_file_extension(url))
                 self.assertEqual(expected_modality, inferred_modality)
+
+    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=5000)
+    @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
+    @patch('marqo.core.inference.modality_utils.fetch_content_sample')
+    def test_infer_modality_passes_timeout_from_env_var(self, mock_fetch, mock_validate, mock_read_env):
+        """Test that infer_modality reads the timeout env var and passes it to fetch_content_sample."""
+        mock_sample = MagicMock()
+        mock_fetch.return_value.__enter__.return_value = mock_sample
+
+        with patch('magic.from_buffer', return_value='image/jpeg'):
+            infer_modality("https://example.com/image")
+
+        mock_fetch.assert_called_once()
+        _, kwargs = mock_fetch.call_args
+        self.assertEqual(kwargs['timeout_ms'], 5000)
+
+    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=3000)
+    @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
+    @patch('marqo.core.inference.modality_utils.encode_url', side_effect=lambda x: x)
+    @patch('marqo.core.inference.modality_utils.get_url_file_extension', return_value=None)
+    @patch('requests.get')
+    def test_infer_modality_timeout_raises_media_download_error(
+        self, mock_get, mock_ext, mock_encode, mock_validate, mock_read_env
+    ):
+        """Test that a timeout during modality inference raises MediaDownloadError."""
+        mock_get.side_effect = requests.exceptions.Timeout("Connection timed out")
+
+        with self.assertRaises(MediaDownloadError):
+            infer_modality("https://example.com/unknown")
+
+    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=3000)
+    @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
+    @patch('marqo.core.inference.modality_utils.encode_url', side_effect=lambda x: x)
+    @patch('marqo.core.inference.modality_utils.get_url_file_extension', return_value=None)
+    @patch('requests.get')
+    def test_infer_modality_connection_error_raises_media_download_error(
+        self, mock_get, mock_ext, mock_encode, mock_validate, mock_read_env
+    ):
+        """Test that a connection error during modality inference raises MediaDownloadError."""
+        mock_get.side_effect = requests.exceptions.ConnectionError("Connection refused")
+
+        with self.assertRaises(MediaDownloadError):
+            infer_modality("https://example.com/unknown")
 
     def test_infer_modality_no_extension_found(self):
         """A test to ensure if the extension is not found, we go to the mime type"""

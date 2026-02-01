@@ -88,6 +88,10 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 5,
         EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 20,
 
+        # Media download timeouts
+        EnvVars.MARQO_INFER_MODALITY_TIMEOUT_MS: 3000,    # 3s for modality inference URL fetch
+        EnvVars.MARQO_IMAGE_DOWNLOAD_TIMEOUT_MS: 3000,     # 3s for image download via pycurl
+
         ##########################################
         # Inference Server config (In Inference)
         EnvVars.MARQO_MODELS_TO_PRELOAD: [],
