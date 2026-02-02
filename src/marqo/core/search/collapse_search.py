@@ -254,6 +254,9 @@ class CollapseSearch:
                     merged_hit[key] = value
                 else:
                     merged_hit[key] = sorted_hit.get(key, value)
+            # Include fields in sorted_hit that are not in relevance_hit
+            for key in sorted_hit.keys() - relevance_hit.keys():
+                merged_hit[key] = sorted_hit[key]
             merged_hit["_highlights"] = [{}]
             merged_hit["_originalId"] = relevance_hit.get("_id")
             return merged_hit

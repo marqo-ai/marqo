@@ -473,6 +473,24 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
         result = cs.merge_two_collapse_results(relevance, sorted_res, [])
         self.assertNotIn("_originalId", result["hits"][0])
 
+    def test_merge_includes_fields_unique_to_sorted_variant(self):
+        """Fields present in the sorted variant but not in the relevance variant are included."""
+        cs = _make_collapse_search()
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": "g1", "price": 10, "brand": "Acme", "sku": "X123"},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        merged_hit = result["hits"][0]
+
+        self.assertEqual("h3", merged_hit["_id"])
+        self.assertEqual("Acme", merged_hit["brand"])
+        self.assertEqual("X123", merged_hit["sku"])
+
     def test_merge_sorted_hit_missing_field_falls_back_to_relevance(self):
         """18. When sorted hit lacks a field, falls back to relevance hit value via .get(key, value)."""
         cs = _make_collapse_search()
