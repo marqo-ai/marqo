@@ -379,10 +379,16 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
         ]}
 
         result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
-        merged_hit = result["hits"][0]
 
-        self.assertEqual("same1", merged_hit["_id"])
-        self.assertEqual("same1", merged_hit["_originalId"])
+        expected = {
+            "_id": "same1",
+            "category": "g1",
+            "price": 10,
+            "_score": 0.9,
+            "_highlights": [{}],
+            "_originalId": "same1",
+        }
+        self.assertEqual(expected, result["hits"][0])
 
     def test_merge_keeps_original_hit_when_not_in_sorted(self):
         """Hits not in sorted results are kept unchanged, without _originalId."""
@@ -398,15 +404,22 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
 
         result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
 
-        with self.subTest("matched hit replaced"):
-            self.assertEqual("h3", result["hits"][0]["_id"])
-
-        with self.subTest("unmatched hit kept unchanged"):
-            self.assertEqual("h2", result["hits"][1]["_id"])
-            self.assertEqual(200, result["hits"][1]["price"])
-
-        with self.subTest("unmatched hit has no _originalId"):
-            self.assertNotIn("_originalId", result["hits"][1])
+        expected_merged = {
+            "_id": "h3",
+            "category": "g1",
+            "price": 10,
+            "_score": 0.9,
+            "_highlights": [{}],
+            "_originalId": "h1",
+        }
+        expected_unmatched = {
+            "_id": "h2",
+            "category": "g2",
+            "price": 200,
+            "_score": 0.8,
+        }
+        self.assertEqual(expected_merged, result["hits"][0])
+        self.assertEqual(expected_unmatched, result["hits"][1])
 
     def test_merge_edge_cases(self):
         """Edge cases: empty sorted results, None collapse field, non-hit keys preserved."""
@@ -420,7 +433,11 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             sorted_res = {"hits": []}
 
             result = cs.merge_two_collapse_results(relevance, sorted_res, [])
-            self.assertEqual(["h1", "h2"], [h["_id"] for h in result["hits"]])
+            expected = {"hits": [
+                {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+                {"_id": "h2", "category": "g2", "price": 200, "_score": 0.8},
+            ]}
+            self.assertEqual(expected, result)
 
         with self.subTest("sorted hit with None collapse field is skipped"):
             relevance = {"hits": [
@@ -431,7 +448,10 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             ]}
 
             result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
-            self.assertEqual("h1", result["hits"][0]["_id"])
+            expected = {"hits": [
+                {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+            ]}
+            self.assertEqual(expected, result)
 
         with self.subTest("non-hit keys (totalHits, processingTimeMs) preserved"):
             relevance = {
@@ -442,8 +462,19 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             sorted_res = {"hits": [{"_id": "h3", "category": "g1", "price": 10}]}
 
             result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
-            self.assertEqual(42, result["totalHits"])
-            self.assertEqual(15, result["processingTimeMs"])
+            expected = {
+                "hits": [{
+                    "_id": "h3",
+                    "category": "g1",
+                    "price": 10,
+                    "_score": 0.9,
+                    "_highlights": [{}],
+                    "_originalId": "h1",
+                }],
+                "totalHits": 42,
+                "processingTimeMs": 15,
+            }
+            self.assertEqual(expected, result)
 
 
 class TestCollapseSortByOrder(unittest.TestCase):
