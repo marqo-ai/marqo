@@ -478,18 +478,35 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
         cs = _make_collapse_search()
 
         relevance = {"hits": [
-            {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
+            {
+                "_id": "h1", "category": "g1", "price": 100, "_score": 0.9, "_pixel_data": "abc",
+                "_highlights": [{"title": "match"}], "_recency_score": 0.5, "_lexical_score": 0.7, "_tensor_score": 0.3,
+            },
         ]}
         sorted_res = {"hits": [
-            {"_id": "h3", "category": "g1", "price": 10, "brand": "Acme", "sku": "X123"},
+            {
+                "_id": "h3", "category": "g1", "price": 10, "brand": "Acme", "sku": "X123", "_pixel_data": "def",
+            },
         ]}
 
         result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
-        merged_hit = result["hits"][0]
 
-        self.assertEqual("h3", merged_hit["_id"])
-        self.assertEqual("Acme", merged_hit["brand"])
-        self.assertEqual("X123", merged_hit["sku"])
+        expected = {
+            "_highlights": [{}],
+            "_recency_score": 0.5,
+            "_lexical_score": 0.7,
+            "_id": "h3",
+            "category": "g1",
+            "price": 10,
+            "brand": "Acme",
+            "sku": "X123",
+            "_originalId": "h1",
+            "_score": 0.9,
+            "_pixel_data": "abc",
+            "_tensor_score": 0.3,
+        }
+
+        self.assertEqual(expected, result["hits"][0])
 
     def test_merge_sorted_hit_missing_field_falls_back_to_relevance(self):
         """18. When sorted hit lacks a field, falls back to relevance hit value via .get(key, value)."""
