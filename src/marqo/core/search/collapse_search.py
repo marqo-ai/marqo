@@ -236,6 +236,14 @@ class CollapseSearch:
         Merge two collapse results by keeping the structure from relevance_collapse_results
         but replacing hits with lower-priced variants from sorted_collapse_results.
 
+        For metadata fields (starting with '_'), we preserve those from relevance results except for '_highlights' and '_id',
+        For '_highlights', we set it to an empty list as we do not have highlights for the sorted variants.
+        For '_id', we use the sorted variant's ID.
+        For fields exist in both hits, we take the value from sorted results.
+        For fields exist in sorted results but not in relevance results, we also include them.
+        For fields exist in relevance results but not in sorted results, we remove them.
+        And extra meta field '_originalId' is added to keep track of the original relevance hit ID.
+
         Args:
             relevance_collapse_results: Results from relevance-based collapse search
             sorted_collapse_results: Results from sort-based collapse search (e.g., lowest price)
@@ -252,8 +260,8 @@ class CollapseSearch:
                 # This should include fields like _score, _tensor_score, _lexical_score, _recency_score, _pixel_score, etc.
                 if key.startswith("_") and key not in ["_id", "_highlights"]:
                     merged_hit[key] = value
-                else:
-                    merged_hit[key] = sorted_hit.get(key, value)
+                elif key in sorted_hit:
+                    merged_hit[key] = sorted_hit[key]
             # Include fields in sorted_hit that are not in relevance_hit
             for key in sorted_hit.keys() - relevance_hit.keys():
                 merged_hit[key] = sorted_hit[key]
