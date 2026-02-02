@@ -4,9 +4,12 @@ from pydantic.v1 import Field, PrivateAttr, root_validator, validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.sort_by_model import SortOrder
+from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 
 
 class CollapseSortByField(StrictBaseModel):
+    class Config(StrictBaseModel.Config):
+        use_enum_values = True
     """
     The model defining the sort by field within the collapse group. No missing policy is needed as this
     sort is for selecting the representative document within each collapse group.
@@ -18,8 +21,17 @@ class CollapseSortByField(StrictBaseModel):
     field_name: str = Field(..., alias="fieldName", description="The name of the field to sort by.")
     order: SortOrder = SortOrder.Desc
 
+    @validator('field_name')
+    def _validate_field_name(cls, v):
+        """Validate the field name is in a valid format."""
+        try:
+            validate_field_name(v)
+        except Exception as e:
+            raise ValueError(e)
+        return v
 
 class CollapseSortBy(StrictBaseModel):
+
     """
     The model defining the sort-by configuration within a collapse group. This controls how the
     representative document is selected from each collapse group.
@@ -63,7 +75,7 @@ class CollapseSortBy(StrictBaseModel):
         description=
         "Whether to always fetch all variants within each collapse group. "
         "By default(False), only fetch the sort_by variants if the returned document has "
-        "the target collapse sort_by field, and the value of the field is numrical. "
+        "the target collapse sort_by field, and the value of the field is numerical. "
     )
 
     _execute: bool = PrivateAttr(False)
@@ -74,7 +86,7 @@ class CollapseSortBy(StrictBaseModel):
     def generate_vespa_sort_by_query_input(self):
         return_body = {}
         for field in self.fields:
-            return_body[field.field_name] = 1 if field.order == "desc" else -1
+            return_body[field.field_name] = 1 if field.order == SortOrder.Desc else -1
         return return_body
 
     def should_execute_sort(self) -> bool:

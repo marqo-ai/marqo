@@ -834,6 +834,8 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             (RetrievalMethod.Disjunction, RankingMethod.RRF),
             (RetrievalMethod.Lexical, RankingMethod.Lexical),
             (RetrievalMethod.Tensor, RankingMethod.Tensor),
+            (RetrievalMethod.Lexical, RankingMethod.Tensor),
+            (RetrievalMethod.Tensor, RankingMethod.Lexical),
         ]
 
         for retrieval_method, ranking_method in test_cases:
@@ -1194,11 +1196,12 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
-            text="shoe",
+            text="shoe alpha",
             search_method="HYBRID",
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF,
+                alpha=0,
             ),
             collapse=CollapseModel(
                 name="category",
@@ -1221,46 +1224,26 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         """Scenario 7: When the main query sortBy field is in disableIfMainSortByFields,
         collapse sortBy is pruned (set to None), so collapse.sortBy is not used.
         This requires going through the SearchQuery validator."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
-        # Construct SearchQuery which triggers the remove_collapse_sort_by_if_main_query_has_sort_by validator
-        search_query = SearchQuery(
-            q="shoe",
-            searchMethod="HYBRID",
-            hybridParameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF,
-            ),
-            collapseFields=[CollapseModel(
-                name="category",
-                sort_by=CollapseSortBy(
-                    fields=[CollapseSortByField(fieldName="price", order="asc")],
-                    disableIfMainSortByFields={"price"},
-                ),
-            )],
-            sortBy=SortByModel(
-                fields=[SortByField(fieldName="price", order="desc")]
-            ),
-            limit=10
-        )
-
-        # The validator should have pruned collapse.sortBy because "price" is in disableIfMainSortByFields
-        self.assertIsNone(search_query.collapse_fields[0].sort_by)
 
         # Now actually execute the search with the pruned collapse model
         self._add_shoe_documents()
-
-        collapse = search_query.collapse_fields[0]
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
-            text="shoe",
+            text="shoe alpha",
             search_method="HYBRID",
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF,
+                alpha=0
             ),
-            collapse=collapse,
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(
+                    fields=[CollapseSortByField(field_name="price", order="asc")],
+                    disable_if_main_sort_by_fields={"price"},  # main sortBy is on "price", so this triggers pruning
+                )
+            ),
             sort_by=SortByModel(
                 fields=[SortByField(fieldName="price", order="desc")],
                 minSortCandidates=10
@@ -1269,8 +1252,11 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         )
 
         # Main sortBy orders by price desc. Collapse sortBy was pruned so representatives are relevance-based.
-        # shoes_b has higher max price (220) than shoes_a (200), so shoes_b first.
-        self.assertEqual(["shoes_b", "shoes_a"], [hit["category"] for hit in res["hits"]])
+        # shoes_b1 has higher max price (180) than shoes_a (120), so shoes_b1 first.
+        self.assertEqual(["shoe_b1", "shoe_a1"], [hit["_id"] for hit in res["hits"]])
+        for hit in res["hits"]:
+            # Since collapse.sortBy was pruned, representatives are relevance-based, so no _originalId set
+            self.assertNotIn("_originalId", hit)
 
     def test_collapse_sort_by_kept_when_main_sort_by_not_in_disable_list(self):
         """Scenario 7b: When the main query sortBy field is NOT in disableIfMainSortByFields,
@@ -1428,3 +1414,49 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         # All groups should be unique
         categories = [hit["category"] for hit in res["hits"]]
         self.assertEqual(len(categories), len(set(categories)))
+
+    def test_collapse_search_sort_by_with_facets(self):
+        self._add_shoe_documents()
+
+        collapse_search_results_without_sort_by = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+            ),
+            facets=FacetsParameters(
+                fields={"price": FieldFacetsConfiguration(type="number")}
+            ),
+            result_count=10
+        )
+
+        collapse_search_results_with_sort_by = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="shoe",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            facets=FacetsParameters(
+                fields={"price": FieldFacetsConfiguration(type="number")}
+            ),
+            result_count=10
+        )
+
+        # Facets should be identical regardless of collapse sort_by usage
+        self.assertEqual(
+            collapse_search_results_without_sort_by["facets"],
+            collapse_search_results_with_sort_by["facets"]
+        )

@@ -210,7 +210,7 @@ class TestCollectDocumentIds(unittest.TestCase):
             {"_id": "h1", "category": "g1", "price": 100},
             {"_id": "h2", "category": "g2", "price": 50.5},
         ]}
-        self.assertEqual(["g1", "g2"], cs.collect_document_ids(results))
+        self.assertEqual(["g1", "g2"], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_excludes_non_numeric_values(self):
         """5. Hits with string sort field values are excluded."""
@@ -219,7 +219,7 @@ class TestCollectDocumentIds(unittest.TestCase):
             {"_id": "h1", "category": "g1", "price": "expensive"},
             {"_id": "h2", "category": "g2", "price": "cheap"},
         ]}
-        self.assertEqual([], cs.collect_document_ids(results))
+        self.assertEqual([], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_excludes_missing_field(self):
         """6. Hits missing the sort field are excluded."""
@@ -227,7 +227,7 @@ class TestCollectDocumentIds(unittest.TestCase):
         results = {"hits": [
             {"_id": "h1", "category": "g1"},
         ]}
-        self.assertEqual([], cs.collect_document_ids(results))
+        self.assertEqual([], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_mixed_numeric_and_non_numeric(self):
         """7. Only numeric-field hits are collected from a mixed set."""
@@ -238,7 +238,7 @@ class TestCollectDocumentIds(unittest.TestCase):
             {"_id": "h3", "category": "g3"},
             {"_id": "h4", "category": "g4", "price": 0},
         ]}
-        self.assertEqual(["g1", "g4"], cs.collect_document_ids(results))
+        self.assertEqual(["g1", "g4"], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_always_fetch_variants_includes_all(self):
         """8. With always_fetch_variants=True, all hits are collected regardless of field type."""
@@ -248,13 +248,13 @@ class TestCollectDocumentIds(unittest.TestCase):
             {"_id": "h2", "category": "g2", "price": "expensive"},
             {"_id": "h3", "category": "g3"},
         ]}
-        self.assertEqual(["g1", "g2", "g3"], cs.collect_document_ids(results))
+        self.assertEqual(["g1", "g2", "g3"], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_empty_hits(self):
         """9. Returns empty list when search results have no hits."""
         cs = _make_collapse_search()
-        self.assertEqual([], cs.collect_document_ids({"hits": []}))
-        self.assertEqual([], cs.collect_document_ids({}))
+        self.assertEqual([], cs.collect_parent_ids({"hits": []}))
+        self.assertEqual([], cs.collect_parent_ids({}))
 
 
 class TestGenerateCollapseSortByQuery(unittest.TestCase):
@@ -513,7 +513,7 @@ class TestCollectDocumentIdsAdditional(unittest.TestCase):
             {"_id": "h2", "category": "g2", "price": False},
         ]}
         # bool IS subclass of int in Python, so these are collected
-        self.assertEqual(["g1", "g2"], cs.collect_document_ids(results))
+        self.assertEqual(["g1", "g2"], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_excludes_none_value(self):
         """22. None sort field value is excluded."""
@@ -521,7 +521,7 @@ class TestCollectDocumentIdsAdditional(unittest.TestCase):
         results = {"hits": [
             {"_id": "h1", "category": "g1", "price": None},
         ]}
-        self.assertEqual([], cs.collect_document_ids(results))
+        self.assertEqual([], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_negative_numbers(self):
         """23. Negative numbers are collected as valid numeric values."""
@@ -530,7 +530,7 @@ class TestCollectDocumentIdsAdditional(unittest.TestCase):
             {"_id": "h1", "category": "g1", "price": -50},
             {"_id": "h2", "category": "g2", "price": -0.5},
         ]}
-        self.assertEqual(["g1", "g2"], cs.collect_document_ids(results))
+        self.assertEqual(["g1", "g2"], cs.collect_parent_ids(results))
 
 
 class TestGenerateCollapseSortByQueryAdditional(unittest.TestCase):

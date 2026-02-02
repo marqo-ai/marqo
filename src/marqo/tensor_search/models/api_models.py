@@ -476,20 +476,6 @@ class SearchQuery(BaseMarqoModel):
                 raise ValueError("Exactly one collapse field must be provided")
         return values
 
-    @root_validator(pre=False)
-    def remove_collapse_sort_by_if_main_query_has_sort_by(cls, values):
-        """Remove collapse.sortBy if main query has sortBy fields that disable collapse sortBy."""
-        collapse_fields = values.get('collapse_fields')
-        sort_by = values.get('sort_by')
-
-        if collapse_fields is not None and sort_by is not None:
-            collapse_field = collapse_fields[0]
-            if (collapse_field.sort_by is not None and
-                collapse_field.sort_by.disable_if_main_sort_by_fields is not None and
-                any(field.field_name in collapse_field.sort_by.disable_if_main_sort_by_fields for field in sort_by.fields)):
-                collapse_field.sort_by = None
-        return values
-
 
 class BulkSearchQueryEntity(SearchQuery):
     index: MarqoIndex

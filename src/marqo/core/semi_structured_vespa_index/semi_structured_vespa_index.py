@@ -141,6 +141,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
             if marqo_query.collapse:
+                if marqo_query.collapse.sort_by and marqo_query.collapse.sort_by.should_execute_sort():
+                    raise InternalError( # pragma: no cover
+                        "Cannot use second phase modifiers with collapse sort by as they both modify the lexical ranking profile. "
+                        "secondPhaseModifiers should set to None when doing collapse sort by search "
+                    )
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity'
             else:
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS

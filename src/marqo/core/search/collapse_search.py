@@ -16,6 +16,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMod
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.core.vespa_index.vespa_index import VespaIndex
 
 
 class HybridSearchInternalParameters(StrictBaseModel):
@@ -59,9 +60,9 @@ class CollapseSearch:
     Implements collapse sort by functionality by performing two hybrid searches:
     1. A relevance-based collapse search to get the top N collapsed groups.
     2. A sort-based collapse search (e.g., lowest price) to get the sorted variants within those groups.
-    Finally, merges the results to by replacing the hits in the relevance results with the sorted variants.
+    Finally, merges the results by replacing the hits in the relevance results with the sorted variants.
 
-    The could path is only executed if 'collapse.sort_by' is provided.
+    The code path is only executed if 'collapse.sort_by' is provided.
     """
     def __init__(
             self,
@@ -160,15 +161,15 @@ class CollapseSearch:
                 telemetry_prefix="search.hybrid.collapse_search.relevance_collapse"
             )
 
-        with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.collect_documents_ids"):
-            collected_document_ids = self.collect_document_ids(relevance_collapse_results)
+        with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.collect_parent_ids"):
+            collected_parent_ids = self.collect_parent_ids(relevance_collapse_results)
 
-        if not collected_document_ids:
+        if not collected_parent_ids:
             return relevance_collapse_results
 
         with (RequestMetricsStore.for_request().time("search.hybrid.collapse_search.generate_collapse_sort_by_query")):
             collapse_sort_query: HybridSearchInternalParameters = \
-            self.generate_collapse_sort_by_query(collected_document_ids)
+            self.generate_collapse_sort_by_query(collected_parent_ids)
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.sorted_collapse"):
             sorted_collapse_results = HybridSearch().execute_search(
@@ -206,17 +207,32 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.merge_results"):
             merged_results = self.merge_two_collapse_results(
-                relevance_collapse_results, sorted_collapse_results, collected_document_ids
+                relevance_collapse_results, sorted_collapse_results, collected_parent_ids
             )
 
         return merged_results
 
-    def collect_document_ids(self, search_results: Dict) -> List[str]:
+    def collect_parent_ids(self, search_results: Dict) -> List[str]:
+        """
+        Collect parent IDs from the collapse field in search results. Only include those where the sort_by field value is a valid number
+        Args:
+            search_results: The search results from which to collect document IDs.
+
+        Returns:
+            A list of document IDs (parent IDs) that meet the criteria.
+        """
+        def value_is_valid_number(value: Any) -> bool:
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
+
         document_ids = []
         for hit in search_results.get("hits", []):
             value = hit.get(self.internal_params.collapse.sort_by.fields[0].field_name)
-            if self.internal_params.collapse.sort_by.always_fetch_variants or isinstance(value, (int, float)):
-                document_ids.append(hit.get(self.internal_params.collapse.name))
+            if self.internal_params.collapse.sort_by.always_fetch_variants or value_is_valid_number(value):
+                parent_id = hit.get(self.internal_params.collapse.name)
+                # Ideally all documents should have the collapse field with a parent id, however, we do a
+                # check here to be safe.
+                if parent_id is not None:
+                    document_ids.append(parent_id)
         return document_ids
 
     def generate_collapse_sort_by_query(self, parent_ids: List[str]) -> HybridSearchInternalParameters:
@@ -263,7 +279,7 @@ class CollapseSearch:
         collapse_sort_by_hybrid_parameters.collapse.sort_by.enable_execute_sort()
         collapse_filter_string = (
                 f'{collapse_sort_by_hybrid_parameters.collapse.name} in ('
-                + ', '.join(f'"{doc_id}"' for doc_id in parent_ids)
+                + ', '.join(f'"{VespaIndex.escape(parent_id)}"' for parent_id in parent_ids)
                 + ')'
         )
         collapse_sort_by_hybrid_parameters.collapse.sort_by.set_collapse_sort_by_filter_string(collapse_filter_string)
@@ -286,6 +302,8 @@ class CollapseSearch:
         def merge_hit(sorted_hit, relevance_hit) -> Dict:
             merged_hit = {}
             for key, value in relevance_hit.items():
+                # Preserve metadata fields (starting with '_') from relevance hit except for _highlights and _id.
+                # This should include fields like _score, _tensor_score, _lexical_score, _recency_score, _pixel_score, etc.
                 if key.startswith("_") and key not in ["_id", "_highlights"]:
                     merged_hit[key] = value
                 else:
@@ -314,8 +332,8 @@ class CollapseSearch:
                 # Keep the original hit (either no sort field or not in sorted results)
                 merged_hits.append(hit)
 
-        # Create merged result preserving the structure from relevance_collapse_results
-        merged_results = relevance_collapse_results.copy()
-        merged_results["hits"] = merged_hits
-
-        return merged_results
+        # Replace hits in relevance results with merged hits. Note that we keep the search request level metadata unchanged.
+        # E.g., totalHits, facets, _sortCandidates, etc.
+        # Note that facet results may no longer be accurate after merging as the facet is based on relevance hits
+        relevance_collapse_results["hits"] = merged_hits
+        return relevance_collapse_results
