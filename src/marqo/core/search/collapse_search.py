@@ -129,35 +129,7 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.relevance_collapse"):
             relevance_collapse_results = HybridSearch().execute_search(
-                config=self.internal_params.config,
-                marqo_index=self.internal_params.marqo_index,
-                query=self.internal_params.query,
-                result_count=self.internal_params.result_count,
-                offset=self.internal_params.offset,
-                rerank_depth=self.internal_params.rerank_depth,
-                ef_search=self.internal_params.ef_search,
-                approximate=self.internal_params.approximate,
-                approximate_threshold=self.internal_params.approximate_threshold,
-                searchable_attributes=self.internal_params.searchable_attributes,
-                filter_string=self.internal_params.filter_string,
-                device=self.internal_params.device,
-                attributes_to_retrieve=self.internal_params.attributes_to_retrieve,
-                boost=self.internal_params.boost,
-                media_download_headers=self.internal_params.media_download_headers,
-                context=self.internal_params.context,
-                score_modifiers=self.internal_params.score_modifiers,
-                model_auth=self.internal_params.model_auth,
-                highlights=self.internal_params.highlights,
-                text_query_prefix=self.internal_params.text_query_prefix,
-                hybrid_parameters=self.internal_params.hybrid_parameters,
-                facets=self.internal_params.facets,
-                track_total_hits=self.internal_params.track_total_hits,
-                language=self.internal_params.language,
-                relevance_cutoff=self.internal_params.relevance_cutoff,
-                sort_by=self.internal_params.sort_by,
-                interpolation_method=self.internal_params.interpolation_method,
-                collapse=self.internal_params.collapse,
-                recency_parameters=self.internal_params.recency_parameters,
+                **self.internal_params.dict(),
                 telemetry_prefix="search.hybrid.collapse_search.relevance_collapse"
             )
 
@@ -173,35 +145,7 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.sorted_collapse"):
             sorted_collapse_results = HybridSearch().execute_search(
-                config=self.internal_params.config,
-                marqo_index=collapse_sort_query.marqo_index,
-                query=collapse_sort_query.query,
-                result_count=collapse_sort_query.result_count,
-                offset=collapse_sort_query.offset,
-                rerank_depth=collapse_sort_query.rerank_depth,
-                ef_search=collapse_sort_query.ef_search,
-                approximate=collapse_sort_query.approximate,
-                approximate_threshold=collapse_sort_query.approximate_threshold,
-                searchable_attributes=collapse_sort_query.searchable_attributes,
-                filter_string=collapse_sort_query.filter_string,
-                device=collapse_sort_query.device,
-                attributes_to_retrieve=collapse_sort_query.attributes_to_retrieve,
-                boost=collapse_sort_query.boost,
-                media_download_headers=collapse_sort_query.media_download_headers,
-                context=collapse_sort_query.context,
-                score_modifiers=collapse_sort_query.score_modifiers,
-                model_auth=collapse_sort_query.model_auth,
-                highlights=collapse_sort_query.highlights,
-                text_query_prefix=collapse_sort_query.text_query_prefix,
-                hybrid_parameters=collapse_sort_query.hybrid_parameters,
-                facets=collapse_sort_query.facets,
-                track_total_hits=collapse_sort_query.track_total_hits,
-                language=collapse_sort_query.language,
-                relevance_cutoff=collapse_sort_query.relevance_cutoff,
-                sort_by=collapse_sort_query.sort_by,
-                interpolation_method=collapse_sort_query.interpolation_method,
-                collapse=collapse_sort_query.collapse,
-                recency_parameters=collapse_sort_query.recency_parameters,
+                **collapse_sort_query.dict(),
                 telemetry_prefix="search.hybrid.collapse_search.sorted_collapse"
             )
 
