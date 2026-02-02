@@ -129,7 +129,8 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.relevance_collapse"):
             relevance_collapse_results = HybridSearch().execute_search(
-                **self.internal_params.dict(),
+                # Using **dict(...) as this is shallow (first layer only, nested models stay as Pydantic objects)
+                **dict(self.internal_params),
                 telemetry_prefix="search.hybrid.collapse_search.relevance_collapse"
             )
 
@@ -145,7 +146,8 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.sorted_collapse"):
             sorted_collapse_results = HybridSearch().execute_search(
-                **collapse_sort_query.dict(),
+                # Using **dict(...) as this is shallow (first layer only, nested models stay as Pydantic objects)
+                **dict(collapse_sort_query),
                 telemetry_prefix="search.hybrid.collapse_search.sorted_collapse"
             )
 
