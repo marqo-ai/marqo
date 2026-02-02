@@ -254,20 +254,15 @@ class CollapseSearch:
         """
 
         def merge_hit(sorted_hit, relevance_hit) -> Dict:
-            merged_hit = {}
+            """Merge two hits according to the rules defined above."""
             for key, value in relevance_hit.items():
-                # Preserve metadata fields (starting with '_') from relevance hit except for _highlights and _id.
-                # This should include fields like _score, _tensor_score, _lexical_score, _recency_score, _pixel_score, etc.
-                if key.startswith("_") and key not in ["_id", "_highlights"]:
-                    merged_hit[key] = value
-                elif key in sorted_hit:
-                    merged_hit[key] = sorted_hit[key]
-            # Include fields in sorted_hit that are not in relevance_hit
-            for key in sorted_hit.keys() - relevance_hit.keys():
-                merged_hit[key] = sorted_hit[key]
-            merged_hit["_highlights"] = [{}]
-            merged_hit["_originalId"] = relevance_hit.get("_id")
-            return merged_hit
+                # Copy over metadata fields from relevance hit to sorted hit, e.g., _score, _tense_score, _recency_score,
+                # _pixel_data, etc.
+                if key.startswith("_") and key not in ("_id", "_highlights"):
+                    sorted_hit[key] = value
+            sorted_hit["_highlights"] = [{}]
+            sorted_hit["_originalId"] = relevance_hit.get("_id")
+            return sorted_hit
 
         collapse_field_name = self.internal_params.collapse.name
 
@@ -277,6 +272,10 @@ class CollapseSearch:
             parent_id = hit.get(collapse_field_name)
             if parent_id is not None:
                 sorted_hits_by_parent[parent_id] = hit
+
+        if len(sorted_hits_by_parent) == 0:
+            # Quick return if no sorted hits found
+            return relevance_collapse_results
 
         # Replace hits in relevance results with sorted variants where available
         merged_hits = []
