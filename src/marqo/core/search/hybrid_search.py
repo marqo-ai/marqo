@@ -34,36 +34,33 @@ from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_doc
 from marqo.vespa.exceptions import VespaStatusError
 
 
-class HybridSearch:
+def should_use_collapse_search(
+        collapse: Optional[CollapseModel] = None,
+        main_query_sort_by: Optional[SortByModel] = None
+) -> bool:
+    """
+    Determine whether to use collapse search based on the collapse parameters, and sort_by parameters.
+    """
+    if not collapse:
+        return False
 
-    def should_use_collapse_search(
-            self,
-            collapse: Optional[CollapseModel] = None,
-            main_query_sort_by: Optional[SortByModel] = None
-    ) -> bool:
-        """
-        Determine whether to use collapse search based on the collapse parameters, and sort_by parameters.
-        """
-        if not collapse:
-            return False
+    if not collapse.sort_by:
+        return False
 
-        if not collapse.sort_by:
-            return False
-
-        if not main_query_sort_by:
-            return True
-
-        if not collapse.sort_by.disable_if_main_sort_by_fields:
-            return True
-
-        main_query_sort_by_fields = {field.field_name for field in main_query_sort_by.fields}
-
-        if not main_query_sort_by_fields.isdisjoint(collapse.sort_by.disable_if_main_sort_by_fields):
-            return False # There is an intersection
+    if not main_query_sort_by:
         return True
 
+    if not collapse.sort_by.disable_if_main_sort_by_fields:
+        return True
+
+    main_query_sort_by_fields = {field.field_name for field in main_query_sort_by.fields}
+
+    if not main_query_sort_by_fields.isdisjoint(collapse.sort_by.disable_if_main_sort_by_fields):
+        return False  # There is an intersection
+    return True
 
 
+class HybridSearch:
     def search(
             self,
             config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
@@ -85,7 +82,7 @@ class HybridSearch:
             collapse: Optional[CollapseModel] = None,
             recency_parameters: Optional[RecencyParameters] = None
     ):
-        if self.should_use_collapse_search(collapse=collapse, main_query_sort_by=sort_by):
+        if should_use_collapse_search(collapse=collapse, main_query_sort_by=sort_by):
             # Deliberately use a late import to avoid circular imports
             from marqo.core.search.collapse_search import CollapseSearch
             return CollapseSearch(

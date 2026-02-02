@@ -302,6 +302,30 @@ class TestGenerateCollapseSortByQuery(unittest.TestCase):
         filter_str = collapse_arg.sort_by.get_collapse_sort_by_filter_string()
         self.assertEqual('category in ("parent_a", "parent_b")', filter_str)
 
+    def test_generate_collapse_sort_by_query_escapes_parent_ids(self):
+        """Parent IDs with special characters (quotes, backslashes) are escaped in the filter string."""
+        cs = _make_collapse_search()
+        test_cases = [
+            (
+                ['id_with_"quote', 'id_with_\\backslash'],
+                'category in ("id_with_\\"quote", "id_with_\\\\backslash")',
+            ),
+            (
+                ['normal_id'],
+                'category in ("normal_id")',
+            ),
+            (
+                ['a"b\\c"d'],
+                'category in ("a\\"b\\\\c\\"d")',
+            ),
+        ]
+        for parent_ids, expected_filter in test_cases:
+            with self.subTest(parent_ids=parent_ids):
+                with _patch_internal_params_validation():
+                    result = cs.generate_collapse_sort_by_query(parent_ids)
+                filter_str = result.collapse.sort_by.get_collapse_sort_by_filter_string()
+                self.assertEqual(expected_filter, filter_str)
+
     def test_generate_collapse_sort_by_query_deep_copies_collapse(self):
         """12. The returned collapse is a deep copy — modifying it doesn't affect the original."""
         cs = _make_collapse_search()
@@ -515,6 +539,17 @@ class TestCollectDocumentIdsAdditional(unittest.TestCase):
         # Booleans are explicitly excluded by the value_is_valid_number check
         self.assertEqual([], cs.collect_parent_ids(results))
 
+    def test_collect_document_ids_boolean_mixed_with_numeric(self):
+        """Boolean values are excluded while numeric values in the same result set are collected."""
+        cs = _make_collapse_search()
+        results = {"hits": [
+            {"_id": "h1", "category": "g1", "price": True},
+            {"_id": "h2", "category": "g2", "price": 42},
+            {"_id": "h3", "category": "g3", "price": False},
+            {"_id": "h4", "category": "g4", "price": 3.14},
+        ]}
+        self.assertEqual(["g2", "g4"], cs.collect_parent_ids(results))
+
     def test_collect_document_ids_excludes_none_value(self):
         """22. None sort field value is excluded."""
         cs = _make_collapse_search()
@@ -531,6 +566,31 @@ class TestCollectDocumentIdsAdditional(unittest.TestCase):
             {"_id": "h2", "category": "g2", "price": -0.5},
         ]}
         self.assertEqual(["g1", "g2"], cs.collect_parent_ids(results))
+
+
+class TestCollapseSortByOrder(unittest.TestCase):
+    """Tests for CollapseSortBy.generate_vespa_sort_by_query_input() with different sort orders."""
+
+    def test_sort_by_desc_generates_positive_weight(self):
+        """Desc order produces weight 1 (higher values preferred)."""
+        sort_by = CollapseSortBy(
+            fields=[CollapseSortByField(fieldName="price", order="desc")]
+        )
+        self.assertEqual({"price": 1}, sort_by.generate_vespa_sort_by_query_input())
+
+    def test_sort_by_asc_generates_negative_weight(self):
+        """Asc order produces weight -1 (lower values preferred)."""
+        sort_by = CollapseSortBy(
+            fields=[CollapseSortByField(fieldName="price", order="asc")]
+        )
+        self.assertEqual({"price": -1}, sort_by.generate_vespa_sort_by_query_input())
+
+    def test_sort_by_default_order_is_desc(self):
+        """Default order is desc when not specified."""
+        sort_by = CollapseSortBy(
+            fields=[CollapseSortByField(fieldName="price")]
+        )
+        self.assertEqual({"price": 1}, sort_by.generate_vespa_sort_by_query_input())
 
 
 class TestGenerateCollapseSortByQueryAdditional(unittest.TestCase):
