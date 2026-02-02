@@ -10,17 +10,29 @@ import requests
 import validators
 
 from marqo.core.inference.api import Modality, MediaDownloadError
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
+
+_INFER_MODALITY_TIMEOUT_MS = read_env_vars_and_defaults_ints(EnvVars.MARQO_INFER_MODALITY_TIMEOUT_MS)
 
 
 @contextmanager
-def fetch_content_sample(url: str, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
+def fetch_content_sample(url: str, media_download_headers: Optional[dict] = None,
+                         sample_size=10240,  # 10 KB
+                         timeout_ms: int = _INFER_MODALITY_TIMEOUT_MS):
     # It's ok to pass None to requests.get() for headers and it won't change the default headers
     """Fetch a sample of the content from the URL.
+
+    Args:
+        url: The URL to fetch.
+        media_download_headers: Optional headers to pass to the request.
+        sample_size: The maximum number of bytes to fetch.
+        timeout_ms: Timeout in milliseconds for the HTTP request.
 
     Raises:
         HTTPError: If the response status code is not 200
     """
-    response = requests.get(url, stream=True, headers=media_download_headers)
+    response = requests.get(url, stream=True, headers=media_download_headers, timeout=timeout_ms / 1000)
     response.raise_for_status()
     buffer = io.BytesIO()
     try:

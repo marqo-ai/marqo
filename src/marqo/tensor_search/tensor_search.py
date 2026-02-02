@@ -832,13 +832,20 @@ def _get_preprocessing_config(modality: Modality, media_download_headers: Option
     if modality == Modality.TEXT:
         return TextPreprocessingConfig()  # the prefix has been added to the query, so we don't need to specify it here
     elif modality == Modality.IMAGE:
-        return ImagePreprocessingConfig(download_header=media_download_headers, download_thread_count=1)
+        return ImagePreprocessingConfig(
+            download_header=media_download_headers, download_thread_count=1,
+            download_timeout_ms=read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_TIMEOUT_MS),
+        )
     elif modality == Modality.AUDIO:
+        # Audio/video downloads are handled by the inference server with their own timeout mechanism
+        # (max_media_size_bytes), so download_timeout_ms is not needed here.
         return AudioPreprocessingConfig(
             download_header=media_download_headers, download_thread_count=1,
             max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
         )
     elif modality == Modality.VIDEO:
+        # Audio/video downloads are handled by the inference server with their own timeout mechanism
+        # (max_media_size_bytes), so download_timeout_ms is not needed here.
         return VideoPreprocessingConfig(
             download_header=media_download_headers, download_thread_count=1,
             max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)

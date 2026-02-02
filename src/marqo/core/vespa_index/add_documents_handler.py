@@ -409,8 +409,11 @@ class AddDocumentsHandler(ABC):
                 download_thread_count=self.add_docs_params.image_download_thread_count,
                 download_header=self.add_docs_params.media_download_headers,
                 patch_method=None if not for_top_level_field or not patch_method else patch_method.value,
+                download_timeout_ms=read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_TIMEOUT_MS),
             )
         elif modality == Modality.AUDIO:
+            # Audio/video downloads are handled by the inference server with their own timeout mechanism
+            # (max_media_size_bytes), so download_timeout_ms is not needed here.
             return AudioPreprocessingConfig(
                 should_chunk=True,
                 download_thread_count=self.add_docs_params.media_download_thread_count,
@@ -422,6 +425,8 @@ class AddDocumentsHandler(ABC):
                 max_media_size_bytes=read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
             )
         elif modality == Modality.VIDEO:
+            # Audio/video downloads are handled by the inference server with their own timeout mechanism
+            # (max_media_size_bytes), so download_timeout_ms is not needed here.
             return VideoPreprocessingConfig(
                 should_chunk=True,
                 download_thread_count=self.add_docs_params.media_download_thread_count,
