@@ -8,7 +8,7 @@ from PIL import Image
 
 from marqo.core.inference.api import Modality, MediaDownloadError
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
-    _infer_modality_based_on_extension, \
+    _infer_modality_based_on_extension, _INFER_MODALITY_TIMEOUT_MS, \
     get_url_file_extension, is_base64_image
 
 
@@ -143,11 +143,11 @@ class TestMultimodalUtils(unittest.TestCase):
                 inferred_modality = _infer_modality_based_on_extension(get_url_file_extension(url))
                 self.assertEqual(expected_modality, inferred_modality)
 
-    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=5000)
+    @patch('marqo.core.inference.modality_utils._INFER_MODALITY_TIMEOUT_MS', 5000)
     @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
     @patch('marqo.core.inference.modality_utils.fetch_content_sample')
-    def test_infer_modality_passes_timeout_from_env_var(self, mock_fetch, mock_validate, mock_read_env):
-        """Test that infer_modality reads the timeout env var and passes it to fetch_content_sample."""
+    def test_infer_modality_passes_timeout_from_env_var(self, mock_fetch, mock_validate):
+        """Test that infer_modality uses the module-level timeout, passed as default to fetch_content_sample."""
         mock_sample = MagicMock()
         mock_fetch.return_value.__enter__.return_value = mock_sample
 
@@ -155,16 +155,16 @@ class TestMultimodalUtils(unittest.TestCase):
             infer_modality("https://example.com/image")
 
         mock_fetch.assert_called_once()
+        # fetch_content_sample is called without explicit timeout_ms, so it uses the default
         _, kwargs = mock_fetch.call_args
-        self.assertEqual(kwargs['timeout_ms'], 5000)
+        self.assertNotIn('timeout_ms', kwargs)
 
-    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=3000)
     @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
     @patch('marqo.core.inference.modality_utils.encode_url', side_effect=lambda x: x)
     @patch('marqo.core.inference.modality_utils.get_url_file_extension', return_value=None)
     @patch('requests.get')
     def test_infer_modality_timeout_raises_media_download_error(
-        self, mock_get, mock_ext, mock_encode, mock_validate, mock_read_env
+        self, mock_get, mock_ext, mock_encode, mock_validate
     ):
         """Test that a timeout during modality inference raises MediaDownloadError."""
         mock_get.side_effect = requests.exceptions.Timeout("Connection timed out")
@@ -172,19 +172,22 @@ class TestMultimodalUtils(unittest.TestCase):
         with self.assertRaises(MediaDownloadError):
             infer_modality("https://example.com/unknown")
 
-    @patch('marqo.core.inference.modality_utils.read_env_vars_and_defaults_ints', return_value=3000)
     @patch('marqo.core.inference.modality_utils.validate_url', return_value=True)
     @patch('marqo.core.inference.modality_utils.encode_url', side_effect=lambda x: x)
     @patch('marqo.core.inference.modality_utils.get_url_file_extension', return_value=None)
     @patch('requests.get')
     def test_infer_modality_connection_error_raises_media_download_error(
-        self, mock_get, mock_ext, mock_encode, mock_validate, mock_read_env
+        self, mock_get, mock_ext, mock_encode, mock_validate
     ):
         """Test that a connection error during modality inference raises MediaDownloadError."""
         mock_get.side_effect = requests.exceptions.ConnectionError("Connection refused")
 
         with self.assertRaises(MediaDownloadError):
             infer_modality("https://example.com/unknown")
+
+    def test_infer_modality_timeout_default_value(self):
+        """Test that the module-level timeout constant has the expected default value."""
+        self.assertEqual(_INFER_MODALITY_TIMEOUT_MS, 3000)
 
     def test_infer_modality_no_extension_found(self):
         """A test to ensure if the extension is not found, we go to the mime type"""

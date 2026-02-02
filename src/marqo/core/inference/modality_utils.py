@@ -9,18 +9,17 @@ import magic
 import requests
 import validators
 
-from marqo.api import configs
 from marqo.core.inference.api import Modality, MediaDownloadError
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
-_DEFAULT_INFER_MODALITY_TIMEOUT_MS = configs.default_env_vars()[EnvVars.MARQO_INFER_MODALITY_TIMEOUT_MS]
+_INFER_MODALITY_TIMEOUT_MS = read_env_vars_and_defaults_ints(EnvVars.MARQO_INFER_MODALITY_TIMEOUT_MS)
 
 
 @contextmanager
 def fetch_content_sample(url: str, media_download_headers: Optional[dict] = None,
                          sample_size=10240,  # 10 KB
-                         timeout_ms: int = _DEFAULT_INFER_MODALITY_TIMEOUT_MS):
+                         timeout_ms: int = _INFER_MODALITY_TIMEOUT_MS):
     # It's ok to pass None to requests.get() for headers and it won't change the default headers
     """Fetch a sample of the content from the URL.
 
@@ -142,8 +141,7 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
 
         # Use context manager to handle content sample
         try:
-            timeout_ms = read_env_vars_and_defaults_ints(EnvVars.MARQO_INFER_MODALITY_TIMEOUT_MS)
-            with fetch_content_sample(encoded_url, media_download_headers, timeout_ms=timeout_ms) as sample:
+            with fetch_content_sample(encoded_url, media_download_headers) as sample:
                 mime = magic.from_buffer(sample.read(), mime=True)
                 modality: Modality = _infer_modality_based_on_mime_type(mime)
                 return modality
