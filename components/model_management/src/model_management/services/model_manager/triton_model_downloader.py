@@ -99,7 +99,7 @@ class TritonModelDownloader:
                 out_paths.append(dest)
                 continue
 
-            fs, path = fsspec.core.url_to_fs(uri, anon=True)
+            fs, path = fsspec.core.url_to_fs(uri)
             dest.parent.mkdir(parents=True, exist_ok=True)
             self._download_with_progress(fs, path, dest)
             out_paths.append(dest)
