@@ -4,6 +4,7 @@ from pydantic.v1 import Field, PrivateAttr, root_validator, validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.sort_by_model import SortOrder
+from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 
 
@@ -26,7 +27,7 @@ class CollapseSortByField(StrictBaseModel):
         """Validate the field name is in a valid format."""
         try:
             validate_field_name(v)
-        except Exception as e:
+        except InvalidFieldNameError as e:
             raise ValueError(e)
         return v
 
