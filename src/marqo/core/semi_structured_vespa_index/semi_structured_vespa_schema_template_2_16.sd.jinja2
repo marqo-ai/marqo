@@ -168,10 +168,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+            {%- if collapse_field %}
 
-            {% if collapse_field -%}
             query(marqo__collapse_sort_weights) tensor<double>(p{})
-            {% endif -%}
+            {%- endif %}
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -482,9 +482,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
-            {% if collapse_field -%}
+            {%- if collapse_field %}
+
             query(marqo__collapse_sort_weights) tensor<double>(p{})
-            {% endif -%}
+            {%- endif %}
         }
     }
 

@@ -1006,7 +1006,7 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
             self.assertIsNotNone(sq.collapse_fields[0].sort_by)
             self.assertEqual(sq.collapse_fields[0].sort_by.fields[0].field_name, "price")
 
-        with self.subTest("collapse.sortBy pruned when main sortBy matches disableIfMainSortByFields"):
+        with self.subTest("collapse.sortBy preserved even when main sortBy matches disableIfMainSortByFields"):
             sq = SearchQuery(
                 q="test",
                 searchMethod=SearchMethod.HYBRID,
@@ -1019,7 +1019,8 @@ class TestSearchQueryCollapseFields(unittest.TestCase):
                 )],
                 sortBy=SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
             )
-            self.assertIsNone(sq.collapse_fields[0].sort_by)
+            # Pruning is no longer done at the API model level
+            self.assertIsNotNone(sq.collapse_fields[0].sort_by)
 
         with self.subTest("collapse.sortBy kept when main sortBy does not match disableIfMainSortByFields"):
             sq = SearchQuery(

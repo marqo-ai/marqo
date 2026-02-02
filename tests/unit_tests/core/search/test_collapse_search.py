@@ -505,15 +505,15 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
 class TestCollectDocumentIdsAdditional(unittest.TestCase):
     """Additional tests for CollapseSearch.collect_document_ids()."""
 
-    def test_collect_document_ids_boolean_values_are_collected(self):
-        """21. In Python, bool is a subclass of int, so True/False pass isinstance(value, (int, float))."""
+    def test_collect_document_ids_boolean_values_are_excluded(self):
+        """21. Boolean values are explicitly excluded even though bool is a subclass of int in Python."""
         cs = _make_collapse_search()
         results = {"hits": [
             {"_id": "h1", "category": "g1", "price": True},
             {"_id": "h2", "category": "g2", "price": False},
         ]}
-        # bool IS subclass of int in Python, so these are collected
-        self.assertEqual(["g1", "g2"], cs.collect_parent_ids(results))
+        # Booleans are explicitly excluded by the value_is_valid_number check
+        self.assertEqual([], cs.collect_parent_ids(results))
 
     def test_collect_document_ids_excludes_none_value(self):
         """22. None sort field value is excluded."""
