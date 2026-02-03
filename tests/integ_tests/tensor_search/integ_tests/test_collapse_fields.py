@@ -1354,25 +1354,90 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
-            text="shoe",
+            text="running shoe alpha",
             search_method="HYBRID",
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="desc")])
+            ),
+            attributes_to_retrieve=["title", "price"], # "price" is included
+            result_count=10
+        )
+
+        self.assertEqual(["shoe_a5", "shoe_b3"], [hit["_id"] for hit in res["hits"]])
+        hit_0 = res["hits"][0]
+        expected_hit_0 = {
+            "_id": "shoe_a5",
+            "title": "Running Shoe Epsilon",
+            "price": 200.0,
+            "_originalId": "shoe_a1",
+            "_highlights": [{}],
+            "_score": hit_0["_score"],  # score is dynamic
+        }
+
+        self.assertEqual(expected_hit_0, hit_0)
+        hit_1 = res["hits"][1]
+        expected_hit_1 = {
+            "_id": "shoe_b3",
+            "title": "Hiking Boot Gamma",
+            "price": 220.0,
+            "_highlights": [{}],
+            "_originalId": "shoe_b1",
+            "_score": hit_1["_score"],  # score is dynamic
+        }
+        self.assertEqual(expected_hit_1, hit_1)
+
+    def test_collapse_sort_by_works_when_sort_field_not_in_attributes_to_retrieve(self):
+        """Collapse sortBy should work even when the sort_by field is not in attributes_to_retrieve.
+
+        The sort_by field (e.g., 'price') is automatically added to attributes_to_retrieve internally
+        so that collect_parent_ids() can access the field value for sorting decisions.
+        """
+        self._add_shoe_documents()
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running shoe alpha",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
             ),
             collapse=CollapseModel(
                 name="category",
                 sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
             ),
-            attributes_to_retrieve=["title", "price"],
+            attributes_to_retrieve=["title"],  # 'price' (sort_by field) is NOT included
             result_count=10
         )
 
-        self.assertEqual(2, len(res["hits"]))
-        for hit in res["hits"]:
-            # Should only contain requested attributes plus meta fields
-            non_meta_keys = {k for k in hit.keys() if not k.startswith("_")}
-            self.assertTrue(non_meta_keys.issubset({"title", "price"}))
+        self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
+        hit_0 = res["hits"][0]
+        expected_hit_0 = {
+            "_id": "shoe_a4",
+            "title": "Running Shoe Delta",
+            "_originalId": "shoe_a1",
+            "_highlights": [{}],
+            "_score": hit_0["_score"],  # score is dynamic
+        }
+
+        self.assertEqual(expected_hit_0, hit_0)
+        hit_1 = res["hits"][1]
+        expected_hit_1 = {
+            "_id": "shoe_b5",
+            "title": "Hiking Boot Epsilon",
+            "_highlights": [{}],
+            "_originalId": "shoe_b1",
+            "_score": hit_1["_score"],  # score is dynamic
+        }
+        self.assertEqual(expected_hit_1, hit_1)
 
     def test_collapse_sort_by_many_groups(self):
         """Scenario 8c: Collapse sortBy with many groups and pagination."""

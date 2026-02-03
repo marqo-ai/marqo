@@ -1312,7 +1312,6 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
                 self.assertNotIn("parent_id", vespa_query["yql"])
                 self.assertNotIn("parent_id", marqo_query.attributes_to_retrieve)
 
-
 class TestSemiStructuredVespaIndexToVespaQueryCollapseSortBy(MarqoTestCase):
     """Tests for the collapse sort_by code path in to_vespa_query.
 

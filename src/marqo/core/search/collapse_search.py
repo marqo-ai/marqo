@@ -17,6 +17,7 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.core.vespa_index.vespa_index import VespaIndex
+from copy import deepcopy
 
 
 class HybridSearchInternalParameters(StrictBaseModel):
@@ -86,6 +87,16 @@ class CollapseSearch:
             collapse: Optional[CollapseModel] = None,
             recency_parameters: Optional[RecencyParameters] = None
     ):
+        self.original_attributes_to_retrieve = deepcopy(attributes_to_retrieve)
+
+        if attributes_to_retrieve is not None:
+            if collapse and collapse.name not in attributes_to_retrieve:
+                attributes_to_retrieve.append(collapse.name)
+            if collapse and collapse.sort_by and collapse.sort_by.fields[0].field_name not in attributes_to_retrieve:
+                attributes_to_retrieve.append(collapse.sort_by.fields[0].field_name)
+
+        self.modified_attributes_to_retrieve = attributes_to_retrieve
+
         self.internal_params = HybridSearchInternalParameters(
             config=config,
             marqo_index=marqo_index,
@@ -99,7 +110,7 @@ class CollapseSearch:
             searchable_attributes=searchable_attributes,
             filter_string=filter_string,
             device=device,
-            attributes_to_retrieve=attributes_to_retrieve,
+            attributes_to_retrieve=self.modified_attributes_to_retrieve,
             boost=boost,
             media_download_headers=media_download_headers,
             context=context,
@@ -198,7 +209,7 @@ class CollapseSearch:
             searchable_attributes=self.internal_params.searchable_attributes,
             filter_string=self.internal_params.filter_string,
             device=self.internal_params.device,
-            attributes_to_retrieve=self.internal_params.attributes_to_retrieve,
+            attributes_to_retrieve=self.modified_attributes_to_retrieve,
             boost=None,
             media_download_headers=None,
             context=None,
@@ -287,6 +298,17 @@ class CollapseSearch:
             else:
                 # Keep the original hit (either no sort field or not in sorted results)
                 merged_hits.append(hit)
+
+            if self.original_attributes_to_retrieve is not None:
+                # Remove collapse field and sort_by field if they were not in the original attributes to retrieve,
+                # Note that `"originalId"` is deliberately kept to help track the original relevance hit ID even if
+                # it is not in the original attributes to retrieve.
+                for field_to_remove in [
+                    collapse_field_name,
+                    self.internal_params.collapse.sort_by.fields[0].field_name]:
+                    if field_to_remove not in self.original_attributes_to_retrieve:
+                        if field_to_remove in merged_hits[-1]:
+                            del merged_hits[-1][field_to_remove]
 
         # Replace hits in relevance results with merged hits. Note that we keep the search request level metadata unchanged.
         # E.g., totalHits, facets, _sortCandidates, etc.

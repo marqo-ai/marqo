@@ -39,6 +39,7 @@ def _make_collapse_search(
         sort_field="price",
         sort_order="asc",
         always_fetch_variants=False,
+        original_attributes_to_retrieve=None,
 ) -> CollapseSearch:
     """Helper to create a CollapseSearch with mocked internal_params, bypassing __init__ validation."""
     cs = CollapseSearch.__new__(CollapseSearch)
@@ -86,6 +87,9 @@ def _make_collapse_search(
     mock_params.recency_parameters = None
 
     cs.internal_params = mock_params
+    # These are set in __init__ for attributes_to_retrieve handling
+    cs.original_attributes_to_retrieve = original_attributes_to_retrieve
+    cs.modified_attributes_to_retrieve = None
     return cs
 
 
@@ -475,6 +479,95 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
                 "processingTimeMs": 15,
             }
             self.assertEqual(expected, result)
+
+
+class TestMergeAttributesToRetrieve(unittest.TestCase):
+    """Tests for merge_two_collapse_results handling of original_attributes_to_retrieve."""
+
+    def test_merge_removes_collapse_and_sort_fields_not_in_original_attributes(self):
+        """When original_attributes_to_retrieve excludes collapse/sort_by fields, they are removed from merged hits."""
+        cs = _make_collapse_search(
+            collapse_field="category",
+            sort_field="price",
+            original_attributes_to_retrieve=["title"],  # excludes 'category' and 'price'
+        )
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "title": "Shoe A", "_score": 0.9},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+
+        # 'category' and 'price' should be removed since not in original_attributes_to_retrieve
+        expected = {
+            "_id": "h3",
+            "title": "Shoe B",
+            "_score": 0.9,
+            "_highlights": [{}],
+            "_originalId": "h1",
+        }
+        self.assertEqual(expected, result["hits"][0])
+
+    def test_merge_keeps_fields_when_in_original_attributes(self):
+        """When original_attributes_to_retrieve includes collapse/sort_by fields, they are kept."""
+        cs = _make_collapse_search(
+            collapse_field="category",
+            sort_field="price",
+            original_attributes_to_retrieve=["title", "price", "category"],
+        )
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "title": "Shoe A", "_score": 0.9},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+
+        # 'category' and 'price' should be kept since in original_attributes_to_retrieve
+        expected = {
+            "_id": "h3",
+            "category": "g1",
+            "price": 10,
+            "title": "Shoe B",
+            "_score": 0.9,
+            "_highlights": [{}],
+            "_originalId": "h1",
+        }
+        self.assertEqual(expected, result["hits"][0])
+
+    def test_merge_does_not_remove_fields_when_original_attributes_is_none(self):
+        """When original_attributes_to_retrieve is None (all fields), nothing is removed."""
+        cs = _make_collapse_search(
+            collapse_field="category",
+            sort_field="price",
+            original_attributes_to_retrieve=None,
+        )
+
+        relevance = {"hits": [
+            {"_id": "h1", "category": "g1", "price": 100, "title": "Shoe A", "_score": 0.9},
+        ]}
+        sorted_res = {"hits": [
+            {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
+        ]}
+
+        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+
+        # All fields should be kept since original_attributes_to_retrieve is None
+        expected = {
+            "_id": "h3",
+            "category": "g1",
+            "price": 10,
+            "title": "Shoe B",
+            "_score": 0.9,
+            "_highlights": [{}],
+            "_originalId": "h1",
+        }
+        self.assertEqual(expected, result["hits"][0])
 
 
 class TestCollapseSortByOrder(unittest.TestCase):
