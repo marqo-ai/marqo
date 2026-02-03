@@ -1,4 +1,3 @@
-from dataclasses import field
 from typing import List, Optional, Union, Iterable, Dict
 
 from marqo.api import exceptions as api_exceptions
