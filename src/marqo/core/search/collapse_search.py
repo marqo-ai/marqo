@@ -87,15 +87,16 @@ class CollapseSearch:
             collapse: Optional[CollapseModel] = None,
             recency_parameters: Optional[RecencyParameters] = None
     ):
-        self.original_attributes_to_retrieve = deepcopy(attributes_to_retrieve)
+        modified_attributes_to_retrieve = deepcopy(attributes_to_retrieve)
 
-        if attributes_to_retrieve is not None:
-            if collapse and collapse.name not in attributes_to_retrieve:
-                attributes_to_retrieve.append(collapse.name)
-            if collapse and collapse.sort_by and collapse.sort_by.fields[0].field_name not in attributes_to_retrieve:
-                attributes_to_retrieve.append(collapse.sort_by.fields[0].field_name)
+        if modified_attributes_to_retrieve is not None:
+            if collapse and collapse.name not in modified_attributes_to_retrieve:
+                modified_attributes_to_retrieve.append(collapse.name)
+            if collapse and collapse.sort_by and collapse.sort_by.fields[0].field_name not in modified_attributes_to_retrieve:
+                modified_attributes_to_retrieve.append(collapse.sort_by.fields[0].field_name)
 
-        self.modified_attributes_to_retrieve = attributes_to_retrieve
+        self.original_attributes_to_retrieve = attributes_to_retrieve
+        self.modified_attributes_to_retrieve = modified_attributes_to_retrieve
 
         self.internal_params = HybridSearchInternalParameters(
             config=config,

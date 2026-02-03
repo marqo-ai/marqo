@@ -1351,6 +1351,8 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         """Scenario 8b: Collapse sortBy respects attributes_to_retrieve."""
         self._add_shoe_documents()
 
+        original_attributes_to_retrieve = ["title", "price"]
+
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
@@ -1365,10 +1367,11 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                 name="category",
                 sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="desc")])
             ),
-            attributes_to_retrieve=["title", "price"], # "price" is included
+            attributes_to_retrieve=original_attributes_to_retrieve, # "price" is included
             result_count=10
         )
 
+        self.assertEqual(["title", "price"], original_attributes_to_retrieve)
         self.assertEqual(["shoe_a5", "shoe_b3"], [hit["_id"] for hit in res["hits"]])
         hit_0 = res["hits"][0]
         expected_hit_0 = {
@@ -1400,6 +1403,8 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         """
         self._add_shoe_documents()
 
+        original_attributes_to_retrieve = ["title"]
+
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
@@ -1414,9 +1419,12 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
                 name="category",
                 sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
             ),
-            attributes_to_retrieve=["title"],  # 'price' (sort_by field) is NOT included
+            attributes_to_retrieve=original_attributes_to_retrieve,
             result_count=10
         )
+
+        # Ensure original attributes_to_retrieve is unchanged
+        self.assertEqual(["title"], original_attributes_to_retrieve)
 
         self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
         hit_0 = res["hits"][0]

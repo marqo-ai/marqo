@@ -1,11 +1,11 @@
 from typing import List, Optional, ClassVar
 
-from pydantic.v1 import Field, PrivateAttr, root_validator, validator
+from pydantic.v1 import Field, PrivateAttr, validator
 
-from marqo.base_model import StrictBaseModel
-from marqo.tensor_search.models.sort_by_model import SortOrder
 from marqo.api.exceptions import InvalidFieldNameError
+from marqo.base_model import StrictBaseModel
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
+from marqo.tensor_search.models.sort_by_model import SortOrder
 
 
 class CollapseSortByField(StrictBaseModel):
