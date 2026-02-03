@@ -14,7 +14,7 @@ if [ -z "${MARQO_API_WORKERS}" ]; then
 fi
 
 # Start the Marqo API in the background
-cd /app/src/marqo/tensor_search
+cd /marqo/app/src/marqo/tensor_search
 uvicorn api:app --host "$MARQO_HOST" --port 8882 --workers $MARQO_API_WORKERS --timeout-keep-alive 75 --log-level "$MARQO_LOG_LEVEL" &
 
 # Capture the PID of the last background process
