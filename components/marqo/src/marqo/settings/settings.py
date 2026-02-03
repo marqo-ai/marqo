@@ -1,5 +1,3 @@
-import os
-
 from enum import StrEnum
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
@@ -13,7 +11,7 @@ class MarqoDefaultModelsBucket(StrEnum):
     preprod = "s3://marqo-default-models-preprod"
     prod = "s3://marqo-default-models-prod"
 
-
+# TODO - Gradually migrate other settings to use pydantic-settings
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         populate_by_name=True,
@@ -24,7 +22,8 @@ class Settings(BaseSettings):
     )
 
     marqo_default_models_s3_bucket: MarqoDefaultModelsBucket = Field(
-        MarqoDefaultModelsBucket.prod, alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
+        MarqoDefaultModelsBucket.prod, alias="MARQO_DEFAULT_MODELS_S3_BUCKET", description=
+        "The S3 bucket from which Marqo downloads default models."
     )
 
     @field_validator("marqo_default_models_s3_bucket", mode="before")
