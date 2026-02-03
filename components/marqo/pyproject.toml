@@ -25,6 +25,7 @@ dependencies = [
     "semver>=3.0.4",
     "uvicorn>=0.37.0",
     "validators>=0.35.0",
+    "marqo-common",
 ]
 
 [dependency-groups]
@@ -75,3 +76,6 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+
+[tool.uv.sources]
+marqo-common = {path = "../common", editable = true}

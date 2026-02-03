@@ -1,0 +1,1 @@
+from .model_registry import build_model_properties
