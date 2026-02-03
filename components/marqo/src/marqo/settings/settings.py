@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     marqo_default_models_s3_bucket: MarqoDefaultModelsBucket = Field(
-        MarqoDefaultModelsBucket.prod, alias="MARQO_DEFAULT_MODELS_S3_BUCKET", description=
+        MarqoDefaultModelsBucket.os, alias="MARQO_DEFAULT_MODELS_S3_BUCKET", description=
         "The S3 bucket from which Marqo downloads default models."
     )
 
