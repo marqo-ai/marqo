@@ -42,7 +42,7 @@ WORKDIR /app/marqo
 # Validate build context (this COPY forces the context_check stage to run)
 COPY --from=context_check /tmp/context_validated /tmp/.context_ok
 
-COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
+COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/marqo/vespa/target/
 
 # Copy common package first (needed for local dependency)
 COPY common /app/common
