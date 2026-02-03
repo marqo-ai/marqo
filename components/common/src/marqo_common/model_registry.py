@@ -1,5 +1,7 @@
 import json
 
+MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER = "MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER"
+
 _MODEL_REGISTRY: dict[str, dict] = {
     "Marqo/marqo-fashionCLIP": {
         "name": "hf-hub:Marqo/marqo-fashionCLIP",
@@ -9,7 +11,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-fashionCLIP-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-fashionCLIP/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-fashionCLIP/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -20,7 +22,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-fashionCLIP-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-fashionCLIP/text-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-fashionCLIP/text-encoder/model.onnx"
             ],
             "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
@@ -34,7 +36,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-fashionSigLIP/image-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-fashionSigLIP/image-encoder/model.onnx",
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -45,7 +47,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-fashionSigLIP-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-fashionSigLIP/text-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-fashionSigLIP/text-encoder/model.onnx"
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
@@ -59,7 +61,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-ecommerce-embeddings-L-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-ecommerce-embeddings-L/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-ecommerce-embeddings-L/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 256, 256], "dataType": "TYPE_FP32"}
@@ -70,7 +72,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "marqo-ecommerce-embeddings-L-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-ecommerce-embeddings-L/text-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-ecommerce-embeddings-L/text-encoder/model.onnx"
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
@@ -84,7 +86,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "marqo-ecommerce-embeddings-B-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-ecommerce-embeddings-B/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-ecommerce-embeddings-B/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -95,7 +97,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "marqo-ecommerce-embeddings-B-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/marqo-ecommerce-embeddings-B/text-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/marqo-ecommerce-embeddings-B/text-encoder/model.onnx"
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
@@ -109,7 +111,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-16-SigLIP2-256-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-L-16-SigLIP2-256/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-L-16-SigLIP2-256/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 256, 256], "dataType": "TYPE_FP32"}
@@ -120,8 +122,8 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-16-SigLIP2-256-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx",
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx.data",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-L-16-SigLIP2-256/text-encoder/model.onnx.data",
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
@@ -135,7 +137,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-16-SigLIP-256-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-L-16-SigLIP-256/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-L-16-SigLIP-256/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 256, 256], "dataType": "TYPE_FP32"}
@@ -146,7 +148,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-16-SigLIP-256-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-L-16-SigLIP-256/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-L-16-SigLIP-256/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [1024], "dataType": "TYPE_FP32"}],
@@ -160,7 +162,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-L-14-laion2B-s32B-b82K-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-L-14-laion2B-s32B-b82K/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-L-14-laion2B-s32B-b82K/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -171,7 +173,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-L-14-laion2B-s32B-b82K-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-L-14-laion2B-s32B-b82K/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-L-14-laion2B-s32B-b82K/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
@@ -185,7 +187,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -196,7 +198,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-B-32-laion2B-s34B-b79K-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-B-32-laion2B-s34B-b79K/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
@@ -210,7 +212,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "timm-ViT-B-16-SigLIP-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-B-16-SigLIP/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -221,7 +223,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "timm-ViT-B-16-SigLIP-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-ViT-B-16-SigLIP/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [64], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
@@ -235,7 +237,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "timm-ViT-L-14-laion400m_e32b_b82k-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-vit_large_patch14_clip_224.laion400m_e32/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-vit_large_patch14_clip_224.laion400m_e32/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -246,7 +248,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "timm-ViT-L-14-laion400m_e32b_b82k-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/timm-vit_large_patch14_clip_224.laion400m_e32/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-vit_large_patch14_clip_224.laion400m_e32/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
@@ -260,7 +262,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k-image-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/image-encoder/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/image-encoder/model.onnx"
             ],
             "input": [
                 {"name": "input", "dims": [3, 224, 224], "dataType": "TYPE_FP32"}
@@ -271,7 +273,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/text-encoder/model.onnx",
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/laion-CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/text-encoder/model.onnx",
             ],
             "input": [{"name": "input", "dims": [77], "dataType": "TYPE_INT32"}],
             "output": [{"name": "output", "dims": [512], "dataType": "TYPE_FP32"}],
@@ -289,7 +291,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
             "name": "e5-base-v2-text-encoder",
-            "sources": ["{MARQO_DEFAULT_MODELS_S3_BUCKET}/infloat-e5-base-v2/model.onnx"],
+            "sources": [f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/infloat-e5-base-v2/model.onnx"],
             "input": [
                 {"name": "input_ids", "dims": [-1], "dataType": "TYPE_INT64"},
                 {"name": "attention_mask", "dims": [-1], "dataType": "TYPE_INT64"},
@@ -316,7 +318,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "tritonTextEncoderProperties": {
             "maxBatchSize": 32,
             "name": "e5-small-v2-text-encoder",
-            "sources": ["{MARQO_DEFAULT_MODELS_S3_BUCKET}/infloat-e5-small-v2/model.onnx"],
+            "sources": [f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/infloat-e5-small-v2/model.onnx"],
             "input": [
                 {"name": "input_ids", "dims": [-1], "dataType": "TYPE_INT64"},
                 {"name": "attention_mask", "dims": [-1], "dataType": "TYPE_INT64"},
@@ -342,7 +344,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "all-MiniLM-L6-v2-text-encoder",
             "sources": [
-                "{MARQO_DEFAULT_MODELS_S3_BUCKET}/sentence-transformers-all-minilm-l6-v2/model.onnx"
+                f"{MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/sentence-transformers-all-minilm-l6-v2/model.onnx"
             ],
             "input": [
                 {"name": "input_ids", "dims": [-1], "dataType": "TYPE_INT64"},
@@ -405,5 +407,8 @@ def build_model_properties(model_name: str, marqo_default_models_s3_bucket: str)
         raise KeyError(f"Model {model_name} is not registered.")
 
     properties_json = json.dumps(_MODEL_REGISTRY[model_name])
-    properties_json = properties_json.format(MARQO_DEFAULT_MODELS_S3_BUCKET=marqo_default_models_s3_bucket)
+    properties_json = properties_json.replace(
+        MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER,
+        marqo_default_models_s3_bucket
+    )
     return json.loads(properties_json)

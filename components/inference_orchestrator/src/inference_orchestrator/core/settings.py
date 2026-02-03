@@ -9,7 +9,7 @@ from inference_orchestrator.core.enum import MarqoCacheType
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 
-from .enum import LogFormat, LogLevel
+from .enum import LogFormat, LogLevel, StrEnum
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
 
@@ -21,6 +21,13 @@ def _default_cache_dir() -> str:
     """
     base = Path(os.path.expanduser("~/.cache/marqo/models"))
     return str(base)
+
+
+class MarqoDefaultModelsBucket(StrEnum):
+    os = "s3://marqo-default-models-os"
+    staging = "s3://marqo-default-models-staging"
+    preprod = "s3://marqo-default-models-preprod"
+    prod = "s3://marqo-default-models-prod"
 
 
 class Settings(BaseSettings):
@@ -54,6 +61,17 @@ class Settings(BaseSettings):
     marqo_model_cache_path: str = Field(
         default=_default_cache_dir(), alias="MARQO_MODEL_CACHE_PATH"
     )
+
+    marqo_default_models_s3_bucket: MarqoDefaultModelsBucket = Field(
+        MarqoDefaultModelsBucket.prod, alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
+    )
+
+    @field_validator("marqo_default_models_s3_bucket", mode="before")
+    def _validate_bucket(cls, v: str) -> MarqoDefaultModelsBucket:
+        """Provide a shortcut to set the default models bucket via env var."""
+        if v in MarqoDefaultModelsBucket.__members__:
+            return MarqoDefaultModelsBucket[v]
+        return v
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):
