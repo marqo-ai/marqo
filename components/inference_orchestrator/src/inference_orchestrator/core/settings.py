@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
@@ -63,11 +63,11 @@ class Settings(BaseSettings):
     )
 
     marqo_default_models_s3_bucket: MarqoDefaultModelsBucket = Field(
-        MarqoDefaultModelsBucket.prod, alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
+        MarqoDefaultModelsBucket.os, alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
     )
 
     @field_validator("marqo_default_models_s3_bucket", mode="before")
-    def _validate_bucket(cls, v: str) -> MarqoDefaultModelsBucket:
+    def _validate_bucket(cls, v: Any) -> Any:
         """Provide a shortcut to set the default models bucket via env var."""
         if v in MarqoDefaultModelsBucket.__members__:
             return MarqoDefaultModelsBucket[v]
