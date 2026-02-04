@@ -11,6 +11,7 @@ class MarqoDefaultModelsBucket(StrEnum):
     preprod = "s3://marqo-default-models-preprod"
     prod = "s3://marqo-default-models-prod"
 
+
 # TODO - Gradually migrate other settings to use pydantic-settings
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
