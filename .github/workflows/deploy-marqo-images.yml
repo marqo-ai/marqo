@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [staging, preprod, os]
+        environment: [staging, preprod, os, prod-cell-1]
     environment: ${{ matrix.environment }}
     defaults:
       run:
