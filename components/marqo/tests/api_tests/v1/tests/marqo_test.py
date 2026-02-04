@@ -18,7 +18,7 @@ import requests
 class MarqoTestCase(unittest.TestCase):
 
     indexes_to_delete = []
-    _MARQO_URL = "http://3.227.153.164:8882"
+    _MARQO_URL = "http://localhost:8882"
 
     @classmethod
     def setUpClass(cls) -> None:
