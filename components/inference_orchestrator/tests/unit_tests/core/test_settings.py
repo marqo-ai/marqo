@@ -30,6 +30,9 @@ class TestSettings(TestCase):
             self.assertEqual(LogFormat.PLAIN, settings.marqo_log_format)
             self.assertEqual(30, settings.marqo_metrics_export_interval)
             self.assertIsInstance(settings.channel_args, TritonChannelArgs)
+            self.assertEqual(
+                MarqoDefaultModelsBucket.os, settings.marqo_default_models_s3_bucket
+            )
 
     def test_custom_values_via_environment_variables(self):
         """Test that Settings can be initialized with custom values from environment variables"""
@@ -429,3 +432,22 @@ class TestSettings(TestCase):
             self.assertEqual(
                 MarqoDefaultModelsBucket.os, settings.marqo_default_models_s3_bucket
             )
+
+    def test_default_models_bucket_invalid_value(self):
+        """Test that default models bucket rejects invalid values."""
+        invalid_cases = [
+            ("invalid shortcut", "invalid"),
+            ("wrong S3 URL", "s3://some-other-bucket"),
+            ("random string", "random-bucket-name"),
+            ("empty string", ""),
+        ]
+
+        for msg, invalid_value in invalid_cases:
+            with self.subTest(msg=msg, value=invalid_value):
+                with self.assertRaises(ValidationError):
+                    with patch.dict(
+                        os.environ,
+                        {"MARQO_DEFAULT_MODELS_S3_BUCKET": invalid_value},
+                        clear=True,
+                    ):
+                        Settings(_env_file=None)
