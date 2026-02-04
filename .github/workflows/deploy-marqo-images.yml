@@ -93,8 +93,7 @@ jobs:
         id: build-and-push-api
         uses: docker/build-push-action@v6
         with:
-          context: ./components
-          file: ./components/marqo/Dockerfile
+          context: ./components/marqo
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.prepare.outputs.api_tags }}
@@ -103,8 +102,7 @@ jobs:
         id: build-and-push-inference-orchestrator
         uses: docker/build-push-action@v6
         with:
-          context: ./components
-          file: ./components/inference_orchestrator/Dockerfile
+          context: ./components/inference_orchestrator
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.prepare.outputs.inference_tags }}
