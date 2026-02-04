@@ -88,6 +88,7 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.vespa_index.vespa_schema import MINIMUM_SEMI_STRUCTURED_INDEX_VERSION
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 logger = get_logger(__name__)
 
@@ -360,7 +361,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
            interpolation_method: Optional[InterpolationMethod] = None,
-           collapse_field_name: Optional[str] = None,
+           collapse: Optional[CollapseModel] = None,
            recency_parameters=None
            ) -> Dict:
     """The root search method. Calls the specific search method
@@ -458,7 +459,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     marqo_index_version = marqo_index.parsed_marqo_version()
     
     # Validate collapse field configuration
-    if collapse_field_name is not None:
+    if collapse is not None:
         # Validate if the index version support this feature
         if (marqo_index_version < constants.MARQO_COLLAPSE_FIELDS_MINIMUM_VERSION or
                 not isinstance(marqo_index, SemiStructuredMarqoIndex)):
@@ -470,8 +471,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             )
 
         # Validate collapse field exists in index configuration
-        if not marqo_index.is_collapse_field(collapse_field_name):
-            raise api_exceptions.InvalidArgError(f"Field '{collapse_field_name}' is not configured as a collapse field "
+        if not marqo_index.is_collapse_field(collapse.name):
+            raise api_exceptions.InvalidArgError(f"Field '{collapse.name}' is not configured as a collapse field "
                                                  f"for this index")
     
     if rerank_depth is not None \
@@ -533,7 +534,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 language=language,
                 relevance_cutoff=relevance_cutoff, sort_by=sort_by,
                 interpolation_method=interpolation_method,
-                collapse_field_name=collapse_field_name,
+                collapse=collapse,
                 recency_parameters=recency_parameters
             )
 

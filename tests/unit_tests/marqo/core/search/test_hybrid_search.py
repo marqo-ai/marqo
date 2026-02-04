@@ -14,12 +14,13 @@ from marqo.core.models.hybrid_parameters import (
 )
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.core.search.hybrid_search import HybridSearch
+from marqo.core.search.hybrid_search import HybridSearch, should_use_collapse_search
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextTensor
+from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField, SortOrder
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
@@ -726,3 +727,57 @@ class TestRecencyValidation(TestCase):
         # The validation should pass (no error raised)
         # This test verifies that the validation ONLY fails when grow_from is provided
         self.assertIsNone(recency_params.grow_from)
+
+
+class TestShouldUseCollapseSearch(TestCase):
+    """Tests for should_use_collapse_search() logic."""
+
+    def test_no_collapse_returns_false(self):
+        self.assertFalse(should_use_collapse_search(collapse=None))
+
+    def test_collapse_without_sort_by_returns_false(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel
+        collapse = CollapseModel(name="product_id")
+        self.assertFalse(should_use_collapse_search(collapse=collapse))
+
+    def test_collapse_with_sort_by_no_main_sort_returns_true(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        collapse = CollapseModel(
+            name="product_id",
+            sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+        )
+        self.assertTrue(should_use_collapse_search(collapse=collapse, main_query_sort_by=None))
+
+    def test_collapse_with_sort_by_and_main_sort_no_disable_fields_returns_true(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        collapse = CollapseModel(
+            name="product_id",
+            sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+        )
+        main_sort = SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
+        # No disable_if_main_sort_by_fields set, so collapse search should still be used
+        self.assertTrue(should_use_collapse_search(collapse=collapse, main_query_sort_by=main_sort))
+
+    def test_collapse_disabled_when_main_sort_intersects_disable_fields(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        collapse = CollapseModel(
+            name="product_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price", order="asc")],
+                disableIfMainSortByFields={"price"}
+            )
+        )
+        main_sort = SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
+        self.assertFalse(should_use_collapse_search(collapse=collapse, main_query_sort_by=main_sort))
+
+    def test_collapse_not_disabled_when_main_sort_disjoint_from_disable_fields(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        collapse = CollapseModel(
+            name="product_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price", order="asc")],
+                disableIfMainSortByFields={"price"}
+            )
+        )
+        main_sort = SortByModel(fields=[SortByField(field_name="date", order=SortOrder.Desc)])
+        self.assertTrue(should_use_collapse_search(collapse=collapse, main_query_sort_by=main_sort))

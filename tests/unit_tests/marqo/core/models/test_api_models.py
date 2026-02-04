@@ -458,6 +458,72 @@ class TestWeakAndParameters(unittest.TestCase):
                 self.assertEqual(result, expected)
 
 
+class TestCollapseModel(unittest.TestCase):
+    """Tests for CollapseModel and CollapseSortBy validation logic."""
+
+    def test_always_fetch_variants_true(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        model = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price")],
+                alwaysFetchVariants=True,
+            )
+        )
+        self.assertTrue(model.sort_by.always_fetch_variants)
+
+    def test_always_fetch_variants_default_false(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        model = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price")])
+        )
+        self.assertFalse(model.sort_by.always_fetch_variants)
+
+    def test_no_sort_by_valid(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel
+        model = CollapseModel(name="parent_id")
+        self.assertIsNone(model.sort_by)
+
+    def test_always_fetch_variants_false_with_sort_by(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        model = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price")],
+                alwaysFetchVariants=False,
+            )
+        )
+        self.assertFalse(model.sort_by.always_fetch_variants)
+
+    def test_num_threads_per_search(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        model = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price")],
+                numThreadsPerSearch=4,
+            )
+        )
+        self.assertEqual(4, model.sort_by.num_threads_per_search)
+
+    def test_disable_if_main_sort_by_fields(self):
+        from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
+        model = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price")],
+                disableIfMainSortByFields=["price", "date"],
+            )
+        )
+        self.assertEqual({"price", "date"}, model.sort_by.disable_if_main_sort_by_fields)
+
+    def test_sort_by_requires_fields(self):
+        from marqo.tensor_search.models.collapse_model import CollapseSortBy
+        with self.assertRaises(ValidationError):
+            CollapseSortBy(alwaysFetchVariants=True)
+
+
 if __name__ == "__main__":
     unittest.main()
 
