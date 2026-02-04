@@ -85,7 +85,7 @@ jobs:
           python-version: '3.11'
 
       - name: Create ECR Repository if not found
-        run:
+        run: |
           chmod +x ./.github/scripts/create_ecrs_if_not_exist.sh
           ./.github/scripts/create_ecrs_if_not_exist.sh marqoai
 
