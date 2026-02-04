@@ -1,8 +1,10 @@
+import importlib
 import unittest
+from pydantic import ValidationError
 from unittest.mock import patch
 
-from pydantic import ValidationError
-
+from marqo.api.exceptions import EnvVarError
+from marqo.settings import settings as settings_module
 from marqo.settings.settings import (
     MarqoDefaultModelsBucket,
     Settings,
@@ -90,3 +92,18 @@ class TestGetSettings(unittest.TestCase):
         """Test that the returned settings have a valid bucket value."""
         settings = get_settings()
         self.assertIn(settings.marqo_default_models_s3_bucket, list(MarqoDefaultModelsBucket))
+
+
+class TestSettingsModuleLoadError(unittest.TestCase):
+    """Tests for the module-level exception handling during settings initialization."""
+
+    def test_invalid_settings_raises_env_var_error_on_module_load(self):
+        """Test that ValidationError/SettingsError is converted to EnvVarError at module load.
+
+        This tests lines 40-41 of settings.py where module-level exception handling
+        converts pydantic errors to EnvVarError.
+        """
+        with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": "invalid_bucket"}, clear=True):
+            with self.assertRaises(EnvVarError) as context:
+                importlib.reload(settings_module)
+            self.assertIn("Error parsing environment variables", str(context.exception))
