@@ -1,4 +1,6 @@
 name: Deploy Marqo Images to All ECRs (os, staging, preprod, prod)
+# This workflow is mainly for release usage where we want to push images to all ECRs used by different AWS environments.
+# If you want to just push images for dev purposes, please use the 'Build and Push Marqo Images to ECR' workflow.
 
 on:
   workflow_dispatch:
