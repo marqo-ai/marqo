@@ -19,6 +19,6 @@ The Dockerfiles copy `common/` into the image and install it as a local dependen
 
 ## Adding Models
 
-Add entries to `_MODEL_REGISTRY` in `src/marqo_common/model_registry.py`. Use `MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER` for S3 paths - it gets replaced at runtime.
+Add entries to `_MODEL_REGISTRY` in `src/marqo_common/model_registry.py`. Use `_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER` for S3 paths - it gets replaced at runtime.
 
 Requires Python 3.11+. No external dependencies.
