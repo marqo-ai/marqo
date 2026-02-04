@@ -146,7 +146,8 @@ jobs:
         id: build-and-push-api
         uses: docker/build-push-action@v6
         with:
-          context: ./components/marqo
+          context: ./components
+          file: ./components/marqo/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api:${{ env.IMAGE_TAG }}
@@ -155,7 +156,8 @@ jobs:
         id: build-and-push-inference-orchestrator
         uses: docker/build-push-action@v6
         with:
-          context: ./components/inference_orchestrator
+          context: ./components
+          file: ./components/inference_orchestrator/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator:${{ env.IMAGE_TAG }}
