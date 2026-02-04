@@ -85,7 +85,9 @@ jobs:
           python-version: '3.11'
 
       - name: Create ECR Repository if not found
-        run: ./.github/scripts/create_ecrs_if_not_exist.sh marqoai
+        run:
+          chmod +x ./.github/scripts/create_ecrs_if_not_exist.sh
+          ./.github/scripts/create_ecrs_if_not_exist.sh marqoai
 
       - name: Build and push api image
         id: build-and-push-api
