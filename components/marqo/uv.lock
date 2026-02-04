@@ -1080,7 +1080,6 @@ dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "kazoo" },
-    { name = "marqo-common" },
     { name = "memory-profiler" },
     { name = "msgpack" },
     { name = "msgpack-numpy" },
@@ -1089,7 +1088,6 @@ dependencies = [
     { name = "pillow" },
     { name = "psutil" },
     { name = "pydantic" },
-    { name = "pydantic-settings" },
     { name = "python-json-logger" },
     { name = "python-magic" },
     { name = "readerwriterlock" },
@@ -1124,7 +1122,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jsonschema", specifier = ">=4.25.1" },
     { name = "kazoo", specifier = ">=2.10.0" },
-    { name = "marqo-common", editable = "../common" },
     { name = "memory-profiler", specifier = ">=0.61.0" },
     { name = "msgpack", specifier = ">=1.1.2" },
     { name = "msgpack-numpy", specifier = ">=0.4.8" },
@@ -1133,7 +1130,6 @@ requires-dist = [
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "psutil", specifier = ">=7.1.0" },
     { name = "pydantic", specifier = ">=2.12.0" },
-    { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "python-json-logger", specifier = ">=4.0.0" },
     { name = "python-magic", specifier = ">=0.4.27" },
     { name = "readerwriterlock", specifier = ">=1.0.9" },
@@ -1159,11 +1155,6 @@ dev = [
     { name = "pyvespa", specifier = ">=0.62.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
-
-[[package]]
-name = "marqo-common"
-version = "0.1.0"
-source = { editable = "../common" }
 
 [[package]]
 name = "matplotlib-inline"
@@ -1716,20 +1707,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/42/30/134c8a921630d8a88d6f905a562495a6421e959a23c19b0f49b660801d67/pydantic_core-2.41.1-pp311-pypy311_pp73-musllinux_1_1_armv7l.whl", hash = "sha256:e244c37d5471c9acdcd282890c6c4c83747b77238bfa19429b8473586c907656", size = 2324489, upload-time = "2025-10-07T10:50:36.48Z" },
     { url = "https://files.pythonhosted.org/packages/9c/48/a9263aeaebdec81e941198525b43edb3b44f27cfa4cb8005b8d3eb8dec72/pydantic_core-2.41.1-pp311-pypy311_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:1e798b4b304a995110d41ec93653e57975620ccb2842ba9420037985e7d7284e", size = 2322763, upload-time = "2025-10-07T10:50:38.751Z" },
     { url = "https://files.pythonhosted.org/packages/1d/62/755d2bd2593f701c5839fc084e9c2c5e2418f460383ad04e3b5d0befc3ca/pydantic_core-2.41.1-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:f1fc716c0eb1663c59699b024428ad5ec2bcc6b928527b8fe28de6cb89f47efb", size = 2144046, upload-time = "2025-10-07T10:50:40.686Z" },
-]
-
-[[package]]
-name = "pydantic-settings"
-version = "2.12.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "typing-inspection" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/43/4b/ac7e0aae12027748076d72a8764ff1c9d82ca75a7a52622e67ed3f765c54/pydantic_settings-2.12.0.tar.gz", hash = "sha256:005538ef951e3c2a68e1c08b292b5f2e71490def8589d4221b95dab00dafcfd0", size = 194184, upload-time = "2025-11-10T14:25:47.013Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/60/5d4751ba3f4a40a6891f24eec885f51afd78d208498268c734e256fb13c4/pydantic_settings-2.12.0-py3-none-any.whl", hash = "sha256:fddb9fd99a5b18da837b29710391e945b1e30c135477f484084ee513adb93809", size = 51880, upload-time = "2025-11-10T14:25:45.546Z" },
 ]
 
 [[package]]

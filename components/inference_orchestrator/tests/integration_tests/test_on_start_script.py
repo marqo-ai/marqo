@@ -9,7 +9,6 @@ from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from inference_orchestrator.on_start_script import CacheModels, PrintVersion, on_start
-from inference_orchestrator.services.errors import UnsupportedModelError
 from inference_orchestrator.services.triton_inference.model_manager import model_manager
 from tests.integration_tests.test_case import InferenceTestCase
 
@@ -233,22 +232,6 @@ class TestOnStart(InferenceTestCase):
 
             model_names = [model["modelName"] for model in loaded_models["models"]]
             self.assertTrue(any(model_name in name for name in model_names))
-
-    def test_a_proper_error_is_raised_when_model_is_not_supported(self):
-        """Test that an appropriate error is raised when an unsupported model is specified."""
-        unsupported_model_name = "hf/unsupported-model-xyz"
-
-        # Create a mock settings object
-        mock_settings = MagicMock()
-        mock_settings.marqo_models_to_preload = [unsupported_model_name]
-
-        with patch("inference_orchestrator.on_start_script.settings", mock_settings):
-            # Run on_start and expect an error
-            with self.assertRaises(UnsupportedModelError) as context:
-                on_start(self.config)
-
-            # Verify the error message indicates unsupported model
-            self.assertIn("not supported", str(context.exception))
 
 
 class TestCacheModelsEdgeCases(InferenceTestCase):

@@ -32,7 +32,6 @@ dependencies = [
     "tritonclient[grpc,http]==2.60.0",
     "uvicorn>=0.37.0",
     "validators>=0.35.0",
-    "marqo-common",
 ]
 
 [dependency-groups]
@@ -59,8 +58,6 @@ torch = [
 torchvision = [
   { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
 ]
-marqo-common = {path = "../common", editable = true}
-
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
