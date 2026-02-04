@@ -16,12 +16,3 @@ def get_model_properties(
         raise UnsupportedModelError(
             f"The specified model '{model_name}' is not supported "
         )
-
-
-def validate_model_properties(properties: dict) -> None:
-    """This is just a very shallow validation as the detailed validation is done in the vectorise call"""
-    required_fields = ["dimensions", "type"]
-
-    for field in required_fields:
-        if field not in properties:
-            raise ValueError(f"Model properties must include '{field}'.")
