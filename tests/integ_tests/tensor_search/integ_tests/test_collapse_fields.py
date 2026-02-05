@@ -1614,7 +1614,7 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
                 ),
                 collapse=CollapseModel(
                     name="category",
-                    sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+                    sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="cost", order="asc")])
                 ),
                 result_count=10
             )
