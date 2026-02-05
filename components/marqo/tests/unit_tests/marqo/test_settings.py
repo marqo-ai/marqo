@@ -1,12 +1,8 @@
-import importlib
 import unittest
 from pydantic import ValidationError
 from unittest.mock import patch
 
-from marqo.api.exceptions import EnvVarError
-from marqo.settings import settings as settings_module
 from marqo.settings.settings import (
-    MarqoDefaultModelsBucket,
     Settings,
     get_settings,
 )
@@ -16,62 +12,69 @@ class TestSettings(unittest.TestCase):
     """Tests for the Settings pydantic-settings class."""
 
     def test_default_bucket_value(self):
-        """Test that the default bucket is set to 'os'."""
+        """Test that the default bucket is set to the OS bucket."""
         with patch.dict("os.environ", {}, clear=True):
             settings = Settings()
-            self.assertEqual(settings.marqo_default_models_s3_bucket, MarqoDefaultModelsBucket.os)
+            self.assertEqual(settings.marqo_default_models_s3_bucket, "s3://marqo-default-models-os")
 
-    def test_bucket_from_shortcut_name(self):
-        """Test setting bucket via shortcut names (os, staging, preprod, prod)."""
+    def test_bucket_from_env_var(self):
+        """Test setting bucket via the MARQO_DEFAULT_MODELS_S3_BUCKET environment variable."""
         test_cases = [
-            ("os", MarqoDefaultModelsBucket.os),
-            ("staging", MarqoDefaultModelsBucket.staging),
-            ("preprod", MarqoDefaultModelsBucket.preprod),
-            ("prod", MarqoDefaultModelsBucket.prod),
+            "s3://marqo-default-models-os",
+            "s3://marqo-default-models-staging",
+            "s3://marqo-default-models-preprod",
+            "s3://marqo-default-models-production",
+            "s3://my-custom-bucket",
         ]
-        for shortcut, expected_bucket in test_cases:
-            with self.subTest(shortcut=shortcut):
-                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": shortcut}, clear=True):
+        for bucket in test_cases:
+            with self.subTest(bucket=bucket):
+                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": bucket}, clear=True):
                     settings = Settings()
-                    self.assertEqual(settings.marqo_default_models_s3_bucket, expected_bucket)
+                    self.assertEqual(settings.marqo_default_models_s3_bucket, bucket)
 
-    def test_bucket_from_full_s3_url(self):
-        """Test setting bucket via full S3 URLs."""
+    def test_bucket_adds_s3_prefix_when_missing(self):
+        """Test that the validator adds the s3:// prefix if it's missing."""
         test_cases = [
-            ("s3://marqo-default-models-os", MarqoDefaultModelsBucket.os),
-            ("s3://marqo-default-models-staging", MarqoDefaultModelsBucket.staging),
-            ("s3://marqo-default-models-preprod", MarqoDefaultModelsBucket.preprod),
-            ("s3://marqo-default-models-prod", MarqoDefaultModelsBucket.prod),
+            ("marqo-default-models-os", "s3://marqo-default-models-os"),
+            ("my-custom-bucket", "s3://my-custom-bucket"),
         ]
-        for s3_url, expected_bucket in test_cases:
-            with self.subTest(s3_url=s3_url):
-                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": s3_url}, clear=True):
+        for env_value, expected in test_cases:
+            with self.subTest(env_value=env_value):
+                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": env_value}, clear=True):
                     settings = Settings()
-                    self.assertEqual(settings.marqo_default_models_s3_bucket, expected_bucket)
+                    self.assertEqual(settings.marqo_default_models_s3_bucket, expected)
 
-    def test_invalid_bucket_value_raises_error(self):
-        """Test that invalid bucket values raise a ValidationError."""
-        invalid_values = ["invalid_bucket", "s3://some-other-bucket", "dev", "production"]
-        for invalid_value in invalid_values:
-            with self.subTest(invalid_value=invalid_value):
-                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": invalid_value}, clear=True):
-                    with self.assertRaises(ValidationError) as context:
-                        Settings()
-                    self.assertIn("MARQO_DEFAULT_MODELS_S3_BUCKET", str(context.exception))
+    def test_bucket_removes_trailing_slash(self):
+        """Test that the validator removes trailing slashes without corrupting the s3:// prefix."""
+        test_cases = [
+            ("s3://marqo-default-models-os/", "s3://marqo-default-models-os"),
+            ("s3://my-bucket///", "s3://my-bucket"),
+        ]
+        for env_value, expected in test_cases:
+            with self.subTest(env_value=env_value):
+                with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": env_value}, clear=True):
+                    settings = Settings()
+                    self.assertEqual(settings.marqo_default_models_s3_bucket, expected)
+
+    def test_bucket_adds_prefix_and_removes_trailing_slash(self):
+        """Test that the validator both adds s3:// prefix and removes trailing slashes."""
+        with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": "my-bucket/"}, clear=True):
+            settings = Settings()
+            self.assertEqual(settings.marqo_default_models_s3_bucket, "s3://my-bucket")
 
     def test_settings_is_frozen(self):
         """Test that the Settings instance is immutable (frozen)."""
         with patch.dict("os.environ", {}, clear=True):
             settings = Settings()
             with self.assertRaises(ValidationError):
-                settings.marqo_default_models_s3_bucket = MarqoDefaultModelsBucket.prod
+                settings.marqo_default_models_s3_bucket = "s3://some-other-bucket"
 
     def test_settings_ignores_extra_fields(self):
         """Test that Settings ignores extra environment variables."""
         with patch.dict("os.environ", {"SOME_OTHER_VAR": "some_value"}, clear=True):
             # Should not raise an error
             settings = Settings()
-            self.assertEqual(settings.marqo_default_models_s3_bucket, MarqoDefaultModelsBucket.os)
+            self.assertEqual(settings.marqo_default_models_s3_bucket, "s3://marqo-default-models-os")
 
 
 class TestGetSettings(unittest.TestCase):
@@ -88,22 +91,10 @@ class TestGetSettings(unittest.TestCase):
         settings2 = get_settings()
         self.assertIs(settings1, settings2)
 
-    def test_get_settings_has_valid_bucket(self):
-        """Test that the returned settings have a valid bucket value."""
+    def test_get_settings_has_bucket(self):
+        """Test that the returned settings have a bucket value."""
         settings = get_settings()
-        self.assertIn(settings.marqo_default_models_s3_bucket, list(MarqoDefaultModelsBucket))
+        self.assertIsInstance(settings.marqo_default_models_s3_bucket, str)
+        self.assertTrue(len(settings.marqo_default_models_s3_bucket) > 0)
 
 
-class TestSettingsModuleLoadError(unittest.TestCase):
-    """Tests for the module-level exception handling during settings initialization."""
-
-    def test_invalid_settings_raises_env_var_error_on_module_load(self):
-        """Test that ValidationError/SettingsError is converted to EnvVarError at module load.
-
-        This tests lines 40-41 of settings.py where module-level exception handling
-        converts pydantic errors to EnvVarError.
-        """
-        with patch.dict("os.environ", {"MARQO_DEFAULT_MODELS_S3_BUCKET": "invalid_bucket"}, clear=True):
-            with self.assertRaises(EnvVarError) as context:
-                importlib.reload(settings_module)
-            self.assertIn("Error parsing environment variables", str(context.exception))
