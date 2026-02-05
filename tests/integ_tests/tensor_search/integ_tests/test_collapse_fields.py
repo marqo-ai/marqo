@@ -1568,6 +1568,7 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
             {"_id": "shoe_b1", "title": "Walking boot Alpha", "category": "shoes_b", "price": 89.99, "cost": 70.0, "brand": "adidas"},
         ]
 
+        # A lot of identical variants with the same low cost to force ties in collapse sort by
         shoe_a_variants = [
             {
                 "_id": f"shoe_a{i}", "title": f"variants",
@@ -1576,6 +1577,7 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
             for i in range(2, 10)
         ]
 
+        # A lot of identical variants with the same low cost to force ties in collapse sort by
         shoe_b_variants = [
             {
                 "_id": f"shoe_b{i}", "title": f"variants",
@@ -1585,8 +1587,6 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
         ]
 
         docs = basic_docs + shoe_a_variants + shoe_b_variants
-
-
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
