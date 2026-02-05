@@ -8,7 +8,7 @@ FROM busybox AS context_check
 COPY common/pyproject.toml /tmp/context_validated
 
 # Stage 1: Build the Java package using Maven
-FROM maven:3.8.7-openjdk-18-slim AS maven_build
+FROM vespaengine/vespa-pipeline AS maven_build
 
 WORKDIR /app/vespa
 # Copy only the pom.xml and any other files required for dependency resolution
@@ -18,7 +18,7 @@ RUN mvn dependency:go-offline
 
 COPY marqo/vespa/src /app/vespa/src
 # Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
-RUN mvn clean package -T 1C -X
+RUN mvn clean package -T 1C
 
 ARG COMMITHASH
 

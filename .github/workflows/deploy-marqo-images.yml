@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-and-deploy:
     name: Build and Deploy Marqo Images to ECR for all AWS Environments
-    runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}/spot=false"
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         environment: [staging, preprod, os, prod-cell-1]
