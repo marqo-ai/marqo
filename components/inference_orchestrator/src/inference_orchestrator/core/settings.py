@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
@@ -9,7 +9,7 @@ from inference_orchestrator.core.enum import MarqoCacheType
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
 from inference_orchestrator.schemas.triton_channel_args import TritonChannelArgs
 
-from .enum import LogFormat, LogLevel, StrEnum
+from .enum import LogFormat, LogLevel
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # to src/
 
@@ -21,13 +21,6 @@ def _default_cache_dir() -> str:
     """
     base = Path(os.path.expanduser("~/.cache/marqo/models"))
     return str(base)
-
-
-class MarqoDefaultModelsBucket(StrEnum):
-    os = "s3://marqo-default-models-os"
-    staging = "s3://marqo-default-models-staging"
-    preprod = "s3://marqo-default-models-preprod"
-    prod = "s3://marqo-default-models-prod"
 
 
 class Settings(BaseSettings):
@@ -62,16 +55,18 @@ class Settings(BaseSettings):
         default=_default_cache_dir(), alias="MARQO_MODEL_CACHE_PATH"
     )
 
-    marqo_default_models_s3_bucket: MarqoDefaultModelsBucket = Field(
-        MarqoDefaultModelsBucket.os, alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
+    marqo_default_models_s3_bucket: str = Field(
+        "s3://marqo-default-models-os", alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
     )
 
-    @field_validator("marqo_default_models_s3_bucket", mode="before")
-    def _validate_bucket(cls, v: Any) -> Any:
-        """Provide a shortcut to set the default models bucket via env var."""
-        if v in MarqoDefaultModelsBucket.__members__:
-            return MarqoDefaultModelsBucket[v]
-        return v
+    @field_validator("marqo_default_models_s3_bucket")
+    def validate_marqo_default_models_s3_bucket(cls, value):
+        # Add "s3://" prefix if it's missing to ensure the value is always in the correct format
+        if not value.startswith("s3://"):
+            value = "s3://" + value
+        # Remove trailing slashes from the path portion only, preserving the s3:// prefix
+        value = "s3://" + value[len("s3://") :].rstrip("/")
+        return value
 
     @field_validator("marqo_models_to_preload", mode="after")
     def _validate_models_to_preload(cls, v: list):

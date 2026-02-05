@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from inference_orchestrator.core.enum import LogFormat, LogLevel
 from inference_orchestrator.core.settings import (
-    MarqoDefaultModelsBucket,
     Settings,
     get_settings,
 )
@@ -31,7 +30,7 @@ class TestSettings(TestCase):
             self.assertEqual(30, settings.marqo_metrics_export_interval)
             self.assertIsInstance(settings.channel_args, TritonChannelArgs)
             self.assertEqual(
-                MarqoDefaultModelsBucket.os, settings.marqo_default_models_s3_bucket
+                "s3://marqo-default-models-os", settings.marqo_default_models_s3_bucket
             )
 
     def test_custom_values_via_environment_variables(self):
@@ -383,71 +382,75 @@ class TestSettings(TestCase):
             settings = Settings(_env_file=None)
             self.assertEqual(200, settings.marqo_inference_cache_size)
 
-    def test_default_models_bucket_shortcut_names(self):
-        """Test that _validate_bucket converts shortcut names to full bucket enum values."""
+    def test_default_models_bucket_adds_s3_prefix(self):
+        """Test that the validator adds s3:// prefix when it is missing."""
         test_cases = [
-            ("os", MarqoDefaultModelsBucket.os),
-            ("staging", MarqoDefaultModelsBucket.staging),
-            ("preprod", MarqoDefaultModelsBucket.preprod),
-            ("prod", MarqoDefaultModelsBucket.prod),
+            ("plain bucket name", "my-bucket", "s3://my-bucket"),
+            (
+                "default bucket name without prefix",
+                "marqo-default-models-os",
+                "s3://marqo-default-models-os",
+            ),
         ]
 
-        for shortcut_name, expected_bucket in test_cases:
-            with self.subTest(shortcut=shortcut_name):
+        for msg, input_value, expected in test_cases:
+            with self.subTest(msg=msg, input=input_value):
                 with patch.dict(
                     os.environ,
-                    {"MARQO_DEFAULT_MODELS_S3_BUCKET": shortcut_name},
+                    {"MARQO_DEFAULT_MODELS_S3_BUCKET": input_value},
                     clear=True,
                 ):
                     settings = Settings(_env_file=None)
-                    self.assertEqual(
-                        expected_bucket, settings.marqo_default_models_s3_bucket
-                    )
+                    self.assertEqual(expected, settings.marqo_default_models_s3_bucket)
 
-    def test_default_models_bucket_full_s3_url(self):
-        """Test that _validate_bucket accepts full S3 bucket URLs."""
+    def test_default_models_bucket_preserves_s3_prefix(self):
+        """Test that the validator preserves an existing s3:// prefix."""
         test_cases = [
-            ("s3://marqo-default-models-os", MarqoDefaultModelsBucket.os),
-            ("s3://marqo-default-models-staging", MarqoDefaultModelsBucket.staging),
-            ("s3://marqo-default-models-preprod", MarqoDefaultModelsBucket.preprod),
-            ("s3://marqo-default-models-prod", MarqoDefaultModelsBucket.prod),
+            (
+                "standard bucket",
+                "s3://marqo-default-models-os",
+                "s3://marqo-default-models-os",
+            ),
+            ("custom bucket", "s3://my-custom-bucket", "s3://my-custom-bucket"),
         ]
 
-        for full_url, expected_bucket in test_cases:
-            with self.subTest(url=full_url):
+        for msg, input_value, expected in test_cases:
+            with self.subTest(msg=msg, input=input_value):
                 with patch.dict(
                     os.environ,
-                    {"MARQO_DEFAULT_MODELS_S3_BUCKET": full_url},
+                    {"MARQO_DEFAULT_MODELS_S3_BUCKET": input_value},
                     clear=True,
                 ):
                     settings = Settings(_env_file=None)
-                    self.assertEqual(
-                        expected_bucket, settings.marqo_default_models_s3_bucket
-                    )
+                    self.assertEqual(expected, settings.marqo_default_models_s3_bucket)
+
+    def test_default_models_bucket_strips_trailing_slashes(self):
+        """Test that the validator strips trailing slashes from the bucket path."""
+        test_cases = [
+            ("single trailing slash with prefix", "s3://my-bucket/", "s3://my-bucket"),
+            (
+                "multiple trailing slashes with prefix",
+                "s3://my-bucket///",
+                "s3://my-bucket",
+            ),
+            ("no trailing slash with prefix", "s3://my-bucket", "s3://my-bucket"),
+            ("trailing slash without prefix", "my-bucket/", "s3://my-bucket"),
+        ]
+
+        for msg, input_value, expected in test_cases:
+            with self.subTest(msg=msg, input=input_value):
+                with patch.dict(
+                    os.environ,
+                    {"MARQO_DEFAULT_MODELS_S3_BUCKET": input_value},
+                    clear=True,
+                ):
+                    settings = Settings(_env_file=None)
+                    self.assertEqual(expected, settings.marqo_default_models_s3_bucket)
 
     def test_default_models_bucket_default_value(self):
-        """Test that default models bucket defaults to 'os' when not set."""
+        """Test that default models bucket defaults to 's3://marqo-default-models-os' when not set."""
         with patch.dict(os.environ, {}, clear=True):
             settings = Settings(_env_file=None)
             self.assertEqual(
-                MarqoDefaultModelsBucket.os, settings.marqo_default_models_s3_bucket
+                "s3://marqo-default-models-os", settings.marqo_default_models_s3_bucket
             )
-
-    def test_default_models_bucket_invalid_value(self):
-        """Test that default models bucket rejects invalid values."""
-        invalid_cases = [
-            ("invalid shortcut", "invalid"),
-            ("wrong S3 URL", "s3://some-other-bucket"),
-            ("random string", "random-bucket-name"),
-            ("empty string", ""),
-        ]
-
-        for msg, invalid_value in invalid_cases:
-            with self.subTest(msg=msg, value=invalid_value):
-                with self.assertRaises(ValidationError):
-                    with patch.dict(
-                        os.environ,
-                        {"MARQO_DEFAULT_MODELS_S3_BUCKET": invalid_value},
-                        clear=True,
-                    ):
-                        Settings(_env_file=None)
