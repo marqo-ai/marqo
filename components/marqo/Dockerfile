@@ -18,7 +18,7 @@ RUN mvn dependency:go-offline
 
 COPY marqo/vespa/src /app/vespa/src
 # Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
-RUN mvn clean package -T 1C
+RUN mvn clean package -T 1C -X
 
 ARG COMMITHASH
 
