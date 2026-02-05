@@ -61,6 +61,8 @@ class Settings(BaseSettings):
 
     @field_validator("marqo_default_models_s3_bucket")
     def validate_marqo_default_models_s3_bucket(cls, value):
+        if not value:
+            raise ValueError("MARQO_DEFAULT_MODELS_S3_BUCKET cannot be empty.")
         # Add "s3://" prefix if it's missing to ensure the value is always in the correct format
         if not value.startswith("s3://"):
             value = "s3://" + value
