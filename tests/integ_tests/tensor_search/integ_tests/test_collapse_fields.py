@@ -1533,3 +1533,102 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             collapse_search_results_without_sort_by["facets"],
             collapse_search_results_with_sort_by["facets"]
         )
+
+class TestCollapseSortByTieBreaker(MarqoTestCase):
+    """Integration tests for collapse fields with sort by functionality in tie-breaking scenarios.
+
+    This test class must pass on the multi-shard environment to ensure that the collapse sort by logic correctly
+    handles tie-breaking when multiple documents have the same sort field value. The tests cover scenarios where
+    multiple documents within a group have the same price, and we verify that the collapse sort by consistently
+    selects the same representative document based on relevance as a tie-breaker.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        default_text_index = cls.unstructured_marqo_index_request(
+            collapse_fields=[CollapseField(name="category", minGroups=2)]
+        )
+
+        cls.indexes = cls.create_indexes([
+            default_text_index,
+        ])
+
+        cls.default_text_index = cls.indexes[0]
+
+    def setUp(self) -> None:
+        self.clear_indexes(self.indexes)
+
+    def _add_shoe_documents(self):
+        """Add sample shoe documents across two category groups with varying prices."""
+        basic_docs = [
+            # Two basic shoes
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "cost": 95.0, "brand": "nike"},
+            {"_id": "shoe_b1", "title": "Walking boot Alpha", "category": "shoes_b", "price": 89.99, "cost": 70.0, "brand": "adidas"},
+        ]
+
+        shoe_a_variants = [
+            {
+                "_id": f"shoe_a{i}", "title": f"variants",
+             "category": "shoes_a", "price": 120.0, "cost": 15.0,
+            }
+            for i in range(2, 10)
+        ]
+
+        shoe_b_variants = [
+            {
+                "_id": f"shoe_b{i}", "title": f"variants",
+                "category": "shoes_b", "price": 120.0, "cost": 1.0,
+            }
+            for i in range(2, 6)
+        ]
+
+        docs = basic_docs + shoe_a_variants + shoe_b_variants
+
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+    def test_collapse_sort_by_with_ties(self):
+        """When multiple documents within a group have the same sort field value (price),
+        the collapse sort by should consistently select the same representative based on a tie-breaker."""
+        self._add_shoe_documents()
+
+        def get_results():
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="running shoe boot alpha",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                    alpha=0,
+                ),
+                collapse=CollapseModel(
+                    name="category",
+                    sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+                ),
+                result_count=10
+            )
+            return [hit["_id"] for hit in res["hits"]] + [hit.get("_originalId") for hit in res["hits"]]
+
+        first_result = get_results()
+
+        for _ in range(10):
+            # Run the same search multiple times to verify that the same representative is consistently selected
+            result = get_results()
+            self.assertEqual(
+                first_result, result,
+                f"Collapse sort by with ties should consistently select the same representative "
+                f"document based on relevance as a tie-breaker, however got different results across runs. "
+                f"Expected result: {first_result}, Returned result: {result}"
+
+            )

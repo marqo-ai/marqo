@@ -412,6 +412,13 @@ schema {{ index.schema_name }} {
         first-phase {
             expression: collapse_sort_value()
         }
+
+        function tie_breaker() {
+            expression: random(1024).match * 1e-9
+        }
+        function collapse_final_score() {
+            expression: collapse_sort_value() + tie_breaker()
+        }
         diversity {
             attribute: {{ collapse_field.name }}
             min-groups: {{ collapse_field.min_groups }}
