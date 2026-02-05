@@ -625,6 +625,8 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/8e/abdd3f14d735b2929290a018ecf133c901be4874b858dd1c604b9319f064/greenlet-3.2.4-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2523e5246274f54fdadbce8494458a2ebdcdbc7b802318466ac5606d3cded1f8", size = 587684, upload-time = "2025-08-07T13:18:25.164Z" },
     { url = "https://files.pythonhosted.org/packages/5d/65/deb2a69c3e5996439b0176f6651e0052542bb6c8f8ec2e3fba97c9768805/greenlet-3.2.4-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:1987de92fec508535687fb807a5cea1560f6196285a4cde35c100b8cd632cc52", size = 1116647, upload-time = "2025-08-07T13:42:38.655Z" },
     { url = "https://files.pythonhosted.org/packages/3f/cc/b07000438a29ac5cfb2194bfc128151d52f333cee74dd7dfe3fb733fc16c/greenlet-3.2.4-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:55e9c5affaa6775e2c6b67659f3a71684de4c549b3dd9afca3bc773533d284fa", size = 1142073, upload-time = "2025-08-07T13:18:21.737Z" },
+    { url = "https://files.pythonhosted.org/packages/67/24/28a5b2fa42d12b3d7e5614145f0bd89714c34c08be6aabe39c14dd52db34/greenlet-3.2.4-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:c9c6de1940a7d828635fbd254d69db79e54619f165ee7ce32fda763a9cb6a58c", size = 1548385, upload-time = "2025-11-04T12:42:11.067Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/05/03f2f0bdd0b0ff9a4f7b99333d57b53a7709c27723ec8123056b084e69cd/greenlet-3.2.4-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:03c5136e7be905045160b1b9fdca93dd6727b180feeafda6818e6496434ed8c5", size = 1613329, upload-time = "2025-11-04T12:42:12.928Z" },
     { url = "https://files.pythonhosted.org/packages/d8/0f/30aef242fcab550b0b3520b8e3561156857c94288f0332a79928c31a52cf/greenlet-3.2.4-cp311-cp311-win_amd64.whl", hash = "sha256:9c40adce87eaa9ddb593ccb0fa6a07caf34015a29bf8d344811665b573138db9", size = 299100, upload-time = "2025-08-07T13:44:12.287Z" },
 ]
 
@@ -765,102 +767,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/b0/36bd937216ec521246249be3bf9855081de4c5e06a0c9b4219dbeda50373/importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd", size = 27656, upload-time = "2025-04-27T15:29:00.214Z" },
-]
-
-[[package]]
-name = "inference-orchestrator"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "blake3" },
-    { name = "cachetools" },
-    { name = "fastapi" },
-    { name = "hf-transfer" },
-    { name = "httpx" },
-    { name = "more-itertools" },
-    { name = "msgpack" },
-    { name = "msgpack-numpy" },
-    { name = "nltk" },
-    { name = "notebook" },
-    { name = "open-clip-torch" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-sdk" },
-    { name = "orjson" },
-    { name = "pillow" },
-    { name = "pycurl" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-json-logger" },
-    { name = "readerwriterlock" },
-    { name = "semver" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux')" },
-    { name = "transformers" },
-    { name = "tritonclient", extra = ["grpc", "http"] },
-    { name = "uvicorn" },
-    { name = "validators" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "opentelemetry-test-utils" },
-    { name = "parameterized" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-md-report" },
-    { name = "pytest-retry" },
-    { name = "pytest-subtests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "blake3", specifier = ">=1.0.6" },
-    { name = "cachetools", specifier = ">=6.2.0" },
-    { name = "fastapi", specifier = ">=0.117.1" },
-    { name = "hf-transfer", specifier = ">=0.1.9" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "more-itertools", specifier = ">=10.8.0" },
-    { name = "msgpack", specifier = ">=1.1.1" },
-    { name = "msgpack-numpy", specifier = ">=0.4.8" },
-    { name = "nltk", specifier = ">=3.9.1" },
-    { name = "notebook", specifier = ">=7.4.7" },
-    { name = "open-clip-torch", specifier = ">=3.2.0" },
-    { name = "opentelemetry-api", specifier = ">=1.37.0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
-    { name = "orjson", specifier = ">=3.11.3" },
-    { name = "pillow", specifier = ">=11.3.0" },
-    { name = "pycurl", specifier = ">=7.45.7" },
-    { name = "pydantic", specifier = ">=2.11.9" },
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "python-json-logger", specifier = ">=3.3.0" },
-    { name = "readerwriterlock", specifier = ">=1.0.9" },
-    { name = "semver", specifier = ">=3.0.4" },
-    { name = "torch", marker = "sys_platform != 'linux'", specifier = "==2.8.0" },
-    { name = "torch", marker = "sys_platform == 'linux'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "torchvision", marker = "sys_platform != 'linux'", specifier = "==0.23.0" },
-    { name = "torchvision", marker = "sys_platform == 'linux'", specifier = "==0.23.0", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "transformers", specifier = ">=4.56.2" },
-    { name = "tritonclient", extras = ["grpc", "http"], specifier = "==2.60.0" },
-    { name = "uvicorn", specifier = ">=0.37.0" },
-    { name = "validators", specifier = ">=0.35.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "opentelemetry-test-utils", specifier = ">=0.58b0" },
-    { name = "parameterized", specifier = ">=0.9.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "pytest-md-report", specifier = ">=0.7.0" },
-    { name = "pytest-retry", specifier = ">=1.7.0" },
-    { name = "pytest-subtests", specifier = ">=0.14.2" },
 ]
 
 [[package]]
@@ -1213,6 +1119,109 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0f/62/d9c46a7f5c9adbeeeda52f5b8d802e1094e9717705a645efc71b0913a0a8/markupsafe-3.0.3-cp311-cp311-win32.whl", hash = "sha256:0db14f5dafddbb6d9208827849fad01f1a2609380add406671a26386cdf15a19", size = 14572, upload-time = "2025-09-27T18:36:28.045Z" },
     { url = "https://files.pythonhosted.org/packages/83/8a/4414c03d3f891739326e1783338e48fb49781cc915b2e0ee052aa490d586/markupsafe-3.0.3-cp311-cp311-win_amd64.whl", hash = "sha256:de8a88e63464af587c950061a5e6a67d3632e36df62b986892331d4620a35c01", size = 15077, upload-time = "2025-09-27T18:36:29.025Z" },
     { url = "https://files.pythonhosted.org/packages/35/73/893072b42e6862f319b5207adc9ae06070f095b358655f077f69a35601f0/markupsafe-3.0.3-cp311-cp311-win_arm64.whl", hash = "sha256:3b562dd9e9ea93f13d53989d23a7e775fdfd1066c33494ff43f5418bc8c58a5c", size = 13876, upload-time = "2025-09-27T18:36:29.954Z" },
+]
+
+[[package]]
+name = "marqo-common"
+version = "0.1.0"
+source = { editable = "../common" }
+
+[[package]]
+name = "marqo-inference-orchestrator"
+version = "0.0.1"
+source = { virtual = "." }
+dependencies = [
+    { name = "blake3" },
+    { name = "cachetools" },
+    { name = "fastapi" },
+    { name = "hf-transfer" },
+    { name = "httpx" },
+    { name = "marqo-common" },
+    { name = "more-itertools" },
+    { name = "msgpack" },
+    { name = "msgpack-numpy" },
+    { name = "nltk" },
+    { name = "notebook" },
+    { name = "open-clip-torch" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "orjson" },
+    { name = "pillow" },
+    { name = "pycurl" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-json-logger" },
+    { name = "readerwriterlock" },
+    { name = "semver" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux')" },
+    { name = "transformers" },
+    { name = "tritonclient", extra = ["grpc", "http"] },
+    { name = "uvicorn" },
+    { name = "validators" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "opentelemetry-test-utils" },
+    { name = "parameterized" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-md-report" },
+    { name = "pytest-retry" },
+    { name = "pytest-subtests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "blake3", specifier = ">=1.0.6" },
+    { name = "cachetools", specifier = ">=6.2.0" },
+    { name = "fastapi", specifier = ">=0.117.1" },
+    { name = "hf-transfer", specifier = ">=0.1.9" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "marqo-common", editable = "../common" },
+    { name = "more-itertools", specifier = ">=10.8.0" },
+    { name = "msgpack", specifier = ">=1.1.1" },
+    { name = "msgpack-numpy", specifier = ">=0.4.8" },
+    { name = "nltk", specifier = ">=3.9.1" },
+    { name = "notebook", specifier = ">=7.4.7" },
+    { name = "open-clip-torch", specifier = ">=3.2.0" },
+    { name = "opentelemetry-api", specifier = ">=1.37.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
+    { name = "orjson", specifier = ">=3.11.3" },
+    { name = "pillow", specifier = ">=11.3.0" },
+    { name = "pycurl", specifier = ">=7.45.7" },
+    { name = "pydantic", specifier = ">=2.11.9" },
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "python-json-logger", specifier = ">=3.3.0" },
+    { name = "readerwriterlock", specifier = ">=1.0.9" },
+    { name = "semver", specifier = ">=3.0.4" },
+    { name = "torch", marker = "sys_platform != 'linux'", specifier = "==2.8.0" },
+    { name = "torch", marker = "sys_platform == 'linux'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torchvision", marker = "sys_platform != 'linux'", specifier = "==0.23.0" },
+    { name = "torchvision", marker = "sys_platform == 'linux'", specifier = "==0.23.0", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "transformers", specifier = ">=4.56.2" },
+    { name = "tritonclient", extras = ["grpc", "http"], specifier = "==2.60.0" },
+    { name = "uvicorn", specifier = ">=0.37.0" },
+    { name = "validators", specifier = ">=0.35.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "opentelemetry-test-utils", specifier = ">=0.58b0" },
+    { name = "parameterized", specifier = ">=0.9.0" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pytest-md-report", specifier = ">=0.7.0" },
+    { name = "pytest-retry", specifier = ">=1.7.0" },
+    { name = "pytest-subtests", specifier = ">=0.14.2" },
 ]
 
 [[package]]
