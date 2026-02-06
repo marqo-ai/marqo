@@ -366,7 +366,7 @@ schema marqo__test_00semi_00structured_00schema {
     }
     rank-profile collapse_to_sort_value inherits base_rank_profile{
         first-phase {
-            expression: collapse_sort_final_score()
+            expression: collapse_final_score()
         }
         function tie_breaker() {
             expression: random(1024).match * 1e-9
