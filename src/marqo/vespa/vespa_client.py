@@ -222,14 +222,26 @@ class VespaClient:
         _BACKOFF_BASE = 2
         _MAX_INTERVAL = 16
 
+        _SLOW_CONVERGENCE_THRESHOLD = 10
+
         start_time = time.time()
         attempt = 0
         while time.time() - start_time < timeout:
             try:
-                if self.get_application_has_converged():
+                convergence_status = self._get_convergence_status()
+                elapsed = time.time() - start_time
+                if convergence_status.converged:
+                    if elapsed > _SLOW_CONVERGENCE_THRESHOLD:
+                        logger.warning(f'Vespa application converged after {elapsed:.1f}s')
                     return
                 else:
-                    logger.debug('Waiting for Vespa application to converge')
+                    if elapsed > _SLOW_CONVERGENCE_THRESHOLD:
+                        logger.warning(
+                            f'Vespa application has not converged after {elapsed:.1f}s. '
+                            f'Convergence status: {convergence_status.to_dict()}'
+                        )
+                    else:
+                        logger.debug('Waiting for Vespa application to converge')
             # TODO Find out what exceptions is raised here
             except (httpx.TimeoutException, httpcore.TimeoutException):
                 logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
