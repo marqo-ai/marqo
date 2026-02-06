@@ -136,10 +136,6 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             from marqo.tensor_search import index_meta_cache
             index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
-        # Check convergence before feeding documents, even if no schema update
-        # was needed in this request, to handle concurrent deployments from other requests
-        self.vespa_client.check_for_application_convergence()
-
     def _get_field_language(self, field_name):
         """Extract language specification for a field from mappings and validate."""
         if not self.add_docs_params.mappings:
