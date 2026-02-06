@@ -251,5 +251,102 @@ class TestVespaClient(unittest.TestCase):
         self.assertIn('fieldSet=test_schema:title', call_url)
 
 
+    def test_get_convergence_status_all_converged(self):
+        """Test _get_convergence_status when all services are converged."""
+        response_data = {
+            'currentGeneration': 9,
+            'wantedGeneration': 9,
+            'converged': True,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node1', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 9},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = response_data
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            status = self.vespa_client._get_convergence_status()
+
+        self.assertTrue(status.converged)
+        self.assertEqual(status.current_generation, 9)
+        self.assertEqual(status.wanted_generation, 9)
+        self.assertEqual(status.non_converged_services, [])
+
+    def test_get_convergence_status_some_not_converged(self):
+        """Test _get_convergence_status lists services not at wantedGeneration."""
+        response_data = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+                {'host': 'node2', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 7},
+                {'host': 'node1', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 9},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = response_data
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            status = self.vespa_client._get_convergence_status()
+
+        self.assertFalse(status.converged)
+        self.assertEqual(len(status.non_converged_services), 2)
+        self.assertEqual(status.non_converged_services[0], {
+            'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8
+        })
+        self.assertEqual(status.non_converged_services[1], {
+            'host': 'node2', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 7
+        })
+
+    def test_convergence_status_to_dict_includes_non_converged_services(self):
+        """Test that to_dict includes nonConvergedServices only when non-empty."""
+        status_converged = VespaClient._ConvergenceStatus(
+            current_generation=9, wanted_generation=9, converged=True,
+            non_converged_services=[]
+        )
+        d = status_converged.to_dict()
+        self.assertNotIn('nonConvergedServices', d)
+
+        non_converged = [{'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}]
+        status_not_converged = VespaClient._ConvergenceStatus(
+            current_generation=8, wanted_generation=9, converged=False,
+            non_converged_services=non_converged
+        )
+        d = status_not_converged.to_dict()
+        self.assertIn('nonConvergedServices', d)
+        self.assertEqual(d['nonConvergedServices'], non_converged)
+
+    def test_wait_for_convergence_error_message_contains_non_converged_services(self):
+        """Test that the timeout error message includes non-converged service details."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = convergence_response
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError) as ctx:
+                self.vespa_client.wait_for_application_convergence(timeout=1)
+
+        error_msg = str(ctx.exception)
+        self.assertIn('node2', error_msg)
+        self.assertIn('wantedGeneration', error_msg)
+        self.assertIn("'converged': False", error_msg)
+
+
 if __name__ == '__main__':
     unittest.main()

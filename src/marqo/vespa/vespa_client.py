@@ -41,10 +41,22 @@ class VespaClient:
     }
 
     class _ConvergenceStatus:
-        def __init__(self, current_generation: int, wanted_generation: int, converged: bool):
+        def __init__(self, current_generation: int, wanted_generation: int, converged: bool,
+                     non_converged_services: List[Dict[str, Any]] = None):
             self.current_generation = current_generation
             self.wanted_generation = wanted_generation
             self.converged = converged
+            self.non_converged_services = non_converged_services or []
+
+        def to_dict(self) -> Dict[str, Any]:
+            result = {
+                'currentGeneration': self.current_generation,
+                'wantedGeneration': self.wanted_generation,
+                'converged': self.converged,
+            }
+            if self.non_converged_services:
+                result['nonConvergedServices'] = self.non_converged_services
+            return result
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
                  content_cluster_name: str, default_search_timeout_ms: int = 1000,
@@ -210,8 +222,11 @@ class VespaClient:
             except (httpx.TimeoutException, httpcore.TimeoutException):
                 logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
 
-        raise VespaNotConvergedError(f"Vespa application did not converge within {timeout} seconds. "
-                                    f"The convergence status is {self._get_convergence_status()}")
+        convergence_status = self._get_convergence_status()
+        raise VespaNotConvergedError(
+            f"Vespa application did not converge within {timeout} seconds. "
+            f"The convergence status is {convergence_status.to_dict()}"
+        )
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
@@ -785,10 +800,22 @@ class VespaClient:
 
         try:
             json = response.json()
+            wanted_generation = json['wantedGeneration']
+            non_converged_services = [
+                {
+                    'host': svc.get('host'),
+                    'port': svc.get('port'),
+                    'type': svc.get('type'),
+                    'currentGeneration': svc.get('currentGeneration'),
+                }
+                for svc in json.get('services', [])
+                if svc.get('currentGeneration') != wanted_generation
+            ]
             return self._ConvergenceStatus(
                 current_generation=json['currentGeneration'],
-                wanted_generation=json['wantedGeneration'],
-                converged=json['converged']
+                wanted_generation=wanted_generation,
+                converged=json['converged'],
+                non_converged_services=non_converged_services,
             )
 
         except (JSONDecodeError, KeyError) as e:
