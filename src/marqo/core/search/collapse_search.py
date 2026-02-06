@@ -248,8 +248,7 @@ class CollapseSearch:
         """Check if the sorted variant is strictly better than the relevance hit based on the sort field value.
 
         Returns True if the sorted variant's sort value is strictly lower (for asc) or strictly higher (for desc)
-        than the relevance hit's sort value. Returns True if the values cannot be compared (e.g., missing field),
-        to preserve the original replacement behavior for non-tie cases.
+        than the relevance hit's sort value.
 
         Consider the special case that always_fetch_variants is True,
         in which we will fetch the sort_by variants even if the sort_by field value in relevance
