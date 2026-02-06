@@ -48,8 +48,7 @@ class Document:
 
         if isinstance(marqo_index, StructuredMarqoIndex):
             add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,
-                                                             self.inference,
-                                                             convergence_timeout_seconds=self.convergence_timeout_seconds)
+                                                             self.inference)
         elif isinstance(marqo_index, SemiStructuredMarqoIndex):
             add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
                                                                  self.vespa_client, self.index_management,
@@ -57,8 +56,7 @@ class Document:
                                                                  convergence_timeout_seconds=self.convergence_timeout_seconds)
         elif isinstance(marqo_index, UnstructuredMarqoIndex):
             add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,
-                                                               self.inference,
-                                                               convergence_timeout_seconds=self.convergence_timeout_seconds)
+                                                               self.inference)
         else:
             raise InternalError(f"Unknown index type {type(marqo_index)}")
 

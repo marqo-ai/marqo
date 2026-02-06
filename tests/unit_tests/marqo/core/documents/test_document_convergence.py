@@ -83,11 +83,17 @@ class TestDocumentConvergence(MarqoTestCase):
                 timeout=custom_timeout
             )
 
-    def test_add_documents_passes_convergence_timeout_to_handler(self):
-        """Verify convergence timeout is passed to the handler constructor."""
-        self.mock_index_management.get_index.return_value = self._make_structured_index("test_index")
+    def test_add_documents_passes_convergence_timeout_to_semi_structured_handler(self):
+        """Verify convergence timeout is passed to the SemiStructuredAddDocumentsHandler constructor."""
+        marqo_index = self.semi_structured_marqo_index(
+            name="test_index",
+            tensor_field_names=[],
+            lexical_field_names=[],
+            string_array_field_names=[]
+        )
+        self.mock_index_management.get_index.return_value = marqo_index
 
-        with patch('marqo.core.document.document.StructuredAddDocumentsHandler') as mock_handler_cls:
+        with patch('marqo.core.document.document.SemiStructuredAddDocumentsHandler') as mock_handler_cls:
             mock_handler = Mock()
             mock_handler.add_documents.return_value = Mock()
             mock_handler_cls.return_value = mock_handler

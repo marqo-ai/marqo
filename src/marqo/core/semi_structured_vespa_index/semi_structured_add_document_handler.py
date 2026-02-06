@@ -37,8 +37,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                  vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
                  field_count_config=SemiStructuredFieldCountConfig(),
                  convergence_timeout_seconds: int = 120):
-        super().__init__(marqo_index, add_docs_params, vespa_client, inference,
-                         convergence_timeout_seconds=convergence_timeout_seconds)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
+        self.convergence_timeout_seconds = convergence_timeout_seconds
         self.index_management = index_management
         self.marqo_index = marqo_index
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)
